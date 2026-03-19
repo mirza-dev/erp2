@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useMemo, ReactNode } from "react";
 import { mockCustomers, mockProducts, mockOrders, mockUretimKayitlari, mockOrderDetails } from "./mock-data";
 import type { Customer, Product, Order, OrderDetail, OrderLineItem, UretimKaydi } from "./mock-data";
 import { mapOrderToInvoice, sendInvoiceToParasut } from "./parasut";
@@ -40,6 +40,7 @@ interface DataContextValue {
     deleteUretimKaydi: (id: string) => void;
     addOrder: (detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">) => string;
     updateOrderStatus: (orderId: string, newStatus: OrderStatus) => Promise<UpdateStatusResult>;
+    reorderSuggestions: Product[];
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -240,6 +241,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return { ok: true };
     };
 
+    // --- Reorder suggestions ---
+    const reorderSuggestions = useMemo(
+        () => products.filter(p => p.isActive && p.availableStock < p.minStockLevel),
+        [products],
+    );
+
     return (
         <DataContext.Provider value={{
             customers, products, orders, orderDetails, uretimKayitlari,
@@ -247,6 +254,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             addCustomer, updateCustomer,
             addUretimKaydi, deleteUretimKaydi,
             addOrder, updateOrderStatus,
+            reorderSuggestions,
         }}>
             {children}
         </DataContext.Provider>

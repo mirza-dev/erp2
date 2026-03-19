@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useData } from "@/lib/data-context";
 
 interface NavItem {
     label: string;
@@ -14,45 +15,48 @@ interface NavGroup {
     items: NavItem[];
 }
 
-const navGroups: NavGroup[] = [
-    {
-        label: "Operasyon",
-        items: [
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Siparişler", href: "/dashboard/orders", count: 12 },
-            { label: "Stok & Ürünler", href: "/dashboard/products" },
-        ],
-    },
-    {
-        label: "Üretim",
-        items: [
-            { label: "Üretim Girişi", href: "/dashboard/production" },
-        ],
-    },
-    {
-        label: "Otomasyon",
-        items: [
-            { label: "AI İçeri Aktar", href: "/dashboard/import" },
-            { label: "Üretim Uyarıları", href: "/dashboard/alerts", count: 3 },
-        ],
-    },
-    {
-        label: "Muhasebe",
-        items: [
-            { label: "Paraşüt Sync", href: "/dashboard/parasut" },
-            { label: "Cariler", href: "/dashboard/customers" },
-        ],
-    },
-    {
-        label: "Sistem",
-        items: [
-            { label: "Ayarlar", href: "/dashboard/settings" },
-        ],
-    },
-];
-
 export default function Sidebar() {
     const pathname = usePathname();
+    const { reorderSuggestions } = useData();
+    const reorderCount = reorderSuggestions.length;
+
+    const navGroups: NavGroup[] = [
+        {
+            label: "Operasyon",
+            items: [
+                { label: "Dashboard", href: "/dashboard" },
+                { label: "Siparişler", href: "/dashboard/orders", count: 12 },
+                { label: "Stok & Ürünler", href: "/dashboard/products" },
+                { label: "Satın Alma Önerileri", href: "/dashboard/purchase/suggested", count: reorderCount || undefined },
+            ],
+        },
+        {
+            label: "Üretim",
+            items: [
+                { label: "Üretim Girişi", href: "/dashboard/production" },
+            ],
+        },
+        {
+            label: "Otomasyon",
+            items: [
+                { label: "AI İçeri Aktar", href: "/dashboard/import" },
+                { label: "Üretim Uyarıları", href: "/dashboard/alerts", count: 3 },
+            ],
+        },
+        {
+            label: "Muhasebe",
+            items: [
+                { label: "Paraşüt Sync", href: "/dashboard/parasut" },
+                { label: "Cariler", href: "/dashboard/customers" },
+            ],
+        },
+        {
+            label: "Sistem",
+            items: [
+                { label: "Ayarlar", href: "/dashboard/settings" },
+            ],
+        },
+    ];
 
     const isActive = (href: string) =>
         href === "/dashboard"
