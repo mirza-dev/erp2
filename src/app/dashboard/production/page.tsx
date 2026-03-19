@@ -135,8 +135,8 @@ export default function ProductionPage() {
 
     // ── Voice input ─────────────────────────────────────────────────────────
     const startListening = () => {
-        const SpeechRec = (window as Window & { SpeechRecognition?: typeof SpeechRecognition; webkitSpeechRecognition?: typeof SpeechRecognition }).SpeechRecognition
-            || (window as Window & { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
         if (!SpeechRec) {
             setVoiceError("Bu tarayıcı sesli girişi desteklemiyor (Chrome kullanın)");
