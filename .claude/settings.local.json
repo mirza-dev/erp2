@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/mirzasaribiyik/Downloads/**)",
+      "Bash(xargs:*)",
+      "mcp__magic__21st_magic_component_inspiration",
+      "Bash(npm run build:*)",
+      "Bash(lsof:*)",
+      "Bash(pkill:*)",
+      "Read(//private/tmp/**)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(test:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(npx tsc:*)",
+      "Read(//Users/mirzasaribiyik/**)",
+      "Bash(/Users/mirzasaribiyik/Desktop/erp2/src/app/dashboard/layout.tsx:*)",
+      "Bash(/tmp/test_erp.py:*)",
+      "Bash(/tmp/test_reservation.py:*)",
+      "Bash(open:*)",
+      "Bash(/tmp/recon_selectors.py:*)",
+      "Bash(/tmp/recon2.py:*)",
+      "Bash(/tmp/recon3.py:*)",
+      "Bash(/tmp/recon4.py:*)",
+      "Bash(/tmp/recon5.py:*)",
+      "Bash(git remote get-url:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git -c core.fsmonitor=false add src package.json package-lock.json next.config.ts tsconfig.json .gitignore)",
+      "Bash(git -c core.fsmonitor=false -c core.untrackedCache=false add src package.json package-lock.json next.config.ts tsconfig.json .gitignore)"
+    ],
+    "additionalDirectories": [
+      "/Users/mirzasaribiyik/Desktop/erp2/src/app/dashboard/orders",
+      "/tmp",
+      "/private/tmp",
+      "/Users/mirzasaribiyik/Desktop/erp2",
+      "/Users/mirzasaribiyik/Desktop/erp2/.git"
+    ]
+  }
+}

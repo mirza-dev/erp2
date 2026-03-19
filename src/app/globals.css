@@ -1,26 +1,198 @@
 @import "tailwindcss";
 
+/* ============================================
+   AI-ERP KokpitERP — Minimal Enterprise Design
+   Light, clean, 0.5px borders, small fonts
+   ============================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Layout */
+  --sidebar-width: 200px;
+  --topbar-height: 52px;
+
+  /* Background — koyu gri/siyah */
+  --bg-primary: #1a1d23;
+  --bg-secondary: #131518;
+  --bg-tertiary: #22252c;
+
+  /* Text — parlak, rahat okunur */
+  --text-primary: #e6edf3;
+  --text-secondary: #9ca3b0;
+  --text-tertiary: #636d7c;
+
+  /* Borders — belirgin çizgiler */
+  --border-primary: #444c56;
+  --border-secondary: #373e47;
+  --border-tertiary: #2d333b;
+
+  /* Accent — elektrik mavisi, patlayan */
+  --accent: #58a6ff;
+  --accent-bg: rgba(56, 139, 253, 0.15);
+  --accent-border: #388bfd;
+  --accent-text: #58a6ff;
+
+  /* Success — canlı yeşil */
+  --success: #3fb950;
+  --success-bg: rgba(63, 185, 80, 0.15);
+  --success-border: #2ea043;
+  --success-text: #3fb950;
+
+  /* Warning — canlı turuncu */
+  --warning: #d29922;
+  --warning-bg: rgba(210, 153, 34, 0.15);
+  --warning-border: #bb8009;
+  --warning-text: #d29922;
+
+  /* Danger — canlı kırmızı */
+  --danger: #f85149;
+  --danger-bg: rgba(248, 81, 73, 0.15);
+  --danger-border: #da3633;
+  --danger-text: #f85149;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  /* Shadows — minimal */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--bg-secondary);
+  --color-foreground: var(--text-primary);
+  --color-primary: var(--text-primary);
+  --color-primary-light: var(--bg-secondary);
+  --color-primary-foreground: #ffffff;
+  --color-accent: var(--accent);
+  --color-accent-hover: #79c0ff;
+  --color-accent-light: var(--accent-bg);
+  --color-accent-dark: #388bfd;
+  --color-accent-foreground: #ffffff;
+  --color-success: var(--success);
+  --color-success-light: var(--success-bg);
+  --color-warning: var(--warning);
+  --color-warning-light: var(--warning-bg);
+  --color-danger: var(--danger);
+  --color-danger-light: var(--danger-bg);
+  --color-info: var(--accent);
+  --color-info-light: var(--accent-bg);
+  --color-card: var(--bg-primary);
+  --color-card-foreground: var(--text-primary);
+  --color-muted: var(--bg-secondary);
+  --color-muted-foreground: var(--text-secondary);
+  --color-border: var(--border-tertiary);
+  --color-border-strong: var(--border-primary);
+  --color-sidebar-bg: var(--bg-primary);
+  --color-sidebar-text: var(--text-secondary);
+  --color-sidebar-accent: var(--accent);
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), 'Courier New', monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ============================================
+   Global Reset
+   ============================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+/* ============================================
+   Scrollbar — minimal
+   ============================================ */
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 100px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* ============================================
+   Animations — minimal
+   ============================================ */
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.2s ease-out;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* ============================================
+   Status Badges — compact, 10px
+   ============================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.badge-success { background: var(--success-bg); color: var(--success-text); }
+.badge-warning { background: var(--warning-bg); color: var(--warning-text); }
+.badge-danger  { background: var(--danger-bg);  color: var(--danger-text); }
+.badge-info    { background: var(--accent-bg);   color: var(--accent-text); }
+.badge-neutral { background: var(--bg-tertiary); color: var(--text-secondary); }
+.badge-accent  { background: var(--accent-bg);   color: var(--accent-text); }
+
+/* ============================================
+   Thin borders utility
+   ============================================ */
+
+.border-thin {
+  border-width: 0.5px;
 }
