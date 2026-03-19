@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useData } from "@/lib/data-context";
+import { formatCurrency } from "@/lib/utils";
 
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
@@ -53,6 +55,11 @@ const tdStyle: React.CSSProperties = {
 };
 
 export default function ParasutPage() {
+    const { orderDetails } = useData();
+    const syncedOrders = orderDetails
+        .filter(o => o.parasutInvoiceId && o.parasutSentAt)
+        .sort((a, b) => new Date(b.parasutSentAt!).getTime() - new Date(a.parasutSentAt!).getTime());
+
     const [connection, setConnection] = useState<ConnectionStatus>("connected");
     const [showCredentials, setShowCredentials] = useState(false);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
@@ -306,6 +313,78 @@ export default function ParasutPage() {
                             </div>
                         </div>
                     ))}
+                </div>
+
+                {/* C — Son Faturalar (otomatik gönderilen) */}
+                <div
+                    style={{
+                        background: "var(--bg-secondary)",
+                        border: "0.5px solid var(--border-tertiary)",
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                    }}
+                >
+                    <div
+                        style={{
+                            padding: "12px 16px",
+                            borderBottom: "0.5px solid var(--border-tertiary)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                        }}
+                    >
+                        <div style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-secondary)" }}>
+                            Son Faturalar
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                            Otomatik gönderilen · {syncedOrders.length} fatura
+                        </div>
+                    </div>
+
+                    {syncedOrders.length === 0 ? (
+                        <div style={{ padding: "20px 16px", fontSize: "12px", color: "var(--text-tertiary)", textAlign: "center" }}>
+                            Henüz otomatik gönderilen fatura yok. Bir sipariş &quot;Sevk Edildi&quot; durumuna geçince buraya eklenir.
+                        </div>
+                    ) : (
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead>
+                                <tr>
+                                    <th style={thStyle}>Fatura No</th>
+                                    <th style={thStyle}>Sipariş No</th>
+                                    <th style={thStyle}>Müşteri</th>
+                                    <th style={{ ...thStyle, textAlign: "right" }}>Tutar</th>
+                                    <th style={{ ...thStyle, textAlign: "right" }}>Döviz</th>
+                                    <th style={{ ...thStyle, textAlign: "right" }}>Gönderim</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {syncedOrders.map(order => (
+                                    <tr key={order.id}>
+                                        <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: "12px", color: "var(--accent-text)" }}>
+                                            {order.parasutInvoiceId}
+                                        </td>
+                                        <td style={{ ...tdStyle, fontSize: "12px", color: "var(--text-secondary)" }}>
+                                            {order.orderNumber}
+                                        </td>
+                                        <td style={{ ...tdStyle, fontSize: "12px" }}>
+                                            {order.customerName}
+                                        </td>
+                                        <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", fontWeight: 500 }}>
+                                            {formatCurrency(order.grandTotal, order.currency)}
+                                        </td>
+                                        <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", color: "var(--text-tertiary)" }}>
+                                            {order.currency}
+                                        </td>
+                                        <td style={{ ...tdStyle, textAlign: "right" }}>
+                                            <span style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
+                                                {formatDateTime(order.parasutSentAt!)}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
 
                 {/* D — Sync Log Table */}

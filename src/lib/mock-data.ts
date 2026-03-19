@@ -77,6 +77,9 @@ export interface OrderDetail extends Order {
     subtotal: number;
     vatTotal: number;
     notes: string;
+    parasutInvoiceId?: string;
+    parasutSentAt?: string;
+    parasutError?: string;
     lines: OrderLineItem[];
 }
 
@@ -426,6 +429,8 @@ export const mockOrderDetails: OrderDetail[] = [
         vatTotal: 15334,
         grandTotal: 92000,
         notes: "İzmit Rafineri bakım dönemi. Acil teslimat.",
+        parasutInvoiceId: "F-2026-0041",
+        parasutSentAt: "2026-03-12T09:15:00.000Z",
         lines: [
             { id: "l4", productId: "7", productName: "Y Tipi Filtre DN100", productSku: "FT-Y-DN100", unit: "adet", quantity: 50, unitPrice: 580, discountPct: 0, lineTotal: 29000 },
             { id: "l5", productId: "6", productName: "PTFE Conta DN50", productSku: "CT-PTFE-DN50", unit: "adet", quantity: 1000, unitPrice: 28, discountPct: 10, lineTotal: 25200 },
@@ -493,6 +498,8 @@ export const mockOrderDetails: OrderDetail[] = [
         vatTotal: 24167,
         grandTotal: 145000,
         notes: "Macaristan ve Hırvatistan tesisleri. İki ayrı sevkiyat.",
+        parasutInvoiceId: "F-2026-0038",
+        parasutSentAt: "2026-03-05T14:22:00.000Z",
         lines: [
             { id: "l11", productId: "3", productName: "API Forged Sürgülü Vana DN100", productSku: "SV-API-DN100", unit: "adet", quantity: 60, unitPrice: 1250, discountPct: 5, lineTotal: 71250 },
             { id: "l12", productId: "9", productName: "Çift Klapeli Çek Valf DN200", productSku: "CV-CK-DN200", unit: "adet", quantity: 20, unitPrice: 1850, discountPct: 0, lineTotal: 37000 },

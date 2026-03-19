@@ -46,6 +46,17 @@ export default function OrderDetailPage() {
     const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
     const [loading, setLoading] = useState<string | null>(null);
 
+    type ParasutStatus = "idle" | "sending" | "sent" | "error";
+    const [parasutStatus, setParasutStatus] = useState<ParasutStatus>(
+        order?.parasutInvoiceId ? "sent" : "idle"
+    );
+    const [parasutInvoiceId, setParasutInvoiceId] = useState<string | null>(
+        order?.parasutInvoiceId ?? null
+    );
+    const [parasutError, setParasutError] = useState<string | null>(
+        order?.parasutError ?? null
+    );
+
     if (!order) {
         return (
             <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
@@ -57,10 +68,33 @@ export default function OrderDetailPage() {
         );
     }
 
-    const handleTransition = (next: OrderStatus) => {
+    const handleTransition = async (next: OrderStatus) => {
         setLoading(next);
-        setTimeout(() => {
-            const result = updateOrderStatus(order!.id, next);
+
+        if (next === "SHIPPED") {
+            setParasutStatus("sending");
+            const result = await updateOrderStatus(order!.id, next);
+            if (result.ok) {
+                setStatus("SHIPPED");
+                if (result.parasutSync && result.parasutSync.success) {
+                    setParasutStatus("sent");
+                    setParasutInvoiceId((result.parasutSync as { success: true; invoiceId: string }).invoiceId);
+                } else {
+                    setParasutStatus("error");
+                    setParasutError(
+                        result.parasutSync && !result.parasutSync.success
+                            ? result.parasutSync.error
+                            : "Bilinmeyen hata"
+                    );
+                }
+            }
+            setLoading(null);
+            return;
+        }
+
+        // Diğer geçişler: mevcut 600ms simülasyon korunur
+        setTimeout(async () => {
+            const result = await updateOrderStatus(order!.id, next);
             if (!result.ok && result.conflicts) {
                 setConflicts(result.conflicts);
                 setConflictOpen(true);
@@ -161,7 +195,7 @@ export default function OrderDetailPage() {
                                     disabled={loading !== null}
                                     style={accentBtn(loading === "SHIPPED")}
                                 >
-                                    {loading === "SHIPPED" ? "İşleniyor..." : "Sevket"}
+                                    {loading === "SHIPPED" ? "Paraşüt'e gönderiliyor..." : "Sevket"}
                                 </button>
                             </>
                         )}
@@ -365,6 +399,20 @@ export default function OrderDetailPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {/* Paraşüt Muhasebe Sync */}
+                            {status === "SHIPPED" && (
+                                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid var(--border-tertiary)" }}>
+                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                        Muhasebe Sync
+                                    </div>
+                                    <ParasutBadge
+                                        status={parasutStatus}
+                                        invoiceId={parasutInvoiceId}
+                                        error={parasutError}
+                                    />
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -515,4 +563,81 @@ function dangerBtn(loading: boolean): React.CSSProperties {
         cursor: loading ? "wait" : "pointer",
         opacity: loading ? 0.7 : 1,
     };
+}
+
+function ParasutBadge({
+    status,
+    invoiceId,
+    error,
+}: {
+    status: "idle" | "sending" | "sent" | "error";
+    invoiceId: string | null;
+    error: string | null;
+}) {
+    if (status === "idle") return null;
+
+    if (status === "sending") {
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "7px",
+                    padding: "7px 10px",
+                    background: "var(--warning-bg)",
+                    border: "0.5px solid var(--warning-border)",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    color: "var(--warning-text)",
+                }}
+            >
+                <div
+                    style={{
+                        width: "6px",
+                        height: "6px",
+                        borderRadius: "50%",
+                        background: "var(--warning)",
+                        flexShrink: 0,
+                    }}
+                />
+                Paraşüt&apos;e gönderiliyor...
+            </div>
+        );
+    }
+
+    if (status === "sent") {
+        return (
+            <div
+                style={{
+                    padding: "7px 10px",
+                    background: "var(--success-bg)",
+                    border: "0.5px solid var(--success-border)",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    color: "var(--success-text)",
+                    fontWeight: 500,
+                }}
+            >
+                Fatura {invoiceId} Paraşüt&apos;e gönderildi
+            </div>
+        );
+    }
+
+    return (
+        <div
+            style={{
+                padding: "7px 10px",
+                background: "var(--danger-bg)",
+                border: "0.5px solid var(--danger-border)",
+                borderRadius: "6px",
+            }}
+        >
+            <div style={{ fontSize: "12px", color: "var(--danger-text)", fontWeight: 500, marginBottom: "2px" }}>
+                Paraşüt&apos;e gönderilemedi
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--danger-text)", opacity: 0.8 }}>
+                {error}
+            </div>
+        </div>
+    );
 }

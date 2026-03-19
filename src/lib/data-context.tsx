@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, ReactNode } from "react";
 import { mockCustomers, mockProducts, mockOrders, mockUretimKayitlari, mockOrderDetails } from "./mock-data";
 import type { Customer, Product, Order, OrderDetail, OrderLineItem, UretimKaydi } from "./mock-data";
+import { mapOrderToInvoice, sendInvoiceToParasut } from "./parasut";
+import type { ParasutSyncResult } from "./parasut";
 
 type OrderStatus = "DRAFT" | "PENDING" | "APPROVED" | "SHIPPED" | "CANCELLED";
 
@@ -21,6 +23,7 @@ export interface ConflictItem {
 export interface UpdateStatusResult {
     ok: boolean;
     conflicts?: ConflictItem[];
+    parasutSync?: ParasutSyncResult;
 }
 
 interface DataContextValue {
@@ -36,7 +39,7 @@ interface DataContextValue {
     addUretimKaydi: (k: Omit<UretimKaydi, "id">) => void;
     deleteUretimKaydi: (id: string) => void;
     addOrder: (detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">) => string;
-    updateOrderStatus: (orderId: string, newStatus: OrderStatus) => UpdateStatusResult;
+    updateOrderStatus: (orderId: string, newStatus: OrderStatus) => Promise<UpdateStatusResult>;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -165,7 +168,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         return id;
     };
 
-    const updateOrderStatus = (orderId: string, newStatus: OrderStatus): UpdateStatusResult => {
+    const updateOrderStatus = async (orderId: string, newStatus: OrderStatus): Promise<UpdateStatusResult> => {
         const order = orderDetails.find(o => o.id === orderId);
         if (!order) return { ok: false };
         const prevStatus = order.status;
@@ -196,7 +199,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             releaseStock(order.lines);
         }
 
-        // SHIPPED: deduct physical stock
+        // SHIPPED: stok düş + Paraşüt'e otomatik fatura gönder
         if (newStatus === "SHIPPED" && prevStatus === "APPROVED") {
             setProducts(prev => prev.map(p => {
                 const line = order.lines.find(l => l.productId === p.id);
@@ -207,9 +210,31 @@ export function DataProvider({ children }: { children: ReactNode }) {
                     allocatedStock: Math.max(0, p.allocatedStock - line.quantity),
                 };
             }));
+
+            // Durumu hemen güncelle — UI donmasın
+            setOrderDetails(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+
+            // Paraşüt'e async gönder
+            const payload = mapOrderToInvoice({ ...order, status: newStatus });
+            const syncResult = await sendInvoiceToParasut(payload);
+
+            if (syncResult.success) {
+                setOrderDetails(prev => prev.map(o =>
+                    o.id === orderId
+                        ? { ...o, parasutInvoiceId: syncResult.invoiceId, parasutSentAt: syncResult.sentAt, parasutError: undefined }
+                        : o
+                ));
+            } else {
+                setOrderDetails(prev => prev.map(o =>
+                    o.id === orderId ? { ...o, parasutError: syncResult.error } : o
+                ));
+            }
+
+            return { ok: true, parasutSync: syncResult };
         }
 
-        // Update order status in both lists
+        // Diğer geçişler: sadece durumu güncelle
         setOrderDetails(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
         setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
         return { ok: true };
