@@ -151,7 +151,8 @@ export default function ProductionPage() {
         rec.onstart = () => { setListening(true); setVoiceError(""); setVoiceText(""); };
         rec.onend = () => setListening(false);
         rec.onerror = () => { setListening(false); setVoiceError("Ses tanınamadı, tekrar deneyin"); };
-        rec.onresult = (e) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        rec.onresult = (e: any) => {
             const transcript = e.results[0][0].transcript;
             setVoiceText(transcript);
             const parsed = parseVoice(transcript, products);
