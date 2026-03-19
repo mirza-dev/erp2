@@ -18,14 +18,14 @@ const IMPORTED_CUSTOMERS: Customer[] = [
 ];
 
 const IMPORTED_PRODUCTS: Product[] = [
-    { id: "imp-p1", name: "Glob Vana Hijyenik", sku: "ENDVAN-001", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 278.48, currency: "USD", totalStock: 81, allocatedStock: 6, availableStock: 75, minStockLevel: 31, isActive: true },
-    { id: "imp-p2", name: "Glob Vana Paslanmaz", sku: "ENDVAN-002", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 249.42, currency: "USD", totalStock: 81, allocatedStock: 5, availableStock: 76, minStockLevel: 30, isActive: true },
-    { id: "imp-p3", name: "Sürgülü Vana ANSI 150", sku: "ENDVAN-003", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 1400.97, currency: "USD", totalStock: 123, allocatedStock: 32, availableStock: 91, minStockLevel: 26, isActive: true },
-    { id: "imp-p4", name: "Sürgülü Vana PN16", sku: "ENDVAN-004", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 290.69, currency: "USD", totalStock: 78, allocatedStock: 3, availableStock: 75, minStockLevel: 19, isActive: true },
-    { id: "imp-p5", name: "Flanş Set ISO", sku: "FLAIZO-008", category: "Flanş Aksesuarları", unit: "set", price: 138.23, currency: "USD", totalStock: 210, allocatedStock: 52, availableStock: 158, minStockLevel: 50, isActive: true },
-    { id: "imp-p6", name: "Kelebek Vana DN80", sku: "ENDVAN-017", category: "Kelebek Vanalar", unit: "adet", price: 737.80, currency: "USD", totalStock: 44, allocatedStock: 8, availableStock: 36, minStockLevel: 15, isActive: true },
-    { id: "imp-p7", name: "Küresel Vana PN40", sku: "ENDVAN-021", category: "Küresel Vanalar", unit: "adet", price: 984.20, currency: "USD", totalStock: 60, allocatedStock: 10, availableStock: 50, minStockLevel: 20, isActive: true },
-    { id: "imp-p8", name: "Kelebek Vana Büyük", sku: "KAR-007", category: "Kelebek Vanalar", unit: "adet", price: 12949.46, currency: "USD", totalStock: 12, allocatedStock: 3, availableStock: 9, minStockLevel: 5, isActive: true },
+    { id: "imp-p1", name: "Glob Vana Hijyenik", sku: "ENDVAN-001", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 278.48, currency: "USD", totalStock: 81, allocatedStock: 6, availableStock: 75, minStockLevel: 31, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
+    { id: "imp-p2", name: "Glob Vana Paslanmaz", sku: "ENDVAN-002", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 249.42, currency: "USD", totalStock: 81, allocatedStock: 5, availableStock: 76, minStockLevel: 30, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
+    { id: "imp-p3", name: "Sürgülü Vana ANSI 150", sku: "ENDVAN-003", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 1400.97, currency: "USD", totalStock: 123, allocatedStock: 32, availableStock: 91, minStockLevel: 26, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
+    { id: "imp-p4", name: "Sürgülü Vana PN16", sku: "ENDVAN-004", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 290.69, currency: "USD", totalStock: 78, allocatedStock: 3, availableStock: 75, minStockLevel: 19, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
+    { id: "imp-p5", name: "Flanş Set ISO", sku: "FLAIZO-008", category: "Flanş Aksesuarları", unit: "set", price: 138.23, currency: "USD", totalStock: 210, allocatedStock: 52, availableStock: 158, minStockLevel: 50, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
+    { id: "imp-p6", name: "Kelebek Vana DN80", sku: "ENDVAN-017", category: "Kelebek Vanalar", unit: "adet", price: 737.80, currency: "USD", totalStock: 44, allocatedStock: 8, availableStock: 36, minStockLevel: 15, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
+    { id: "imp-p7", name: "Küresel Vana PN40", sku: "ENDVAN-021", category: "Küresel Vanalar", unit: "adet", price: 984.20, currency: "USD", totalStock: 60, allocatedStock: 10, availableStock: 50, minStockLevel: 20, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
+    { id: "imp-p8", name: "Kelebek Vana Büyük", sku: "KAR-007", category: "Kelebek Vanalar", unit: "adet", price: 12949.46, currency: "USD", totalStock: 12, allocatedStock: 3, availableStock: 9, minStockLevel: 5, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
 ];
 
 const IMPORTED_ORDERS: Order[] = [
