@@ -98,7 +98,8 @@ export default function ProductionPage() {
     const [listening, setListening] = useState(false);
     const [voiceText, setVoiceText] = useState("");
     const [voiceError, setVoiceError] = useState("");
-    const recognitionRef = useRef<SpeechRecognition | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recognitionRef = useRef<any>(null);
 
     const todayStr = today();
     const todayLogs = uretimKayitlari.filter(k => k.tarih === todayStr);
