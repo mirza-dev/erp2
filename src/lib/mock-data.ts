@@ -30,6 +30,7 @@ export interface Product {
     warehouse: string;
     reorderQty?: number;
     preferredVendor?: string;
+    dailyUsage?: number;
 }
 
 export interface Customer {
@@ -155,6 +156,7 @@ export const mockProducts: Product[] = [
         productType: "finished",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 100,
+        dailyUsage: 3,
     },
     {
         id: "5",
@@ -240,6 +242,7 @@ export const mockProducts: Product[] = [
         productType: "finished",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 30,
+        dailyUsage: 2,
     },
     {
         id: "10",
@@ -276,6 +279,7 @@ export const mockProducts: Product[] = [
         warehouse: "Fabrika Deposu",
         reorderQty: 1000,
         preferredVendor: "Döktaş Dökümcülük",
+        dailyUsage: 25,
     },
     {
         id: "rm-2",
@@ -294,6 +298,7 @@ export const mockProducts: Product[] = [
         warehouse: "Fabrika Deposu",
         reorderQty: 5000,
         preferredVendor: "Garlock Türkiye",
+        dailyUsage: 80,
     },
     {
         id: "rm-3",
@@ -330,6 +335,7 @@ export const mockProducts: Product[] = [
         warehouse: "Fabrika Deposu",
         reorderQty: 3000,
         preferredVendor: "Norm Civata",
+        dailyUsage: 40,
     },
     {
         id: "rm-5",
@@ -348,6 +354,7 @@ export const mockProducts: Product[] = [
         warehouse: "Fabrika Deposu",
         reorderQty: 200,
         preferredVendor: "Tüpraş Flanş",
+        dailyUsage: 8,
     },
 ];
 
