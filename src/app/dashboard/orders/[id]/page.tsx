@@ -48,6 +48,16 @@ export default function OrderDetailPage() {
     const [conflictOpen, setConflictOpen] = useState(false);
     const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
     const [loading, setLoading] = useState<string | null>(null);
+    const [justTransitioned, setJustTransitioned] = useState<OrderStatus | null>(null);
+
+    // Confirmation dialog state
+    const [confirmDialog, setConfirmDialog] = useState<{
+        action: OrderStatus;
+        title: string;
+        message: string;
+        confirmLabel: string;
+        variant: "primary" | "danger";
+    } | null>(null);
 
     type ParasutStatus = "idle" | "sending" | "sent" | "error";
     const [parasutStatus, setParasutStatus] = useState<ParasutStatus>(
@@ -79,6 +89,8 @@ export default function OrderDetailPage() {
             const result = await updateOrderStatus(order!.id, next);
             if (result.ok) {
                 setStatus("SHIPPED");
+                setJustTransitioned("SHIPPED");
+                setTimeout(() => setJustTransitioned(null), 1500);
                 toast({ type: "success", message: "Sipariş sevk edildi" });
                 if (result.parasutSync && result.parasutSync.success) {
                     setParasutStatus("sent");
@@ -107,6 +119,8 @@ export default function OrderDetailPage() {
                 toast({ type: "error", message: "Stok yetersiz — sipariş onaylanamadı" });
             } else if (result.ok) {
                 setStatus(next);
+                setJustTransitioned(next);
+                setTimeout(() => setJustTransitioned(null), 1500);
                 const labels: Record<string, string> = {
                     PENDING: "Sipariş onaya gönderildi",
                     APPROVED: "Sipariş onaylandı",
@@ -116,6 +130,28 @@ export default function OrderDetailPage() {
             }
             setLoading(null);
         }, 600);
+    };
+
+    const requestTransition = (next: OrderStatus) => {
+        if (next === "CANCELLED") {
+            setConfirmDialog({
+                action: "CANCELLED",
+                title: "Siparişi İptal Et",
+                message: `${order.orderNumber} numaralı siparişi iptal etmek istediğinize emin misiniz? Ayrılmış stoklar serbest bırakılır.`,
+                confirmLabel: "Evet, İptal Et",
+                variant: "danger",
+            });
+        } else if (next === "APPROVED") {
+            setConfirmDialog({
+                action: "APPROVED",
+                title: "Siparişi Onayla",
+                message: `${order.orderNumber} numaralı siparişi onaylamak istediğinize emin misiniz? Stok kontrolleri yapılacak.`,
+                confirmLabel: "Onayla",
+                variant: "primary",
+            });
+        } else {
+            handleTransition(next);
+        }
     };
 
     const cfg = statusConfig[status];
@@ -153,14 +189,16 @@ export default function OrderDetailPage() {
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                             {order.orderNumber}
                         </div>
-                        <span className={`badge ${cfg.cls}`}>{cfg.label}</span>
+                        <span className={`badge ${cfg.cls}`} style={{ fontSize: "12px", padding: "3px 10px", fontWeight: 700 }}>
+                            {cfg.label}
+                        </span>
                     </div>
 
                     {/* Action buttons by status */}
                     <div style={{ display: "flex", gap: "8px" }}>
                         {status === "DRAFT" && (
                             <>
-                                <Button variant="danger" onClick={() => handleTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
+                                <Button variant="danger" onClick={() => requestTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
                                     İptal Et
                                 </Button>
                                 <Button variant="primary" onClick={() => handleTransition("PENDING")} disabled={loading !== null} loading={loading === "PENDING"}>
@@ -170,17 +208,17 @@ export default function OrderDetailPage() {
                         )}
                         {status === "PENDING" && (
                             <>
-                                <Button variant="danger" onClick={() => handleTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
+                                <Button variant="danger" onClick={() => requestTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => handleTransition("APPROVED")} disabled={loading !== null} loading={loading === "APPROVED"}>
+                                <Button variant="primary" onClick={() => requestTransition("APPROVED")} disabled={loading !== null} loading={loading === "APPROVED"}>
                                     {loading === "APPROVED" ? "Kontrol ediliyor..." : "Onayla"}
                                 </Button>
                             </>
                         )}
                         {status === "APPROVED" && (
                             <>
-                                <Button variant="danger" onClick={() => handleTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
+                                <Button variant="danger" onClick={() => requestTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
                                     İptal Et
                                 </Button>
                                 <Button variant="primary" onClick={() => handleTransition("SHIPPED")} disabled={loading !== null} loading={loading === "SHIPPED"}>
@@ -350,12 +388,13 @@ export default function OrderDetailPage() {
                                     const stepIdx = steps.indexOf(s);
                                     const isDone = stepIdx <= currentIdx && status !== "CANCELLED";
                                     const isCurrent = s === status;
+                                    const isJust = justTransitioned === s;
                                     return (
                                         <div key={s} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: i < 3 ? "6px" : 0 }}>
                                             <div
                                                 style={{
-                                                    width: "6px",
-                                                    height: "6px",
+                                                    width: isJust ? "8px" : "6px",
+                                                    height: isJust ? "8px" : "6px",
                                                     borderRadius: "50%",
                                                     flexShrink: 0,
                                                     background: isCurrent
@@ -363,6 +402,7 @@ export default function OrderDetailPage() {
                                                         : isDone
                                                         ? "var(--success)"
                                                         : "var(--border-primary)",
+                                                    boxShadow: isJust ? "0 0 8px var(--accent)" : "none",
                                                 }}
                                             />
                                             <span
@@ -374,6 +414,9 @@ export default function OrderDetailPage() {
                                                         ? "var(--success-text)"
                                                         : "var(--text-tertiary)",
                                                     fontWeight: isCurrent ? 600 : 400,
+                                                    background: isJust ? "var(--accent-bg)" : "transparent",
+                                                    padding: isJust ? "1px 6px" : "0",
+                                                    borderRadius: "3px",
                                                 }}
                                             >
                                                 {statusConfig[s].label}
@@ -383,8 +426,28 @@ export default function OrderDetailPage() {
                                 })}
                                 {status === "CANCELLED" && (
                                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
-                                        <div style={{ width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0, background: "var(--danger)" }} />
-                                        <span style={{ fontSize: "12px", color: "var(--danger-text)", fontWeight: 600 }}>İptal Edildi</span>
+                                        <div
+                                            style={{
+                                                width: justTransitioned === "CANCELLED" ? "8px" : "6px",
+                                                height: justTransitioned === "CANCELLED" ? "8px" : "6px",
+                                                borderRadius: "50%",
+                                                flexShrink: 0,
+                                                background: "var(--danger)",
+                                                boxShadow: justTransitioned === "CANCELLED" ? "0 0 8px var(--danger)" : "none",
+                                            }}
+                                        />
+                                        <span
+                                            style={{
+                                                fontSize: "12px",
+                                                color: "var(--danger-text)",
+                                                fontWeight: 600,
+                                                background: justTransitioned === "CANCELLED" ? "var(--danger-bg)" : "transparent",
+                                                padding: justTransitioned === "CANCELLED" ? "1px 6px" : "0",
+                                                borderRadius: "3px",
+                                            }}
+                                        >
+                                            İptal Edildi
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -484,6 +547,91 @@ export default function OrderDetailPage() {
                             </Button>
                             <Button variant="primary" onClick={() => setConflictOpen(false)} style={{ flex: 1 }}>
                                 Stoku Yenile
+                            </Button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Confirmation Dialog */}
+            {confirmDialog && (
+                <>
+                    <div
+                        onClick={() => setConfirmDialog(null)}
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            zIndex: 100,
+                            background: "rgba(0,0,0,0.6)",
+                        }}
+                    />
+                    <div
+                        style={{
+                            position: "fixed",
+                            top: "50%",
+                            left: "50%",
+                            transform: "translate(-50%, -50%)",
+                            zIndex: 101,
+                            background: "var(--bg-primary)",
+                            border: `0.5px solid ${confirmDialog.variant === "danger" ? "var(--danger-border)" : "var(--accent-border)"}`,
+                            borderRadius: "8px",
+                            padding: "20px 24px",
+                            width: "380px",
+                            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                        }}
+                    >
+                        {/* Icon + Title */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                            <div
+                                style={{
+                                    width: "22px",
+                                    height: "22px",
+                                    borderRadius: "4px",
+                                    background: confirmDialog.variant === "danger" ? "var(--danger-bg)" : "var(--warning-bg)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                <svg width="10" height="10" viewBox="0 0 10 10">
+                                    <path d="M5 1L9 9H1z" fill={confirmDialog.variant === "danger" ? "var(--danger-text)" : "var(--warning-text)"} />
+                                </svg>
+                            </div>
+                            <div style={{
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                color: confirmDialog.variant === "danger" ? "var(--danger-text)" : "var(--text-primary)",
+                            }}>
+                                {confirmDialog.title}
+                            </div>
+                        </div>
+
+                        {/* Message */}
+                        <div style={{
+                            fontSize: "13px",
+                            color: "var(--text-secondary)",
+                            lineHeight: 1.6,
+                            marginBottom: "16px",
+                        }}>
+                            {confirmDialog.message}
+                        </div>
+
+                        {/* Buttons */}
+                        <div style={{ display: "flex", gap: "8px" }}>
+                            <Button variant="secondary" onClick={() => setConfirmDialog(null)} style={{ flex: 1 }}>
+                                Vazgeç
+                            </Button>
+                            <Button
+                                variant={confirmDialog.variant}
+                                onClick={() => {
+                                    const action = confirmDialog.action;
+                                    setConfirmDialog(null);
+                                    handleTransition(action);
+                                }}
+                                style={{ flex: 1 }}
+                            >
+                                {confirmDialog.confirmLabel}
                             </Button>
                         </div>
                     </div>

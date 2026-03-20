@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/StateViews";
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
     DRAFT:     { label: "Taslak",      cls: "badge-neutral" },
@@ -82,21 +83,27 @@ function OrdersList() {
             </div>
 
             {/* Toolbar */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                {/* Tabs */}
-                <div style={{ display: "flex", gap: "4px" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px" }}>
+                {/* Tabs — bottom border style */}
+                <div style={{ display: "flex", gap: "0px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                     {filterTabs.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             style={{
                                 fontSize: "12px",
-                                padding: "6px 12px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: activeTab === tab.id ? "var(--accent-bg)" : "transparent",
-                                color: activeTab === tab.id ? "var(--accent-text)" : "var(--text-secondary)",
+                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                padding: "8px 14px",
+                                border: "none",
+                                borderBottom: activeTab === tab.id
+                                    ? "2px solid var(--accent)"
+                                    : "2px solid transparent",
+                                background: "transparent",
+                                color: activeTab === tab.id
+                                    ? "var(--accent-text)"
+                                    : "var(--text-tertiary)",
                                 cursor: "pointer",
+                                marginBottom: "-0.5px",
                             }}
                         >
                             {tab.label} ({getCount(tab.id)})
@@ -141,44 +148,83 @@ function OrdersList() {
                             <th style={thStyle}>Tarih</th>
                             <th style={{ ...thStyle, textAlign: "center" }}>Kalem</th>
                             <th style={{ ...thStyle, textAlign: "right" }}>Tutar</th>
+                            <th style={{ ...thStyle, width: "32px" }}></th>
                         </tr>
                     </thead>
                     <tbody>
-                        {filtered.map((order) => {
-                            const status = statusConfig[order.status];
-                            return (
-                                <tr
-                                    key={order.id}
-                                    style={{ cursor: "pointer" }}
-                                    onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "var(--bg-secondary)"));
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "transparent"));
-                                    }}
-                                >
-                                    <td style={{ ...tdStyle, fontWeight: 500 }}>
-                                        {order.orderNumber}
-                                    </td>
-                                    <td style={tdStyle}>
-                                        {order.customerName}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                                        <span className={`badge ${status.cls}`}>{status.label}</span>
-                                    </td>
-                                    <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
-                                        {formatDate(order.createdAt)}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)" }}>
-                                        {order.itemCount}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
-                                        {formatCurrency(order.grandTotal, order.currency)}
-                                    </td>
-                                </tr>
-                            );
-                        })}
+                        {filtered.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} style={{ border: "none" }}>
+                                    <EmptyState
+                                        title={
+                                            search
+                                                ? `"${search}" ile eşleşen sipariş bulunamadı`
+                                                : `${filterTabs.find(t => t.id === activeTab)?.label ?? ""} durumunda sipariş yok`
+                                        }
+                                        description="Arama terimini değiştirmeyi veya filtreleri temizlemeyi deneyin."
+                                        action={{
+                                            label: "Filtreleri Temizle",
+                                            onClick: () => { setSearch(""); setActiveTab("ALL"); },
+                                        }}
+                                    />
+                                </td>
+                            </tr>
+                        ) : (
+                            filtered.map((order) => {
+                                const status = statusConfig[order.status];
+                                return (
+                                    <tr
+                                        key={order.id}
+                                        style={{ cursor: "pointer" }}
+                                        onClick={() => router.push(`/dashboard/orders/${order.id}`)}
+                                        onMouseEnter={(e) => {
+                                            const tds = e.currentTarget.querySelectorAll("td");
+                                            tds.forEach((td, i) => {
+                                                td.style.background = "var(--bg-secondary)";
+                                                if (i === 0) td.style.borderLeft = "2px solid var(--accent)";
+                                            });
+                                            const chevron = e.currentTarget.querySelector("[data-chevron]") as HTMLElement;
+                                            if (chevron) chevron.style.opacity = "1";
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            const tds = e.currentTarget.querySelectorAll("td");
+                                            tds.forEach((td, i) => {
+                                                td.style.background = "transparent";
+                                                if (i === 0) td.style.borderLeft = "2px solid transparent";
+                                            });
+                                            const chevron = e.currentTarget.querySelector("[data-chevron]") as HTMLElement;
+                                            if (chevron) chevron.style.opacity = "0";
+                                        }}
+                                    >
+                                        <td style={{ ...tdStyle, fontWeight: 500, borderLeft: "2px solid transparent" }}>
+                                            {order.orderNumber}
+                                        </td>
+                                        <td style={tdStyle}>
+                                            {order.customerName}
+                                        </td>
+                                        <td style={{ ...tdStyle, textAlign: "center" }}>
+                                            <span className={`badge ${status.cls}`}>{status.label}</span>
+                                        </td>
+                                        <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
+                                            {formatDate(order.createdAt)}
+                                        </td>
+                                        <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)" }}>
+                                            {order.itemCount}
+                                        </td>
+                                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
+                                            {formatCurrency(order.grandTotal, order.currency)}
+                                        </td>
+                                        <td style={{ ...tdStyle, width: "32px", textAlign: "center", padding: "10px 8px" }}>
+                                            <span data-chevron="" style={{ opacity: 0, color: "var(--text-tertiary)", fontSize: "12px" }}>
+                                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                                    <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                                                </svg>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
                     </tbody>
                 </table>
             </div>
