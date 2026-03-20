@@ -54,6 +54,11 @@ function NewOrderForm() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [lines, setLines] = useState<OrderLine[]>([newLine()]);
     const [notes, setNotes] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitAttempted, setSubmitAttempted] = useState(false);
+    const [windowWidth, setWindowWidth] = useState<number>(
+        typeof window !== "undefined" ? window.innerWidth : 1200
+    );
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Pre-fill customer from query param
@@ -76,6 +81,15 @@ function NewOrderForm() {
         document.addEventListener("mousedown", handleClick);
         return () => document.removeEventListener("mousedown", handleClick);
     }, []);
+
+    // Track window width for mobile layout
+    useEffect(() => {
+        function handleResize() { setWindowWidth(window.innerWidth); }
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    const isMobile = windowWidth < 768;
 
     const filteredCustomers = customers.filter((c: Customer) =>
         c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
@@ -109,39 +123,53 @@ function NewOrderForm() {
     const filledLines = lines.filter(l => l.product !== null).length;
     const canSubmit = selectedCustomer !== null && filledLines > 0;
 
-    const buildAndSave = (status: "DRAFT" | "PENDING") => {
+    const blockReasons: string[] = [];
+    if (!selectedCustomer) blockReasons.push("Müşteri seçilmedi");
+    if (filledLines === 0)  blockReasons.push("En az 1 ürün gerekli");
+    const disabledReasonText = blockReasons.join(" · ");
+
+    const buildAndSave = async (status: "DRAFT" | "PENDING") => {
+        setSubmitAttempted(true);
         if (!selectedCustomer || filledLines === 0) return;
-        const orderLines: OrderLineItem[] = lines
-            .filter(l => l.product !== null)
-            .map(l => ({
-                id: crypto.randomUUID(),
-                productId: l.product!.id,
-                productName: l.product!.name,
-                productSku: l.product!.sku,
-                unit: l.product!.unit,
-                quantity: l.quantity,
-                unitPrice: l.unitPrice,
-                discountPct: l.discountPct,
-                lineTotal: lineTotal(l),
-            }));
-        addOrder({
-            customerName: selectedCustomer.name,
-            customerId: selectedCustomer.id,
-            customerEmail: selectedCustomer.email,
-            customerCountry: selectedCustomer.country,
-            customerTaxOffice: selectedCustomer.taxOffice,
-            customerTaxNumber: selectedCustomer.taxNumber,
-            status,
-            currency,
-            createdAt: new Date().toISOString().slice(0, 10),
-            subtotal,
-            vatTotal: vat,
-            grandTotal,
-            notes,
-            lines: orderLines,
-        });
-        toast({ type: "success", message: status === "DRAFT" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
-        router.push("/dashboard/orders");
+        setIsSubmitting(true);
+        try {
+            await new Promise<void>(r => setTimeout(r, 800));
+            const orderLines: OrderLineItem[] = lines
+                .filter(l => l.product !== null)
+                .map(l => ({
+                    id: crypto.randomUUID(),
+                    productId: l.product!.id,
+                    productName: l.product!.name,
+                    productSku: l.product!.sku,
+                    unit: l.product!.unit,
+                    quantity: l.quantity,
+                    unitPrice: l.unitPrice,
+                    discountPct: l.discountPct,
+                    lineTotal: lineTotal(l),
+                }));
+            addOrder({
+                customerName: selectedCustomer.name,
+                customerId: selectedCustomer.id,
+                customerEmail: selectedCustomer.email,
+                customerCountry: selectedCustomer.country,
+                customerTaxOffice: selectedCustomer.taxOffice,
+                customerTaxNumber: selectedCustomer.taxNumber,
+                status,
+                currency,
+                createdAt: new Date().toISOString().slice(0, 10),
+                subtotal,
+                vatTotal: vat,
+                grandTotal,
+                notes,
+                lines: orderLines,
+            });
+            toast({ type: "success", message: status === "DRAFT" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
+            router.push("/dashboard/orders");
+        } catch {
+            toast({ type: "error", message: "Sipariş kaydedilemedi. Lütfen tekrar deneyin." });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -177,18 +205,33 @@ function NewOrderForm() {
                         Yeni Sipariş
                     </div>
                 </div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                    <Button variant="secondary" onClick={() => buildAndSave("DRAFT")} disabled={!canSubmit}>
-                        Taslak Kaydet
-                    </Button>
-                    <Button variant="primary" onClick={() => buildAndSave("PENDING")} disabled={!canSubmit}>
-                        Gönder →
-                    </Button>
-                </div>
+                {!isMobile && (
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                            <Button variant="secondary" loading={isSubmitting} onClick={() => buildAndSave("DRAFT")}>
+                                {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
+                            </Button>
+                            <Button variant="primary" loading={isSubmitting} onClick={() => buildAndSave("PENDING")}>
+                                {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
+                            </Button>
+                        </div>
+                        {submitAttempted && !canSubmit && !isSubmitting && (
+                            <div style={{ fontSize: "11px", color: "var(--danger-text)" }}>
+                                {disabledReasonText}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Main grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: "12px", alignItems: "start" }}>
+            <div style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 300px",
+                gap: "12px",
+                alignItems: "start",
+                paddingBottom: isMobile ? "80px" : undefined,
+            }}>
 
                 {/* Left column */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -204,6 +247,7 @@ function NewOrderForm() {
                     >
                         <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "10px" }}>
                             Müşteri
+                            <span style={{ color: "var(--danger-text)", marginLeft: "2px" }}>*</span>
                         </div>
 
                         {/* Dropdown */}
@@ -214,7 +258,11 @@ function NewOrderForm() {
                                     width: "100%",
                                     fontSize: "13px",
                                     padding: "7px 10px",
-                                    border: `0.5px solid ${dropdownOpen ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                    border: `0.5px solid ${
+                                    submitAttempted && !selectedCustomer
+                                        ? "var(--danger-border)"
+                                        : dropdownOpen ? "var(--accent-border)" : "var(--border-secondary)"
+                                }`,
                                     borderRadius: "6px",
                                     background: "var(--bg-secondary)",
                                     color: selectedCustomer ? "var(--text-primary)" : "var(--text-tertiary)",
@@ -313,6 +361,23 @@ function NewOrderForm() {
                                 <div>{selectedCustomer.taxOffice} VD · {selectedCustomer.taxNumber}</div>
                             </div>
                         )}
+
+                        {submitAttempted && !selectedCustomer && (
+                            <div style={{
+                                marginTop: "6px",
+                                fontSize: "11px",
+                                color: "var(--danger-text)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                            }}>
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                    <circle cx="5" cy="5" r="4.5" stroke="currentColor" strokeWidth="1"/>
+                                    <path d="M5 3v2.5M5 7h.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                </svg>
+                                Lütfen bir müşteri seçin
+                            </div>
+                        )}
                     </div>
 
                     {/* Order lines */}
@@ -331,9 +396,13 @@ function NewOrderForm() {
                                 fontSize: "12px",
                                 fontWeight: 600,
                                 color: "var(--text-primary)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
                             }}
                         >
                             Sipariş Kalemleri
+                            <span style={{ color: "var(--danger-text)" }}>*</span>
                         </div>
 
                         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
@@ -385,7 +454,7 @@ function NewOrderForm() {
                                                     }}>
                                                         {stockInsufficient
                                                             ? `Stok yetersiz — ${stock} ${liveProduct?.unit} mevcut`
-                                                            : `Satilabilir stok: ${stock} ${liveProduct?.unit}${stockLow ? " — Dusuk" : ""}`
+                                                            : `Satılabilir stok: ${stock} ${liveProduct?.unit}${stockLow ? " — Düşük" : ""}`
                                                         }
                                                     </div>
                                                 )}
@@ -451,42 +520,65 @@ function NewOrderForm() {
                             </tbody>
                         </table>
 
+                        {submitAttempted && filledLines === 0 && (
+                            <div style={{
+                                padding: "6px 16px",
+                                fontSize: "11px",
+                                color: "var(--danger-text)",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                            }}>
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                    <circle cx="5" cy="5" r="4.5" stroke="currentColor" strokeWidth="1"/>
+                                    <path d="M5 3v2.5M5 7h.01" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                                </svg>
+                                En az bir ürün seçilmeli
+                            </div>
+                        )}
+
                         {/* Add line */}
-                        <div style={{ padding: "10px 16px" }}>
-                            <button
-                                onClick={() => setLines([...lines, newLine()])}
-                                style={{
-                                    fontSize: "12px",
-                                    padding: "5px 12px",
-                                    border: "0.5px dashed var(--border-secondary)",
-                                    borderRadius: "4px",
-                                    background: "transparent",
-                                    color: "var(--text-secondary)",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "5px",
-                                }}
-                                onMouseEnter={e => {
-                                    e.currentTarget.style.color = "var(--accent-text)";
-                                    e.currentTarget.style.borderColor = "var(--accent-border)";
-                                }}
-                                onMouseLeave={e => {
-                                    e.currentTarget.style.color = "var(--text-secondary)";
-                                    e.currentTarget.style.borderColor = "var(--border-secondary)";
-                                }}
-                            >
-                                + Kalem Ekle
-                            </button>
-                        </div>
+                        <button
+                            onClick={() => setLines([...lines, newLine()])}
+                            style={{
+                                width: "100%",
+                                height: "40px",
+                                fontSize: "13px",
+                                border: "none",
+                                borderTop: "0.5px dashed var(--border-secondary)",
+                                borderRadius: "0 0 6px 6px",
+                                background: "transparent",
+                                color: "var(--text-secondary)",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "6px",
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.color = "var(--accent-text)";
+                                e.currentTarget.style.background = "var(--accent-bg)";
+                                e.currentTarget.style.borderTopColor = "var(--accent-border)";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.color = "var(--text-secondary)";
+                                e.currentTarget.style.background = "transparent";
+                                e.currentTarget.style.borderTopColor = "var(--border-secondary)";
+                            }}
+                        >
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                            </svg>
+                            Kalem Ekle
+                        </button>
                     </div>
                 </div>
 
                 {/* Right column — Summary */}
                 <div
                     style={{
-                        position: "sticky",
-                        top: "68px",
+                        position: isMobile ? "static" : "sticky",
+                        top: isMobile ? undefined : "68px",
                         display: "flex",
                         flexDirection: "column",
                         gap: "12px",
@@ -557,16 +649,54 @@ function NewOrderForm() {
 
                         {/* Actions */}
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "12px" }}>
-                            <Button variant="primary" size="md" fullWidth onClick={() => buildAndSave("PENDING")} disabled={!canSubmit}>
-                                Siparisi Olustur ve Gonder
+                            <Button variant="primary" size="md" fullWidth loading={isSubmitting} onClick={() => buildAndSave("PENDING")}>
+                                {isSubmitting ? "Gönderiliyor…" : "Siparişi Oluştur ve Gönder"}
                             </Button>
-                            <Button variant="secondary" fullWidth onClick={() => buildAndSave("DRAFT")} disabled={!canSubmit}>
-                                Taslak Olarak Kaydet
+                            <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("DRAFT")}>
+                                {isSubmitting ? "Kaydediliyor…" : "Taslak Olarak Kaydet"}
                             </Button>
+                            {submitAttempted && !canSubmit && !isSubmitting && (
+                                <div style={{ fontSize: "11px", color: "var(--danger-text)", textAlign: "center", marginTop: "2px" }}>
+                                    {disabledReasonText}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Mobile sticky action bar */}
+            {isMobile && (
+                <div
+                    style={{
+                        position: "fixed",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        background: "var(--bg-primary)",
+                        borderTop: "0.5px solid var(--border-tertiary)",
+                        padding: "12px 16px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "8px",
+                        zIndex: 50,
+                    }}
+                >
+                    <div style={{ display: "flex", gap: "8px" }}>
+                        <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("DRAFT")}>
+                            {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
+                        </Button>
+                        <Button variant="primary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("PENDING")}>
+                            {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
+                        </Button>
+                    </div>
+                    {submitAttempted && !canSubmit && !isSubmitting && (
+                        <div style={{ fontSize: "11px", color: "var(--danger-text)", textAlign: "center" }}>
+                            {disabledReasonText}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
