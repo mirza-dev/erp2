@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
 
@@ -41,6 +42,7 @@ const tdStyle: React.CSSProperties = {
 
 export default function StockDataGrid({ filterCategory = "", filterStatus = "" }: StockDataGridProps) {
     const { products } = useData();
+    const [selectedId, setSelectedId] = useState<string | null>(null);
 
     const filtered = products.filter(p => {
         if (filterCategory && p.category !== filterCategory) return false;
@@ -50,6 +52,31 @@ export default function StockDataGrid({ filterCategory = "", filterStatus = "" }
         }
         return true;
     });
+
+    const applyHover = (tr: HTMLElement) => {
+        const tds = tr.querySelectorAll("td");
+        tds.forEach((td, i) => {
+            td.style.background = "var(--bg-secondary)";
+            if (i === 0) td.style.borderLeft = "2px solid var(--accent)";
+        });
+    };
+
+    const removeHover = (tr: HTMLElement, productId: string) => {
+        if (selectedId === productId) return;
+        const tds = tr.querySelectorAll("td");
+        tds.forEach((td, i) => {
+            td.style.background = "transparent";
+            if (i === 0) td.style.borderLeft = "2px solid transparent";
+        });
+    };
+
+    const applySelected = (tr: HTMLElement) => {
+        const tds = tr.querySelectorAll("td");
+        tds.forEach((td, i) => {
+            td.style.background = "var(--accent-bg)";
+            if (i === 0) td.style.borderLeft = "2px solid var(--accent)";
+        });
+    };
 
     return (
         <div
@@ -81,29 +108,47 @@ export default function StockDataGrid({ filterCategory = "", filterStatus = "" }
                         </tr>
                     ) : filtered.map((product) => {
                         const status = getStatusInfo(product.availableStock, product.minStockLevel);
+                        const isSelected = selectedId === product.id;
                         return (
                             <tr
                                 key={product.id}
                                 style={{ cursor: "pointer" }}
+                                onClick={(e) => {
+                                    const newId = isSelected ? null : product.id;
+                                    setSelectedId(newId);
+                                    // Apply or remove selected styling
+                                    if (newId) {
+                                        applySelected(e.currentTarget);
+                                    } else {
+                                        removeHover(e.currentTarget, "__force__");
+                                    }
+                                }}
                                 onMouseEnter={(e) => {
-                                    const tds = e.currentTarget.querySelectorAll("td");
-                                    tds.forEach(td => (td.style.background = "var(--bg-secondary)"));
+                                    if (!isSelected) applyHover(e.currentTarget);
                                 }}
                                 onMouseLeave={(e) => {
-                                    const tds = e.currentTarget.querySelectorAll("td");
-                                    tds.forEach(td => (td.style.background = "transparent"));
+                                    if (isSelected) {
+                                        applySelected(e.currentTarget);
+                                    } else {
+                                        removeHover(e.currentTarget, "__force__");
+                                    }
                                 }}
                             >
-                                <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
+                                <td style={{
+                                    ...tdStyle,
+                                    color: "var(--text-secondary)",
+                                    borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
+                                    background: isSelected ? "var(--accent-bg)" : "transparent",
+                                }}>
                                     {product.sku}
                                 </td>
-                                <td style={tdStyle}>
+                                <td style={{ ...tdStyle, background: isSelected ? "var(--accent-bg)" : "transparent" }}>
                                     {product.name}
                                 </td>
-                                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
+                                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500, background: isSelected ? "var(--accent-bg)" : "transparent" }}>
                                     {formatNumber(product.totalStock)}
                                 </td>
-                                <td style={{ ...tdStyle, textAlign: "right", color: "var(--warning-text)" }}>
+                                <td style={{ ...tdStyle, textAlign: "right", color: "var(--warning-text)", background: isSelected ? "var(--accent-bg)" : "transparent" }}>
                                     {formatNumber(product.allocatedStock)}
                                 </td>
                                 <td
@@ -112,14 +157,15 @@ export default function StockDataGrid({ filterCategory = "", filterStatus = "" }
                                         textAlign: "right",
                                         fontWeight: 500,
                                         color: getAvailClass(product.availableStock, product.minStockLevel),
+                                        background: isSelected ? "var(--accent-bg)" : "transparent",
                                     }}
                                 >
                                     {formatNumber(product.availableStock)}
                                 </td>
-                                <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)" }}>
+                                <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)", background: isSelected ? "var(--accent-bg)" : "transparent" }}>
                                     {formatNumber(product.minStockLevel)}
                                 </td>
-                                <td style={{ ...tdStyle, textAlign: "center" }}>
+                                <td style={{ ...tdStyle, textAlign: "center", background: isSelected ? "var(--accent-bg)" : "transparent" }}>
                                     <span className={`badge ${status.cls}`}>{status.label}</span>
                                 </td>
                             </tr>

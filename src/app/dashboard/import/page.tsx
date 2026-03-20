@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
 import type { Customer, Product, Order } from "@/lib/mock-data";
+import DemoBanner from "@/components/ui/DemoBanner";
 
 // ─── Data to inject into global state after import ────────────────────────
 const IMPORTED_CUSTOMERS: Customer[] = [
@@ -338,6 +339,9 @@ export default function ImportPage() {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <DemoBanner storageKey="import-demo">
+                Excel analizi simülasyon modunda çalışmaktadır. Gerçek dosya parse işlemi AI entegrasyonu ile aktif olacak.
+            </DemoBanner>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>

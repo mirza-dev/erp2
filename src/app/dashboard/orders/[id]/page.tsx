@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useData, type ConflictItem } from "@/lib/data-context";
+import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 
 type OrderStatus = "DRAFT" | "PENDING" | "APPROVED" | "SHIPPED" | "CANCELLED";
 
@@ -39,6 +41,7 @@ const tdStyle: React.CSSProperties = {
 export default function OrderDetailPage() {
     const params = useParams();
     const { orderDetails, updateOrderStatus } = useData();
+    const { toast } = useToast();
     const order = orderDetails.find(o => o.id === params.id);
 
     const [status, setStatus] = useState<OrderStatus>(order?.status ?? "DRAFT");
@@ -76,9 +79,11 @@ export default function OrderDetailPage() {
             const result = await updateOrderStatus(order!.id, next);
             if (result.ok) {
                 setStatus("SHIPPED");
+                toast({ type: "success", message: "Sipariş sevk edildi" });
                 if (result.parasutSync && result.parasutSync.success) {
                     setParasutStatus("sent");
                     setParasutInvoiceId((result.parasutSync as { success: true; invoiceId: string }).invoiceId);
+                    toast({ type: "info", message: "Fatura Paraşüt'e gönderildi" });
                 } else {
                     setParasutStatus("error");
                     setParasutError(
@@ -86,6 +91,7 @@ export default function OrderDetailPage() {
                             ? result.parasutSync.error
                             : "Bilinmeyen hata"
                     );
+                    toast({ type: "error", message: "Paraşüt sync başarısız" });
                 }
             }
             setLoading(null);
@@ -98,8 +104,15 @@ export default function OrderDetailPage() {
             if (!result.ok && result.conflicts) {
                 setConflicts(result.conflicts);
                 setConflictOpen(true);
+                toast({ type: "error", message: "Stok yetersiz — sipariş onaylanamadı" });
             } else if (result.ok) {
                 setStatus(next);
+                const labels: Record<string, string> = {
+                    PENDING: "Sipariş onaya gönderildi",
+                    APPROVED: "Sipariş onaylandı",
+                    CANCELLED: "Sipariş iptal edildi",
+                };
+                toast({ type: next === "CANCELLED" ? "warning" : "success", message: labels[next] ?? "Durum güncellendi" });
             }
             setLoading(null);
         }, 600);
@@ -147,56 +160,32 @@ export default function OrderDetailPage() {
                     <div style={{ display: "flex", gap: "8px" }}>
                         {status === "DRAFT" && (
                             <>
-                                <button
-                                    onClick={() => handleTransition("CANCELLED")}
-                                    disabled={loading !== null}
-                                    style={dangerBtn(loading === "CANCELLED")}
-                                >
+                                <Button variant="danger" onClick={() => handleTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
                                     İptal Et
-                                </button>
-                                <button
-                                    onClick={() => handleTransition("PENDING")}
-                                    disabled={loading !== null}
-                                    style={accentBtn(loading === "PENDING")}
-                                >
+                                </Button>
+                                <Button variant="primary" onClick={() => handleTransition("PENDING")} disabled={loading !== null} loading={loading === "PENDING"}>
                                     {loading === "PENDING" ? "Gönderiliyor..." : "Onaya Gönder"}
-                                </button>
+                                </Button>
                             </>
                         )}
                         {status === "PENDING" && (
                             <>
-                                <button
-                                    onClick={() => handleTransition("CANCELLED")}
-                                    disabled={loading !== null}
-                                    style={dangerBtn(loading === "CANCELLED")}
-                                >
+                                <Button variant="danger" onClick={() => handleTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
                                     İptal Et
-                                </button>
-                                <button
-                                    onClick={() => handleTransition("APPROVED")}
-                                    disabled={loading !== null}
-                                    style={accentBtn(loading === "APPROVED")}
-                                >
+                                </Button>
+                                <Button variant="primary" onClick={() => handleTransition("APPROVED")} disabled={loading !== null} loading={loading === "APPROVED"}>
                                     {loading === "APPROVED" ? "Kontrol ediliyor..." : "Onayla"}
-                                </button>
+                                </Button>
                             </>
                         )}
                         {status === "APPROVED" && (
                             <>
-                                <button
-                                    onClick={() => handleTransition("CANCELLED")}
-                                    disabled={loading !== null}
-                                    style={dangerBtn(loading === "CANCELLED")}
-                                >
+                                <Button variant="danger" onClick={() => handleTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
                                     İptal Et
-                                </button>
-                                <button
-                                    onClick={() => handleTransition("SHIPPED")}
-                                    disabled={loading !== null}
-                                    style={accentBtn(loading === "SHIPPED")}
-                                >
+                                </Button>
+                                <Button variant="primary" onClick={() => handleTransition("SHIPPED")} disabled={loading !== null} loading={loading === "SHIPPED"}>
                                     {loading === "SHIPPED" ? "Paraşüt'e gönderiliyor..." : "Sevket"}
-                                </button>
+                                </Button>
                             </>
                         )}
                         {(status === "SHIPPED" || status === "CANCELLED") && (
@@ -490,37 +479,12 @@ export default function OrderDetailPage() {
                             ))}
                         </div>
                         <div style={{ display: "flex", gap: "8px" }}>
-                            <button
-                                onClick={() => setConflictOpen(false)}
-                                style={{
-                                    flex: 1,
-                                    fontSize: "12px",
-                                    padding: "7px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px",
-                                    background: "transparent",
-                                    color: "var(--text-secondary)",
-                                    cursor: "pointer",
-                                }}
-                            >
+                            <Button variant="secondary" onClick={() => setConflictOpen(false)} style={{ flex: 1 }}>
                                 Kapat
-                            </button>
-                            <button
-                                onClick={() => setConflictOpen(false)}
-                                style={{
-                                    flex: 1,
-                                    fontSize: "12px",
-                                    padding: "7px",
-                                    border: "0.5px solid var(--accent-border)",
-                                    borderRadius: "6px",
-                                    background: "var(--accent-bg)",
-                                    color: "var(--accent-text)",
-                                    cursor: "pointer",
-                                    fontWeight: 600,
-                                }}
-                            >
+                            </Button>
+                            <Button variant="primary" onClick={() => setConflictOpen(false)} style={{ flex: 1 }}>
                                 Stoku Yenile
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </>
@@ -536,33 +500,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
             <span style={{ color: "var(--text-secondary)" }}>{value}</span>
         </div>
     );
-}
-
-function accentBtn(loading: boolean): React.CSSProperties {
-    return {
-        fontSize: "12px",
-        padding: "6px 14px",
-        border: "0.5px solid var(--accent-border)",
-        borderRadius: "6px",
-        background: "var(--accent-bg)",
-        color: "var(--accent-text)",
-        cursor: loading ? "wait" : "pointer",
-        fontWeight: 600,
-        opacity: loading ? 0.7 : 1,
-    };
-}
-
-function dangerBtn(loading: boolean): React.CSSProperties {
-    return {
-        fontSize: "12px",
-        padding: "6px 14px",
-        border: "0.5px solid var(--danger-border)",
-        borderRadius: "6px",
-        background: "var(--danger-bg)",
-        color: "var(--danger-text)",
-        cursor: loading ? "wait" : "pointer",
-        opacity: loading ? 0.7 : 1,
-    };
 }
 
 function ParasutBadge({

@@ -1,6 +1,15 @@
 "use client";
 
-export default function Topbar() {
+import Link from "next/link";
+import { useData } from "@/lib/data-context";
+
+interface TopbarProps {
+    onToggleSidebar?: () => void;
+}
+
+export default function Topbar({ onToggleSidebar }: TopbarProps) {
+    const { reorderSuggestions } = useData();
+    const alertCount = reorderSuggestions.length;
     return (
         <header
             style={{
@@ -13,36 +22,59 @@ export default function Topbar() {
                 borderBottom: "0.5px solid var(--border-tertiary)",
             }}
         >
-            {/* Logo */}
-            <div
-                style={{
-                    fontSize: "15px",
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                }}
-            >
-                KokpitERP
-                <span
+            {/* Left */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {/* Hamburger — mobile only */}
+                <button
+                    className="hamburger-btn"
+                    onClick={onToggleSidebar}
                     style={{
-                        fontSize: "11px",
-                        background: "var(--accent-bg)",
-                        color: "var(--accent-text)",
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        border: "0.5px solid var(--accent-border)",
+                        display: "none",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                        padding: "4px",
                     }}
                 >
-                    AI
-                </span>
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                </button>
+
+                {/* Logo */}
+                <div
+                    style={{
+                        fontSize: "15px",
+                        fontWeight: 600,
+                        color: "var(--text-primary)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                    }}
+                >
+                    KokpitERP
+                    <span
+                        style={{
+                            fontSize: "11px",
+                            background: "var(--accent-bg)",
+                            color: "var(--accent-text)",
+                            padding: "2px 6px",
+                            borderRadius: "4px",
+                            border: "0.5px solid var(--accent-border)",
+                        }}
+                    >
+                        AI
+                    </span>
+                </div>
             </div>
 
             {/* Right */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                {/* Live indicator */}
-                <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                {/* Live indicator — hide on mobile */}
+                <div className="topbar-right-extras" style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                     <span
                         className="animate-pulse-dot"
                         style={{
@@ -58,19 +90,23 @@ export default function Topbar() {
                 </div>
 
                 {/* Alert button */}
-                <button
-                    style={{
-                        fontSize: "12px",
-                        padding: "5px 12px",
-                        border: "0.5px solid var(--danger-border)",
-                        borderRadius: "6px",
-                        background: "var(--danger-bg)",
-                        color: "var(--danger-text)",
-                        cursor: "pointer",
-                    }}
-                >
-                    3 Üretim Uyarısı
-                </button>
+                {alertCount > 0 && (
+                    <Link href="/dashboard/alerts" style={{ textDecoration: "none" }}>
+                        <button
+                            style={{
+                                fontSize: "12px",
+                                padding: "5px 12px",
+                                border: "0.5px solid var(--danger-border)",
+                                borderRadius: "6px",
+                                background: "var(--danger-bg)",
+                                color: "var(--danger-text)",
+                                cursor: "pointer",
+                            }}
+                        >
+                            {alertCount} Uyarı
+                        </button>
+                    </Link>
+                )}
 
                 {/* User avatar */}
                 <div

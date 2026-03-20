@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useData } from "@/lib/data-context";
 import { formatCurrency } from "@/lib/utils";
+import DemoBanner from "@/components/ui/DemoBanner";
 
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
@@ -90,6 +91,9 @@ export default function ParasutPage() {
 
     return (
         <div style={{ padding: "0" }}>
+            <DemoBanner storageKey="parasut-demo">
+                Paraşüt entegrasyonu demo modunda çalışmaktadır. Gerçek API bağlantısı yakında aktif olacak.
+            </DemoBanner>
             {/* Header */}
             <div
                 style={{

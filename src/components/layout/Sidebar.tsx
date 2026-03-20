@@ -15,7 +15,11 @@ interface NavGroup {
     items: NavItem[];
 }
 
-export default function Sidebar() {
+interface SidebarProps {
+    onNavigate?: () => void;
+}
+
+export default function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
     const { reorderSuggestions } = useData();
     const reorderCount = reorderSuggestions.length;
@@ -40,7 +44,7 @@ export default function Sidebar() {
             label: "Otomasyon",
             items: [
                 { label: "AI İçeri Aktar", href: "/dashboard/import" },
-                { label: "Üretim Uyarıları", href: "/dashboard/alerts", count: 3 },
+                { label: "Üretim Uyarıları", href: "/dashboard/alerts", count: reorderCount || undefined },
             ],
         },
         {
@@ -73,6 +77,7 @@ export default function Sidebar() {
                 flexDirection: "column",
                 gap: "1px",
                 overflowY: "auto",
+                height: "100%",
             }}
         >
             {navGroups.map((group) => (
@@ -94,6 +99,7 @@ export default function Sidebar() {
                             <Link
                                 key={item.href}
                                 href={item.href}
+                                onClick={onNavigate}
                                 style={{
                                     display: "flex",
                                     alignItems: "center",

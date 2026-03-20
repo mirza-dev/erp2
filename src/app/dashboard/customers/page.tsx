@@ -5,6 +5,8 @@ import { formatCurrency } from "@/lib/utils";
 import { type Customer } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
 import CustomerDetailPanel from "@/components/customers/CustomerDetailPanel";
+import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -49,12 +51,12 @@ const modalLabelStyle: React.CSSProperties = {
 
 export default function CustomersPage() {
     const { customers: mockCustomers, addCustomer } = useData();
+    const { toast } = useToast();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [search, setSearch] = useState("");
     const [activeFilter, setActiveFilter] = useState<"all" | "active" | "passive">("all");
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCustomer, setNewCustomer] = useState(newCustomerInitial);
-    const [addSaved, setAddSaved] = useState(false);
 
     const setField = (key: keyof typeof newCustomerInitial) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -63,12 +65,9 @@ export default function CustomersPage() {
     const handleAdd = () => {
         if (!newCustomer.name) return;
         addCustomer(newCustomer);
-        setAddSaved(true);
-        setTimeout(() => {
-            setShowAddModal(false);
-            setAddSaved(false);
-            setNewCustomer(newCustomerInitial);
-        }, 1200);
+        toast({ type: "success", message: `${newCustomer.name} müşteri olarak eklendi` });
+        setShowAddModal(false);
+        setNewCustomer(newCustomerInitial);
     };
 
     const activeCount = mockCustomers.filter(c => c.isActive).length;
@@ -111,20 +110,9 @@ export default function CustomersPage() {
                                 outline: "none",
                             }}
                         />
-                        <button
-                            onClick={() => setShowAddModal(true)}
-                            style={{
-                                fontSize: "12px",
-                                padding: "6px 14px",
-                                border: "0.5px solid var(--accent-border)",
-                                borderRadius: "6px",
-                                background: "var(--accent-bg)",
-                                color: "var(--accent-text)",
-                                cursor: "pointer",
-                            }}
-                        >
+                        <Button variant="primary" onClick={() => setShowAddModal(true)}>
                             + Yeni Müşteri
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -372,40 +360,12 @@ export default function CustomersPage() {
                                 borderTop: "0.5px solid var(--border-tertiary)",
                             }}
                         >
-                            <button
-                                onClick={handleAdd}
-                                disabled={!newCustomer.name}
-                                style={{
-                                    fontSize: "13px",
-                                    padding: "7px 18px",
-                                    border: "0.5px solid var(--accent-border)",
-                                    borderRadius: "6px",
-                                    background: newCustomer.name ? "var(--accent-bg)" : "var(--bg-tertiary)",
-                                    color: newCustomer.name ? "var(--accent-text)" : "var(--text-tertiary)",
-                                    cursor: newCustomer.name ? "pointer" : "not-allowed",
-                                }}
-                            >
+                            <Button variant="primary" size="md" onClick={handleAdd} disabled={!newCustomer.name}>
                                 Müşteriyi Kaydet
-                            </button>
-                            <button
-                                onClick={() => setShowAddModal(false)}
-                                style={{
-                                    fontSize: "13px",
-                                    padding: "7px 14px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px",
-                                    background: "transparent",
-                                    color: "var(--text-secondary)",
-                                    cursor: "pointer",
-                                }}
-                            >
+                            </Button>
+                            <Button variant="secondary" size="md" onClick={() => setShowAddModal(false)}>
                                 İptal
-                            </button>
-                            {addSaved && (
-                                <span style={{ fontSize: "12px", color: "var(--success-text)" }}>
-                                    ✓ Kaydedildi
-                                </span>
-                            )}
+                            </Button>
                         </div>
                     </div>
                 </>

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { formatNumber } from "@/lib/utils";
 
@@ -10,6 +11,7 @@ const subtitleColors = {
 };
 
 export default function StatsCards() {
+    const router = useRouter();
     const { products, uretimKayitlari } = useData();
 
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -31,18 +33,21 @@ export default function StatsCards() {
             value: formatNumber(totalStock),
             subtitle: `${products.length} aktif ürün`,
             subtitleColor: "ok" as const,
+            href: "/dashboard/products",
         },
         {
             label: "Rezerve Stok",
             value: formatNumber(allocatedStock),
             subtitle: "Aktif siparişlerde kilitli",
             subtitleColor: "warn" as const,
+            href: "/dashboard/orders",
         },
         {
             label: "Satılabilir Stok",
             value: formatNumber(availableStock),
             subtitle: "Anlık hesaplanıyor",
             subtitleColor: "ok" as const,
+            href: "/dashboard/products",
         },
         {
             label: "Kritik Seviye",
@@ -50,29 +55,49 @@ export default function StatsCards() {
             subtitle: criticalCount > 0 ? "Üretim uyarısı aktif" : "Stok durumu iyi",
             subtitleColor: criticalCount > 0 ? ("warn" as const) : ("ok" as const),
             valueDanger: criticalCount > 0,
+            href: "/dashboard/alerts",
         },
         {
             label: "Bugünkü Üretim",
             value: todayTotal > 0 ? formatNumber(todayTotal) + " adet" : "—",
             subtitle: todayProductTypes > 0 ? `${todayProductTypes} ürün türü üretildi` : "Henüz giriş yok",
             subtitleColor: todayTotal > 0 ? ("ok" as const) : ("warn" as const),
+            href: "/dashboard/production",
         },
     ];
 
     return (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "12px" }}>
+        <div className="stats-cards-grid">
             {metrics.map((m) => (
                 <div
                     key={m.label}
+                    onClick={() => router.push(m.href)}
                     style={{
                         background: "var(--bg-primary)",
                         border: "0.5px solid var(--border-tertiary)",
                         borderRadius: "6px",
                         padding: "14px 16px",
+                        cursor: "pointer",
+                        position: "relative",
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "var(--accent-border)";
+                        e.currentTarget.style.background = "var(--bg-secondary)";
+                        const arrow = e.currentTarget.querySelector("[data-arrow]") as HTMLElement;
+                        if (arrow) arrow.style.color = "var(--accent-text)";
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "var(--border-tertiary)";
+                        e.currentTarget.style.background = "var(--bg-primary)";
+                        const arrow = e.currentTarget.querySelector("[data-arrow]") as HTMLElement;
+                        if (arrow) arrow.style.color = "var(--text-tertiary)";
                     }}
                 >
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "6px" }}>
-                        {m.label}
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "6px" }}>
+                            {m.label}
+                        </div>
+                        <span data-arrow style={{ fontSize: "14px", color: "var(--text-tertiary)" }}>→</span>
                     </div>
                     <div
                         style={{

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
+import Button from "@/components/ui/Button";
 
 const categories = [
     "Tümü",
@@ -86,19 +87,7 @@ export default function ProductsPage() {
                             outline: "none",
                         }}
                     />
-                    <button
-                        style={{
-                            fontSize: "12px",
-                            padding: "6px 14px",
-                            border: "0.5px solid var(--accent-border)",
-                            borderRadius: "6px",
-                            background: "var(--accent-bg)",
-                            color: "var(--accent-text)",
-                            cursor: "pointer",
-                        }}
-                    >
-                        + Yeni Ürün
-                    </button>
+                    <Button variant="primary">+ Yeni Ürün</Button>
                 </div>
             </div>
 

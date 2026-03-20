@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
+import DemoBanner from "@/components/ui/DemoBanner";
 
 type Tab = "firma" | "kullanici" | "bildirimler" | "api";
 
@@ -33,34 +36,19 @@ const sectionTitle: React.CSSProperties = {
     marginBottom: "12px",
 };
 
-function SaveButton({ onClick, saved }: { onClick: () => void; saved: boolean }) {
+function SaveButton({ onClick }: { onClick: () => void; saved?: boolean }) {
     return (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "20px" }}>
-            <button
-                onClick={onClick}
-                style={{
-                    fontSize: "13px",
-                    padding: "7px 18px",
-                    border: "0.5px solid var(--accent-border)",
-                    borderRadius: "6px",
-                    background: "var(--accent-bg)",
-                    color: "var(--accent-text)",
-                    cursor: "pointer",
-                }}
-            >
+        <div style={{ marginTop: "20px" }}>
+            <Button variant="primary" size="md" onClick={onClick}>
                 Kaydet
-            </button>
-            {saved && (
-                <span style={{ fontSize: "12px", color: "var(--success-text)" }}>
-                    ✓ Kaydedildi
-                </span>
-            )}
+            </Button>
         </div>
     );
 }
 
 // ─── Firma Profili ─────────────────────────────────────────────────────────────
 function FirmaTab() {
+    const { toast } = useToast();
     const [form, setForm] = useState({
         name: "PMT Endüstriyel Ürünler A.Ş.",
         taxOffice: "Başakşehir",
@@ -70,17 +58,14 @@ function FirmaTab() {
         website: "www.pmt-endustriyel.com.tr",
         currency: "USD",
     });
-    const [saved, setSaved] = useState(false);
     const [logoDragging, setLogoDragging] = useState(false);
 
     const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setForm(f => ({ ...f, [key]: e.target.value }));
-        setSaved(false);
     };
 
     const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        toast({ type: "success", message: "Firma bilgileri kaydedildi" });
     };
 
     return (
@@ -151,37 +136,36 @@ function FirmaTab() {
                 </div>
             </div>
 
-            <SaveButton onClick={handleSave} saved={saved} />
+            <SaveButton onClick={handleSave} />
         </div>
     );
 }
 
 // ─── Kullanıcı / Profil ────────────────────────────────────────────────────────
 function KullaniciTab() {
+    const { toast } = useToast();
     const [form, setForm] = useState({ fullName: "Mirza Sarıbıyık", email: "mirza@pmt-endustriyel.com.tr" });
     const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
-    const [profileSaved, setProfileSaved] = useState(false);
-    const [pwSaved, setPwSaved] = useState(false);
     const [pwError, setPwError] = useState("");
 
     const handleProfileSave = () => {
-        setProfileSaved(true);
-        setTimeout(() => setProfileSaved(false), 3000);
+        toast({ type: "success", message: "Profil bilgileri güncellendi" });
     };
 
     const handlePwSave = () => {
         if (pwForm.next !== pwForm.confirm) {
             setPwError("Yeni şifreler eşleşmiyor.");
+            toast({ type: "error", message: "Yeni şifreler eşleşmiyor" });
             return;
         }
         if (pwForm.next.length < 8) {
             setPwError("Şifre en az 8 karakter olmalı.");
+            toast({ type: "error", message: "Şifre en az 8 karakter olmalı" });
             return;
         }
         setPwError("");
-        setPwSaved(true);
         setPwForm({ current: "", next: "", confirm: "" });
-        setTimeout(() => setPwSaved(false), 3000);
+        toast({ type: "success", message: "Şifre başarıyla değiştirildi" });
     };
 
     return (
@@ -249,7 +233,7 @@ function KullaniciTab() {
                         </div>
                     </div>
                 </div>
-                <SaveButton onClick={handleProfileSave} saved={profileSaved} />
+                <SaveButton onClick={handleProfileSave} />
             </div>
 
             {/* Password */}
@@ -274,7 +258,7 @@ function KullaniciTab() {
                         <div style={{ fontSize: "12px", color: "var(--danger-text)" }}>{pwError}</div>
                     )}
                 </div>
-                <SaveButton onClick={handlePwSave} saved={pwSaved} />
+                <SaveButton onClick={handlePwSave} />
             </div>
         </div>
     );
@@ -282,6 +266,7 @@ function KullaniciTab() {
 
 // ─── Bildirimler ───────────────────────────────────────────────────────────────
 function BildirimlerTab() {
+    const { toast } = useToast();
     const [prefs, setPrefs] = useState([
         { id: "stock-critical", label: "Kritik stok uyarıları", email: true, browser: false },
         { id: "order-pending", label: "Sipariş onay bekliyor", email: true, browser: true },
@@ -289,16 +274,12 @@ function BildirimlerTab() {
         { id: "sync-error", label: "Paraşüt sync hataları", email: true, browser: false },
         { id: "order-shipped", label: "Sipariş sevk edildi", email: false, browser: true },
     ]);
-    const [saved, setSaved] = useState(false);
-
     const toggle = (id: string, channel: "email" | "browser") => {
         setPrefs(ps => ps.map(p => p.id === id ? { ...p, [channel]: !p[channel] } : p));
-        setSaved(false);
     };
 
     const handleSave = () => {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+        toast({ type: "success", message: "Bildirim tercihleri kaydedildi" });
     };
 
     return (
@@ -376,7 +357,7 @@ function BildirimlerTab() {
                     </div>
                 ))}
             </div>
-            <SaveButton onClick={handleSave} saved={saved} />
+            <SaveButton onClick={handleSave} />
         </div>
     );
 }
@@ -523,34 +504,8 @@ function ApiTab() {
                         <input style={inputStyle} value={newKeyValue} onChange={e => setNewKeyValue(e.target.value)} placeholder="sk_..." type="password" />
                     </div>
                     <div style={{ display: "flex", gap: "8px" }}>
-                        <button
-                            onClick={handleAdd}
-                            style={{
-                                fontSize: "12px",
-                                padding: "6px 14px",
-                                border: "0.5px solid var(--accent-border)",
-                                borderRadius: "6px",
-                                background: "var(--accent-bg)",
-                                color: "var(--accent-text)",
-                                cursor: "pointer",
-                            }}
-                        >
-                            Ekle
-                        </button>
-                        <button
-                            onClick={() => setShowAddForm(false)}
-                            style={{
-                                fontSize: "12px",
-                                padding: "6px 14px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: "transparent",
-                                color: "var(--text-secondary)",
-                                cursor: "pointer",
-                            }}
-                        >
-                            İptal
-                        </button>
+                        <Button variant="primary" onClick={handleAdd}>Ekle</Button>
+                        <Button variant="secondary" onClick={() => setShowAddForm(false)}>İptal</Button>
                     </div>
                 </div>
             ) : (
@@ -588,6 +543,9 @@ export default function SettingsPage() {
 
     return (
         <div style={{ padding: "0" }}>
+            <DemoBanner storageKey="settings-demo">
+                Ayarlar demo modunda çalışmaktadır. Değişiklikler sadece bu oturum için geçerlidir.
+            </DemoBanner>
             {/* Header */}
             <div style={{ padding: "20px 24px 16px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                 <h1 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>

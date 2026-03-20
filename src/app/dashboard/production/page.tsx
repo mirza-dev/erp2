@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { useData } from "@/lib/data-context";
 import type { Product } from "@/lib/mock-data";
 import { formatNumber } from "@/lib/utils";
+import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 
 interface FormLine {
     id: string;
@@ -92,9 +94,9 @@ function parseVoice(text: string, products: Product[]): { productId: string; ade
 
 export default function ProductionPage() {
     const { products, uretimKayitlari, addUretimKaydi, deleteUretimKaydi } = useData();
+    const { toast } = useToast();
     const [tarih, setTarih] = useState(today());
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
-    const [saved, setSaved] = useState(false);
     const [listening, setListening] = useState(false);
     const [voiceText, setVoiceText] = useState("");
     const [voiceError, setVoiceError] = useState("");
@@ -128,9 +130,9 @@ export default function ProductionPage() {
                 notlar: line.notlar,
             });
         }
-        setSaved(true);
+        const totalAdet = valid.reduce((s, l) => s + parseInt(l.adet), 0);
+        toast({ type: "success", message: `${valid.length} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi` });
         setLines([newLine()]);
-        setTimeout(() => setSaved(false), 2500);
     };
 
     // ── Voice input ─────────────────────────────────────────────────────────
@@ -344,30 +346,9 @@ export default function ProductionPage() {
                         + Kalem Ekle
                     </button>
 
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        {saved && (
-                            <span style={{ fontSize: "12px", color: "var(--success-text)" }}>
-                                ✓ Üretim kaydedildi — stok güncellendi
-                            </span>
-                        )}
-                        <button
-                            onClick={handleSave}
-                            disabled={!canSave}
-                            style={{
-                                fontSize: "13px",
-                                padding: "7px 20px",
-                                border: "0.5px solid",
-                                borderColor: canSave ? "var(--accent-border)" : "var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: canSave ? "var(--accent-bg)" : "transparent",
-                                color: canSave ? "var(--accent-text)" : "var(--text-tertiary)",
-                                cursor: canSave ? "pointer" : "not-allowed",
-                                fontWeight: 600,
-                            }}
-                        >
-                            Kaydet & Stoğu Güncelle
-                        </button>
-                    </div>
+                    <Button variant="primary" size="md" onClick={handleSave} disabled={!canSave}>
+                        Kaydet & Stoğu Güncelle
+                    </Button>
                 </div>
             </div>
 

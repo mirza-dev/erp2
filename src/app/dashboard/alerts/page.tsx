@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { mockProducts } from "@/lib/mock-data";
 import { formatCurrency } from "@/lib/utils";
+import DemoBanner from "@/components/ui/DemoBanner";
 
 type AlertSeverity = "critical" | "warning" | "info";
 type AlertCategory = "stock" | "order" | "ai";
@@ -166,6 +167,9 @@ export default function AlertsPage() {
 
     return (
         <div style={{ padding: "0" }}>
+            <DemoBanner storageKey="alerts-demo">
+                Uyarılar demo verileriyle çalışmaktadır. Gerçek zamanlı stok takibi yakında aktif olacak.
+            </DemoBanner>
             {/* Page Header */}
             <div
                 style={{

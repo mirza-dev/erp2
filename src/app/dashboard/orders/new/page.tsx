@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { formatCurrency } from "@/lib/utils";
 import { type Customer, type Product, type OrderLineItem } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
+import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 
 interface OrderLine {
     id: string;
@@ -44,6 +46,7 @@ const inputStyle: React.CSSProperties = {
 
 function NewOrderForm() {
     const { customers, products, addOrder } = useData();
+    const { toast } = useToast();
     const searchParams = useSearchParams();
     const router = useRouter();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -137,6 +140,7 @@ function NewOrderForm() {
             notes,
             lines: orderLines,
         });
+        toast({ type: "success", message: status === "DRAFT" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
         router.push("/dashboard/orders");
     };
 
@@ -174,39 +178,12 @@ function NewOrderForm() {
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                        onClick={() => buildAndSave("DRAFT")}
-                        disabled={!canSubmit}
-                        style={{
-                            fontSize: "12px",
-                            padding: "6px 14px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "6px",
-                            background: "transparent",
-                            color: "var(--text-secondary)",
-                            cursor: canSubmit ? "pointer" : "not-allowed",
-                            opacity: canSubmit ? 1 : 0.5,
-                        }}
-                    >
+                    <Button variant="secondary" onClick={() => buildAndSave("DRAFT")} disabled={!canSubmit}>
                         Taslak Kaydet
-                    </button>
-                    <button
-                        onClick={() => buildAndSave("PENDING")}
-                        disabled={!canSubmit}
-                        style={{
-                            fontSize: "12px",
-                            padding: "6px 14px",
-                            border: "0.5px solid var(--accent-border)",
-                            borderRadius: "6px",
-                            background: "var(--accent-bg)",
-                            color: "var(--accent-text)",
-                            cursor: canSubmit ? "pointer" : "not-allowed",
-                            fontWeight: 600,
-                            opacity: canSubmit ? 1 : 0.5,
-                        }}
-                    >
+                    </Button>
+                    <Button variant="primary" onClick={() => buildAndSave("PENDING")} disabled={!canSubmit}>
                         Gönder →
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -580,41 +557,12 @@ function NewOrderForm() {
 
                         {/* Actions */}
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "12px" }}>
-                            <button
-                                onClick={() => buildAndSave("PENDING")}
-                                disabled={!canSubmit}
-                                style={{
-                                    fontSize: "13px",
-                                    padding: "8px 14px",
-                                    border: "0.5px solid var(--accent-border)",
-                                    borderRadius: "6px",
-                                    background: "var(--accent-bg)",
-                                    color: "var(--accent-text)",
-                                    cursor: canSubmit ? "pointer" : "not-allowed",
-                                    fontWeight: 600,
-                                    width: "100%",
-                                    opacity: canSubmit ? 1 : 0.5,
-                                }}
-                            >
+                            <Button variant="primary" size="md" fullWidth onClick={() => buildAndSave("PENDING")} disabled={!canSubmit}>
                                 Siparisi Olustur ve Gonder
-                            </button>
-                            <button
-                                onClick={() => buildAndSave("DRAFT")}
-                                disabled={!canSubmit}
-                                style={{
-                                    fontSize: "12px",
-                                    padding: "7px 14px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px",
-                                    background: "transparent",
-                                    color: "var(--text-secondary)",
-                                    cursor: canSubmit ? "pointer" : "not-allowed",
-                                    width: "100%",
-                                    opacity: canSubmit ? 1 : 0.5,
-                                }}
-                            >
+                            </Button>
+                            <Button variant="secondary" fullWidth onClick={() => buildAndSave("DRAFT")} disabled={!canSubmit}>
                                 Taslak Olarak Kaydet
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

@@ -26,6 +26,8 @@ export default function DashboardPage() {
     const categories = Array.from(new Set(products.map(p => p.category))).sort();
     const hasFilter = filterCategory !== "" || filterStatus !== "";
 
+    const statusLabel = STATUS_OPTIONS.find(s => s.key === filterStatus)?.label ?? filterStatus;
+
     // Close dropdown on outside click
     useEffect(() => {
         function handleClick(e: MouseEvent) {
@@ -187,36 +189,106 @@ export default function DashboardPage() {
                 </div>
             </div>
 
+            {/* Active filter chips */}
+            {hasFilter && (
+                <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Aktif filtreler:</span>
+                    {filterCategory !== "" && (
+                        <span style={{
+                            fontSize: "11px",
+                            padding: "3px 8px",
+                            background: "var(--accent-bg)",
+                            color: "var(--accent-text)",
+                            borderRadius: "4px",
+                            border: "0.5px solid var(--accent-border)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                        }}>
+                            {filterCategory}
+                            <span
+                                onClick={() => setFilterCategory("")}
+                                style={{ cursor: "pointer", opacity: 0.7, fontSize: "12px" }}
+                            >
+                                ✕
+                            </span>
+                        </span>
+                    )}
+                    {filterStatus !== "" && (
+                        <span style={{
+                            fontSize: "11px",
+                            padding: "3px 8px",
+                            background: "var(--accent-bg)",
+                            color: "var(--accent-text)",
+                            borderRadius: "4px",
+                            border: "0.5px solid var(--accent-border)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                        }}>
+                            {statusLabel}
+                            <span
+                                onClick={() => setFilterStatus("")}
+                                style={{ cursor: "pointer", opacity: 0.7, fontSize: "12px" }}
+                            >
+                                ✕
+                            </span>
+                        </span>
+                    )}
+                    <span
+                        onClick={() => { setFilterCategory(""); setFilterStatus(""); }}
+                        style={{ fontSize: "11px", color: "var(--accent-text)", cursor: "pointer", marginLeft: "4px" }}
+                    >
+                        Tümünü temizle
+                    </span>
+                </div>
+            )}
+
             {/* Stock table */}
             <StockDataGrid filterCategory={filterCategory} filterStatus={filterStatus} />
 
             {/* Bottom grid: AI alerts + (recent orders + import zone) */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            <div className="dashboard-bottom-grid">
                 <AIAlerts />
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                     <RecentOrders />
-                    <div
-                        style={{
-                            border: "1.5px dashed var(--border-secondary)",
-                            borderRadius: "6px",
-                            padding: "14px 16px",
-                            textAlign: "center",
-                            fontSize: "12px",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                            background: "var(--bg-secondary)",
-                        }}
-                        onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = "var(--accent-border)";
-                            e.currentTarget.style.color = "var(--accent-text)";
-                        }}
-                        onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = "var(--border-secondary)";
-                            e.currentTarget.style.color = "var(--text-secondary)";
-                        }}
-                    >
-                        PDF / Excel dosyasını buraya sürükle — AI otomatik okur
-                    </div>
+                    <Link href="/dashboard/import" style={{ textDecoration: "none" }}>
+                        <div
+                            style={{
+                                border: "1.5px dashed var(--border-secondary)",
+                                borderRadius: "6px",
+                                padding: "20px 16px",
+                                textAlign: "center",
+                                cursor: "pointer",
+                                background: "var(--bg-secondary)",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: "6px",
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = "var(--accent-border)";
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = "var(--border-secondary)";
+                            }}
+                        >
+                            {/* Upload icon */}
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" style={{ color: "var(--text-tertiary)" }}>
+                                <path d="M12 16V4m0 0l-4 4m4-4l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                <path d="M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 500 }}>
+                                Sipariş dosyalarını buraya sürükleyin
+                            </div>
+                            <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                veya <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>Dosya Seç</span>
+                            </div>
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                .xlsx, .csv, .pdf
+                            </div>
+                        </div>
+                    </Link>
                 </div>
             </div>
         </div>

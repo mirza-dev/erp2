@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
+import Button from "@/components/ui/Button";
 
 const statusConfig: Record<string, { label: string; cls: string }> = {
     DRAFT:     { label: "Taslak",      cls: "badge-neutral" },
@@ -76,19 +77,7 @@ function OrdersList() {
                     </div>
                 </div>
                 <Link href="/dashboard/orders/new">
-                    <button
-                        style={{
-                            fontSize: "12px",
-                            padding: "6px 14px",
-                            border: "0.5px solid var(--accent-border)",
-                            borderRadius: "6px",
-                            background: "var(--accent-bg)",
-                            color: "var(--accent-text)",
-                            cursor: "pointer",
-                        }}
-                    >
-                        + Yeni Sipariş
-                    </button>
+                    <Button variant="primary">+ Yeni Sipariş</Button>
                 </Link>
             </div>
 
