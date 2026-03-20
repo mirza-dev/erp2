@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
@@ -30,6 +30,7 @@ const thStyle: React.CSSProperties = {
     fontWeight: 500,
     color: "var(--text-secondary)",
     borderBottom: "0.5px solid var(--border-tertiary)",
+    whiteSpace: "nowrap",
 };
 
 const tdStyle: React.CSSProperties = {
@@ -38,12 +39,57 @@ const tdStyle: React.CSSProperties = {
     borderBottom: "0.5px solid var(--border-tertiary)",
     color: "var(--text-primary)",
     lineHeight: 1.4,
+    whiteSpace: "nowrap",
 };
 
+const modalInputStyle: React.CSSProperties = {
+    fontSize: "13px",
+    padding: "6px 10px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "6px",
+    background: "var(--bg-tertiary)",
+    color: "var(--text-primary)",
+    outline: "none",
+    width: "100%",
+};
+
+function FormField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+    return (
+        <div>
+            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                {label}{required && <span style={{ color: "var(--danger-text)", marginLeft: "2px" }}>*</span>}
+            </div>
+            {children}
+        </div>
+    );
+}
+
 export default function ProductsPage() {
-    const { products: mockProducts } = useData();
+    const { products: mockProducts, addProduct } = useData();
     const [search, setSearch] = useState("");
     const [activeCategory, setActiveCategory] = useState("Tümü");
+    const [createOpen, setCreateOpen] = useState(false);
+    const [createForm, setCreateForm] = useState<{
+        name: string; sku: string; category: string; unit: string;
+        price: number; currency: string; totalStock: number; minStockLevel: number;
+        productType: "finished" | "raw_material"; warehouse: string;
+    }>({
+        name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
+        price: 0, currency: "USD", totalStock: 0, minStockLevel: 0,
+        productType: "finished", warehouse: "Sevkiyat Deposu",
+    });
+    const [createSubmitting, setCreateSubmitting] = useState(false);
+    const [windowWidth, setWindowWidth] = useState<number>(
+        typeof window !== "undefined" ? window.innerWidth : 1200
+    );
+
+    useEffect(() => {
+        function handleResize() { setWindowWidth(window.innerWidth); }
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    const isMobile = windowWidth < 768;
 
     const filtered = mockProducts.filter((p) => {
         const matchSearch =
@@ -55,10 +101,29 @@ export default function ProductsPage() {
 
     const criticalCount = mockProducts.filter(p => p.availableStock <= p.minStockLevel).length;
 
+    const categoryCounts: Record<string, number> = { "Tümü": mockProducts.length };
+    categories.slice(1).forEach(cat => {
+        categoryCounts[cat] = mockProducts.filter(p => p.category === cat).length;
+    });
+
+    const handleCreate = async () => {
+        if (!createForm.name.trim() || !createForm.sku.trim()) return;
+        setCreateSubmitting(true);
+        await new Promise<void>(r => setTimeout(r, 600));
+        addProduct(createForm);
+        setCreateOpen(false);
+        setCreateSubmitting(false);
+        setCreateForm({
+            name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
+            price: 0, currency: "USD", totalStock: 0, minStockLevel: 0,
+            productType: "finished" as const, warehouse: "Sevkiyat Deposu",
+        });
+    };
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <div>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                         Stok & Ürünler
@@ -83,11 +148,11 @@ export default function ProductsPage() {
                             borderRadius: "6px",
                             background: "var(--bg-primary)",
                             color: "var(--text-primary)",
-                            width: "200px",
+                            width: isMobile ? "140px" : "200px",
                             outline: "none",
                         }}
                     />
-                    <Button variant="primary">+ Yeni Ürün</Button>
+                    <Button variant="primary" onClick={() => setCreateOpen(true)}>+ Yeni Ürün</Button>
                 </div>
             </div>
 
@@ -100,14 +165,42 @@ export default function ProductsPage() {
                         style={{
                             fontSize: "12px",
                             padding: "5px 12px",
-                            border: "0.5px solid var(--border-secondary)",
+                            border: `0.5px solid ${activeCategory === cat ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "6px",
                             background: activeCategory === cat ? "var(--accent-bg)" : "transparent",
                             color: activeCategory === cat ? "var(--accent-text)" : "var(--text-secondary)",
                             cursor: "pointer",
+                            fontWeight: activeCategory === cat ? 600 : 400,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                        }}
+                        onMouseEnter={e => {
+                            if (activeCategory !== cat) {
+                                e.currentTarget.style.background = "var(--bg-tertiary)";
+                                e.currentTarget.style.color = "var(--text-primary)";
+                            }
+                        }}
+                        onMouseLeave={e => {
+                            if (activeCategory !== cat) {
+                                e.currentTarget.style.background = "transparent";
+                                e.currentTarget.style.color = "var(--text-secondary)";
+                            }
                         }}
                     >
                         {cat}
+                        <span style={{
+                            fontSize: "10px",
+                            padding: "1px 5px",
+                            borderRadius: "10px",
+                            background: activeCategory === cat ? "var(--accent)" : "var(--bg-tertiary)",
+                            color: activeCategory === cat ? "#fff" : "var(--text-tertiary)",
+                            fontWeight: 600,
+                            minWidth: "16px",
+                            textAlign: "center",
+                        }}>
+                            {categoryCounts[cat] ?? 0}
+                        </span>
                     </button>
                 ))}
             </div>
@@ -119,9 +212,10 @@ export default function ProductsPage() {
                     border: "0.5px solid var(--border-tertiary)",
                     borderRadius: "6px",
                     overflow: "hidden",
+                    overflowX: "auto",
                 }}
             >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "640px" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)" }}>
                             <th style={thStyle}>SKU</th>
@@ -151,7 +245,7 @@ export default function ProductsPage() {
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
                                         {product.sku}
                                     </td>
-                                    <td style={{ ...tdStyle, fontWeight: 500 }}>
+                                    <td style={{ ...tdStyle, fontWeight: 500, maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis" }}>
                                         {product.name}
                                     </td>
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
@@ -184,7 +278,203 @@ export default function ProductsPage() {
                         })}
                     </tbody>
                 </table>
+
+                {filtered.length === 0 && (
+                    <div style={{
+                        padding: "40px 16px",
+                        textAlign: "center",
+                        color: "var(--text-tertiary)",
+                        fontSize: "13px",
+                    }}>
+                        <div style={{ fontSize: "28px", marginBottom: "8px" }}>📦</div>
+                        <div style={{ fontWeight: 500, color: "var(--text-secondary)", marginBottom: "4px" }}>
+                            Ürün bulunamadı
+                        </div>
+                        <div style={{ fontSize: "12px" }}>
+                            {search ? `"${search}" ile eşleşen ürün yok` : `"${activeCategory}" kategorisinde ürün yok`}
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* Create Product Modal */}
+            {createOpen && (
+                <>
+                    {/* Backdrop */}
+                    <div
+                        onClick={() => !createSubmitting && setCreateOpen(false)}
+                        style={{
+                            position: "fixed", inset: 0, zIndex: 100,
+                            background: "rgba(0,0,0,0.55)",
+                        }}
+                    />
+                    {/* Modal */}
+                    <div style={{
+                        position: "fixed", top: "50%", left: "50%",
+                        transform: "translate(-50%, -50%)",
+                        zIndex: 101,
+                        background: "var(--bg-primary)",
+                        border: "0.5px solid var(--border-primary)",
+                        borderRadius: "8px",
+                        width: isMobile ? "calc(100vw - 32px)" : "480px",
+                        maxHeight: "90vh",
+                        overflowY: "auto",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                    }}>
+                        {/* Modal header */}
+                        <div style={{
+                            padding: "14px 16px",
+                            borderBottom: "0.5px solid var(--border-tertiary)",
+                            display: "flex", justifyContent: "space-between", alignItems: "center",
+                        }}>
+                            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+                                Yeni Ürün
+                            </div>
+                            <button
+                                onClick={() => !createSubmitting && setCreateOpen(false)}
+                                style={{
+                                    background: "transparent", border: "none",
+                                    color: "var(--text-tertiary)", cursor: "pointer",
+                                    fontSize: "16px", padding: "2px 6px", borderRadius: "4px",
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.color = "var(--text-primary)"}
+                                onMouseLeave={e => e.currentTarget.style.color = "var(--text-tertiary)"}
+                            >
+                                ×
+                            </button>
+                        </div>
+
+                        {/* Modal body */}
+                        <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                            {/* Ürün Adı */}
+                            <FormField label="Ürün Adı" required>
+                                <input
+                                    style={modalInputStyle}
+                                    value={createForm.name}
+                                    onChange={e => setCreateForm(f => ({ ...f, name: e.target.value }))}
+                                    placeholder="3 Parçalı Küresel Vana DN25"
+                                    autoFocus
+                                />
+                            </FormField>
+
+                            {/* SKU + Kategori */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                <FormField label="SKU" required>
+                                    <input
+                                        style={modalInputStyle}
+                                        value={createForm.sku}
+                                        onChange={e => setCreateForm(f => ({ ...f, sku: e.target.value }))}
+                                        placeholder="KV-3P-DN25"
+                                    />
+                                </FormField>
+                                <FormField label="Kategori">
+                                    <select
+                                        style={modalInputStyle}
+                                        value={createForm.category}
+                                        onChange={e => setCreateForm(f => ({ ...f, category: e.target.value }))}
+                                    >
+                                        {categories.slice(1).map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </FormField>
+                            </div>
+
+                            {/* Fiyat + Para Birimi + Birim */}
+                            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "10px" }}>
+                                <FormField label="Birim Fiyat">
+                                    <input
+                                        style={modalInputStyle}
+                                        type="number"
+                                        min={0}
+                                        step={0.01}
+                                        value={createForm.price}
+                                        onChange={e => setCreateForm(f => ({ ...f, price: parseFloat(e.target.value) || 0 }))}
+                                    />
+                                </FormField>
+                                <FormField label="Para Birimi">
+                                    <select
+                                        style={modalInputStyle}
+                                        value={createForm.currency}
+                                        onChange={e => setCreateForm(f => ({ ...f, currency: e.target.value }))}
+                                    >
+                                        {["USD", "TRY", "EUR"].map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                </FormField>
+                                <FormField label="Birim">
+                                    <select
+                                        style={modalInputStyle}
+                                        value={createForm.unit}
+                                        onChange={e => setCreateForm(f => ({ ...f, unit: e.target.value }))}
+                                    >
+                                        {["adet", "kg", "m", "litre", "takım"].map(u => <option key={u}>{u}</option>)}
+                                    </select>
+                                </FormField>
+                            </div>
+
+                            {/* Başlangıç Stoğu + Min. Stok */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                <FormField label="Başlangıç Stoğu">
+                                    <input
+                                        style={modalInputStyle}
+                                        type="number"
+                                        min={0}
+                                        value={createForm.totalStock}
+                                        onChange={e => setCreateForm(f => ({ ...f, totalStock: parseInt(e.target.value) || 0 }))}
+                                    />
+                                </FormField>
+                                <FormField label="Min. Stok Seviyesi">
+                                    <input
+                                        style={modalInputStyle}
+                                        type="number"
+                                        min={0}
+                                        value={createForm.minStockLevel}
+                                        onChange={e => setCreateForm(f => ({ ...f, minStockLevel: parseInt(e.target.value) || 0 }))}
+                                    />
+                                </FormField>
+                            </div>
+
+                            {/* Ürün Tipi + Depo */}
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                <FormField label="Ürün Tipi">
+                                    <select
+                                        style={modalInputStyle}
+                                        value={createForm.productType}
+                                        onChange={e => setCreateForm(f => ({ ...f, productType: e.target.value as "finished" | "raw_material" }))}
+                                    >
+                                        <option value="finished">Mamul</option>
+                                        <option value="raw_material">Hammadde</option>
+                                    </select>
+                                </FormField>
+                                <FormField label="Depo">
+                                    <input
+                                        style={modalInputStyle}
+                                        value={createForm.warehouse}
+                                        onChange={e => setCreateForm(f => ({ ...f, warehouse: e.target.value }))}
+                                    />
+                                </FormField>
+                            </div>
+                        </div>
+
+                        {/* Modal footer */}
+                        <div style={{
+                            padding: "12px 16px",
+                            borderTop: "0.5px solid var(--border-tertiary)",
+                            display: "flex", justifyContent: "flex-end", gap: "8px",
+                        }}>
+                            <Button variant="secondary" onClick={() => setCreateOpen(false)} disabled={createSubmitting}>
+                                İptal
+                            </Button>
+                            <Button
+                                variant="primary"
+                                loading={createSubmitting}
+                                onClick={handleCreate}
+                                disabled={!createForm.name.trim() || !createForm.sku.trim() || createSubmitting}
+                            >
+                                {createSubmitting ? "Kaydediliyor…" : "Ürün Oluştur"}
+                            </Button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

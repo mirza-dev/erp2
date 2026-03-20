@@ -36,6 +36,7 @@ interface DataContextValue {
     importedCount: { customers: number; products: number; orders: number } | null;
     addCustomer: (c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">) => void;
     updateCustomer: (id: string, updates: Partial<Customer>) => void;
+    addProduct: (p: Omit<Product, "id" | "allocatedStock" | "availableStock" | "isActive">) => void;
     addUretimKaydi: (k: Omit<UretimKaydi, "id">) => void;
     deleteUretimKaydi: (id: string) => void;
     addOrder: (detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">) => string;
@@ -85,6 +86,18 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
     const updateCustomer = (id: string, updates: Partial<Customer>) => {
         setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+    };
+
+    // --- Products ---
+    const addProduct = (fields: Omit<Product, "id" | "allocatedStock" | "availableStock" | "isActive">) => {
+        const newP: Product = {
+            ...fields,
+            id: `prod-${Date.now()}`,
+            isActive: true,
+            allocatedStock: 0,
+            availableStock: fields.totalStock,
+        };
+        setProducts(prev => [newP, ...prev]);
     };
 
     // --- Üretim ---
@@ -252,6 +265,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
             customers, products, orders, orderDetails, uretimKayitlari,
             addImportedData, importedCount,
             addCustomer, updateCustomer,
+            addProduct,
             addUretimKaydi, deleteUretimKaydi,
             addOrder, updateOrderStatus,
             reorderSuggestions,
