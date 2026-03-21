@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { mockProducts } from "@/lib/mock-data";
-import { formatCurrency } from "@/lib/utils";
+import { useData } from "@/lib/data-context";
 import DemoBanner from "@/components/ui/DemoBanner";
 import { useToast } from "@/components/ui/Toast";
 
@@ -154,6 +153,7 @@ function formatRelativeTime(isoString: string): string {
 export default function AlertsPage() {
     const router = useRouter();
     const { toast } = useToast();
+    const { products } = useData();
     const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
     const [filter, setFilter] = useState<"all" | AlertCategory>("all");
     const [lastRefreshed, setLastRefreshed] = useState("az önce");
@@ -183,7 +183,7 @@ export default function AlertsPage() {
     const infoCount = alerts.filter((a) => a.severity === "info").length;
 
     // Low stock products for the sidebar panel
-    const lowStockProducts = mockProducts.filter(
+    const lowStockProducts = products.filter(
         (p) => p.available_now < p.minStockLevel
     );
 
@@ -540,7 +540,7 @@ export default function AlertsPage() {
 
                     {/* All products stock bars */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                        {mockProducts.map((product) => {
+                        {products.map((product) => {
                             const pct = Math.round((product.available_now / product.on_hand) * 100);
                             const isCritical = product.available_now < product.minStockLevel;
                             const isWarning = !isCritical && product.available_now < product.minStockLevel * 1.5;
