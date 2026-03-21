@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useData } from "@/lib/data-context";
+import { useToast } from "@/components/ui/Toast";
+import Button from "@/components/ui/Button";
 
 type FilterType = "all" | "raw_material" | "finished";
 
@@ -19,9 +21,132 @@ function daysBg(days: number | null) {
     return "var(--bg-tertiary)";
 }
 
+function WhyBadge({ daysLeft, urgency }: { daysLeft: number | null; urgency: number }) {
+    const lines: { text: string; color: string; bg: string }[] = [];
+
+    if (daysLeft !== null && daysLeft <= 7) {
+        lines.push({ text: "⚡ 7 günde tükeniyor", color: "var(--danger-text)", bg: "var(--danger-bg)" });
+    } else if (daysLeft !== null && daysLeft <= 14) {
+        lines.push({ text: "⚠ 14 günde tükeniyor", color: "var(--warning-text)", bg: "var(--warning-bg)" });
+    } else if (daysLeft === null) {
+        lines.push({ text: "Günlük kullanım verisi yok — stok min altında", color: "var(--warning-text)", bg: "var(--warning-bg)" });
+    }
+
+    if (urgency >= 80) {
+        lines.push({ text: `Kritik: min'in %${urgency - 100 < 0 ? Math.abs(urgency - 100) : urgency} altında`, color: "var(--danger-text)", bg: "var(--danger-bg)" });
+    }
+
+    if (lines.length === 0) return null;
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginTop: "4px" }}>
+            {lines.map((l, i) => (
+                <span key={i} style={{
+                    display: "inline-block",
+                    fontSize: "10px",
+                    fontWeight: 500,
+                    background: l.bg,
+                    color: l.color,
+                    padding: "1px 6px",
+                    borderRadius: "3px",
+                    width: "fit-content",
+                }}>
+                    {l.text}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+function SegmentBanner({ filter, rawCount, finishedCount, rawItems, finishedItems }: {
+    filter: FilterType;
+    rawCount: number;
+    finishedCount: number;
+    rawItems: { reorderQty?: number; price?: number }[];
+    finishedItems: { reorderQty?: number }[];
+}) {
+    if (filter === "all") return null;
+
+    if (filter === "raw_material") {
+        const totalOrderValue = rawItems.reduce((sum, p) => {
+            const qty = p.reorderQty ?? 0;
+            const price = p.price ?? 0;
+            return sum + qty * price;
+        }, 0);
+        return (
+            <div style={{
+                marginTop: "12px",
+                padding: "12px 16px",
+                background: "var(--warning-bg)",
+                border: "1px solid var(--warning-border)",
+                borderRadius: "8px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                flexWrap: "wrap",
+            }}>
+                <div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--warning-text)" }}>
+                        Tedarikçi ile sipariş verilmesi gereken {rawCount} hammadde
+                    </div>
+                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                        Minimum stok seviyesinin altında — tedarik süreci başlatılmalı
+                    </div>
+                </div>
+                {totalOrderValue > 0 && (
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--warning-text)", whiteSpace: "nowrap" }}>
+                        Toplam sipariş: {totalOrderValue.toLocaleString("tr-TR", { minimumFractionDigits: 0 })} ₺
+                    </div>
+                )}
+            </div>
+        );
+    }
+
+    return (
+        <div style={{
+            marginTop: "12px",
+            padding: "12px 16px",
+            background: "var(--accent-bg)",
+            border: "1px solid var(--accent-border)",
+            borderRadius: "8px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap",
+        }}>
+            <div>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-text)" }}>
+                    Üretim emri bekleyen {finishedCount} ürün
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                    Üretim kapasitesine göre önceliklendirin — kritik olanlar önce planlanmalı
+                </div>
+            </div>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-text)", whiteSpace: "nowrap" }}>
+                {finishedCount} üretim planı bekliyor
+            </div>
+        </div>
+    );
+}
+
 export default function PurchaseSuggestedPage() {
     const { reorderSuggestions } = useData();
+    const { toast } = useToast();
     const [filter, setFilter] = useState<FilterType>("all");
+    const [orderedIds, setOrderedIds] = useState<Set<string>>(new Set());
+    const [windowWidth, setWindowWidth] = useState(
+        typeof window !== "undefined" ? window.innerWidth : 1200
+    );
+
+    useEffect(() => {
+        const handleResize = () => setWindowWidth(window.innerWidth);
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    const isMobile = windowWidth < 768;
 
     const rawItems = reorderSuggestions.filter(p => p.productType === "raw_material");
     const finishedItems = reorderSuggestions.filter(p => p.productType === "finished");
@@ -30,14 +155,12 @@ export default function PurchaseSuggestedPage() {
         ? reorderSuggestions
         : reorderSuggestions.filter(p => p.productType === filter);
 
-    // Sort by urgency DESC
     const sorted = [...filtered].sort((a, b) => {
         const urgA = (1 - a.availableStock / a.minStockLevel);
         const urgB = (1 - b.availableStock / b.minStockLevel);
         return urgB - urgA;
     });
 
-    // Summary stats
     const avgRisk = reorderSuggestions.length > 0
         ? Math.round(reorderSuggestions.reduce((sum, p) => sum + (1 - p.availableStock / p.minStockLevel) * 100, 0) / reorderSuggestions.length)
         : 0;
@@ -56,6 +179,17 @@ export default function PurchaseSuggestedPage() {
         { key: "finished", label: "Bitmiş Ürün", count: finishedItems.length },
     ];
 
+    function handleOrder(p: typeof sorted[0]) {
+        setOrderedIds(prev => new Set(prev).add(p.id));
+        const isRaw = p.productType === "raw_material";
+        toast({
+            type: "success",
+            message: isRaw
+                ? `Satın alma emri oluşturuldu: ${p.name}`
+                : `Üretim emri oluşturuldu: ${p.name}`,
+        });
+    }
+
     return (
         <div style={{ padding: "24px 32px" }}>
             {/* Header */}
@@ -69,7 +203,6 @@ export default function PurchaseSuggestedPage() {
             {/* Summary cards */}
             {reorderSuggestions.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginTop: "20px" }}>
-                    {/* Toplam Kritik */}
                     <div style={{
                         background: "var(--bg-secondary)",
                         border: "1px solid var(--danger-border)",
@@ -87,7 +220,6 @@ export default function PurchaseSuggestedPage() {
                         </div>
                     </div>
 
-                    {/* En Acil */}
                     <div style={{
                         background: "var(--bg-secondary)",
                         border: "1px solid var(--warning-border)",
@@ -120,7 +252,6 @@ export default function PurchaseSuggestedPage() {
                         )}
                     </div>
 
-                    {/* Ortalama Risk */}
                     <div style={{
                         background: "var(--bg-secondary)",
                         border: "1px solid var(--border-secondary)",
@@ -189,6 +320,15 @@ export default function PurchaseSuggestedPage() {
                 })}
             </div>
 
+            {/* Segment banner */}
+            <SegmentBanner
+                filter={filter}
+                rawCount={rawItems.length}
+                finishedCount={finishedItems.length}
+                rawItems={rawItems}
+                finishedItems={finishedItems}
+            />
+
             {/* Table or empty state */}
             {sorted.length === 0 ? (
                 <div style={{
@@ -200,7 +340,115 @@ export default function PurchaseSuggestedPage() {
                     <div style={{ fontSize: "32px", marginBottom: "8px" }}>&#10003;</div>
                     Tüm stoklar minimum seviyenin üstünde.
                 </div>
+            ) : isMobile ? (
+                /* Mobile card layout */
+                <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                    {sorted.map(p => {
+                        const urgency = Math.round((1 - p.availableStock / p.minStockLevel) * 100);
+                        const stockPct = Math.min(100, Math.round((p.availableStock / p.minStockLevel) * 100));
+                        const deficit = p.minStockLevel - p.availableStock;
+                        const daysLeft = p.dailyUsage ? Math.round(p.availableStock / p.dailyUsage) : null;
+                        const isRaw = p.productType === "raw_material";
+                        const isOrdered = orderedIds.has(p.id);
+
+                        return (
+                            <div key={p.id} style={{
+                                border: "1px solid var(--border-secondary)",
+                                borderRadius: "8px",
+                                padding: "14px 16px",
+                                background: urgency >= 80 ? "rgba(248,81,73,0.04)" : "var(--bg-secondary)",
+                            }}>
+                                {/* Type + Name row */}
+                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <span style={{
+                                            display: "inline-block",
+                                            padding: "1px 7px",
+                                            borderRadius: "4px",
+                                            fontSize: "10px",
+                                            fontWeight: 600,
+                                            background: isRaw ? "var(--danger-bg)" : "var(--accent-bg)",
+                                            color: isRaw ? "var(--danger-text)" : "var(--accent-text)",
+                                            marginBottom: "4px",
+                                        }}>
+                                            {isRaw ? "Hammadde" : "Bitmiş Ürün"}
+                                        </span>
+                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
+                                            {p.name}
+                                        </div>
+                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace", marginTop: "2px" }}>
+                                            {p.sku}
+                                        </div>
+                                        <WhyBadge daysLeft={daysLeft} urgency={urgency} />
+                                    </div>
+                                    <div style={{ fontSize: "18px", fontWeight: 700, color: urgency >= 80 ? "var(--danger-text)" : "var(--warning-text)", whiteSpace: "nowrap" }}>
+                                        {urgency}%
+                                    </div>
+                                </div>
+
+                                {/* Risk bar */}
+                                <div style={{
+                                    marginTop: "10px",
+                                    height: "4px",
+                                    background: "var(--bg-tertiary)",
+                                    borderRadius: "2px",
+                                    overflow: "hidden",
+                                }}>
+                                    <div style={{
+                                        width: `${urgency}%`,
+                                        height: "100%",
+                                        background: urgency >= 80 ? "var(--danger)" : urgency >= 50 ? "var(--warning)" : "var(--accent)",
+                                        borderRadius: "2px",
+                                    }} />
+                                </div>
+
+                                {/* Stock details */}
+                                <div style={{ display: "flex", gap: "16px", marginTop: "10px", flexWrap: "wrap" }}>
+                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                        <span style={{ color: "var(--text-tertiary)" }}>Mevcut:</span>{" "}
+                                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{p.availableStock.toLocaleString("tr-TR")}</span>
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                        <span style={{ color: "var(--text-tertiary)" }}>Min:</span>{" "}
+                                        <span style={{ fontWeight: 600 }}>{p.minStockLevel.toLocaleString("tr-TR")}</span>
+                                    </div>
+                                    <div style={{ fontSize: "12px" }}>
+                                        <span style={{ color: "var(--text-tertiary)" }}>Açık:</span>{" "}
+                                        <span style={{ fontWeight: 700, color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
+                                    </div>
+                                </div>
+
+                                {/* Recommended qty */}
+                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "6px" }}>
+                                    <span style={{ color: "var(--text-tertiary)" }}>Önerilen:</span>{" "}
+                                    <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                                        {p.reorderQty?.toLocaleString("tr-TR") ?? "—"} {p.unit}
+                                    </span>
+                                </div>
+
+                                {/* CTA */}
+                                <div style={{ marginTop: "12px" }}>
+                                    <Button
+                                        variant={isOrdered ? "secondary" : isRaw ? "primary" : "secondary"}
+                                        size="sm"
+                                        fullWidth
+                                        disabled={isOrdered}
+                                        onClick={() => handleOrder(p)}
+                                        style={isOrdered ? { background: "var(--success-bg)", color: "var(--success-text)", borderColor: "var(--success-border)" } : undefined}
+                                    >
+                                        {isOrdered
+                                            ? "Oluşturuldu ✓"
+                                            : isRaw
+                                                ? "Sipariş Oluştur"
+                                                : "Üretim Emri Ver"}
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
             ) : (
+                /* Desktop table */
                 <div style={{
                     marginTop: "16px",
                     border: "1px solid var(--border-secondary)",
@@ -210,7 +458,7 @@ export default function PurchaseSuggestedPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
-                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Risk Skoru", "Önerilen · Tükenme", "Durum"].map(h => (
+                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Risk Skoru", "Önerilen · Tükenme", "Aksiyon"].map(h => (
                                     <th key={h} style={{
                                         padding: "10px 12px",
                                         textAlign: "left",
@@ -234,6 +482,7 @@ export default function PurchaseSuggestedPage() {
                                 const deficit = p.minStockLevel - p.availableStock;
                                 const daysLeft = p.dailyUsage ? Math.round(p.availableStock / p.dailyUsage) : null;
                                 const isRaw = p.productType === "raw_material";
+                                const isOrdered = orderedIds.has(p.id);
 
                                 return (
                                     <tr key={p.id} style={{
@@ -254,9 +503,10 @@ export default function PurchaseSuggestedPage() {
                                                 {isRaw ? "Hammadde" : "Bitmiş Ürün"}
                                             </span>
                                         </td>
-                                        {/* Ürün Adı */}
-                                        <td style={{ padding: "10px 12px", color: "var(--text-primary)", fontWeight: 500, maxWidth: "180px" }}>
-                                            {p.name}
+                                        {/* Ürün Adı + Why */}
+                                        <td style={{ padding: "10px 12px", maxWidth: "200px" }}>
+                                            <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>{p.name}</div>
+                                            <WhyBadge daysLeft={daysLeft} urgency={urgency} />
                                         </td>
                                         {/* SKU */}
                                         <td style={{ padding: "10px 12px", fontFamily: "monospace", color: "var(--text-secondary)", fontSize: "12px" }}>
@@ -266,7 +516,7 @@ export default function PurchaseSuggestedPage() {
                                         <td style={{ padding: "10px 12px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                                             {p.warehouse}
                                         </td>
-                                        {/* Stok — mini bar */}
+                                        {/* Stok */}
                                         <td style={{ padding: "10px 12px" }}>
                                             <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 500 }}>
                                                 {p.availableStock.toLocaleString("tr-TR")}
@@ -339,28 +589,21 @@ export default function PurchaseSuggestedPage() {
                                                 </span>
                                             )}
                                         </td>
-                                        {/* Durum */}
+                                        {/* Aksiyon */}
                                         <td style={{ padding: "10px 12px" }}>
-                                            <div style={{
-                                                display: "inline-flex",
-                                                alignItems: "center",
-                                                gap: "5px",
-                                                padding: "4px 10px",
-                                                borderRadius: "4px",
-                                                fontSize: "12px",
-                                                fontWeight: 500,
-                                                background: isRaw ? "var(--warning-bg)" : "var(--success-bg)",
-                                                color: isRaw ? "var(--warning-text)" : "var(--success-text)",
-                                                border: `1px solid ${isRaw ? "var(--warning-border)" : "var(--success-border)"}`,
-                                                whiteSpace: "nowrap",
-                                            }}>
-                                                {isRaw ? "▲ Sipariş verilmeli" : "▶ Üretim emri verilmeli"}
-                                            </div>
-                                            {isRaw && p.preferredVendor && (
-                                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                                                    {p.preferredVendor}
-                                                </div>
-                                            )}
+                                            <Button
+                                                variant={isOrdered ? "secondary" : isRaw ? "primary" : "secondary"}
+                                                size="sm"
+                                                disabled={isOrdered}
+                                                onClick={() => handleOrder(p)}
+                                                style={isOrdered ? { background: "var(--success-bg)", color: "var(--success-text)", borderColor: "var(--success-border)", opacity: 1 } : undefined}
+                                            >
+                                                {isOrdered
+                                                    ? "Oluşturuldu ✓"
+                                                    : isRaw
+                                                        ? "Sipariş Oluştur"
+                                                        : "Üretim Emri Ver"}
+                                            </Button>
                                         </td>
                                     </tr>
                                 );

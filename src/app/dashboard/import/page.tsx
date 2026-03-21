@@ -404,18 +404,17 @@ export default function ImportPage() {
             {/* ───── IDLE ───── */}
             {state === "idle" && (
                 <>
+                    {/* Drop zone — drag target only, no onClick */}
                     <div
                         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                         onDragLeave={() => setDragOver(false)}
                         onDrop={handleDrop}
-                        onClick={() => fileInputRef.current?.click()}
                         style={{
-                            border: `1.5px dashed ${dragOver ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            border: `2px dashed ${dragOver ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "8px",
-                            padding: "60px 24px",
+                            padding: "48px 24px",
                             textAlign: "center",
-                            cursor: "pointer",
-                            background: dragOver ? "rgba(56,139,253,0.04)" : "var(--bg-primary)",
+                            background: dragOver ? "rgba(56,139,253,0.07)" : "var(--bg-primary)",
                             transition: "border-color 0.15s, background 0.15s",
                         }}
                     >
@@ -427,30 +426,89 @@ export default function ImportPage() {
                             onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }}
                         />
                         <div style={{
-                            width: "48px", height: "48px", margin: "0 auto 16px",
+                            width: "56px", height: "56px", margin: "0 auto 16px",
                             background: "var(--accent-bg)", borderRadius: "10px",
                             display: "flex", alignItems: "center", justifyContent: "center",
                         }}>
-                            <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                            <svg width="24" height="24" viewBox="0 0 22 22" fill="none">
                                 <path d="M11 14V4M11 4L7 8M11 4L15 8" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M3 17h16" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
                             </svg>
                         </div>
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
-                            {dragOver ? "Dosyayı bırak" : "Excel dosyasını sürükle veya tıkla"}
+                            {dragOver ? "Dosyayı bırak" : "Dosyanı içe aktar"}
                         </div>
-                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                            .xlsx · .xls · .csv · .pdf &nbsp;·&nbsp; Çok-sheet desteklenir
+                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>
+                            Excel, CSV veya PDF dosyalarını destekliyoruz
                         </div>
-                        <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap" }}>
-                            {["Müşteri Listesi", "Sipariş Geçmişi", "Ürün Kataloğu", "Stok Raporu"].map(label => (
-                                <span key={label} style={{
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            style={{
+                                padding: "8px 20px",
+                                background: "var(--accent)",
+                                color: "#fff",
+                                border: "none",
+                                borderRadius: "6px",
+                                fontSize: "13px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                            }}
+                        >
+                            📂 Dosya Seç
+                        </button>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "8px" }}>
+                            veya dosyayı buraya sürükle
+                        </div>
+                        {/* File type chips */}
+                        <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap", alignItems: "center" }}>
+                            {["XLSX", "XLS", "CSV", "PDF"].map(ext => (
+                                <span key={ext} style={{
                                     fontSize: "11px", padding: "3px 10px",
-                                    background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)",
-                                    borderRadius: "12px", color: "var(--text-tertiary)",
-                                }}>{label}</span>
+                                    background: "var(--bg-secondary)",
+                                    border: "0.5px solid var(--border-secondary)",
+                                    borderRadius: "4px",
+                                    color: "var(--text-secondary)",
+                                    fontFamily: "monospace",
+                                    fontWeight: 600,
+                                }}>{ext}</span>
                             ))}
+                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>· çok-sheet desteklenir</span>
                         </div>
+                    </div>
+
+                    {/* Örnek etiketler */}
+                    <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
+                        {["Müşteri Listesi", "Sipariş Geçmişi", "Ürün Kataloğu", "Stok Raporu"].map(label => (
+                            <span key={label} style={{
+                                fontSize: "11px", padding: "3px 10px",
+                                background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)",
+                                borderRadius: "12px", color: "var(--text-tertiary)",
+                            }}>{label}</span>
+                        ))}
+                    </div>
+
+                    {/* "Ne Olacak?" akış göstergesi */}
+                    <div style={{
+                        display: "flex", alignItems: "center", gap: "0",
+                        background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
+                        borderRadius: "6px", overflow: "hidden",
+                    }}>
+                        {[
+                            { icon: "🔍", label: "Analiz" },
+                            { icon: "🗂", label: "Sheet Seç" },
+                            { icon: "🔗", label: "Eşleştir" },
+                            { icon: "👁", label: "Önizle" },
+                            { icon: "✅", label: "İçe Aktar" },
+                        ].map((step, i) => (
+                            <div key={step.label} style={{
+                                flex: 1, textAlign: "center", padding: "10px 8px",
+                                borderRight: i < 4 ? "0.5px solid var(--border-tertiary)" : "none",
+                                display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
+                            }}>
+                                <span style={{ fontSize: "14px" }}>{step.icon}</span>
+                                <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{step.label}</span>
+                            </div>
+                        ))}
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>

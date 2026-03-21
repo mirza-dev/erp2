@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { mockProducts } from "@/lib/mock-data";
 import { formatCurrency } from "@/lib/utils";
 import DemoBanner from "@/components/ui/DemoBanner";
+import { useToast } from "@/components/ui/Toast";
 
 type AlertSeverity = "critical" | "warning" | "info";
 type AlertCategory = "stock" | "order" | "ai";
@@ -18,6 +20,8 @@ interface Alert {
     meta?: string;
     actionLabel?: string;
     actionHref?: string;
+    actionRouteTo?: string;
+    actionToastMsg?: string;
     dismissible: boolean;
     createdAt: string;
 }
@@ -32,6 +36,8 @@ const initialAlerts: Alert[] = [
         description: "Mevcut stok (20 adet) minimum stok seviyesinin (50 adet) altına düştü. %60 açık.",
         meta: "KB-WT-DN150 · Kelebek Vanalar",
         actionLabel: "Satın Alma Emri",
+        actionRouteTo: "/dashboard/purchase/suggested",
+        actionToastMsg: "Satın alma emri sayfası açılıyor",
         dismissible: false,
         createdAt: "2026-03-17T08:14:00",
     },
@@ -43,6 +49,8 @@ const initialAlerts: Alert[] = [
         description: "Mevcut stok (5 adet) minimum stok seviyesinin (15 adet) altına düştü. %67 açık. Aktif siparişlerin %92'si tahsis edilmiş durumda.",
         meta: "CV-CK-DN200 · Çek Valfler",
         actionLabel: "Satın Alma Emri",
+        actionRouteTo: "/dashboard/purchase/suggested",
+        actionToastMsg: "Satın alma emri sayfası açılıyor",
         dismissible: false,
         createdAt: "2026-03-17T07:52:00",
     },
@@ -92,6 +100,8 @@ const initialAlerts: Alert[] = [
         description: "Son 90 günlük satış trendine göre 2 Parçalı Küresel Vana DN50, 6 hafta içinde minimum stok seviyesine ulaşacak. 200 adet sipariş öneriliyor.",
         meta: "Önerilen miktar: 200 adet · Tahmini maliyet: $136,000",
         actionLabel: "Sipariş Oluştur",
+        actionRouteTo: "/dashboard/orders/new",
+        actionToastMsg: "Yeni sipariş formu açılıyor",
         dismissible: true,
         createdAt: "2026-03-17T06:00:00",
     },
@@ -142,16 +152,28 @@ function formatRelativeTime(isoString: string): string {
 }
 
 export default function AlertsPage() {
+    const router = useRouter();
+    const { toast } = useToast();
     const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
     const [filter, setFilter] = useState<"all" | AlertCategory>("all");
     const [lastRefreshed, setLastRefreshed] = useState("az önce");
+    const [refreshing, setRefreshing] = useState(false);
 
     const dismiss = (id: string) => {
         setAlerts((prev) => prev.filter((a) => a.id !== id));
+        toast({ type: "info", message: "Uyarı kapatıldı" });
     };
 
     const handleRefresh = () => {
-        setLastRefreshed("az önce");
+        if (refreshing) return;
+        setRefreshing(true);
+        setTimeout(() => {
+            setRefreshing(false);
+            setLastRefreshed(
+                new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+            );
+            toast({ type: "success", message: "Uyarılar güncellendi" });
+        }, 800);
     };
 
     const filtered = filter === "all" ? alerts : alerts.filter((a) => a.category === filter);
@@ -197,6 +219,7 @@ export default function AlertsPage() {
                 </div>
                 <button
                     onClick={handleRefresh}
+                    disabled={refreshing}
                     style={{
                         fontSize: "12px",
                         padding: "6px 14px",
@@ -204,13 +227,14 @@ export default function AlertsPage() {
                         borderRadius: "6px",
                         background: "transparent",
                         color: "var(--text-secondary)",
-                        cursor: "pointer",
+                        cursor: refreshing ? "not-allowed" : "pointer",
                         display: "flex",
                         alignItems: "center",
                         gap: "6px",
+                        opacity: refreshing ? 0.6 : 1,
                     }}
                 >
-                    ↻ Yenile
+                    {refreshing ? "Yükleniyor..." : "↻ Yenile"}
                 </button>
             </div>
 
@@ -296,7 +320,7 @@ export default function AlertsPage() {
                                     padding: "10px 14px",
                                     border: "none",
                                     borderBottom: filter === key ? "2px solid var(--accent)" : "2px solid transparent",
-                                    background: "transparent",
+                                    background: filter === key ? "var(--accent-bg)" : "transparent",
                                     color: filter === key ? "var(--accent-text)" : "var(--text-secondary)",
                                     cursor: "pointer",
                                     display: "flex",
@@ -440,7 +464,8 @@ export default function AlertsPage() {
                                                         href={alert.actionHref}
                                                         style={{
                                                             fontSize: "12px",
-                                                            padding: "5px 12px",
+                                                            fontWeight: 600,
+                                                            padding: "5px 14px",
                                                             borderRadius: "6px",
                                                             background: colors.bg,
                                                             border: `0.5px solid ${colors.border}`,
@@ -453,9 +478,14 @@ export default function AlertsPage() {
                                                     </Link>
                                                 ) : (
                                                     <button
+                                                        onClick={() => {
+                                                            if (alert.actionToastMsg) toast({ type: "success", message: alert.actionToastMsg });
+                                                            if (alert.actionRouteTo) router.push(alert.actionRouteTo);
+                                                        }}
                                                         style={{
                                                             fontSize: "12px",
-                                                            padding: "5px 12px",
+                                                            fontWeight: 600,
+                                                            padding: "5px 14px",
                                                             borderRadius: "6px",
                                                             background: colors.bg,
                                                             border: `0.5px solid ${colors.border}`,

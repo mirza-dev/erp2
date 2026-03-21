@@ -100,6 +100,7 @@ export default function ProductionPage() {
     const [listening, setListening] = useState(false);
     const [voiceText, setVoiceText] = useState("");
     const [voiceError, setVoiceError] = useState("");
+    const [isSaving, setIsSaving] = useState(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognitionRef = useRef<any>(null);
 
@@ -111,28 +112,39 @@ export default function ProductionPage() {
     };
 
     const removeLine = (id: string) => {
-        if (lines.length > 1) setLines(prev => prev.filter(l => l.id !== id));
+        if (lines.length === 1) {
+            setLines([newLine()]);
+        } else {
+            setLines(prev => prev.filter(l => l.id !== id));
+        }
     };
 
     const handleSave = () => {
         const valid = lines.filter(l => l.productId && parseInt(l.adet) > 0);
-        if (valid.length === 0) return;
-        for (const line of valid) {
-            const product = products.find(p => p.id === line.productId);
-            if (!product) continue;
-            addUretimKaydi({
-                productId: product.id,
-                productName: product.name,
-                productSku: product.sku,
-                adet: parseInt(line.adet),
-                tarih,
-                girenKullanici: "Usta",
-                notlar: line.notlar,
-            });
+        if (valid.length === 0) {
+            toast({ type: "error", message: "Lütfen en az bir ürün seçin ve adet girin" });
+            return;
         }
-        const totalAdet = valid.reduce((s, l) => s + parseInt(l.adet), 0);
-        toast({ type: "success", message: `${valid.length} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi` });
-        setLines([newLine()]);
+        setIsSaving(true);
+        setTimeout(() => {
+            for (const line of valid) {
+                const product = products.find(p => p.id === line.productId);
+                if (!product) continue;
+                addUretimKaydi({
+                    productId: product.id,
+                    productName: product.name,
+                    productSku: product.sku,
+                    adet: parseInt(line.adet),
+                    tarih,
+                    girenKullanici: "Usta",
+                    notlar: line.notlar,
+                });
+            }
+            const totalAdet = valid.reduce((s, l) => s + parseInt(l.adet), 0);
+            toast({ type: "success", message: `${valid.length} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi` });
+            setLines([newLine()]);
+            setIsSaving(false);
+        }, 650);
     };
 
     // ── Voice input ─────────────────────────────────────────────────────────
@@ -222,36 +234,29 @@ export default function ProductionPage() {
                         Üretim Kalemleri
                     </div>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        {voiceText && !listening && (
-                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                "{voiceText}"
-                            </span>
-                        )}
-                        {voiceError && (
-                            <span style={{ fontSize: "11px", color: "var(--warning-text)" }}>{voiceError}</span>
-                        )}
                         <button
-                            onClick={listening ? stopListening : startListening}
-                            title="Sesli giriş"
+                            onClick={() => toast({ type: "info", message: "🎤 Sesli giriş özelliği yakında aktif olacak" })}
+                            title="Sesli giriş (yakında)"
                             style={{
                                 fontSize: "13px",
                                 padding: "5px 12px",
-                                border: `0.5px solid ${listening ? "var(--danger-border)" : "var(--border-secondary)"}`,
+                                border: "0.5px solid var(--border-secondary)",
                                 borderRadius: "6px",
-                                background: listening ? "var(--danger-bg)" : "transparent",
-                                color: listening ? "var(--danger-text)" : "var(--text-secondary)",
+                                background: "transparent",
+                                color: "var(--text-secondary)",
                                 cursor: "pointer",
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "5px",
                             }}
                         >
-                            {listening ? "⏹ Durdur" : "🎤 Sesli Giriş"}
+                            🎤 Sesli Giriş (Yakında)
                         </button>
                     </div>
                 </div>
 
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", minWidth: "520px", borderCollapse: "collapse" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)" }}>
                             <th style={{ ...thStyle, width: "34px" }}>#</th>
@@ -310,16 +315,17 @@ export default function ProductionPage() {
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
                                             onClick={() => removeLine(line.id)}
-                                            disabled={lines.length === 1}
                                             style={{
                                                 fontSize: "16px",
-                                                color: lines.length === 1 ? "var(--text-tertiary)" : "var(--danger-text)",
+                                                color: "var(--danger-text)",
                                                 background: "transparent",
                                                 border: "none",
-                                                cursor: lines.length === 1 ? "not-allowed" : "pointer",
-                                                opacity: lines.length === 1 ? 0.3 : 1,
+                                                cursor: "pointer",
+                                                opacity: 0.6,
                                                 lineHeight: 1,
                                             }}
+                                            onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
+                                            onMouseLeave={e => (e.currentTarget.style.opacity = "0.6")}
                                         >×</button>
                                     </td>
                                 </tr>
@@ -327,8 +333,9 @@ export default function ProductionPage() {
                         })}
                     </tbody>
                 </table>
+                </div>
 
-                <div style={{ padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>
                     <button
                         onClick={() => setLines(prev => [...prev, newLine()])}
                         style={{
@@ -346,8 +353,8 @@ export default function ProductionPage() {
                         + Kalem Ekle
                     </button>
 
-                    <Button variant="primary" size="md" onClick={handleSave} disabled={!canSave}>
-                        Kaydet & Stoğu Güncelle
+                    <Button variant="primary" size="md" onClick={handleSave} disabled={!canSave || isSaving} loading={isSaving}>
+                        {isSaving ? "Kaydediliyor..." : "Kaydet & Stoğu Güncelle"}
                     </Button>
                 </div>
             </div>
