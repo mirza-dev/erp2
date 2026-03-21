@@ -343,7 +343,7 @@ export default function ImportPage() {
                 Excel analizi simülasyon modunda çalışmaktadır. Gerçek dosya parse işlemi AI entegrasyonu ile aktif olacak.
             </DemoBanner>
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <div>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                         AI Veri İçe Aktarım
@@ -771,7 +771,7 @@ export default function ImportPage() {
 
                     <div style={{
                         background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                        borderRadius: "8px", overflow: "hidden",
+                        borderRadius: "8px", overflowX: "auto",
                     }}>
                         {/* Preview info bar */}
                         <div style={{
@@ -790,7 +790,7 @@ export default function ImportPage() {
 
                         {/* Dynamic preview table */}
                         {activeTab === "Urunler" && (
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
                                 <thead><tr style={{ background: "var(--bg-secondary)" }}>
                                     {["SKU", "Ürün Adı", "Kategori", "Birim", "Fiyat"].map(h => <th key={h} style={thStyle}>{h}</th>)}
                                 </tr></thead>
@@ -800,7 +800,7 @@ export default function ImportPage() {
                             </table>
                         )}
                         {activeTab === "Musteriler" && (
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
                                 <thead><tr style={{ background: "var(--bg-secondary)" }}>
                                     {["Kod", "Firma Adı", "Ülke", "Para Birimi", "Durum"].map(h => <th key={h} style={thStyle}>{h}</th>)}
                                 </tr></thead>
@@ -810,7 +810,7 @@ export default function ImportPage() {
                             </table>
                         )}
                         {activeTab === "Siparisler" && (
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
                                 <thead><tr style={{ background: "var(--bg-secondary)" }}>
                                     {["Sipariş No", "Tarih", "Müşteri", "Durum", "Tutar"].map(h => <th key={h} style={thStyle}>{h}</th>)}
                                 </tr></thead>
@@ -820,7 +820,7 @@ export default function ImportPage() {
                             </table>
                         )}
                         {activeTab === "Siparis_Kalemleri" && (
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
                                 <thead><tr style={{ background: "var(--bg-secondary)" }}>
                                     {["Kalem ID", "Sipariş", "Ürün", "Miktar", "Fiyat", "Toplam"].map(h => <th key={h} style={thStyle}>{h}</th>)}
                                 </tr></thead>
@@ -830,7 +830,7 @@ export default function ImportPage() {
                             </table>
                         )}
                         {activeTab === "Stok" && (
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "600px" }}>
                                 <thead><tr style={{ background: "var(--bg-secondary)" }}>
                                     {["Ürün SKU", "Mevcut Stok", "Rezerve", "Serbest", "Min. Seviye"].map(h => <th key={h} style={thStyle}>{h}</th>)}
                                 </tr></thead>

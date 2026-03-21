@@ -232,6 +232,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                 <div>
                     <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}>{form.fullName}</div>
                     <button
+                        onClick={() => toast({ type: "info", message: "Fotoğraf yükleme yakında açılacak" })}
                         style={{
                             fontSize: "11px",
                             marginTop: "3px",
@@ -419,6 +420,7 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
 
 // ─── API Anahtarları ───────────────────────────────────────────────────────────
 function ApiTab() {
+    const { toast } = useToast();
     const [keys, setKeys] = useState([
         { id: "parasut", label: "Paraşüt API", key: "sk_live_prs_xK9mW2pQrTv3nLhBfZeYuD1234", visible: false },
         { id: "claude", label: "Claude AI (Anthropic)", key: "sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", visible: false },
@@ -519,6 +521,7 @@ function ApiTab() {
                                 {copied === k.id ? "Kopyalandı ✓" : "Kopyala"}
                             </button>
                             <button
+                                onClick={() => toast({ type: "info", message: "API anahtarı yenileme yakında açılacak" })}
                                 style={{
                                     fontSize: "11px",
                                     padding: "4px 8px",

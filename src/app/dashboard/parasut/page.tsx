@@ -132,6 +132,8 @@ export default function ParasutPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "8px",
                 }}
             >
                 <div>
@@ -366,7 +368,7 @@ export default function ParasutPage() {
                         background: "var(--bg-secondary)",
                         border: "0.5px solid var(--border-tertiary)",
                         borderRadius: "8px",
-                        overflow: "hidden",
+                        overflowX: "auto",
                     }}
                 >
                     <div
@@ -391,7 +393,7 @@ export default function ParasutPage() {
                             Henüz otomatik gönderilen fatura yok. Bir sipariş &quot;Sevk Edildi&quot; durumuna geçince buraya eklenir.
                         </div>
                     ) : (
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "560px" }}>
                             <thead>
                                 <tr>
                                     <th style={thStyle}>Fatura No</th>
@@ -438,7 +440,7 @@ export default function ParasutPage() {
                         background: "var(--bg-secondary)",
                         border: "0.5px solid var(--border-tertiary)",
                         borderRadius: "8px",
-                        overflow: "hidden",
+                        overflowX: "auto",
                     }}
                 >
                     <div
@@ -452,7 +454,7 @@ export default function ParasutPage() {
                     >
                         Sync Geçmişi
                     </div>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "520px" }}>
                         <thead>
                             <tr>
                                 <th style={thStyle}>Tarih</th>

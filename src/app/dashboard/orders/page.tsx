@@ -83,7 +83,7 @@ function OrdersList() {
             </div>
 
             {/* Toolbar */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                 {/* Tabs — bottom border style */}
                 <div style={{ display: "flex", gap: "0px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                     {filterTabs.map((tab) => (
@@ -136,10 +136,10 @@ function OrdersList() {
                     background: "var(--bg-primary)",
                     border: "0.5px solid var(--border-tertiary)",
                     borderRadius: "6px",
-                    overflow: "hidden",
+                    overflowX: "auto",
                 }}
             >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "700px" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)" }}>
                             <th style={thStyle}>Sipariş No</th>

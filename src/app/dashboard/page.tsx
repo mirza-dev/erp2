@@ -45,7 +45,7 @@ export default function DashboardPage() {
             <StatsCards />
 
             {/* Section header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                     Stok Envanteri — Canlı
                 </div>

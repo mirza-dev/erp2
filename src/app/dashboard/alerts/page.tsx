@@ -200,6 +200,8 @@ export default function AlertsPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "8px",
                 }}
             >
                 <div>

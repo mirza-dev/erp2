@@ -499,7 +499,7 @@ function NewOrderForm() {
                                             </td>
                                             <td style={{ padding: "8px 12px", textAlign: "center" }}>
                                                 <button
-                                                    onClick={() => removeLine(line.id)}
+                                                    onClick={() => { removeLine(line.id); if (lines.length > 1) toast({ type: "success", message: "Satır kaldırıldı" }); }}
                                                     disabled={lines.length === 1}
                                                     style={{
                                                         fontSize: "14px",

@@ -388,7 +388,8 @@ export default function ProductionPage() {
                         Bugün henüz üretim kaydı girilmedi
                     </div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "480px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
                                 <th style={thStyle}>SKU</th>
@@ -411,7 +412,7 @@ export default function ProductionPage() {
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.notlar || "—"}</td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
-                                            onClick={() => deleteUretimKaydi(kaydi.id)}
+                                            onClick={() => { deleteUretimKaydi(kaydi.id); toast({ type: "success", message: "Üretim kaydı silindi" }); }}
                                             title="Kaydı sil (stok geri alınır)"
                                             style={{
                                                 fontSize: "14px",
@@ -429,6 +430,7 @@ export default function ProductionPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
 
@@ -445,7 +447,8 @@ export default function ProductionPage() {
                             Geçmiş Kayıtlar
                         </div>
                     </div>
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "460px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
                                 <th style={thStyle}>Tarih</th>
@@ -467,6 +470,7 @@ export default function ProductionPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
         </div>
