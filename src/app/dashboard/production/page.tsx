@@ -93,7 +93,7 @@ function parseVoice(text: string, products: Product[]): { productId: string; ade
 }
 
 export default function ProductionPage() {
-    const { products, uretimKayitlari, addUretimKaydi, deleteUretimKaydi } = useData();
+    const { products, uretimKayitlari, addUretimKaydi, deleteUretimKaydi, loadError } = useData();
     const { toast } = useToast();
     const [tarih, setTarih] = useState(today());
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
@@ -101,6 +101,7 @@ export default function ProductionPage() {
     const [voiceText, setVoiceText] = useState("");
     const [voiceError, setVoiceError] = useState("");
     const [isSaving, setIsSaving] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const recognitionRef = useRef<any>(null);
 
@@ -119,18 +120,18 @@ export default function ProductionPage() {
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const valid = lines.filter(l => l.productId && parseInt(l.adet) > 0);
         if (valid.length === 0) {
             toast({ type: "error", message: "Lütfen en az bir ürün seçin ve adet girin" });
             return;
         }
         setIsSaving(true);
-        setTimeout(() => {
+        try {
             for (const line of valid) {
                 const product = products.find(p => p.id === line.productId);
                 if (!product) continue;
-                addUretimKaydi({
+                await addUretimKaydi({
                     productId: product.id,
                     productName: product.name,
                     productSku: product.sku,
@@ -143,8 +144,11 @@ export default function ProductionPage() {
             const totalAdet = valid.reduce((s, l) => s + parseInt(l.adet), 0);
             toast({ type: "success", message: `${valid.length} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi` });
             setLines([newLine()]);
+        } catch {
+            toast({ type: "error", message: "Üretim kaydedilemedi. Lütfen tekrar deneyin." });
+        } finally {
             setIsSaving(false);
-        }, 650);
+        }
     };
 
     // ── Voice input ─────────────────────────────────────────────────────────
@@ -196,6 +200,22 @@ export default function ProductionPage() {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Load error banner */}
+            {loadError && (
+                <div style={{
+                    padding: "10px 14px",
+                    background: "var(--danger-bg)",
+                    border: "0.5px solid var(--danger-border)",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    color: "var(--danger-text)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                }}>
+                    ⚠ {loadError}
+                </div>
+            )}
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
@@ -412,7 +432,19 @@ export default function ProductionPage() {
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.notlar || "—"}</td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
-                                            onClick={() => { deleteUretimKaydi(kaydi.id); toast({ type: "success", message: "Üretim kaydı silindi" }); }}
+                                            onClick={async () => {
+                                                if (deletingId === kaydi.id) return;
+                                                setDeletingId(kaydi.id);
+                                                try {
+                                                    await deleteUretimKaydi(kaydi.id);
+                                                    toast({ type: "success", message: "Üretim kaydı silindi" });
+                                                } catch {
+                                                    toast({ type: "error", message: "Kayıt silinemedi." });
+                                                } finally {
+                                                    setDeletingId(null);
+                                                }
+                                            }}
+                                            disabled={deletingId === kaydi.id}
                                             title="Kaydı sil (stok geri alınır)"
                                             style={{
                                                 fontSize: "14px",

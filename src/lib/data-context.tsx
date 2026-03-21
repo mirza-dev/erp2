@@ -88,6 +88,7 @@ interface DataContextValue {
     transition: OrderTransition
   ) => Promise<UpdateStatusResult>;
   reorderSuggestions: Product[];
+  loadError: string | null;
 }
 
 // ── Context ─────────────────────────────────────────────────
@@ -104,6 +105,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [uretimKayitlari, setUretimKayitlari] = useState<UretimKaydi[]>([]);
   const [importedCount, setImportedCount] =
     useState<DataContextValue["importedCount"]>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // ── Mount: Fetch all lists from API ──────────────────────
 
@@ -117,6 +119,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
             fetch("/api/orders"),
             fetch("/api/production"),
           ]);
+
+        const failed = [productsRes, customersRes, ordersRes, productionRes].find(r => !r.ok);
+        if (failed) {
+          setLoadError(`Veriler yüklenemedi (HTTP ${failed.status}). Backend bağlantısını kontrol edin.`);
+        }
 
         if (productsRes.ok) {
           const data = await productsRes.json();
@@ -137,6 +144,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           );
         }
       } catch (err) {
+        setLoadError("Sunucuya bağlanılamadı. Ağ bağlantınızı ve backend durumunu kontrol edin.");
         console.error("Failed to fetch initial data:", err);
       }
     };
@@ -192,9 +200,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setCustomers((prev) => [mapCustomer(data), ...prev]);
+      } else {
+        throw new Error(await res.text());
       }
     } catch (err) {
       console.error("addCustomer failed:", err);
+      throw err;
     }
   };
 
@@ -233,9 +244,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setProducts((prev) => [mapProduct(data), ...prev]);
+      } else {
+        throw new Error(await res.text());
       }
     } catch (err) {
       console.error("addProduct failed:", err);
+      throw err;
     }
   };
 
@@ -265,14 +279,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setUretimKayitlari(
             Array.isArray(data) ? data.map(mapProductionEntry) : []
           );
+        } else {
+          console.error("addUretimKaydi: production refetch failed", prodRes.status);
         }
         if (prodDataRes.ok) {
           const data = await prodDataRes.json();
           setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
+        } else {
+          console.error("addUretimKaydi: products refetch failed", prodDataRes.status);
         }
+      } else {
+        throw new Error(await res.text());
       }
     } catch (err) {
       console.error("addUretimKaydi failed:", err);
+      throw err;
     }
   };
 
@@ -286,10 +307,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (productsRes.ok) {
           const data = await productsRes.json();
           setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
+        } else {
+          console.error("deleteUretimKaydi: products refetch failed", productsRes.status);
         }
+      } else {
+        throw new Error(await res.text());
       }
     } catch (err) {
       console.error("deleteUretimKaydi failed:", err);
+      throw err;
     }
   };
 
@@ -374,6 +400,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if (productsRes.ok) {
           const data = await productsRes.json();
           setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
+        } else {
+          console.error("updateOrderStatus: products refetch failed", productsRes.status);
         }
       }
 
@@ -414,6 +442,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         addOrder,
         updateOrderStatus,
         reorderSuggestions,
+        loadError,
       }}
     >
       {children}

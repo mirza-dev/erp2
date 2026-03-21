@@ -50,24 +50,32 @@ const modalLabelStyle: React.CSSProperties = {
 };
 
 export default function CustomersPage() {
-    const { customers: mockCustomers, addCustomer } = useData();
+    const { customers: mockCustomers, addCustomer, loadError } = useData();
     const { toast } = useToast();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [search, setSearch] = useState("");
     const [activeFilter, setActiveFilter] = useState<"all" | "active" | "passive">("all");
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCustomer, setNewCustomer] = useState(newCustomerInitial);
+    const [isAdding, setIsAdding] = useState(false);
 
     const setField = (key: keyof typeof newCustomerInitial) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
             setNewCustomer(f => ({ ...f, [key]: e.target.value }));
 
-    const handleAdd = () => {
-        if (!newCustomer.name) return;
-        addCustomer(newCustomer);
-        toast({ type: "success", message: `${newCustomer.name} müşteri olarak eklendi` });
-        setShowAddModal(false);
-        setNewCustomer(newCustomerInitial);
+    const handleAdd = async () => {
+        if (!newCustomer.name || isAdding) return;
+        setIsAdding(true);
+        try {
+            await addCustomer(newCustomer);
+            toast({ type: "success", message: `${newCustomer.name} müşteri olarak eklendi` });
+            setShowAddModal(false);
+            setNewCustomer(newCustomerInitial);
+        } catch {
+            toast({ type: "error", message: "Müşteri eklenemedi. Lütfen tekrar deneyin." });
+        } finally {
+            setIsAdding(false);
+        }
     };
 
     const activeCount = mockCustomers.filter(c => c.isActive).length;
@@ -83,6 +91,22 @@ export default function CustomersPage() {
     return (
         <>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {/* Load error banner */}
+                {loadError && (
+                    <div style={{
+                        padding: "10px 14px",
+                        background: "var(--danger-bg)",
+                        border: "0.5px solid var(--danger-border)",
+                        borderRadius: "6px",
+                        fontSize: "12px",
+                        color: "var(--danger-text)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                    }}>
+                        ⚠ {loadError}
+                    </div>
+                )}
                 {/* Header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                     <div>
@@ -376,8 +400,8 @@ export default function CustomersPage() {
                                 borderTop: "0.5px solid var(--border-tertiary)",
                             }}
                         >
-                            <Button variant="primary" size="md" onClick={handleAdd} disabled={!newCustomer.name}>
-                                Müşteriyi Kaydet
+                            <Button variant="primary" size="md" onClick={handleAdd} disabled={!newCustomer.name || isAdding}>
+                                {isAdding ? "Kaydediliyor…" : "Müşteriyi Kaydet"}
                             </Button>
                             <Button variant="secondary" size="md" onClick={() => setShowAddModal(false)}>
                                 İptal
