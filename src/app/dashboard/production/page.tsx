@@ -289,7 +289,7 @@ export default function ProductionPage() {
                                         </select>
                                         {selectedProduct && (
                                             <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "3px" }}>
-                                                Mevcut stok: {formatNumber(selectedProduct.availableStock)} {selectedProduct.unit}
+                                                Mevcut stok: {formatNumber(selectedProduct.available_now)} {selectedProduct.unit}
                                             </div>
                                         )}
                                     </td>

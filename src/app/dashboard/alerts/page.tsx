@@ -184,7 +184,7 @@ export default function AlertsPage() {
 
     // Low stock products for the sidebar panel
     const lowStockProducts = mockProducts.filter(
-        (p) => p.availableStock < p.minStockLevel
+        (p) => p.available_now < p.minStockLevel
     );
 
     return (
@@ -541,9 +541,9 @@ export default function AlertsPage() {
                     {/* All products stock bars */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                         {mockProducts.map((product) => {
-                            const pct = Math.round((product.availableStock / product.totalStock) * 100);
-                            const isCritical = product.availableStock < product.minStockLevel;
-                            const isWarning = !isCritical && product.availableStock < product.minStockLevel * 1.5;
+                            const pct = Math.round((product.available_now / product.on_hand) * 100);
+                            const isCritical = product.available_now < product.minStockLevel;
+                            const isWarning = !isCritical && product.available_now < product.minStockLevel * 1.5;
                             const barColor = isCritical
                                 ? "var(--danger)"
                                 : isWarning
@@ -587,7 +587,7 @@ export default function AlertsPage() {
                                                 flexShrink: 0,
                                             }}
                                         >
-                                            {product.availableStock.toLocaleString()}
+                                            {product.available_now.toLocaleString()}
                                         </div>
                                     </div>
                                     <div
@@ -663,7 +663,7 @@ export default function AlertsPage() {
                                         marginBottom: "2px",
                                     }}
                                 >
-                                    · {p.sku}: {p.availableStock}/{p.minStockLevel} adet
+                                    · {p.sku}: {p.available_now}/{p.minStockLevel} adet
                                 </div>
                             ))}
                         </div>

@@ -6,7 +6,11 @@ import type { Customer, Product, Order, OrderDetail, OrderLineItem, UretimKaydi 
 import { mapOrderToInvoice, sendInvoiceToParasut } from "./parasut";
 import type { ParasutSyncResult } from "./parasut";
 
-type OrderStatus = "DRAFT" | "PENDING" | "APPROVED" | "SHIPPED" | "CANCELLED";
+export type CommercialStatus = "draft" | "pending_approval" | "approved" | "cancelled";
+export type FulfillmentStatus = "unallocated" | "partially_allocated" | "allocated" | "partially_shipped" | "shipped";
+
+// Transition type: commercial status changes + fulfillment "shipped" transition
+type OrderTransition = CommercialStatus | "shipped";
 
 interface ImportPayload {
     customers?: Customer[];
@@ -36,11 +40,11 @@ interface DataContextValue {
     importedCount: { customers: number; products: number; orders: number } | null;
     addCustomer: (c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">) => void;
     updateCustomer: (id: string, updates: Partial<Customer>) => void;
-    addProduct: (p: Omit<Product, "id" | "allocatedStock" | "availableStock" | "isActive">) => void;
+    addProduct: (p: Omit<Product, "id" | "reserved" | "available_now" | "isActive">) => void;
     addUretimKaydi: (k: Omit<UretimKaydi, "id">) => void;
     deleteUretimKaydi: (id: string) => void;
     addOrder: (detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">) => string;
-    updateOrderStatus: (orderId: string, newStatus: OrderStatus) => Promise<UpdateStatusResult>;
+    updateOrderStatus: (orderId: string, transition: OrderTransition) => Promise<UpdateStatusResult>;
     reorderSuggestions: Product[];
 }
 
@@ -89,13 +93,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
 
     // --- Products ---
-    const addProduct = (fields: Omit<Product, "id" | "allocatedStock" | "availableStock" | "isActive">) => {
+    const addProduct = (fields: Omit<Product, "id" | "reserved" | "available_now" | "isActive">) => {
         const newP: Product = {
             ...fields,
             id: `prod-${Date.now()}`,
             isActive: true,
-            allocatedStock: 0,
-            availableStock: fields.totalStock,
+            reserved: 0,
+            available_now: fields.on_hand,
         };
         setProducts(prev => [newP, ...prev]);
     };
@@ -108,8 +112,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
             if (p.id !== k.productId) return p;
             return {
                 ...p,
-                totalStock: p.totalStock + k.adet,
-                availableStock: p.availableStock + k.adet,
+                on_hand: p.on_hand + k.adet,
+                available_now: p.available_now + k.adet,
             };
         }));
     };
@@ -122,33 +126,35 @@ export function DataProvider({ children }: { children: ReactNode }) {
             if (p.id !== kaydi.productId) return p;
             return {
                 ...p,
-                totalStock: Math.max(0, p.totalStock - kaydi.adet),
-                availableStock: Math.max(0, p.availableStock - kaydi.adet),
+                on_hand: Math.max(0, p.on_hand - kaydi.adet),
+                available_now: Math.max(0, p.available_now - kaydi.adet),
             };
         }));
     };
 
     // --- Stock helpers ---
+    // Reserve stock when an order is APPROVED (hard reservation)
     const reserveStock = (lines: OrderLineItem[]) => {
         setProducts(prev => prev.map(p => {
             const line = lines.find(l => l.productId === p.id);
             if (!line) return p;
             return {
                 ...p,
-                allocatedStock: p.allocatedStock + line.quantity,
-                availableStock: Math.max(0, p.availableStock - line.quantity),
+                reserved: p.reserved + line.quantity,
+                available_now: Math.max(0, p.available_now - line.quantity),
             };
         }));
     };
 
+    // Release reserved stock (on cancellation of approved order)
     const releaseStock = (lines: OrderLineItem[]) => {
         setProducts(prev => prev.map(p => {
             const line = lines.find(l => l.productId === p.id);
             if (!line) return p;
             return {
                 ...p,
-                allocatedStock: Math.max(0, p.allocatedStock - line.quantity),
-                availableStock: p.availableStock + line.quantity,
+                reserved: Math.max(0, p.reserved - line.quantity),
+                available_now: p.available_now + line.quantity,
             };
         }));
     };
@@ -167,7 +173,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
             id,
             orderNumber,
             customerName: detail.customerName,
-            status: detail.status,
+            commercial_status: detail.commercial_status,
+            fulfillment_status: detail.fulfillment_status,
             grandTotal: detail.grandTotal,
             currency: detail.currency,
             createdAt: detail.createdAt,
@@ -175,62 +182,75 @@ export function DataProvider({ children }: { children: ReactNode }) {
         };
         setOrders(prev => [newOrder, ...prev]);
 
-        if (detail.status === "PENDING" || detail.status === "DRAFT") {
-            reserveStock(detail.lines);
-        }
+        // Domain rule: NO stock reservation for draft or pending_approval orders.
+        // Hard reservation only happens when commercial_status transitions to "approved".
 
         return id;
     };
 
-    const updateOrderStatus = async (orderId: string, newStatus: OrderStatus): Promise<UpdateStatusResult> => {
+    const updateOrderStatus = async (orderId: string, transition: OrderTransition): Promise<UpdateStatusResult> => {
         const order = orderDetails.find(o => o.id === orderId);
         if (!order) return { ok: false };
-        const prevStatus = order.status;
 
-        // PENDING → APPROVED: conflict check
-        if (newStatus === "APPROVED") {
+        const prevCommercial = order.commercial_status;
+        const prevFulfillment = order.fulfillment_status;
+
+        // ── pending_approval → approved: conflict check then reserve stock ──
+        if (transition === "approved") {
             const conflicts: ConflictItem[] = [];
             for (const line of order.lines) {
                 const product = products.find(p => p.id === line.productId);
                 if (!product) continue;
-                // This order is already allocated. Check if totalStock covers all allocations.
-                const availableForThis = product.totalStock - (product.allocatedStock - line.quantity);
-                if (availableForThis < line.quantity) {
+                // Order is NOT yet reserved (pending_approval = unallocated).
+                // Check if available_now can cover the requested quantity.
+                if (product.available_now < line.quantity) {
                     conflicts.push({
                         productName: line.productName,
                         requested: line.quantity,
-                        available: Math.max(0, availableForThis),
+                        available: Math.max(0, product.available_now),
                     });
                 }
             }
             if (conflicts.length > 0) return { ok: false, conflicts };
+
+            // Reserve stock and transition to allocated
+            reserveStock(order.lines);
+            setOrderDetails(prev => prev.map(o =>
+                o.id === orderId
+                    ? { ...o, commercial_status: "approved", fulfillment_status: "allocated" }
+                    : o
+            ));
+            setOrders(prev => prev.map(o =>
+                o.id === orderId
+                    ? { ...o, commercial_status: "approved", fulfillment_status: "allocated" }
+                    : o
+            ));
+            return { ok: true };
         }
 
-        // DRAFT → PENDING: already reserved at creation, no action needed
-
-        // CANCELLED: release stock if was DRAFT, PENDING or APPROVED
-        if (newStatus === "CANCELLED" && (prevStatus === "DRAFT" || prevStatus === "PENDING" || prevStatus === "APPROVED")) {
-            releaseStock(order.lines);
-        }
-
-        // SHIPPED: stok düş + Paraşüt'e otomatik fatura gönder
-        if (newStatus === "SHIPPED" && prevStatus === "APPROVED") {
+        // ── approved/allocated → shipped: deduct on_hand, release reserved, Paraşüt sync ──
+        if (transition === "shipped" && prevFulfillment === "allocated") {
             setProducts(prev => prev.map(p => {
                 const line = order.lines.find(l => l.productId === p.id);
                 if (!line) return p;
                 return {
                     ...p,
-                    totalStock: Math.max(0, p.totalStock - line.quantity),
-                    allocatedStock: Math.max(0, p.allocatedStock - line.quantity),
+                    on_hand: Math.max(0, p.on_hand - line.quantity),
+                    reserved: Math.max(0, p.reserved - line.quantity),
+                    // available_now stays the same: was already subtracted on reservation
                 };
             }));
 
-            // Durumu hemen güncelle — UI donmasın
-            setOrderDetails(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+            // Update status immediately so UI doesn't freeze
+            setOrderDetails(prev => prev.map(o =>
+                o.id === orderId ? { ...o, fulfillment_status: "shipped" } : o
+            ));
+            setOrders(prev => prev.map(o =>
+                o.id === orderId ? { ...o, fulfillment_status: "shipped" } : o
+            ));
 
-            // Paraşüt'e async gönder
-            const payload = mapOrderToInvoice({ ...order, status: newStatus });
+            // Paraşüt async sync
+            const payload = mapOrderToInvoice({ ...order, fulfillment_status: "shipped" });
             const syncResult = await sendInvoiceToParasut(payload);
 
             if (syncResult.success) {
@@ -248,15 +268,43 @@ export function DataProvider({ children }: { children: ReactNode }) {
             return { ok: true, parasutSync: syncResult };
         }
 
-        // Diğer geçişler: sadece durumu güncelle
-        setOrderDetails(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
-        return { ok: true };
+        // ── cancelled: release reserved stock only if was allocated ──
+        if (transition === "cancelled") {
+            if (prevFulfillment === "allocated" || prevFulfillment === "partially_allocated") {
+                releaseStock(order.lines);
+            }
+            // draft and pending_approval orders were never reserved — no stock change
+
+            setTimeout(() => {
+                setOrderDetails(prev => prev.map(o =>
+                    o.id === orderId ? { ...o, commercial_status: "cancelled", fulfillment_status: "unallocated" } : o
+                ));
+                setOrders(prev => prev.map(o =>
+                    o.id === orderId ? { ...o, commercial_status: "cancelled", fulfillment_status: "unallocated" } : o
+                ));
+            }, 600);
+            return { ok: true };
+        }
+
+        // ── draft → pending_approval: just update commercial status, no stock change ──
+        if (transition === "pending_approval") {
+            setTimeout(() => {
+                setOrderDetails(prev => prev.map(o =>
+                    o.id === orderId ? { ...o, commercial_status: "pending_approval" } : o
+                ));
+                setOrders(prev => prev.map(o =>
+                    o.id === orderId ? { ...o, commercial_status: "pending_approval" } : o
+                ));
+            }, 600);
+            return { ok: true };
+        }
+
+        return { ok: false };
     };
 
     // --- Reorder suggestions ---
     const reorderSuggestions = useMemo(
-        () => products.filter(p => p.isActive && p.availableStock < p.minStockLevel),
+        () => products.filter(p => p.isActive && p.available_now < p.minStockLevel),
         [products],
     );
 

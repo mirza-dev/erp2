@@ -32,19 +32,17 @@ const labelStyle: React.CSSProperties = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-    DRAFT: "Taslak",
-    PENDING: "Bekleyen",
-    APPROVED: "Onaylı",
-    SHIPPED: "Sevk Edildi",
-    CANCELLED: "İptal",
+    draft:            "Taslak",
+    pending_approval: "Bekleyen",
+    approved:         "Onaylı",
+    cancelled:        "İptal",
 };
 
 const STATUS_COLOR: Record<string, string> = {
-    DRAFT: "var(--text-tertiary)",
-    PENDING: "var(--warning-text)",
-    APPROVED: "var(--accent-text)",
-    SHIPPED: "var(--success-text)",
-    CANCELLED: "var(--danger-text)",
+    draft:            "var(--text-tertiary)",
+    pending_approval: "var(--warning-text)",
+    approved:         "var(--accent-text)",
+    cancelled:        "var(--danger-text)",
 };
 
 export default function CustomerDetailPanel({
@@ -353,8 +351,8 @@ export default function CustomerDetailPanel({
                                                 <div style={{ fontSize: "12px", fontWeight: 500, color: "var(--success-text)" }}>
                                                     {formatCurrency(order.grandTotal, order.currency)}
                                                 </div>
-                                                <div style={{ fontSize: "11px", color: STATUS_COLOR[order.status] ?? "var(--text-secondary)" }}>
-                                                    {STATUS_LABEL[order.status] ?? order.status}
+                                                <div style={{ fontSize: "11px", color: STATUS_COLOR[order.commercial_status] ?? "var(--text-secondary)" }}>
+                                                    {STATUS_LABEL[order.commercial_status] ?? order.commercial_status}
                                                 </div>
                                             </div>
                                         </Link>

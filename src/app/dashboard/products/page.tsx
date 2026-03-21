@@ -71,11 +71,11 @@ export default function ProductsPage() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createForm, setCreateForm] = useState<{
         name: string; sku: string; category: string; unit: string;
-        price: number; currency: string; totalStock: number; minStockLevel: number;
+        price: number; currency: string; on_hand: number; minStockLevel: number;
         productType: "finished" | "raw_material"; warehouse: string;
     }>({
         name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
-        price: 0, currency: "USD", totalStock: 0, minStockLevel: 0,
+        price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
         productType: "finished", warehouse: "Sevkiyat Deposu",
     });
     const [createSubmitting, setCreateSubmitting] = useState(false);
@@ -99,7 +99,7 @@ export default function ProductsPage() {
         return matchSearch && matchCategory;
     });
 
-    const criticalCount = mockProducts.filter(p => p.availableStock <= p.minStockLevel).length;
+    const criticalCount = mockProducts.filter(p => p.available_now <= p.minStockLevel).length;
 
     const categoryCounts: Record<string, number> = { "Tümü": mockProducts.length };
     categories.slice(1).forEach(cat => {
@@ -115,7 +115,7 @@ export default function ProductsPage() {
         setCreateSubmitting(false);
         setCreateForm({
             name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
-            price: 0, currency: "USD", totalStock: 0, minStockLevel: 0,
+            price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
             productType: "finished" as const, warehouse: "Sevkiyat Deposu",
         });
     };
@@ -230,7 +230,7 @@ export default function ProductsPage() {
                     </thead>
                     <tbody>
                         {filtered.map((product) => {
-                            const status = getStatusBadge(product.availableStock, product.minStockLevel);
+                            const status = getStatusBadge(product.available_now, product.minStockLevel);
                             return (
                                 <tr
                                     key={product.id}
@@ -255,20 +255,20 @@ export default function ProductsPage() {
                                         {formatCurrency(product.price, product.currency)}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
-                                        {formatNumber(product.totalStock)}
+                                        {formatNumber(product.on_hand)}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right", color: "var(--warning-text)" }}>
-                                        {formatNumber(product.allocatedStock)}
+                                        {formatNumber(product.reserved)}
                                     </td>
                                     <td
                                         style={{
                                             ...tdStyle,
                                             textAlign: "right",
                                             fontWeight: 500,
-                                            color: product.availableStock <= product.minStockLevel ? "var(--danger-text)" : "var(--success-text)",
+                                            color: product.available_now <= product.minStockLevel ? "var(--danger-text)" : "var(--success-text)",
                                         }}
                                     >
-                                        {formatNumber(product.availableStock)}
+                                        {formatNumber(product.available_now)}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center" }}>
                                         <span className={`badge ${status.cls}`}>{status.label}</span>
@@ -417,8 +417,8 @@ export default function ProductsPage() {
                                         style={modalInputStyle}
                                         type="number"
                                         min={0}
-                                        value={createForm.totalStock}
-                                        onChange={e => setCreateForm(f => ({ ...f, totalStock: parseInt(e.target.value) || 0 }))}
+                                        value={createForm.on_hand}
+                                        onChange={e => setCreateForm(f => ({ ...f, on_hand: parseInt(e.target.value) || 0 }))}
                                     />
                                 </FormField>
                                 <FormField label="Min. Stok Seviyesi">

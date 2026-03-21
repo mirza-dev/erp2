@@ -47,7 +47,7 @@ export default function StockDataGrid({ filterCategory = "", filterStatus = "" }
     const filtered = products.filter(p => {
         if (filterCategory && p.category !== filterCategory) return false;
         if (filterStatus) {
-            const { key } = getStatusInfo(p.availableStock, p.minStockLevel);
+            const { key } = getStatusInfo(p.available_now, p.minStockLevel);
             if (key !== filterStatus) return false;
         }
         return true;
@@ -107,7 +107,7 @@ export default function StockDataGrid({ filterCategory = "", filterStatus = "" }
                             </td>
                         </tr>
                     ) : filtered.map((product) => {
-                        const status = getStatusInfo(product.availableStock, product.minStockLevel);
+                        const status = getStatusInfo(product.available_now, product.minStockLevel);
                         const isSelected = selectedId === product.id;
                         return (
                             <tr
@@ -146,21 +146,21 @@ export default function StockDataGrid({ filterCategory = "", filterStatus = "" }
                                     {product.name}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500, background: isSelected ? "var(--accent-bg)" : "transparent" }}>
-                                    {formatNumber(product.totalStock)}
+                                    {formatNumber(product.on_hand)}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: "right", color: "var(--warning-text)", background: isSelected ? "var(--accent-bg)" : "transparent" }}>
-                                    {formatNumber(product.allocatedStock)}
+                                    {formatNumber(product.reserved)}
                                 </td>
                                 <td
                                     style={{
                                         ...tdStyle,
                                         textAlign: "right",
                                         fontWeight: 500,
-                                        color: getAvailClass(product.availableStock, product.minStockLevel),
+                                        color: getAvailClass(product.available_now, product.minStockLevel),
                                         background: isSelected ? "var(--accent-bg)" : "transparent",
                                     }}
                                 >
-                                    {formatNumber(product.availableStock)}
+                                    {formatNumber(product.available_now)}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)", background: isSelected ? "var(--accent-bg)" : "transparent" }}>
                                     {formatNumber(product.minStockLevel)}

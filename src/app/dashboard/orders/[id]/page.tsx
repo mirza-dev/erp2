@@ -4,18 +4,23 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { useData, type ConflictItem } from "@/lib/data-context";
+import { useData, type ConflictItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
-type OrderStatus = "DRAFT" | "PENDING" | "APPROVED" | "SHIPPED" | "CANCELLED";
+const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
+    draft:            { label: "Taslak",      cls: "badge-neutral" },
+    pending_approval: { label: "Bekliyor",    cls: "badge-warning" },
+    approved:         { label: "Onaylı",      cls: "badge-accent"  },
+    cancelled:        { label: "İptal",       cls: "badge-danger"  },
+};
 
-const statusConfig: Record<OrderStatus, { label: string; cls: string }> = {
-    DRAFT:     { label: "Taslak",      cls: "badge-neutral" },
-    PENDING:   { label: "Bekliyor",    cls: "badge-warning" },
-    APPROVED:  { label: "Onaylı",      cls: "badge-accent"  },
-    SHIPPED:   { label: "Sevk Edildi", cls: "badge-success" },
-    CANCELLED: { label: "İptal",       cls: "badge-danger"  },
+const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: string }> = {
+    unallocated:         { label: "Rezervesiz",    cls: "badge-neutral"  },
+    partially_allocated: { label: "Kısmi Rezerve", cls: "badge-warning"  },
+    allocated:           { label: "Rezerveli",     cls: "badge-warning"  },
+    partially_shipped:   { label: "Kısmi Sevk",    cls: "badge-accent"   },
+    shipped:             { label: "Sevk Edildi",   cls: "badge-success"  },
 };
 
 const thStyle: React.CSSProperties = {
@@ -44,15 +49,17 @@ export default function OrderDetailPage() {
     const { toast } = useToast();
     const order = orderDetails.find(o => o.id === params.id);
 
-    const [status, setStatus] = useState<OrderStatus>(order?.status ?? "DRAFT");
+    const [commercialStatus, setCommercialStatus] = useState<CommercialStatus>(order?.commercial_status ?? "draft");
+    const [fulfillmentStatus, setFulfillmentStatus] = useState<FulfillmentStatus>(order?.fulfillment_status ?? "unallocated");
     const [conflictOpen, setConflictOpen] = useState(false);
     const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
     const [loading, setLoading] = useState<string | null>(null);
-    const [justTransitioned, setJustTransitioned] = useState<OrderStatus | null>(null);
+    const [justTransitionedCommercial, setJustTransitionedCommercial] = useState<CommercialStatus | null>(null);
+    const [justTransitionedFulfillment, setJustTransitionedFulfillment] = useState<FulfillmentStatus | null>(null);
 
     // Confirmation dialog state
     const [confirmDialog, setConfirmDialog] = useState<{
-        action: OrderStatus;
+        action: CommercialStatus | "shipped";
         title: string;
         message: string;
         confirmLabel: string;
@@ -81,16 +88,16 @@ export default function OrderDetailPage() {
         );
     }
 
-    const handleTransition = async (next: OrderStatus) => {
+    const handleTransition = async (next: CommercialStatus | "shipped") => {
         setLoading(next);
 
-        if (next === "SHIPPED") {
+        if (next === "shipped") {
             setParasutStatus("sending");
-            const result = await updateOrderStatus(order!.id, next);
+            const result = await updateOrderStatus(order.id, "shipped");
             if (result.ok) {
-                setStatus("SHIPPED");
-                setJustTransitioned("SHIPPED");
-                setTimeout(() => setJustTransitioned(null), 1500);
+                setFulfillmentStatus("shipped");
+                setJustTransitionedFulfillment("shipped");
+                setTimeout(() => setJustTransitionedFulfillment(null), 1500);
                 toast({ type: "success", message: "Sipariş sevk edildi" });
                 if (result.parasutSync && result.parasutSync.success) {
                     setParasutStatus("sent");
@@ -110,42 +117,62 @@ export default function OrderDetailPage() {
             return;
         }
 
-        // Diğer geçişler: mevcut 600ms simülasyon korunur
-        setTimeout(async () => {
-            const result = await updateOrderStatus(order!.id, next);
+        // pending_approval → approved: async with conflict check
+        if (next === "approved") {
+            const result = await updateOrderStatus(order.id, "approved");
             if (!result.ok && result.conflicts) {
                 setConflicts(result.conflicts);
                 setConflictOpen(true);
                 toast({ type: "error", message: "Stok yetersiz — sipariş onaylanamadı" });
-            } else if (result.ok) {
-                setStatus(next);
-                setJustTransitioned(next);
-                setTimeout(() => setJustTransitioned(null), 1500);
-                const labels: Record<string, string> = {
-                    PENDING: "Sipariş onaya gönderildi",
-                    APPROVED: "Sipariş onaylandı",
-                    CANCELLED: "Sipariş iptal edildi",
-                };
-                toast({ type: next === "CANCELLED" ? "warning" : "success", message: labels[next] ?? "Durum güncellendi" });
+                setLoading(null);
+                return;
+            }
+            if (result.ok) {
+                setCommercialStatus("approved");
+                setFulfillmentStatus("allocated");
+                setJustTransitionedCommercial("approved");
+                setTimeout(() => setJustTransitionedCommercial(null), 1500);
+                toast({ type: "success", message: "Sipariş onaylandı ve stok rezerve edildi" });
+            }
+            setLoading(null);
+            return;
+        }
+
+        // Other transitions: draft→pending_approval, any→cancelled
+        setTimeout(async () => {
+            const result = await updateOrderStatus(order.id, next);
+            if (result.ok) {
+                if (next === "cancelled") {
+                    setCommercialStatus("cancelled");
+                    setFulfillmentStatus("unallocated");
+                    setJustTransitionedCommercial("cancelled");
+                    setTimeout(() => setJustTransitionedCommercial(null), 1500);
+                    toast({ type: "warning", message: "Sipariş iptal edildi" });
+                } else if (next === "pending_approval") {
+                    setCommercialStatus("pending_approval");
+                    setJustTransitionedCommercial("pending_approval");
+                    setTimeout(() => setJustTransitionedCommercial(null), 1500);
+                    toast({ type: "success", message: "Sipariş onaya gönderildi" });
+                }
             }
             setLoading(null);
         }, 600);
     };
 
-    const requestTransition = (next: OrderStatus) => {
-        if (next === "CANCELLED") {
+    const requestTransition = (next: CommercialStatus | "shipped") => {
+        if (next === "cancelled") {
             setConfirmDialog({
-                action: "CANCELLED",
+                action: "cancelled",
                 title: "Siparişi İptal Et",
-                message: `${order.orderNumber} numaralı siparişi iptal etmek istediğinize emin misiniz? Ayrılmış stoklar serbest bırakılır.`,
+                message: `${order.orderNumber} numaralı siparişi iptal etmek istediğinize emin misiniz?${fulfillmentStatus === "allocated" ? " Rezerve edilmiş stoklar serbest bırakılır." : ""}`,
                 confirmLabel: "Evet, İptal Et",
                 variant: "danger",
             });
-        } else if (next === "APPROVED") {
+        } else if (next === "approved") {
             setConfirmDialog({
-                action: "APPROVED",
+                action: "approved",
                 title: "Siparişi Onayla",
-                message: `${order.orderNumber} numaralı siparişi onaylamak istediğinize emin misiniz? Stok kontrolleri yapılacak.`,
+                message: `${order.orderNumber} numaralı siparişi onaylamak istediğinize emin misiniz? Stok kontrolleri yapılacak ve rezervasyon oluşturulacak.`,
                 confirmLabel: "Onayla",
                 variant: "primary",
             });
@@ -154,13 +181,20 @@ export default function OrderDetailPage() {
         }
     };
 
-    const cfg = statusConfig[status];
+    const commercialCfg = commercialStatusConfig[commercialStatus];
+    const fulfillmentCfg = fulfillmentStatusConfig[fulfillmentStatus];
+
+    // Commercial timeline steps
+    const commercialSteps: CommercialStatus[] = ["draft", "pending_approval", "approved"];
+    const currentCommercialIdx = commercialStatus === "cancelled"
+        ? commercialSteps.indexOf("pending_approval")
+        : commercialSteps.indexOf(commercialStatus);
 
     return (
         <>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <Link href="/dashboard/orders">
                             <button
@@ -189,46 +223,53 @@ export default function OrderDetailPage() {
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                             {order.orderNumber}
                         </div>
-                        <span className={`badge ${cfg.cls}`} style={{ fontSize: "12px", padding: "3px 10px", fontWeight: 700 }}>
-                            {cfg.label}
+                        {/* Primary badge: commercial status */}
+                        <span className={`badge ${commercialCfg.cls}`} style={{ fontSize: "12px", padding: "3px 10px", fontWeight: 700 }}>
+                            {commercialCfg.label}
                         </span>
+                        {/* Secondary chip: fulfillment status (only when meaningful) */}
+                        {fulfillmentStatus !== "unallocated" && (
+                            <span className={`badge ${fulfillmentCfg.cls}`} style={{ fontSize: "10px", padding: "2px 7px" }}>
+                                {fulfillmentCfg.label}
+                            </span>
+                        )}
                     </div>
 
                     {/* Action buttons by status */}
                     <div style={{ display: "flex", gap: "8px" }}>
-                        {status === "DRAFT" && (
+                        {commercialStatus === "draft" && (
                             <>
-                                <Button variant="danger" onClick={() => requestTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
+                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={loading !== null} loading={loading === "cancelled"}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => handleTransition("PENDING")} disabled={loading !== null} loading={loading === "PENDING"}>
-                                    {loading === "PENDING" ? "Gönderiliyor..." : "Onaya Gönder"}
+                                <Button variant="primary" onClick={() => handleTransition("pending_approval")} disabled={loading !== null} loading={loading === "pending_approval"}>
+                                    {loading === "pending_approval" ? "Gönderiliyor..." : "Onaya Gönder"}
                                 </Button>
                             </>
                         )}
-                        {status === "PENDING" && (
+                        {commercialStatus === "pending_approval" && (
                             <>
-                                <Button variant="danger" onClick={() => requestTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
+                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={loading !== null} loading={loading === "cancelled"}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => requestTransition("APPROVED")} disabled={loading !== null} loading={loading === "APPROVED"}>
-                                    {loading === "APPROVED" ? "Kontrol ediliyor..." : "Onayla"}
+                                <Button variant="primary" onClick={() => requestTransition("approved")} disabled={loading !== null} loading={loading === "approved"}>
+                                    {loading === "approved" ? "Kontrol ediliyor..." : "Onayla"}
                                 </Button>
                             </>
                         )}
-                        {status === "APPROVED" && (
+                        {commercialStatus === "approved" && fulfillmentStatus === "allocated" && (
                             <>
-                                <Button variant="danger" onClick={() => requestTransition("CANCELLED")} disabled={loading !== null} loading={loading === "CANCELLED"}>
+                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={loading !== null} loading={loading === "cancelled"}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => handleTransition("SHIPPED")} disabled={loading !== null} loading={loading === "SHIPPED"}>
-                                    {loading === "SHIPPED" ? "Paraşüt'e gönderiliyor..." : "Sevket"}
+                                <Button variant="primary" onClick={() => handleTransition("shipped")} disabled={loading !== null} loading={loading === "shipped"}>
+                                    {loading === "shipped" ? "Paraşüt'e gönderiliyor..." : "Sevket"}
                                 </Button>
                             </>
                         )}
-                        {(status === "SHIPPED" || status === "CANCELLED") && (
+                        {(fulfillmentStatus === "shipped" || commercialStatus === "cancelled") && (
                             <div style={{ fontSize: "12px", color: "var(--text-tertiary)", padding: "6px 0" }}>
-                                {status === "SHIPPED" ? "Teslim edildi — kapalı" : "İptal edildi — kapalı"}
+                                {fulfillmentStatus === "shipped" ? "Teslim edildi — kapalı" : "İptal edildi — kapalı"}
                             </div>
                         )}
                     </div>
@@ -375,22 +416,18 @@ export default function OrderDetailPage() {
                                 </div>
                             </div>
 
-                            {/* Status timeline */}
+                            {/* Commercial timeline */}
                             <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "0.5px solid var(--border-tertiary)" }}>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>
-                                    Durum
+                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                    Ticari Süreç
                                 </div>
-                                {(["DRAFT", "PENDING", "APPROVED", "SHIPPED"] as OrderStatus[]).map((s, i) => {
-                                    const steps = ["DRAFT", "PENDING", "APPROVED", "SHIPPED"];
-                                    const currentIdx = status === "CANCELLED"
-                                        ? steps.indexOf("PENDING")
-                                        : steps.indexOf(status);
-                                    const stepIdx = steps.indexOf(s);
-                                    const isDone = stepIdx <= currentIdx && status !== "CANCELLED";
-                                    const isCurrent = s === status;
-                                    const isJust = justTransitioned === s;
+                                {commercialSteps.map((s, i) => {
+                                    const stepIdx = commercialSteps.indexOf(s);
+                                    const isDone = stepIdx <= currentCommercialIdx && commercialStatus !== "cancelled";
+                                    const isCurrent = s === commercialStatus;
+                                    const isJust = justTransitionedCommercial === s;
                                     return (
-                                        <div key={s} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: i < 3 ? "6px" : 0 }}>
+                                        <div key={s} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: i < commercialSteps.length - 1 ? "6px" : 0 }}>
                                             <div
                                                 style={{
                                                     width: isJust ? "8px" : "6px",
@@ -419,21 +456,21 @@ export default function OrderDetailPage() {
                                                     borderRadius: "3px",
                                                 }}
                                             >
-                                                {statusConfig[s].label}
+                                                {commercialStatusConfig[s].label}
                                             </span>
                                         </div>
                                     );
                                 })}
-                                {status === "CANCELLED" && (
+                                {commercialStatus === "cancelled" && (
                                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
                                         <div
                                             style={{
-                                                width: justTransitioned === "CANCELLED" ? "8px" : "6px",
-                                                height: justTransitioned === "CANCELLED" ? "8px" : "6px",
+                                                width: justTransitionedCommercial === "cancelled" ? "8px" : "6px",
+                                                height: justTransitionedCommercial === "cancelled" ? "8px" : "6px",
                                                 borderRadius: "50%",
                                                 flexShrink: 0,
                                                 background: "var(--danger)",
-                                                boxShadow: justTransitioned === "CANCELLED" ? "0 0 8px var(--danger)" : "none",
+                                                boxShadow: justTransitionedCommercial === "cancelled" ? "0 0 8px var(--danger)" : "none",
                                             }}
                                         />
                                         <span
@@ -441,8 +478,8 @@ export default function OrderDetailPage() {
                                                 fontSize: "12px",
                                                 color: "var(--danger-text)",
                                                 fontWeight: 600,
-                                                background: justTransitioned === "CANCELLED" ? "var(--danger-bg)" : "transparent",
-                                                padding: justTransitioned === "CANCELLED" ? "1px 6px" : "0",
+                                                background: justTransitionedCommercial === "cancelled" ? "var(--danger-bg)" : "transparent",
+                                                padding: justTransitionedCommercial === "cancelled" ? "1px 6px" : "0",
                                                 borderRadius: "3px",
                                             }}
                                         >
@@ -452,8 +489,61 @@ export default function OrderDetailPage() {
                                 )}
                             </div>
 
+                            {/* Fulfillment timeline */}
+                            <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid var(--border-tertiary)" }}>
+                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                    Lojistik
+                                </div>
+                                {(["unallocated", "allocated", "shipped"] as FulfillmentStatus[]).map((s, i) => {
+                                    const steps = ["unallocated", "allocated", "shipped"];
+                                    const currentIdx = steps.indexOf(fulfillmentStatus);
+                                    const stepIdx = steps.indexOf(s);
+                                    const isDone = stepIdx <= currentIdx;
+                                    const isCurrent = s === fulfillmentStatus;
+                                    const isJust = justTransitionedFulfillment === s;
+                                    return (
+                                        <div key={s} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: i < 2 ? "6px" : 0 }}>
+                                            <div
+                                                style={{
+                                                    width: isJust ? "8px" : "6px",
+                                                    height: isJust ? "8px" : "6px",
+                                                    borderRadius: "50%",
+                                                    flexShrink: 0,
+                                                    background: isCurrent && s === "shipped"
+                                                        ? "var(--success)"
+                                                        : isCurrent
+                                                        ? "var(--accent)"
+                                                        : isDone
+                                                        ? "var(--success)"
+                                                        : "var(--border-primary)",
+                                                    boxShadow: isJust ? "0 0 8px var(--accent)" : "none",
+                                                }}
+                                            />
+                                            <span
+                                                style={{
+                                                    fontSize: "12px",
+                                                    color: isCurrent && s === "shipped"
+                                                        ? "var(--success-text)"
+                                                        : isCurrent
+                                                        ? "var(--accent-text)"
+                                                        : isDone
+                                                        ? "var(--success-text)"
+                                                        : "var(--text-tertiary)",
+                                                    fontWeight: isCurrent ? 600 : 400,
+                                                    background: isJust ? "var(--accent-bg)" : "transparent",
+                                                    padding: isJust ? "1px 6px" : "0",
+                                                    borderRadius: "3px",
+                                                }}
+                                            >
+                                                {fulfillmentStatusConfig[s].label}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
                             {/* Paraşüt Muhasebe Sync */}
-                            {status === "SHIPPED" && (
+                            {fulfillmentStatus === "shipped" && (
                                 <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid var(--border-tertiary)" }}>
                                     <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
                                         Muhasebe Sync
@@ -519,7 +609,7 @@ export default function OrderDetailPage() {
                             </div>
                         </div>
                         <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "14px" }}>
-                            Asagidaki urunlerin stoku baska bir siparis tarafindan rezerve edildi. Siparis onaylanamıyor.
+                            Aşağıdaki ürünlerde satılabilir stok yetersiz. Sipariş onaylanamıyor.
                         </div>
                         <div
                             style={{
@@ -531,8 +621,8 @@ export default function OrderDetailPage() {
                             }}
                         >
                             <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-tertiary)", marginBottom: "6px", fontWeight: 500 }}>
-                                <span>Urun</span>
-                                <span>Talep / Mevcut</span>
+                                <span>Ürün</span>
+                                <span>Talep / Satılabilir</span>
                             </div>
                             {conflicts.map((c, i) => (
                                 <div key={i} style={{ display: "flex", justifyContent: "space-between", color: "var(--text-primary)", marginTop: i > 0 ? "4px" : 0 }}>
@@ -544,9 +634,6 @@ export default function OrderDetailPage() {
                         <div style={{ display: "flex", gap: "8px" }}>
                             <Button variant="secondary" onClick={() => setConflictOpen(false)} style={{ flex: 1 }}>
                                 Kapat
-                            </Button>
-                            <Button variant="primary" onClick={() => setConflictOpen(false)} style={{ flex: 1 }}>
-                                Stoku Yenile
                             </Button>
                         </div>
                     </div>
@@ -580,7 +667,6 @@ export default function OrderDetailPage() {
                             boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
                         }}
                     >
-                        {/* Icon + Title */}
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
                             <div
                                 style={{
@@ -607,7 +693,6 @@ export default function OrderDetailPage() {
                             </div>
                         </div>
 
-                        {/* Message */}
                         <div style={{
                             fontSize: "13px",
                             color: "var(--text-secondary)",
@@ -617,7 +702,6 @@ export default function OrderDetailPage() {
                             {confirmDialog.message}
                         </div>
 
-                        {/* Buttons */}
                         <div style={{ display: "flex", gap: "8px" }}>
                             <Button variant="secondary" onClick={() => setConfirmDialog(null)} style={{ flex: 1 }}>
                                 Vazgeç

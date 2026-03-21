@@ -19,12 +19,12 @@ export default function StatsCards() {
     const todayTotal = todayRecords.reduce((sum, k) => sum + k.adet, 0);
     const todayProductTypes = new Set(todayRecords.map(k => k.productId)).size;
 
-    const totalStock = products.reduce((sum, p) => sum + p.totalStock, 0);
-    const allocatedStock = products.reduce((sum, p) => sum + p.allocatedStock, 0);
-    const availableStock = products.reduce((sum, p) => sum + p.availableStock, 0);
+    const totalStock = products.reduce((sum, p) => sum + p.on_hand, 0);
+    const allocatedStock = products.reduce((sum, p) => sum + p.reserved, 0);
+    const availableStock = products.reduce((sum, p) => sum + p.available_now, 0);
     const criticalCount = products.filter(p => {
-        const ratio = p.minStockLevel > 0 ? p.availableStock / p.minStockLevel : 999;
-        return p.availableStock === 0 || ratio <= 1;
+        const ratio = p.minStockLevel > 0 ? p.available_now / p.minStockLevel : 999;
+        return p.available_now === 0 || ratio <= 1;
     }).length;
 
     const metrics = [

@@ -22,11 +22,11 @@ export default function AIAlerts() {
 
     // Sort by urgency DESC, then daysLeft ASC
     const sorted = [...reorderSuggestions].sort((a, b) => {
-        const urgA = (1 - a.availableStock / a.minStockLevel);
-        const urgB = (1 - b.availableStock / b.minStockLevel);
+        const urgA = (1 - a.available_now / a.minStockLevel);
+        const urgB = (1 - b.available_now / b.minStockLevel);
         if (urgB !== urgA) return urgB - urgA;
-        const dA = a.dailyUsage ? a.availableStock / a.dailyUsage : 999;
-        const dB = b.dailyUsage ? b.availableStock / b.dailyUsage : 999;
+        const dA = a.dailyUsage ? a.available_now / a.dailyUsage : 999;
+        const dB = b.dailyUsage ? b.available_now / b.dailyUsage : 999;
         return dA - dB;
     });
 
@@ -87,9 +87,9 @@ export default function AIAlerts() {
 
             {/* Alert items */}
             {top4.map((p, i) => {
-                const urgency = Math.round((1 - p.availableStock / p.minStockLevel) * 100);
-                const daysLeft = p.dailyUsage ? Math.round(p.availableStock / p.dailyUsage) : null;
-                const stockPct = Math.min(100, Math.round((p.availableStock / p.minStockLevel) * 100));
+                const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
+                const daysLeft = p.dailyUsage ? Math.round(p.available_now / p.dailyUsage) : null;
+                const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
                 const isRaw = p.productType === "raw_material";
                 const borderColor = isRaw ? "var(--danger)" : "var(--warning)";
 
@@ -161,7 +161,7 @@ export default function AIAlerts() {
                                 }} />
                             </div>
                             <span style={{ fontSize: "10px", color: "var(--text-tertiary)", flexShrink: 0 }}>
-                                {p.availableStock}/{p.minStockLevel}
+                                {p.available_now}/{p.minStockLevel}
                             </span>
                         </div>
 

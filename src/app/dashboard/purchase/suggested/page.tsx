@@ -156,21 +156,21 @@ export default function PurchaseSuggestedPage() {
         : reorderSuggestions.filter(p => p.productType === filter);
 
     const sorted = [...filtered].sort((a, b) => {
-        const urgA = (1 - a.availableStock / a.minStockLevel);
-        const urgB = (1 - b.availableStock / b.minStockLevel);
+        const urgA = (1 - a.available_now / a.minStockLevel);
+        const urgB = (1 - b.available_now / b.minStockLevel);
         return urgB - urgA;
     });
 
     const avgRisk = reorderSuggestions.length > 0
-        ? Math.round(reorderSuggestions.reduce((sum, p) => sum + (1 - p.availableStock / p.minStockLevel) * 100, 0) / reorderSuggestions.length)
+        ? Math.round(reorderSuggestions.reduce((sum, p) => sum + (1 - p.available_now / p.minStockLevel) * 100, 0) / reorderSuggestions.length)
         : 0;
 
     const mostUrgent = [...reorderSuggestions]
         .filter(p => p.dailyUsage)
-        .sort((a, b) => (a.availableStock / (a.dailyUsage ?? 1)) - (b.availableStock / (b.dailyUsage ?? 1)))[0];
+        .sort((a, b) => (a.available_now / (a.dailyUsage ?? 1)) - (b.available_now / (b.dailyUsage ?? 1)))[0];
 
     const mostUrgentDays = mostUrgent?.dailyUsage
-        ? Math.round(mostUrgent.availableStock / mostUrgent.dailyUsage)
+        ? Math.round(mostUrgent.available_now / mostUrgent.dailyUsage)
         : null;
 
     const tabs: { key: FilterType; label: string; count: number }[] = [
@@ -344,10 +344,10 @@ export default function PurchaseSuggestedPage() {
                 /* Mobile card layout */
                 <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     {sorted.map(p => {
-                        const urgency = Math.round((1 - p.availableStock / p.minStockLevel) * 100);
-                        const stockPct = Math.min(100, Math.round((p.availableStock / p.minStockLevel) * 100));
-                        const deficit = p.minStockLevel - p.availableStock;
-                        const daysLeft = p.dailyUsage ? Math.round(p.availableStock / p.dailyUsage) : null;
+                        const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
+                        const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
+                        const deficit = p.minStockLevel - p.available_now;
+                        const daysLeft = p.dailyUsage ? Math.round(p.available_now / p.dailyUsage) : null;
                         const isRaw = p.productType === "raw_material";
                         const isOrdered = orderedIds.has(p.id);
 
@@ -406,7 +406,7 @@ export default function PurchaseSuggestedPage() {
                                 <div style={{ display: "flex", gap: "16px", marginTop: "10px", flexWrap: "wrap" }}>
                                     <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                                         <span style={{ color: "var(--text-tertiary)" }}>Mevcut:</span>{" "}
-                                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{p.availableStock.toLocaleString("tr-TR")}</span>
+                                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{p.available_now.toLocaleString("tr-TR")}</span>
                                     </div>
                                     <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                                         <span style={{ color: "var(--text-tertiary)" }}>Min:</span>{" "}
@@ -477,10 +477,10 @@ export default function PurchaseSuggestedPage() {
                         </thead>
                         <tbody>
                             {sorted.map((p, idx) => {
-                                const urgency = Math.round((1 - p.availableStock / p.minStockLevel) * 100);
-                                const stockPct = Math.min(100, Math.round((p.availableStock / p.minStockLevel) * 100));
-                                const deficit = p.minStockLevel - p.availableStock;
-                                const daysLeft = p.dailyUsage ? Math.round(p.availableStock / p.dailyUsage) : null;
+                                const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
+                                const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
+                                const deficit = p.minStockLevel - p.available_now;
+                                const daysLeft = p.dailyUsage ? Math.round(p.available_now / p.dailyUsage) : null;
                                 const isRaw = p.productType === "raw_material";
                                 const isOrdered = orderedIds.has(p.id);
 
@@ -519,7 +519,7 @@ export default function PurchaseSuggestedPage() {
                                         {/* Stok */}
                                         <td style={{ padding: "10px 12px" }}>
                                             <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 500 }}>
-                                                {p.availableStock.toLocaleString("tr-TR")}
+                                                {p.available_now.toLocaleString("tr-TR")}
                                             </div>
                                             <div style={{
                                                 width: "72px",

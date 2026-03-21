@@ -1,17 +1,18 @@
 "use client";
 
-import { mockOrders } from "@/lib/mock-data";
+import { useData } from "@/lib/data-context";
+import type { CommercialStatus } from "@/lib/data-context";
 import { formatCurrency } from "@/lib/utils";
 
-const statusConfig: Record<string, { label: string; cls: string }> = {
-    DRAFT:     { label: "Taslak",      cls: "badge-neutral" },
-    PENDING:   { label: "Bekliyor",    cls: "badge-warning" },
-    APPROVED:  { label: "Onaylı",      cls: "badge-accent"  },
-    SHIPPED:   { label: "Sevk Edildi", cls: "badge-success" },
-    CANCELLED: { label: "İptal",       cls: "badge-danger"  },
+const statusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
+    draft:            { label: "Taslak",   cls: "badge-neutral" },
+    pending_approval: { label: "Bekliyor", cls: "badge-warning" },
+    approved:         { label: "Onaylı",   cls: "badge-accent"  },
+    cancelled:        { label: "İptal",    cls: "badge-danger"  },
 };
 
 export default function RecentOrders() {
+    const { orders } = useData();
     return (
         <div
             style={{
@@ -32,8 +33,8 @@ export default function RecentOrders() {
                 Son Siparişler
             </div>
 
-            {mockOrders.slice(0, 3).map((order) => {
-                const status = statusConfig[order.status];
+            {orders.slice(0, 3).map((order) => {
+                const status = statusConfig[order.commercial_status];
                 return (
                     <div
                         key={order.id}

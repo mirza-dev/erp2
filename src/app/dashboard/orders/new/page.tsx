@@ -128,7 +128,7 @@ function NewOrderForm() {
     if (filledLines === 0)  blockReasons.push("En az 1 ürün gerekli");
     const disabledReasonText = blockReasons.join(" · ");
 
-    const buildAndSave = async (status: "DRAFT" | "PENDING") => {
+    const buildAndSave = async (mode: "draft" | "pending_approval") => {
         setSubmitAttempted(true);
         if (!selectedCustomer || filledLines === 0) return;
         setIsSubmitting(true);
@@ -154,7 +154,8 @@ function NewOrderForm() {
                 customerCountry: selectedCustomer.country,
                 customerTaxOffice: selectedCustomer.taxOffice,
                 customerTaxNumber: selectedCustomer.taxNumber,
-                status,
+                commercial_status: mode,
+                fulfillment_status: "unallocated",
                 currency,
                 createdAt: new Date().toISOString().slice(0, 10),
                 subtotal,
@@ -163,7 +164,7 @@ function NewOrderForm() {
                 notes,
                 lines: orderLines,
             });
-            toast({ type: "success", message: status === "DRAFT" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
+            toast({ type: "success", message: mode === "draft" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
             router.push("/dashboard/orders");
         } catch {
             toast({ type: "error", message: "Sipariş kaydedilemedi. Lütfen tekrar deneyin." });
@@ -208,10 +209,10 @@ function NewOrderForm() {
                 {!isMobile && (
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                         <div style={{ display: "flex", gap: "8px" }}>
-                            <Button variant="secondary" loading={isSubmitting} onClick={() => buildAndSave("DRAFT")}>
+                            <Button variant="secondary" loading={isSubmitting} onClick={() => buildAndSave("draft")}>
                                 {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
                             </Button>
-                            <Button variant="primary" loading={isSubmitting} onClick={() => buildAndSave("PENDING")}>
+                            <Button variant="primary" loading={isSubmitting} onClick={() => buildAndSave("pending_approval")}>
                                 {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
                             </Button>
                         </div>
@@ -421,7 +422,7 @@ function NewOrderForm() {
                                 {lines.map((line, idx) => {
                                     const total = lineTotal(line);
                                     const liveProduct = line.product ? products.find(p => p.id === line.product!.id) : null;
-                                    const stock = liveProduct?.availableStock ?? null;
+                                    const stock = liveProduct?.available_now ?? null;
                                     const stockInsufficient = stock !== null && line.quantity > stock;
                                     const stockLow = stock !== null && !stockInsufficient && stock <= (liveProduct?.minStockLevel ?? 0);
                                     return (
@@ -649,10 +650,10 @@ function NewOrderForm() {
 
                         {/* Actions */}
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "12px" }}>
-                            <Button variant="primary" size="md" fullWidth loading={isSubmitting} onClick={() => buildAndSave("PENDING")}>
+                            <Button variant="primary" size="md" fullWidth loading={isSubmitting} onClick={() => buildAndSave("pending_approval")}>
                                 {isSubmitting ? "Gönderiliyor…" : "Siparişi Oluştur ve Gönder"}
                             </Button>
-                            <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("DRAFT")}>
+                            <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("draft")}>
                                 {isSubmitting ? "Kaydediliyor…" : "Taslak Olarak Kaydet"}
                             </Button>
                             {submitAttempted && !canSubmit && !isSubmitting && (
@@ -683,10 +684,10 @@ function NewOrderForm() {
                     }}
                 >
                     <div style={{ display: "flex", gap: "8px" }}>
-                        <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("DRAFT")}>
+                        <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("draft")}>
                             {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
                         </Button>
-                        <Button variant="primary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("PENDING")}>
+                        <Button variant="primary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("pending_approval")}>
                             {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
                         </Button>
                     </div>

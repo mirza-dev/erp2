@@ -5,23 +5,35 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
+import type { CommercialStatus, FulfillmentStatus } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 
-const statusConfig: Record<string, { label: string; cls: string }> = {
-    DRAFT:     { label: "Taslak",      cls: "badge-neutral" },
-    PENDING:   { label: "Bekliyor",    cls: "badge-warning" },
-    APPROVED:  { label: "Onaylı",      cls: "badge-accent"  },
-    SHIPPED:   { label: "Sevk Edildi", cls: "badge-success" },
-    CANCELLED: { label: "İptal",       cls: "badge-danger"  },
+const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
+    draft:            { label: "Taslak",      cls: "badge-neutral" },
+    pending_approval: { label: "Bekliyor",    cls: "badge-warning" },
+    approved:         { label: "Onaylı",      cls: "badge-accent"  },
+    cancelled:        { label: "İptal",       cls: "badge-danger"  },
 };
 
-const filterTabs = [
-    { id: "ALL",       label: "Tümü" },
-    { id: "PENDING",   label: "Bekleyen" },
-    { id: "APPROVED",  label: "Onaylı" },
-    { id: "SHIPPED",   label: "Sevk Edildi" },
-    { id: "CANCELLED", label: "İptal" },
+const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: string }> = {
+    unallocated:         { label: "Rezervesiz",   cls: "badge-neutral"  },
+    partially_allocated: { label: "Kısmi Rezerve", cls: "badge-warning"  },
+    allocated:           { label: "Rezerveli",    cls: "badge-warning"  },
+    partially_shipped:   { label: "Kısmi Sevk",   cls: "badge-accent"   },
+    shipped:             { label: "Sevk Edildi",  cls: "badge-success"  },
+};
+
+// For filter tabs — combine commercial + fulfillment into user-facing buckets
+type FilterTab = "ALL" | CommercialStatus | "shipped";
+
+const filterTabs: { id: FilterTab; label: string }[] = [
+    { id: "ALL",              label: "Tümü" },
+    { id: "pending_approval", label: "Bekleyen" },
+    { id: "approved",         label: "Onaylı" },
+    { id: "shipped",          label: "Sevk Edildi" },
+    { id: "cancelled",        label: "İptal" },
+    { id: "draft",            label: "Taslak" },
 ];
 
 const thStyle: React.CSSProperties = {
@@ -41,12 +53,18 @@ const tdStyle: React.CSSProperties = {
     lineHeight: 1.4,
 };
 
+function matchesTab(order: { commercial_status: CommercialStatus; fulfillment_status: FulfillmentStatus }, tab: FilterTab): boolean {
+    if (tab === "ALL") return true;
+    if (tab === "shipped") return order.fulfillment_status === "shipped";
+    return order.commercial_status === tab;
+}
+
 function OrdersList() {
     const { orders: mockOrders } = useData();
     const router = useRouter();
     const searchParams = useSearchParams();
     const [search, setSearch] = useState("");
-    const [activeTab, setActiveTab] = useState("ALL");
+    const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
 
     useEffect(() => {
         const customer = searchParams.get("customer");
@@ -58,12 +76,13 @@ function OrdersList() {
         const matchSearch =
             o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
             o.customerName.toLowerCase().includes(search.toLowerCase());
-        const matchStatus = activeTab === "ALL" || o.status === activeTab;
-        return matchSearch && matchStatus;
+        return matchSearch && matchesTab(o, activeTab);
     });
 
-    const getCount = (id: string) =>
-        id === "ALL" ? mockOrders.length : mockOrders.filter(o => o.status === id).length;
+    const getCount = (tab: FilterTab) =>
+        tab === "ALL" ? mockOrders.length : mockOrders.filter(o => matchesTab(o, tab)).length;
+
+    const pendingCount = mockOrders.filter(o => o.commercial_status === "pending_approval").length;
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -74,7 +93,7 @@ function OrdersList() {
                         Siparişler
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        {mockOrders.length} sipariş · {mockOrders.filter(o => o.status === "PENDING").length} onay bekliyor
+                        {mockOrders.length} sipariş · {pendingCount} onay bekliyor
                     </div>
                 </div>
                 <Link href="/dashboard/orders/new">
@@ -139,12 +158,13 @@ function OrdersList() {
                     overflowX: "auto",
                 }}
             >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "700px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "740px" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)" }}>
                             <th style={thStyle}>Sipariş No</th>
                             <th style={thStyle}>Müşteri</th>
-                            <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
+                            <th style={{ ...thStyle, textAlign: "center" }}>Ticari Durum</th>
+                            <th style={{ ...thStyle, textAlign: "center" }}>Lojistik</th>
                             <th style={thStyle}>Tarih</th>
                             <th style={{ ...thStyle, textAlign: "center" }}>Kalem</th>
                             <th style={{ ...thStyle, textAlign: "right" }}>Tutar</th>
@@ -154,7 +174,7 @@ function OrdersList() {
                     <tbody>
                         {filtered.length === 0 ? (
                             <tr>
-                                <td colSpan={7} style={{ border: "none" }}>
+                                <td colSpan={8} style={{ border: "none" }}>
                                     <EmptyState
                                         title={
                                             search
@@ -171,7 +191,8 @@ function OrdersList() {
                             </tr>
                         ) : (
                             filtered.map((order) => {
-                                const status = statusConfig[order.status];
+                                const commercial = commercialStatusConfig[order.commercial_status];
+                                const fulfillment = fulfillmentStatusConfig[order.fulfillment_status];
                                 return (
                                     <tr
                                         key={order.id}
@@ -203,7 +224,17 @@ function OrdersList() {
                                             {order.customerName}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "center" }}>
-                                            <span className={`badge ${status.cls}`}>{status.label}</span>
+                                            <span className={`badge ${commercial.cls}`}>{commercial.label}</span>
+                                        </td>
+                                        <td style={{ ...tdStyle, textAlign: "center" }}>
+                                            {order.fulfillment_status !== "unallocated" && (
+                                                <span
+                                                    className={`badge ${fulfillment.cls}`}
+                                                    style={{ fontSize: "10px", padding: "2px 6px" }}
+                                                >
+                                                    {fulfillment.label}
+                                                </span>
+                                            )}
                                         </td>
                                         <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
                                             {formatDate(order.createdAt)}
