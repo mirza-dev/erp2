@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
@@ -20,8 +20,8 @@ const inputStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
+    fontSize: "12px",
+    color: "var(--text-secondary)",
     marginBottom: "4px",
     display: "block",
     textTransform: "uppercase",
@@ -36,35 +36,55 @@ const sectionTitle: React.CSSProperties = {
     marginBottom: "12px",
 };
 
-function SaveButton({ onClick }: { onClick: () => void; saved?: boolean }) {
+function SaveButton({ onClick, loading, dirty }: { onClick: () => void; loading?: boolean; dirty?: boolean }) {
     return (
-        <div style={{ marginTop: "20px" }}>
-            <Button variant="primary" size="md" onClick={onClick}>
+        <div style={{ marginTop: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
+            <Button variant="primary" size="md" onClick={onClick} loading={loading} disabled={loading}>
                 Kaydet
             </Button>
+            {dirty && !loading && (
+                <span style={{ fontSize: "12px", color: "var(--warning-text)" }}>
+                    ⚠ Kaydedilmemiş değişiklikler
+                </span>
+            )}
         </div>
     );
 }
 
 // ─── Firma Profili ─────────────────────────────────────────────────────────────
-function FirmaTab() {
+const initialFirmaForm = {
+    name: "PMT Endüstriyel Ürünler A.Ş.",
+    taxOffice: "Başakşehir",
+    taxNo: "TR-4821937650",
+    address: "Başakşehir OSB, Hadımköy Yolu 45, 34307 İstanbul",
+    phone: "+90 212 555 0142",
+    website: "www.pmt-endustriyel.com.tr",
+    currency: "USD",
+};
+
+function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
-    const [form, setForm] = useState({
-        name: "PMT Endüstriyel Ürünler A.Ş.",
-        taxOffice: "Başakşehir",
-        taxNo: "TR-4821937650",
-        address: "Başakşehir OSB, Hadımköy Yolu 45, 34307 İstanbul",
-        phone: "+90 212 555 0142",
-        website: "www.pmt-endustriyel.com.tr",
-        currency: "USD",
-    });
+    const [form, setForm] = useState({ ...initialFirmaForm });
+    const savedRef = useRef({ ...initialFirmaForm });
+    const [isDirty, setIsDirty] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [logoDragging, setLogoDragging] = useState(false);
 
-    const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setForm(f => ({ ...f, [key]: e.target.value }));
+    const set = (key: keyof typeof initialFirmaForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const next = { ...form, [key]: e.target.value };
+        setForm(next);
+        const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
+        setIsDirty(dirty);
+        onDirtyChange?.(dirty);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        setIsSaving(true);
+        await new Promise(r => setTimeout(r, 800));
+        savedRef.current = { ...form };
+        setIsDirty(false);
+        onDirtyChange?.(false);
+        setIsSaving(false);
         toast({ type: "success", message: "Firma bilgileri kaydedildi" });
     };
 
@@ -136,19 +156,38 @@ function FirmaTab() {
                 </div>
             </div>
 
-            <SaveButton onClick={handleSave} />
+            <SaveButton onClick={handleSave} loading={isSaving} dirty={isDirty} />
         </div>
     );
 }
 
 // ─── Kullanıcı / Profil ────────────────────────────────────────────────────────
-function KullaniciTab() {
+const initialProfileForm = { fullName: "Mirza Sarıbıyık", email: "mirza@pmt-endustriyel.com.tr" };
+
+function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
-    const [form, setForm] = useState({ fullName: "Mirza Sarıbıyık", email: "mirza@pmt-endustriyel.com.tr" });
+    const [form, setForm] = useState({ ...initialProfileForm });
+    const savedRef = useRef({ ...initialProfileForm });
+    const [isDirty, setIsDirty] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
     const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
     const [pwError, setPwError] = useState("");
 
-    const handleProfileSave = () => {
+    const handleProfileFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const next = { ...form, fullName: e.target.value };
+        setForm(next);
+        const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
+        setIsDirty(dirty);
+        onDirtyChange?.(dirty);
+    };
+
+    const handleProfileSave = async () => {
+        setIsSaving(true);
+        await new Promise(r => setTimeout(r, 800));
+        savedRef.current = { ...form };
+        setIsDirty(false);
+        onDirtyChange?.(false);
+        setIsSaving(false);
         toast({ type: "success", message: "Profil bilgileri güncellendi" });
     };
 
@@ -218,7 +257,7 @@ function KullaniciTab() {
                         <input
                             style={inputStyle}
                             value={form.fullName}
-                            onChange={e => setForm(f => ({ ...f, fullName: e.target.value }))}
+                            onChange={handleProfileFieldChange}
                         />
                     </div>
                     <div>
@@ -233,7 +272,7 @@ function KullaniciTab() {
                         </div>
                     </div>
                 </div>
-                <SaveButton onClick={handleProfileSave} />
+                <SaveButton onClick={handleProfileSave} loading={isSaving} dirty={isDirty} />
             </div>
 
             {/* Password */}
@@ -265,20 +304,36 @@ function KullaniciTab() {
 }
 
 // ─── Bildirimler ───────────────────────────────────────────────────────────────
-function BildirimlerTab() {
+const initialPrefs = [
+    { id: "stock-critical", label: "Kritik stok uyarıları", email: true, browser: false },
+    { id: "order-pending", label: "Sipariş onay bekliyor", email: true, browser: true },
+    { id: "order-new", label: "Yeni sipariş oluşturuldu", email: false, browser: true },
+    { id: "sync-error", label: "Paraşüt sync hataları", email: true, browser: false },
+    { id: "order-shipped", label: "Sipariş sevk edildi", email: false, browser: true },
+];
+
+function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
-    const [prefs, setPrefs] = useState([
-        { id: "stock-critical", label: "Kritik stok uyarıları", email: true, browser: false },
-        { id: "order-pending", label: "Sipariş onay bekliyor", email: true, browser: true },
-        { id: "order-new", label: "Yeni sipariş oluşturuldu", email: false, browser: true },
-        { id: "sync-error", label: "Paraşüt sync hataları", email: true, browser: false },
-        { id: "order-shipped", label: "Sipariş sevk edildi", email: false, browser: true },
-    ]);
+    const [prefs, setPrefs] = useState(initialPrefs.map(p => ({ ...p })));
+    const savedRef = useRef(initialPrefs.map(p => ({ ...p })));
+    const [isDirty, setIsDirty] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+
     const toggle = (id: string, channel: "email" | "browser") => {
-        setPrefs(ps => ps.map(p => p.id === id ? { ...p, [channel]: !p[channel] } : p));
+        const next = prefs.map(p => p.id === id ? { ...p, [channel]: !p[channel] } : p);
+        setPrefs(next);
+        const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
+        setIsDirty(dirty);
+        onDirtyChange?.(dirty);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
+        setIsSaving(true);
+        await new Promise(r => setTimeout(r, 800));
+        savedRef.current = prefs.map(p => ({ ...p }));
+        setIsDirty(false);
+        onDirtyChange?.(false);
+        setIsSaving(false);
         toast({ type: "success", message: "Bildirim tercihleri kaydedildi" });
     };
 
@@ -357,7 +412,7 @@ function BildirimlerTab() {
                     </div>
                 ))}
             </div>
-            <SaveButton onClick={handleSave} />
+            <SaveButton onClick={handleSave} loading={isSaving} dirty={isDirty} />
         </div>
     );
 }
@@ -533,6 +588,7 @@ function ApiTab() {
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<Tab>("firma");
+    const [dirtyTabs, setDirtyTabs] = useState<Set<Tab>>(new Set());
 
     const tabs: { key: Tab; label: string }[] = [
         { key: "firma", label: "Firma Profili" },
@@ -540,6 +596,22 @@ export default function SettingsPage() {
         { key: "bildirimler", label: "Bildirimler" },
         { key: "api", label: "API Anahtarları" },
     ];
+
+    const handleDirtyChange = (tab: Tab, isDirty: boolean) => {
+        setDirtyTabs(prev => {
+            const next = new Set(prev);
+            isDirty ? next.add(tab) : next.delete(tab);
+            return next;
+        });
+    };
+
+    const handleTabSwitch = (key: Tab) => {
+        if (dirtyTabs.has(activeTab) && key !== activeTab) {
+            if (!window.confirm("Kaydedilmemiş değişiklikler var. Yine de devam edilsin mi?")) return;
+            setDirtyTabs(prev => { const next = new Set(prev); next.delete(activeTab); return next; });
+        }
+        setActiveTab(key);
+    };
 
     return (
         <div style={{ padding: "0" }}>
@@ -571,7 +643,7 @@ export default function SettingsPage() {
                     {tabs.map(({ key, label }) => (
                         <button
                             key={key}
-                            onClick={() => setActiveTab(key)}
+                            onClick={() => handleTabSwitch(key)}
                             style={{
                                 textAlign: "left",
                                 fontSize: "13px",
@@ -583,18 +655,31 @@ export default function SettingsPage() {
                                 fontWeight: activeTab === key ? 500 : 400,
                                 borderLeft: `2px solid ${activeTab === key ? "var(--accent)" : "transparent"}`,
                                 transition: "all 0.1s",
+                                display: "flex",
+                                alignItems: "center",
                             }}
                         >
                             {label}
+                            {dirtyTabs.has(key) && (
+                                <span style={{
+                                    display: "inline-block",
+                                    width: "6px",
+                                    height: "6px",
+                                    borderRadius: "50%",
+                                    background: "var(--warning)",
+                                    marginLeft: "6px",
+                                    flexShrink: 0,
+                                }} />
+                            )}
                         </button>
                     ))}
                 </div>
 
                 {/* Right content */}
                 <div style={{ padding: "24px 28px", maxWidth: "640px" }}>
-                    {activeTab === "firma" && <FirmaTab />}
-                    {activeTab === "kullanici" && <KullaniciTab />}
-                    {activeTab === "bildirimler" && <BildirimlerTab />}
+                    {activeTab === "firma" && <FirmaTab onDirtyChange={(d) => handleDirtyChange("firma", d)} />}
+                    {activeTab === "kullanici" && <KullaniciTab onDirtyChange={(d) => handleDirtyChange("kullanici", d)} />}
+                    {activeTab === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
                     {activeTab === "api" && <ApiTab />}
                 </div>
             </div>

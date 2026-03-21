@@ -84,7 +84,7 @@ export default function CustomersPage() {
         <>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                     <div>
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                             Cariler
@@ -161,10 +161,10 @@ export default function CustomersPage() {
                         background: "var(--bg-primary)",
                         border: "0.5px solid var(--border-tertiary)",
                         borderRadius: "6px",
-                        overflow: "hidden",
+                        overflowX: "auto",
                     }}
                 >
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "700px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
                                 <th style={thStyle}>Müşteri</th>
@@ -173,6 +173,7 @@ export default function CustomersPage() {
                                 <th style={thStyle}>Telefon</th>
                                 <th style={{ ...thStyle, textAlign: "center" }}>Sipariş</th>
                                 <th style={{ ...thStyle, textAlign: "right" }}>Toplam Gelir</th>
+                                <th style={{ ...thStyle, width: "32px" }}></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -208,6 +209,18 @@ export default function CustomersPage() {
                                                 {customer.name.charAt(0)}
                                             </div>
                                             {customer.name}
+                                            <span style={{
+                                                fontSize: "10px",
+                                                padding: "1px 6px",
+                                                borderRadius: "8px",
+                                                marginLeft: "6px",
+                                                background: customer.isActive ? "var(--success-bg)" : "var(--bg-tertiary)",
+                                                color: customer.isActive ? "var(--success-text)" : "var(--text-tertiary)",
+                                                border: `0.5px solid ${customer.isActive ? "var(--success-border)" : "var(--border-tertiary)"}`,
+                                                flexShrink: 0,
+                                            }}>
+                                                {customer.isActive ? "Aktif" : "Pasif"}
+                                            </span>
                                         </div>
                                     </td>
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
@@ -227,6 +240,9 @@ export default function CustomersPage() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500, color: "var(--success-text)" }}>
                                         {formatCurrency(customer.totalRevenue, customer.currency)}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)", fontSize: "16px", paddingRight: "16px" }}>
+                                        ›
                                     </td>
                                 </tr>
                             ))}

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useData } from "@/lib/data-context";
 import { formatCurrency } from "@/lib/utils";
 import DemoBanner from "@/components/ui/DemoBanner";
+import { useToast } from "@/components/ui/Toast";
 
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
@@ -57,15 +58,22 @@ const tdStyle: React.CSSProperties = {
 
 export default function ParasutPage() {
     const { orderDetails } = useData();
-    const syncedOrders = orderDetails
-        .filter(o => o.parasutInvoiceId && o.parasutSentAt)
-        .sort((a, b) => new Date(b.parasutSentAt!).getTime() - new Date(a.parasutSentAt!).getTime());
+    const { toast } = useToast();
+
+    const syncedOrders = useMemo(() =>
+        orderDetails
+            .filter(o => o.parasutInvoiceId && o.parasutSentAt)
+            .sort((a, b) => new Date(b.parasutSentAt!).getTime() - new Date(a.parasutSentAt!).getTime()),
+        [orderDetails]
+    );
 
     const [connection, setConnection] = useState<ConnectionStatus>("connected");
     const [showCredentials, setShowCredentials] = useState(false);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
     const [syncStep, setSyncStep] = useState(0); // 0=idle, 1=cariler, 2=faturalar, 3=ödemeler
     const [syncProgress, setSyncProgress] = useState(0);
+    const [lastSyncTime, setLastSyncTime] = useState("17 Mar 2026 · 14:30");
+    const [logs, setLogs] = useState<SyncLog[]>(mockLogs);
 
     const runSync = () => {
         if (syncStatus === "syncing") return;
@@ -78,16 +86,38 @@ export default function ParasutPage() {
         setTimeout(() => { setSyncProgress(66); }, 1000);
         setTimeout(() => { setSyncStep(3); setSyncProgress(83); }, 1400);
         setTimeout(() => { setSyncProgress(100); }, 1800);
-        setTimeout(() => { setSyncStatus("done"); setSyncStep(0); }, 2100);
+        setTimeout(() => {
+            setSyncStatus("done");
+            setSyncStep(0);
+
+            const now = new Date();
+            const timeLabel = now.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })
+                + " · " + now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+            setLastSyncTime(timeLabel);
+
+            const newLog: SyncLog = {
+                id: `l-${Date.now()}`,
+                date: now.toISOString(),
+                success: true,
+                customers: 2,
+                invoices: 5,
+                payments: 3,
+                durationSec: 3,
+            };
+            setLogs(prev => [newLog, ...prev]);
+
+            toast({ type: "success", message: "Sync tamamlandı — 5 fatura · 3 ödeme · 2 cari" });
+        }, 2100);
+        setTimeout(() => { setSyncStatus("idle"); }, 4100);
     };
 
     const syncStepLabel = ["", "Cariler sync ediliyor...", "Faturalar sync ediliyor...", "Ödemeler sync ediliyor..."][syncStep] || "";
 
-    const scopeCards = [
-        { label: "Cariler", lastSync: "17 Mar 12:00", count: 47, unit: "cari" },
-        { label: "Faturalar", lastSync: "17 Mar 12:00", count: 128, unit: "fatura" },
-        { label: "Ödemeler", lastSync: "16 Mar 22:00", count: 94, unit: "ödeme" },
-    ];
+    const scopeCards = useMemo(() => [
+        { label: "Cariler", count: 47, unit: "cari" },
+        { label: "Faturalar", count: 128, unit: "fatura" },
+        { label: "Ödemeler", count: 94, unit: "ödeme" },
+    ], []);
 
     return (
         <div style={{ padding: "0" }}>
@@ -130,7 +160,14 @@ export default function ParasutPage() {
                         {syncStatus === "syncing" ? "Sync ediliyor..." : "▶ Manuel Sync"}
                     </button>
                     <button
-                        onClick={() => setConnection(c => c === "connected" ? "disconnected" : "connected")}
+                        onClick={() => {
+                            const next = connection === "connected" ? "disconnected" : "connected";
+                            setConnection(next);
+                            toast({
+                                type: next === "connected" ? "success" : "warning",
+                                message: next === "connected" ? "Paraşüt bağlantısı kuruldu" : "Paraşüt bağlantısı kesildi",
+                            });
+                        }}
                         style={{
                             fontSize: "12px",
                             padding: "6px 14px",
@@ -180,11 +217,15 @@ export default function ParasutPage() {
                                 {connection === "connected" ? "Bağlı" : "Bağlantı Yok"}
                             </span>
                             <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                api.parasut.com · Son sync: 17 Mar 2026 14:30
+                                api.parasut.com · Son sync: {lastSyncTime}
                             </span>
                         </div>
                         <button
-                            onClick={() => setShowCredentials(v => !v)}
+                            onClick={() => {
+                                const next = !showCredentials;
+                                setShowCredentials(next);
+                                toast({ type: "info", message: next ? "API kimlik bilgileri gösterildi" : "API kimlik bilgileri gizlendi" });
+                            }}
                             style={{
                                 fontSize: "11px",
                                 padding: "4px 10px",
@@ -313,7 +354,7 @@ export default function ParasutPage() {
                                 </span>
                             </div>
                             <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                Son sync: {card.lastSync}
+                                Son sync: {lastSyncTime}
                             </div>
                         </div>
                     ))}
@@ -423,7 +464,7 @@ export default function ParasutPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {mockLogs.map((log) => (
+                            {logs.map((log) => (
                                 <tr
                                     key={log.id}
                                     style={{
