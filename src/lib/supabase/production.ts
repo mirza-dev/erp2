@@ -76,3 +76,12 @@ export async function dbGetProductionEntry(id: string): Promise<ProductionEntryR
     if (error || !data) return null;
     return data;
 }
+
+export async function dbDeleteProductionEntry(id: string): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("production_entries")
+        .delete()
+        .eq("id", id);
+    if (error) throw new Error(error.message);
+}

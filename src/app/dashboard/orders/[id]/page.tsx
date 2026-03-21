@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useData, type ConflictItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
+import { mapOrderDetail } from "@/lib/api-mappers";
+import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
@@ -45,9 +47,28 @@ const tdStyle: React.CSSProperties = {
 
 export default function OrderDetailPage() {
     const params = useParams();
-    const { orderDetails, updateOrderStatus } = useData();
+    const { updateOrderStatus } = useData();
     const { toast } = useToast();
-    const order = orderDetails.find(o => o.id === params.id);
+    const [order, setOrder] = useState<OrderDetail | null>(null);
+    const [orderLoading, setOrderLoading] = useState(true);
+
+    // Fetch order from API on mount
+    useEffect(() => {
+        const fetchOrder = async () => {
+            try {
+                const res = await fetch(`/api/orders/${params.id}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setOrder(mapOrderDetail(data));
+                }
+            } catch (err) {
+                console.error("Failed to fetch order:", err);
+            } finally {
+                setOrderLoading(false);
+            }
+        };
+        if (params.id) fetchOrder();
+    }, [params.id]);
 
     const [commercialStatus, setCommercialStatus] = useState<CommercialStatus>(order?.commercial_status ?? "draft");
     const [fulfillmentStatus, setFulfillmentStatus] = useState<FulfillmentStatus>(order?.fulfillment_status ?? "unallocated");
@@ -67,15 +88,23 @@ export default function OrderDetailPage() {
     } | null>(null);
 
     type ParasutStatus = "idle" | "sending" | "sent" | "error";
-    const [parasutStatus, setParasutStatus] = useState<ParasutStatus>(
-        order?.parasutInvoiceId ? "sent" : "idle"
-    );
-    const [parasutInvoiceId, setParasutInvoiceId] = useState<string | null>(
-        order?.parasutInvoiceId ?? null
-    );
-    const [parasutError, setParasutError] = useState<string | null>(
-        order?.parasutError ?? null
-    );
+    const [parasutStatus, setParasutStatus] = useState<ParasutStatus>("idle");
+    const [parasutInvoiceId, setParasutInvoiceId] = useState<string | null>(null);
+    const [parasutError, setParasutError] = useState<string | null>(null);
+
+    // Update parasut state when order loads
+    useEffect(() => {
+        if (order) {
+            if (order.parasutInvoiceId) {
+                setParasutStatus("sent");
+                setParasutInvoiceId(order.parasutInvoiceId);
+            }
+            if (order.parasutError) {
+                setParasutStatus("error");
+                setParasutError(order.parasutError);
+            }
+        }
+    }, [order]);
 
     if (!order) {
         return (
@@ -99,18 +128,23 @@ export default function OrderDetailPage() {
                 setJustTransitionedFulfillment("shipped");
                 setTimeout(() => setJustTransitionedFulfillment(null), 1500);
                 toast({ type: "success", message: "Sipariş sevk edildi" });
-                if (result.parasutSync && result.parasutSync.success) {
-                    setParasutStatus("sent");
-                    setParasutInvoiceId((result.parasutSync as { success: true; invoiceId: string }).invoiceId);
-                    toast({ type: "info", message: "Fatura Paraşüt'e gönderildi" });
-                } else {
-                    setParasutStatus("error");
-                    setParasutError(
-                        result.parasutSync && !result.parasutSync.success
-                            ? result.parasutSync.error
-                            : "Bilinmeyen hata"
-                    );
-                    toast({ type: "error", message: "Paraşüt sync başarısız" });
+                // Backend handles Paraşüt sync — fetch updated order to get parasut status
+                try {
+                    const res = await fetch(`/api/orders/${order.id}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.parasut_invoice_id) {
+                            setParasutStatus("sent");
+                            setParasutInvoiceId(data.parasut_invoice_id);
+                            toast({ type: "info", message: "Fatura Paraşüt'e gönderildi" });
+                        } else if (data.parasut_error) {
+                            setParasutStatus("error");
+                            setParasutError(data.parasut_error);
+                            toast({ type: "error", message: "Paraşüt sync başarısız" });
+                        }
+                    }
+                } catch (err) {
+                    console.error("Failed to fetch updated order:", err);
                 }
             }
             setLoading(null);
@@ -231,6 +265,16 @@ export default function OrderDetailPage() {
                         {fulfillmentStatus !== "unallocated" && (
                             <span className={`badge ${fulfillmentCfg.cls}`} style={{ fontSize: "10px", padding: "2px 7px" }}>
                                 {fulfillmentCfg.label}
+                            </span>
+                        )}
+                        {/* AI confidence badge */}
+                        {order.aiConfidence && (
+                            <span style={{
+                                fontSize: "11px", fontWeight: 500, padding: "2px 8px", borderRadius: "4px",
+                                background: "var(--accent-bg)", color: "var(--accent-text)",
+                                border: "0.5px solid var(--accent-border)",
+                            }}>
+                                AI Güven: %{Math.round(order.aiConfidence * 100)}
                             </span>
                         )}
                     </div>

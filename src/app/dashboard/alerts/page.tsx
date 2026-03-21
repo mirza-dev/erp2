@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
-import DemoBanner from "@/components/ui/DemoBanner";
 import { useToast } from "@/components/ui/Toast";
+import type { AlertRow } from "@/lib/database.types";
 
 type AlertSeverity = "critical" | "warning" | "info";
 type AlertCategory = "stock" | "order" | "ai";
@@ -25,104 +25,13 @@ interface Alert {
     createdAt: string;
 }
 
-const initialAlerts: Alert[] = [
-    // Critical stock alerts — derived from mockProducts (availableStock < minStockLevel)
-    {
-        id: "a1",
-        severity: "critical",
-        category: "stock",
-        title: "Kritik Stok: Wafer Tip Kelebek Vana DN150",
-        description: "Mevcut stok (20 adet) minimum stok seviyesinin (50 adet) altına düştü. %60 açık.",
-        meta: "KB-WT-DN150 · Kelebek Vanalar",
-        actionLabel: "Satın Alma Emri",
-        actionRouteTo: "/dashboard/purchase/suggested",
-        actionToastMsg: "Satın alma emri sayfası açılıyor",
-        dismissible: false,
-        createdAt: "2026-03-17T08:14:00",
-    },
-    {
-        id: "a2",
-        severity: "critical",
-        category: "stock",
-        title: "Kritik Stok: Çift Klapeli Çek Valf DN200",
-        description: "Mevcut stok (5 adet) minimum stok seviyesinin (15 adet) altına düştü. %67 açık. Aktif siparişlerin %92'si tahsis edilmiş durumda.",
-        meta: "CV-CK-DN200 · Çek Valfler",
-        actionLabel: "Satın Alma Emri",
-        actionRouteTo: "/dashboard/purchase/suggested",
-        actionToastMsg: "Satın alma emri sayfası açılıyor",
-        dismissible: false,
-        createdAt: "2026-03-17T07:52:00",
-    },
-    // Warning alerts
-    {
-        id: "a3",
-        severity: "warning",
-        category: "order",
-        title: "Sipariş Onay Bekliyor: ORD-0003",
-        description: "ADNOC Offshore siparişi (ORD-0003) 5 gündür PENDING durumunda. Onay süreci tamamlanmadı.",
-        meta: "ADNOC Offshore · $18,750",
-        actionLabel: "Siparişe Git",
-        actionHref: "/dashboard/orders/3",
-        dismissible: true,
-        createdAt: "2026-03-12T09:00:00",
-    },
-    {
-        id: "a4",
-        severity: "warning",
-        category: "order",
-        title: "Sevkiyat Tarihi Belirtilmedi: ORD-0005",
-        description: "Petronas siparişi (ORD-0005) APPROVED durumunda ancak 4 gündür sevkiyat tarihi girilmedi.",
-        meta: "Petronas Lubricants · $45,200",
-        actionLabel: "Siparişe Git",
-        actionHref: "/dashboard/orders/5",
-        dismissible: true,
-        createdAt: "2026-03-13T11:30:00",
-    },
-    {
-        id: "a5",
-        severity: "warning",
-        category: "stock",
-        title: "Yüksek Tahsisat: 2 Parçalı Küresel Vana DN50",
-        description: "Toplam stoğun %37.5'i aktif siparişlere tahsis edilmiş. Yeni gelen siparişler stok yetersizliğine yol açabilir.",
-        meta: "KV-2P-DN50 · Küresel Vanalar · 300/800 tahsis",
-        actionLabel: "Ürüne Git",
-        actionHref: "/dashboard/products",
-        dismissible: true,
-        createdAt: "2026-03-16T14:20:00",
-    },
-    // AI recommendations
-    {
-        id: "a6",
-        severity: "info",
-        category: "ai",
-        title: "AI Öneri: KV-2P-DN50 için yeniden sipariş",
-        description: "Son 90 günlük satış trendine göre 2 Parçalı Küresel Vana DN50, 6 hafta içinde minimum stok seviyesine ulaşacak. 200 adet sipariş öneriliyor.",
-        meta: "Önerilen miktar: 200 adet · Tahmini maliyet: $136,000",
-        actionLabel: "Sipariş Oluştur",
-        actionRouteTo: "/dashboard/orders/new",
-        actionToastMsg: "Yeni sipariş formu açılıyor",
-        dismissible: true,
-        createdAt: "2026-03-17T06:00:00",
-    },
-    {
-        id: "a7",
-        severity: "info",
-        category: "ai",
-        title: "AI Öneri: Mevsimsel talep artışı bekleniyor",
-        description: "Q2 başında (Nisan–Mayıs) Küresel Vana kategorisinde geçen yıla oranla %35 sipariş artışı öngörülüyor. Erken stok hazırlığı yapılması önerilir.",
-        meta: "Etkilenen kategori: Küresel Vanalar · 3 ürün",
-        dismissible: true,
-        createdAt: "2026-03-17T06:00:00",
-    },
-];
-
 const severityColors: Record<AlertSeverity, { dot: string; bg: string; border: string; text: string; badge: string }> = {
     critical: {
         dot: "var(--danger)",
         bg: "var(--danger-bg)",
         border: "var(--danger-border)",
         text: "var(--danger-text)",
-        badge: "KRİTİK",
+        badge: "KR\u0130T\u0130K",
     },
     warning: {
         dot: "var(--warning)",
@@ -136,44 +45,100 @@ const severityColors: Record<AlertSeverity, { dot: string; bg: string; border: s
         bg: "var(--accent-bg)",
         border: "var(--accent-border)",
         text: "var(--accent-text)",
-        badge: "AI ÖNERİ",
+        badge: "AI \u00d6NER\u0130",
     },
 };
+
+function mapAlertRow(row: AlertRow): Alert {
+    const category: AlertCategory =
+        row.type.includes("stock") ? "stock"
+        : row.type.includes("order") || row.type.includes("shortage") ? "order"
+        : "ai";
+    return {
+        id: row.id,
+        severity: row.severity,
+        category,
+        title: row.title,
+        description: row.description ?? "",
+        meta: row.entity_id ?? undefined,
+        dismissible: row.status === "open",
+        createdAt: row.created_at,
+    };
+}
 
 function formatRelativeTime(isoString: string): string {
     const diff = Date.now() - new Date(isoString).getTime();
     const hours = Math.floor(diff / 3600000);
     const minutes = Math.floor(diff / 60000);
-    if (hours >= 24) return `${Math.floor(hours / 24)} gün önce`;
-    if (hours >= 1) return `${hours} saat önce`;
-    if (minutes >= 1) return `${minutes} dk önce`;
-    return "az önce";
+    if (hours >= 24) return `${Math.floor(hours / 24)} g\u00fcn \u00f6nce`;
+    if (hours >= 1) return `${hours} saat \u00f6nce`;
+    if (minutes >= 1) return `${minutes} dk \u00f6nce`;
+    return "az \u00f6nce";
 }
 
 export default function AlertsPage() {
     const router = useRouter();
     const { toast } = useToast();
     const { products } = useData();
-    const [alerts, setAlerts] = useState<Alert[]>(initialAlerts);
+    const [alerts, setAlerts] = useState<Alert[]>([]);
     const [filter, setFilter] = useState<"all" | AlertCategory>("all");
-    const [lastRefreshed, setLastRefreshed] = useState("az önce");
+    const [lastRefreshed, setLastRefreshed] = useState("az \u00f6nce");
     const [refreshing, setRefreshing] = useState(false);
 
-    const dismiss = (id: string) => {
+    // Fetch alerts from API on mount
+    useEffect(() => {
+        const fetchAlerts = async () => {
+            try {
+                const res = await fetch("/api/alerts");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) {
+                        setAlerts(data.map(mapAlertRow));
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to fetch alerts:", err);
+            }
+        };
+        fetchAlerts();
+    }, []);
+
+    const dismiss = async (id: string) => {
+        try {
+            await fetch(`/api/alerts/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "dismissed" }),
+            });
+        } catch { /* optimistic — ignore */ }
         setAlerts((prev) => prev.filter((a) => a.id !== id));
-        toast({ type: "info", message: "Uyarı kapatıldı" });
+        toast({ type: "info", message: "Uyar\u0131 kapat\u0131ld\u0131" });
     };
 
-    const handleRefresh = () => {
+    const handleRefresh = async () => {
         if (refreshing) return;
         setRefreshing(true);
-        setTimeout(() => {
+        try {
+            const res = await fetch("/api/alerts/scan", { method: "POST" });
+            if (res.ok) {
+                // Refetch alerts
+                const alertsRes = await fetch("/api/alerts");
+                if (alertsRes.ok) {
+                    const data = await alertsRes.json();
+                    if (Array.isArray(data)) {
+                        setAlerts(data.map(mapAlertRow));
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Refresh failed:", err);
+        } finally {
             setRefreshing(false);
             setLastRefreshed(
                 new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
             );
-            toast({ type: "success", message: "Uyarılar güncellendi" });
-        }, 800);
+            toast({ type: "success", message: "Uyar\u0131lar g\u00fcncellendi" });
+        }
     };
 
     const filtered = filter === "all" ? alerts : alerts.filter((a) => a.category === filter);
@@ -189,9 +154,6 @@ export default function AlertsPage() {
 
     return (
         <div style={{ padding: "0" }}>
-            <DemoBanner storageKey="alerts-demo">
-                Uyarılar demo verileriyle çalışmaktadır. Gerçek zamanlı stok takibi yakında aktif olacak.
-            </DemoBanner>
             {/* Page Header */}
             <div
                 style={{
@@ -213,10 +175,10 @@ export default function AlertsPage() {
                             margin: 0,
                         }}
                     >
-                        Üretim & Stok Uyarıları
+                        \u00dcretim & Stok Uyar\u0131lar\u0131
                     </h1>
                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                        Son güncelleme: {lastRefreshed}
+                        Son g\u00fcncelleme: {lastRefreshed}
                     </div>
                 </div>
                 <button
@@ -236,7 +198,7 @@ export default function AlertsPage() {
                         opacity: refreshing ? 0.6 : 1,
                     }}
                 >
-                    {refreshing ? "Yükleniyor..." : "↻ Yenile"}
+                    {refreshing ? "Y\u00fckleniyor..." : "\u21bb Yenile"}
                 </button>
             </div>
 
@@ -251,8 +213,8 @@ export default function AlertsPage() {
             >
                 {[
                     { label: "Kritik", count: criticalCount, severity: "critical" as AlertSeverity },
-                    { label: "Uyarı", count: warningCount, severity: "warning" as AlertSeverity },
-                    { label: "AI Öneri", count: infoCount, severity: "info" as AlertSeverity },
+                    { label: "Uyar\u0131", count: warningCount, severity: "warning" as AlertSeverity },
+                    { label: "AI \u00d6neri", count: infoCount, severity: "info" as AlertSeverity },
                 ].map(({ label, count, severity }) => (
                     <div
                         key={severity}
@@ -265,7 +227,6 @@ export default function AlertsPage() {
                             border: `0.5px solid ${severityColors[severity].border}`,
                             borderRadius: "6px",
                             cursor: "pointer",
-                            opacity: filter !== "all" && filter !== "stock" && filter !== "order" && filter !== "ai" ? 0.6 : 1,
                         }}
                         onClick={() => setFilter("all")}
                     >
@@ -308,10 +269,10 @@ export default function AlertsPage() {
                     >
                         {(
                             [
-                                { key: "all", label: "Tümü", count: alerts.length },
+                                { key: "all", label: "T\u00fcm\u00fc", count: alerts.length },
                                 { key: "stock", label: "Stok", count: alerts.filter((a) => a.category === "stock").length },
-                                { key: "order", label: "Sipariş", count: alerts.filter((a) => a.category === "order").length },
-                                { key: "ai", label: "AI Önerileri", count: alerts.filter((a) => a.category === "ai").length },
+                                { key: "order", label: "Sipari\u015F", count: alerts.filter((a) => a.category === "order").length },
+                                { key: "ai", label: "AI \u00d6nerileri", count: alerts.filter((a) => a.category === "ai").length },
                             ] as { key: "all" | AlertCategory; label: string; count: number }[]
                         ).map(({ key, label, count }) => (
                             <button
@@ -362,7 +323,7 @@ export default function AlertsPage() {
                                     fontSize: "13px",
                                 }}
                             >
-                                Bu kategoride uyarı yok.
+                                Bu kategoride uyar\u0131 yok.
                             </div>
                         )}
                         {filtered.map((alert) => {
@@ -372,7 +333,7 @@ export default function AlertsPage() {
                                     key={alert.id}
                                     style={{
                                         background: "var(--bg-secondary)",
-                                        border: `0.5px solid var(--border-tertiary)`,
+                                        border: "0.5px solid var(--border-tertiary)",
                                         borderLeft: `3px solid ${colors.dot}`,
                                         borderRadius: "6px",
                                         padding: "14px 16px",
@@ -476,7 +437,7 @@ export default function AlertsPage() {
                                                             cursor: "pointer",
                                                         }}
                                                     >
-                                                        {alert.actionLabel} →
+                                                        {alert.actionLabel} {"\u2192"}
                                                     </Link>
                                                 ) : (
                                                     <button
@@ -495,7 +456,7 @@ export default function AlertsPage() {
                                                             cursor: "pointer",
                                                         }}
                                                     >
-                                                        {alert.actionLabel} →
+                                                        {alert.actionLabel} {"\u2192"}
                                                     </button>
                                                 )
                                             )}
@@ -541,7 +502,7 @@ export default function AlertsPage() {
                     {/* All products stock bars */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                         {products.map((product) => {
-                            const pct = Math.round((product.available_now / product.on_hand) * 100);
+                            const pct = product.on_hand > 0 ? Math.round((product.available_now / product.on_hand) * 100) : 0;
                             const isCritical = product.available_now < product.minStockLevel;
                             const isWarning = !isCritical && product.available_now < product.minStockLevel * 1.5;
                             const barColor = isCritical
@@ -652,7 +613,7 @@ export default function AlertsPage() {
                                     marginBottom: "6px",
                                 }}
                             >
-                                {lowStockProducts.length} ürün kritik seviyenin altında
+                                {lowStockProducts.length} \u00fcr\u00fcn kritik seviyenin alt\u0131nda
                             </div>
                             {lowStockProducts.map((p) => (
                                 <div
@@ -663,7 +624,7 @@ export default function AlertsPage() {
                                         marginBottom: "2px",
                                     }}
                                 >
-                                    · {p.sku}: {p.available_now}/{p.minStockLevel} adet
+                                    \u00b7 {p.sku}: {p.available_now}/{p.minStockLevel} adet
                                 </div>
                             ))}
                         </div>

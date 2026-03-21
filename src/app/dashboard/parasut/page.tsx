@@ -1,35 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { useData } from "@/lib/data-context";
-import { formatCurrency } from "@/lib/utils";
-import DemoBanner from "@/components/ui/DemoBanner";
+import { useState, useEffect, useMemo } from "react";
 import { useToast } from "@/components/ui/Toast";
+import type { IntegrationSyncLogRow } from "@/lib/database.types";
 
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
-
-interface SyncLog {
-    id: string;
-    date: string;
-    success: boolean;
-    customers: number;
-    invoices: number;
-    payments: number;
-    durationSec: number;
-    error?: string;
-}
-
-const mockLogs: SyncLog[] = [
-    { id: "l1", date: "2026-03-17T14:30:00", success: true,  customers: 2,  invoices: 5,  payments: 3,  durationSec: 4 },
-    { id: "l2", date: "2026-03-17T12:00:00", success: true,  customers: 0,  invoices: 12, payments: 8,  durationSec: 3 },
-    { id: "l3", date: "2026-03-16T22:00:00", success: false, customers: 0,  invoices: 0,  payments: 0,  durationSec: 2, error: "API rate limit aşıldı (429). 1 saat sonra tekrar deneyin." },
-    { id: "l4", date: "2026-03-16T18:00:00", success: true,  customers: 1,  invoices: 7,  payments: 4,  durationSec: 4 },
-    { id: "l5", date: "2026-03-16T12:00:00", success: true,  customers: 3,  invoices: 9,  payments: 6,  durationSec: 5 },
-    { id: "l6", date: "2026-03-15T22:00:00", success: true,  customers: 0,  invoices: 4,  payments: 11, durationSec: 3 },
-    { id: "l7", date: "2026-03-15T14:00:00", success: true,  customers: 5,  invoices: 18, payments: 9,  durationSec: 6 },
-    { id: "l8", date: "2026-03-15T08:00:00", success: true,  customers: 1,  invoices: 3,  payments: 2,  durationSec: 3 },
-];
 
 function formatDateTime(iso: string) {
     const d = new Date(iso);
@@ -57,73 +33,87 @@ const tdStyle: React.CSSProperties = {
 };
 
 export default function ParasutPage() {
-    const { orderDetails } = useData();
     const { toast } = useToast();
-
-    const syncedOrders = useMemo(() =>
-        orderDetails
-            .filter(o => o.parasutInvoiceId && o.parasutSentAt)
-            .sort((a, b) => new Date(b.parasutSentAt!).getTime() - new Date(a.parasutSentAt!).getTime()),
-        [orderDetails]
-    );
 
     const [connection, setConnection] = useState<ConnectionStatus>("connected");
     const [showCredentials, setShowCredentials] = useState(false);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
-    const [syncStep, setSyncStep] = useState(0); // 0=idle, 1=cariler, 2=faturalar, 3=ödemeler
+    const [syncStep, setSyncStep] = useState(0);
     const [syncProgress, setSyncProgress] = useState(0);
-    const [lastSyncTime, setLastSyncTime] = useState("17 Mar 2026 · 14:30");
-    const [logs, setLogs] = useState<SyncLog[]>(mockLogs);
+    const [lastSyncTime, setLastSyncTime] = useState("17 Mar 2026 \u00b7 14:30");
+    const [logs, setLogs] = useState<IntegrationSyncLogRow[]>([]);
 
-    const runSync = () => {
+    // Fetch sync logs from API on mount
+    useEffect(() => {
+        const fetchLogs = async () => {
+            try {
+                const res = await fetch("/api/parasut/logs?limit=50");
+                if (res.ok) {
+                    const data = await res.json();
+                    setLogs(Array.isArray(data) ? data : []);
+                }
+            } catch (err) {
+                console.error("Failed to fetch parasut logs:", err);
+            }
+        };
+        fetchLogs();
+    }, []);
+
+    const runSync = async () => {
         if (syncStatus === "syncing") return;
         setSyncStatus("syncing");
         setSyncStep(1);
-        setSyncProgress(15);
+        setSyncProgress(20);
+        try {
+            setSyncStep(2);
+            setSyncProgress(50);
+            const res = await fetch("/api/parasut/sync", { method: "POST" });
+            setSyncStep(3);
+            setSyncProgress(80);
+            if (res.ok) {
+                const data = await res.json();
+                setSyncProgress(100);
+                setSyncStatus("done");
+                setSyncStep(0);
 
-        setTimeout(() => { setSyncProgress(33); }, 300);
-        setTimeout(() => { setSyncStep(2); setSyncProgress(50); }, 700);
-        setTimeout(() => { setSyncProgress(66); }, 1000);
-        setTimeout(() => { setSyncStep(3); setSyncProgress(83); }, 1400);
-        setTimeout(() => { setSyncProgress(100); }, 1800);
-        setTimeout(() => {
-            setSyncStatus("done");
-            setSyncStep(0);
+                const now = new Date();
+                const timeLabel = now.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })
+                    + " \u00b7 " + now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+                setLastSyncTime(timeLabel);
 
-            const now = new Date();
-            const timeLabel = now.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })
-                + " · " + now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-            setLastSyncTime(timeLabel);
-
-            const newLog: SyncLog = {
-                id: `l-${Date.now()}`,
-                date: now.toISOString(),
-                success: true,
-                customers: 2,
-                invoices: 5,
-                payments: 3,
-                durationSec: 3,
-            };
-            setLogs(prev => [newLog, ...prev]);
-
-            toast({ type: "success", message: "Sync tamamlandı — 5 fatura · 3 ödeme · 2 cari" });
-        }, 2100);
-        setTimeout(() => { setSyncStatus("idle"); }, 4100);
+                // Refetch logs
+                const logsRes = await fetch("/api/parasut/logs?limit=50");
+                if (logsRes.ok) {
+                    const logsData = await logsRes.json();
+                    setLogs(Array.isArray(logsData) ? logsData : []);
+                }
+                toast({ type: "success", message: data.message ?? "Sync tamamland\u0131" });
+                // Auto-reset done status after 3 seconds
+                setTimeout(() => setSyncStatus("idle"), 3000);
+            } else {
+                setSyncStatus("idle");
+                toast({ type: "error", message: "Sync ba\u015Far\u0131s\u0131z" });
+            }
+        } catch (err) {
+            console.error("Sync failed:", err);
+            setSyncStatus("idle");
+            toast({ type: "error", message: "Sync ba\u015Far\u0131s\u0131z" });
+        }
     };
 
-    const syncStepLabel = ["", "Cariler sync ediliyor...", "Faturalar sync ediliyor...", "Ödemeler sync ediliyor..."][syncStep] || "";
+    const syncStepLabel = ["", "Cariler sync ediliyor...", "Faturalar sync ediliyor...", "\u00d6demeler sync ediliyor..."][syncStep] || "";
+
+    // No synced orders yet — will be populated when orders reach "shipped" status
+    const syncedOrders: { id: string; parasutInvoiceId: string; orderNumber: string; customerName: string; grandTotal: number; currency: string; parasutSentAt: string }[] = [];
 
     const scopeCards = useMemo(() => [
         { label: "Cariler", count: 47, unit: "cari" },
         { label: "Faturalar", count: 128, unit: "fatura" },
-        { label: "Ödemeler", count: 94, unit: "ödeme" },
+        { label: "\u00d6demeler", count: 94, unit: "\u00f6deme" },
     ], []);
 
     return (
         <div style={{ padding: "0" }}>
-            <DemoBanner storageKey="parasut-demo">
-                Paraşüt entegrasyonu demo modunda çalışmaktadır. Gerçek API bağlantısı yakında aktif olacak.
-            </DemoBanner>
             {/* Header */}
             <div
                 style={{
@@ -138,10 +128,10 @@ export default function ParasutPage() {
             >
                 <div>
                     <h1 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Paraşüt Muhasebe Entegrasyonu
+                        Para\u015F\u00FCt Muhasebe Entegrasyonu
                     </h1>
                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                        api.parasut.com · Otomatik sync: her 6 saatte bir
+                        api.parasut.com \u00b7 Otomatik sync: her 6 saatte bir
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -159,7 +149,7 @@ export default function ParasutPage() {
                             opacity: connection === "disconnected" ? 0.5 : 1,
                         }}
                     >
-                        {syncStatus === "syncing" ? "Sync ediliyor..." : "▶ Manuel Sync"}
+                        {syncStatus === "syncing" ? "Sync ediliyor..." : "\u25b6 Manuel Sync"}
                     </button>
                     <button
                         onClick={() => {
@@ -167,7 +157,7 @@ export default function ParasutPage() {
                             setConnection(next);
                             toast({
                                 type: next === "connected" ? "success" : "warning",
-                                message: next === "connected" ? "Paraşüt bağlantısı kuruldu" : "Paraşüt bağlantısı kesildi",
+                                message: next === "connected" ? "Para\u015F\u00FCt ba\u011Flant\u0131s\u0131 kuruldu" : "Para\u015F\u00FCt ba\u011Flant\u0131s\u0131 kesildi",
                             });
                         }}
                         style={{
@@ -180,14 +170,14 @@ export default function ParasutPage() {
                             cursor: "pointer",
                         }}
                     >
-                        {connection === "connected" ? "Bağlantıyı Kes" : "Bağlan"}
+                        {connection === "connected" ? "Ba\u011Flant\u0131y\u0131 Kes" : "Ba\u011Flan"}
                     </button>
                 </div>
             </div>
 
             <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "20px" }}>
 
-                {/* A — Connection Status Card */}
+                {/* A -- Connection Status Card */}
                 <div
                     style={{
                         background: "var(--bg-secondary)",
@@ -216,17 +206,17 @@ export default function ParasutPage() {
                                     color: connection === "connected" ? "var(--success-text)" : "var(--danger-text)",
                                 }}
                             >
-                                {connection === "connected" ? "Bağlı" : "Bağlantı Yok"}
+                                {connection === "connected" ? "Ba\u011Fl\u0131" : "Ba\u011Flant\u0131 Yok"}
                             </span>
                             <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                api.parasut.com · Son sync: {lastSyncTime}
+                                api.parasut.com \u00b7 Son sync: {lastSyncTime}
                             </span>
                         </div>
                         <button
                             onClick={() => {
                                 const next = !showCredentials;
                                 setShowCredentials(next);
-                                toast({ type: "info", message: next ? "API kimlik bilgileri gösterildi" : "API kimlik bilgileri gizlendi" });
+                                toast({ type: "info", message: next ? "API kimlik bilgileri g\u00f6sterildi" : "API kimlik bilgileri gizlendi" });
                             }}
                             style={{
                                 fontSize: "11px",
@@ -238,7 +228,7 @@ export default function ParasutPage() {
                                 cursor: "pointer",
                             }}
                         >
-                            {showCredentials ? "Gizle" : "Göster"}
+                            {showCredentials ? "Gizle" : "G\u00f6ster"}
                         </button>
                     </div>
 
@@ -287,7 +277,7 @@ export default function ParasutPage() {
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                             <span style={{ fontSize: "13px", color: syncStatus === "done" ? "var(--success-text)" : "var(--warning-text)", fontWeight: 500 }}>
                                 {syncStatus === "done"
-                                    ? "✓ Sync tamamlandı"
+                                    ? "\u2713 Sync tamamland\u0131"
                                     : syncStepLabel}
                             </span>
                             <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
@@ -305,15 +295,10 @@ export default function ParasutPage() {
                                 }}
                             />
                         </div>
-                        {syncStatus === "done" && (
-                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "8px" }}>
-                                47 cari güncellendi · 12 yeni fatura · 8 ödeme · 0 hata
-                            </div>
-                        )}
                     </div>
                 )}
 
-                {/* B — Scope Cards */}
+                {/* B -- Scope Cards */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
                     {scopeCards.map((card) => (
                         <div
@@ -362,7 +347,7 @@ export default function ParasutPage() {
                     ))}
                 </div>
 
-                {/* C — Son Faturalar (otomatik gönderilen) */}
+                {/* C -- Son Faturalar (otomatik gonderilen) */}
                 <div
                     style={{
                         background: "var(--bg-secondary)",
@@ -384,24 +369,24 @@ export default function ParasutPage() {
                             Son Faturalar
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                            Otomatik gönderilen · {syncedOrders.length} fatura
+                            Otomatik g\u00f6nderilen \u00b7 {syncedOrders.length} fatura
                         </div>
                     </div>
 
                     {syncedOrders.length === 0 ? (
                         <div style={{ padding: "20px 16px", fontSize: "12px", color: "var(--text-tertiary)", textAlign: "center" }}>
-                            Henüz otomatik gönderilen fatura yok. Bir sipariş &quot;Sevk Edildi&quot; durumuna geçince buraya eklenir.
+                            Hen\u00fcz otomatik g\u00f6nderilen fatura yok. Bir sipari\u015F &quot;Sevk Edildi&quot; durumuna ge\u00e7ince buraya eklenir.
                         </div>
                     ) : (
                         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "560px" }}>
                             <thead>
                                 <tr>
                                     <th style={thStyle}>Fatura No</th>
-                                    <th style={thStyle}>Sipariş No</th>
-                                    <th style={thStyle}>Müşteri</th>
+                                    <th style={thStyle}>Sipari\u015F No</th>
+                                    <th style={thStyle}>M\u00fc\u015Fteri</th>
                                     <th style={{ ...thStyle, textAlign: "right" }}>Tutar</th>
-                                    <th style={{ ...thStyle, textAlign: "right" }}>Döviz</th>
-                                    <th style={{ ...thStyle, textAlign: "right" }}>Gönderim</th>
+                                    <th style={{ ...thStyle, textAlign: "right" }}>D\u00f6viz</th>
+                                    <th style={{ ...thStyle, textAlign: "right" }}>G\u00f6nderim</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -417,14 +402,14 @@ export default function ParasutPage() {
                                             {order.customerName}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", fontWeight: 500 }}>
-                                            {formatCurrency(order.grandTotal, order.currency)}
+                                            {order.grandTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", color: "var(--text-tertiary)" }}>
                                             {order.currency}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right" }}>
                                             <span style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
-                                                {formatDateTime(order.parasutSentAt!)}
+                                                {formatDateTime(order.parasutSentAt)}
                                             </span>
                                         </td>
                                     </tr>
@@ -434,7 +419,7 @@ export default function ParasutPage() {
                     )}
                 </div>
 
-                {/* D — Sync Log Table */}
+                {/* D -- Sync Log Table */}
                 <div
                     style={{
                         background: "var(--bg-secondary)",
@@ -452,58 +437,60 @@ export default function ParasutPage() {
                             color: "var(--text-secondary)",
                         }}
                     >
-                        Sync Geçmişi
+                        Sync Ge\u00e7mi\u015Fi
                     </div>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "520px" }}>
                         <thead>
                             <tr>
                                 <th style={thStyle}>Tarih</th>
-                                <th style={thStyle}>Sonuç</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>Cariler</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>Faturalar</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>Ödemeler</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>Süre</th>
+                                <th style={thStyle}>Sonu\u00e7</th>
+                                <th style={thStyle}>Entity</th>
+                                <th style={thStyle}>D\u0131\u015F ID</th>
+                                <th style={thStyle}>Hata</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {logs.map((log) => (
-                                <tr
-                                    key={log.id}
-                                    style={{
-                                        background: log.success ? "transparent" : "var(--danger-bg)",
-                                    }}
-                                >
-                                    <td style={tdStyle}>
-                                        <span style={{ fontFamily: "monospace", fontSize: "12px" }}>
-                                            {formatDateTime(log.date)}
-                                        </span>
-                                    </td>
-                                    <td style={tdStyle}>
-                                        {log.success ? (
-                                            <span style={{ color: "var(--success-text)", fontSize: "12px" }}>✓ Başarılı</span>
-                                        ) : (
-                                            <div>
-                                                <span style={{ color: "var(--danger-text)", fontSize: "12px" }}>✕ Hata</span>
-                                                <div style={{ fontSize: "11px", color: "var(--danger-text)", opacity: 0.8, marginTop: "1px" }}>
-                                                    {log.error}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", color: log.customers > 0 ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-                                        {log.success ? `+${log.customers}` : "—"}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", color: log.invoices > 0 ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-                                        {log.success ? `+${log.invoices}` : "—"}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", color: log.payments > 0 ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-                                        {log.success ? `+${log.payments}` : "—"}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                        {log.success ? `${log.durationSec}s` : "—"}
+                            {logs.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} style={{ ...tdStyle, textAlign: "center", color: "var(--text-tertiary)" }}>
+                                        Hen\u00fcz sync ge\u00e7mi\u015Fi yok
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                logs.map((log) => {
+                                    const isSuccess = log.status === "success";
+                                    return (
+                                        <tr
+                                            key={log.id}
+                                            style={{
+                                                background: isSuccess ? "transparent" : "var(--danger-bg)",
+                                            }}
+                                        >
+                                            <td style={tdStyle}>
+                                                <span style={{ fontFamily: "monospace", fontSize: "12px" }}>
+                                                    {formatDateTime(log.requested_at)}
+                                                </span>
+                                            </td>
+                                            <td style={tdStyle}>
+                                                {isSuccess ? (
+                                                    <span style={{ color: "var(--success-text)", fontSize: "12px" }}>{"\u2713"} Ba\u015Far\u0131l\u0131</span>
+                                                ) : (
+                                                    <span style={{ color: "var(--danger-text)", fontSize: "12px" }}>{"\u2715"} Hata</span>
+                                                )}
+                                            </td>
+                                            <td style={{ ...tdStyle, fontSize: "12px", color: "var(--text-secondary)" }}>
+                                                {log.entity_type}
+                                            </td>
+                                            <td style={{ ...tdStyle, fontSize: "12px", color: "var(--text-secondary)" }}>
+                                                {log.external_id || "\u2014"}
+                                            </td>
+                                            <td style={{ ...tdStyle, fontSize: "11px", color: "var(--danger-text)" }}>
+                                                {log.error_message ? log.error_message.substring(0, 40) : "\u2014"}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
                         </tbody>
                     </table>
                 </div>

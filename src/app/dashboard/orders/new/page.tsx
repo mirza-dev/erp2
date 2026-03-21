@@ -147,7 +147,7 @@ function NewOrderForm() {
                     discountPct: l.discountPct,
                     lineTotal: lineTotal(l),
                 }));
-            addOrder({
+            await addOrder({
                 customerName: selectedCustomer.name,
                 customerId: selectedCustomer.id,
                 customerEmail: selectedCustomer.email,

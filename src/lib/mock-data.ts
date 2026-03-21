@@ -87,6 +87,8 @@ export interface OrderDetail extends Order {
     parasutSentAt?: string;
     parasutError?: string;
     lines: OrderLineItem[];
+    aiConfidence?: number;
+    aiReason?: string;
 }
 
 export const mockProducts: Product[] = [

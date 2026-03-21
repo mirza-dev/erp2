@@ -2,8 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useData } from "@/lib/data-context";
-import { useToast } from "@/components/ui/Toast";
-import Button from "@/components/ui/Button";
 
 type FilterType = "all" | "raw_material" | "finished";
 
@@ -133,9 +131,7 @@ function SegmentBanner({ filter, rawCount, finishedCount, rawItems, finishedItem
 
 export default function PurchaseSuggestedPage() {
     const { reorderSuggestions } = useData();
-    const { toast } = useToast();
     const [filter, setFilter] = useState<FilterType>("all");
-    const [orderedIds, setOrderedIds] = useState<Set<string>>(new Set());
     const [windowWidth, setWindowWidth] = useState(
         typeof window !== "undefined" ? window.innerWidth : 1200
     );
@@ -178,17 +174,6 @@ export default function PurchaseSuggestedPage() {
         { key: "raw_material", label: "Hammadde", count: rawItems.length },
         { key: "finished", label: "Bitmiş Ürün", count: finishedItems.length },
     ];
-
-    function handleOrder(p: typeof sorted[0]) {
-        setOrderedIds(prev => new Set(prev).add(p.id));
-        const isRaw = p.productType === "raw_material";
-        toast({
-            type: "success",
-            message: isRaw
-                ? `Satın alma emri oluşturuldu: ${p.name}`
-                : `Üretim emri oluşturuldu: ${p.name}`,
-        });
-    }
 
     return (
         <div style={{ padding: "24px 32px" }}>
@@ -349,8 +334,6 @@ export default function PurchaseSuggestedPage() {
                         const deficit = p.minStockLevel - p.available_now;
                         const daysLeft = p.dailyUsage ? Math.round(p.available_now / p.dailyUsage) : null;
                         const isRaw = p.productType === "raw_material";
-                        const isOrdered = orderedIds.has(p.id);
-
                         return (
                             <div key={p.id} style={{
                                 border: "1px solid var(--border-secondary)",
@@ -426,22 +409,15 @@ export default function PurchaseSuggestedPage() {
                                     </span>
                                 </div>
 
-                                {/* CTA */}
+                                {/* Durum badge */}
                                 <div style={{ marginTop: "12px" }}>
-                                    <Button
-                                        variant={isOrdered ? "secondary" : isRaw ? "primary" : "secondary"}
-                                        size="sm"
-                                        fullWidth
-                                        disabled={isOrdered}
-                                        onClick={() => handleOrder(p)}
-                                        style={isOrdered ? { background: "var(--success-bg)", color: "var(--success-text)", borderColor: "var(--success-border)" } : undefined}
-                                    >
-                                        {isOrdered
-                                            ? "Oluşturuldu ✓"
-                                            : isRaw
-                                                ? "Sipariş Oluştur"
-                                                : "Üretim Emri Ver"}
-                                    </Button>
+                                    <span style={{
+                                        fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "4px",
+                                        background: "var(--warning-bg)", color: "var(--warning-text)",
+                                        border: "0.5px solid var(--warning-border)",
+                                    }}>
+                                        {isRaw ? "📦 Tedarik Gerekli" : "🔧 Üretim Emri Açılmalı"}
+                                    </span>
                                 </div>
                             </div>
                         );
@@ -458,7 +434,7 @@ export default function PurchaseSuggestedPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
-                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Risk Skoru", "Önerilen · Tükenme", "Aksiyon"].map(h => (
+                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Risk Skoru", "Önerilen · Tükenme", "Durum"].map(h => (
                                     <th key={h} style={{
                                         padding: "10px 12px",
                                         textAlign: "left",
@@ -482,9 +458,7 @@ export default function PurchaseSuggestedPage() {
                                 const deficit = p.minStockLevel - p.available_now;
                                 const daysLeft = p.dailyUsage ? Math.round(p.available_now / p.dailyUsage) : null;
                                 const isRaw = p.productType === "raw_material";
-                                const isOrdered = orderedIds.has(p.id);
-
-                                return (
+                                        return (
                                     <tr key={p.id} style={{
                                         borderBottom: idx < sorted.length - 1 ? "1px solid var(--border-tertiary)" : "none",
                                         background: urgency >= 80 ? "rgba(248,81,73,0.04)" : "transparent",
@@ -591,19 +565,13 @@ export default function PurchaseSuggestedPage() {
                                         </td>
                                         {/* Aksiyon */}
                                         <td style={{ padding: "10px 12px" }}>
-                                            <Button
-                                                variant={isOrdered ? "secondary" : isRaw ? "primary" : "secondary"}
-                                                size="sm"
-                                                disabled={isOrdered}
-                                                onClick={() => handleOrder(p)}
-                                                style={isOrdered ? { background: "var(--success-bg)", color: "var(--success-text)", borderColor: "var(--success-border)", opacity: 1 } : undefined}
-                                            >
-                                                {isOrdered
-                                                    ? "Oluşturuldu ✓"
-                                                    : isRaw
-                                                        ? "Sipariş Oluştur"
-                                                        : "Üretim Emri Ver"}
-                                            </Button>
+                                            <span style={{
+                                                fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "4px",
+                                                background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                border: "0.5px solid var(--warning-border)",
+                                            }}>
+                                                {isRaw ? "📦 Tedarik Gerekli" : "🔧 Üretim Emri Açılmalı"}
+                                            </span>
                                         </td>
                                     </tr>
                                 );

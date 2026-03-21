@@ -291,7 +291,15 @@ export default function ImportPage() {
         setSheets(prev => prev.map((s, i) => i === idx ? { ...s, selected: !s.selected } : s));
     };
 
-    const handleImport = () => {
+    const handleImport = async () => {
+        // Audit trail: batch kaydı oluştur
+        try {
+            await fetch("/api/import", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ file_name: fileName ?? "import.xlsx" }),
+            });
+        } catch { /* non-blocking */ }
         setState("importing");
         const init: Record<string, number> = {};
         IMPORTABLE_TABS.forEach(t => (init[t] = 0));
@@ -339,9 +347,6 @@ export default function ImportPage() {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <DemoBanner storageKey="import-demo">
-                Excel analizi simülasyon modunda çalışmaktadır. Gerçek dosya parse işlemi AI entegrasyonu ile aktif olacak.
-            </DemoBanner>
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <div>
