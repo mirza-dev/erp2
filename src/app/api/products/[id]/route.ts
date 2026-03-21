@@ -5,6 +5,7 @@ import {
     dbDeleteProduct,
     type CreateProductInput,
 } from "@/lib/supabase/products";
+import { handleApiError } from "@/lib/api-error";
 
 // GET /api/products/[id]
 export async function GET(
@@ -19,8 +20,7 @@ export async function GET(
         }
         return NextResponse.json(product);
     } catch (err) {
-        console.error("[GET /api/products/[id]]", err);
-        return NextResponse.json({ error: "Ürün alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/products/[id]");
     }
 }
 
@@ -35,8 +35,7 @@ export async function PATCH(
         const product = await dbUpdateProduct(id, body);
         return NextResponse.json(product);
     } catch (err) {
-        console.error("[PATCH /api/products/[id]]", err);
-        return NextResponse.json({ error: "Ürün güncellenemedi." }, { status: 500 });
+        return handleApiError(err, "PATCH /api/products/[id]");
     }
 }
 
@@ -50,7 +49,6 @@ export async function DELETE(
         await dbDeleteProduct(id);
         return NextResponse.json({ ok: true });
     } catch (err) {
-        console.error("[DELETE /api/products/[id]]", err);
-        return NextResponse.json({ error: "Ürün silinemedi." }, { status: 500 });
+        return handleApiError(err, "DELETE /api/products/[id]");
     }
 }

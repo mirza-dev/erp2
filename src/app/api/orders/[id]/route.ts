@@ -4,6 +4,7 @@ import {
     serviceTransitionOrder,
     type OrderTransition,
 } from "@/lib/services/order-service";
+import { handleApiError } from "@/lib/api-error";
 
 // GET /api/orders/[id]
 export async function GET(
@@ -18,8 +19,7 @@ export async function GET(
         }
         return NextResponse.json(order);
     } catch (err) {
-        console.error("[GET /api/orders/[id]]", err);
-        return NextResponse.json({ error: "Sipariş alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/orders/[id]");
     }
 }
 
@@ -54,8 +54,7 @@ export async function PATCH(
         const updated = await serviceGetOrder(id);
         return NextResponse.json(updated);
     } catch (err) {
-        console.error("[PATCH /api/orders/[id]]", err);
-        return NextResponse.json({ error: "Durum güncellenemedi." }, { status: 500 });
+        return handleApiError(err, "PATCH /api/orders/[id]");
     }
 }
 
@@ -74,7 +73,6 @@ export async function DELETE(
 
         return NextResponse.json({ ok: true });
     } catch (err) {
-        console.error("[DELETE /api/orders/[id]]", err);
-        return NextResponse.json({ error: "Sipariş iptal edilemedi." }, { status: 500 });
+        return handleApiError(err, "DELETE /api/orders/[id]");
     }
 }

@@ -6,6 +6,7 @@ import {
 } from "@/lib/services/order-service";
 import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
+import { handleApiError } from "@/lib/api-error";
 
 // GET /api/orders?commercial_status=approved&customer_id=xxx&page=1
 export async function GET(req: NextRequest) {
@@ -23,8 +24,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json(orders);
     } catch (err) {
-        console.error("[GET /api/orders]", err);
-        return NextResponse.json({ error: "Siparişler alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/orders");
     }
 }
 
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
         const result = await serviceCreateOrder(body);
         return NextResponse.json(result, { status: 201 });
     } catch (err) {
-        console.error("[POST /api/orders]", err);
-        return NextResponse.json({ error: "Sipariş oluşturulamadı." }, { status: 500 });
+        return handleApiError(err, "POST /api/orders");
     }
 }

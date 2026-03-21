@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceCreateProductionEntry } from "@/lib/services/production-service";
 import { dbListProductionEntries } from "@/lib/supabase/production";
+import { handleApiError } from "@/lib/api-error";
 
 // GET /api/production?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
@@ -11,8 +12,7 @@ export async function GET(req: NextRequest) {
         const entries = await dbListProductionEntries(productId, limit);
         return NextResponse.json(entries);
     } catch (err) {
-        console.error("[GET /api/production]", err);
-        return NextResponse.json({ error: "Üretim kayıtları alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/production");
     }
 }
 
@@ -43,7 +43,6 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ entry_id: result.entry_id }, { status: 201 });
     } catch (err) {
-        console.error("[POST /api/production]", err);
-        return NextResponse.json({ error: "Üretim kaydı oluşturulamadı." }, { status: 500 });
+        return handleApiError(err, "POST /api/production");
     }
 }

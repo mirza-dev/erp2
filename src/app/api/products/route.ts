@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListProducts, dbCreateProduct, type CreateProductInput } from "@/lib/supabase/products";
+import { handleApiError } from "@/lib/api-error";
+import { ConfigError } from "@/lib/supabase/service";
 
 // GET /api/products?category=xxx&product_type=finished&low_stock=true&page=1
 export async function GET(req: NextRequest) {
@@ -13,8 +15,7 @@ export async function GET(req: NextRequest) {
         });
         return NextResponse.json(products);
     } catch (err) {
-        console.error("[GET /api/products]", err);
-        return NextResponse.json({ error: "Ürünler alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/products");
     }
 }
 
@@ -36,12 +37,14 @@ export async function POST(req: NextRequest) {
         const product = await dbCreateProduct(body);
         return NextResponse.json(product, { status: 201 });
     } catch (err: unknown) {
-        console.error("[POST /api/products]", err);
+        // ConfigError (missing env) → 503 before anything else
+        if (err instanceof ConfigError) return handleApiError(err, "POST /api/products");
+        // Duplicate SKU → 409 (business rule, keep inline)
         const msg = err instanceof Error ? err.message : "Ürün oluşturulamadı.";
-        // Duplicate SKU
         if (msg.includes("unique")) {
+            console.error("[POST /api/products] duplicate SKU", err);
             return NextResponse.json({ error: "Bu SKU zaten kayıtlı." }, { status: 409 });
         }
-        return NextResponse.json({ error: msg }, { status: 500 });
+        return handleApiError(err, "POST /api/products");
     }
 }

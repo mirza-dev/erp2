@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbDeleteProductionEntry } from "@/lib/supabase/production";
+import { handleApiError } from "@/lib/api-error";
 
 // DELETE /api/production/[id]
 export async function DELETE(
@@ -11,7 +12,6 @@ export async function DELETE(
         await dbDeleteProductionEntry(id);
         return NextResponse.json({ ok: true });
     } catch (err) {
-        console.error("[DELETE /api/production/[id]]", err);
-        return NextResponse.json({ error: "Üretim kaydı silinemedi." }, { status: 500 });
+        return handleApiError(err, "DELETE /api/production/[id]");
     }
 }
