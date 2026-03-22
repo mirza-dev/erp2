@@ -109,7 +109,7 @@ export async function serviceTransitionOrder(
         if (!isValidCommercialTransition(order.commercial_status, "pending_approval")) {
             return { success: false, error: `'${order.commercial_status}' durumundan onay beklemesine geçilemez.` };
         }
-        await dbUpdateOrderStatus(orderId, "pending_approval", order.fulfillment_status);
+        await dbUpdateOrderStatus(orderId, "pending_approval", order.fulfillment_status ?? "unallocated");
         await dbLogOrderAction(orderId, "status_transition",
             { commercial_status: order.commercial_status },
             { commercial_status: "pending_approval" });
@@ -118,6 +118,11 @@ export async function serviceTransitionOrder(
 
     // ── pending_approval → approved: atomic RPC with partial allocation ──
     if (transition === "approved") {
+        const order = await dbGetOrderById(orderId);
+        if (!order) return { success: false, error: "Sipariş bulunamadı." };
+        if (!isValidCommercialTransition(order.commercial_status, "approved")) {
+            return { success: false, error: `'${order.commercial_status}' durumundaki sipariş onaylanamaz. Önce onaya gönderin.` };
+        }
         const result: ApproveOrderResult = await dbApproveOrder(orderId);
         return {
             success: result.success,
@@ -129,6 +134,11 @@ export async function serviceTransitionOrder(
 
     // ── approved+allocated → shipped: atomic RPC ──
     if (transition === "shipped") {
+        const order = await dbGetOrderById(orderId);
+        if (!order) return { success: false, error: "Sipariş bulunamadı." };
+        if (order.commercial_status !== "approved") {
+            return { success: false, error: "Yalnızca onaylanmış siparişler sevk edilebilir." };
+        }
         const result = await dbShipOrderFull(orderId);
         return { success: result.success, error: result.error };
     }

@@ -154,11 +154,14 @@ export default function OrderDetailPage() {
 
     const handleTransition = async (next: CommercialStatus | "shipped") => {
         setLoading(next);
-
-        if (next === "shipped") {
-            setParasutStatus("sending");
-            const result = await updateOrderStatus(order.id, "shipped");
-            if (result.ok) {
+        try {
+            if (next === "shipped") {
+                setParasutStatus("sending");
+                const result = await updateOrderStatus(order.id, "shipped");
+                if (!result.ok) {
+                    toast({ type: "error", message: result.error || "Sevk işlemi başarısız." });
+                    return;
+                }
                 setFulfillmentStatus("shipped");
                 setJustTransitionedFulfillment("shipped");
                 setTimeout(() => setJustTransitionedFulfillment(null), 1500);
@@ -181,51 +184,53 @@ export default function OrderDetailPage() {
                 } catch (err) {
                     console.error("Failed to fetch updated order:", err);
                 }
-            }
-            setLoading(null);
-            return;
-        }
-
-        // pending_approval → approved: async with conflict check
-        if (next === "approved") {
-            const result = await updateOrderStatus(order.id, "approved");
-            if (!result.ok && result.conflicts) {
-                setConflicts(result.conflicts);
-                setConflictOpen(true);
-                toast({ type: "error", message: "Stok yetersiz — sipariş onaylanamadı" });
-                setLoading(null);
                 return;
             }
-            if (result.ok) {
+
+            if (next === "approved") {
+                const result = await updateOrderStatus(order.id, "approved");
+                if (!result.ok) {
+                    if (result.conflicts) {
+                        setConflicts(result.conflicts);
+                        setConflictOpen(true);
+                        toast({ type: "error", message: "Stok yetersiz — sipariş onaylanamadı" });
+                    } else {
+                        toast({ type: "error", message: result.error || "Onaylama başarısız." });
+                    }
+                    return;
+                }
                 setCommercialStatus("approved");
                 setFulfillmentStatus("allocated");
                 setJustTransitionedCommercial("approved");
                 setTimeout(() => setJustTransitionedCommercial(null), 1500);
                 toast({ type: "success", message: "Sipariş onaylandı ve stok rezerve edildi" });
+                return;
             }
-            setLoading(null);
-            return;
-        }
 
-        // Other transitions: draft→pending_approval, any→cancelled
-        setTimeout(async () => {
+            // pending_approval, cancelled
             const result = await updateOrderStatus(order.id, next);
-            if (result.ok) {
-                if (next === "cancelled") {
-                    setCommercialStatus("cancelled");
-                    setFulfillmentStatus("unallocated");
-                    setJustTransitionedCommercial("cancelled");
-                    setTimeout(() => setJustTransitionedCommercial(null), 1500);
-                    toast({ type: "warning", message: "Sipariş iptal edildi" });
-                } else if (next === "pending_approval") {
-                    setCommercialStatus("pending_approval");
-                    setJustTransitionedCommercial("pending_approval");
-                    setTimeout(() => setJustTransitionedCommercial(null), 1500);
-                    toast({ type: "success", message: "Sipariş onaya gönderildi" });
-                }
+            if (!result.ok) {
+                toast({ type: "error", message: result.error || "İşlem başarısız oldu." });
+                return;
             }
+            if (next === "cancelled") {
+                setCommercialStatus("cancelled");
+                setFulfillmentStatus("unallocated");
+                setJustTransitionedCommercial("cancelled");
+                setTimeout(() => setJustTransitionedCommercial(null), 1500);
+                toast({ type: "warning", message: "Sipariş iptal edildi" });
+            } else if (next === "pending_approval") {
+                setCommercialStatus("pending_approval");
+                setJustTransitionedCommercial("pending_approval");
+                setTimeout(() => setJustTransitionedCommercial(null), 1500);
+                toast({ type: "success", message: "Sipariş onaya gönderildi" });
+            }
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.";
+            toast({ type: "error", message: msg });
+        } finally {
             setLoading(null);
-        }, 600);
+        }
     };
 
     const requestTransition = (next: CommercialStatus | "shipped") => {

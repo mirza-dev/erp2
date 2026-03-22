@@ -408,7 +408,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
-        return { ok: false, error: errBody.error };
+        return { ok: false, error: errBody.error || `API error: ${res.status}` };
       }
 
       const updated = await res.json();
