@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     }
 }
 
-// POST /api/orders — creates a new draft order
+// POST /api/orders — creates a new order (draft or pending_approval)
 export async function POST(req: NextRequest) {
     try {
         const body: CreateOrderInput = await req.json();

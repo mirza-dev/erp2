@@ -112,7 +112,7 @@ export async function dbCreateOrder(input: CreateOrderInput): Promise<{ id: stri
             customer_country: input.customer_country ?? null,
             customer_tax_office: input.customer_tax_office ?? null,
             customer_tax_number: input.customer_tax_number ?? null,
-            commercial_status: "draft",
+            commercial_status: input.commercial_status,
             fulfillment_status: "unallocated",
             currency: input.currency,
             subtotal: input.subtotal,

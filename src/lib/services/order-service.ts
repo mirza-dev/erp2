@@ -88,8 +88,11 @@ export async function serviceGetOrder(id: string) {
 export async function serviceCreateOrder(input: CreateOrderInput) {
     const validation = validateOrderCreate(input);
     if (!validation.valid) throw new Error(validation.errors.join(" "));
-    // Backend invariant: new orders are always draft + unallocated
-    return dbCreateOrder({ ...input, commercial_status: "draft", fulfillment_status: "unallocated" });
+    // Only draft and pending_approval are valid initial statuses (domain-rules §4.1)
+    if (input.commercial_status !== "draft" && input.commercial_status !== "pending_approval") {
+        throw new Error(`Geçersiz başlangıç durumu: ${input.commercial_status}`);
+    }
+    return dbCreateOrder({ ...input, fulfillment_status: "unallocated" });
 }
 
 // ── Status Transitions ───────────────────────────────────────
