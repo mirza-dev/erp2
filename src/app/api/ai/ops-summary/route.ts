@@ -3,7 +3,7 @@ import { dbListProducts } from "@/lib/supabase/products";
 import { dbListAlerts } from "@/lib/supabase/alerts";
 import { dbListOrders } from "@/lib/supabase/orders";
 import { computeCoverageDays } from "@/lib/stock-utils";
-import { aiGenerateOpsSummary, type OpsSummaryInput } from "@/lib/services/ai-service";
+import { aiGenerateOpsSummary, isAIAvailable, type OpsSummaryInput } from "@/lib/services/ai-service";
 import { handleApiError } from "@/lib/api-error";
 
 async function gatherMetrics(): Promise<OpsSummaryInput> {
@@ -46,10 +46,21 @@ async function gatherMetrics(): Promise<OpsSummaryInput> {
 }
 
 export async function POST() {
+    if (!isAIAvailable()) {
+        return NextResponse.json({
+            ai_available: false,
+            summary: "",
+            insights: [],
+            anomalies: [],
+            confidence: 0,
+            generatedAt: new Date().toISOString(),
+        });
+    }
+
     try {
         const metrics = await gatherMetrics();
         const result = await aiGenerateOpsSummary(metrics);
-        return NextResponse.json(result);
+        return NextResponse.json({ ai_available: true, ...result });
     } catch (err) {
         return handleApiError(err, "AI özet oluşturulamadı.");
     }

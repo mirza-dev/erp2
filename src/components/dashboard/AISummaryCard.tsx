@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 
 interface OpsSummaryResult {
+    ai_available: boolean;
     summary: string;
     insights: string[];
     anomalies: string[];
@@ -10,7 +11,7 @@ interface OpsSummaryResult {
     generatedAt: string;
 }
 
-type CardState = "loading" | "loaded" | "error";
+type CardState = "loading" | "loaded" | "error" | "disabled";
 
 export default function AISummaryCard() {
     const [state, setState] = useState<CardState>("loading");
@@ -22,6 +23,10 @@ export default function AISummaryCard() {
             const res = await fetch("/api/ai/ops-summary", { method: "POST" });
             if (!res.ok) throw new Error("API error");
             const result: OpsSummaryResult = await res.json();
+            if (result.ai_available === false) {
+                setState("disabled");
+                return;
+            }
             if (!result.summary) {
                 setState("error");
                 return;
@@ -35,6 +40,33 @@ export default function AISummaryCard() {
 
     useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
+    if (state === "disabled") {
+        return (
+            <div style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border-secondary)",
+                borderLeft: "3px solid var(--border-primary)",
+                borderRadius: "8px",
+                padding: "16px 20px",
+            }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: "8px" }}>
+                    AI Operasyon Ozeti
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
+                    <span style={{ fontSize: "14px", color: "var(--text-tertiary)", flexShrink: 0 }}>⚙</span>
+                    <div>
+                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "2px" }}>
+                            AI servisi yapilandirilmamis
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                            ANTHROPIC_API_KEY eksik — diger ERP modulleri tam calisiyor.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (state === "error") {
         return (
             <div style={{
@@ -47,7 +79,7 @@ export default function AISummaryCard() {
                 gap: "8px",
             }}>
                 <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                    AI operasyon ozeti su an kullanilamiyor.
+                    AI servisi yanit vermedi — tekrar denemek icin yenile.
                 </span>
             </div>
         );

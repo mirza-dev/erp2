@@ -8,6 +8,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { dbGetOrderById } from "@/lib/supabase/orders";
 import { createServiceClient } from "@/lib/supabase/service";
 
+export function isAIAvailable(): boolean {
+    return !!process.env.ANTHROPIC_API_KEY;
+}
+
 const client = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
@@ -74,6 +78,10 @@ function parseAIResponse(text: string): { parsed_data: Record<string, unknown>; 
 export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntityResult> {
     const systemPrompt = PARSE_SYSTEM[input.entity_type];
     if (!systemPrompt) throw new Error(`Unknown entity_type: ${input.entity_type}`);
+
+    if (!isAIAvailable()) {
+        return { parsed_data: {}, confidence: 0, ai_reason: "AI servisi yapılandırılmamış", unmatched_fields: ["all"] };
+    }
 
     try {
         const message = await client.messages.create({
@@ -146,6 +154,11 @@ Kurallar:
 
 export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsSummaryResult> {
     const now = new Date().toISOString();
+
+    if (!isAIAvailable()) {
+        return { summary: "", insights: [], anomalies: [], confidence: 0, generatedAt: now };
+    }
+
     try {
         const message = await client.messages.create({
             model: MODEL,
@@ -197,6 +210,10 @@ Risk factors to consider: missing customer info, unusually high discount, very l
 export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
     const order = await dbGetOrderById(orderId);
     if (!order) throw new Error("Sipariş bulunamadı.");
+
+    if (!isAIAvailable()) {
+        return { confidence: 0, risk_level: "medium", reason: "AI servisi yapılandırılmamış" };
+    }
 
     try {
         const orderSummary = JSON.stringify({

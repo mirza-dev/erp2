@@ -14,7 +14,10 @@ export async function GET() {
     // ── Env checks ──────────────────────────────────────────────────────
     checks["env.SUPABASE_URL"]       = process.env.NEXT_PUBLIC_SUPABASE_URL    ? "ok" : "MISSING";
     checks["env.SERVICE_ROLE_KEY"]   = process.env.SUPABASE_SERVICE_ROLE_KEY   ? "ok" : "MISSING";
-    checks["env.ANTHROPIC_API_KEY"]  = process.env.ANTHROPIC_API_KEY           ? "ok" : "MISSING";
+    // Optional — AI özet/puanlama/parse; eksikse sistem çalışır, AI özellikleri devre dışı
+    checks["ai.ANTHROPIC_API_KEY"]   = process.env.ANTHROPIC_API_KEY
+        ? "ok"
+        : "disabled (AI features unavailable)";
     // Optional — Paraşüt entegrasyonu; eksikse 503 dönmez
     checks["env.PARASUT_CLIENT_ID"]  = process.env.PARASUT_CLIENT_ID
         ? "ok (optional)"
@@ -92,7 +95,6 @@ export async function GET() {
     const requiredKeys = [
         "env.SUPABASE_URL",
         "env.SERVICE_ROLE_KEY",
-        "env.ANTHROPIC_API_KEY",
         "db.customers",
         "db.sales_orders",
         "db.production_entries",

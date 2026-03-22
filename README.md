@@ -33,7 +33,7 @@ curl http://localhost:3000/api/health
 | `NEXT_PUBLIC_SUPABASE_URL` | ✓ | Supabase Dashboard → Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✓ | aynı yer (public, client-side güvenli) |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✓ | aynı yer — **gizli tut**, RLS'i bypass eder |
-| `ANTHROPIC_API_KEY` | ✓ | [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| `ANTHROPIC_API_KEY` | Opsiyonel | AI özet, puanlama ve parse için. Eksikse sistem çalışır; AI özellikleri devre dışı kalır. [console.anthropic.com](https://console.anthropic.com/settings/keys) |
 | `PARASUT_CLIENT_ID` | Opsiyonel | Paraşüt Developer Portal → OAuth |
 | `PARASUT_CLIENT_SECRET` | Opsiyonel | aynı yer |
 | `PARASUT_COMPANY_ID` | Opsiyonel | aynı yer |
@@ -74,25 +74,28 @@ GET /api/health
 
 Env değişkenlerini ve tablo/migration varlığını kontrol eder.
 
-- **HTTP 200** → her şey hazır
-- **HTTP 503** → eksik env veya uygulanmamış migration
+- **HTTP 200** → sistem hazır (AI opsiyonel, eksikse 503 dönmez)
+- **HTTP 503** → eksik zorunlu env (Supabase) veya uygulanmamış migration
 
 ```jsonc
-// Örnek başarılı yanıt
+// AI yapılandırılmış — tam kapasite
 {
   "env.SUPABASE_URL": "ok",
   "env.SERVICE_ROLE_KEY": "ok",
-  "env.ANTHROPIC_API_KEY": "ok",
+  "ai.ANTHROPIC_API_KEY": "ok",
   "env.PARASUT_CLIENT_ID": "MISSING (optional)",
   "db.customers": "ok",
-  "db.sales_orders": "ok",
-  "db.production_entries": "ok",
-  "db.alerts": "ok",
-  "db.rpc_stock_functions": "ok",
-  "db.rpc_order_functions": "ok",
-  "db.rpc_inventory_functions": "ok",
-  "db.migration_005": "ok",
-  "db.migration_006": "ok"
+  // ...migration check'ler
+}
+
+// AI yapılandırılmamış — sistem çalışıyor, AI özellikleri devre dışı
+{
+  "env.SUPABASE_URL": "ok",
+  "env.SERVICE_ROLE_KEY": "ok",
+  "ai.ANTHROPIC_API_KEY": "disabled (AI features unavailable)",
+  "env.PARASUT_CLIENT_ID": "MISSING (optional)",
+  "db.customers": "ok",
+  // ...
 }
 ```
 
