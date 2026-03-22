@@ -2,7 +2,7 @@
 Status: Faz 0–10 Tamamlandı
 Depends On: `domain-rules.md`
 Last Updated: 2026-03-22
-Son Commit: feat: full frontend→backend wiring + roadmap hardening (807ccf7)
+Son Commit: feat: Faz 6 + Faz 10 — lead-time purchase engine + AI ops summary (ccc2fa8)
 
 ## 1. Amaç
 Bu belge, `domain-rules.md` içinde tanımlanan operasyonel kuralları uygulamaya geçirmek için geliştirme sırasını, kapsamları ve riskleri tanımlar.
@@ -50,7 +50,7 @@ Amaç:
 - Tüm ekip ve araçlar için ortak dil yaratmak
 
 Yapılacaklar:
-- `docs/domain-rules.md` dosyasını oluştur ve sabitle
+- `domain-rules.md` dosyasını oluştur ve sabitle
 - Domain terimlerini normalize et:
   - on_hand
   - reserved
@@ -472,7 +472,7 @@ Risk:
 
 ---
 
-## Faz 10: AI Layer ✅ Tamamlandı (parse, score, risk_level, fire-and-forget)
+## Faz 10: AI Layer ✅ Tamamlandı (parse, score, ops-summary, anomaly-detection, fire-and-forget)
 Amaç:
 - Sistemi yalnızca kurallı değil, akıllı hale getirmek
 

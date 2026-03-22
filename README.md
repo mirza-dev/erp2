@@ -53,6 +53,7 @@ curl http://localhost:3000/api/health
 | 3 | `003_order_rpcs.sql` | Sipariş durum geçiş RPC'leri |
 | 4 | `004_inventory_rpcs.sql` | Gelişmiş envanter yönetim RPC'leri |
 | 5 | `005_faz8910_hardening.sql` | `ai_risk_level` kolonu, parasut/sync-log index'leri |
+| 6 | `006_lead_time.sql` | `products.lead_time_days` kolonu — lead-time-aware satın alma önerisi |
 
 **Supabase CLI ile:**
 ```bash
@@ -61,7 +62,7 @@ supabase db push
 
 **Dashboard ile:** SQL Editor → her dosyayı sırayla çalıştır.
 
-> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon çalışmaz.
+> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi çalışmaz.
 
 ---
 
@@ -87,7 +88,11 @@ Env değişkenlerini ve tablo/migration varlığını kontrol eder.
   "db.sales_orders": "ok",
   "db.production_entries": "ok",
   "db.alerts": "ok",
-  "db.rpc_stock_functions": "ok"
+  "db.rpc_stock_functions": "ok",
+  "db.rpc_order_functions": "ok",
+  "db.rpc_inventory_functions": "ok",
+  "db.migration_005": "ok",
+  "db.migration_006": "ok"
 }
 ```
 
@@ -130,7 +135,7 @@ src/
 │   │   ├── production/        — CRUD
 │   │   ├── alerts/            — CRUD + scan
 │   │   ├── import/            — AI dosya parse akışı
-│   │   ├── ai/                — parse + score endpoint'leri
+│   │   ├── ai/                — parse + score + ops-summary endpoint'leri
 │   │   └── parasut/           — Muhasebe sync
 │   └── globals.css            — CSS variables (dark theme)
 ├── components/

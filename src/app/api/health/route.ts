@@ -47,6 +47,42 @@ export async function GET() {
             ? `missing: ${rpcError.message}`
             : "ok";
 
+        // Migration 003 — order RPCs (approve_order_with_allocation, ship_order_full, cancel_order)
+        const { error: rpc3Error } = await supabase.rpc("approve_order_with_allocation", {
+            p_order_id: "00000000-0000-0000-0000-000000000000",
+        });
+        checks["db.rpc_order_functions"] = rpc3Error?.code === "PGRST202"
+            ? `missing: ${rpc3Error.message}`
+            : "ok";
+
+        // Migration 004 — inventory RPCs (record_stock_movement, complete_production, etc.)
+        const { error: rpc4Error } = await supabase.rpc("record_stock_movement", {
+            p_product_id: "00000000-0000-0000-0000-000000000000",
+            p_movement_type: "adjustment",
+            p_quantity: 0,
+        });
+        checks["db.rpc_inventory_functions"] = rpc4Error?.code === "PGRST202"
+            ? `missing: ${rpc4Error.message}`
+            : "ok";
+
+        // Migration 005 — ai_risk_level column on sales_orders
+        const { error: col5Error } = await supabase
+            .from("sales_orders")
+            .select("ai_risk_level")
+            .limit(1);
+        checks["db.migration_005"] = col5Error
+            ? `missing_or_error: ${col5Error.message}`
+            : "ok";
+
+        // Migration 006 — lead_time_days column on products
+        const { error: col6Error } = await supabase
+            .from("products")
+            .select("lead_time_days")
+            .limit(1);
+        checks["db.migration_006"] = col6Error
+            ? `missing_or_error: ${col6Error.message}`
+            : "ok";
+
     } catch (e) {
         checks["db.error"] = `exception: ${e}`;
     }
@@ -61,7 +97,11 @@ export async function GET() {
         "db.sales_orders",
         "db.production_entries",
         "db.alerts",
-        "db.rpc_stock_functions",
+        "db.rpc_stock_functions",       // 002
+        "db.rpc_order_functions",       // 003
+        "db.rpc_inventory_functions",   // 004
+        "db.migration_005",             // 005 — ai_risk_level
+        "db.migration_006",             // 006 — lead_time_days
     ];
     const allOk = requiredKeys.every((k) => checks[k] === "ok");
 
