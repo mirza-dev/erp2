@@ -90,6 +90,7 @@ interface DataContextValue {
     transition: OrderTransition
   ) => Promise<UpdateStatusResult>;
   reorderSuggestions: Product[];
+  activeAlertCount: number;
   loadError: string | null;
   refetchAll: () => Promise<void>;
 }
@@ -108,18 +109,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [uretimKayitlari, setUretimKayitlari] = useState<UretimKaydi[]>([]);
   const [importedCount, setImportedCount] =
     useState<DataContextValue["importedCount"]>(null);
+  const [activeAlertCount, setActiveAlertCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // ── Fetch all lists from API ─────────────────────────────
 
   const refetchAll = useCallback(async () => {
     try {
-      const [productsRes, customersRes, ordersRes, productionRes] =
+      const [productsRes, customersRes, ordersRes, productionRes, alertsRes] =
         await Promise.all([
           fetch("/api/products"),
           fetch("/api/customers"),
           fetch("/api/orders"),
           fetch("/api/production"),
+          fetch("/api/alerts"),
         ]);
 
       const failed = [productsRes, customersRes, ordersRes, productionRes].find(r => !r.ok);
@@ -144,6 +147,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setUretimKayitlari(
           Array.isArray(data) ? data.map(mapProductionEntry) : []
         );
+      }
+      if (alertsRes.ok) {
+        const data = await alertsRes.json();
+        const activeAlerts = (Array.isArray(data) ? data : []).filter(
+          (a: { status: string }) => a.status === "open"
+        );
+        setActiveAlertCount(activeAlerts.length);
       }
     } catch (err) {
       setLoadError("Sunucuya ba\u011flanamad\u0131. A\u011f ba\u011flant\u0131n\u0131z\u0131 ve backend durumunu kontrol edin.");
@@ -465,6 +475,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         addOrder,
         updateOrderStatus,
         reorderSuggestions,
+        activeAlertCount,
         loadError,
         refetchAll,
       }}

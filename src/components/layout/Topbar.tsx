@@ -8,8 +8,8 @@ interface TopbarProps {
 }
 
 export default function Topbar({ onToggleSidebar }: TopbarProps) {
-    const { reorderSuggestions } = useData();
-    const alertCount = reorderSuggestions.length;
+    const { activeAlertCount } = useData();
+    const alertCount = activeAlertCount;
     return (
         <header
             style={{

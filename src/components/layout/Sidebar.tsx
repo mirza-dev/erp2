@@ -21,15 +21,16 @@ interface SidebarProps {
 
 export default function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
-    const { reorderSuggestions } = useData();
+    const { reorderSuggestions, orders, activeAlertCount } = useData();
     const reorderCount = reorderSuggestions.length;
+    const pendingOrderCount = orders.filter(o => o.commercial_status === "pending_approval").length;
 
     const navGroups: NavGroup[] = [
         {
             label: "Operasyon",
             items: [
                 { label: "Dashboard", href: "/dashboard" },
-                { label: "Siparişler", href: "/dashboard/orders", count: 12 },
+                { label: "Siparişler", href: "/dashboard/orders", count: pendingOrderCount || undefined },
                 { label: "Stok & Ürünler", href: "/dashboard/products" },
                 { label: "Satın Alma Önerileri", href: "/dashboard/purchase/suggested", count: reorderCount || undefined },
             ],
@@ -44,7 +45,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
             label: "Otomasyon",
             items: [
                 { label: "AI İçeri Aktar", href: "/dashboard/import" },
-                { label: "Üretim Uyarıları", href: "/dashboard/alerts", count: reorderCount || undefined },
+                { label: "Üretim Uyarıları", href: "/dashboard/alerts", count: activeAlertCount || undefined },
             ],
         },
         {

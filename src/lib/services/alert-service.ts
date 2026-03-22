@@ -98,6 +98,27 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
             const r2 = await dbResolveAlertsForEntity("stock_risk", entityId);
             resolved += r1 + r2;
         }
+
+        // Order shortage: reserved stock exceeds available — active orders at risk
+        const reserved = product.reserved ?? 0;
+        if (reserved > 0 && available < reserved) {
+            const shortageExists = await dbOpenAlertExists("order_shortage", entityId);
+            if (!shortageExists) {
+                const shortfall = reserved - available;
+                await dbCreateAlert({
+                    type: "order_shortage",
+                    severity: "critical",
+                    title: `Sipariş Eksik: ${product.name}`,
+                    description: `${reserved} ${product.unit} rezerve edilmiş, ancak sadece ${available} ${product.unit} mevcut. ${shortfall} ${product.unit} eksik.`,
+                    entity_type: "product",
+                    entity_id: entityId,
+                });
+                created++;
+            }
+        } else if (reserved > 0 && available >= reserved) {
+            // Shortage resolved
+            resolved += await dbResolveAlertsForEntity("order_shortage", entityId, "stock_recovered");
+        }
     }
 
     return { scanned: products.length, created, resolved };

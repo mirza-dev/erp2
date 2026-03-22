@@ -141,6 +141,14 @@ export default function OrderDetailPage() {
         }
     }, [order]);
 
+    // Sync commercial/fulfillment status when order loads
+    useEffect(() => {
+        if (order) {
+            setCommercialStatus(order.commercial_status);
+            setFulfillmentStatus(order.fulfillment_status);
+        }
+    }, [order]);
+
     if (!order) {
         return (
             <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
