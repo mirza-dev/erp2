@@ -2,11 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useData } from "@/lib/data-context";
-import { computeCoverageDays, daysColor, daysBg } from "@/lib/stock-utils";
+import { computeCoverageDays, computeTargetStock, daysColor, daysBg } from "@/lib/stock-utils";
+import type { Product } from "@/lib/mock-data";
 
 type FilterType = "all" | "raw_material" | "finished";
 
-function WhyBadge({ daysLeft, urgency }: { daysLeft: number | null; urgency: number }) {
+function WhyBadge({ daysLeft, urgency, leadTimeDays }: {
+    daysLeft: number | null;
+    urgency: number;
+    leadTimeDays?: number;
+}) {
     const lines: { text: string; color: string; bg: string }[] = [];
 
     if (daysLeft !== null && daysLeft <= 7) {
@@ -15,6 +20,14 @@ function WhyBadge({ daysLeft, urgency }: { daysLeft: number | null; urgency: num
         lines.push({ text: "⚠ 14 günde tükeniyor", color: "var(--warning-text)", bg: "var(--warning-bg)" });
     } else if (daysLeft === null) {
         lines.push({ text: "Günlük kullanım verisi yok — stok min altında", color: "var(--warning-text)", bg: "var(--warning-bg)" });
+    }
+
+    if (daysLeft !== null && leadTimeDays != null && leadTimeDays > 0 && daysLeft < leadTimeDays) {
+        lines.push({
+            text: `Stok, tedarik süresinden (${leadTimeDays} gün) önce tükenecek`,
+            color: "var(--danger-text)",
+            bg: "var(--danger-bg)",
+        });
     }
 
     if (urgency >= 80) {
@@ -112,6 +125,47 @@ function SegmentBanner({ filter, rawCount, finishedCount, rawItems, finishedItem
             <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-text)", whiteSpace: "nowrap" }}>
                 {finishedCount} üretim planı bekliyor
             </div>
+        </div>
+    );
+}
+
+/** Compute suggestion for a single product row */
+function computeSuggestion(p: Product) {
+    const { target, formula, leadTimeDemand } = computeTargetStock(
+        p.minStockLevel, p.dailyUsage ?? null, p.leadTimeDays ?? null
+    );
+    const moq = p.reorderQty ?? p.minStockLevel;
+    const needed = Math.max(0, target - p.available_now);
+    const suggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
+    return { suggestQty, target, formula, leadTimeDemand, moq };
+}
+
+/** Formula label for UI display */
+function FormulaLabel({ p, formula, leadTimeDemand }: {
+    p: Product;
+    formula: "lead_time" | "fallback";
+    leadTimeDemand: number | null;
+}) {
+    if (formula === "lead_time" && leadTimeDemand !== null && p.dailyUsage && p.leadTimeDays) {
+        return (
+            <div style={{
+                fontSize: "10px",
+                color: "var(--accent-text)",
+                marginTop: "2px",
+                fontFamily: "monospace",
+            }}>
+                LT: {p.dailyUsage}×{p.leadTimeDays}+{p.minStockLevel}
+            </div>
+        );
+    }
+    return (
+        <div style={{
+            fontSize: "10px",
+            color: "var(--text-tertiary)",
+            marginTop: "2px",
+            fontFamily: "monospace",
+        }}>
+            2×min
         </div>
     );
 }
@@ -324,10 +378,10 @@ export default function PurchaseSuggestedPage() {
                 <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     {sorted.map(p => {
                         const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
-                        const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
                         const deficit = p.minStockLevel - p.available_now;
                         const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                         const isRaw = p.productType === "raw_material";
+                        const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
                         return (
                             <div key={p.id} style={{
                                 border: "1px solid var(--border-secondary)",
@@ -356,7 +410,7 @@ export default function PurchaseSuggestedPage() {
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace", marginTop: "2px" }}>
                                             {p.sku}
                                         </div>
-                                        <WhyBadge daysLeft={daysLeft} urgency={urgency} />
+                                        <WhyBadge daysLeft={daysLeft} urgency={urgency} leadTimeDays={p.leadTimeDays} />
                                     </div>
                                     <div style={{ fontSize: "18px", fontWeight: 700, color: urgency >= 80 ? "var(--danger-text)" : "var(--warning-text)", whiteSpace: "nowrap" }}>
                                         {urgency}%
@@ -393,14 +447,21 @@ export default function PurchaseSuggestedPage() {
                                         <span style={{ color: "var(--text-tertiary)" }}>Açık:</span>{" "}
                                         <span style={{ fontWeight: 700, color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
                                     </div>
+                                    {p.leadTimeDays != null && (
+                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                            <span style={{ color: "var(--text-tertiary)" }}>Tedarik:</span>{" "}
+                                            <span style={{ fontWeight: 600 }}>{p.leadTimeDays} gün</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Recommended qty */}
                                 <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "6px" }}>
                                     <span style={{ color: "var(--text-tertiary)" }}>Önerilen:</span>{" "}
                                     <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
-                                        {p.reorderQty?.toLocaleString("tr-TR") ?? "—"} {p.unit}
+                                        {suggestQty.toLocaleString("tr-TR")} {p.unit}
                                     </span>
+                                    <FormulaLabel p={p} formula={formula} leadTimeDemand={leadTimeDemand} />
                                 </div>
 
                                 {/* Durum badge */}
@@ -452,7 +513,8 @@ export default function PurchaseSuggestedPage() {
                                 const deficit = p.minStockLevel - p.available_now;
                                 const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                                 const isRaw = p.productType === "raw_material";
-                                        return (
+                                const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
+                                return (
                                     <tr key={p.id} style={{
                                         borderBottom: idx < sorted.length - 1 ? "1px solid var(--border-tertiary)" : "none",
                                         background: urgency >= 80 ? "rgba(248,81,73,0.04)" : "transparent",
@@ -474,7 +536,7 @@ export default function PurchaseSuggestedPage() {
                                         {/* Ürün Adı + Why */}
                                         <td style={{ padding: "10px 12px", maxWidth: "200px" }}>
                                             <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>{p.name}</div>
-                                            <WhyBadge daysLeft={daysLeft} urgency={urgency} />
+                                            <WhyBadge daysLeft={daysLeft} urgency={urgency} leadTimeDays={p.leadTimeDays} />
                                         </td>
                                         {/* SKU */}
                                         <td style={{ padding: "10px 12px", fontFamily: "monospace", color: "var(--text-secondary)", fontSize: "12px" }}>
@@ -540,8 +602,9 @@ export default function PurchaseSuggestedPage() {
                                         {/* Önerilen + Tükenme */}
                                         <td style={{ padding: "10px 12px" }}>
                                             <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 500 }}>
-                                                {p.reorderQty?.toLocaleString("tr-TR") ?? "—"} {p.unit}
+                                                {suggestQty.toLocaleString("tr-TR")} {p.unit}
                                             </div>
+                                            <FormulaLabel p={p} formula={formula} leadTimeDemand={leadTimeDemand} />
                                             {daysLeft !== null ? (
                                                 <span style={{
                                                     display: "inline-block",

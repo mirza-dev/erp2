@@ -6,6 +6,7 @@ import StatsCards from "@/components/dashboard/StatsCards";
 import StockDataGrid from "@/components/dashboard/StockDataGrid";
 import RecentOrders from "@/components/dashboard/RecentOrders";
 import AIAlerts from "@/components/dashboard/AIAlerts";
+import AISummaryCard from "@/components/dashboard/AISummaryCard";
 import { useData } from "@/lib/data-context";
 
 const STATUS_OPTIONS = [
@@ -246,6 +247,9 @@ export default function DashboardPage() {
 
             {/* Stock table */}
             <StockDataGrid filterCategory={filterCategory} filterStatus={filterStatus} />
+
+            {/* AI Ops Summary (AI-powered, full width) */}
+            <AISummaryCard />
 
             {/* Bottom grid: AI alerts + (recent orders + import zone) */}
             <div className="dashboard-bottom-grid">

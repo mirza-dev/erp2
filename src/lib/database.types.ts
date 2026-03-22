@@ -61,6 +61,7 @@ export interface ProductRow {
     reorder_qty: number | null
     preferred_vendor: string | null
     daily_usage: number | null
+    lead_time_days: number | null
     created_at: string
     updated_at: string
 }

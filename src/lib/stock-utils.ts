@@ -11,6 +11,56 @@ export function computeCoverageDays(available: number, dailyUsage?: number | nul
     return Math.round(available / dailyUsage);
 }
 
+// ── Lead Time Demand ─────────────────────────────────────────
+
+/** Demand during supplier lead time. Returns null if either input is unknown. */
+export function computeLeadTimeDemand(
+    dailyUsage: number | null | undefined,
+    leadTimeDays: number | null | undefined
+): number | null {
+    if (!dailyUsage || dailyUsage <= 0) return null;
+    if (!leadTimeDays || leadTimeDays <= 0) return null;
+    return Math.ceil(dailyUsage * leadTimeDays);
+}
+
+// ── Target Stock ─────────────────────────────────────────────
+
+export interface TargetStockResult {
+    target: number;
+    formula: "lead_time" | "fallback";
+    leadTimeDemand: number | null;
+    safetyStock: number;
+}
+
+/**
+ * Compute target stock level.
+ * - Lead-time formula (veri var): demand_during_lead_time + safety_stock (= min)
+ * - Fallback (veri yok): min × 2
+ */
+export function computeTargetStock(
+    min: number,
+    dailyUsage: number | null | undefined,
+    leadTimeDays: number | null | undefined
+): TargetStockResult {
+    const leadTimeDemand = computeLeadTimeDemand(dailyUsage, leadTimeDays);
+
+    if (leadTimeDemand !== null) {
+        return {
+            target: leadTimeDemand + min,
+            formula: "lead_time",
+            leadTimeDemand,
+            safetyStock: min,
+        };
+    }
+
+    return {
+        target: min * 2,
+        formula: "fallback",
+        leadTimeDemand: null,
+        safetyStock: min,
+    };
+}
+
 // ── Urgency ──────────────────────────────────────────────────
 
 /** Urgency %: (1 - available/min) * 100, clamped 0–100. */
@@ -42,6 +92,7 @@ export interface StockRiskInputs {
     min: number;
     dailyUsage: number | null;
     coverageDays: number | null;
+    leadTimeDays: number | null;
     unit: string;
 }
 
@@ -51,12 +102,13 @@ export function buildStockAlertDescription(
     inputs: StockRiskInputs,
     severity: "critical" | "warning"
 ): string {
-    const { available, min, dailyUsage, coverageDays, unit } = inputs;
+    const { available, min, dailyUsage, coverageDays, leadTimeDays, unit } = inputs;
 
     if (severity === "critical") {
         const base = `Mevcut stok ${available} ${unit} (min: ${min}).`;
         if (dailyUsage && coverageDays !== null) {
-            return `${base} Günlük kullanım: ${dailyUsage} ${unit}/gün → ~${coverageDays} gün sonra tükenebilir.`;
+            const ltPart = leadTimeDays ? ` Tedarik süresi: ${leadTimeDays} gün.` : "";
+            return `${base} Günlük kullanım: ${dailyUsage} ${unit}/gün → ~${coverageDays} gün sonra tükenebilir.${ltPart}`;
         }
         return `${base} Günlük kullanım verisi yok — tükenme süresi hesaplanamıyor.`;
     }
@@ -65,7 +117,8 @@ export function buildStockAlertDescription(
     const threshold = Math.ceil(min * 1.5);
     const base = `Stok ${available} ${unit}, uyarı eşiğine (${threshold}) yaklaşıyor.`;
     if (dailyUsage && coverageDays !== null) {
-        return `${base} Günlük kullanım: ${dailyUsage} ${unit}/gün → ~${coverageDays} gün kaldı.`;
+        const ltPart = leadTimeDays ? ` Tedarik süresi: ${leadTimeDays} gün.` : "";
+        return `${base} Günlük kullanım: ${dailyUsage} ${unit}/gün → ~${coverageDays} gün kaldı.${ltPart}`;
     }
     return base;
 }
@@ -76,9 +129,15 @@ export function buildPurchaseDescription(
         moq: number;
         preferredVendor: string | null;
         targetStock: number;
+        formula: "lead_time" | "fallback";
+        leadTimeDemand: number | null;
     }
 ): string {
-    const { available, min, dailyUsage, coverageDays, unit, suggestQty, moq, preferredVendor, targetStock } = inputs;
+    const {
+        available, min, dailyUsage, coverageDays, leadTimeDays, unit,
+        suggestQty, moq, preferredVendor, targetStock,
+        formula, leadTimeDemand,
+    } = inputs;
 
     const parts: string[] = [];
     parts.push(`Stok ${available}/${min} (min).`);
@@ -87,7 +146,15 @@ export function buildPurchaseDescription(
         parts.push(`Günlük kullanım ${dailyUsage} → ~${coverageDays} gün kaldı.`);
     }
 
-    parts.push(`Hedef: ${targetStock} (2×min). MOQ: ${moq}.`);
+    if (formula === "lead_time" && leadTimeDemand !== null && leadTimeDays) {
+        parts.push(
+            `Hedef: ${targetStock} (tedarik ${leadTimeDays} gün × ${dailyUsage}/gün = ${leadTimeDemand} + emniyet ${min}).`
+        );
+    } else {
+        parts.push(`Hedef: ${targetStock} (2×min — tedarik süresi bilinmiyor).`);
+    }
+
+    parts.push(`MOQ: ${moq}.`);
 
     if (preferredVendor) {
         parts.push(`Tedarikçi: ${preferredVendor}.`);

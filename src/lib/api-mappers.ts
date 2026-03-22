@@ -45,6 +45,7 @@ export function mapProduct(row: ProductWithStock): Product {
     reorderQty: row.reorder_qty ?? undefined,
     preferredVendor: row.preferred_vendor ?? undefined,
     dailyUsage: row.daily_usage ?? undefined,
+    leadTimeDays: row.lead_time_days ?? undefined,
   };
 }
 

@@ -57,8 +57,9 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
 
         const entityId = product.id;
         const dailyUsage = product.daily_usage ?? null;
+        const leadTimeDays = product.lead_time_days ?? null;
         const coverageDays = computeCoverageDays(available, dailyUsage);
-        const riskInputs: StockRiskInputs = { available, min, dailyUsage, coverageDays, unit: product.unit };
+        const riskInputs: StockRiskInputs = { available, min, dailyUsage, coverageDays, leadTimeDays, unit: product.unit };
 
         if (isCritical) {
             // Resolve any existing warning for this product (escalate)
@@ -73,7 +74,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     description: buildStockAlertDescription(riskInputs, "critical"),
                     entity_type: "product",
                     entity_id: entityId,
-                    ai_inputs_summary: { available, min, dailyUsage, coverageDays, unit: product.unit },
+                    ai_inputs_summary: { available, min, dailyUsage, coverageDays, leadTimeDays, unit: product.unit },
                 });
                 created++;
             }
@@ -87,7 +88,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     description: buildStockAlertDescription(riskInputs, "warning"),
                     entity_type: "product",
                     entity_id: entityId,
-                    ai_inputs_summary: { available, min, dailyUsage, coverageDays, unit: product.unit },
+                    ai_inputs_summary: { available, min, dailyUsage, coverageDays, leadTimeDays, unit: product.unit },
                 });
                 created++;
             }

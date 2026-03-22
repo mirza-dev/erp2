@@ -100,6 +100,84 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
     }
 }
 
+// ── Ops Summary ──────────────────────────────────────────────
+
+export interface OpsSummaryInput {
+    criticalStockCount: number;
+    warningStockCount: number;
+    topCriticalItems: { name: string; available: number; min: number; coverageDays: number | null }[];
+    pendingOrderCount: number;
+    approvedOrderCount: number;
+    highRiskOrderCount: number;
+    openAlertCount: number;
+}
+
+export interface OpsSummaryResult {
+    summary: string;
+    insights: string[];
+    anomalies: string[];
+    confidence: number;
+    generatedAt: string;
+}
+
+const OPS_SUMMARY_SYSTEM = `Sen endüstriyel ERP operasyon asistanısın. B2B vana satışı yapan bir firmanın stok, sipariş ve tedarik durumunu analiz ediyorsun.
+
+Görev: Verilen metrikleri analiz et, kısa ve aksiyon odaklı bir operasyon özeti üret.
+
+SADECE aşağıdaki JSON formatında cevap ver, başka hiçbir şey yazma:
+{
+  "summary": "2-3 cümlelik genel durum değerlendirmesi",
+  "insights": ["aksiyon maddesi 1", "aksiyon maddesi 2", "aksiyon maddesi 3"],
+  "anomalies": ["tespit edilen anormallik 1"]
+}
+
+Anomali örnekleri:
+- Çok fazla kritik stok uyarısı (toplam ürünün %30'undan fazlası)
+- Bekleyen sipariş sayısı onaylananlardan çok fazla (operasyonel darboğaz)
+- Stok tükenme süresi tedarik süresinden kısa olan ürünler
+- Açık alert sayısı çok yüksek (yığılma riski)
+
+Kurallar:
+- Türkçe yaz
+- Kısa ve net ol, jargon kullanma
+- Her insight aksiyon içersin ("şunu yapın", "bunu kontrol edin")
+- Anomali yoksa boş dizi döndür []
+- En fazla 5 insight, en fazla 3 anomali`;
+
+export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsSummaryResult> {
+    const now = new Date().toISOString();
+    try {
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 512,
+            system: OPS_SUMMARY_SYSTEM,
+            messages: [{ role: "user", content: JSON.stringify(input) }],
+        });
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return {
+                summary: parsed.summary ?? "",
+                insights: Array.isArray(parsed.insights) ? parsed.insights : [],
+                anomalies: Array.isArray(parsed.anomalies) ? parsed.anomalies : [],
+                confidence: 0.75,
+                generatedAt: now,
+            };
+        }
+
+        return { summary: "", insights: [], anomalies: [], confidence: 0, generatedAt: now };
+    } catch (err) {
+        console.error("[AI OpsSummary] graceful degradation:", err);
+        return { summary: "", insights: [], anomalies: [], confidence: 0, generatedAt: now };
+    }
+}
+
 // ── Score ─────────────────────────────────────────────────────
 
 export interface ScoreOrderResult {

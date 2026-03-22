@@ -1,7 +1,11 @@
 /**
  * Purchase Suggestion Service — deterministik satın alma önerisi üretimi.
  * domain-rules §6.1: critical = available_now <= min_stock_level
- * Formül: target = min*2, needed = max(0, target - available), rounded up to MOQ
+ *
+ * Formül (Faz 6 — lead-time-aware):
+ * - Veri var: target = daily_usage × lead_time_days + min (emniyet stoğu)
+ * - Veri yok: target = min × 2 (fallback)
+ * - MOQ rounding: max(moq, ceil(needed / moq) * moq)
  */
 
 import { dbListProducts } from "@/lib/supabase/products";
@@ -11,22 +15,32 @@ import {
     dbCreateAlert,
     dbResolveAlertsForEntity,
 } from "@/lib/supabase/alerts";
-import { computeCoverageDays, buildPurchaseDescription } from "@/lib/stock-utils";
+import { computeCoverageDays, computeTargetStock, buildPurchaseDescription } from "@/lib/stock-utils";
 
 // ── Formül ───────────────────────────────────────────────────
 
+interface SuggestResult {
+    suggestQty: number;
+    targetStock: number;
+    formula: "lead_time" | "fallback";
+    leadTimeDemand: number | null;
+}
+
 /**
  * Önerilen satın alma miktarını hesaplar.
- * target = min_stock_level * 2
- * needed = max(0, target - available_now)
- * moq = product.reorder_qty ?? min_stock_level
- * suggest = max(moq, ceil(needed / moq) * moq)
+ * computeTargetStock ile target belirler, MOQ'ya yuvarlar.
  */
-function calcSuggestQty(available: number, min: number, moq: number): number {
-    const target = min * 2;
+function calcSuggestQty(
+    available: number,
+    min: number,
+    moq: number,
+    dailyUsage: number | null,
+    leadTimeDays: number | null
+): SuggestResult {
+    const { target, formula, leadTimeDemand } = computeTargetStock(min, dailyUsage, leadTimeDays);
     const needed = Math.max(0, target - available);
-    if (needed === 0) return moq;
-    return Math.max(moq, Math.ceil(needed / moq) * moq);
+    const suggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
+    return { suggestQty, targetStock: target, formula, leadTimeDemand };
 }
 
 // ── Scan ─────────────────────────────────────────────────────
@@ -57,22 +71,33 @@ export async function serviceScanPurchaseSuggestions(): Promise<PurchaseScanResu
         if (available <= min) {
             const exists = await dbOpenAlertExists("purchase_recommended", entityId);
             if (!exists) {
-                const suggestQty = calcSuggestQty(available, min, moq);
-                const targetStock = min * 2;
                 const dailyUsage = product.daily_usage ?? null;
+                const leadTimeDays = product.lead_time_days ?? null;
                 const coverageDays = computeCoverageDays(available, dailyUsage);
+
+                const { suggestQty, targetStock, formula, leadTimeDemand } = calcSuggestQty(
+                    available, min, moq, dailyUsage, leadTimeDays
+                );
 
                 await dbCreateAlert({
                     type: "purchase_recommended",
                     severity: "warning",
                     title: `Satın Alma Önerisi: ${product.name}`,
                     description: buildPurchaseDescription({
-                        available, min, dailyUsage, coverageDays, unit: product.unit,
-                        suggestQty, moq, preferredVendor: product.preferred_vendor ?? null, targetStock,
+                        available, min, dailyUsage, coverageDays, leadTimeDays,
+                        unit: product.unit,
+                        suggestQty, moq,
+                        preferredVendor: product.preferred_vendor ?? null,
+                        targetStock, formula, leadTimeDemand,
                     }),
                     entity_type: "product",
                     entity_id: entityId,
-                    ai_inputs_summary: { available, min, dailyUsage, coverageDays, suggestQty, moq, targetStock, unit: product.unit },
+                    ai_inputs_summary: {
+                        available, min, dailyUsage, coverageDays, leadTimeDays,
+                        suggestQty, moq, targetStock,
+                        formula, leadTimeDemand,
+                        unit: product.unit,
+                    },
                 });
                 created++;
             }

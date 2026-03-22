@@ -31,6 +31,7 @@ export interface Product {
     reorderQty?: number;
     preferredVendor?: string;
     dailyUsage?: number;
+    leadTimeDays?: number;
 }
 
 export interface Customer {
