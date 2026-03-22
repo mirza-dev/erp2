@@ -1,10 +1,11 @@
 # Implementation Roadmap
-Status: Proposed  
-Depends On: `docs/domain-rules.md`  
-Last Updated: 2026-03-20
+Status: Faz 0–10 Tamamlandı
+Depends On: `domain-rules.md`
+Last Updated: 2026-03-22
+Son Commit: feat: full frontend→backend wiring + roadmap hardening (807ccf7)
 
 ## 1. Amaç
-Bu belge, `docs/domain-rules.md` içinde tanımlanan operasyonel kuralları uygulamaya geçirmek için geliştirme sırasını, kapsamları ve riskleri tanımlar.
+Bu belge, `domain-rules.md` içinde tanımlanan operasyonel kuralları uygulamaya geçirmek için geliştirme sırasını, kapsamları ve riskleri tanımlar.
 
 Hedef:
 - Frontend ve backend’i aynı domain modeli etrafında toplamak
@@ -44,7 +45,7 @@ AI, çekirdek operasyonel mantıktan önce gelmez.
 
 ## 3. Fazlar
 
-## Faz 0: Domain Alignment
+## Faz 0: Domain Alignment ✅ Tamamlandı
 Amaç:
 - Tüm ekip ve araçlar için ortak dil yaratmak
 
@@ -69,7 +70,7 @@ Risk:
 
 ---
 
-## Faz 1: Frontend Stabilization
+## Faz 1: Frontend Stabilization ✅ Tamamlandı
 Amaç:
 - Backend eksik olsa bile UI’ı ürünleşmiş ve güvenilir hale getirmek
 
@@ -119,7 +120,7 @@ Risk:
 
 ---
 
-## Faz 2: Core Domain Model
+## Faz 2: Core Domain Model ✅ Tamamlandı (5 migration, 14 tablo)
 Amaç:
 - Backend için temel veri modelini kurmak
 
@@ -159,7 +160,7 @@ Modüller:
 
 ---
 
-## Faz 3: Orders Engine
+## Faz 3: Orders Engine ✅ Tamamlandı
 Amaç:
 - Sipariş yaşam döngüsünü operasyonel olarak doğru kurmak
 
@@ -205,7 +206,7 @@ Risk:
 
 ---
 
-## Faz 4: Inventory ve Reservation Engine
+## Faz 4: Inventory ve Reservation Engine ✅ Tamamlandı
 Amaç:
 - Sistemin en kritik matematiğini güvenilir hale getirmek
 
@@ -251,7 +252,7 @@ Risk:
 
 ---
 
-## Faz 5: Critical Stock ve Alerts Engine
+## Faz 5: Critical Stock ve Alerts Engine ✅ Tamamlandı
 Amaç:
 - Kural bazlı risk tespiti ve operasyon uyarılarını üretmek
 
@@ -297,7 +298,7 @@ Risk:
 
 ---
 
-## Faz 6: Purchase Suggestion Engine
+## Faz 6: Purchase Suggestion Engine ✅ Tamamlandı
 Amaç:
 - Kritik stoktan aksiyona giden zinciri tamamlamak
 
@@ -339,7 +340,7 @@ Risk:
 
 ---
 
-## Faz 7: Production Engine
+## Faz 7: Production Engine ✅ Tamamlandı
 Amaç:
 - Finished good ve raw material ilişkisinin operasyonel olarak doğru kurulması
 
@@ -381,7 +382,7 @@ Risk:
 
 ---
 
-## Faz 8: Import Flow
+## Faz 8: Import Flow ✅ Tamamlandı (batch → drafts → confirm → refetchAll)
 Amaç:
 - Import’u sadece parser değil, gerçek operasyon başlangıç noktası yapmak
 
@@ -428,7 +429,7 @@ Risk:
 
 ---
 
-## Faz 9: Paraşüt Integration Boundary
+## Faz 9: Paraşüt Integration Boundary ✅ Tamamlandı (sync-all, retry, stats, invoices)
 Amaç:
 - Entegrasyonu net sınırlarla güvenli hale getirmek
 
@@ -471,7 +472,7 @@ Risk:
 
 ---
 
-## Faz 10: AI Layer
+## Faz 10: AI Layer ✅ Tamamlandı (parse, score, risk_level, fire-and-forget)
 Amaç:
 - Sistemi yalnızca kurallı değil, akıllı hale getirmek
 
