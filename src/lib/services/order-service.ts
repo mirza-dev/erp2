@@ -1,6 +1,7 @@
 /**
  * Order Service — business logic layer for order lifecycle.
  * Follows domain-rules.md §4 (orders) + §5 (inventory/reservation).
+ * Transition logic is delegated to atomic Postgres RPCs.
  * Used by API routes only (server-side).
  */
 
@@ -9,14 +10,13 @@ import {
     dbListOrders,
     dbCreateOrder,
     dbUpdateOrderStatus,
-    dbGetProductStocks,
-    dbReserveStock,
-    dbReleaseStock,
-    dbShipOrder,
     dbLogOrderAction,
+    dbApproveOrder,
+    dbShipOrderFull,
+    dbCancelOrder,
     type CreateOrderInput,
     type ListOrdersFilter,
-    type StockConflict,
+    type ApproveOrderResult,
 } from "@/lib/supabase/orders";
 
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
@@ -25,10 +25,18 @@ import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 
 export type OrderTransition = CommercialStatus | "shipped";
 
+export interface ShortageInfo {
+    product_name: string;
+    requested: number;
+    reserved: number;
+    shortage: number;
+}
+
 export interface TransitionResult {
     success: boolean;
     error?: string;
-    conflicts?: StockConflict[];
+    shortages?: ShortageInfo[];
+    fulfillment_status?: FulfillmentStatus;
 }
 
 export interface ValidationResult {
@@ -80,7 +88,8 @@ export async function serviceGetOrder(id: string) {
 export async function serviceCreateOrder(input: CreateOrderInput) {
     const validation = validateOrderCreate(input);
     if (!validation.valid) throw new Error(validation.errors.join(" "));
-    return dbCreateOrder(input);
+    // Backend invariant: new orders are always draft + unallocated
+    return dbCreateOrder({ ...input, commercial_status: "draft", fulfillment_status: "unallocated" });
 }
 
 // ── Status Transitions ───────────────────────────────────────
@@ -89,95 +98,42 @@ export async function serviceTransitionOrder(
     orderId: string,
     transition: OrderTransition
 ): Promise<TransitionResult> {
-    const order = await dbGetOrderById(orderId);
-    if (!order) return { success: false, error: "Sipariş bulunamadı." };
 
-    const prevCommercial = order.commercial_status;
-    const prevFulfillment = order.fulfillment_status;
-
-    // ── draft → pending_approval ─────────────────────────────
+    // ── draft → pending_approval (simple status update, no stock effect) ──
     if (transition === "pending_approval") {
-        if (!isValidCommercialTransition(prevCommercial, "pending_approval")) {
-            return { success: false, error: `'${prevCommercial}' durumundan onay beklemesine geçilemez.` };
+        const order = await dbGetOrderById(orderId);
+        if (!order) return { success: false, error: "Sipariş bulunamadı." };
+        if (!isValidCommercialTransition(order.commercial_status, "pending_approval")) {
+            return { success: false, error: `'${order.commercial_status}' durumundan onay beklemesine geçilemez.` };
         }
-        await dbUpdateOrderStatus(orderId, "pending_approval", prevFulfillment);
-        await dbLogOrderAction(orderId, "status_transition", { commercial_status: prevCommercial }, { commercial_status: "pending_approval" });
+        await dbUpdateOrderStatus(orderId, "pending_approval", order.fulfillment_status);
+        await dbLogOrderAction(orderId, "status_transition",
+            { commercial_status: order.commercial_status },
+            { commercial_status: "pending_approval" });
         return { success: true };
     }
 
-    // ── pending_approval → approved: conflict check + reserve stock ──
+    // ── pending_approval → approved: atomic RPC with partial allocation ──
     if (transition === "approved") {
-        if (!isValidCommercialTransition(prevCommercial, "approved")) {
-            return { success: false, error: `'${prevCommercial}' durumundan onaylamaya geçilemez.` };
-        }
-
-        // Check stock for all lines (domain-rules §5.1: hard reservation only on approved)
-        const productIds = order.lines.map(l => l.product_id);
-        const stocks = await dbGetProductStocks(productIds);
-
-        const conflicts: StockConflict[] = [];
-        for (const line of order.lines) {
-            const stock = stocks.get(line.product_id);
-            const available = stock?.available_now ?? 0;
-            if (available < line.quantity) {
-                conflicts.push({
-                    product_id: line.product_id,
-                    product_name: line.product_name,
-                    requested: line.quantity,
-                    available,
-                });
-            }
-        }
-
-        if (conflicts.length > 0) {
-            return { success: false, conflicts };
-        }
-
-        // Reserve stock and update status
-        await dbReserveStock(orderId, order.lines);
-        await dbUpdateOrderStatus(orderId, "approved", "allocated");
-        await dbLogOrderAction(orderId, "order_approved",
-            { commercial_status: prevCommercial, fulfillment_status: prevFulfillment },
-            { commercial_status: "approved", fulfillment_status: "allocated" }
-        );
-        return { success: true };
+        const result: ApproveOrderResult = await dbApproveOrder(orderId);
+        return {
+            success: result.success,
+            error: result.error,
+            shortages: result.shortages,
+            fulfillment_status: result.fulfillment_status,
+        };
     }
 
-    // ── approved/allocated → shipped ────────────────────────
+    // ── approved+allocated → shipped: atomic RPC ──
     if (transition === "shipped") {
-        if (prevCommercial !== "approved") {
-            return { success: false, error: "Yalnızca onaylı sipariş sevk edilebilir." };
-        }
-        if (prevFulfillment !== "allocated" && prevFulfillment !== "partially_allocated") {
-            return { success: false, error: "Sipariş rezerveli olmalıdır." };
-        }
-
-        await dbShipOrder(orderId, order.lines);
-        await dbUpdateOrderStatus(orderId, "approved", "shipped");
-        await dbLogOrderAction(orderId, "order_shipped",
-            { fulfillment_status: prevFulfillment },
-            { fulfillment_status: "shipped" }
-        );
-        return { success: true };
+        const result = await dbShipOrderFull(orderId);
+        return { success: result.success, error: result.error };
     }
 
-    // ── cancelled ────────────────────────────────────────────
+    // ── cancelled: atomic RPC with reservation release + shortage cancel ──
     if (transition === "cancelled") {
-        if (!isValidCommercialTransition(prevCommercial, "cancelled")) {
-            return { success: false, error: `'${prevCommercial}' durumundan iptal edilemez.` };
-        }
-
-        // Only release stock if order was allocated (domain-rules §4.5)
-        if (prevFulfillment === "allocated" || prevFulfillment === "partially_allocated") {
-            await dbReleaseStock(orderId);
-        }
-
-        await dbUpdateOrderStatus(orderId, "cancelled", "unallocated");
-        await dbLogOrderAction(orderId, "order_cancelled",
-            { commercial_status: prevCommercial, fulfillment_status: prevFulfillment },
-            { commercial_status: "cancelled", fulfillment_status: "unallocated" }
-        );
-        return { success: true };
+        const result = await dbCancelOrder(orderId);
+        return { success: result.success, error: result.error };
     }
 
     return { success: false, error: `Bilinmeyen geçiş: ${transition}` };

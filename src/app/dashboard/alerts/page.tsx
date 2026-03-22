@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { useToast } from "@/components/ui/Toast";
+import { computeCoverageDays, daysColor } from "@/lib/stock-utils";
 import type { AlertRow } from "@/lib/database.types";
 
 type AlertSeverity = "critical" | "warning" | "info";
@@ -14,6 +15,7 @@ interface Alert {
     id: string;
     severity: AlertSeverity;
     category: AlertCategory;
+    source: "system" | "ai" | "ui";
     title: string;
     description: string;
     meta?: string;
@@ -23,6 +25,7 @@ interface Alert {
     actionToastMsg?: string;
     dismissible: boolean;
     createdAt: string;
+    aiConfidence?: number;
 }
 
 const severityColors: Record<AlertSeverity, { dot: string; bg: string; border: string; text: string; badge: string }> = {
@@ -51,18 +54,21 @@ const severityColors: Record<AlertSeverity, { dot: string; bg: string; border: s
 
 function mapAlertRow(row: AlertRow): Alert {
     const category: AlertCategory =
-        row.type.includes("stock") ? "stock"
+        row.source === "ai" ? "ai"
+        : row.type.includes("stock") || row.type === "purchase_recommended" ? "stock"
         : row.type.includes("order") || row.type.includes("shortage") ? "order"
-        : "ai";
+        : "stock";
     return {
         id: row.id,
         severity: row.severity,
         category,
+        source: row.source,
         title: row.title,
         description: row.description ?? "",
         meta: row.entity_id ?? undefined,
         dismissible: row.status === "open",
         createdAt: row.created_at,
+        aiConfidence: row.ai_confidence ?? undefined,
     };
 }
 
@@ -378,7 +384,9 @@ export default function AlertsPage() {
                                                         border: `0.5px solid ${colors.border}`,
                                                     }}
                                                 >
-                                                    {colors.badge}
+                                                    {alert.source === "ai" && alert.aiConfidence
+                                                        ? `AI \u00d6NER\u0130 (%${Math.round(alert.aiConfidence * 100)})`
+                                                        : colors.badge}
                                                 </span>
                                                 <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
                                                     {alert.title}
@@ -569,26 +577,39 @@ export default function AlertsPage() {
                                             }}
                                         />
                                     </div>
-                                    <div
-                                        style={{
-                                            display: "flex",
-                                            justifyContent: "space-between",
-                                            marginTop: "2px",
-                                        }}
-                                    >
-                                        <span
-                                            style={{
-                                                fontSize: "10px",
-                                                color: "var(--text-tertiary)",
-                                                fontFamily: "monospace",
-                                            }}
-                                        >
-                                            {product.sku}
-                                        </span>
-                                        <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                                            min {product.minStockLevel.toLocaleString()}
-                                        </span>
-                                    </div>
+                                    {(() => {
+                                        const covDays = computeCoverageDays(product.available_now, product.dailyUsage);
+                                        return (
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    alignItems: "center",
+                                                    marginTop: "2px",
+                                                }}
+                                            >
+                                                <span
+                                                    style={{
+                                                        fontSize: "10px",
+                                                        color: "var(--text-tertiary)",
+                                                        fontFamily: "monospace",
+                                                    }}
+                                                >
+                                                    {product.sku}
+                                                </span>
+                                                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                    {product.dailyUsage ? (
+                                                        <span style={{ fontSize: "10px", fontWeight: 500, color: daysColor(covDays) }}>
+                                                            ~{covDays} gün
+                                                        </span>
+                                                    ) : null}
+                                                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
+                                                        min {product.minStockLevel.toLocaleString()}
+                                                    </span>
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             );
                         })}

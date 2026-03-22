@@ -8,6 +8,7 @@ export interface CreateAlertInput {
     description?: string;
     entity_type?: string;
     entity_id?: string;
+    ai_inputs_summary?: Record<string, unknown>;
 }
 
 export interface ListAlertsFilter {
@@ -69,6 +70,7 @@ export async function dbCreateAlert(input: CreateAlertInput): Promise<AlertRow> 
             description: input.description ?? null,
             entity_type: input.entity_type ?? null,
             entity_id: input.entity_id ?? null,
+            ai_inputs_summary: input.ai_inputs_summary ?? null,
             status: "open",
             source: "system",
         })

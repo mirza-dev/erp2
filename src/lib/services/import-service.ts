@@ -9,8 +9,9 @@ import {
     dbGetBatch, dbUpdateBatchStatus, dbListDrafts, dbGetDraft, dbUpdateDraft,
     type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
-import { dbCreateCustomer } from "@/lib/supabase/customers";
+import { dbCreateCustomer, dbFindCustomerByName } from "@/lib/supabase/customers";
 import { dbCreateProduct } from "@/lib/supabase/products";
+import { serviceCreateOrder } from "@/lib/services/order-service";
 
 // ── Batch ────────────────────────────────────────────────────
 
@@ -104,8 +105,32 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: product.id });
 
             } else if (draft.entity_type === "order") {
-                // §9.2: import hiçbir zaman doğrudan approved order oluşturmaz
-                // Faz 10 (AI layer) bunu handle eder — şimdilik merged işaretlenir
+                // \u00a79.2: import creates DRAFT orders \u2014 never approved
+                const customerName = String(data.customer_name ?? data.musteri ?? "");
+                const customer = customerName
+                    ? await dbFindCustomerByName(customerName)
+                    : null;
+
+                const grandTotal = Number(data.grand_total ?? data.tutar ?? 0);
+                const subtotal = grandTotal / 1.20;
+                const vatTotal = grandTotal - subtotal;
+
+                const order = await serviceCreateOrder({
+                    customer_id: customer?.id,
+                    customer_name: customerName || "Bilinmeyen M\u00fc\u015fteri",
+                    currency: String(data.currency ?? "USD"),
+                    notes: `\u0130\u00e7e aktar\u0131m batch: ${batchId}`,
+                    commercial_status: "draft",
+                    fulfillment_status: "unallocated",
+                    subtotal,
+                    vat_total: vatTotal,
+                    grand_total: grandTotal,
+                    lines: [],
+                });
+                await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: order.id });
+
+            } else if (draft.entity_type === "order_line" || draft.entity_type === "stock") {
+                // Order lines and stock updates are informational \u2014 mark merged
                 await dbUpdateDraft(draft.id, { status: "merged" });
             }
 

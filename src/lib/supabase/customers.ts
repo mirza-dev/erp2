@@ -31,6 +31,18 @@ export async function dbGetCustomerById(id: string): Promise<CustomerRow | null>
     return data;
 }
 
+export async function dbFindCustomerByName(name: string): Promise<CustomerRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("customers")
+        .select("*")
+        .ilike("name", name)
+        .limit(1)
+        .maybeSingle();
+    if (error || !data) return null;
+    return data;
+}
+
 export async function dbCreateCustomer(input: CreateCustomerInput): Promise<CustomerRow> {
     const supabase = createServiceClient();
     const { data, error } = await supabase

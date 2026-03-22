@@ -125,6 +125,7 @@ export interface RecordMovementInput {
     created_by?: string;
 }
 
+/** @deprecated Use dbRecordMovementAtomic() — atomik DB transaction */
 export async function dbRecordMovement(input: RecordMovementInput): Promise<void> {
     const supabase = createServiceClient();
 
@@ -147,6 +148,48 @@ export async function dbRecordMovement(input: RecordMovementInput): Promise<void
         p_delta: input.quantity,
     });
     if (pErr) throw new Error(pErr.message);
+}
+
+// ── Atomic Inventory Operations ─────────────────────────────
+
+export interface RecordMovementResult {
+    success: boolean;
+    error?: string;
+    new_on_hand?: number;
+    movement_id?: string;
+}
+
+/** Atomic stock movement: insert + on_hand update in a single DB transaction */
+export async function dbRecordMovementAtomic(input: RecordMovementInput): Promise<RecordMovementResult> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("record_stock_movement", {
+        p_product_id: input.product_id,
+        p_movement_type: input.movement_type,
+        p_quantity: input.quantity,
+        p_reference_type: input.reference_type ?? "manual",
+        p_reference_id: input.reference_id ?? null,
+        p_notes: input.notes ?? null,
+        p_source: "ui",
+    });
+    if (error) throw new Error(error.message);
+    return data as RecordMovementResult;
+}
+
+export interface ResolveShortagesResult {
+    success: boolean;
+    shortages_resolved: number;
+    shortages_partially_resolved: number;
+    total_allocated: number;
+}
+
+/** Resolve open shortages for a product using available stock (FIFO) */
+export async function dbTryResolveShortages(productId: string): Promise<ResolveShortagesResult> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("try_resolve_shortages", {
+        p_product_id: productId,
+    });
+    if (error) throw new Error(error.message);
+    return data as ResolveShortagesResult;
 }
 
 export async function dbListMovements(productId: string, limit = 50) {

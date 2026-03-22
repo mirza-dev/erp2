@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbRecordMovement, dbListMovements, type RecordMovementInput } from "@/lib/supabase/products";
+import {
+    dbRecordMovementAtomic,
+    dbTryResolveShortages,
+    dbListMovements,
+    type RecordMovementInput,
+} from "@/lib/supabase/products";
 
 // GET /api/inventory/movements?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
@@ -35,8 +40,22 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Geçersiz hareket tipi." }, { status: 400 });
         }
 
-        await dbRecordMovement(body);
-        return NextResponse.json({ ok: true }, { status: 201 });
+        const result = await dbRecordMovementAtomic(body);
+
+        if (!result.success) {
+            return NextResponse.json({ error: result.error }, { status: 409 });
+        }
+
+        // Stock receipt → try resolving open shortages (non-fatal)
+        if (body.quantity > 0) {
+            try {
+                await dbTryResolveShortages(body.product_id);
+            } catch {
+                console.warn("[POST /api/inventory/movements] shortage resolution failed (non-fatal)", body.product_id);
+            }
+        }
+
+        return NextResponse.json({ ok: true, new_on_hand: result.new_on_hand }, { status: 201 });
     } catch (err) {
         console.error("[POST /api/inventory/movements]", err);
         return NextResponse.json({ error: "Hareket kaydedilemedi." }, { status: 500 });

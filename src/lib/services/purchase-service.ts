@@ -11,6 +11,7 @@ import {
     dbCreateAlert,
     dbResolveAlertsForEntity,
 } from "@/lib/supabase/alerts";
+import { computeCoverageDays, buildPurchaseDescription } from "@/lib/stock-utils";
 
 // ── Formül ───────────────────────────────────────────────────
 
@@ -57,17 +58,21 @@ export async function serviceScanPurchaseSuggestions(): Promise<PurchaseScanResu
             const exists = await dbOpenAlertExists("purchase_recommended", entityId);
             if (!exists) {
                 const suggestQty = calcSuggestQty(available, min, moq);
-                const vendorNote = product.preferred_vendor
-                    ? ` — Tedarikçi: ${product.preferred_vendor}`
-                    : "";
+                const targetStock = min * 2;
+                const dailyUsage = product.daily_usage ?? null;
+                const coverageDays = computeCoverageDays(available, dailyUsage);
 
                 await dbCreateAlert({
                     type: "purchase_recommended",
                     severity: "warning",
                     title: `Satın Alma Önerisi: ${product.name}`,
-                    description: `Mevcut stok (${available} ${product.unit}), minimum seviyede (${min} ${product.unit}). Önerilen sipariş: ${suggestQty} ${product.unit}${vendorNote}.`,
+                    description: buildPurchaseDescription({
+                        available, min, dailyUsage, coverageDays, unit: product.unit,
+                        suggestQty, moq, preferredVendor: product.preferred_vendor ?? null, targetStock,
+                    }),
                     entity_type: "product",
                     entity_id: entityId,
+                    ai_inputs_summary: { available, min, dailyUsage, coverageDays, suggestQty, moq, targetStock, unit: product.unit },
                 });
                 created++;
             }

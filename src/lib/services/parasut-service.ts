@@ -5,8 +5,8 @@
  * ERP stok/sipariş durumunu değiştirmez — sadece fatura durumunu senkronize eder.
  */
 
-import { dbGetOrderById } from "@/lib/supabase/orders";
-import { dbCreateSyncLog } from "@/lib/supabase/sync-log";
+import { dbGetOrderById, dbListOrders } from "@/lib/supabase/orders";
+import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/sync-log";
 import { sendInvoiceToParasut } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { ParasutInvoicePayload } from "@/lib/parasut";
@@ -116,4 +116,68 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
 
         return { success: false, error: result.error };
     }
+}
+
+// ── Retry ────────────────────────────────────────────────────
+
+export async function serviceRetrySyncLog(syncLogId: string): Promise<SyncOrderResult> {
+    const log = await dbGetSyncLog(syncLogId);
+    if (!log) return { success: false, error: "Sync log bulunamadı." };
+    if (!log.entity_id) return { success: false, error: "entity_id eksik." };
+    if (log.retry_count >= 3) return { success: false, error: "Maks. deneme sayısı (3) aşıldı." };
+
+    // Mark as retrying
+    await dbUpdateSyncLog(syncLogId, {
+        status: "retrying",
+        retry_count: log.retry_count + 1,
+    });
+
+    const result = await serviceSyncOrderToParasut(log.entity_id);
+
+    // Update the original log based on result
+    await dbUpdateSyncLog(syncLogId, {
+        status: result.success ? "success" : "error",
+        error_message: result.success ? null : (result.error ?? null),
+        completed_at: result.success ? new Date().toISOString() : null,
+        external_id: result.invoice_id ?? null,
+    });
+
+    return result;
+}
+
+// ── Sync All Pending ─────────────────────────────────────────
+
+export async function serviceSyncAllPending(): Promise<{
+    synced: number;
+    failed: number;
+    errors: string[];
+}> {
+    const supabase = createServiceClient();
+
+    // Find approved orders with no parasut_invoice_id and no parasut_error
+    const { data: pendingOrders, error } = await supabase
+        .from("sales_orders")
+        .select("id, order_number")
+        .eq("commercial_status", "approved")
+        .is("parasut_invoice_id", null)
+        .is("parasut_error", null)
+        .limit(50);
+
+    if (error) throw new Error(error.message);
+
+    let synced = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    for (const order of pendingOrders ?? []) {
+        const result = await serviceSyncOrderToParasut(order.id);
+        if (result.success) {
+            synced++;
+        } else {
+            failed++;
+            errors.push(`${order.order_number}: ${result.error}`);
+        }
+    }
+
+    return { synced, failed, errors };
 }

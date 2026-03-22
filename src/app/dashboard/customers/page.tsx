@@ -71,8 +71,9 @@ export default function CustomersPage() {
             toast({ type: "success", message: `${newCustomer.name} müşteri olarak eklendi` });
             setShowAddModal(false);
             setNewCustomer(newCustomerInitial);
-        } catch {
-            toast({ type: "error", message: "Müşteri eklenemedi. Lütfen tekrar deneyin." });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Müşteri eklenemedi. Lütfen tekrar deneyin.";
+            toast({ type: "error", message: msg });
         } finally {
             setIsAdding(false);
         }

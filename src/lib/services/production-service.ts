@@ -1,17 +1,14 @@
 /**
  * Production Service — üretim girişi + BOM tüketimi.
- * Akış:
- *  1. Bitmiş ürünün BOM'unu çek
- *  2. Her bileşen için yeterli stok var mı kontrol et
- *  3. Bileşen stoklarını düş (adjust_on_hand negatif delta)
- *  4. Bitmiş ürün stoğunu artır (adjust_on_hand pozitif delta)
- *  5. Inventory movements kaydet
- *  6. production_entries kaydı oluştur
+ * Tüm iş tek bir atomik RPC (complete_production) ile yapılır:
+ *  1. BOM validasyonu + bileşen kilidi
+ *  2. Bileşen tüketimi + bitmiş ürün stoğu artışı
+ *  3. Movement kayıtları + production_entry oluşturma
+ * Sonrasında shortage resolution ayrı RPC ile tetiklenir (non-fatal).
  */
 
-import { dbGetProductById } from "@/lib/supabase/products";
-import { dbRecordMovement } from "@/lib/supabase/products";
-import { dbGetBOM, dbCreateProductionEntry } from "@/lib/supabase/production";
+import { dbCompleteProduction } from "@/lib/supabase/production";
+import { dbTryResolveShortages } from "@/lib/supabase/products";
 
 export interface CreateProductionInput {
     product_id: string;
@@ -40,69 +37,40 @@ export interface ProductionResult {
 export async function serviceCreateProductionEntry(
     input: CreateProductionInput
 ): Promise<ProductionResult> {
-    // 1. Bitmiş ürünü çek
-    const product = await dbGetProductById(input.product_id);
-    if (!product) return { success: false, error: "Ürün bulunamadı." };
-    if (!product.is_active) return { success: false, error: "Ürün aktif değil." };
-    if (input.produced_qty <= 0) return { success: false, error: "Üretim miktarı sıfırdan büyük olmalı." };
-
-    // 2. BOM'u çek
-    const bom = await dbGetBOM(input.product_id);
-
-    // 3. Stok yeterliliği kontrolü
-    const shortages: ComponentShortage[] = [];
-    for (const row of bom) {
-        const comp = await dbGetProductById(row.component_product_id);
-        if (!comp) continue;
-        const required = row.quantity * input.produced_qty;
-        if (comp.available_now < required) {
-            shortages.push({
-                component_product_id: row.component_product_id,
-                required_qty: required,
-                available_qty: comp.available_now,
-            });
-        }
-    }
-    if (shortages.length > 0) {
-        return { success: false, error: "Yetersiz bileşen stoğu.", shortages };
+    // 1. Basic validation (fast fail before RPC)
+    if (!input.product_id) return { success: false, error: "Ürün ID zorunludur." };
+    if (!input.produced_qty || input.produced_qty <= 0) {
+        return { success: false, error: "Üretim miktarı sıfırdan büyük olmalı." };
     }
 
-    const productionDate = input.production_date ?? new Date().toISOString().split("T")[0];
-
-    // 4. Bileşen stoklarını tüket
-    for (const row of bom) {
-        const consumed = row.quantity * input.produced_qty;
-        await dbRecordMovement({
-            product_id: row.component_product_id,
-            movement_type: "production",
-            quantity: -consumed,
-            reference_type: "production_entry",
-            notes: `BOM tüketimi: ${product.name} x${input.produced_qty}`,
-        });
-    }
-
-    // 5. Bitmiş ürün stoğunu artır
-    await dbRecordMovement({
+    // 2. Atomic production: BOM check + consume + produce + record — all in one transaction
+    const result = await dbCompleteProduction({
         product_id: input.product_id,
-        movement_type: "production",
-        quantity: input.produced_qty,
-        reference_type: "production_entry",
-        notes: input.notes ?? `Üretim girişi: ${input.produced_qty} ${product.unit}`,
-    });
-
-    // 6. Üretim kaydı oluştur
-    const entry = await dbCreateProductionEntry({
-        product_id: input.product_id,
-        product_name: product.name,
-        product_sku: product.sku,
         produced_qty: input.produced_qty,
         scrap_qty: input.scrap_qty,
         waste_reason: input.waste_reason,
-        production_date: productionDate,
+        production_date: input.production_date,
         notes: input.notes,
         related_order_id: input.related_order_id,
         entered_by: input.entered_by,
     });
 
-    return { success: true, entry_id: entry.id };
+    if (!result.success) {
+        return {
+            success: false,
+            error: result.error,
+            shortages: result.shortages,
+        };
+    }
+
+    // 3. Post-production shortage resolution (non-fatal)
+    // Finished product stock increased — try to allocate to waiting orders
+    try {
+        await dbTryResolveShortages(input.product_id);
+    } catch {
+        // Shortage resolution failure must not roll back production
+        console.warn("[production-service] shortage resolution failed (non-fatal)", input.product_id);
+    }
+
+    return { success: true, entry_id: result.entry_id };
 }

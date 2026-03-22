@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/components/ui/Toast";
-import type { IntegrationSyncLogRow } from "@/lib/database.types";
+import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types";
 
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
+
+interface ParasutStats {
+    customers: number;
+    synced_invoices: number;
+    pending_syncs: number;
+    failed_syncs: number;
+}
 
 function formatDateTime(iso: string) {
     const d = new Date(iso);
@@ -42,22 +49,36 @@ export default function ParasutPage() {
     const [syncProgress, setSyncProgress] = useState(0);
     const [lastSyncTime, setLastSyncTime] = useState("17 Mar 2026 \u00b7 14:30");
     const [logs, setLogs] = useState<IntegrationSyncLogRow[]>([]);
+    const [stats, setStats] = useState<ParasutStats>({ customers: 0, synced_invoices: 0, pending_syncs: 0, failed_syncs: 0 });
+    const [syncedOrders, setSyncedOrders] = useState<SalesOrderRow[]>([]);
+    const [expandedError, setExpandedError] = useState<string | null>(null);
+    const [retryingId, setRetryingId] = useState<string | null>(null);
 
-    // Fetch sync logs from API on mount
-    useEffect(() => {
-        const fetchLogs = async () => {
-            try {
-                const res = await fetch("/api/parasut/logs?limit=50");
-                if (res.ok) {
-                    const data = await res.json();
-                    setLogs(Array.isArray(data) ? data : []);
-                }
-            } catch (err) {
-                console.error("Failed to fetch parasut logs:", err);
+    const fetchAll = useCallback(async () => {
+        try {
+            const [logsRes, statsRes, invoicesRes] = await Promise.all([
+                fetch("/api/parasut/logs?limit=50"),
+                fetch("/api/parasut/stats"),
+                fetch("/api/parasut/invoices"),
+            ]);
+            if (logsRes.ok) {
+                const data = await logsRes.json();
+                setLogs(Array.isArray(data) ? data : []);
             }
-        };
-        fetchLogs();
+            if (statsRes.ok) {
+                setStats(await statsRes.json());
+            }
+            if (invoicesRes.ok) {
+                const data = await invoicesRes.json();
+                setSyncedOrders(Array.isArray(data) ? data : []);
+            }
+        } catch (err) {
+            console.error("Failed to fetch parasut data:", err);
+        }
     }, []);
+
+    // Fetch all data on mount
+    useEffect(() => { fetchAll(); }, [fetchAll]);
 
     const runSync = async () => {
         if (syncStatus === "syncing") return;
@@ -67,7 +88,7 @@ export default function ParasutPage() {
         try {
             setSyncStep(2);
             setSyncProgress(50);
-            const res = await fetch("/api/parasut/sync", { method: "POST" });
+            const res = await fetch("/api/parasut/sync-all", { method: "POST" });
             setSyncStep(3);
             setSyncProgress(80);
             if (res.ok) {
@@ -81,36 +102,53 @@ export default function ParasutPage() {
                     + " \u00b7 " + now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
                 setLastSyncTime(timeLabel);
 
-                // Refetch logs
-                const logsRes = await fetch("/api/parasut/logs?limit=50");
-                if (logsRes.ok) {
-                    const logsData = await logsRes.json();
-                    setLogs(Array.isArray(logsData) ? logsData : []);
-                }
-                toast({ type: "success", message: data.message ?? "Sync tamamland\u0131" });
-                // Auto-reset done status after 3 seconds
+                // Refetch all data
+                await fetchAll();
+
+                const msg = `${data.synced} fatura gönderildi${data.failed > 0 ? `, ${data.failed} hata` : ""}`;
+                toast({ type: data.failed > 0 ? "warning" : "success", message: msg });
                 setTimeout(() => setSyncStatus("idle"), 3000);
             } else {
                 setSyncStatus("idle");
-                toast({ type: "error", message: "Sync ba\u015Far\u0131s\u0131z" });
+                toast({ type: "error", message: "Sync başarısız" });
             }
         } catch (err) {
             console.error("Sync failed:", err);
             setSyncStatus("idle");
-            toast({ type: "error", message: "Sync ba\u015Far\u0131s\u0131z" });
+            toast({ type: "error", message: "Sync başarısız" });
+        }
+    };
+
+    const retrySync = async (logId: string) => {
+        if (retryingId) return;
+        setRetryingId(logId);
+        try {
+            const res = await fetch("/api/parasut/retry", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sync_log_id: logId }),
+            });
+            if (res.ok) {
+                toast({ type: "success", message: "Yeniden deneme başarılı" });
+                await fetchAll();
+            } else {
+                const data = await res.json().catch(() => ({}));
+                toast({ type: "error", message: data.error ?? "Yeniden deneme başarısız" });
+            }
+        } catch {
+            toast({ type: "error", message: "Yeniden deneme başarısız" });
+        } finally {
+            setRetryingId(null);
         }
     };
 
     const syncStepLabel = ["", "Cariler sync ediliyor...", "Faturalar sync ediliyor...", "\u00d6demeler sync ediliyor..."][syncStep] || "";
 
-    // No synced orders yet — will be populated when orders reach "shipped" status
-    const syncedOrders: { id: string; parasutInvoiceId: string; orderNumber: string; customerName: string; grandTotal: number; currency: string; parasutSentAt: string }[] = [];
-
     const scopeCards = useMemo(() => [
-        { label: "Cariler", count: 47, unit: "cari" },
-        { label: "Faturalar", count: 128, unit: "fatura" },
-        { label: "\u00d6demeler", count: 94, unit: "\u00f6deme" },
-    ], []);
+        { label: "Cariler", count: stats.customers, unit: "cari" },
+        { label: "Faturalar", count: stats.synced_invoices, unit: "fatura" },
+        { label: "Bekleyen", count: stats.pending_syncs, unit: "sipari\u015f" },
+    ], [stats]);
 
     return (
         <div style={{ padding: "0" }}>
@@ -393,23 +431,23 @@ export default function ParasutPage() {
                                 {syncedOrders.map(order => (
                                     <tr key={order.id}>
                                         <td style={{ ...tdStyle, fontFamily: "monospace", fontSize: "12px", color: "var(--accent-text)" }}>
-                                            {order.parasutInvoiceId}
+                                            {order.parasut_invoice_id}
                                         </td>
                                         <td style={{ ...tdStyle, fontSize: "12px", color: "var(--text-secondary)" }}>
-                                            {order.orderNumber}
+                                            {order.order_number}
                                         </td>
                                         <td style={{ ...tdStyle, fontSize: "12px" }}>
-                                            {order.customerName}
+                                            {order.customer_name}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", fontWeight: 500 }}>
-                                            {order.grandTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                                            {(order.grand_total ?? 0).toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right", fontSize: "12px", color: "var(--text-tertiary)" }}>
                                             {order.currency}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right" }}>
                                             <span style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
-                                                {formatDateTime(order.parasutSentAt)}
+                                                {order.parasut_sent_at ? formatDateTime(order.parasut_sent_at) : "\u2014"}
                                             </span>
                                         </td>
                                     </tr>
@@ -445,25 +483,29 @@ export default function ParasutPage() {
                                 <th style={thStyle}>Tarih</th>
                                 <th style={thStyle}>Sonu\u00e7</th>
                                 <th style={thStyle}>Entity</th>
-                                <th style={thStyle}>D\u0131\u015F ID</th>
+                                <th style={thStyle}>D\u0131\u015f ID</th>
                                 <th style={thStyle}>Hata</th>
+                                <th style={{ ...thStyle, textAlign: "center" }}>Aksyon</th>
                             </tr>
                         </thead>
                         <tbody>
                             {logs.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} style={{ ...tdStyle, textAlign: "center", color: "var(--text-tertiary)" }}>
-                                        Hen\u00fcz sync ge\u00e7mi\u015Fi yok
+                                    <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--text-tertiary)" }}>
+                                        Hen\u00fcz sync ge\u00e7mi\u015fi yok
                                     </td>
                                 </tr>
                             ) : (
                                 logs.map((log) => {
                                     const isSuccess = log.status === "success";
+                                    const isError = log.status === "error";
+                                    const isExpanded = expandedError === log.id;
+                                    const maxRetries = (log.retry_count ?? 0) >= 3;
                                     return (
                                         <tr
                                             key={log.id}
                                             style={{
-                                                background: isSuccess ? "transparent" : "var(--danger-bg)",
+                                                background: isSuccess ? "transparent" : isError ? "var(--danger-bg)" : "transparent",
                                             }}
                                         >
                                             <td style={tdStyle}>
@@ -473,7 +515,7 @@ export default function ParasutPage() {
                                             </td>
                                             <td style={tdStyle}>
                                                 {isSuccess ? (
-                                                    <span style={{ color: "var(--success-text)", fontSize: "12px" }}>{"\u2713"} Ba\u015Far\u0131l\u0131</span>
+                                                    <span style={{ color: "var(--success-text)", fontSize: "12px" }}>{"\u2713"} Ba\u015far\u0131l\u0131</span>
                                                 ) : (
                                                     <span style={{ color: "var(--danger-text)", fontSize: "12px" }}>{"\u2715"} Hata</span>
                                                 )}
@@ -484,8 +526,43 @@ export default function ParasutPage() {
                                             <td style={{ ...tdStyle, fontSize: "12px", color: "var(--text-secondary)" }}>
                                                 {log.external_id || "\u2014"}
                                             </td>
-                                            <td style={{ ...tdStyle, fontSize: "11px", color: "var(--danger-text)" }}>
-                                                {log.error_message ? log.error_message.substring(0, 40) : "\u2014"}
+                                            <td style={{ ...tdStyle, fontSize: "11px", color: "var(--danger-text)", maxWidth: "200px" }}>
+                                                {log.error_message ? (
+                                                    <span
+                                                        onClick={() => setExpandedError(isExpanded ? null : log.id)}
+                                                        style={{ cursor: "pointer" }}
+                                                        title={isExpanded ? "K\u00fc\u00e7\u00fclt" : "Geni\u015flet"}
+                                                    >
+                                                        {isExpanded ? log.error_message : log.error_message.substring(0, 80)}
+                                                        {!isExpanded && log.error_message.length > 80 && "\u2026"}
+                                                    </span>
+                                                ) : "\u2014"}
+                                            </td>
+                                            <td style={{ ...tdStyle, textAlign: "center" }}>
+                                                {isError && (
+                                                    maxRetries ? (
+                                                        <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
+                                                            Maks. deneme ({log.retry_count}/3)
+                                                        </span>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => retrySync(log.id)}
+                                                            disabled={retryingId === log.id}
+                                                            style={{
+                                                                fontSize: "11px",
+                                                                padding: "3px 8px",
+                                                                border: "0.5px solid var(--warning-border)",
+                                                                borderRadius: "4px",
+                                                                background: "var(--warning-bg)",
+                                                                color: "var(--warning-text)",
+                                                                cursor: retryingId === log.id ? "not-allowed" : "pointer",
+                                                                opacity: retryingId === log.id ? 0.5 : 1,
+                                                            }}
+                                                        >
+                                                            {retryingId === log.id ? "..." : `\u21bb Dene (${log.retry_count ?? 0}/3)`}
+                                                        </button>
+                                                    )
+                                                )}
                                             </td>
                                         </tr>
                                     );

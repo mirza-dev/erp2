@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 
 const categories = [
     "Tümü",
@@ -65,7 +66,8 @@ function FormField({ label, required, children }: { label: string; required?: bo
 }
 
 export default function ProductsPage() {
-    const { products: mockProducts, addProduct } = useData();
+    const { products: mockProducts, addProduct, loadError } = useData();
+    const { toast } = useToast();
     const [search, setSearch] = useState("");
     const [activeCategory, setActiveCategory] = useState("Tümü");
     const [createOpen, setCreateOpen] = useState(false);
@@ -109,19 +111,41 @@ export default function ProductsPage() {
     const handleCreate = async () => {
         if (!createForm.name.trim() || !createForm.sku.trim()) return;
         setCreateSubmitting(true);
-        await new Promise<void>(r => setTimeout(r, 600));
-        addProduct(createForm);
-        setCreateOpen(false);
-        setCreateSubmitting(false);
-        setCreateForm({
-            name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
-            price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
-            productType: "finished" as const, warehouse: "Sevkiyat Deposu",
-        });
+        try {
+            await addProduct(createForm);
+            setCreateOpen(false);
+            setCreateForm({
+                name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
+                price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
+                productType: "finished" as const, warehouse: "Sevkiyat Deposu",
+            });
+            toast({ type: "success", message: `${createForm.name} ürün olarak eklendi` });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Ürün eklenemedi. Lütfen tekrar deneyin.";
+            toast({ type: "error", message: msg });
+        } finally {
+            setCreateSubmitting(false);
+        }
     };
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Load error banner */}
+            {loadError && (
+                <div style={{
+                    padding: "10px 14px",
+                    background: "var(--danger-bg)",
+                    border: "0.5px solid var(--danger-border)",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    color: "var(--danger-text)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                }}>
+                    ⚠ {loadError}
+                </div>
+            )}
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <div>

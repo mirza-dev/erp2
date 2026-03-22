@@ -51,6 +51,19 @@ export default function OrderDetailPage() {
     const { toast } = useToast();
     const [order, setOrder] = useState<OrderDetail | null>(null);
     const [orderLoading, setOrderLoading] = useState(true);
+    const [rescoring, setRescoring] = useState(false);
+
+    const refetchOrder = async () => {
+        try {
+            const res = await fetch(`/api/orders/${params.id}`);
+            if (res.ok) {
+                const data = await res.json();
+                setOrder(mapOrderDetail(data));
+            }
+        } catch (err) {
+            console.error("Failed to fetch order:", err);
+        }
+    };
 
     // Fetch order from API on mount
     useEffect(() => {
@@ -69,6 +82,28 @@ export default function OrderDetailPage() {
         };
         if (params.id) fetchOrder();
     }, [params.id]);
+
+    const handleRescore = async () => {
+        if (rescoring || !params.id) return;
+        setRescoring(true);
+        try {
+            const res = await fetch(`/api/ai/score`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ order_id: params.id }),
+            });
+            if (res.ok) {
+                toast({ type: "success", message: "AI skorlama tamamland\u0131" });
+                await refetchOrder();
+            } else {
+                toast({ type: "error", message: "Skorlama ba\u015far\u0131s\u0131z" });
+            }
+        } catch {
+            toast({ type: "error", message: "Skorlama ba\u015far\u0131s\u0131z" });
+        } finally {
+            setRescoring(false);
+        }
+    };
 
     const [commercialStatus, setCommercialStatus] = useState<CommercialStatus>(order?.commercial_status ?? "draft");
     const [fulfillmentStatus, setFulfillmentStatus] = useState<FulfillmentStatus>(order?.fulfillment_status ?? "unallocated");
@@ -267,15 +302,42 @@ export default function OrderDetailPage() {
                                 {fulfillmentCfg.label}
                             </span>
                         )}
-                        {/* AI confidence badge */}
-                        {order.aiConfidence && (
-                            <span style={{
-                                fontSize: "11px", fontWeight: 500, padding: "2px 8px", borderRadius: "4px",
-                                background: "var(--accent-bg)", color: "var(--accent-text)",
-                                border: "0.5px solid var(--accent-border)",
-                            }}>
-                                AI Güven: %{Math.round(order.aiConfidence * 100)}
-                            </span>
+                        {/* AI confidence + risk badge */}
+                        {order.aiConfidence != null && order.aiConfidence > 0 && (() => {
+                            const risk = order.aiRiskLevel ?? "medium";
+                            const riskColors = {
+                                low:    { bg: "var(--success-bg)", text: "var(--success-text)", border: "var(--success-border)", label: "D\u00fc\u015f\u00fck Risk" },
+                                medium: { bg: "var(--warning-bg)", text: "var(--warning-text)", border: "var(--warning-border)", label: "Orta Risk" },
+                                high:   { bg: "var(--danger-bg)",  text: "var(--danger-text)",  border: "var(--danger-border)",  label: "Y\u00fcksek Risk" },
+                            };
+                            const rc = riskColors[risk];
+                            return (
+                                <span
+                                    title={order.aiReason ?? ""}
+                                    style={{
+                                        fontSize: "11px", fontWeight: 500, padding: "2px 8px", borderRadius: "4px",
+                                        background: rc.bg, color: rc.text, border: `0.5px solid ${rc.border}`,
+                                        cursor: order.aiReason ? "help" : "default",
+                                    }}
+                                >
+                                    {rc.label} \u00b7 %{Math.round(order.aiConfidence * 100)}
+                                </span>
+                            );
+                        })()}
+                        {order.aiConfidence != null && order.aiConfidence > 0 && (
+                            <button
+                                onClick={handleRescore}
+                                disabled={rescoring}
+                                style={{
+                                    fontSize: "10px", padding: "2px 7px", borderRadius: "4px",
+                                    border: "0.5px solid var(--border-secondary)",
+                                    background: "transparent", color: "var(--text-tertiary)",
+                                    cursor: rescoring ? "not-allowed" : "pointer",
+                                    opacity: rescoring ? 0.5 : 1,
+                                }}
+                            >
+                                {rescoring ? "..." : "\u21bb Skorla"}
+                            </button>
                         )}
                     </div>
 

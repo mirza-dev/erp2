@@ -120,6 +120,7 @@ export function mapOrderDetail(row: SalesOrderWithLines): OrderDetail {
     lines: row.lines.map(mapOrderLine),
     aiConfidence: row.ai_confidence ?? undefined,
     aiReason: row.ai_reason ?? undefined,
+    aiRiskLevel: row.ai_risk_level ?? undefined,
   };
 }
 

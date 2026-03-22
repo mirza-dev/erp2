@@ -85,3 +85,57 @@ export async function dbDeleteProductionEntry(id: string): Promise<void> {
         .eq("id", id);
     if (error) throw new Error(error.message);
 }
+
+// ── Atomic Production ───────────────────────────────────────
+
+export interface CompleteProductionInput {
+    product_id: string;
+    produced_qty: number;
+    scrap_qty?: number;
+    waste_reason?: string;
+    production_date?: string;
+    notes?: string;
+    related_order_id?: string;
+    entered_by?: string;
+}
+
+export interface CompleteProductionResult {
+    success: boolean;
+    entry_id?: string;
+    new_on_hand?: number;
+    error?: string;
+    shortages?: { component_product_id: string; required_qty: number; available_qty: number }[];
+}
+
+// ── Reverse Production (atomic delete + stock rollback) ──────
+
+export interface ReverseProductionResult {
+    success: boolean;
+    error?: string;
+}
+
+export async function dbReverseProduction(entryId: string): Promise<ReverseProductionResult> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("reverse_production", {
+        p_entry_id: entryId,
+    });
+    if (error) throw new Error(error.message);
+    return data as ReverseProductionResult;
+}
+
+/** Atomic production: BOM validation → component consumption → finished good receipt → all in one transaction */
+export async function dbCompleteProduction(input: CompleteProductionInput): Promise<CompleteProductionResult> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("complete_production", {
+        p_product_id: input.product_id,
+        p_produced_qty: input.produced_qty,
+        p_scrap_qty: input.scrap_qty ?? 0,
+        p_waste_reason: input.waste_reason ?? null,
+        p_production_date: input.production_date ?? new Date().toISOString().split("T")[0],
+        p_notes: input.notes ?? null,
+        p_related_order_id: input.related_order_id ?? null,
+        p_entered_by: input.entered_by ?? null,
+    });
+    if (error) throw new Error(error.message);
+    return data as CompleteProductionResult;
+}

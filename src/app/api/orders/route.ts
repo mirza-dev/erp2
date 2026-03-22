@@ -4,6 +4,7 @@ import {
     serviceCreateOrder,
     validateOrderCreate,
 } from "@/lib/services/order-service";
+import { aiScoreOrder } from "@/lib/services/ai-service";
 import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError } from "@/lib/api-error";
@@ -39,6 +40,12 @@ export async function POST(req: NextRequest) {
         }
 
         const result = await serviceCreateOrder(body);
+
+        // Fire-and-forget AI scoring — don't block the response
+        aiScoreOrder(result.id).catch(err =>
+            console.error("[AI Score] fire-and-forget:", err)
+        );
+
         return NextResponse.json(result, { status: 201 });
     } catch (err) {
         return handleApiError(err, "POST /api/orders");

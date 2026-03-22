@@ -3,39 +3,6 @@
 import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
-import type { Customer, Product, Order } from "@/lib/mock-data";
-import DemoBanner from "@/components/ui/DemoBanner";
-
-// ─── Data to inject into global state after import ────────────────────────
-const IMPORTED_CUSTOMERS: Customer[] = [
-    { id: "imp-c1", name: "Nord Technik BV", email: "procurement@nordtechnik.com", phone: "+20 3 420 1100", address: "İskenderiye, Mısır", taxNumber: "9471823401", taxOffice: "Alexandria Tax", country: "Mısır", currency: "USD", notes: "Excel import — 18 Mar 2026", isActive: true, totalOrders: 0, totalRevenue: 0, lastOrderDate: "2024-05-01" },
-    { id: "imp-c2", name: "Atlas Engineering LLC", email: "sales@atlasengineering.ae", phone: "+971 6 555 2200", address: "Sharjah, BAE", taxNumber: "AE200312441", taxOffice: "UAE FTA", country: "BAE", currency: "USD", notes: "Excel import — 18 Mar 2026", isActive: true, totalOrders: 0, totalRevenue: 0, lastOrderDate: "2024-05-06" },
-    { id: "imp-c3", name: "Petro Gulf Trading", email: "ops@petrogulf.qa", phone: "+974 4 444 9900", address: "Doha, Katar", taxNumber: "QA20240831", taxOffice: "Qatar GTA", country: "Katar", currency: "USD", notes: "Excel import — 18 Mar 2026", isActive: true, totalOrders: 0, totalRevenue: 0, lastOrderDate: "2024-06-01" },
-    { id: "imp-c4", name: "Marmara Technik GmbH", email: "info@marmara-technik.de", phone: "+49 40 3301 8800", address: "Hamburg, Almanya", taxNumber: "DE119283745", taxOffice: "Hamburg FA", country: "Almanya", currency: "EUR", notes: "Excel import — 18 Mar 2026", isActive: true, totalOrders: 0, totalRevenue: 0, lastOrderDate: "2024-05-14" },
-    { id: "imp-c5", name: "Enerji Sistemleri A.Ş.", email: "satin@enerjisis.com.tr", phone: "+90 212 555 7700", address: "İstanbul, Türkiye", taxNumber: "5234109870", taxOffice: "Beyoğlu VD", country: "Türkiye", currency: "USD", notes: "Excel import — 18 Mar 2026", isActive: true, totalOrders: 0, totalRevenue: 0, lastOrderDate: "2024-05-20" },
-    { id: "imp-c6", name: "Sahara Industries SPA", email: "procurement@sahara-ind.dz", phone: "+213 21 633 5500", address: "Cezayir, Cezayir", taxNumber: "DZ20240099", taxOffice: "Alger DA", country: "Cezayir", currency: "EUR", notes: "Excel import — 18 Mar 2026", isActive: true, totalOrders: 0, totalRevenue: 0, lastOrderDate: "2024-06-15" },
-    { id: "imp-c7", name: "Bosphorus Tech LLC", email: "orders@bosphorustech.nl", phone: "+31 10 210 4400", address: "Rotterdam, Hollanda", taxNumber: "NL820471039B01", taxOffice: "Rotterdam BD", country: "Hollanda", currency: "EUR", notes: "Excel import — 18 Mar 2026", isActive: true, totalOrders: 0, totalRevenue: 0, lastOrderDate: "2024-07-01" },
-    { id: "imp-c8", name: "Delta Flow Systems", email: "supply@deltaflow.az", phone: "+994 12 310 8800", address: "Bakü, Azerbaycan", taxNumber: "AZ2024051102", taxOffice: "Baku MTA", country: "Azerbaycan", currency: "USD", notes: "Excel import — 18 Mar 2026", isActive: true, totalOrders: 0, totalRevenue: 0, lastOrderDate: "2024-07-10" },
-];
-
-const IMPORTED_PRODUCTS: Product[] = [
-    { id: "imp-p1", name: "Glob Vana Hijyenik", sku: "ENDVAN-001", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 278.48, currency: "USD", on_hand: 81, reserved: 6, available_now: 75, minStockLevel: 31, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
-    { id: "imp-p2", name: "Glob Vana Paslanmaz", sku: "ENDVAN-002", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 249.42, currency: "USD", on_hand: 81, reserved: 5, available_now: 76, minStockLevel: 30, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
-    { id: "imp-p3", name: "Sürgülü Vana ANSI 150", sku: "ENDVAN-003", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 1400.97, currency: "USD", on_hand: 123, reserved: 32, available_now: 91, minStockLevel: 26, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
-    { id: "imp-p4", name: "Sürgülü Vana PN16", sku: "ENDVAN-004", category: "Kontrol ve Hat Vanaları", unit: "adet", price: 290.69, currency: "USD", on_hand: 78, reserved: 3, available_now: 75, minStockLevel: 19, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
-    { id: "imp-p5", name: "Flanş Set ISO", sku: "FLAIZO-008", category: "Flanş Aksesuarları", unit: "set", price: 138.23, currency: "USD", on_hand: 210, reserved: 52, available_now: 158, minStockLevel: 50, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
-    { id: "imp-p6", name: "Kelebek Vana DN80", sku: "ENDVAN-017", category: "Kelebek Vanalar", unit: "adet", price: 737.80, currency: "USD", on_hand: 44, reserved: 8, available_now: 36, minStockLevel: 15, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
-    { id: "imp-p7", name: "Küresel Vana PN40", sku: "ENDVAN-021", category: "Küresel Vanalar", unit: "adet", price: 984.20, currency: "USD", on_hand: 60, reserved: 10, available_now: 50, minStockLevel: 20, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
-    { id: "imp-p8", name: "Kelebek Vana Büyük", sku: "KAR-007", category: "Kelebek Vanalar", unit: "adet", price: 12949.46, currency: "USD", on_hand: 12, reserved: 3, available_now: 9, minStockLevel: 5, isActive: true, productType: "finished", warehouse: "Sevkiyat Deposu" },
-];
-
-const IMPORTED_ORDERS: Order[] = [
-    { id: "imp-o1", orderNumber: "SIP-0001", customerName: "Nord Technik BV", commercial_status: "approved", fulfillment_status: "shipped", grandTotal: 59386.89, currency: "USD", createdAt: "2024-05-01", itemCount: 4 },
-    { id: "imp-o2", orderNumber: "SIP-0002", customerName: "Atlas Engineering LLC", commercial_status: "approved", fulfillment_status: "shipped", grandTotal: 43911.84, currency: "USD", createdAt: "2024-05-29", itemCount: 3 },
-    { id: "imp-o3", orderNumber: "SIP-0003", customerName: "Petro Gulf Trading", commercial_status: "approved", fulfillment_status: "shipped", grandTotal: 72655.17, currency: "USD", createdAt: "2024-05-06", itemCount: 5 },
-    { id: "imp-o4", orderNumber: "SIP-0004", customerName: "Marmara Technik GmbH", commercial_status: "approved", fulfillment_status: "shipped", grandTotal: 21890.57, currency: "USD", createdAt: "2024-04-28", itemCount: 2 },
-    { id: "imp-o5", orderNumber: "SIP-0005", customerName: "Enerji Sistemleri A.Ş.", commercial_status: "approved", fulfillment_status: "allocated", grandTotal: 34220.00, currency: "USD", createdAt: "2024-05-14", itemCount: 3 },
-];
 
 type ImportState = "idle" | "analyzing" | "sheet_select" | "mapping" | "preview" | "importing" | "done";
 
@@ -234,7 +201,7 @@ const IMPORT_COUNTS: Record<string, { total: number; label: string }> = {
 };
 
 export default function ImportPage() {
-    const { addImportedData } = useData();
+    const { refetchAll } = useData();
     const [state, setState] = useState<ImportState>("idle");
     const [fileName, setFileName] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
@@ -292,46 +259,57 @@ export default function ImportPage() {
     };
 
     const handleImport = async () => {
-        // Audit trail: batch kaydı oluştur
-        try {
-            await fetch("/api/import", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ file_name: fileName ?? "import.xlsx" }),
-            });
-        } catch { /* non-blocking */ }
         setState("importing");
         const init: Record<string, number> = {};
         IMPORTABLE_TABS.forEach(t => (init[t] = 0));
         setImportProgress(init);
 
-        // Simulate progress per entity sequentially
-        const entities = ["Urunler", "Musteriler", "Siparisler", "Siparis_Kalemleri", "Stok"];
-        const totals = entities.map(e => IMPORT_COUNTS[e].total);
-        let delay = 0;
+        try {
+            // 1. Create batch
+            const batchRes = await fetch("/api/import", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ file_name: fileName ?? "import.xlsx" }),
+            });
+            const batch = batchRes.ok ? await batchRes.json() : null;
+            const batchId = batch?.id;
 
-        entities.forEach((entity, ei) => {
-            const total = totals[ei];
-            const steps = 8;
-            for (let s = 1; s <= steps; s++) {
-                delay += 80 + ei * 15;
-                const count = Math.round((s / steps) * total);
-                const d = delay;
-                setTimeout(() => {
-                    setImportProgress(prev => ({ ...prev, [entity]: count }));
-                    if (s === steps && ei === entities.length - 1) {
-                        setTimeout(() => {
-                            addImportedData({
-                                customers: IMPORTED_CUSTOMERS,
-                                products: IMPORTED_PRODUCTS,
-                                orders: IMPORTED_ORDERS,
-                            });
-                            setState("done");
-                        }, 400);
+            // 2. Send preview data as drafts
+            if (batchId) {
+                const entityMap: Record<string, string> = {
+                    Urunler: "product", Musteriler: "customer",
+                    Siparisler: "order", Siparis_Kalemleri: "order_line", Stok: "stock",
+                };
+                const selectedSheets = sheets.filter(s => s.status === "importable" && s.selected);
+                for (const sheet of selectedSheets) {
+                    const entityType = entityMap[sheet.name] ?? sheet.name;
+                    const previewRows = PREVIEW_DATA[sheet.name] ?? [];
+                    const drafts = previewRows.map(row => ({
+                        entity_type: entityType,
+                        parsed_data: row,
+                        confidence: 0.85,
+                    }));
+                    if (drafts.length > 0) {
+                        await fetch(`/api/import/${batchId}/drafts`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(drafts),
+                        });
                     }
-                }, d);
+                    setImportProgress(prev => ({ ...prev, [sheet.name]: IMPORT_COUNTS[sheet.name]?.total ?? 0 }));
+                }
+
+                // 3. Confirm batch \u2192 merge drafts to real entities
+                await fetch(`/api/import/${batchId}/confirm`, { method: "POST" });
             }
-        });
+
+            // 4. Refresh all data from API
+            await refetchAll();
+            setState("done");
+        } catch (err) {
+            console.error("Import failed:", err);
+            setState("done");
+        }
     };
 
     const reset = () => {

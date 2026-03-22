@@ -89,6 +89,7 @@ export interface OrderDetail extends Order {
     lines: OrderLineItem[];
     aiConfidence?: number;
     aiReason?: string;
+    aiRiskLevel?: "low" | "medium" | "high";
 }
 
 export const mockProducts: Product[] = [

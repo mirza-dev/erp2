@@ -48,7 +48,7 @@ Also add "UNMATCHED:" a comma-separated list of any fields you could not extract
 
 function parseAIResponse(text: string): { parsed_data: Record<string, unknown>; confidence: number; ai_reason: string; unmatched_fields: string[] } {
     // Extract JSON block
-    const jsonMatch = text.match(/\{[\s\S]*?\}/);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
     let parsed_data: Record<string, unknown> = {};
     if (jsonMatch) {
         try { parsed_data = JSON.parse(jsonMatch[0]); } catch { /* ignore */ }
@@ -75,19 +75,29 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
     const systemPrompt = PARSE_SYSTEM[input.entity_type];
     if (!systemPrompt) throw new Error(`Unknown entity_type: ${input.entity_type}`);
 
-    const message = await client.messages.create({
-        model: MODEL,
-        max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: "user", content: input.raw_text }],
-    });
+    try {
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: [{ role: "user", content: input.raw_text }],
+        });
 
-    const text = message.content
-        .filter(c => c.type === "text")
-        .map(c => (c as { type: "text"; text: string }).text)
-        .join("\n");
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
 
-    return parseAIResponse(text);
+        return parseAIResponse(text);
+    } catch (err) {
+        console.error("[AI Parse] graceful degradation:", err);
+        return {
+            parsed_data: {},
+            confidence: 0,
+            ai_reason: "AI servisi yanıt veremedi",
+            unmatched_fields: ["all"],
+        };
+    }
 }
 
 // ── Score ─────────────────────────────────────────────────────
@@ -110,50 +120,57 @@ export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
     const order = await dbGetOrderById(orderId);
     if (!order) throw new Error("Sipariş bulunamadı.");
 
-    const orderSummary = JSON.stringify({
-        order_number: order.order_number,
-        customer_name: order.customer_name,
-        customer_country: order.customer_country,
-        currency: order.currency,
-        grand_total: order.grand_total,
-        commercial_status: order.commercial_status,
-        notes: order.notes,
-        line_count: order.lines.length,
-        lines: order.lines.map(l => ({
-            product: l.product_name,
-            qty: l.quantity,
-            unit_price: l.unit_price,
-            discount_pct: l.discount_pct,
-        })),
-    });
+    try {
+        const orderSummary = JSON.stringify({
+            order_number: order.order_number,
+            customer_name: order.customer_name,
+            customer_country: order.customer_country,
+            currency: order.currency,
+            grand_total: order.grand_total,
+            commercial_status: order.commercial_status,
+            notes: order.notes,
+            line_count: order.lines.length,
+            lines: order.lines.map(l => ({
+                product: l.product_name,
+                qty: l.quantity,
+                unit_price: l.unit_price,
+                discount_pct: l.discount_pct,
+            })),
+        });
 
-    const message = await client.messages.create({
-        model: MODEL,
-        max_tokens: 256,
-        system: SCORE_SYSTEM,
-        messages: [{ role: "user", content: orderSummary }],
-    });
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 256,
+            system: SCORE_SYSTEM,
+            messages: [{ role: "user", content: orderSummary }],
+        });
 
-    const text = message.content
-        .filter(c => c.type === "text")
-        .map(c => (c as { type: "text"; text: string }).text)
-        .join("\n");
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
 
-    const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
-    const riskMatch = text.match(/RISK_LEVEL:\s*(low|medium|high)/i);
-    const reasonMatch = text.match(/REASON:\s*(.+?)$/im);
+        const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
+        const riskMatch = text.match(/RISK_LEVEL:\s*(low|medium|high)/i);
+        const reasonMatch = text.match(/REASON:\s*(.+?)$/im);
 
-    const confidence = confMatch ? parseFloat(confMatch[1]) : 0.5;
-    const risk_level = (riskMatch ? riskMatch[1].toLowerCase() : "medium") as "low" | "medium" | "high";
-    const reason = reasonMatch ? reasonMatch[1].trim() : "";
+        const confidence = confMatch ? parseFloat(confMatch[1]) : 0.5;
+        const risk_level = (riskMatch ? riskMatch[1].toLowerCase() : "medium") as "low" | "medium" | "high";
+        const reason = reasonMatch ? reasonMatch[1].trim() : "";
 
-    // Persist to order record (§11.1 — non-authoritative, advisory only)
-    const supabase = createServiceClient();
-    await supabase.from("sales_orders").update({
-        ai_confidence: confidence,
-        ai_reason: reason,
-        ai_model_version: MODEL,
-    }).eq("id", orderId);
+        // Persist to order record (§11.1 — non-authoritative, advisory only)
+        const supabase = createServiceClient();
+        await supabase.from("sales_orders").update({
+            ai_confidence: confidence,
+            ai_reason: reason,
+            ai_model_version: MODEL,
+            ai_risk_level: risk_level,
+        }).eq("id", orderId);
 
-    return { confidence, risk_level, reason };
+        return { confidence, risk_level, reason };
+    } catch (err) {
+        console.error("[AI Score] graceful degradation:", err);
+        // Don't write to DB — don't overwrite a previous good score
+        return { confidence: 0, risk_level: "medium", reason: "AI scoring unavailable" };
+    }
 }

@@ -6,6 +6,7 @@ import {
   useState,
   useMemo,
   useEffect,
+  useCallback,
   ReactNode,
 } from "react";
 
@@ -53,6 +54,7 @@ export interface ConflictItem {
 export interface UpdateStatusResult {
   ok: boolean;
   conflicts?: ConflictItem[];
+  error?: string;
 }
 
 // ── Internal types ──────────────────────────────────────────
@@ -78,8 +80,8 @@ interface DataContextValue {
   addProduct: (
     p: Omit<Product, "id" | "reserved" | "available_now" | "isActive">
   ) => Promise<void>;
-  addUretimKaydi: (k: Omit<UretimKaydi, "id">) => Promise<void>;
-  deleteUretimKaydi: (id: string) => Promise<void>;
+  addUretimKaydi: (k: Omit<UretimKaydi, "id">) => Promise<{ refetchFailed?: boolean }>;
+  deleteUretimKaydi: (id: string) => Promise<{ refetchFailed?: boolean }>;
   addOrder: (
     detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">
   ) => Promise<string>;
@@ -89,6 +91,7 @@ interface DataContextValue {
   ) => Promise<UpdateStatusResult>;
   reorderSuggestions: Product[];
   loadError: string | null;
+  refetchAll: () => Promise<void>;
 }
 
 // ── Context ─────────────────────────────────────────────────
@@ -107,50 +110,49 @@ export function DataProvider({ children }: { children: ReactNode }) {
     useState<DataContextValue["importedCount"]>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // ── Mount: Fetch all lists from API ──────────────────────
+  // ── Fetch all lists from API ─────────────────────────────
 
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [productsRes, customersRes, ordersRes, productionRes] =
-          await Promise.all([
-            fetch("/api/products"),
-            fetch("/api/customers"),
-            fetch("/api/orders"),
-            fetch("/api/production"),
-          ]);
+  const refetchAll = useCallback(async () => {
+    try {
+      const [productsRes, customersRes, ordersRes, productionRes] =
+        await Promise.all([
+          fetch("/api/products"),
+          fetch("/api/customers"),
+          fetch("/api/orders"),
+          fetch("/api/production"),
+        ]);
 
-        const failed = [productsRes, customersRes, ordersRes, productionRes].find(r => !r.ok);
-        if (failed) {
-          setLoadError(`Veriler yüklenemedi (HTTP ${failed.status}). Backend bağlantısını kontrol edin.`);
-        }
-
-        if (productsRes.ok) {
-          const data = await productsRes.json();
-          setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
-        }
-        if (customersRes.ok) {
-          const data = await customersRes.json();
-          setCustomers(Array.isArray(data) ? data.map(mapCustomer) : []);
-        }
-        if (ordersRes.ok) {
-          const data = await ordersRes.json();
-          setOrders(Array.isArray(data) ? data.map(mapOrderSummary) : []);
-        }
-        if (productionRes.ok) {
-          const data = await productionRes.json();
-          setUretimKayitlari(
-            Array.isArray(data) ? data.map(mapProductionEntry) : []
-          );
-        }
-      } catch (err) {
-        setLoadError("Sunucuya bağlanılamadı. Ağ bağlantınızı ve backend durumunu kontrol edin.");
-        console.error("Failed to fetch initial data:", err);
+      const failed = [productsRes, customersRes, ordersRes, productionRes].find(r => !r.ok);
+      if (failed) {
+        setLoadError(`Veriler y\u00fcklenemedi (HTTP ${failed.status}). Backend ba\u011flant\u0131s\u0131n\u0131 kontrol edin.`);
       }
-    };
 
-    fetchAll();
+      if (productsRes.ok) {
+        const data = await productsRes.json();
+        setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
+      }
+      if (customersRes.ok) {
+        const data = await customersRes.json();
+        setCustomers(Array.isArray(data) ? data.map(mapCustomer) : []);
+      }
+      if (ordersRes.ok) {
+        const data = await ordersRes.json();
+        setOrders(Array.isArray(data) ? data.map(mapOrderSummary) : []);
+      }
+      if (productionRes.ok) {
+        const data = await productionRes.json();
+        setUretimKayitlari(
+          Array.isArray(data) ? data.map(mapProductionEntry) : []
+        );
+      }
+    } catch (err) {
+      setLoadError("Sunucuya ba\u011flanamad\u0131. A\u011f ba\u011flant\u0131n\u0131z\u0131 ve backend durumunu kontrol edin.");
+      console.error("Failed to fetch initial data:", err);
+    }
   }, []);
+
+  // ── Mount ──────────────────────────────────────────────
+  useEffect(() => { refetchAll(); }, [refetchAll]);
 
   // ── Import ───────────────────────────────────────────────
 
@@ -255,7 +257,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // ── Production (Uretim) ──────────────────────────────────
 
-  const addUretimKaydi = async (k: Omit<UretimKaydi, "id">) => {
+  const addUretimKaydi = async (k: Omit<UretimKaydi, "id">): Promise<{ refetchFailed?: boolean }> => {
     try {
       const body = {
         product_id: k.productId,
@@ -268,51 +270,70 @@ export function DataProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (res.ok) {
-        // Refetch production and products (stock has changed)
-        const [prodRes, prodDataRes] = await Promise.all([
-          fetch("/api/production"),
-          fetch("/api/products"),
-        ]);
-        if (prodRes.ok) {
-          const data = await prodRes.json();
-          setUretimKayitlari(
-            Array.isArray(data) ? data.map(mapProductionEntry) : []
-          );
-        } else {
-          console.error("addUretimKaydi: production refetch failed", prodRes.status);
-        }
-        if (prodDataRes.ok) {
-          const data = await prodDataRes.json();
-          setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
-        } else {
-          console.error("addUretimKaydi: products refetch failed", prodDataRes.status);
-        }
-      } else {
-        throw new Error(await res.text());
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error ?? "Üretim kaydedilemedi.");
       }
+      // POST succeeded — refetch production and products (stock has changed)
+      let refetchFailed = false;
+      const [prodRes, prodDataRes] = await Promise.all([
+        fetch("/api/production"),
+        fetch("/api/products"),
+      ]);
+      if (prodRes.ok) {
+        const data = await prodRes.json();
+        setUretimKayitlari(
+          Array.isArray(data) ? data.map(mapProductionEntry) : []
+        );
+      } else {
+        refetchFailed = true;
+        console.error("addUretimKaydi: production refetch failed", prodRes.status);
+      }
+      if (prodDataRes.ok) {
+        const data = await prodDataRes.json();
+        setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
+      } else {
+        refetchFailed = true;
+        console.error("addUretimKaydi: products refetch failed", prodDataRes.status);
+      }
+      return { refetchFailed };
     } catch (err) {
       console.error("addUretimKaydi failed:", err);
       throw err;
     }
   };
 
-  const deleteUretimKaydi = async (id: string) => {
+  const deleteUretimKaydi = async (id: string): Promise<{ refetchFailed?: boolean }> => {
     try {
       const res = await fetch(`/api/production/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setUretimKayitlari((prev) => prev.filter((k) => k.id !== id));
-        // Refetch products (stock has changed)
-        const productsRes = await fetch("/api/products");
-        if (productsRes.ok) {
-          const data = await productsRes.json();
-          setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
-        } else {
-          console.error("deleteUretimKaydi: products refetch failed", productsRes.status);
-        }
-      } else {
-        throw new Error(await res.text());
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error ?? "Üretim kaydı silinemedi.");
       }
+      setUretimKayitlari((prev) => prev.filter((k) => k.id !== id));
+      // Refetch products and production (stock has changed)
+      let refetchFailed = false;
+      const [productsRes, prodRes] = await Promise.all([
+        fetch("/api/products"),
+        fetch("/api/production"),
+      ]);
+      if (productsRes.ok) {
+        const data = await productsRes.json();
+        setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
+      } else {
+        refetchFailed = true;
+        console.error("deleteUretimKaydi: products refetch failed", productsRes.status);
+      }
+      if (prodRes.ok) {
+        const data = await prodRes.json();
+        setUretimKayitlari(
+          Array.isArray(data) ? data.map(mapProductionEntry) : []
+        );
+      } else {
+        refetchFailed = true;
+        console.error("deleteUretimKaydi: production refetch failed", prodRes.status);
+      }
+      return { refetchFailed };
     } catch (err) {
       console.error("deleteUretimKaydi failed:", err);
       throw err;
@@ -361,7 +382,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setOrders((prev) => [newOrder, ...prev]);
         return newOrder.id;
       }
-      throw new Error("Failed to create order");
+      const errBody = await res.text().catch(() => "");
+      throw new Error(errBody || "Sipariş oluşturulamadı.");
     } catch (err) {
       console.error("addOrder failed:", err);
       throw err;
@@ -385,7 +407,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
 
       if (!res.ok) {
-        return { ok: false };
+        const errBody = await res.json().catch(() => ({}));
+        return { ok: false, error: errBody.error };
       }
 
       const updated = await res.json();
@@ -408,7 +431,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       return { ok: true };
     } catch (err) {
       console.error("updateOrderStatus failed:", err);
-      return { ok: false };
+      return { ok: false, error: err instanceof Error ? err.message : undefined };
     }
   };
 
@@ -443,6 +466,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateOrderStatus,
         reorderSuggestions,
         loadError,
+        refetchAll,
       }}
     >
       {children}

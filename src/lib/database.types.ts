@@ -106,6 +106,7 @@ export interface SalesOrderRow {
     ai_confidence: number | null
     ai_reason: string | null
     ai_model_version: string | null
+    ai_risk_level: "low" | "medium" | "high" | null
 }
 
 export interface OrderLineRow {

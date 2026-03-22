@@ -14,6 +14,7 @@ import {
     type ListAlertsFilter,
 } from "@/lib/supabase/alerts";
 import type { AlertStatus } from "@/lib/database.types";
+import { computeCoverageDays, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
 
 // ── Lifecycle transitions (domain-rules §12.3) ───────────────
 
@@ -55,6 +56,9 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
         const isWarning  = !isCritical && available <= Math.ceil(min * 1.5);
 
         const entityId = product.id;
+        const dailyUsage = product.daily_usage ?? null;
+        const coverageDays = computeCoverageDays(available, dailyUsage);
+        const riskInputs: StockRiskInputs = { available, min, dailyUsage, coverageDays, unit: product.unit };
 
         if (isCritical) {
             // Resolve any existing warning for this product (escalate)
@@ -66,9 +70,10 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     type: "stock_critical",
                     severity: "critical",
                     title: `Kritik Stok: ${product.name}`,
-                    description: `Mevcut stok (${available} ${product.unit}) minimum seviye (${min} ${product.unit}) altında.`,
+                    description: buildStockAlertDescription(riskInputs, "critical"),
                     entity_type: "product",
                     entity_id: entityId,
+                    ai_inputs_summary: { available, min, dailyUsage, coverageDays, unit: product.unit },
                 });
                 created++;
             }
@@ -79,9 +84,10 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     type: "stock_risk",
                     severity: "warning",
                     title: `Stok Uyarısı: ${product.name}`,
-                    description: `Mevcut stok (${available} ${product.unit}) minimum seviyenin %150'sine (${Math.ceil(min * 1.5)} ${product.unit}) yaklaşıyor.`,
+                    description: buildStockAlertDescription(riskInputs, "warning"),
                     entity_type: "product",
                     entity_id: entityId,
+                    ai_inputs_summary: { available, min, dailyUsage, coverageDays, unit: product.unit },
                 });
                 created++;
             }

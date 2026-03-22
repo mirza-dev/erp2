@@ -18,7 +18,13 @@ function newLine(): FormLine {
     return { id: crypto.randomUUID(), productId: "", adet: "", notlar: "" };
 }
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+};
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
@@ -127,11 +133,16 @@ export default function ProductionPage() {
             return;
         }
         setIsSaving(true);
-        try {
-            for (const line of valid) {
-                const product = products.find(p => p.id === line.productId);
-                if (!product) continue;
-                await addUretimKaydi({
+        let succeeded = 0;
+        let failed = 0;
+        let refetchWarning = false;
+        const failedLineIds: string[] = [];
+
+        for (const line of valid) {
+            const product = products.find(p => p.id === line.productId);
+            if (!product) { failed++; failedLineIds.push(line.id); continue; }
+            try {
+                const result = await addUretimKaydi({
                     productId: product.id,
                     productName: product.name,
                     productSku: product.sku,
@@ -140,15 +151,27 @@ export default function ProductionPage() {
                     girenKullanici: "Usta",
                     notlar: line.notlar,
                 });
+                succeeded++;
+                if (result?.refetchFailed) refetchWarning = true;
+            } catch {
+                failed++;
+                failedLineIds.push(line.id);
             }
-            const totalAdet = valid.reduce((s, l) => s + parseInt(l.adet), 0);
-            toast({ type: "success", message: `${valid.length} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi` });
-            setLines([newLine()]);
-        } catch {
-            toast({ type: "error", message: "Üretim kaydedilemedi. Lütfen tekrar deneyin." });
-        } finally {
-            setIsSaving(false);
         }
+
+        if (succeeded > 0 && failed === 0) {
+            const totalAdet = valid.reduce((s, l) => s + parseInt(l.adet), 0);
+            const msg = `${succeeded} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi`;
+            toast({ type: "success", message: refetchWarning ? msg + " (veri gecikmeli yüklenebilir)" : msg });
+            setLines([newLine()]);
+        } else if (succeeded > 0 && failed > 0) {
+            toast({ type: "warning", message: `${succeeded} kayıt başarılı, ${failed} kayıt başarısız. Başarısız satırları kontrol edin.` });
+            setLines(prev => prev.filter(l => failedLineIds.includes(l.id)));
+        } else {
+            toast({ type: "error", message: "Hiçbir kayıt oluşturulamadı. Lütfen tekrar deneyin." });
+        }
+
+        setIsSaving(false);
     };
 
     // ── Voice input ─────────────────────────────────────────────────────────
@@ -438,8 +461,9 @@ export default function ProductionPage() {
                                                 try {
                                                     await deleteUretimKaydi(kaydi.id);
                                                     toast({ type: "success", message: "Üretim kaydı silindi" });
-                                                } catch {
-                                                    toast({ type: "error", message: "Kayıt silinemedi." });
+                                                } catch (err) {
+                                                    const msg = err instanceof Error ? err.message : "Kayıt silinemedi.";
+                                                    toast({ type: "error", message: msg });
                                                 } finally {
                                                     setDeletingId(null);
                                                 }

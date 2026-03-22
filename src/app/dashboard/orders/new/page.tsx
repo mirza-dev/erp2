@@ -133,7 +133,6 @@ function NewOrderForm() {
         if (!selectedCustomer || filledLines === 0) return;
         setIsSubmitting(true);
         try {
-            await new Promise<void>(r => setTimeout(r, 800));
             const orderLines: OrderLineItem[] = lines
                 .filter(l => l.product !== null)
                 .map(l => ({
@@ -166,8 +165,9 @@ function NewOrderForm() {
             });
             toast({ type: "success", message: mode === "draft" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
             router.push("/dashboard/orders");
-        } catch {
-            toast({ type: "error", message: "Sipariş kaydedilemedi. Lütfen tekrar deneyin." });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Sipariş kaydedilemedi. Lütfen tekrar deneyin.";
+            toast({ type: "error", message: msg });
         } finally {
             setIsSubmitting(false);
         }

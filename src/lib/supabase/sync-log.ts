@@ -46,3 +46,48 @@ export async function dbListSyncLogs(entityType?: string, limit = 50): Promise<I
     if (error) throw new Error(error.message);
     return data ?? [];
 }
+
+export async function dbGetSyncLog(id: string): Promise<IntegrationSyncLogRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("integration_sync_logs")
+        .select("*")
+        .eq("id", id)
+        .single();
+    if (error || !data) return null;
+    return data;
+}
+
+export async function dbUpdateSyncLog(
+    id: string,
+    updates: {
+        status?: "success" | "error" | "pending" | "retrying";
+        retry_count?: number;
+        error_message?: string | null;
+        completed_at?: string | null;
+        external_id?: string | null;
+    }
+): Promise<IntegrationSyncLogRow> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("integration_sync_logs")
+        .update(updates)
+        .eq("id", id)
+        .select("*")
+        .single();
+    if (error || !data) throw new Error(error?.message ?? "Sync log update failed");
+    return data;
+}
+
+export async function dbListFailedSyncLogs(limit = 20): Promise<IntegrationSyncLogRow[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("integration_sync_logs")
+        .select("*")
+        .eq("status", "error")
+        .lt("retry_count", 3)
+        .order("requested_at", { ascending: false })
+        .limit(limit);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}

@@ -4,6 +4,7 @@ import {
     serviceTransitionOrder,
     type OrderTransition,
 } from "@/lib/services/order-service";
+import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { handleApiError } from "@/lib/api-error";
 
 // GET /api/orders/[id]
@@ -41,18 +42,23 @@ export async function PATCH(
         const result = await serviceTransitionOrder(id, transition);
 
         if (!result.success) {
-            if (result.conflicts && result.conflicts.length > 0) {
-                return NextResponse.json(
-                    { error: "Stok yetersiz.", conflicts: result.conflicts },
-                    { status: 409 }
-                );
-            }
             return NextResponse.json({ error: result.error }, { status: 400 });
         }
 
-        // Return updated order
+        // Fire-and-forget Parasut sync when order is shipped
+        if (transition === "shipped" && result.success) {
+            serviceSyncOrderToParasut(id).catch(err =>
+                console.error("[Parasut sync] fire-and-forget:", err)
+            );
+        }
+
+        // Return updated order with shortage info if partial allocation occurred
         const updated = await serviceGetOrder(id);
-        return NextResponse.json(updated);
+        const response: Record<string, unknown> = { ...updated };
+        if (result.shortages && result.shortages.length > 0) {
+            response.shortages = result.shortages;
+        }
+        return NextResponse.json(response);
     } catch (err) {
         return handleApiError(err, "PATCH /api/orders/[id]");
     }

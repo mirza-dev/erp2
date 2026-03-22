@@ -2,22 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { useData } from "@/lib/data-context";
+import { computeCoverageDays, daysColor, daysBg } from "@/lib/stock-utils";
 
 type FilterType = "all" | "raw_material" | "finished";
-
-function daysColor(days: number | null) {
-    if (days === null) return "var(--warning-text)";
-    if (days <= 7) return "var(--danger-text)";
-    if (days <= 14) return "var(--warning-text)";
-    return "var(--text-secondary)";
-}
-
-function daysBg(days: number | null) {
-    if (days === null) return "var(--warning-bg)";
-    if (days <= 7) return "var(--danger-bg)";
-    if (days <= 14) return "var(--warning-bg)";
-    return "var(--bg-tertiary)";
-}
 
 function WhyBadge({ daysLeft, urgency }: { daysLeft: number | null; urgency: number }) {
     const lines: { text: string; color: string; bg: string }[] = [];
@@ -152,8 +139,15 @@ export default function PurchaseSuggestedPage() {
         : reorderSuggestions.filter(p => p.productType === filter);
 
     const sorted = [...filtered].sort((a, b) => {
-        const urgA = (1 - a.available_now / a.minStockLevel);
-        const urgB = (1 - b.available_now / b.minStockLevel);
+        const daysA = computeCoverageDays(a.available_now, a.dailyUsage);
+        const daysB = computeCoverageDays(b.available_now, b.dailyUsage);
+        // Known coverage days first (ascending — fewer days = more urgent)
+        if (daysA !== null && daysB !== null) return daysA - daysB;
+        if (daysA !== null) return -1;
+        if (daysB !== null) return 1;
+        // Both null → urgency % fallback
+        const urgA = 1 - a.available_now / a.minStockLevel;
+        const urgB = 1 - b.available_now / b.minStockLevel;
         return urgB - urgA;
     });
 
@@ -165,8 +159,8 @@ export default function PurchaseSuggestedPage() {
         .filter(p => p.dailyUsage)
         .sort((a, b) => (a.available_now / (a.dailyUsage ?? 1)) - (b.available_now / (b.dailyUsage ?? 1)))[0];
 
-    const mostUrgentDays = mostUrgent?.dailyUsage
-        ? Math.round(mostUrgent.available_now / mostUrgent.dailyUsage)
+    const mostUrgentDays = mostUrgent
+        ? computeCoverageDays(mostUrgent.available_now, mostUrgent.dailyUsage)
         : null;
 
     const tabs: { key: FilterType; label: string; count: number }[] = [
@@ -332,7 +326,7 @@ export default function PurchaseSuggestedPage() {
                         const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
                         const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
                         const deficit = p.minStockLevel - p.available_now;
-                        const daysLeft = p.dailyUsage ? Math.round(p.available_now / p.dailyUsage) : null;
+                        const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                         const isRaw = p.productType === "raw_material";
                         return (
                             <div key={p.id} style={{
@@ -456,7 +450,7 @@ export default function PurchaseSuggestedPage() {
                                 const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
                                 const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
                                 const deficit = p.minStockLevel - p.available_now;
-                                const daysLeft = p.dailyUsage ? Math.round(p.available_now / p.dailyUsage) : null;
+                                const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                                 const isRaw = p.productType === "raw_material";
                                         return (
                                     <tr key={p.id} style={{
@@ -548,7 +542,7 @@ export default function PurchaseSuggestedPage() {
                                             <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 500 }}>
                                                 {p.reorderQty?.toLocaleString("tr-TR") ?? "—"} {p.unit}
                                             </div>
-                                            {daysLeft !== null && (
+                                            {daysLeft !== null ? (
                                                 <span style={{
                                                     display: "inline-block",
                                                     marginTop: "4px",
@@ -560,6 +554,16 @@ export default function PurchaseSuggestedPage() {
                                                     borderRadius: "4px",
                                                 }}>
                                                     {daysLeft} gün
+                                                </span>
+                                            ) : (
+                                                <span style={{
+                                                    display: "inline-block",
+                                                    marginTop: "4px",
+                                                    fontSize: "10px",
+                                                    color: "var(--text-tertiary)",
+                                                    fontStyle: "italic",
+                                                }}>
+                                                    Kullanım verisi yok
                                                 </span>
                                             )}
                                         </td>

@@ -2,7 +2,6 @@ import { createServiceClient } from "./service";
 import type {
     SalesOrderRow,
     OrderLineRow,
-    StockReservationRow,
     CommercialStatus,
     FulfillmentStatus,
 } from "@/lib/database.types";
@@ -49,8 +48,12 @@ export interface ListOrdersFilter {
 
 // ── Helpers ──────────────────────────────────────────────────
 
-function generateOrderNumber(seq: number): string {
-    return `ORD-${new Date().getFullYear()}-${String(seq).padStart(4, "0")}`;
+/** Generate a concurrency-safe order number via Postgres counter */
+export async function dbGenerateOrderNumber(): Promise<string> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("generate_order_number");
+    if (error) throw new Error(error.message);
+    return data as string;
 }
 
 // ── Queries ──────────────────────────────────────────────────
@@ -96,10 +99,8 @@ export async function dbListOrders(filter: ListOrdersFilter = {}): Promise<Sales
 export async function dbCreateOrder(input: CreateOrderInput): Promise<{ id: string; order_number: string }> {
     const supabase = createServiceClient();
 
-    // Generate sequential order number
-    const { count } = await supabase.from("sales_orders").select("*", { count: "exact", head: true });
-    const seq = (count ?? 0) + 1;
-    const order_number = generateOrderNumber(seq);
+    // Concurrency-safe order number via Postgres counter RPC
+    const order_number = await dbGenerateOrderNumber();
 
     const { data: order, error: orderError } = await supabase
         .from("sales_orders")
@@ -111,8 +112,8 @@ export async function dbCreateOrder(input: CreateOrderInput): Promise<{ id: stri
             customer_country: input.customer_country ?? null,
             customer_tax_office: input.customer_tax_office ?? null,
             customer_tax_number: input.customer_tax_number ?? null,
-            commercial_status: input.commercial_status,
-            fulfillment_status: input.fulfillment_status,
+            commercial_status: "draft",
+            fulfillment_status: "unallocated",
             currency: input.currency,
             subtotal: input.subtotal,
             vat_total: input.vat_total,
@@ -160,8 +161,55 @@ export async function dbUpdateOrderStatus(
     if (error) throw new Error(error.message);
 }
 
-// ── Stock helpers ────────────────────────────────────────────
+// ── Synced orders (Parasut) ──────────────────────────────────
 
+export async function dbListSyncedOrders(limit = 20): Promise<SalesOrderRow[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("sales_orders")
+        .select("*")
+        .not("parasut_invoice_id", "is", null)
+        .order("parasut_sent_at", { ascending: false })
+        .limit(limit);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}
+
+// ── Approve / Ship / Cancel RPCs ─────────────────────────────
+
+export interface ApproveOrderResult {
+    success: boolean;
+    error?: string;
+    fulfillment_status?: FulfillmentStatus;
+    shortages?: { product_name: string; requested: number; reserved: number; shortage: number }[];
+}
+
+export async function dbApproveOrder(orderId: string): Promise<ApproveOrderResult> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("approve_order_with_allocation", {
+        p_order_id: orderId,
+    });
+    if (error) throw new Error(error.message);
+    return data as ApproveOrderResult;
+}
+
+export async function dbShipOrderFull(orderId: string): Promise<{ success: boolean; error?: string }> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("ship_order_full", { p_order_id: orderId });
+    if (error) throw new Error(error.message);
+    return data as { success: boolean; error?: string };
+}
+
+export async function dbCancelOrder(orderId: string): Promise<{ success: boolean; error?: string }> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("cancel_order", { p_order_id: orderId });
+    if (error) throw new Error(error.message);
+    return data as { success: boolean; error?: string };
+}
+
+// ── Stock helpers (DEPRECATED) ──────────────────────────────
+
+/** @deprecated Use ApproveOrderResult.shortages instead */
 export interface StockConflict {
     product_id: string;
     product_name: string;
@@ -169,7 +217,7 @@ export interface StockConflict {
     available: number;
 }
 
-/** Read current on_hand and reserved for multiple products */
+/** @deprecated approve_order_with_allocation RPC handles stock checks internally */
 export async function dbGetProductStocks(
     productIds: string[]
 ): Promise<Map<string, { on_hand: number; reserved: number; available_now: number }>> {
@@ -191,7 +239,7 @@ export async function dbGetProductStocks(
     return map;
 }
 
-/** Hard reserve stock for an approved order — atomic per-product increment */
+/** @deprecated Use approve_order_with_allocation RPC via dbApproveOrder() */
 export async function dbReserveStock(
     orderId: string,
     lines: OrderLineRow[]
@@ -218,7 +266,7 @@ export async function dbReserveStock(
     }
 }
 
-/** Release reserved stock (on cancellation) */
+/** @deprecated Use cancel_order RPC via dbCancelOrder() */
 export async function dbReleaseStock(orderId: string): Promise<void> {
     const supabase = createServiceClient();
 
@@ -246,7 +294,7 @@ export async function dbReleaseStock(orderId: string): Promise<void> {
         .eq("status", "open");
 }
 
-/** Deduct on_hand and release reserved on shipment */
+/** @deprecated Use ship_order_full RPC via dbShipOrderFull() */
 export async function dbShipOrder(orderId: string, lines: OrderLineRow[]): Promise<void> {
     const supabase = createServiceClient();
 
