@@ -136,6 +136,7 @@ export default function ProductionPage() {
         let succeeded = 0;
         let failed = 0;
         let refetchWarning = false;
+        let firstError: string | null = null;
         const failedLineIds: string[] = [];
 
         for (const line of valid) {
@@ -153,9 +154,10 @@ export default function ProductionPage() {
                 });
                 succeeded++;
                 if (result?.refetchFailed) refetchWarning = true;
-            } catch {
+            } catch (err) {
                 failed++;
                 failedLineIds.push(line.id);
+                if (!firstError) firstError = err instanceof Error ? err.message : "Üretim kaydedilemedi.";
             }
         }
 
@@ -168,7 +170,7 @@ export default function ProductionPage() {
             toast({ type: "warning", message: `${succeeded} kayıt başarılı, ${failed} kayıt başarısız. Başarısız satırları kontrol edin.` });
             setLines(prev => prev.filter(l => failedLineIds.includes(l.id)));
         } else {
-            toast({ type: "error", message: "Hiçbir kayıt oluşturulamadı. Lütfen tekrar deneyin." });
+            toast({ type: "error", message: firstError ?? "Hiçbir kayıt oluşturulamadı. Lütfen tekrar deneyin." });
         }
 
         setIsSaving(false);
