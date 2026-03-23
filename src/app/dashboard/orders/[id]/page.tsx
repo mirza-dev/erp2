@@ -93,13 +93,13 @@ export default function OrderDetailPage() {
                 body: JSON.stringify({ order_id: params.id }),
             });
             if (res.ok) {
-                toast({ type: "success", message: "AI skorlama tamamland\u0131" });
+                toast({ type: "success", message: "AI skorlama tamamlandı" });
                 await refetchOrder();
             } else {
-                toast({ type: "error", message: "Skorlama ba\u015far\u0131s\u0131z" });
+                toast({ type: "error", message: "Skorlama başarısız" });
             }
         } catch {
-            toast({ type: "error", message: "Skorlama ba\u015far\u0131s\u0131z" });
+            toast({ type: "error", message: "Skorlama başarısız" });
         } finally {
             setRescoring(false);
         }
@@ -319,9 +319,9 @@ export default function OrderDetailPage() {
                         {order.aiConfidence != null && order.aiConfidence > 0 && (() => {
                             const risk = order.aiRiskLevel ?? "medium";
                             const riskColors = {
-                                low:    { bg: "var(--success-bg)", text: "var(--success-text)", border: "var(--success-border)", label: "D\u00fc\u015f\u00fck Risk" },
+                                low:    { bg: "var(--success-bg)", text: "var(--success-text)", border: "var(--success-border)", label: "Düşük Risk" },
                                 medium: { bg: "var(--warning-bg)", text: "var(--warning-text)", border: "var(--warning-border)", label: "Orta Risk" },
-                                high:   { bg: "var(--danger-bg)",  text: "var(--danger-text)",  border: "var(--danger-border)",  label: "Y\u00fcksek Risk" },
+                                high:   { bg: "var(--danger-bg)",  text: "var(--danger-text)",  border: "var(--danger-border)",  label: "Yüksek Risk" },
                             };
                             const rc = riskColors[risk];
                             return (
@@ -333,7 +333,7 @@ export default function OrderDetailPage() {
                                         cursor: order.aiReason ? "help" : "default",
                                     }}
                                 >
-                                    {rc.label} \u00b7 %{Math.round(order.aiConfidence * 100)}
+                                    {rc.label} · %{Math.round(order.aiConfidence * 100)}
                                 </span>
                             );
                         })()}
@@ -349,7 +349,7 @@ export default function OrderDetailPage() {
                                     opacity: rescoring ? 0.5 : 1,
                                 }}
                             >
-                                {rescoring ? "..." : "\u21bb Skorla"}
+                                {rescoring ? "..." : "↻ Skorla"}
                             </button>
                         )}
                     </div>

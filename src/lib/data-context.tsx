@@ -129,7 +129,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       const failed = [productsRes, customersRes, ordersRes, productionRes].find(r => !r.ok);
       if (failed) {
-        setLoadError(`Veriler y\u00fcklenemedi (HTTP ${failed.status}). Backend ba\u011flant\u0131s\u0131n\u0131 kontrol edin.`);
+        setLoadError(`Veriler yüklenemedi (HTTP ${failed.status}). Backend bağlantısını kontrol edin.`);
       }
 
       if (productsRes.ok) {
@@ -158,7 +158,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setActiveAlertCount(activeAlerts.length);
       }
     } catch (err) {
-      setLoadError("Sunucuya ba\u011flanamad\u0131. A\u011f ba\u011flant\u0131n\u0131z\u0131 ve backend durumunu kontrol edin.");
+      setLoadError("Sunucuya bağlanamadı. Ağ bağlantınızı ve backend durumunu kontrol edin.");
       console.error("Failed to fetch initial data:", err);
     }
   }, []);

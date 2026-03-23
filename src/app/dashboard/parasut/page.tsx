@@ -47,7 +47,7 @@ export default function ParasutPage() {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
     const [syncStep, setSyncStep] = useState(0);
     const [syncProgress, setSyncProgress] = useState(0);
-    const [lastSyncTime, setLastSyncTime] = useState("17 Mar 2026 \u00b7 14:30");
+    const [lastSyncTime, setLastSyncTime] = useState("17 Mar 2026 · 14:30");
     const [logs, setLogs] = useState<IntegrationSyncLogRow[]>([]);
     const [stats, setStats] = useState<ParasutStats>({ customers: 0, synced_invoices: 0, pending_syncs: 0, failed_syncs: 0 });
     const [syncedOrders, setSyncedOrders] = useState<SalesOrderRow[]>([]);
@@ -99,7 +99,7 @@ export default function ParasutPage() {
 
                 const now = new Date();
                 const timeLabel = now.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })
-                    + " \u00b7 " + now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+                    + " · " + now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
                 setLastSyncTime(timeLabel);
 
                 // Refetch all data
@@ -142,12 +142,12 @@ export default function ParasutPage() {
         }
     };
 
-    const syncStepLabel = ["", "Cariler sync ediliyor...", "Faturalar sync ediliyor...", "\u00d6demeler sync ediliyor..."][syncStep] || "";
+    const syncStepLabel = ["", "Cariler sync ediliyor...", "Faturalar sync ediliyor...", "Ödemeler sync ediliyor..."][syncStep] || "";
 
     const scopeCards = useMemo(() => [
         { label: "Cariler", count: stats.customers, unit: "cari" },
         { label: "Faturalar", count: stats.synced_invoices, unit: "fatura" },
-        { label: "Bekleyen", count: stats.pending_syncs, unit: "sipari\u015f" },
+        { label: "Bekleyen", count: stats.pending_syncs, unit: "sipariş" },
     ], [stats]);
 
     return (
@@ -166,10 +166,10 @@ export default function ParasutPage() {
             >
                 <div>
                     <h1 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Para\u015F\u00FCt Muhasebe Entegrasyonu
+                        Paraşüt Muhasebe Entegrasyonu
                     </h1>
                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                        api.parasut.com \u00b7 Otomatik sync: her 6 saatte bir
+                        api.parasut.com · Otomatik sync: her 6 saatte bir
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -187,7 +187,7 @@ export default function ParasutPage() {
                             opacity: connection === "disconnected" ? 0.5 : 1,
                         }}
                     >
-                        {syncStatus === "syncing" ? "Sync ediliyor..." : "\u25b6 Manuel Sync"}
+                        {syncStatus === "syncing" ? "Sync ediliyor..." : "▶ Manuel Sync"}
                     </button>
                     <button
                         onClick={() => {
@@ -195,7 +195,7 @@ export default function ParasutPage() {
                             setConnection(next);
                             toast({
                                 type: next === "connected" ? "success" : "warning",
-                                message: next === "connected" ? "Para\u015F\u00FCt ba\u011Flant\u0131s\u0131 kuruldu" : "Para\u015F\u00FCt ba\u011Flant\u0131s\u0131 kesildi",
+                                message: next === "connected" ? "Paraşüt bağlantısı kuruldu" : "Paraşüt bağlantısı kesildi",
                             });
                         }}
                         style={{
@@ -208,7 +208,7 @@ export default function ParasutPage() {
                             cursor: "pointer",
                         }}
                     >
-                        {connection === "connected" ? "Ba\u011Flant\u0131y\u0131 Kes" : "Ba\u011Flan"}
+                        {connection === "connected" ? "Bağlantıyı Kes" : "Bağlan"}
                     </button>
                 </div>
             </div>
@@ -244,17 +244,17 @@ export default function ParasutPage() {
                                     color: connection === "connected" ? "var(--success-text)" : "var(--danger-text)",
                                 }}
                             >
-                                {connection === "connected" ? "Ba\u011Fl\u0131" : "Ba\u011Flant\u0131 Yok"}
+                                {connection === "connected" ? "Bağlı" : "Bağlantı Yok"}
                             </span>
                             <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                api.parasut.com \u00b7 Son sync: {lastSyncTime}
+                                api.parasut.com · Son sync: {lastSyncTime}
                             </span>
                         </div>
                         <button
                             onClick={() => {
                                 const next = !showCredentials;
                                 setShowCredentials(next);
-                                toast({ type: "info", message: next ? "API kimlik bilgileri g\u00f6sterildi" : "API kimlik bilgileri gizlendi" });
+                                toast({ type: "info", message: next ? "API kimlik bilgileri gösterildi" : "API kimlik bilgileri gizlendi" });
                             }}
                             style={{
                                 fontSize: "11px",
@@ -266,7 +266,7 @@ export default function ParasutPage() {
                                 cursor: "pointer",
                             }}
                         >
-                            {showCredentials ? "Gizle" : "G\u00f6ster"}
+                            {showCredentials ? "Gizle" : "Göster"}
                         </button>
                     </div>
 
@@ -315,7 +315,7 @@ export default function ParasutPage() {
                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                             <span style={{ fontSize: "13px", color: syncStatus === "done" ? "var(--success-text)" : "var(--warning-text)", fontWeight: 500 }}>
                                 {syncStatus === "done"
-                                    ? "\u2713 Sync tamamland\u0131"
+                                    ? "✓ Sync tamamlandı"
                                     : syncStepLabel}
                             </span>
                             <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
@@ -407,24 +407,24 @@ export default function ParasutPage() {
                             Son Faturalar
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                            Otomatik g\u00f6nderilen \u00b7 {syncedOrders.length} fatura
+                            Otomatik gönderilen · {syncedOrders.length} fatura
                         </div>
                     </div>
 
                     {syncedOrders.length === 0 ? (
                         <div style={{ padding: "20px 16px", fontSize: "12px", color: "var(--text-tertiary)", textAlign: "center" }}>
-                            Hen\u00fcz otomatik g\u00f6nderilen fatura yok. Bir sipari\u015F &quot;Sevk Edildi&quot; durumuna ge\u00e7ince buraya eklenir.
+                            Henüz otomatik gönderilen fatura yok. Bir sipariş &quot;Sevk Edildi&quot; durumuna geçince buraya eklenir.
                         </div>
                     ) : (
                         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "560px" }}>
                             <thead>
                                 <tr>
                                     <th style={thStyle}>Fatura No</th>
-                                    <th style={thStyle}>Sipari\u015F No</th>
-                                    <th style={thStyle}>M\u00fc\u015Fteri</th>
+                                    <th style={thStyle}>Sipariş No</th>
+                                    <th style={thStyle}>Müşteri</th>
                                     <th style={{ ...thStyle, textAlign: "right" }}>Tutar</th>
-                                    <th style={{ ...thStyle, textAlign: "right" }}>D\u00f6viz</th>
-                                    <th style={{ ...thStyle, textAlign: "right" }}>G\u00f6nderim</th>
+                                    <th style={{ ...thStyle, textAlign: "right" }}>Döviz</th>
+                                    <th style={{ ...thStyle, textAlign: "right" }}>Gönderim</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -447,7 +447,7 @@ export default function ParasutPage() {
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right" }}>
                                             <span style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--text-tertiary)" }}>
-                                                {order.parasut_sent_at ? formatDateTime(order.parasut_sent_at) : "\u2014"}
+                                                {order.parasut_sent_at ? formatDateTime(order.parasut_sent_at) : "—"}
                                             </span>
                                         </td>
                                     </tr>
@@ -475,15 +475,15 @@ export default function ParasutPage() {
                             color: "var(--text-secondary)",
                         }}
                     >
-                        Sync Ge\u00e7mi\u015Fi
+                        Sync Geçmişi
                     </div>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "520px" }}>
                         <thead>
                             <tr>
                                 <th style={thStyle}>Tarih</th>
-                                <th style={thStyle}>Sonu\u00e7</th>
+                                <th style={thStyle}>Sonuç</th>
                                 <th style={thStyle}>Entity</th>
-                                <th style={thStyle}>D\u0131\u015f ID</th>
+                                <th style={thStyle}>Dış ID</th>
                                 <th style={thStyle}>Hata</th>
                                 <th style={{ ...thStyle, textAlign: "center" }}>Aksyon</th>
                             </tr>
@@ -492,7 +492,7 @@ export default function ParasutPage() {
                             {logs.length === 0 ? (
                                 <tr>
                                     <td colSpan={6} style={{ ...tdStyle, textAlign: "center", color: "var(--text-tertiary)" }}>
-                                        Hen\u00fcz sync ge\u00e7mi\u015fi yok
+                                        Henüz sync geçmişi yok
                                     </td>
                                 </tr>
                             ) : (
@@ -515,28 +515,28 @@ export default function ParasutPage() {
                                             </td>
                                             <td style={tdStyle}>
                                                 {isSuccess ? (
-                                                    <span style={{ color: "var(--success-text)", fontSize: "12px" }}>{"\u2713"} Ba\u015far\u0131l\u0131</span>
+                                                    <span style={{ color: "var(--success-text)", fontSize: "12px" }}>{"✓"} Başarılı</span>
                                                 ) : (
-                                                    <span style={{ color: "var(--danger-text)", fontSize: "12px" }}>{"\u2715"} Hata</span>
+                                                    <span style={{ color: "var(--danger-text)", fontSize: "12px" }}>{"✕"} Hata</span>
                                                 )}
                                             </td>
                                             <td style={{ ...tdStyle, fontSize: "12px", color: "var(--text-secondary)" }}>
                                                 {log.entity_type}
                                             </td>
                                             <td style={{ ...tdStyle, fontSize: "12px", color: "var(--text-secondary)" }}>
-                                                {log.external_id || "\u2014"}
+                                                {log.external_id || "—"}
                                             </td>
                                             <td style={{ ...tdStyle, fontSize: "11px", color: "var(--danger-text)", maxWidth: "200px" }}>
                                                 {log.error_message ? (
                                                     <span
                                                         onClick={() => setExpandedError(isExpanded ? null : log.id)}
                                                         style={{ cursor: "pointer" }}
-                                                        title={isExpanded ? "K\u00fc\u00e7\u00fclt" : "Geni\u015flet"}
+                                                        title={isExpanded ? "Küçült" : "Genişlet"}
                                                     >
                                                         {isExpanded ? log.error_message : log.error_message.substring(0, 80)}
-                                                        {!isExpanded && log.error_message.length > 80 && "\u2026"}
+                                                        {!isExpanded && log.error_message.length > 80 && "…"}
                                                     </span>
-                                                ) : "\u2014"}
+                                                ) : "—"}
                                             </td>
                                             <td style={{ ...tdStyle, textAlign: "center" }}>
                                                 {isError && (
@@ -559,7 +559,7 @@ export default function ParasutPage() {
                                                                 opacity: retryingId === log.id ? 0.5 : 1,
                                                             }}
                                                         >
-                                                            {retryingId === log.id ? "..." : `\u21bb Dene (${log.retry_count ?? 0}/3)`}
+                                                            {retryingId === log.id ? "..." : `↻ Dene (${log.retry_count ?? 0}/3)`}
                                                         </button>
                                                     )
                                                 )}

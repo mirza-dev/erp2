@@ -105,7 +105,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: product.id });
 
             } else if (draft.entity_type === "order") {
-                // \u00a79.2: import creates DRAFT orders \u2014 never approved
+                // §9.2: import creates DRAFT orders — never approved
                 const customerName = String(data.customer_name ?? data.musteri ?? "");
                 const customer = customerName
                     ? await dbFindCustomerByName(customerName)
@@ -117,9 +117,9 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 const order = await serviceCreateOrder({
                     customer_id: customer?.id,
-                    customer_name: customerName || "Bilinmeyen M\u00fc\u015fteri",
+                    customer_name: customerName || "Bilinmeyen Müşteri",
                     currency: String(data.currency ?? "USD"),
-                    notes: `\u0130\u00e7e aktar\u0131m batch: ${batchId}`,
+                    notes: `İçe aktarım batch: ${batchId}`,
                     commercial_status: "draft",
                     fulfillment_status: "unallocated",
                     subtotal,
@@ -130,7 +130,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: order.id });
 
             } else if (draft.entity_type === "order_line" || draft.entity_type === "stock") {
-                // Order lines and stock updates are informational \u2014 mark merged
+                // Order lines and stock updates are informational — mark merged
                 await dbUpdateDraft(draft.id, { status: "merged" });
             }
 
