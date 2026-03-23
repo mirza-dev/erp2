@@ -417,8 +417,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
         return newId;
       }
-      const errBody = await res.text().catch(() => "");
-      throw new Error(errBody || "Sipariş oluşturulamadı.");
+      const errJson = await res.json().catch(() => null);
+      const errMsg =
+        errJson?.errors?.join(", ") ||
+        errJson?.error ||
+        "Sipariş oluşturulamadı.";
+      throw new Error(errMsg);
     } catch (err) {
       console.error("addOrder failed:", err);
       throw err;

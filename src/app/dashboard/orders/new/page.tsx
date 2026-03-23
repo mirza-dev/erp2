@@ -122,16 +122,17 @@ function NewOrderForm() {
     const grandTotal = subtotal + vat;
 
     const filledLines = lines.filter(l => l.product !== null).length;
-    const canSubmit = selectedCustomer !== null && filledLines > 0;
+    const canSubmit = selectedCustomer !== null && filledLines > 0 && grandTotal > 0;
 
     const blockReasons: string[] = [];
     if (!selectedCustomer) blockReasons.push("Müşteri seçilmedi");
     if (filledLines === 0)  blockReasons.push("En az 1 ürün gerekli");
+    if (filledLines > 0 && grandTotal <= 0) blockReasons.push("Sipariş tutarı 0'dan büyük olmalı");
     const disabledReasonText = blockReasons.join(" · ");
 
     const buildAndSave = async (mode: "draft" | "pending_approval") => {
         setSubmitAttempted(true);
-        if (!selectedCustomer || filledLines === 0) return;
+        if (!canSubmit) return;
         setIsSubmitting(true);
         try {
             const orderLines: OrderLineItem[] = lines
