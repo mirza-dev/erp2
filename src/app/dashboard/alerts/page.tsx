@@ -34,7 +34,7 @@ const severityColors: Record<AlertSeverity, { dot: string; bg: string; border: s
         bg: "var(--danger-bg)",
         border: "var(--danger-border)",
         text: "var(--danger-text)",
-        badge: "KR\u0130T\u0130K",
+        badge: "KRİTİK",
     },
     warning: {
         dot: "var(--warning)",
@@ -48,7 +48,7 @@ const severityColors: Record<AlertSeverity, { dot: string; bg: string; border: s
         bg: "var(--accent-bg)",
         border: "var(--accent-border)",
         text: "var(--accent-text)",
-        badge: "AI \u00d6NER\u0130",
+        badge: "AI ÖNERİ",
     },
 };
 
@@ -76,10 +76,10 @@ function formatRelativeTime(isoString: string): string {
     const diff = Date.now() - new Date(isoString).getTime();
     const hours = Math.floor(diff / 3600000);
     const minutes = Math.floor(diff / 60000);
-    if (hours >= 24) return `${Math.floor(hours / 24)} g\u00fcn \u00f6nce`;
-    if (hours >= 1) return `${hours} saat \u00f6nce`;
-    if (minutes >= 1) return `${minutes} dk \u00f6nce`;
-    return "az \u00f6nce";
+    if (hours >= 24) return `${Math.floor(hours / 24)} gün önce`;
+    if (hours >= 1) return `${hours} saat önce`;
+    if (minutes >= 1) return `${minutes} dk önce`;
+    return "az önce";
 }
 
 export default function AlertsPage() {
@@ -88,25 +88,23 @@ export default function AlertsPage() {
     const { products } = useData();
     const [alerts, setAlerts] = useState<Alert[]>([]);
     const [filter, setFilter] = useState<"all" | AlertCategory>("all");
-    const [lastRefreshed, setLastRefreshed] = useState("az \u00f6nce");
+    const [lastRefreshed, setLastRefreshed] = useState("az önce");
     const [refreshing, setRefreshing] = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
+
+    const refetchAlerts = async () => {
+        const res = await fetch("/api/alerts");
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) {
+                setAlerts(data.map(mapAlertRow));
+            }
+        }
+    };
 
     // Fetch alerts from API on mount
     useEffect(() => {
-        const fetchAlerts = async () => {
-            try {
-                const res = await fetch("/api/alerts");
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data)) {
-                        setAlerts(data.map(mapAlertRow));
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to fetch alerts:", err);
-            }
-        };
-        fetchAlerts();
+        refetchAlerts().catch(err => console.error("Failed to fetch alerts:", err));
     }, []);
 
     const dismiss = async (id: string) => {
@@ -118,7 +116,7 @@ export default function AlertsPage() {
             });
         } catch { /* optimistic — ignore */ }
         setAlerts((prev) => prev.filter((a) => a.id !== id));
-        toast({ type: "info", message: "Uyar\u0131 kapat\u0131ld\u0131" });
+        toast({ type: "info", message: "Uyarı kapatıldı" });
     };
 
     const handleRefresh = async () => {
@@ -127,14 +125,7 @@ export default function AlertsPage() {
         try {
             const res = await fetch("/api/alerts/scan", { method: "POST" });
             if (res.ok) {
-                // Refetch alerts
-                const alertsRes = await fetch("/api/alerts");
-                if (alertsRes.ok) {
-                    const data = await alertsRes.json();
-                    if (Array.isArray(data)) {
-                        setAlerts(data.map(mapAlertRow));
-                    }
-                }
+                await refetchAlerts();
             }
         } catch (err) {
             console.error("Refresh failed:", err);
@@ -143,7 +134,28 @@ export default function AlertsPage() {
             setLastRefreshed(
                 new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
             );
-            toast({ type: "success", message: "Uyar\u0131lar g\u00fcncellendi" });
+            toast({ type: "success", message: "Uyarılar güncellendi" });
+        }
+    };
+
+    const handleAiSuggest = async () => {
+        if (aiGenerating) return;
+        setAiGenerating(true);
+        try {
+            const res = await fetch("/api/alerts/ai-suggest", { method: "POST" });
+            const data = await res.json();
+            if (!data.ai_available) {
+                toast({ type: "warning", message: "AI servisi yapılandırılmamış (ANTHROPIC_API_KEY gerekli)" });
+                return;
+            }
+            await refetchAlerts();
+            setFilter("ai");
+            toast({ type: "success", message: `${data.created} AI önerisi oluşturuldu` });
+        } catch (err) {
+            console.error("AI suggest failed:", err);
+            toast({ type: "error", message: "AI önerisi oluşturulamadı" });
+        } finally {
+            setAiGenerating(false);
         }
     };
 
@@ -181,31 +193,53 @@ export default function AlertsPage() {
                             margin: 0,
                         }}
                     >
-                        \u00dcretim & Stok Uyar\u0131lar\u0131
+                        Üretim & Stok Uyarıları
                     </h1>
                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                        Son g\u00fcncelleme: {lastRefreshed}
+                        Son güncelleme: {lastRefreshed}
                     </div>
                 </div>
-                <button
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    style={{
-                        fontSize: "12px",
-                        padding: "6px 14px",
-                        border: "0.5px solid var(--border-secondary)",
-                        borderRadius: "6px",
-                        background: "transparent",
-                        color: "var(--text-secondary)",
-                        cursor: refreshing ? "not-allowed" : "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        opacity: refreshing ? 0.6 : 1,
-                    }}
-                >
-                    {refreshing ? "Y\u00fckleniyor..." : "\u21bb Yenile"}
-                </button>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <button
+                        onClick={handleAiSuggest}
+                        disabled={aiGenerating}
+                        style={{
+                            fontSize: "12px",
+                            padding: "6px 14px",
+                            border: "0.5px solid var(--accent-border)",
+                            borderRadius: "6px",
+                            background: "var(--accent-bg)",
+                            color: "var(--accent-text)",
+                            cursor: aiGenerating ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            opacity: aiGenerating ? 0.6 : 1,
+                            fontWeight: 500,
+                        }}
+                    >
+                        {aiGenerating ? "Analiz ediliyor..." : "✦ AI Öneri Oluştur"}
+                    </button>
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        style={{
+                            fontSize: "12px",
+                            padding: "6px 14px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "6px",
+                            background: "transparent",
+                            color: "var(--text-secondary)",
+                            cursor: refreshing ? "not-allowed" : "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            opacity: refreshing ? 0.6 : 1,
+                        }}
+                    >
+                        {refreshing ? "Yükleniyor..." : "↻ Yenile"}
+                    </button>
+                </div>
             </div>
 
             {/* Summary Badges */}
@@ -219,8 +253,8 @@ export default function AlertsPage() {
             >
                 {[
                     { label: "Kritik", count: criticalCount, severity: "critical" as AlertSeverity },
-                    { label: "Uyar\u0131", count: warningCount, severity: "warning" as AlertSeverity },
-                    { label: "AI \u00d6neri", count: infoCount, severity: "info" as AlertSeverity },
+                    { label: "Uyarı", count: warningCount, severity: "warning" as AlertSeverity },
+                    { label: "AI Öneri", count: infoCount, severity: "info" as AlertSeverity },
                 ].map(({ label, count, severity }) => (
                     <div
                         key={severity}
@@ -275,10 +309,10 @@ export default function AlertsPage() {
                     >
                         {(
                             [
-                                { key: "all", label: "T\u00fcm\u00fc", count: alerts.length },
+                                { key: "all", label: "Tümü", count: alerts.length },
                                 { key: "stock", label: "Stok", count: alerts.filter((a) => a.category === "stock").length },
-                                { key: "order", label: "Sipari\u015F", count: alerts.filter((a) => a.category === "order").length },
-                                { key: "ai", label: "AI \u00d6nerileri", count: alerts.filter((a) => a.category === "ai").length },
+                                { key: "order", label: "Sipariş", count: alerts.filter((a) => a.category === "order").length },
+                                { key: "ai", label: "AI Önerileri", count: alerts.filter((a) => a.category === "ai").length },
                             ] as { key: "all" | AlertCategory; label: string; count: number }[]
                         ).map(({ key, label, count }) => (
                             <button
@@ -329,7 +363,30 @@ export default function AlertsPage() {
                                     fontSize: "13px",
                                 }}
                             >
-                                Bu kategoride uyar\u0131 yok.
+                                {filter === "ai" ? (
+                                    <div>
+                                        <div style={{ marginBottom: "12px" }}>Henüz AI önerisi yok.</div>
+                                        <button
+                                            onClick={handleAiSuggest}
+                                            disabled={aiGenerating}
+                                            style={{
+                                                fontSize: "12px",
+                                                padding: "6px 14px",
+                                                border: "0.5px solid var(--accent-border)",
+                                                borderRadius: "6px",
+                                                background: "var(--accent-bg)",
+                                                color: "var(--accent-text)",
+                                                cursor: aiGenerating ? "not-allowed" : "pointer",
+                                                fontWeight: 500,
+                                                opacity: aiGenerating ? 0.6 : 1,
+                                            }}
+                                        >
+                                            {aiGenerating ? "Analiz ediliyor..." : "✦ AI Öneri Oluştur"}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    "Bu kategoride uyarı yok."
+                                )}
                             </div>
                         )}
                         {filtered.map((alert) => {
@@ -385,7 +442,7 @@ export default function AlertsPage() {
                                                     }}
                                                 >
                                                     {alert.source === "ai" && alert.aiConfidence
-                                                        ? `AI \u00d6NER\u0130 (%${Math.round(alert.aiConfidence * 100)})`
+                                                        ? `AI ÖNERİ (%${Math.round(alert.aiConfidence * 100)})`
                                                         : colors.badge}
                                                 </span>
                                                 <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
@@ -445,7 +502,7 @@ export default function AlertsPage() {
                                                             cursor: "pointer",
                                                         }}
                                                     >
-                                                        {alert.actionLabel} {"\u2192"}
+                                                        {alert.actionLabel} {"→"}
                                                     </Link>
                                                 ) : (
                                                     <button
@@ -464,7 +521,7 @@ export default function AlertsPage() {
                                                             cursor: "pointer",
                                                         }}
                                                     >
-                                                        {alert.actionLabel} {"\u2192"}
+                                                        {alert.actionLabel} {"→"}
                                                     </button>
                                                 )
                                             )}
@@ -634,7 +691,7 @@ export default function AlertsPage() {
                                     marginBottom: "6px",
                                 }}
                             >
-                                {lowStockProducts.length} \u00fcr\u00fcn kritik seviyenin alt\u0131nda
+                                {lowStockProducts.length} ürün kritik seviyenin altında
                             </div>
                             {lowStockProducts.map((p) => (
                                 <div
@@ -645,7 +702,7 @@ export default function AlertsPage() {
                                         marginBottom: "2px",
                                     }}
                                 >
-                                    \u00b7 {p.sku}: {p.available_now}/{p.minStockLevel} adet
+                                    · {p.sku}: {p.available_now}/{p.minStockLevel} adet
                                 </div>
                             ))}
                         </div>

@@ -66,9 +66,11 @@ function FormField({ label, required, children }: { label: string; required?: bo
 }
 
 export default function ProductsPage() {
-    const { products: mockProducts, addProduct, loadError } = useData();
+    const { products: mockProducts, addProduct, deleteProduct, loadError } = useData();
     const { toast } = useToast();
     const [search, setSearch] = useState("");
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [activeCategory, setActiveCategory] = useState("Tümü");
     const [createOpen, setCreateOpen] = useState(false);
     const [createForm, setCreateForm] = useState<{
@@ -107,6 +109,20 @@ export default function ProductsPage() {
     categories.slice(1).forEach(cat => {
         categoryCounts[cat] = mockProducts.filter(p => p.category === cat).length;
     });
+
+    const handleDelete = async (id: string) => {
+        setDeletingId(id);
+        try {
+            await deleteProduct(id);
+            toast({ type: "success", message: "Ürün silindi" });
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Ürün silinemedi.";
+            toast({ type: "error", message: msg });
+        } finally {
+            setDeletingId(null);
+            setConfirmDeleteId(null);
+        }
+    };
 
     const handleCreate = async () => {
         if (!createForm.name.trim() || !createForm.sku.trim()) return;
@@ -250,6 +266,7 @@ export default function ProductsPage() {
                             <th style={{ ...thStyle, textAlign: "right" }}>Rezerve</th>
                             <th style={{ ...thStyle, textAlign: "right" }}>Satılabilir</th>
                             <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
+                            <th style={{ ...thStyle, width: "120px" }}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -296,6 +313,68 @@ export default function ProductsPage() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center" }}>
                                         <span className={`badge ${status.cls}`}>{status.label}</span>
+                                    </td>
+                                    <td
+                                        style={{ ...tdStyle, textAlign: "right", paddingRight: "12px" }}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        {confirmDeleteId === product.id ? (
+                                            <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Emin misin?</span>
+                                                <button
+                                                    disabled={deletingId === product.id}
+                                                    onClick={() => handleDelete(product.id)}
+                                                    style={{
+                                                        fontSize: "11px",
+                                                        padding: "2px 8px",
+                                                        border: "0.5px solid var(--danger-border)",
+                                                        borderRadius: "4px",
+                                                        background: "var(--danger-bg)",
+                                                        color: "var(--danger-text)",
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    {deletingId === product.id ? "…" : "Evet"}
+                                                </button>
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(null)}
+                                                    style={{
+                                                        fontSize: "11px",
+                                                        padding: "2px 8px",
+                                                        border: "0.5px solid var(--border-secondary)",
+                                                        borderRadius: "4px",
+                                                        background: "transparent",
+                                                        color: "var(--text-secondary)",
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    Hayır
+                                                </button>
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => setConfirmDeleteId(product.id)}
+                                                style={{
+                                                    fontSize: "11px",
+                                                    padding: "2px 8px",
+                                                    border: "0.5px solid var(--border-secondary)",
+                                                    borderRadius: "4px",
+                                                    background: "transparent",
+                                                    color: "var(--text-tertiary)",
+                                                    cursor: "pointer",
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.borderColor = "var(--danger-border)";
+                                                    e.currentTarget.style.color = "var(--danger-text)";
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.borderColor = "var(--border-secondary)";
+                                                    e.currentTarget.style.color = "var(--text-tertiary)";
+                                                }}
+                                            >
+                                                Sil
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             );

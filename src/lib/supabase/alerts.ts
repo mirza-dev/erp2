@@ -9,6 +9,10 @@ export interface CreateAlertInput {
     entity_type?: string;
     entity_id?: string;
     ai_inputs_summary?: Record<string, unknown>;
+    source?: "system" | "ai" | "ui";
+    ai_confidence?: number;
+    ai_reason?: string;
+    ai_model_version?: string;
 }
 
 export interface ListAlertsFilter {
@@ -72,7 +76,10 @@ export async function dbCreateAlert(input: CreateAlertInput): Promise<AlertRow> 
             entity_id: input.entity_id ?? null,
             ai_inputs_summary: input.ai_inputs_summary ?? null,
             status: "open",
-            source: "system",
+            source: input.source ?? "system",
+            ai_confidence: input.ai_confidence ?? null,
+            ai_reason: input.ai_reason ?? null,
+            ai_model_version: input.ai_model_version ?? null,
         })
         .select("*")
         .single();
@@ -97,6 +104,20 @@ export async function dbUpdateAlertStatus(
         .from("alerts").update(updates).eq("id", id).select("*").single();
     if (error || !data) throw new Error(error?.message ?? "Alert update failed");
     return data;
+}
+
+/** Dismiss all open alerts from a given source (e.g. "ai") */
+export async function dbDismissAlertsBySource(source: "system" | "ai" | "ui"): Promise<number> {
+    const supabase = createServiceClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+        .from("alerts")
+        .update({ status: "dismissed", dismissed_at: now, resolution_reason: "replaced_by_new_generation" })
+        .eq("source", source)
+        .eq("status", "open")
+        .select("id");
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
 }
 
 /** Resolve all open alerts of a given type for an entity (stock recovered) */

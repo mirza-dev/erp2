@@ -77,9 +77,11 @@ interface DataContextValue {
     c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">
   ) => Promise<void>;
   updateCustomer: (id: string, updates: Partial<Customer>) => void;
+  deleteCustomer: (id: string) => Promise<void>;
   addProduct: (
     p: Omit<Product, "id" | "reserved" | "available_now" | "isActive">
   ) => Promise<void>;
+  deleteProduct: (id: string) => Promise<void>;
   addUretimKaydi: (k: Omit<UretimKaydi, "id">) => Promise<{ refetchFailed?: boolean }>;
   deleteUretimKaydi: (id: string) => Promise<{ refetchFailed?: boolean }>;
   addOrder: (
@@ -227,6 +229,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
     );
   };
 
+  const deleteCustomer = async (id: string) => {
+    const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(errBody?.error ?? "Müşteri silinemedi.");
+    }
+    setCustomers((prev) => prev.filter((c) => c.id !== id));
+  };
+
   // ── Products ─────────────────────────────────────────────
 
   const addProduct = async (
@@ -263,6 +274,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error("addProduct failed:", err);
       throw err;
     }
+  };
+
+  const deleteProduct = async (id: string) => {
+    const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(errBody?.error ?? "Ürün silinemedi.");
+    }
+    setProducts((prev) => prev.filter((p) => p.id !== id));
   };
 
   // ── Production (Uretim) ──────────────────────────────────
@@ -388,9 +408,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
-        const newOrder = mapOrderSummary(data.order ?? data);
-        setOrders((prev) => [newOrder, ...prev]);
-        return newOrder.id;
+        const newId: string = (data.order ?? data).id;
+        // Refetch full list so all fields are populated correctly
+        const ordersRes = await fetch("/api/orders");
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json();
+          setOrders(Array.isArray(ordersData) ? ordersData.map(mapOrderSummary) : []);
+        }
+        return newId;
       }
       const errBody = await res.text().catch(() => "");
       throw new Error(errBody || "Sipariş oluşturulamadı.");
@@ -469,7 +494,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         importedCount,
         addCustomer,
         updateCustomer,
+        deleteCustomer,
         addProduct,
+        deleteProduct,
         addUretimKaydi,
         deleteUretimKaydi,
         addOrder,

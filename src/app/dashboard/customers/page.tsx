@@ -50,7 +50,7 @@ const modalLabelStyle: React.CSSProperties = {
 };
 
 export default function CustomersPage() {
-    const { customers: mockCustomers, addCustomer, loadError } = useData();
+    const { customers: mockCustomers, addCustomer, deleteCustomer, loadError } = useData();
     const { toast } = useToast();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [search, setSearch] = useState("");
@@ -58,10 +58,27 @@ export default function CustomersPage() {
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCustomer, setNewCustomer] = useState(newCustomerInitial);
     const [isAdding, setIsAdding] = useState(false);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     const setField = (key: keyof typeof newCustomerInitial) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
             setNewCustomer(f => ({ ...f, [key]: e.target.value }));
+
+    const handleDelete = async (id: string) => {
+        setDeletingId(id);
+        try {
+            await deleteCustomer(id);
+            toast({ type: "success", message: "Müşteri silindi" });
+            if (selectedCustomer?.id === id) setSelectedCustomer(null);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Müşteri silinemedi.";
+            toast({ type: "error", message: msg });
+        } finally {
+            setDeletingId(null);
+            setConfirmDeleteId(null);
+        }
+    };
 
     const handleAdd = async () => {
         if (!newCustomer.name || isAdding) return;
@@ -199,6 +216,7 @@ export default function CustomersPage() {
                                 <th style={{ ...thStyle, textAlign: "center" }}>Sipariş</th>
                                 <th style={{ ...thStyle, textAlign: "right" }}>Toplam Gelir</th>
                                 <th style={{ ...thStyle, width: "32px" }}></th>
+                                <th style={{ ...thStyle, width: "120px" }}></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -268,6 +286,68 @@ export default function CustomersPage() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)", fontSize: "16px", paddingRight: "16px" }}>
                                         ›
+                                    </td>
+                                    <td
+                                        style={{ ...tdStyle, textAlign: "right", paddingRight: "12px" }}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        {confirmDeleteId === customer.id ? (
+                                            <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Emin misin?</span>
+                                                <button
+                                                    disabled={deletingId === customer.id}
+                                                    onClick={() => handleDelete(customer.id)}
+                                                    style={{
+                                                        fontSize: "11px",
+                                                        padding: "2px 8px",
+                                                        border: "0.5px solid var(--danger-border)",
+                                                        borderRadius: "4px",
+                                                        background: "var(--danger-bg)",
+                                                        color: "var(--danger-text)",
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    {deletingId === customer.id ? "…" : "Evet"}
+                                                </button>
+                                                <button
+                                                    onClick={() => setConfirmDeleteId(null)}
+                                                    style={{
+                                                        fontSize: "11px",
+                                                        padding: "2px 8px",
+                                                        border: "0.5px solid var(--border-secondary)",
+                                                        borderRadius: "4px",
+                                                        background: "transparent",
+                                                        color: "var(--text-secondary)",
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    Hayır
+                                                </button>
+                                            </span>
+                                        ) : (
+                                            <button
+                                                onClick={() => setConfirmDeleteId(customer.id)}
+                                                style={{
+                                                    fontSize: "11px",
+                                                    padding: "2px 8px",
+                                                    border: "0.5px solid var(--border-secondary)",
+                                                    borderRadius: "4px",
+                                                    background: "transparent",
+                                                    color: "var(--text-tertiary)",
+                                                    cursor: "pointer",
+                                                }}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.borderColor = "var(--danger-border)";
+                                                    e.currentTarget.style.color = "var(--danger-text)";
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.borderColor = "var(--border-secondary)";
+                                                    e.currentTarget.style.color = "var(--text-tertiary)";
+                                                }}
+                                            >
+                                                Sil
+                                            </button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

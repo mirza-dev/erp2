@@ -18,9 +18,19 @@ export async function dbListCustomers(): Promise<CustomerRow[]> {
     const { data, error } = await supabase
         .from("customers")
         .select("*")
+        .eq("is_active", true)
         .order("name");
     if (error) throw new Error(error.message);
     return data ?? [];
+}
+
+export async function dbDeleteCustomer(id: string): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("customers")
+        .update({ is_active: false })
+        .eq("id", id);
+    if (error) throw new Error(error.message);
 }
 
 export async function dbGetCustomerById(id: string): Promise<CustomerRow | null> {

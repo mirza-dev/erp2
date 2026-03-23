@@ -82,7 +82,7 @@ export async function dbCreateProduct(input: CreateProductInput): Promise<Produc
             reorder_qty: input.reorder_qty ?? null,
             preferred_vendor: input.preferred_vendor ?? null,
             daily_usage: input.daily_usage ?? null,
-            lead_time_days: input.lead_time_days ?? null,
+            ...(input.lead_time_days !== undefined ? { lead_time_days: input.lead_time_days } : {}),
         })
         .select("*")
         .single();

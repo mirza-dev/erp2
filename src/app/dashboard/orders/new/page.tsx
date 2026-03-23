@@ -92,8 +92,9 @@ function NewOrderForm() {
     const isMobile = windowWidth < 768;
 
     const filteredCustomers = customers.filter((c: Customer) =>
-        c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-        c.country.toLowerCase().includes(customerSearch.toLowerCase())
+        c.isActive && c.name.trim() &&
+        (c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+        c.country.toLowerCase().includes(customerSearch.toLowerCase()))
     );
 
     // Line operations
