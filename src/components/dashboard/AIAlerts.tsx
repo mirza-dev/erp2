@@ -3,213 +3,205 @@
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
 
-function daysBadgeColor(days: number | null): string {
-    if (days === null) return "var(--warning-text)";
-    if (days <= 7) return "var(--danger-text)";
-    if (days <= 14) return "var(--warning-text)";
-    return "var(--text-secondary)";
+const severityOrder = { critical: 0, warning: 1, info: 2 } as const;
+
+function relativeTime(isoString: string): string {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "az önce";
+  if (mins < 60) return `${mins} dk önce`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} sa önce`;
+  return `${Math.floor(hours / 24)} gün önce`;
 }
 
-function daysBadgeBg(days: number | null): string {
-    if (days === null) return "var(--warning-bg)";
-    if (days <= 7) return "var(--danger-bg)";
-    if (days <= 14) return "var(--warning-bg)";
-    return "var(--bg-tertiary)";
+function severityBorderColor(severity: "critical" | "warning" | "info"): string {
+  if (severity === "critical") return "var(--danger)";
+  if (severity === "warning") return "var(--warning)";
+  return "var(--accent)";
+}
+
+function severityDotColor(severity: "critical" | "warning" | "info"): string {
+  if (severity === "critical") return "var(--danger)";
+  if (severity === "warning") return "var(--warning)";
+  return "var(--accent)";
 }
 
 export default function AIAlerts() {
-    const { reorderSuggestions } = useData();
+  const { openAlerts, loading } = useData();
 
-    // Sort by urgency DESC, then daysLeft ASC
-    const sorted = [...reorderSuggestions].sort((a, b) => {
-        const urgA = (1 - a.available_now / a.minStockLevel);
-        const urgB = (1 - b.available_now / b.minStockLevel);
-        if (urgB !== urgA) return urgB - urgA;
-        const dA = a.dailyUsage ? a.available_now / a.dailyUsage : 999;
-        const dB = b.dailyUsage ? b.available_now / b.dailyUsage : 999;
-        return dA - dB;
-    });
-
-    const top4 = sorted.slice(0, 4);
-
+  if (loading) {
     return (
-        <div
-            style={{
-                background: "var(--bg-primary)",
-                border: "0.5px solid var(--accent-border)",
-                borderRadius: "6px",
-                padding: "16px",
-            }}
-        >
-            {/* Title row */}
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "12px",
-                }}
-            >
-                <div style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: "var(--accent-text)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                }}>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2" />
-                        <path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-                    </svg>
-                    AI Stok Uyarıları
-                </div>
-                {reorderSuggestions.length > 0 && (
-                    <span style={{
-                        fontSize: "11px",
-                        background: "var(--danger-bg)",
-                        color: "var(--danger-text)",
-                        padding: "2px 7px",
-                        borderRadius: "8px",
-                        fontWeight: 600,
-                    }}>
-                        {reorderSuggestions.length} kritik
-                    </span>
-                )}
-            </div>
-
-            {/* Empty state */}
-            {reorderSuggestions.length === 0 && (
-                <div style={{ fontSize: "13px", color: "var(--success-text)", padding: "8px 0" }}>
-                    ✓ Tüm stoklar minimum seviyenin üstünde.
-                </div>
-            )}
-
-            {/* Alert items */}
-            {top4.map((p, i) => {
-                const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
-                const daysLeft = p.dailyUsage ? Math.round(p.available_now / p.dailyUsage) : null;
-                const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
-                const isRaw = p.productType === "raw_material";
-                const borderColor = isRaw ? "var(--danger)" : "var(--warning)";
-
-                return (
-                    <div
-                        key={p.id}
-                        style={{
-                            borderLeft: `3px solid ${borderColor}`,
-                            paddingLeft: "10px",
-                            paddingTop: "8px",
-                            paddingBottom: "8px",
-                            marginBottom: i < top4.length - 1 ? "8px" : 0,
-                            borderBottom: i < top4.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
-                        }}
-                    >
-                        {/* Top row: type chip + name + days badge */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "5px" }}>
-                            <span style={{
-                                fontSize: "10px",
-                                fontWeight: 600,
-                                background: isRaw ? "var(--danger-bg)" : "var(--warning-bg)",
-                                color: isRaw ? "var(--danger-text)" : "var(--warning-text)",
-                                padding: "1px 5px",
-                                borderRadius: "3px",
-                                flexShrink: 0,
-                            }}>
-                                {isRaw ? "Hammadde" : "Bitmiş"}
-                            </span>
-                            <span style={{
-                                fontSize: "12px",
-                                fontWeight: 500,
-                                color: "var(--text-primary)",
-                                flex: 1,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                            }}>
-                                {p.name}
-                            </span>
-                            {daysLeft !== null && (
-                                <span style={{
-                                    fontSize: "11px",
-                                    fontWeight: 700,
-                                    background: daysBadgeBg(daysLeft),
-                                    color: daysBadgeColor(daysLeft),
-                                    padding: "1px 6px",
-                                    borderRadius: "4px",
-                                    flexShrink: 0,
-                                }}>
-                                    {daysLeft} gün
-                                </span>
-                            )}
-                        </div>
-
-                        {/* Stock bar */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                            <div style={{
-                                flex: 1,
-                                height: "4px",
-                                background: "var(--bg-tertiary)",
-                                borderRadius: "2px",
-                                overflow: "hidden",
-                            }}>
-                                <div style={{
-                                    width: `${stockPct}%`,
-                                    height: "100%",
-                                    background: isRaw ? "var(--danger)" : "var(--warning)",
-                                    borderRadius: "2px",
-                                }} />
-                            </div>
-                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)", flexShrink: 0 }}>
-                                {p.available_now}/{p.minStockLevel}
-                            </span>
-                        </div>
-
-                        {/* Risk bar */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)", flexShrink: 0 }}>
-                                Risk
-                            </span>
-                            <div style={{
-                                flex: 1,
-                                height: "3px",
-                                background: "var(--bg-tertiary)",
-                                borderRadius: "2px",
-                                overflow: "hidden",
-                            }}>
-                                <div style={{
-                                    width: `${urgency}%`,
-                                    height: "100%",
-                                    background: urgency >= 80 ? "var(--danger)" : urgency >= 50 ? "var(--warning)" : "var(--accent)",
-                                    borderRadius: "2px",
-                                }} />
-                            </div>
-                            <span style={{ fontSize: "10px", color: "var(--text-secondary)", flexShrink: 0, fontWeight: 600 }}>
-                                {urgency}%
-                            </span>
-                        </div>
-                    </div>
-                );
-            })}
-
-            {/* Footer link */}
-            {reorderSuggestions.length > 0 && (
-                <Link
-                    href="/dashboard/purchase/suggested"
-                    style={{
-                        display: "block",
-                        marginTop: "12px",
-                        fontSize: "12px",
-                        color: "var(--accent-text)",
-                        textDecoration: "none",
-                        textAlign: "center",
-                        padding: "6px",
-                        borderTop: "0.5px solid var(--border-tertiary)",
-                    }}
-                >
-                    Tümünü Gör → ({reorderSuggestions.length} kritik ürün)
-                </Link>
-            )}
+      <div
+        style={{
+          background: "var(--bg-primary)",
+          border: "0.5px solid var(--accent-border)",
+          borderRadius: "6px",
+          padding: "16px",
+        }}
+      >
+        <div style={{
+          fontSize: "13px",
+          fontWeight: 600,
+          color: "var(--accent-text)",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          marginBottom: "12px",
+        }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          Aktif Uyarılar
         </div>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <div
+            key={i}
+            style={{
+              borderLeft: "3px solid var(--bg-tertiary)",
+              paddingLeft: "10px",
+              paddingTop: "8px",
+              paddingBottom: "8px",
+              marginBottom: i < 2 ? "8px" : 0,
+              borderBottom: i < 2 ? "0.5px solid var(--border-tertiary)" : "none",
+            }}
+          >
+            <div style={{ height: "13px", width: "70%", background: "var(--bg-tertiary)", borderRadius: "4px", marginBottom: "6px", animation: "pulse 1.5s ease-in-out infinite" }} />
+            <div style={{ height: "11px", width: "40%", background: "var(--bg-tertiary)", borderRadius: "4px", marginLeft: "12px", animation: "pulse 1.5s ease-in-out infinite", animationDelay: "0.15s" }} />
+          </div>
+        ))}
+      </div>
     );
+  }
+
+  const top4 = [...openAlerts]
+    .sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity])
+    .slice(0, 4);
+
+  return (
+    <div
+      style={{
+        background: "var(--bg-primary)",
+        border: "0.5px solid var(--accent-border)",
+        borderRadius: "6px",
+        padding: "16px",
+      }}
+    >
+      {/* Title row */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "12px",
+        }}
+      >
+        <div style={{
+          fontSize: "13px",
+          fontWeight: 600,
+          color: "var(--accent-text)",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+        }}>
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+          Aktif Uyarılar
+        </div>
+        {openAlerts.length > 0 && (
+          <span style={{
+            fontSize: "11px",
+            background: "var(--danger-bg)",
+            color: "var(--danger-text)",
+            padding: "2px 7px",
+            borderRadius: "8px",
+            fontWeight: 600,
+          }}>
+            {openAlerts.length} açık
+          </span>
+        )}
+      </div>
+
+      {/* Empty state */}
+      {openAlerts.length === 0 && (
+        <div style={{ fontSize: "13px", color: "var(--success-text)", padding: "8px 0" }}>
+          ✓ Aktif uyarı yok.
+        </div>
+      )}
+
+      {/* Alert items */}
+      {top4.map((alert, i) => (
+        <div
+          key={alert.id}
+          style={{
+            borderLeft: `3px solid ${severityBorderColor(alert.severity)}`,
+            paddingLeft: "10px",
+            paddingTop: "8px",
+            paddingBottom: "8px",
+            marginBottom: i < top4.length - 1 ? "8px" : 0,
+            borderBottom: i < top4.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+            <span style={{
+              width: "6px",
+              height: "6px",
+              borderRadius: "50%",
+              background: severityDotColor(alert.severity),
+              flexShrink: 0,
+            }} />
+            <span style={{
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "var(--text-primary)",
+              flex: 1,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}>
+              {alert.title}
+            </span>
+          </div>
+          {alert.description && (
+            <div style={{
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              marginLeft: "12px",
+              marginBottom: "2px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}>
+              {alert.description}
+            </div>
+          )}
+          <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginLeft: "12px" }}>
+            {relativeTime(alert.created_at)}
+          </div>
+        </div>
+      ))}
+
+      {/* Footer link */}
+      {openAlerts.length > 0 && (
+        <Link
+          href="/dashboard/alerts"
+          style={{
+            display: "block",
+            marginTop: "12px",
+            fontSize: "12px",
+            color: "var(--accent-text)",
+            textDecoration: "none",
+            textAlign: "center",
+            padding: "6px",
+            borderTop: "0.5px solid var(--border-tertiary)",
+          }}
+        >
+          Tümünü Gör → ({openAlerts.length} açık uyarı)
+        </Link>
+      )}
+    </div>
+  );
 }

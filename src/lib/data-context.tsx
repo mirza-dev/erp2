@@ -45,6 +45,17 @@ export type FulfillmentStatus =
 
 type OrderTransition = CommercialStatus | "shipped";
 
+export interface OpenAlert {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  description?: string;
+  type: string;
+  source: "system" | "ai" | "ui";
+  created_at: string;
+  entity_id?: string;
+}
+
 export interface ConflictItem {
   productName: string;
   requested: number;
@@ -93,6 +104,8 @@ interface DataContextValue {
   ) => Promise<UpdateStatusResult>;
   reorderSuggestions: Product[];
   activeAlertCount: number;
+  openAlerts: OpenAlert[];
+  loading: boolean;
   loadError: string | null;
   refetchAll: () => Promise<void>;
 }
@@ -112,6 +125,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [importedCount, setImportedCount] =
     useState<DataContextValue["importedCount"]>(null);
   const [activeAlertCount, setActiveAlertCount] = useState(0);
+  const [openAlerts, setOpenAlerts] = useState<OpenAlert[]>([]);
+  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // ── Fetch all lists from API ─────────────────────────────
@@ -152,14 +167,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       if (alertsRes.ok) {
         const data = await alertsRes.json();
-        const activeAlerts = (Array.isArray(data) ? data : []).filter(
+        const open = (Array.isArray(data) ? data : []).filter(
           (a: { status: string }) => a.status === "open"
-        );
-        setActiveAlertCount(activeAlerts.length);
+        ) as OpenAlert[];
+        setActiveAlertCount(open.length);
+        setOpenAlerts(open);
       }
     } catch (err) {
       setLoadError("Sunucuya bağlanamadı. Ağ bağlantınızı ve backend durumunu kontrol edin.");
       console.error("Failed to fetch initial data:", err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -507,6 +525,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         updateOrderStatus,
         reorderSuggestions,
         activeAlertCount,
+        openAlerts,
+        loading,
         loadError,
         refetchAll,
       }}

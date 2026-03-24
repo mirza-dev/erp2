@@ -41,7 +41,7 @@ const tdStyle: React.CSSProperties = {
 };
 
 export default function StockDataGrid({ filterCategory = "", filterStatus = "" }: StockDataGridProps) {
-    const { products } = useData();
+    const { products, loading } = useData();
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
     const filtered = products.filter(p => {
@@ -100,7 +100,24 @@ export default function StockDataGrid({ filterCategory = "", filterStatus = "" }
                     </tr>
                 </thead>
                 <tbody>
-                    {filtered.length === 0 ? (
+                    {loading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                            <tr key={i}>
+                                {Array.from({ length: 7 }).map((_, j) => (
+                                    <td key={j} style={tdStyle}>
+                                        <div style={{
+                                            height: "13px",
+                                            width: j === 1 ? "120px" : "50px",
+                                            background: "var(--bg-tertiary)",
+                                            borderRadius: "4px",
+                                            animation: "pulse 1.5s ease-in-out infinite",
+                                            animationDelay: `${j * 0.05}s`,
+                                        }} />
+                                    </td>
+                                ))}
+                            </tr>
+                        ))
+                    ) : filtered.length === 0 ? (
                         <tr>
                             <td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--text-tertiary)", padding: "20px" }}>
                                 Eşleşen ürün bulunamadı

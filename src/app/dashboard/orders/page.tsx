@@ -56,6 +56,7 @@ const tdStyle: React.CSSProperties = {
 function matchesTab(order: { commercial_status: CommercialStatus; fulfillment_status: FulfillmentStatus }, tab: FilterTab): boolean {
     if (tab === "ALL") return true;
     if (tab === "shipped") return order.fulfillment_status === "shipped";
+    if (tab === "approved") return order.commercial_status === "approved" && order.fulfillment_status !== "shipped";
     return order.commercial_status === tab;
 }
 

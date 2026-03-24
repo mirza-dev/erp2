@@ -12,7 +12,51 @@ const subtitleColors = {
 
 export default function StatsCards() {
     const router = useRouter();
-    const { products, uretimKayitlari } = useData();
+    const { products, uretimKayitlari, loading } = useData();
+
+    if (loading) {
+        return (
+            <div className="stats-cards-grid">
+                {Array.from({ length: 5 }).map((_, i) => (
+                    <div
+                        key={i}
+                        style={{
+                            background: "var(--bg-primary)",
+                            border: "0.5px solid var(--border-tertiary)",
+                            borderRadius: "6px",
+                            padding: "14px 16px",
+                        }}
+                    >
+                        <div style={{
+                            height: "12px",
+                            width: "80px",
+                            background: "var(--bg-tertiary)",
+                            borderRadius: "4px",
+                            marginBottom: "10px",
+                            animation: "pulse 1.5s ease-in-out infinite",
+                        }} />
+                        <div style={{
+                            height: "22px",
+                            width: "60px",
+                            background: "var(--bg-tertiary)",
+                            borderRadius: "4px",
+                            marginBottom: "8px",
+                            animation: "pulse 1.5s ease-in-out infinite",
+                            animationDelay: "0.15s",
+                        }} />
+                        <div style={{
+                            height: "12px",
+                            width: "100px",
+                            background: "var(--bg-tertiary)",
+                            borderRadius: "4px",
+                            animation: "pulse 1.5s ease-in-out infinite",
+                            animationDelay: "0.3s",
+                        }} />
+                    </div>
+                ))}
+            </div>
+        );
+    }
 
     const todayStr = new Date().toISOString().slice(0, 10);
     const todayRecords = uretimKayitlari.filter(k => k.tarih === todayStr);
