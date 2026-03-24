@@ -50,7 +50,7 @@ After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and 
 Also add "UNMATCHED:" a comma-separated list of any fields you could not extract.`,
 };
 
-function parseAIResponse(text: string): { parsed_data: Record<string, unknown>; confidence: number; ai_reason: string; unmatched_fields: string[] } {
+export function parseAIResponse(text: string): { parsed_data: Record<string, unknown>; confidence: number; ai_reason: string; unmatched_fields: string[] } {
     // Extract JSON block
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     let parsed_data: Record<string, unknown> = {};
@@ -104,6 +104,214 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
             confidence: 0,
             ai_reason: "AI servisi yanıt veremedi",
             unmatched_fields: ["all"],
+        };
+    }
+}
+
+// ── Batch Parse ─────────────────────────────────────────────
+
+export interface BatchParseInput {
+    entity_type: "customer" | "product" | "order";
+    rows: Array<Record<string, string>>;
+}
+
+export interface BatchParseResult {
+    items: Array<{
+        parsed_data: Record<string, unknown>;
+        confidence: number;
+        ai_reason: string;
+        unmatched_fields: string[];
+    }>;
+}
+
+const BATCH_PARSE_SYSTEM: Record<string, string> = {
+    customer: `You are a data extraction assistant for a B2B ERP system.
+You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
+For each row, extract customer fields and return a JSON array with objects containing these keys (omit missing fields):
+{ "name": string, "email": string, "phone": string, "country": string (ISO 2-letter or full name), "currency": string (ISO 3-letter), "tax_number": string, "tax_office": string, "address": string, "notes": string }
+
+Return ONLY a JSON object in this exact format:
+{
+  "items": [
+    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
+    ...
+  ]
+}
+Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation. unmatched_fields lists column names that could not be mapped.`,
+
+    product: `You are a data extraction assistant for a B2B ERP system.
+You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
+For each row, extract product fields and return a JSON array with objects containing these keys (omit missing fields):
+{ "name": string, "sku": string, "category": string, "unit": string, "price": number, "currency": string (ISO 3-letter), "min_stock_level": number }
+
+Return ONLY a JSON object in this exact format:
+{
+  "items": [
+    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
+    ...
+  ]
+}
+Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation. unmatched_fields lists column names that could not be mapped.`,
+
+    order: `You are a data extraction assistant for a B2B ERP system.
+You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
+For each row, extract order fields and return a JSON array with objects containing these keys (omit missing fields):
+{ "customer_name": string, "currency": string (ISO 3-letter), "grand_total": number, "notes": string }
+
+Return ONLY a JSON object in this exact format:
+{
+  "items": [
+    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
+    ...
+  ]
+}
+Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation. unmatched_fields lists column names that could not be mapped.`,
+};
+
+/**
+ * Simple column-name → field-name fallback when AI is unavailable.
+ * Maps Turkish Excel column names to ERP field names.
+ */
+const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
+    customer: {
+        firma_adi: "name", musteri_adi: "name", ad: "name", isim: "name",
+        email: "email", eposta: "email", e_posta: "email",
+        telefon: "phone", tel: "phone",
+        ulke: "country", ülke: "country",
+        para_birimi: "currency", para_birimi_tercihi: "currency",
+        vergi_no: "tax_number", vergi_numarasi: "tax_number",
+        vergi_dairesi: "tax_office",
+        adres: "address",
+        notlar: "notes", not: "notes",
+    },
+    product: {
+        urun_adi: "name", ad: "name", isim: "name",
+        urun_kodu: "sku", sku: "sku",
+        kategori: "category",
+        olcu_birimi: "unit", birim: "unit",
+        liste_fiyati_usd: "price", fiyat: "price", liste_fiyati: "price",
+        para_birimi: "currency",
+        min_siparis_miktari: "min_stock_level", guvenlik_stogu: "min_stock_level",
+    },
+    order: {
+        musteri_kodu: "customer_name", musteri_adi: "customer_name", firma_adi: "customer_name",
+        para_birimi: "currency",
+        toplam_tutar_usd: "grand_total", toplam_tutar: "grand_total", tutar: "grand_total",
+        notlar: "notes", not: "notes",
+    },
+};
+
+export function fallbackParseRow(
+    row: Record<string, string>,
+    entityType: string,
+): { parsed_data: Record<string, unknown>; unmatched_fields: string[] } {
+    const fieldMap = FALLBACK_FIELD_MAP[entityType] ?? {};
+    const parsed_data: Record<string, unknown> = {};
+    const unmatched_fields: string[] = [];
+
+    for (const [col, value] of Object.entries(row)) {
+        const normalized = col.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+        const erpField = fieldMap[normalized];
+        if (erpField) {
+            // Try to convert numeric values
+            const num = Number(value);
+            parsed_data[erpField] = !isNaN(num) && value.trim() !== "" && ["price", "grand_total", "min_stock_level"].includes(erpField)
+                ? num
+                : value;
+        } else {
+            unmatched_fields.push(col);
+        }
+    }
+
+    return { parsed_data, unmatched_fields };
+}
+
+export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseResult> {
+    const { entity_type, rows } = input;
+
+    // Fallback when AI is not available
+    if (!isAIAvailable()) {
+        return {
+            items: rows.map(row => {
+                const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
+                return {
+                    parsed_data,
+                    confidence: 0.5,
+                    ai_reason: "AI devre dışı — doğrudan kolon eşleştirmesi",
+                    unmatched_fields,
+                };
+            }),
+        };
+    }
+
+    const systemPrompt = BATCH_PARSE_SYSTEM[entity_type];
+    if (!systemPrompt) {
+        // Unsupported entity type — fallback
+        return {
+            items: rows.map(row => {
+                const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
+                return {
+                    parsed_data,
+                    confidence: 0.5,
+                    ai_reason: `Desteklenmeyen entity tipi: ${entity_type}`,
+                    unmatched_fields,
+                };
+            }),
+        };
+    }
+
+    try {
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: [{ role: "user", content: JSON.stringify(rows) }],
+        });
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (Array.isArray(parsed.items)) {
+                return {
+                    items: parsed.items.map((item: Record<string, unknown>) => ({
+                        parsed_data: (item.parsed_data ?? {}) as Record<string, unknown>,
+                        confidence: typeof item.confidence === "number" ? item.confidence : 0.5,
+                        ai_reason: typeof item.ai_reason === "string" ? item.ai_reason : "",
+                        unmatched_fields: Array.isArray(item.unmatched_fields) ? item.unmatched_fields : [],
+                    })),
+                };
+            }
+        }
+
+        // Could not parse AI response — fallback
+        return {
+            items: rows.map(row => {
+                const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
+                return {
+                    parsed_data,
+                    confidence: 0.5,
+                    ai_reason: "AI yanıtı ayrıştırılamadı — fallback eşleştirme",
+                    unmatched_fields,
+                };
+            }),
+        };
+    } catch (err) {
+        console.error("[AI BatchParse] graceful degradation:", err);
+        return {
+            items: rows.map(row => {
+                const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
+                return {
+                    parsed_data,
+                    confidence: 0.5,
+                    ai_reason: "AI servisi yanıt veremedi — fallback eşleştirme",
+                    unmatched_fields,
+                };
+            }),
         };
     }
 }
