@@ -56,12 +56,11 @@ function WhyBadge({ daysLeft, urgency, leadTimeDays }: {
     );
 }
 
-function SegmentBanner({ filter, rawCount, finishedCount, rawItems, finishedItems }: {
+function SegmentBanner({ filter, rawCount, finishedCount, rawItems }: {
     filter: FilterType;
     rawCount: number;
     finishedCount: number;
     rawItems: { reorderQty?: number; price?: number }[];
-    finishedItems: { reorderQty?: number }[];
 }) {
     if (filter === "all") return null;
 
@@ -359,7 +358,6 @@ export default function PurchaseSuggestedPage() {
                 rawCount={rawItems.length}
                 finishedCount={finishedItems.length}
                 rawItems={rawItems}
-                finishedItems={finishedItems}
             />
 
             {/* Table or empty state */}

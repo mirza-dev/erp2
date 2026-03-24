@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import { useData } from "@/lib/data-context";
-import type { Product } from "@/lib/mock-data";
 import { formatNumber } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -56,60 +55,13 @@ const tdStyle: React.CSSProperties = {
     color: "var(--text-primary)",
 };
 
-// ── Voice parser: extract product hint + quantity from Turkish speech ────────
-function parseVoice(text: string, products: Product[]): { productId: string; adet: number } | null {
-    const lower = text.toLowerCase();
-
-    // Find quantity: look for Turkish number words or digits
-    const digitMatch = lower.match(/(\d+)\s*(adet|tane|parça)?/);
-    let adet = 0;
-    if (digitMatch) adet = parseInt(digitMatch[1]);
-
-    // Map Turkish word numbers
-    const wordMap: Record<string, number> = {
-        "bir": 1, "iki": 2, "üç": 3, "dört": 4, "beş": 5,
-        "altı": 6, "yedi": 7, "sekiz": 8, "dokuz": 9, "on": 10,
-        "yirmi": 20, "otuz": 30, "kırk": 40, "elli": 50,
-        "altmış": 60, "yetmiş": 70, "seksen": 80, "doksan": 90,
-        "yüz": 100, "iki yüz": 200, "üç yüz": 300, "dört yüz": 400, "beş yüz": 500,
-        "bin": 1000,
-    };
-    if (adet === 0) {
-        for (const [word, val] of Object.entries(wordMap)) {
-            if (lower.includes(word)) { adet = val; break; }
-        }
-    }
-
-    if (adet === 0) return null;
-
-    // Find best matching product by name or SKU tokens
-    let best: Product | null = null;
-    let bestScore = 0;
-    for (const p of products) {
-        const tokens = [...p.name.toLowerCase().split(/\s+/), p.sku.toLowerCase()];
-        let score = 0;
-        for (const t of tokens) {
-            if (t.length > 2 && lower.includes(t)) score++;
-        }
-        if (score > bestScore) { bestScore = score; best = p; }
-    }
-
-    if (!best || bestScore === 0) return null;
-    return { productId: best.id, adet };
-}
-
 export default function ProductionPage() {
     const { products, uretimKayitlari, addUretimKaydi, deleteUretimKaydi, loadError } = useData();
     const { toast } = useToast();
     const [tarih, setTarih] = useState(today());
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
-    const [listening, setListening] = useState(false);
-    const [voiceText, setVoiceText] = useState("");
-    const [voiceError, setVoiceError] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const recognitionRef = useRef<any>(null);
 
     const todayStr = today();
     const todayLogs = uretimKayitlari.filter(k => k.tarih === todayStr);
@@ -174,51 +126,6 @@ export default function ProductionPage() {
         }
 
         setIsSaving(false);
-    };
-
-    // ── Voice input ─────────────────────────────────────────────────────────
-    const startListening = () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-        if (!SpeechRec) {
-            setVoiceError("Bu tarayıcı sesli girişi desteklemiyor (Chrome kullanın)");
-            return;
-        }
-        const rec = new SpeechRec();
-        rec.lang = "tr-TR";
-        rec.continuous = false;
-        rec.interimResults = false;
-        recognitionRef.current = rec;
-
-        rec.onstart = () => { setListening(true); setVoiceError(""); setVoiceText(""); };
-        rec.onend = () => setListening(false);
-        rec.onerror = () => { setListening(false); setVoiceError("Ses tanınamadı, tekrar deneyin"); };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        rec.onresult = (e: any) => {
-            const transcript = e.results[0][0].transcript;
-            setVoiceText(transcript);
-            const parsed = parseVoice(transcript, products);
-            if (parsed) {
-                // Fill the first empty line or add a new one
-                const emptyIdx = lines.findIndex(l => !l.productId);
-                if (emptyIdx >= 0) {
-                    setLines(prev => prev.map((l, i) =>
-                        i === emptyIdx ? { ...l, productId: parsed.productId, adet: String(parsed.adet) } : l
-                    ));
-                } else {
-                    setLines(prev => [...prev, { id: crypto.randomUUID(), productId: parsed.productId, adet: String(parsed.adet), notlar: "" }]);
-                }
-            } else {
-                setVoiceError(`"${transcript}" — ürün/adet eşleştirilemedi, lütfen manuel girin`);
-            }
-        };
-        rec.start();
-    };
-
-    const stopListening = () => {
-        recognitionRef.current?.stop();
-        setListening(false);
     };
 
     const canSave = lines.some(l => l.productId && parseInt(l.adet) > 0);

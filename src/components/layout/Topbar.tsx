@@ -85,7 +85,7 @@ export default function Topbar({ onToggleSidebar }: TopbarProps) {
                         }}
                     />
                     <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                        Realtime
+                        Bağlı
                     </span>
                 </div>
 

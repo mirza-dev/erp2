@@ -100,6 +100,7 @@ export function mapOrderToInvoice(order: OrderDetail): ParasutInvoicePayload {
 //   return { success: true, invoiceId: json.data.id, sentAt: new Date().toISOString() };
 
 export async function sendInvoiceToParasut(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     _payload: ParasutInvoicePayload
 ): Promise<ParasutSyncResult> {
     // 1000–1800ms rastgele gecikme (gerçekçi mock)

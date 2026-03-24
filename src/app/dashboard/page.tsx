@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
 import StatsCards from "@/components/dashboard/StatsCards";
 import StockDataGrid from "@/components/dashboard/StockDataGrid";
@@ -24,7 +24,10 @@ export default function DashboardPage() {
     const [filterStatus, setFilterStatus] = useState("");
     const filterRef = useRef<HTMLDivElement>(null);
 
-    const categories = Array.from(new Set(products.map(p => p.category))).sort();
+    const categories = useMemo(
+        () => Array.from(new Set(products.map(p => p.category))).sort(),
+        [products]
+    );
     const hasFilter = filterCategory !== "" || filterStatus !== "";
 
     const statusLabel = STATUS_OPTIONS.find(s => s.key === filterStatus)?.label ?? filterStatus;
@@ -48,7 +51,7 @@ export default function DashboardPage() {
             {/* Section header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                    Stok Envanteri — Canlı
+                    Stok Envanteri
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                     {/* Filter button + dropdown */}

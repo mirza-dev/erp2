@@ -1,5 +1,5 @@
 import { createServiceClient } from "./service";
-import type { ProductRow, ProductWithStock } from "@/lib/database.types";
+import type { ProductWithStock } from "@/lib/database.types";
 
 // ── Types ────────────────────────────────────────────────────
 

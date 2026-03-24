@@ -6,7 +6,7 @@ import { useData } from "@/lib/data-context";
 
 type ImportState = "idle" | "analyzing" | "sheet_select" | "mapping" | "preview" | "importing" | "done";
 
-// ─── Mock sheet analysis (based on real Excel structure) ───────────────────
+// ─── Template sheet definitions (expected Excel format) ───────────────────
 interface SheetInfo {
     name: string;
     displayName: string;
@@ -33,7 +33,7 @@ const DETECTED_SHEETS: SheetInfo[] = [
     { name: "Ozet_KPI", displayName: "Özet KPI", rows: 28, entity: "KPI Özeti", status: "unsupported", selected: false },
 ];
 
-// ─── Column mappings per sheet ─────────────────────────────────────────────
+// ─── Template column mappings per sheet ────────────────────────────────────
 interface ColumnMap {
     excelCol: string;
     sample: string;
@@ -114,7 +114,7 @@ const SHEET_MAPPINGS: Record<string, ColumnMap[]> = {
     ],
 };
 
-// ─── Preview rows per entity ───────────────────────────────────────────────
+// ─── Sample preview rows per entity (template examples) ───────────────────
 const PREVIEW_DATA: Record<string, Array<Record<string, string>>> = {
     Urunler: [
         { sku: "ENDVAN-001", ad: "Glob Vana Hijyenik", kategori: "Kontrol ve Hat Vanalari", birim: "Adet", fiyat: "$278.48" },
@@ -210,6 +210,7 @@ export default function ImportPage() {
     const [sheets, setSheets] = useState<SheetInfo[]>(DETECTED_SHEETS);
     const [activeTab, setActiveTab] = useState("Musteriler");
     const [importProgress, setImportProgress] = useState<Record<string, number>>({});
+    const [confirmResult, setConfirmResult] = useState<{ merged: number; skipped: number; errors: string[] } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const startAnalyzing = useCallback((name: string) => {
@@ -218,10 +219,10 @@ export default function ImportPage() {
         setProgress(0);
 
         const steps: [number, string][] = [
-            [20, "Dosya okunuyor..."],
-            [45, "14 sheet tespit edildi..."],
-            [70, "Kolon analizi yapılıyor..."],
-            [90, "AI eşleştirme önerileri hazırlanıyor..."],
+            [20, "Dosya kontrol ediliyor..."],
+            [45, "Şablon eşleştirmesi yapılıyor..."],
+            [70, "Desteklenen sheetler belirleniyor..."],
+            [90, "Kolon eşlemesi hazırlanıyor..."],
             [100, "Hazır"],
         ];
         steps.forEach(([p, label], i) => {
@@ -300,7 +301,11 @@ export default function ImportPage() {
                 }
 
                 // 3. Confirm batch \u2192 merge drafts to real entities
-                await fetch(`/api/import/${batchId}/confirm`, { method: "POST" });
+                const confirmRes = await fetch(`/api/import/${batchId}/confirm`, { method: "POST" });
+                if (confirmRes.ok) {
+                    const result = await confirmRes.json();
+                    setConfirmResult(result);
+                }
             }
 
             // 4. Refresh all data from API
@@ -308,6 +313,7 @@ export default function ImportPage() {
             setState("done");
         } catch (err) {
             console.error("Import failed:", err);
+            setConfirmResult({ merged: 0, skipped: 0, errors: [String(err)] });
             setState("done");
         }
     };
@@ -318,6 +324,7 @@ export default function ImportPage() {
         setProgress(0);
         setProgressLabel("");
         setImportProgress({});
+        setConfirmResult(null);
         setActiveTab("Musteriler");
     };
 
@@ -329,10 +336,10 @@ export default function ImportPage() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <div>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                        AI Veri İçe Aktarım
+                        Veri İçe Aktarım
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        Excel dosyasını yükle — AI sheetleri tanır, kolonları eşleştirir, önizleme gösterir
+                        Excel dosyasını şablon formatında yükle — sheetler ve kolonlar otomatik eşleştirilir, önizleme gösterilir
                     </div>
                 </div>
                 {(state !== "idle" && state !== "analyzing") && (
@@ -357,7 +364,7 @@ export default function ImportPage() {
             {state !== "idle" && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
                     {[
-                        { key: "analyzing", label: "Analiz" },
+                        { key: "analyzing", label: "Dosya Kontrolü" },
                         { key: "sheet_select", label: "Sheet Seçimi" },
                         { key: "mapping", label: "Kolon Eşleştirme" },
                         { key: "preview", label: "Önizleme" },
@@ -477,7 +484,7 @@ export default function ImportPage() {
                         borderRadius: "6px", overflow: "hidden",
                     }}>
                         {[
-                            { icon: "🔍", label: "Analiz" },
+                            { icon: "🔍", label: "Kontrol" },
                             { icon: "🗂", label: "Sheet Seç" },
                             { icon: "🔗", label: "Eşleştir" },
                             { icon: "👁", label: "Önizle" },
@@ -496,9 +503,9 @@ export default function ImportPage() {
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
                         {[
-                            { title: "Çok-Sheet Desteği", desc: "Excel workbook'taki tüm sheetler taranır. AI hangi sheetin ne olduğunu tanır: müşteri, ürün, sipariş..." },
-                            { title: "Otomatik Kolon Eşleştirme", desc: "Kolon başlıklarına bakarak ERP alanlarıyla eşleştirir. Firma_Adi → Firma Adı, Ulke → Ülke gibi." },
-                            { title: "Seçici İçe Aktarım", desc: "Hangi sheetleri, hangi kolonları içe alacağını seç. Paraşüt'e gitecek veriler otomatik ayrışır." },
+                            { title: "Çok-Sheet Desteği", desc: "Şablon formatındaki tüm sheetler tanımlıdır: müşteri, ürün, sipariş..." },
+                            { title: "Şablon Kolon Eşlemesi", desc: "Her sheet için hangi Excel kolonunun hangi ERP alanına eşlendiğini gösterir." },
+                            { title: "Seçici İçe Aktarım", desc: "Hangi sheetleri içe alacağınızı seçin. Paraşüt verileri ayrıca işaretlenir." },
                         ].map(card => (
                             <div key={card.title} style={{
                                 background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
@@ -528,7 +535,7 @@ export default function ImportPage() {
                         ))}
                     </div>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
-                        AI dosyayı analiz ediyor...
+                        Dosya kontrol ediliyor...
                     </div>
                     {fileName && (
                         <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>{fileName}</div>
@@ -553,7 +560,7 @@ export default function ImportPage() {
                             background: "var(--bg-secondary)", display: "flex", alignItems: "center", justifyContent: "space-between",
                         }}>
                             <div>
-                                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>14 sheet tespit edildi</span>
+                                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>Şablonda 14 sheet tanımlı</span>
                                 <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "10px" }}>
                                     {importableSelected.length} içe aktarılabilir · {importableSelected.filter(s => s.selected).length} seçili
                                 </span>
@@ -674,7 +681,7 @@ export default function ImportPage() {
                             <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: "0 0 180px" }}>Excel Kolonu</span>
                             <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: "0 0 140px" }}>Örnek Değer</span>
                             <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: 1 }}>ERP Alanı</span>
-                            <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: "0 0 80px", textAlign: "center" }}>Güven</span>
+                            <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: "0 0 80px", textAlign: "center" }}>Eşleme</span>
                         </div>
 
                         {(SHEET_MAPPINGS[activeTab] ?? []).map((col, i) => {
@@ -762,11 +769,11 @@ export default function ImportPage() {
                             background: "var(--bg-secondary)", display: "flex", alignItems: "center", justifyContent: "space-between",
                         }}>
                             <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                                İlk 5 satır gösteriliyor ·&nbsp;
+                                Şablon önizlemesi: 5 örnek satır ·&nbsp;
                                 <span style={{ color: "var(--success-text)", fontWeight: 600 }}>
                                     {IMPORT_COUNTS[activeTab].total} {IMPORT_COUNTS[activeTab].label} içe aktarılacak
                                 </span>
-                                &nbsp;· 0 çakışma
+                                &nbsp;(şablona göre)
                             </span>
                             <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Önizleme</span>
                         </div>
@@ -915,22 +922,43 @@ export default function ImportPage() {
                     </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "16px" }}>
-                        {[
-                            { label: "Ürünler", count: "100", detail: "6 yeni · 94 güncellendi", color: "var(--success-text)" },
-                            { label: "Müşteriler", count: "84", detail: "84 yeni eklendi", color: "var(--success-text)" },
-                            { label: "Siparişler", count: "280", detail: "280 sipariş + 1,071 kalem", color: "var(--success-text)" },
-                            { label: "Stok", count: "100", detail: "100 stok kaydı güncellendi", color: "var(--success-text)" },
-                            { label: "Faturalar", count: "352", detail: "Paraşüt Sync ile işlenecek", color: "var(--accent-text)" },
-                            { label: "Tahsilatlar", count: "311", detail: "Paraşüt Sync ile işlenecek", color: "var(--accent-text)" },
-                        ].map(item => (
-                            <div key={item.label} style={{
-                                background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px",
-                            }}>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{item.label}</div>
-                                <div style={{ fontSize: "18px", fontWeight: 600, color: item.color, marginBottom: "2px" }}>{item.count}</div>
-                                <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{item.detail}</div>
+                        {confirmResult ? (
+                            <>
+                                <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
+                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Başarılı</div>
+                                    <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--success-text)", marginBottom: "2px" }}>{confirmResult.merged}</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.merged} kayıt eklendi</div>
+                                </div>
+                                {confirmResult.skipped > 0 && (
+                                    <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
+                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Atlanan</div>
+                                        <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--warning-text)", marginBottom: "2px" }}>{confirmResult.skipped}</div>
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.skipped} kayıt atlandı</div>
+                                    </div>
+                                )}
+                                {confirmResult.errors.length > 0 && (
+                                    <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
+                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Hatalar</div>
+                                        <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "2px" }}>{confirmResult.errors.length}</div>
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.errors[0]}</div>
+                                    </div>
+                                )}
+                                <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
+                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Faturalar</div>
+                                    <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--accent-text)", marginBottom: "2px" }}>352</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Paraşüt Sync ile işlenecek</div>
+                                </div>
+                                <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
+                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Tahsilatlar</div>
+                                    <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--accent-text)", marginBottom: "2px" }}>311</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Paraşüt Sync ile işlenecek</div>
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px", gridColumn: "1 / -1" }}>
+                                <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>İçe aktarım tamamlandı</div>
                             </div>
-                        ))}
+                        )}
                     </div>
 
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>

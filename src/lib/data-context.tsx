@@ -28,7 +28,7 @@ import {
 
 import type { CreateOrderInput } from "./supabase/orders";
 
-// ── Exported types ──────────────────────────────────────────
+// ── Exported types ─────────────────────────────────────────
 
 export type CommercialStatus =
   | "draft"
@@ -70,20 +70,11 @@ export interface UpdateStatusResult {
 
 // ── Internal types ──────────────────────────────────────────
 
-interface ImportPayload {
-  customers?: Customer[];
-  products?: Product[];
-  orders?: Order[];
-}
-
 interface DataContextValue {
   customers: Customer[];
   products: Product[];
   orders: Order[];
-  orderDetails: OrderDetail[];
   uretimKayitlari: UretimKaydi[];
-  addImportedData: (payload: ImportPayload) => void;
-  importedCount: { customers: number; products: number; orders: number } | null;
   addCustomer: (
     c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">
   ) => Promise<void>;
@@ -120,11 +111,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [orderDetails] = useState<OrderDetail[]>([]);
   const [uretimKayitlari, setUretimKayitlari] = useState<UretimKaydi[]>([]);
-  const [importedCount, setImportedCount] =
-    useState<DataContextValue["importedCount"]>(null);
-  const [activeAlertCount, setActiveAlertCount] = useState(0);
   const [openAlerts, setOpenAlerts] = useState<OpenAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -170,7 +157,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const open = (Array.isArray(data) ? data : []).filter(
           (a: { status: string }) => a.status === "open"
         ) as OpenAlert[];
-        setActiveAlertCount(open.length);
         setOpenAlerts(open);
       }
     } catch (err) {
@@ -183,26 +169,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   // ── Mount ──────────────────────────────────────────────
   useEffect(() => { refetchAll(); }, [refetchAll]);
-
-  // ── Import ───────────────────────────────────────────────
-
-  const addImportedData = (payload: ImportPayload) => {
-    const newCustomers = payload.customers ?? [];
-    const newProducts = payload.products ?? [];
-    const newOrders = payload.orders ?? [];
-
-    if (newCustomers.length > 0)
-      setCustomers((prev) => [...prev, ...newCustomers]);
-    if (newProducts.length > 0)
-      setProducts((prev) => [...prev, ...newProducts]);
-    if (newOrders.length > 0) setOrders((prev) => [...newOrders, ...prev]);
-
-    setImportedCount({
-      customers: newCustomers.length,
-      products: newProducts.length,
-      orders: newOrders.length,
-    });
-  };
 
   // ── Customers ────────────────────────────────────────────
 
@@ -492,45 +458,51 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // ── Reorder suggestions ──────────────────────────────────
+  // ── Derived values ───────────────────────────────────────
 
   const reorderSuggestions = useMemo(
-    () =>
-      products.filter(
-        (p) => p.isActive && p.available_now < p.minStockLevel
-      ),
+    () => products.filter((p) => p.isActive && p.available_now < p.minStockLevel),
     [products]
+  );
+
+  const activeAlertCount = useMemo(() => openAlerts.length, [openAlerts]);
+
+  // ── Stable context value ─────────────────────────────────
+
+  const value = useMemo(
+    () => ({
+      customers,
+      products,
+      orders,
+      uretimKayitlari,
+      addCustomer,
+      updateCustomer,
+      deleteCustomer,
+      addProduct,
+      deleteProduct,
+      addUretimKaydi,
+      deleteUretimKaydi,
+      addOrder,
+      updateOrderStatus,
+      reorderSuggestions,
+      activeAlertCount,
+      openAlerts,
+      loading,
+      loadError,
+      refetchAll,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      customers, products, orders, uretimKayitlari,
+      reorderSuggestions, activeAlertCount, openAlerts,
+      loading, loadError,
+    ]
   );
 
   // ── Render ───────────────────────────────────────────────
 
   return (
-    <DataContext.Provider
-      value={{
-        customers,
-        products,
-        orders,
-        orderDetails,
-        uretimKayitlari,
-        addImportedData,
-        importedCount,
-        addCustomer,
-        updateCustomer,
-        deleteCustomer,
-        addProduct,
-        deleteProduct,
-        addUretimKaydi,
-        deleteUretimKaydi,
-        addOrder,
-        updateOrderStatus,
-        reorderSuggestions,
-        activeAlertCount,
-        openAlerts,
-        loading,
-        loadError,
-        refetchAll,
-      }}
-    >
+    <DataContext.Provider value={value}>
       {children}
     </DataContext.Provider>
   );

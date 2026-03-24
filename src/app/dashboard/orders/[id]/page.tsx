@@ -50,7 +50,7 @@ export default function OrderDetailPage() {
     const { updateOrderStatus } = useData();
     const { toast } = useToast();
     const [order, setOrder] = useState<OrderDetail | null>(null);
-    const [orderLoading, setOrderLoading] = useState(true);
+    const [, setOrderLoading] = useState(true);
     const [rescoring, setRescoring] = useState(false);
 
     const refetchOrder = async () => {

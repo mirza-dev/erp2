@@ -603,7 +603,7 @@ export default function SettingsPage() {
     const handleDirtyChange = (tab: Tab, isDirty: boolean) => {
         setDirtyTabs(prev => {
             const next = new Set(prev);
-            isDirty ? next.add(tab) : next.delete(tab);
+            if (isDirty) { next.add(tab); } else { next.delete(tab); }
             return next;
         });
     };

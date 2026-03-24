@@ -5,7 +5,7 @@
  * ERP stok/sipariş durumunu değiştirmez — sadece fatura durumunu senkronize eder.
  */
 
-import { dbGetOrderById, dbListOrders } from "@/lib/supabase/orders";
+import { dbGetOrderById } from "@/lib/supabase/orders";
 import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/sync-log";
 import { sendInvoiceToParasut } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";

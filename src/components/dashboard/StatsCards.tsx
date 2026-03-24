@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { formatNumber } from "@/lib/utils";
@@ -13,6 +14,26 @@ const subtitleColors = {
 export default function StatsCards() {
     const router = useRouter();
     const { products, uretimKayitlari, loading } = useData();
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const todayStats = useMemo(() => {
+        const records = uretimKayitlari.filter(k => k.tarih === todayStr);
+        return {
+            total: records.reduce((sum, k) => sum + k.adet, 0),
+            productTypes: new Set(records.map(k => k.productId)).size,
+        };
+    }, [uretimKayitlari, todayStr]);
+
+    const stockStats = useMemo(() => ({
+        total: products.reduce((sum, p) => sum + p.on_hand, 0),
+        allocated: products.reduce((sum, p) => sum + p.reserved, 0),
+        available: products.reduce((sum, p) => sum + p.available_now, 0),
+        criticalCount: products.filter(p => {
+            const ratio = p.minStockLevel > 0 ? p.available_now / p.minStockLevel : 999;
+            return p.available_now === 0 || ratio <= 1;
+        }).length,
+    }), [products]);
 
     if (loading) {
         return (
@@ -58,18 +79,8 @@ export default function StatsCards() {
         );
     }
 
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const todayRecords = uretimKayitlari.filter(k => k.tarih === todayStr);
-    const todayTotal = todayRecords.reduce((sum, k) => sum + k.adet, 0);
-    const todayProductTypes = new Set(todayRecords.map(k => k.productId)).size;
-
-    const totalStock = products.reduce((sum, p) => sum + p.on_hand, 0);
-    const allocatedStock = products.reduce((sum, p) => sum + p.reserved, 0);
-    const availableStock = products.reduce((sum, p) => sum + p.available_now, 0);
-    const criticalCount = products.filter(p => {
-        const ratio = p.minStockLevel > 0 ? p.available_now / p.minStockLevel : 999;
-        return p.available_now === 0 || ratio <= 1;
-    }).length;
+    const { total: todayTotal, productTypes: todayProductTypes } = todayStats;
+    const { total: totalStock, allocated: allocatedStock, available: availableStock, criticalCount } = stockStats;
 
     const metrics = [
         {
@@ -89,7 +100,7 @@ export default function StatsCards() {
         {
             label: "Satılabilir Stok",
             value: formatNumber(availableStock),
-            subtitle: "Anlık hesaplanıyor",
+            subtitle: "Mevcut stok − Rezerve",
             subtitleColor: "ok" as const,
             href: "/dashboard/products",
         },
