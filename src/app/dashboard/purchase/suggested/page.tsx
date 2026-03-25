@@ -1,9 +1,80 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/lib/data-context";
 import { computeCoverageDays, computeTargetStock, daysColor, daysBg } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
+
+interface AiEnrichmentItem {
+    productId: string;
+    aiWhyNow: string | null;
+    aiQuantityRationale: string | null;
+    aiUrgencyLevel: "critical" | "high" | "moderate" | null;
+    aiConfidence: number | null;
+}
+
+function AiEnrichmentBadge({ enrichment, loading }: {
+    enrichment: AiEnrichmentItem | undefined;
+    loading: boolean;
+}) {
+    if (loading) {
+        return (
+            <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+                AI analizi yükleniyor...
+            </div>
+        );
+    }
+
+    if (!enrichment || (!enrichment.aiWhyNow && !enrichment.aiQuantityRationale)) return null;
+
+    const urgency = enrichment.aiUrgencyLevel ?? "moderate";
+    const borderColor = urgency === "critical" ? "var(--danger)" : urgency === "high" ? "var(--warning)" : "var(--accent)";
+    const urgencyLabel = urgency === "critical" ? "Kritik" : urgency === "high" ? "Yüksek" : "Orta";
+    const urgencyBg = urgency === "critical" ? "var(--danger-bg)" : urgency === "high" ? "var(--warning-bg)" : "var(--accent-bg)";
+    const urgencyText = urgency === "critical" ? "var(--danger-text)" : urgency === "high" ? "var(--warning-text)" : "var(--accent-text)";
+    const confidence = enrichment.aiConfidence != null ? Math.round(enrichment.aiConfidence * 100) : null;
+
+    return (
+        <div style={{
+            marginTop: "6px",
+            borderLeft: `3px solid ${borderColor}`,
+            paddingLeft: "8px",
+            paddingTop: "4px",
+            paddingBottom: "4px",
+        }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    AI Önerisi
+                </span>
+                <span style={{
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    padding: "1px 5px",
+                    borderRadius: "3px",
+                    background: urgencyBg,
+                    color: urgencyText,
+                }}>
+                    {urgencyLabel}
+                </span>
+                {confidence != null && (
+                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
+                        %{confidence} güven
+                    </span>
+                )}
+            </div>
+            {enrichment.aiWhyNow && (
+                <p style={{ margin: 0, fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                    {enrichment.aiWhyNow}
+                </p>
+            )}
+            {enrichment.aiQuantityRationale && (
+                <p style={{ margin: "3px 0 0", fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                    {enrichment.aiQuantityRationale}
+                </p>
+            )}
+        </div>
+    );
+}
 
 type FilterType = "all" | "raw_material" | "finished";
 
@@ -175,12 +246,29 @@ export default function PurchaseSuggestedPage() {
     const [windowWidth, setWindowWidth] = useState(
         typeof window !== "undefined" ? window.innerWidth : 1200
     );
+    const [aiData, setAiData] = useState<{ ai_available: boolean; items: AiEnrichmentItem[] } | null>(null);
+    const [aiLoading, setAiLoading] = useState(false);
 
     useEffect(() => {
         const handleResize = () => setWindowWidth(window.innerWidth);
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
     }, []);
+
+    useEffect(() => {
+        if (reorderSuggestions.length === 0) return;
+        setAiLoading(true);
+        fetch("/api/ai/purchase-copilot", { method: "POST" })
+            .then(res => res.ok ? res.json() : null)
+            .then(data => { if (data) setAiData(data); })
+            .catch(() => {})
+            .finally(() => setAiLoading(false));
+    }, [reorderSuggestions.length]);
+
+    const aiMap = useMemo(() => {
+        if (!aiData?.items) return new Map<string, AiEnrichmentItem>();
+        return new Map(aiData.items.map(i => [i.productId, i]));
+    }, [aiData]);
 
     const isMobile = windowWidth < 768;
 
@@ -231,6 +319,15 @@ export default function PurchaseSuggestedPage() {
             <p style={{ fontSize: "13px", color: "var(--text-tertiary)", marginTop: "4px" }}>
                 Minimum stok seviyesinin altına düşen ürünler · Öncelik sırasına göre
             </p>
+            <div style={{ marginTop: "4px", fontSize: "11px" }}>
+                {aiLoading ? (
+                    <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>AI analizi...</span>
+                ) : aiData?.ai_available ? (
+                    <span style={{ color: "var(--success-text)" }}>AI zenginleştirme aktif</span>
+                ) : (
+                    <span style={{ color: "var(--text-tertiary)" }}>Deterministik mod</span>
+                )}
+            </div>
 
             {/* Summary cards */}
             {reorderSuggestions.length > 0 && (
@@ -409,6 +506,7 @@ export default function PurchaseSuggestedPage() {
                                             {p.sku}
                                         </div>
                                         <WhyBadge daysLeft={daysLeft} urgency={urgency} leadTimeDays={p.leadTimeDays} />
+                                        <AiEnrichmentBadge enrichment={aiMap.get(p.id)} loading={aiLoading} />
                                     </div>
                                     <div style={{ fontSize: "18px", fontWeight: 700, color: urgency >= 80 ? "var(--danger-text)" : "var(--warning-text)", whiteSpace: "nowrap" }}>
                                         {urgency}%
@@ -535,6 +633,7 @@ export default function PurchaseSuggestedPage() {
                                         <td style={{ padding: "10px 12px", maxWidth: "200px" }}>
                                             <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>{p.name}</div>
                                             <WhyBadge daysLeft={daysLeft} urgency={urgency} leadTimeDays={p.leadTimeDays} />
+                                            <AiEnrichmentBadge enrichment={aiMap.get(p.id)} loading={aiLoading} />
                                         </td>
                                         {/* SKU */}
                                         <td style={{ padding: "10px 12px", fontFamily: "monospace", color: "var(--text-secondary)", fontSize: "12px" }}>

@@ -123,6 +123,72 @@ export function buildStockAlertDescription(
     return base;
 }
 
+// ── Stock Risk Level ──────────────────────────────────────────
+
+export type StockRiskLevel = "none" | "coverage_risk" | "approaching_critical";
+
+export interface StockRiskComputation {
+    riskLevel: StockRiskLevel;
+    coverageDays: number | null;
+    leadTimeDays: number | null;
+    dailyUsage: number | null;
+    reason: string;
+}
+
+/**
+ * Compute forward-looking risk level for a product.
+ * Only applies to products ABOVE the deterministic alert threshold (available > ceil(min * 1.5)).
+ * Returns "none" for products already handled by the alert system.
+ */
+export function computeStockRiskLevel(
+    available: number,
+    min: number,
+    dailyUsage: number | null | undefined,
+    leadTimeDays: number | null | undefined,
+): StockRiskComputation {
+    const noRisk = (coverageDays: number | null = null): StockRiskComputation => ({
+        riskLevel: "none",
+        coverageDays,
+        leadTimeDays: leadTimeDays ?? null,
+        dailyUsage: dailyUsage ?? null,
+        reason: "",
+    });
+
+    // Step 1: Already in deterministic alert zone — alert-service handles these
+    if (available <= Math.ceil(min * 1.5)) return noRisk();
+
+    // Step 2: No daily usage data — no fake certainty
+    if (!dailyUsage || dailyUsage <= 0) return noRisk();
+
+    // Step 3: Compute coverage days
+    const coverageDays = computeCoverageDays(available, dailyUsage);
+
+    // Step 4: coverage_risk — priority over approaching_critical
+    if (coverageDays !== null && leadTimeDays && leadTimeDays > 0 && coverageDays < leadTimeDays) {
+        return {
+            riskLevel: "coverage_risk",
+            coverageDays,
+            leadTimeDays: leadTimeDays ?? null,
+            dailyUsage: dailyUsage ?? null,
+            reason: `Kalan stok (~${coverageDays} gün) tedarik süresinden (${leadTimeDays} gün) kısa.`,
+        };
+    }
+
+    // Step 5: approaching_critical
+    if (coverageDays !== null && coverageDays <= 14) {
+        return {
+            riskLevel: "approaching_critical",
+            coverageDays,
+            leadTimeDays: leadTimeDays ?? null,
+            dailyUsage: dailyUsage ?? null,
+            reason: `Mevcut tüketim hızıyla ~${coverageDays} gün içinde kritik seviyeye düşebilir.`,
+        };
+    }
+
+    // Step 6: Default — no risk
+    return noRisk(coverageDays);
+}
+
 export function buildPurchaseDescription(
     inputs: StockRiskInputs & {
         suggestQty: number;
@@ -163,4 +229,23 @@ export function buildPurchaseDescription(
     parts.push(`Önerilen sipariş: ${suggestQty} ${unit}.`);
 
     return parts.join(" ");
+}
+
+// ── Status Badge ──────────────────────────────────────────────
+
+export interface StatusBadge {
+    label: string;
+    cls: string;
+}
+
+/**
+ * Product status badge. Priority: Tükendi > Kritik > Düşük > Riskli > Hazır.
+ * "Düşük" eşiği (min * 2) backend warning eşiğinden (ceil(min * 1.5)) kasıtlı olarak geniştir.
+ */
+export function getStatusBadge(available: number, min: number, hasRisk?: boolean): StatusBadge {
+    if (available === 0) return { label: "Tükendi", cls: "badge-danger" };
+    if (available <= min) return { label: "Kritik", cls: "badge-danger" };
+    if (available <= min * 2) return { label: "Düşük", cls: "badge-warning" };
+    if (hasRisk) return { label: "Riskli", cls: "badge-info" };
+    return { label: "Hazır", cls: "badge-success" };
 }

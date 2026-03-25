@@ -402,6 +402,106 @@ export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsS
     }
 }
 
+// ── Stock Risk ────────────────────────────────────────────────
+
+export interface StockRiskItem {
+    productId: string;
+    productName: string;
+    sku: string;
+    available: number;
+    min: number;
+    dailyUsage: number;
+    coverageDays: number;
+    leadTimeDays: number | null;
+    riskLevel: "coverage_risk" | "approaching_critical";
+    deterministicReason: string;
+}
+
+export interface StockRiskAssessment {
+    productId: string;
+    explanation: string;
+    recommendation: string;
+    confidence: number;
+}
+
+export interface StockRiskResult {
+    assessments: StockRiskAssessment[];
+    generatedAt: string;
+}
+
+const STOCK_RISK_SYSTEM = `Sen endüstriyel ERP stok risk analiz asistanısın. B2B vana satışı yapan bir firmanın ileriye dönük stok risklerini değerlendiriyorsun.
+
+Görev: Verilen her ürün için kısa bir risk açıklaması ve somut bir öneri üret.
+
+SADECE aşağıdaki JSON formatında cevap ver, başka hiçbir şey yazma:
+{
+  "assessments": [
+    {
+      "productId": "uuid-string",
+      "explanation": "Neden riskli olduğuna dair 1-2 cümle",
+      "recommendation": "Ne yapılması gerektiğine dair somut aksiyon",
+      "confidence": 0.80
+    }
+  ]
+}
+
+Kurallar:
+- Türkçe yaz
+- Her ürün için maksimum 2 cümle (explanation + recommendation toplam)
+- Somut aksiyonlar yaz ("sipariş verin", "tedarikçiyi arayın" gibi)
+- Sahte kesinlik kullanma — eğer veri yetersizse bunu belirt
+- confidence kuralları:
+  - dailyUsage ve leadTimeDays ikisi de varsa: 0.75–0.90
+  - sadece dailyUsage varsa (leadTimeDays yok): 0.50–0.70
+- Her ürün için tam olarak bir assessment döndür`;
+
+export async function aiAssessStockRisk(items: StockRiskItem[]): Promise<StockRiskResult> {
+    const now = new Date().toISOString();
+
+    if (!isAIAvailable()) {
+        return { assessments: [], generatedAt: now };
+    }
+
+    if (items.length === 0) {
+        return { assessments: [], generatedAt: now };
+    }
+
+    try {
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 1024,
+            system: STOCK_RISK_SYSTEM,
+            messages: [{ role: "user", content: JSON.stringify(items) }],
+        });
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (Array.isArray(parsed.assessments)) {
+                return {
+                    assessments: parsed.assessments.map((a: Record<string, unknown>) => ({
+                        productId: typeof a.productId === "string" ? a.productId : "",
+                        explanation: typeof a.explanation === "string" ? a.explanation : "",
+                        recommendation: typeof a.recommendation === "string" ? a.recommendation : "",
+                        confidence: typeof a.confidence === "number" ? a.confidence : 0.5,
+                    })),
+                    generatedAt: now,
+                };
+            }
+        }
+
+        return { assessments: [], generatedAt: now };
+    } catch (err) {
+        console.error("[AI StockRisk] graceful degradation:", err);
+        return { assessments: [], generatedAt: now };
+    }
+}
+
 // ── Score ─────────────────────────────────────────────────────
 
 export interface ScoreOrderResult {
@@ -439,6 +539,124 @@ export function parseScoreResponse(text: string): ScoreOrderResult {
     const reason = reasonMatch ? reasonMatch[1].trim() : "";
 
     return { confidence, risk_level, reason };
+}
+
+// ── Purchase Copilot ──────────────────────────────────────────
+
+export interface PurchaseSuggestionItem {
+    productId: string;
+    productName: string;
+    sku: string;
+    productType: "raw_material" | "finished";
+    unit: string;
+    available: number;
+    min: number;
+    dailyUsage: number | null;
+    coverageDays: number | null;
+    leadTimeDays: number | null;
+    suggestQty: number;
+    moq: number;
+    targetStock: number;
+    formula: "lead_time" | "fallback";
+    leadTimeDemand: number | null;
+    preferredVendor: string | null;
+}
+
+export interface PurchaseEnrichment {
+    productId: string;
+    whyNow: string;
+    quantityRationale: string;
+    urgencyLevel: "critical" | "high" | "moderate";
+    confidence: number;
+}
+
+export interface PurchaseEnrichmentResult {
+    enrichments: PurchaseEnrichment[];
+    generatedAt: string;
+}
+
+const PURCHASE_COPILOT_SYSTEM = `Sen endüstriyel ERP satın alma asistanısın. B2B vana satışı yapan bir firmanın satın alma önerilerini zenginleştiriyorsun.
+
+Görev: Verilen her ürün için neden şimdi satın alınması gerektiğini ve önerilen miktarın neden mantıklı olduğunu açıkla.
+
+SADECE aşağıdaki JSON formatında cevap ver, başka hiçbir şey yazma:
+{
+  "enrichments": [
+    {
+      "productId": "uuid-string",
+      "whyNow": "Neden şimdi satın alınması gerektiğine dair 1-2 cümle",
+      "quantityRationale": "Önerilen miktarın neden mantıklı olduğuna dair 1-2 cümle",
+      "urgencyLevel": "critical|high|moderate",
+      "confidence": 0.80
+    }
+  ]
+}
+
+urgencyLevel kuralları:
+- critical: coverageDays < 7 VEYA coverageDays < leadTimeDays
+- high: coverageDays 7-14 arasında
+- moderate: diğer durumlar (günlük kullanım verisi yoksa veya daha uzun süre varsa)
+
+confidence kuralları:
+- 0.75-0.90: dailyUsage ve leadTimeDays ikisi de varsa
+- 0.50-0.70: sadece dailyUsage varsa (leadTimeDays yok)
+- 0.30-0.50: ikisi de yoksa
+
+Kurallar:
+- Türkçe yaz
+- Deterministik hesabı tekrarlama, yorumla ve bağlam ekle
+- Somut, aksiyon odaklı cümleler yaz
+- Sahte kesinlik kullanma — veri yetersizse bunu belirt
+- Her ürün için tam olarak bir enrichment döndür`;
+
+export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[]): Promise<PurchaseEnrichmentResult> {
+    const now = new Date().toISOString();
+
+    if (!isAIAvailable()) {
+        return { enrichments: [], generatedAt: now };
+    }
+
+    if (items.length === 0) {
+        return { enrichments: [], generatedAt: now };
+    }
+
+    try {
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 2048,
+            system: PURCHASE_COPILOT_SYSTEM,
+            messages: [{ role: "user", content: JSON.stringify(items) }],
+        });
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (Array.isArray(parsed.enrichments)) {
+                return {
+                    enrichments: parsed.enrichments.map((e: Record<string, unknown>) => ({
+                        productId: typeof e.productId === "string" ? e.productId : "",
+                        whyNow: typeof e.whyNow === "string" ? e.whyNow : "",
+                        quantityRationale: typeof e.quantityRationale === "string" ? e.quantityRationale : "",
+                        urgencyLevel: (e.urgencyLevel === "critical" || e.urgencyLevel === "high" || e.urgencyLevel === "moderate")
+                            ? e.urgencyLevel
+                            : "moderate",
+                        confidence: typeof e.confidence === "number" ? e.confidence : 0.5,
+                    })),
+                    generatedAt: now,
+                };
+            }
+        }
+
+        return { enrichments: [], generatedAt: now };
+    } catch (err) {
+        console.error("[AI PurchaseCopilot] graceful degradation:", err);
+        return { enrichments: [], generatedAt: now };
+    }
 }
 
 export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {

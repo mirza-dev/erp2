@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
+import { getStatusBadge } from "@/lib/stock-utils";
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -17,12 +18,18 @@ const categories = [
     "Flanş Aksesuarları",
 ];
 
-function getStatusBadge(available: number, min: number) {
-    if (available === 0) return { label: "Tükendi", cls: "badge-danger" };
-    if (available <= min) return { label: "Kritik", cls: "badge-danger" };
-    if (available <= min * 2) return { label: "Düşük", cls: "badge-warning" };
-    return { label: "Hazır", cls: "badge-success" };
+interface RiskItem {
+    productId: string;
+    riskLevel: string;
+    coverageDays: number | null;
+    leadTimeDays: number | null;
+    dailyUsage: number | null;
+    deterministicReason: string;
+    aiExplanation: string | null;
+    aiRecommendation: string | null;
+    aiConfidence: number | null;
 }
+
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -86,11 +93,34 @@ export default function ProductsPage() {
     const [windowWidth, setWindowWidth] = useState<number>(
         typeof window !== "undefined" ? window.innerWidth : 1200
     );
+    const [riskData, setRiskData] = useState<Map<string, RiskItem>>(new Map());
+    const [riskLoading, setRiskLoading] = useState(false);
+    const [riskCounts, setRiskCounts] = useState<{ at_risk: number } | null>(null);
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        async function fetchRisk() {
+            setRiskLoading(true);
+            try {
+                const res = await fetch("/api/ai/stock-risk", { method: "POST" });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (cancelled) return;
+                const map = new Map<string, RiskItem>();
+                for (const item of data.items ?? []) map.set(item.productId, item);
+                setRiskData(map);
+                setRiskCounts({ at_risk: data.counts?.at_risk ?? 0 });
+            } catch { /* graceful: risk data missing = no badges */ }
+            finally { if (!cancelled) setRiskLoading(false); }
+        }
+        fetchRisk();
+        return () => { cancelled = true; };
     }, []);
 
     const isMobile = windowWidth < 768;
@@ -172,6 +202,12 @@ export default function ProductsPage() {
                         {mockProducts.length} ürün · {categories.length - 1} kategori
                         {criticalCount > 0 && (
                             <span style={{ color: "var(--danger-text)", fontWeight: 600 }}> · {criticalCount} kritik</span>
+                        )}
+                        {(riskCounts?.at_risk ?? 0) > 0 && (
+                            <span style={{ color: "var(--accent-text)" }}> · {riskCounts!.at_risk} riskli</span>
+                        )}
+                        {riskLoading && (
+                            <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}> · Risk analizi…</span>
                         )}
                     </div>
                 </div>
@@ -271,7 +307,8 @@ export default function ProductsPage() {
                     </thead>
                     <tbody>
                         {filtered.map((product) => {
-                            const status = getStatusBadge(product.available_now, product.minStockLevel);
+                            const risk = riskData.get(product.id);
+                            const status = getStatusBadge(product.available_now, product.minStockLevel, !!risk);
                             return (
                                 <tr
                                     key={product.id}
@@ -313,6 +350,11 @@ export default function ProductsPage() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center" }}>
                                         <span className={`badge ${status.cls}`}>{status.label}</span>
+                                        {risk && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px", whiteSpace: "normal", maxWidth: "160px", margin: "2px auto 0" }}>
+                                                {risk.aiExplanation || risk.deterministicReason}
+                                            </div>
+                                        )}
                                     </td>
                                     <td
                                         style={{ ...tdStyle, textAlign: "right", paddingRight: "12px" }}
