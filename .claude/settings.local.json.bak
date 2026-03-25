@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/mirzasaribiyik/**)",
+      "Read(//private/tmp/**)",
+      "Bash(git:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(sed:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(grep:*)",
+      "Bash(curl:*)",
+      "Bash(test:*)",
+      "Bash(chmod:*)",
+      "Bash(open:*)"
+    ],
+    "additionalDirectories": [
+      "/Users/mirzasaribiyik/Projects/erp2",
+      "/tmp",
+      "/private/tmp"
+    ]
+  }
+}

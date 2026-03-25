@@ -2,8 +2,19 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-interface OpsSummaryResult {
+interface OpsMetrics {
+    criticalStockCount: number;
+    warningStockCount: number;
+    pendingOrderCount: number;
+    approvedOrderCount: number;
+    highRiskOrderCount: number;
+    openAlertCount: number;
+    topCriticalItems: { name: string; available: number; min: number; coverageDays: number | null }[];
+}
+
+interface OpsSummaryResponse {
     ai_available: boolean;
+    metrics?: OpsMetrics;
     summary: string;
     insights: string[];
     anomalies: string[];
@@ -13,16 +24,109 @@ interface OpsSummaryResult {
 
 type CardState = "loading" | "loaded" | "error" | "disabled";
 
+function MetricsContextBar({ metrics }: { metrics: OpsMetrics }) {
+    const items: { label: string; value: number; danger?: boolean }[] = [
+        { label: "kritik stok", value: metrics.criticalStockCount, danger: true },
+        { label: "uyarı stok", value: metrics.warningStockCount },
+        { label: "bekleyen sipariş", value: metrics.pendingOrderCount },
+        { label: "onaylı sipariş", value: metrics.approvedOrderCount },
+        { label: "yüksek riskli", value: metrics.highRiskOrderCount, danger: true },
+        { label: "açık uyarı", value: metrics.openAlertCount },
+    ];
+
+    return (
+        <div style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "4px",
+            alignItems: "center",
+            borderBottom: "1px solid var(--border-tertiary)",
+            paddingBottom: "10px",
+            marginBottom: "12px",
+        }}>
+            {items.map((item, i) => (
+                <span key={item.label} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span style={{
+                        fontSize: "11px",
+                        color: item.danger && item.value > 0 ? "var(--danger-text)" : "var(--text-tertiary)",
+                    }}>
+                        {item.value} {item.label}
+                    </span>
+                    {i < items.length - 1 && (
+                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>·</span>
+                    )}
+                </span>
+            ))}
+        </div>
+    );
+}
+
+function DeterministicSummary({ metrics }: { metrics: OpsMetrics }) {
+    const lines: string[] = [];
+    if (metrics.criticalStockCount > 0)
+        lines.push(`${metrics.criticalStockCount} ürün kritik stok seviyesinde.`);
+    if (metrics.highRiskOrderCount > 0)
+        lines.push(`${metrics.highRiskOrderCount} yüksek riskli sipariş inceleme bekliyor.`);
+    if (metrics.pendingOrderCount > 0)
+        lines.push(`${metrics.pendingOrderCount} sipariş onay bekliyor.`);
+    if (metrics.openAlertCount > 0)
+        lines.push(`${metrics.openAlertCount} açık uyarı bulunuyor.`);
+    if (lines.length === 0)
+        lines.push("Tüm operasyonel metrikler normal seviyelerde.");
+
+    return (
+        <div>
+            {lines.map((line, i) => (
+                <p key={i} style={{
+                    fontSize: "13px",
+                    lineHeight: 1.6,
+                    color: "var(--text-primary)",
+                    margin: "0 0 6px 0",
+                }}>
+                    {line}
+                </p>
+            ))}
+            {metrics.topCriticalItems.length > 0 && (
+                <ul style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: "8px 0 0 0",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "4px",
+                }}>
+                    {metrics.topCriticalItems.map((item, i) => (
+                        <li key={i} style={{
+                            fontSize: "12px",
+                            color: "var(--danger-text)",
+                            display: "flex",
+                            alignItems: "flex-start",
+                            gap: "6px",
+                        }}>
+                            <span style={{ flexShrink: 0 }}>▸</span>
+                            <span>
+                                {item.name}: {item.available}/{item.min} adet
+                                {" "}(kalan: {item.coverageDays ?? "?"} gün)
+                            </span>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
+
 export default function AISummaryCard() {
     const [state, setState] = useState<CardState>("loading");
-    const [data, setData] = useState<OpsSummaryResult | null>(null);
+    const [data, setData] = useState<OpsSummaryResponse | null>(null);
 
     const fetchSummary = useCallback(async () => {
         setState("loading");
         try {
             const res = await fetch("/api/ai/ops-summary", { method: "POST" });
             if (!res.ok) throw new Error("API error");
-            const result: OpsSummaryResult = await res.json();
+            const result: OpsSummaryResponse = await res.json();
+            setData(result);
             if (result.ai_available === false) {
                 setState("disabled");
                 return;
@@ -31,7 +135,6 @@ export default function AISummaryCard() {
                 setState("error");
                 return;
             }
-            setData(result);
             setState("loaded");
         } catch {
             setState("error");
@@ -39,51 +142,6 @@ export default function AISummaryCard() {
     }, []);
 
     useEffect(() => { fetchSummary(); }, [fetchSummary]);
-
-    if (state === "disabled") {
-        return (
-            <div style={{
-                background: "var(--bg-secondary)",
-                border: "1px solid var(--border-secondary)",
-                borderLeft: "3px solid var(--border-primary)",
-                borderRadius: "8px",
-                padding: "16px 20px",
-            }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-tertiary)", marginBottom: "8px" }}>
-                    AI Operasyon Ozeti
-                </div>
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-                    <span style={{ fontSize: "14px", color: "var(--text-tertiary)", flexShrink: 0 }}>⚙</span>
-                    <div>
-                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "2px" }}>
-                            AI servisi yapilandirilmamis
-                        </div>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                            ANTHROPIC_API_KEY eksik — diger ERP modulleri tam calisiyor.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    if (state === "error") {
-        return (
-            <div style={{
-                background: "var(--bg-secondary)",
-                border: "1px solid var(--border-secondary)",
-                borderRadius: "8px",
-                padding: "12px 16px",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-            }}>
-                <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                    AI servisi yanit vermedi — tekrar denemek icin yenile.
-                </span>
-            </div>
-        );
-    }
 
     if (state === "loading") {
         return (
@@ -108,6 +166,110 @@ export default function AISummaryCard() {
                     </span>
                 </div>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+        );
+    }
+
+    if (state === "disabled") {
+        return (
+            <div style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--accent-border)",
+                borderLeft: "3px solid var(--accent)",
+                borderRadius: "8px",
+                padding: "20px 24px",
+            }}>
+                {/* Header */}
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    marginBottom: "14px",
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{
+                            fontSize: "11px",
+                            fontWeight: 700,
+                            letterSpacing: "0.06em",
+                            textTransform: "uppercase",
+                            color: "var(--accent-text)",
+                        }}>
+                            Operasyon Ozeti
+                        </span>
+                        <span style={{
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            padding: "2px 8px",
+                            borderRadius: "4px",
+                            background: "var(--accent-bg)",
+                            color: "var(--accent-text)",
+                            border: "1px solid var(--accent-border)",
+                        }}>
+                            Otomatik
+                        </span>
+                    </div>
+                </div>
+                {data?.metrics && <MetricsContextBar metrics={data.metrics} />}
+                {data?.metrics && <DeterministicSummary metrics={data.metrics} />}
+                <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "12px" }}>
+                    AI servisi yapilandirilmamis — veriye dayali ozet gosteriliyor.
+                </div>
+            </div>
+        );
+    }
+
+    if (state === "error") {
+        return (
+            <div style={{
+                background: "var(--bg-secondary)",
+                border: "1px solid var(--border-secondary)",
+                borderLeft: "3px solid var(--border-primary)",
+                borderRadius: "8px",
+                padding: "20px 24px",
+            }}>
+                {/* Header */}
+                <div style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: "var(--text-tertiary)",
+                    marginBottom: "14px",
+                }}>
+                    AI Operasyon Ozeti
+                </div>
+                {data?.metrics && <MetricsContextBar metrics={data.metrics} />}
+                {data?.metrics && <DeterministicSummary metrics={data.metrics} />}
+                <div style={{
+                    background: "var(--warning-bg)",
+                    border: "1px solid var(--warning-border)",
+                    borderRadius: "6px",
+                    padding: "10px 14px",
+                    marginTop: data?.metrics ? "12px" : "0",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                }}>
+                    <span style={{ fontSize: "12px", color: "var(--warning-text)" }}>
+                        AI servisi yanit vermedi.
+                    </span>
+                    <button
+                        onClick={fetchSummary}
+                        style={{
+                            fontSize: "11px",
+                            padding: "4px 10px",
+                            border: "1px solid var(--warning-border)",
+                            borderRadius: "5px",
+                            background: "transparent",
+                            color: "var(--warning-text)",
+                            cursor: "pointer",
+                            flexShrink: 0,
+                        }}
+                    >
+                        Tekrar Dene
+                    </button>
+                </div>
             </div>
         );
     }
@@ -182,6 +344,9 @@ export default function AISummaryCard() {
                     Yenile
                 </button>
             </div>
+
+            {/* Metrics context bar */}
+            {data.metrics && <MetricsContextBar metrics={data.metrics} />}
 
             {/* Summary */}
             <p style={{

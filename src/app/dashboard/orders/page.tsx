@@ -219,7 +219,29 @@ function OrdersList() {
                                         }}
                                     >
                                         <td style={{ ...tdStyle, fontWeight: 500, borderLeft: "2px solid transparent" }}>
-                                            {order.orderNumber}
+                                            <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                                                {order.orderNumber}
+                                                {order.aiRiskLevel && order.aiConfidence != null && order.aiConfidence > 0 && (
+                                                    <span
+                                                        title={
+                                                            order.aiRiskLevel === "high" ? "Yüksek inceleme riski"
+                                                            : order.aiRiskLevel === "medium" ? "Orta inceleme riski"
+                                                            : "Düşük inceleme riski"
+                                                        }
+                                                        style={{
+                                                            display: "inline-block",
+                                                            width: "7px",
+                                                            height: "7px",
+                                                            borderRadius: "50%",
+                                                            flexShrink: 0,
+                                                            background:
+                                                                order.aiRiskLevel === "high" ? "var(--danger)"
+                                                                : order.aiRiskLevel === "medium" ? "var(--warning)"
+                                                                : "var(--success)",
+                                                        }}
+                                                    />
+                                                )}
+                                            </span>
                                         </td>
                                         <td style={tdStyle}>
                                             {order.customerName}

@@ -25,6 +25,15 @@ const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: s
     shipped:             { label: "Sevk Edildi",   cls: "badge-success"  },
 };
 
+const riskColors: Record<string, { bg: string; text: string; border: string }> = {
+    low:    { bg: "var(--success-bg)", text: "var(--success-text)", border: "var(--success-border)" },
+    medium: { bg: "var(--warning-bg)", text: "var(--warning-text)", border: "var(--warning-border)" },
+    high:   { bg: "var(--danger-bg)",  text: "var(--danger-text)",  border: "var(--danger-border)"  },
+};
+const riskLabels: Record<string, string> = {
+    low: "Düşük", medium: "Orta", high: "Yüksek",
+};
+
 const thStyle: React.CSSProperties = {
     textAlign: "left",
     padding: "8px 14px",
@@ -50,7 +59,7 @@ export default function OrderDetailPage() {
     const { updateOrderStatus } = useData();
     const { toast } = useToast();
     const [order, setOrder] = useState<OrderDetail | null>(null);
-    const [, setOrderLoading] = useState(true);
+    const [orderLoading, setOrderLoading] = useState(true);
     const [rescoring, setRescoring] = useState(false);
 
     const refetchOrder = async () => {
@@ -68,13 +77,18 @@ export default function OrderDetailPage() {
     // Fetch order from API on mount
     useEffect(() => {
         const fetchOrder = async () => {
+            setOrderLoading(true);
+            setOrder(null);
             try {
                 const res = await fetch(`/api/orders/${params.id}`);
                 if (res.ok) {
                     const data = await res.json();
                     setOrder(mapOrderDetail(data));
+                } else {
+                    setOrder(null);
                 }
             } catch (err) {
+                setOrder(null);
                 console.error("Failed to fetch order:", err);
             } finally {
                 setOrderLoading(false);
@@ -148,6 +162,14 @@ export default function OrderDetailPage() {
             setFulfillmentStatus(order.fulfillment_status);
         }
     }, [order]);
+
+    if (orderLoading) {
+        return (
+            <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
+                Sipariş yükleniyor...
+            </div>
+        );
+    }
 
     if (!order) {
         return (
@@ -318,11 +340,6 @@ export default function OrderDetailPage() {
                         {/* AI confidence + risk badge */}
                         {order.aiConfidence != null && order.aiConfidence > 0 && (() => {
                             const risk = order.aiRiskLevel ?? "medium";
-                            const riskColors = {
-                                low:    { bg: "var(--success-bg)", text: "var(--success-text)", border: "var(--success-border)", label: "Düşük Risk" },
-                                medium: { bg: "var(--warning-bg)", text: "var(--warning-text)", border: "var(--warning-border)", label: "Orta Risk" },
-                                high:   { bg: "var(--danger-bg)",  text: "var(--danger-text)",  border: "var(--danger-border)",  label: "Yüksek Risk" },
-                            };
                             const rc = riskColors[risk];
                             return (
                                 <span
@@ -333,25 +350,10 @@ export default function OrderDetailPage() {
                                         cursor: order.aiReason ? "help" : "default",
                                     }}
                                 >
-                                    {rc.label} · %{Math.round(order.aiConfidence * 100)}
+                                    İnceleme: {riskLabels[risk]}
                                 </span>
                             );
                         })()}
-                        {order.aiConfidence != null && order.aiConfidence > 0 && (
-                            <button
-                                onClick={handleRescore}
-                                disabled={rescoring}
-                                style={{
-                                    fontSize: "10px", padding: "2px 7px", borderRadius: "4px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    background: "transparent", color: "var(--text-tertiary)",
-                                    cursor: rescoring ? "not-allowed" : "pointer",
-                                    opacity: rescoring ? 0.5 : 1,
-                                }}
-                            >
-                                {rescoring ? "..." : "↻ Skorla"}
-                            </button>
-                        )}
                     </div>
 
                     {/* Action buttons by status */}
@@ -674,6 +676,63 @@ export default function OrderDetailPage() {
                                     />
                                 </div>
                             )}
+
+                            {/* AI Değerlendirme */}
+                            <div style={{
+                                background: "var(--bg-primary)",
+                                border: "0.5px solid var(--border-tertiary)",
+                                borderLeft: "3px solid var(--accent-border)",
+                                borderRadius: "6px",
+                                padding: "14px 16px",
+                                marginTop: "12px",
+                            }}>
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                                    <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
+                                        AI Değerlendirme
+                                    </div>
+                                    <button onClick={handleRescore} disabled={rescoring} style={{
+                                        fontSize: "10px", padding: "2px 7px", borderRadius: "4px",
+                                        border: "0.5px solid var(--border-secondary)",
+                                        background: "transparent", color: "var(--text-tertiary)",
+                                        cursor: rescoring ? "not-allowed" : "pointer",
+                                        opacity: rescoring ? 0.5 : 1,
+                                    }}>
+                                        {rescoring ? "..." : "↻ Yeniden Skorla"}
+                                    </button>
+                                </div>
+
+                                {order.aiConfidence != null && order.aiConfidence > 0 ? (
+                                    <>
+                                        <div style={{ marginBottom: "8px" }}>
+                                            <span style={{
+                                                fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px",
+                                                background: riskColors[order.aiRiskLevel ?? "medium"].bg,
+                                                color: riskColors[order.aiRiskLevel ?? "medium"].text,
+                                                border: `0.5px solid ${riskColors[order.aiRiskLevel ?? "medium"].border}`,
+                                            }}>
+                                                İnceleme: {riskLabels[order.aiRiskLevel ?? "medium"]}
+                                            </span>
+                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", marginLeft: "8px" }}>
+                                                Güven: %{Math.round(order.aiConfidence * 100)}
+                                            </span>
+                                        </div>
+
+                                        {order.aiReason && (
+                                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "8px" }}>
+                                                {order.aiReason}
+                                            </div>
+                                        )}
+
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+                                            AI tavsiyesi — operasyonel inceleme riski
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.6 }}>
+                                        Henüz AI değerlendirmesi yapılmadı
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

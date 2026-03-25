@@ -86,6 +86,17 @@ export async function GET() {
             ? `missing_or_error: ${col6Error.message}`
             : "ok";
 
+        // Migration 009 — audit_log.entity_id should be text
+        // Text column accepts arbitrary string comparison; uuid column throws.
+        const { error: col9Error } = await supabase
+            .from("audit_log")
+            .select("id")
+            .eq("entity_id", "__healthcheck_text__")
+            .limit(1);
+        checks["db.migration_009"] = col9Error
+            ? `missing_or_error: ${col9Error.message}`
+            : "ok";
+
     } catch (e) {
         checks["db.error"] = `exception: ${e}`;
     }
@@ -104,6 +115,7 @@ export async function GET() {
         "db.rpc_inventory_functions",   // 004
         "db.migration_005",             // 005 — ai_risk_level
         "db.migration_006",             // 006 — lead_time_days
+        "db.migration_009",             // 009 — audit_log.entity_id text hotfix
     ];
     const allOk = requiredKeys.every((k) => checks[k] === "ok");
 

@@ -48,6 +48,9 @@ export default function DashboardPage() {
             {/* Metrics */}
             <StatsCards />
 
+            {/* AI Ops Summary */}
+            <AISummaryCard />
+
             {/* Section header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                 <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
@@ -250,9 +253,6 @@ export default function DashboardPage() {
 
             {/* Stock table */}
             <StockDataGrid filterCategory={filterCategory} filterStatus={filterStatus} />
-
-            {/* AI Ops Summary (AI-powered, full width) */}
-            <AISummaryCard />
 
             {/* Bottom grid: AI alerts + (recent orders + import zone) */}
             <div className="dashboard-bottom-grid">

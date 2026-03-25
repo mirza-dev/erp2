@@ -358,7 +358,10 @@ Kurallar:
 - Kısa ve net ol, jargon kullanma
 - Her insight aksiyon içersin ("şunu yapın", "bunu kontrol edin")
 - Anomali yoksa boş dizi döndür []
-- En fazla 5 insight, en fazla 3 anomali`;
+- En fazla 5 insight, en fazla 3 anomali
+- Dolgu cümlesi yazma ("genel olarak iyi durumda" gibi) — sadece aksiyon gerektiren konulardan bahset
+- Insight'ları aciliyet sırasına göre sırala (en acil olan ilk)
+- Her şey normalse summary'yi tek kısa cümleyle bitir, insights ve anomalies boş dizi olsun`;
 
 export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsSummaryResult> {
     const now = new Date().toISOString();

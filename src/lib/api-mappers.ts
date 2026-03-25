@@ -83,6 +83,8 @@ export function mapOrderSummary(row: SalesOrderRow): Order {
     currency: row.currency,
     createdAt: row.created_at,
     itemCount: row.item_count,
+    aiRiskLevel: row.ai_risk_level ?? undefined,
+    aiConfidence: row.ai_confidence ?? undefined,
   };
 }
 

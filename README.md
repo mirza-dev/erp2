@@ -54,6 +54,9 @@ curl http://localhost:3000/api/health
 | 4 | `004_inventory_rpcs.sql` | Gelişmiş envanter yönetim RPC'leri |
 | 5 | `005_faz8910_hardening.sql` | `ai_risk_level` kolonu, parasut/sync-log index'leri |
 | 6 | `006_lead_time.sql` | `products.lead_time_days` kolonu — lead-time-aware satın alma önerisi |
+| 7 | `007_rpc_hotfix.sql` | Sipariş RPC hotfix'leri |
+| 8 | `008_inventory_rpc_hotfix.sql` | Envanter/üretim RPC hotfix'leri |
+| 9 | `009_audit_log_entity_id_text.sql` | `audit_log.entity_id` kolonu `text` hotfix'i — runtime uuid/text hatasını kapatır |
 
 **Supabase CLI ile:**
 ```bash
@@ -62,7 +65,7 @@ supabase db push
 
 **Dashboard ile:** SQL Editor → her dosyayı sırayla çalıştır.
 
-> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi çalışmaz.
+> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi, `009` olmadan bazı sipariş transition'larında `entity_id uuid / text` hatası görülebilir.
 
 ---
 

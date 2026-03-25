@@ -46,9 +46,17 @@ async function gatherMetrics(): Promise<OpsSummaryInput> {
 }
 
 export async function POST() {
+    let metrics: OpsSummaryInput;
+    try {
+        metrics = await gatherMetrics();
+    } catch (err) {
+        return handleApiError(err, "Operasyon metrikleri toplanamadı.");
+    }
+
     if (!isAIAvailable()) {
         return NextResponse.json({
             ai_available: false,
+            metrics,
             summary: "",
             insights: [],
             anomalies: [],
@@ -58,9 +66,8 @@ export async function POST() {
     }
 
     try {
-        const metrics = await gatherMetrics();
         const result = await aiGenerateOpsSummary(metrics);
-        return NextResponse.json({ ai_available: true, ...result });
+        return NextResponse.json({ ai_available: true, metrics, ...result });
     } catch (err) {
         return handleApiError(err, "AI özet oluşturulamadı.");
     }

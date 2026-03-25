@@ -61,6 +61,8 @@ export interface Order {
     currency: string;
     createdAt: string;
     itemCount: number;
+    aiRiskLevel?: "low" | "medium" | "high";
+    aiConfidence?: number;
 }
 
 export interface OrderLineItem {
