@@ -407,13 +407,36 @@ export interface ScoreOrderResult {
     reason: string;
 }
 
-const SCORE_SYSTEM = `You are a risk assessment assistant for a B2B ERP system selling industrial valves.
-Given an order JSON, assess its risk and return ONLY this format:
-CONFIDENCE: <float 0-1>
-RISK_LEVEL: <low|medium|high>
-REASON: <one sentence explanation>
+const SCORE_SYSTEM = `Sen bir B2B ERP sipariş inceleme asistanısın. Endüstriyel vana satışı yapan bir firma için çalışıyorsun.
 
-Risk factors to consider: missing customer info, unusually high discount, very large or very small quantity, no notes for large orders, unknown currency.`;
+Görevin: Verilen sipariş JSON'ını inceleyerek, siparişin operasyonel açıdan manuel inceleme gerektirip gerektirmediğini değerlendir.
+
+ÖNEMLİ: Bu bir ödeme riski veya dolandırıcılık tespiti DEĞİLDİR. Bu, siparişteki eksiklik, tutarsızlık veya olağandışı durumları tespit eden operasyonel bir inceleme değerlendirmesidir.
+
+İnceleme faktörleri:
+- Müşteri bilgisi eksikliği (ülke, vergi bilgisi, e-posta)
+- Olağandışı yüksek iskonto oranı (>%15)
+- Çok büyük veya çok küçük sipariş miktarları
+- Büyük siparişlerde not/açıklama eksikliği
+- Bilinmeyen veya alışılmadık para birimi
+- Satır sayısına göre sipariş büyüklüğü tutarsızlığı
+
+SADECE aşağıdaki formatta cevap ver:
+CONFIDENCE: <0-1 arası ondalık sayı>
+RISK_LEVEL: <low|medium|high>
+REASON: <Türkçe tek cümle — neyin inceleme gerektirdiğini açıkla>`;
+
+export function parseScoreResponse(text: string): ScoreOrderResult {
+    const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
+    const riskMatch = text.match(/RISK_LEVEL:\s*(low|medium|high)/i);
+    const reasonMatch = text.match(/REASON:\s*(.+?)$/im);
+
+    const confidence = confMatch ? parseFloat(confMatch[1]) : 0.5;
+    const risk_level = (riskMatch ? riskMatch[1].toLowerCase() : "medium") as "low" | "medium" | "high";
+    const reason = reasonMatch ? reasonMatch[1].trim() : "";
+
+    return { confidence, risk_level, reason };
+}
 
 export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
     const order = await dbGetOrderById(orderId);
@@ -453,13 +476,7 @@ export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
             .map(c => (c as { type: "text"; text: string }).text)
             .join("\n");
 
-        const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
-        const riskMatch = text.match(/RISK_LEVEL:\s*(low|medium|high)/i);
-        const reasonMatch = text.match(/REASON:\s*(.+?)$/im);
-
-        const confidence = confMatch ? parseFloat(confMatch[1]) : 0.5;
-        const risk_level = (riskMatch ? riskMatch[1].toLowerCase() : "medium") as "low" | "medium" | "high";
-        const reason = reasonMatch ? reasonMatch[1].trim() : "";
+        const { confidence, risk_level, reason } = parseScoreResponse(text);
 
         // Persist to order record (§11.1 — non-authoritative, advisory only)
         const supabase = createServiceClient();

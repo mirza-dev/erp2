@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { mapProduct, mapCustomer, mapOrderSummary, mapProductionEntry } from "@/lib/api-mappers";
-import type { ProductWithStock, CustomerRow, SalesOrderRow, ProductionEntryRow } from "@/lib/database.types";
+import { mapProduct, mapCustomer, mapOrderSummary, mapOrderDetail, mapProductionEntry } from "@/lib/api-mappers";
+import type { ProductWithStock, CustomerRow, SalesOrderRow, SalesOrderWithLines, ProductionEntryRow } from "@/lib/database.types";
 
 // ── mapProduct ────────────────────────────────────────────────
 
@@ -158,6 +158,146 @@ describe("mapOrderSummary", () => {
     expect(o.currency).toBe("USD");
     expect(o.itemCount).toBe(2);
     expect(o.createdAt).toBe("2024-01-15T10:00:00Z");
+  });
+});
+
+// ── mapOrderSummary — AI fields ───────────────────────────────
+
+describe("mapOrderSummary — AI fields", () => {
+  const base: SalesOrderRow = {
+    id: "o1",
+    order_number: "ORD-0001",
+    customer_id: "c1",
+    customer_name: "Acme Ltd",
+    customer_email: null,
+    customer_country: null,
+    customer_tax_office: null,
+    customer_tax_number: null,
+    commercial_status: "draft",
+    fulfillment_status: "unallocated",
+    currency: "USD",
+    subtotal: 1000,
+    vat_total: 200,
+    grand_total: 1200,
+    notes: null,
+    item_count: 2,
+    parasut_invoice_id: null,
+    parasut_sent_at: null,
+    parasut_error: null,
+    ai_confidence: null,
+    ai_reason: null,
+    ai_risk_level: null,
+    ai_model_version: null,
+    created_at: "2024-01-15T10:00:00Z",
+    updated_at: "2024-01-15T10:00:00Z",
+    created_by: null,
+  };
+
+  it("maps ai_risk_level to aiRiskLevel when present", () => {
+    const o = mapOrderSummary({ ...base, ai_risk_level: "high", ai_confidence: 0.85 });
+    expect(o.aiRiskLevel).toBe("high");
+  });
+
+  it("maps ai_confidence to aiConfidence when present", () => {
+    const o = mapOrderSummary({ ...base, ai_risk_level: "high", ai_confidence: 0.85 });
+    expect(o.aiConfidence).toBe(0.85);
+  });
+
+  it("maps null ai_risk_level to undefined", () => {
+    const o = mapOrderSummary({ ...base, ai_risk_level: null });
+    expect(o.aiRiskLevel).toBeUndefined();
+  });
+
+  it("maps null ai_confidence to undefined", () => {
+    const o = mapOrderSummary({ ...base, ai_confidence: null });
+    expect(o.aiConfidence).toBeUndefined();
+  });
+});
+
+// ── mapOrderDetail ────────────────────────────────────────────
+
+describe("mapOrderDetail", () => {
+  const baseRow: SalesOrderRow = {
+    id: "o1",
+    order_number: "ORD-0001",
+    customer_id: "c1",
+    customer_name: "Acme Ltd",
+    customer_email: "acme@example.com",
+    customer_country: "TR",
+    customer_tax_office: "Kadıköy",
+    customer_tax_number: "1234567890",
+    commercial_status: "approved",
+    fulfillment_status: "allocated",
+    currency: "USD",
+    subtotal: 1000,
+    vat_total: 200,
+    grand_total: 1200,
+    notes: "Test notu",
+    item_count: 1,
+    parasut_invoice_id: null,
+    parasut_sent_at: null,
+    parasut_error: null,
+    ai_confidence: 0.87,
+    ai_reason: "Standart sipariş",
+    ai_risk_level: "low",
+    ai_model_version: "claude-haiku-4-5-20251001",
+    created_at: "2024-01-15T10:00:00Z",
+    updated_at: "2024-01-15T10:00:00Z",
+    created_by: null,
+  };
+
+  const detailBase: SalesOrderWithLines = {
+    ...baseRow,
+    lines: [{
+      id: "line-1",
+      order_id: "o1",
+      product_id: "p1",
+      product_name: "Test Valve",
+      product_sku: "TV-001",
+      unit: "adet",
+      quantity: 10,
+      unit_price: 100,
+      discount_pct: 0,
+      line_total: 1000,
+      sort_order: 0,
+    }],
+  };
+
+  it("maps ai_confidence to aiConfidence", () => {
+    const d = mapOrderDetail(detailBase);
+    expect(d.aiConfidence).toBe(0.87);
+  });
+
+  it("maps ai_reason to aiReason", () => {
+    const d = mapOrderDetail(detailBase);
+    expect(d.aiReason).toBe("Standart sipariş");
+  });
+
+  it("maps ai_risk_level to aiRiskLevel", () => {
+    const d = mapOrderDetail(detailBase);
+    expect(d.aiRiskLevel).toBe("low");
+  });
+
+  it("maps all three AI fields as undefined when DB null", () => {
+    const d = mapOrderDetail({
+      ...detailBase,
+      ai_confidence: null,
+      ai_reason: null,
+      ai_risk_level: null,
+    });
+    expect(d.aiConfidence).toBeUndefined();
+    expect(d.aiReason).toBeUndefined();
+    expect(d.aiRiskLevel).toBeUndefined();
+  });
+
+  it("maps lines array correctly", () => {
+    const d = mapOrderDetail(detailBase);
+    expect(d.lines).toHaveLength(1);
+    expect(d.lines[0].productName).toBe("Test Valve");
+    expect(d.lines[0].productSku).toBe("TV-001");
+    expect(d.lines[0].quantity).toBe(10);
+    expect(d.lines[0].unitPrice).toBe(100);
+    expect(d.lines[0].lineTotal).toBe(1000);
   });
 });
 
