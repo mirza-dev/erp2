@@ -13,6 +13,11 @@ interface AiEnrichmentItem {
     aiConfidence: number | null;
 }
 
+interface RecEntry {
+    id: string;
+    status: string;
+}
+
 function AiEnrichmentBadge({ enrichment, loading }: {
     enrichment: AiEnrichmentItem | undefined;
     loading: boolean;
@@ -240,14 +245,172 @@ function FormulaLabel({ p, formula, leadTimeDemand }: {
     );
 }
 
+/** Action buttons + status badge for a recommendation */
+function RecActionCell({
+    productId,
+    recEntry,
+    suggestQty,
+    unit,
+    onAccept,
+    onReject,
+    onEdit,
+}: {
+    productId: string;
+    recEntry: RecEntry | undefined;
+    suggestQty: number;
+    unit: string;
+    onAccept: (productId: string) => void;
+    onReject: (productId: string) => void;
+    onEdit: (productId: string, qty: number) => void;
+}) {
+    const [editMode, setEditMode] = useState(false);
+    const [editQty, setEditQty] = useState(suggestQty);
+
+    const status = recEntry?.status ?? "no_rec";
+
+    if (status === "accepted") {
+        return (
+            <span style={{
+                fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                background: "var(--success-bg)", color: "var(--success-text)",
+                border: "0.5px solid var(--success-border)",
+            }}>
+                ✓ Kabul Edildi
+            </span>
+        );
+    }
+
+    if (status === "edited") {
+        const editedQty = recEntry ? (recEntry as RecEntry & { editedQty?: number }).editedQty : null;
+        return (
+            <span style={{
+                fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                background: "var(--accent-bg)", color: "var(--accent-text)",
+                border: "0.5px solid var(--accent-border)",
+            }}>
+                ✎ Düzenlendi{editedQty != null ? `: ${editedQty} ${unit}` : ""}
+            </span>
+        );
+    }
+
+    if (status === "rejected") {
+        return (
+            <span style={{
+                fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                color: "var(--danger-text)",
+            }}>
+                ✕ Reddedildi
+            </span>
+        );
+    }
+
+    if (editMode) {
+        return (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                <input
+                    type="number"
+                    value={editQty}
+                    min={1}
+                    onChange={e => setEditQty(Number(e.target.value))}
+                    style={{
+                        width: "72px",
+                        padding: "3px 6px",
+                        fontSize: "12px",
+                        border: "1px solid var(--border-secondary)",
+                        borderRadius: "4px",
+                        background: "var(--bg-primary)",
+                        color: "var(--text-primary)",
+                    }}
+                />
+                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{unit}</span>
+                <button
+                    onClick={() => { onEdit(productId, editQty); setEditMode(false); }}
+                    style={{
+                        fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                        background: "var(--accent-bg)", color: "var(--accent-text)",
+                        border: "0.5px solid var(--accent-border)", cursor: "pointer",
+                    }}
+                >
+                    Kaydet
+                </button>
+                <button
+                    onClick={() => setEditMode(false)}
+                    style={{
+                        fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
+                        background: "transparent", color: "var(--text-tertiary)",
+                        border: "0.5px solid var(--border-secondary)", cursor: "pointer",
+                    }}
+                >
+                    İptal
+                </button>
+            </div>
+        );
+    }
+
+    // suggested or no_rec
+    if (!recEntry) {
+        return (
+            <span style={{
+                fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "4px",
+                background: "var(--warning-bg)", color: "var(--warning-text)",
+                border: "0.5px solid var(--warning-border)",
+            }}>
+                Beklemede
+            </span>
+        );
+    }
+
+    return (
+        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            <button
+                onClick={() => onAccept(productId)}
+                style={{
+                    fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                    background: "var(--success-bg)", color: "var(--success-text)",
+                    border: "0.5px solid var(--success-border)", cursor: "pointer",
+                }}
+            >
+                Kabul Et
+            </button>
+            <button
+                onClick={() => { setEditQty(suggestQty); setEditMode(true); }}
+                style={{
+                    fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                    background: "var(--accent-bg)", color: "var(--accent-text)",
+                    border: "0.5px solid var(--accent-border)", cursor: "pointer",
+                }}
+            >
+                Düzenle
+            </button>
+            <button
+                onClick={() => onReject(productId)}
+                style={{
+                    fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
+                    background: "transparent", color: "var(--text-tertiary)",
+                    border: "0.5px solid var(--border-secondary)", cursor: "pointer",
+                }}
+            >
+                Reddet
+            </button>
+        </div>
+    );
+}
+
 export default function PurchaseSuggestedPage() {
     const { reorderSuggestions } = useData();
     const [filter, setFilter] = useState<FilterType>("all");
     const [windowWidth, setWindowWidth] = useState(
         typeof window !== "undefined" ? window.innerWidth : 1200
     );
-    const [aiData, setAiData] = useState<{ ai_available: boolean; items: AiEnrichmentItem[] } | null>(null);
+    const [aiData, setAiData] = useState<{
+        ai_available: boolean;
+        items: AiEnrichmentItem[];
+        recommendations?: Array<{ productId: string; recommendationId: string | null; status: string }>;
+    } | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
+
+    // recMap: productId → { id, status, editedQty? }
+    const [recMap, setRecMap] = useState<Map<string, RecEntry & { editedQty?: number }>>(new Map());
 
     useEffect(() => {
         const handleResize = () => setWindowWidth(window.innerWidth);
@@ -260,7 +423,21 @@ export default function PurchaseSuggestedPage() {
         setAiLoading(true);
         fetch("/api/ai/purchase-copilot", { method: "POST" })
             .then(res => res.ok ? res.json() : null)
-            .then(data => { if (data) setAiData(data); })
+            .then(data => {
+                if (data) {
+                    setAiData(data);
+                    // Populate recMap from response
+                    if (data.recommendations) {
+                        const newMap = new Map<string, RecEntry & { editedQty?: number }>();
+                        for (const r of data.recommendations) {
+                            if (r.recommendationId) {
+                                newMap.set(r.productId, { id: r.recommendationId, status: r.status });
+                            }
+                        }
+                        setRecMap(newMap);
+                    }
+                }
+            })
             .catch(() => {})
             .finally(() => setAiLoading(false));
     }, [reorderSuggestions.length]);
@@ -269,6 +446,55 @@ export default function PurchaseSuggestedPage() {
         if (!aiData?.items) return new Map<string, AiEnrichmentItem>();
         return new Map(aiData.items.map(i => [i.productId, i]));
     }, [aiData]);
+
+    const handleAccept = async (productId: string) => {
+        const rec = recMap.get(productId);
+        if (!rec) return;
+        const prev = { ...rec };
+        // Optimistic
+        setRecMap(m => new Map(m).set(productId, { ...rec, status: "accepted" }));
+        try {
+            await fetch(`/api/recommendations/${rec.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "accepted" }),
+            });
+        } catch {
+            setRecMap(m => new Map(m).set(productId, prev));
+        }
+    };
+
+    const handleReject = async (productId: string) => {
+        const rec = recMap.get(productId);
+        if (!rec) return;
+        const prev = { ...rec };
+        setRecMap(m => new Map(m).set(productId, { ...rec, status: "rejected" }));
+        try {
+            await fetch(`/api/recommendations/${rec.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "rejected" }),
+            });
+        } catch {
+            setRecMap(m => new Map(m).set(productId, prev));
+        }
+    };
+
+    const handleEdit = async (productId: string, qty: number) => {
+        const rec = recMap.get(productId);
+        if (!rec) return;
+        const prev = { ...rec };
+        setRecMap(m => new Map(m).set(productId, { ...rec, status: "edited", editedQty: qty }));
+        try {
+            await fetch(`/api/recommendations/${rec.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "edited", editedMetadata: { suggestQty: qty } }),
+            });
+        } catch {
+            setRecMap(m => new Map(m).set(productId, prev));
+        }
+    };
 
     const isMobile = windowWidth < 768;
 
@@ -282,11 +508,9 @@ export default function PurchaseSuggestedPage() {
     const sorted = [...filtered].sort((a, b) => {
         const daysA = computeCoverageDays(a.available_now, a.dailyUsage);
         const daysB = computeCoverageDays(b.available_now, b.dailyUsage);
-        // Known coverage days first (ascending — fewer days = more urgent)
         if (daysA !== null && daysB !== null) return daysA - daysB;
         if (daysA !== null) return -1;
         if (daysB !== null) return 1;
-        // Both null → urgency % fallback
         const urgA = 1 - a.available_now / a.minStockLevel;
         const urgB = 1 - b.available_now / b.minStockLevel;
         return urgB - urgA;
@@ -309,6 +533,11 @@ export default function PurchaseSuggestedPage() {
         { key: "raw_material", label: "Hammadde", count: rawItems.length },
         { key: "finished", label: "Bitmiş Ürün", count: finishedItems.length },
     ];
+
+    // Summary stats for decisions
+    const acceptedCount = [...recMap.values()].filter(r => r.status === "accepted").length;
+    const rejectedCount = [...recMap.values()].filter(r => r.status === "rejected").length;
+    const pendingCount = reorderSuggestions.length - acceptedCount - rejectedCount;
 
     return (
         <div style={{ padding: "24px 32px" }}>
@@ -411,6 +640,17 @@ export default function PurchaseSuggestedPage() {
                 </div>
             )}
 
+            {/* Decision summary */}
+            {recMap.size > 0 && (
+                <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--text-secondary)" }}>
+                    <span style={{ color: "var(--success-text)", fontWeight: 600 }}>{acceptedCount} kabul</span>
+                    {" · "}
+                    <span style={{ color: "var(--danger-text)", fontWeight: 600 }}>{rejectedCount} red</span>
+                    {" · "}
+                    <span style={{ color: "var(--text-tertiary)" }}>{pendingCount} beklemede</span>
+                </div>
+            )}
+
             {/* Filter tabs */}
             <div style={{ display: "flex", gap: "8px", marginTop: "20px" }}>
                 {tabs.map(tab => {
@@ -477,12 +717,15 @@ export default function PurchaseSuggestedPage() {
                         const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                         const isRaw = p.productType === "raw_material";
                         const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
+                        const recEntry = recMap.get(p.id);
+                        const isRejected = recEntry?.status === "rejected";
                         return (
                             <div key={p.id} style={{
                                 border: "1px solid var(--border-secondary)",
                                 borderRadius: "8px",
                                 padding: "14px 16px",
                                 background: urgency >= 80 ? "rgba(248,81,73,0.04)" : "var(--bg-secondary)",
+                                opacity: isRejected ? 0.6 : 1,
                             }}>
                                 {/* Type + Name row */}
                                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
@@ -560,15 +803,17 @@ export default function PurchaseSuggestedPage() {
                                     <FormulaLabel p={p} formula={formula} leadTimeDemand={leadTimeDemand} />
                                 </div>
 
-                                {/* Durum badge */}
+                                {/* Action */}
                                 <div style={{ marginTop: "12px" }}>
-                                    <span style={{
-                                        fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "4px",
-                                        background: "var(--warning-bg)", color: "var(--warning-text)",
-                                        border: "0.5px solid var(--warning-border)",
-                                    }}>
-                                        {isRaw ? "📦 Tedarik Gerekli" : "🔧 Üretim Emri Açılmalı"}
-                                    </span>
+                                    <RecActionCell
+                                        productId={p.id}
+                                        recEntry={recMap.get(p.id)}
+                                        suggestQty={suggestQty}
+                                        unit={p.unit}
+                                        onAccept={handleAccept}
+                                        onReject={handleReject}
+                                        onEdit={handleEdit}
+                                    />
                                 </div>
                             </div>
                         );
@@ -585,7 +830,7 @@ export default function PurchaseSuggestedPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
-                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Risk Skoru", "Önerilen · Tükenme", "Durum"].map(h => (
+                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Risk Skoru", "Önerilen · Tükenme", "Karar"].map(h => (
                                     <th key={h} style={{
                                         padding: "10px 12px",
                                         textAlign: "left",
@@ -610,10 +855,13 @@ export default function PurchaseSuggestedPage() {
                                 const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                                 const isRaw = p.productType === "raw_material";
                                 const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
+                                const recEntry = recMap.get(p.id);
+                                const isRejected = recEntry?.status === "rejected";
                                 return (
                                     <tr key={p.id} style={{
                                         borderBottom: idx < sorted.length - 1 ? "1px solid var(--border-tertiary)" : "none",
                                         background: urgency >= 80 ? "rgba(248,81,73,0.04)" : "transparent",
+                                        opacity: isRejected ? 0.6 : 1,
                                     }}>
                                         {/* Tür */}
                                         <td style={{ padding: "10px 12px" }}>
@@ -727,15 +975,17 @@ export default function PurchaseSuggestedPage() {
                                                 </span>
                                             )}
                                         </td>
-                                        {/* Aksiyon */}
+                                        {/* Karar */}
                                         <td style={{ padding: "10px 12px" }}>
-                                            <span style={{
-                                                fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "4px",
-                                                background: "var(--warning-bg)", color: "var(--warning-text)",
-                                                border: "0.5px solid var(--warning-border)",
-                                            }}>
-                                                {isRaw ? "📦 Tedarik Gerekli" : "🔧 Üretim Emri Açılmalı"}
-                                            </span>
+                                            <RecActionCell
+                                                productId={p.id}
+                                                recEntry={recEntry}
+                                                suggestQty={suggestQty}
+                                                unit={p.unit}
+                                                onAccept={handleAccept}
+                                                onReject={handleReject}
+                                                onEdit={handleEdit}
+                                            />
                                         </td>
                                     </tr>
                                 );

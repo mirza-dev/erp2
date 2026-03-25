@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { dbListProducts } from "@/lib/supabase/products";
 import { computeTargetStock, computeCoverageDays, computeUrgencyPct } from "@/lib/stock-utils";
 import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem } from "@/lib/services/ai-service";
+import { dbUpsertRecommendation, dbExpireSuggestedRecommendations } from "@/lib/supabase/recommendations";
 import { handleApiError } from "@/lib/api-error";
 
 export async function POST() {
@@ -101,6 +102,53 @@ export async function POST() {
             return a.coverageDays - b.coverageDays;
         });
 
+    // ── Persist recommendations (non-blocking) ────────────────────────────────
+    const recommendations: Array<{ productId: string; recommendationId: string | null; status: string }> = [];
+
+    try {
+        const activeProductIds = responseItems.map(i => i.productId);
+
+        // Expire suggestions for products that no longer need purchase
+        if (activeProductIds.length > 0) {
+            await dbExpireSuggestedRecommendations("product", activeProductIds, "purchase_suggestion");
+        }
+
+        // Upsert a recommendation for each item
+        for (const item of responseItems) {
+            const ai = aiMap.get(item.productId);
+            const urgencyPct = item.urgencyPct;
+            const severity = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
+            try {
+                const rec = await dbUpsertRecommendation({
+                    entity_type: "product",
+                    entity_id: item.productId,
+                    recommendation_type: "purchase_suggestion",
+                    title: `${item.productName} — Satın alma önerisi`,
+                    body: ai?.whyNow ?? `Stok ${item.available}/${item.min}. Önerilen: ${item.suggestQty} ${item.unit}.`,
+                    confidence: ai?.confidence ?? null,
+                    severity,
+                    model_version: aiAvailable ? "purchase-copilot-v1" : null,
+                    metadata: {
+                        suggestQty: item.suggestQty,
+                        moq: item.moq,
+                        urgencyPct: item.urgencyPct,
+                        aiWhyNow: ai?.whyNow ?? null,
+                        aiQuantityRationale: ai?.quantityRationale ?? null,
+                        aiUrgencyLevel: ai?.urgencyLevel ?? null,
+                        coverageDays: item.coverageDays,
+                        targetStock: item.targetStock,
+                        formula: item.formula,
+                    },
+                });
+                recommendations.push({ productId: item.productId, recommendationId: rec.id, status: rec.status });
+            } catch {
+                recommendations.push({ productId: item.productId, recommendationId: null, status: "error" });
+            }
+        }
+    } catch {
+        // Persistence errors must not affect the main response
+    }
+
     return NextResponse.json({
         ai_available: aiAvailable,
         counts: {
@@ -110,6 +158,7 @@ export async function POST() {
             finished: finishedCount,
         },
         items: responseItems,
+        recommendations,
         generatedAt: new Date().toISOString(),
     });
 }

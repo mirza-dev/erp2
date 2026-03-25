@@ -13,6 +13,7 @@ import type {
   SalesOrderWithLines,
   ProductionEntryRow,
   OrderLineRow,
+  AiRecommendationRow,
 } from "./database.types";
 
 import type {
@@ -22,6 +23,7 @@ import type {
   OrderDetail,
   OrderLineItem,
   UretimKaydi,
+  AiRecommendation,
 } from "./mock-data";
 
 // ── Product ───────────────────────────────────────────────
@@ -124,6 +126,27 @@ export function mapOrderDetail(row: SalesOrderWithLines): OrderDetail {
     aiConfidence: row.ai_confidence ?? undefined,
     aiReason: row.ai_reason ?? undefined,
     aiRiskLevel: row.ai_risk_level ?? undefined,
+  };
+}
+
+// ── AI Recommendation ─────────────────────────────────────
+
+export function mapRecommendation(row: AiRecommendationRow): AiRecommendation {
+  return {
+    id: row.id,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    recommendationType: row.recommendation_type,
+    title: row.title,
+    body: row.body,
+    confidence: row.confidence,
+    severity: row.severity,
+    status: row.status,
+    modelVersion: row.model_version,
+    metadata: row.metadata as Record<string, unknown> | null,
+    editedMetadata: row.edited_metadata as Record<string, unknown> | null,
+    decidedAt: row.decided_at,
+    createdAt: row.created_at,
   };
 }
 

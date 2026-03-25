@@ -1,0 +1,201 @@
+import { createServiceClient } from "./service";
+import type {
+    AiRecommendationRow,
+    RecommendationType,
+    RecommendationStatus,
+    FeedbackType,
+} from "@/lib/database.types";
+
+export interface UpsertRecommendationInput {
+    entity_type: string;
+    entity_id: string;
+    recommendation_type: RecommendationType;
+    title: string;
+    body?: string | null;
+    confidence?: number | null;
+    severity?: "critical" | "warning" | "info";
+    model_version?: string | null;
+    metadata?: Record<string, unknown> | null;
+}
+
+export interface ListRecommendationsFilter {
+    entity_type?: string;
+    entity_id?: string;
+    recommendation_type?: RecommendationType;
+    status?: RecommendationStatus;
+}
+
+export interface UpdateRecommendationStatusOpts {
+    editedMetadata?: Record<string, unknown>;
+    feedbackNote?: string;
+    actor?: string;
+}
+
+// Valid transitions from a given status
+const VALID_TRANSITIONS: Partial<Record<RecommendationStatus, RecommendationStatus[]>> = {
+    suggested: ["accepted", "edited", "rejected", "expired"],
+};
+
+// ── Queries ──────────────────────────────────────────────────
+
+/**
+ * Upsert a recommendation: if a "suggested" row already exists for
+ * entity+type, refresh it. Otherwise insert a new row.
+ */
+export async function dbUpsertRecommendation(
+    input: UpsertRecommendationInput
+): Promise<AiRecommendationRow> {
+    const supabase = createServiceClient();
+
+    const { data: existing } = await supabase
+        .from("ai_recommendations")
+        .select("*")
+        .eq("entity_type", input.entity_type)
+        .eq("entity_id", input.entity_id)
+        .eq("recommendation_type", input.recommendation_type)
+        .eq("status", "suggested")
+        .maybeSingle();
+
+    if (existing) {
+        const { data, error } = await supabase
+            .from("ai_recommendations")
+            .update({
+                title: input.title,
+                body: input.body ?? null,
+                confidence: input.confidence ?? null,
+                severity: input.severity ?? "info",
+                model_version: input.model_version ?? null,
+                metadata: input.metadata ?? null,
+            })
+            .eq("id", existing.id)
+            .select("*")
+            .single();
+        if (error || !data) throw new Error(error?.message ?? "Recommendation update failed");
+        return data;
+    }
+
+    const { data, error } = await supabase
+        .from("ai_recommendations")
+        .insert({
+            entity_type: input.entity_type,
+            entity_id: input.entity_id,
+            recommendation_type: input.recommendation_type,
+            title: input.title,
+            body: input.body ?? null,
+            confidence: input.confidence ?? null,
+            severity: input.severity ?? "info",
+            model_version: input.model_version ?? null,
+            metadata: input.metadata ?? null,
+        })
+        .select("*")
+        .single();
+    if (error || !data) throw new Error(error?.message ?? "Recommendation creation failed");
+    return data;
+}
+
+export async function dbListRecommendations(
+    filter: ListRecommendationsFilter = {}
+): Promise<AiRecommendationRow[]> {
+    const supabase = createServiceClient();
+    let query = supabase
+        .from("ai_recommendations")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+    if (filter.entity_type)        query = query.eq("entity_type", filter.entity_type);
+    if (filter.entity_id)          query = query.eq("entity_id", filter.entity_id);
+    if (filter.recommendation_type) query = query.eq("recommendation_type", filter.recommendation_type);
+    if (filter.status)             query = query.eq("status", filter.status);
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}
+
+export async function dbGetRecommendationById(id: string): Promise<AiRecommendationRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("ai_recommendations").select("*").eq("id", id).single();
+    if (error || !data) return null;
+    return data;
+}
+
+/**
+ * Transition a recommendation to a new status.
+ * Only suggested → accepted|edited|rejected|expired is valid.
+ * Creates an ai_feedback row for every non-expire transition.
+ */
+export async function dbUpdateRecommendationStatus(
+    id: string,
+    status: RecommendationStatus,
+    opts: UpdateRecommendationStatusOpts = {}
+): Promise<AiRecommendationRow> {
+    const supabase = createServiceClient();
+
+    const current = await dbGetRecommendationById(id);
+    if (!current) throw new Error(`Recommendation ${id} not found`);
+
+    const allowedNext = VALID_TRANSITIONS[current.status] ?? [];
+    if (!allowedNext.includes(status)) {
+        throw new Error(`Invalid status transition: ${current.status} → ${status}`);
+    }
+
+    const now = new Date().toISOString();
+    const updates: Record<string, unknown> = { status, decided_at: now };
+
+    if (status === "edited" && opts.editedMetadata) {
+        updates.edited_metadata = opts.editedMetadata;
+    }
+    if (status === "expired") {
+        updates.expired_at = now;
+        updates.decided_at = null;
+    }
+
+    const { data, error } = await supabase
+        .from("ai_recommendations")
+        .update(updates)
+        .eq("id", id)
+        .select("*")
+        .single();
+    if (error || !data) throw new Error(error?.message ?? "Recommendation status update failed");
+
+    // Record feedback (not for expire — that's a system action)
+    if (status !== "expired") {
+        const feedbackType = status as FeedbackType;
+        await supabase.from("ai_feedback").insert({
+            recommendation_id: id,
+            feedback_type: feedbackType,
+            feedback_note: opts.feedbackNote ?? null,
+            edited_values: opts.editedMetadata ?? null,
+            actor: opts.actor ?? null,
+        });
+    }
+
+    return data;
+}
+
+/**
+ * Expire all "suggested" recommendations for the given entity+type
+ * whose entity_id is NOT in the provided list.
+ * Used when the purchase copilot regenerates — products no longer
+ * below min stock should have their suggestions expired.
+ */
+export async function dbExpireSuggestedRecommendations(
+    entityType: string,
+    activeEntityIds: string[],
+    recommendationType: RecommendationType
+): Promise<number> {
+    if (activeEntityIds.length === 0) return 0;
+    const supabase = createServiceClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+        .from("ai_recommendations")
+        .update({ status: "expired", expired_at: now })
+        .eq("entity_type", entityType)
+        .eq("recommendation_type", recommendationType)
+        .eq("status", "suggested")
+        .not("entity_id", "in", `("${activeEntityIds.join('","')}")`)
+        .select("id");
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+}

@@ -26,6 +26,16 @@ vi.mock("@/lib/services/ai-service", () => ({
     isAIAvailable: () => mockIsAIAvailable(),
 }));
 
+// ─── Recommendations mock (non-blocking persistence) ─────────────────────────
+
+const mockDbUpsertRecommendation = vi.fn();
+const mockDbExpireSuggestedRecommendations = vi.fn();
+
+vi.mock("@/lib/supabase/recommendations", () => ({
+    dbUpsertRecommendation: (...args: unknown[]) => mockDbUpsertRecommendation(...args),
+    dbExpireSuggestedRecommendations: (...args: unknown[]) => mockDbExpireSuggestedRecommendations(...args),
+}));
+
 import { POST } from "@/app/api/ai/purchase-copilot/route";
 import { ConfigError } from "@/lib/supabase/service";
 
@@ -33,6 +43,9 @@ import { ConfigError } from "@/lib/supabase/service";
 beforeEach(() => {
     mockDbListProducts.mockReset();
     mockAiEnrichPurchaseSuggestions.mockReset();
+    // Default: upsert resolves with a mock rec row; expire resolves with 0
+    mockDbUpsertRecommendation.mockResolvedValue({ id: "rec-mock", status: "suggested" });
+    mockDbExpireSuggestedRecommendations.mockResolvedValue(0);
     mockIsAIAvailable.mockReset();
 });
 
@@ -486,18 +499,18 @@ describe("POST /api/ai/purchase-copilot — §11.1 mutation prevention", () => {
         ]);
     });
 
-    it("route only calls dbListProducts (no write operations)", async () => {
+    it("route calls dbListProducts once", async () => {
         await POST();
         expect(mockDbListProducts).toHaveBeenCalledTimes(1);
     });
 
-    it("response is pure JSON with no side-effect indicators", async () => {
+    it("response contains expected top-level keys including recommendations", async () => {
         const res = await POST();
         const body = await res.json();
         expect(body).not.toHaveProperty("alertId");
         expect(body).not.toHaveProperty("orderId");
         expect(body).not.toHaveProperty("stockMutation");
-        expect(Object.keys(body).sort()).toEqual(["ai_available", "counts", "generatedAt", "items"]);
+        expect(Object.keys(body).sort()).toEqual(["ai_available", "counts", "generatedAt", "items", "recommendations"]);
     });
 
     it("route does not import alert-service, order-service, or production-service", () => {

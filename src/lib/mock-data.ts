@@ -77,6 +77,23 @@ export interface OrderLineItem {
     lineTotal: number;
 }
 
+export interface AiRecommendation {
+    id: string;
+    entityType: string;
+    entityId: string;
+    recommendationType: "purchase_suggestion" | "stock_risk" | "order_risk";
+    title: string;
+    body: string | null;
+    confidence: number | null;
+    severity: "critical" | "warning" | "info";
+    status: "suggested" | "accepted" | "edited" | "rejected" | "expired";
+    modelVersion: string | null;
+    metadata: Record<string, unknown> | null;
+    editedMetadata: Record<string, unknown> | null;
+    decidedAt: string | null;
+    createdAt: string;
+}
+
 export interface OrderDetail extends Order {
     customerId: string;
     customerEmail: string;

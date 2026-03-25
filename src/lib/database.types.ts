@@ -21,6 +21,9 @@ export type ImportBatchStatus = "pending" | "processing" | "review" | "confirmed
 export type ImportDraftStatus = "pending" | "confirmed" | "rejected" | "merged"
 export type SyncStatus = "success" | "error" | "pending" | "retrying"
 export type AuditSource = "ui" | "system" | "ai" | "integration"
+export type RecommendationType = "purchase_suggestion" | "stock_risk" | "order_risk"
+export type RecommendationStatus = "suggested" | "accepted" | "edited" | "rejected" | "expired"
+export type FeedbackType = "accepted" | "edited" | "rejected" | "note"
 
 // ── Row Types ────────────────────────────────────────────────
 
@@ -248,6 +251,35 @@ export interface AuditLogRow {
     after_state: Json | null
     occurred_at: string
     source: AuditSource
+}
+
+export interface AiRecommendationRow {
+    id: string
+    entity_type: string
+    entity_id: string
+    recommendation_type: RecommendationType
+    title: string
+    body: string | null
+    confidence: number | null
+    severity: "critical" | "warning" | "info"
+    status: RecommendationStatus
+    model_version: string | null
+    metadata: Json | null
+    edited_metadata: Json | null
+    decided_at: string | null
+    expired_at: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface AiFeedbackRow {
+    id: string
+    recommendation_id: string
+    feedback_type: FeedbackType
+    feedback_note: string | null
+    edited_values: Json | null
+    actor: string | null
+    created_at: string
 }
 
 // ── Composite / joined types ──────────────────────────────────
