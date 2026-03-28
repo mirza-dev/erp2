@@ -400,7 +400,7 @@ export default function ImportPage() {
                                     color: isDone ? "var(--success-text)" : isActive ? "var(--accent-text)" : "var(--text-tertiary)",
                                     fontWeight: isActive ? 600 : 400,
                                 }}>
-                                    {isDone ? "\u2713 " : ""}{step.label}
+                                    {isDone ? "✓ " : ""}{step.label}
                                 </span>
                             </div>
                         );
@@ -464,10 +464,10 @@ export default function ImportPage() {
                             </svg>
                         </div>
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
-                            {dragOver ? "Dosyay\u0131 b\u0131rak" : "Dosyan\u0131 i\u00e7e aktar"}
+                            {dragOver ? "Dosyayı bırak" : "Dosyanı içe aktar"}
                         </div>
                         <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>
-                            Excel ve CSV dosyalar\u0131n\u0131 destekliyoruz
+                            Excel ve CSV dosyalarını destekliyoruz
                         </div>
                         <button
                             onClick={() => fileInputRef.current?.click()}
@@ -482,10 +482,10 @@ export default function ImportPage() {
                                 cursor: "pointer",
                             }}
                         >
-                            Dosya Se\u00e7
+                            Dosya Seç
                         </button>
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "8px" }}>
-                            veya dosyay\u0131 buraya s\u00fcr\u00fckle
+                            veya dosyayı buraya sürükle
                         </div>
                         {/* File type chips */}
                         <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap", alignItems: "center" }}>
@@ -500,7 +500,7 @@ export default function ImportPage() {
                                     fontWeight: 600,
                                 }}>{ext}</span>
                             ))}
-                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>\u00b7 \u00e7ok-sheet desteklenir</span>
+                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>· çok-sheet desteklenir</span>
                         </div>
                     </div>
 
@@ -511,11 +511,11 @@ export default function ImportPage() {
                         borderRadius: "6px", overflow: "hidden",
                     }}>
                         {[
-                            { icon: "\ud83d\udd0d", label: "Dosya Oku" },
-                            { icon: "\ud83d\uddc2", label: "Sheet Se\u00e7" },
-                            { icon: "\ud83e\udde0", label: "AI Analiz" },
-                            { icon: "\ud83d\udc41", label: "\u0130ncele" },
-                            { icon: "\u2705", label: "\u0130\u00e7e Aktar" },
+                            { icon: "🔍", label: "Dosya Oku" },
+                            { icon: "🗂", label: "Sheet Seç" },
+                            { icon: "🧠", label: "AI Analiz" },
+                            { icon: "👁", label: "İncele" },
+                            { icon: "✅", label: "İçe Aktar" },
                         ].map((step, i) => (
                             <div key={step.label} style={{
                                 flex: 1, textAlign: "center", padding: "10px 8px",
@@ -530,9 +530,9 @@ export default function ImportPage() {
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
                         {[
-                            { title: "\u00c7ok-Sheet Deste\u011fi", desc: "Excel dosyan\u0131zdaki t\u00fcm sheetler otomatik tespit edilir." },
-                            { title: "AI Ayr\u0131\u015ft\u0131rma", desc: "Her sat\u0131r AI ile analiz edilir, g\u00fcven skoru ve e\u015fle\u015ftirme \u00f6nerisi verilir." },
-                            { title: "Se\u00e7ici \u0130\u00e7e Aktar\u0131m", desc: "D\u00fc\u015f\u00fck g\u00fcvenli sat\u0131rlar\u0131 inceleyip onaylay\u0131n veya reddedin." },
+                            { title: "Çok-Sheet Desteği", desc: "Excel dosyanızdaki tüm sheetler otomatik tespit edilir." },
+                            { title: "AI Ayrıştırma", desc: "Her satır AI ile analiz edilir, güven skoru ve eşleştirme önerisi verilir." },
+                            { title: "Seçici İçe Aktarım", desc: "Düşük güvenli satırları inceleyip onaylayın veya reddedin." },
                         ].map(card => (
                             <div key={card.title} style={{
                                 background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
@@ -591,7 +591,7 @@ export default function ImportPage() {
                                     Dosyada {sheets.length} sheet bulundu
                                 </span>
                                 <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "10px" }}>
-                                    {importableSelected.length} i\u00e7e aktar\u0131labilir \u00b7 {importableSelected.filter(s => s.selected).length} se\u00e7ili
+                                    {importableSelected.length} içe aktarılabilir · {importableSelected.filter(s => s.selected).length} seçili
                                 </span>
                             </div>
                             {fileName && <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{fileName}</span>}
@@ -611,9 +611,9 @@ export default function ImportPage() {
                                     ? "var(--accent-bg)"
                                     : "var(--bg-tertiary)";
                                 const statusLabel = sheet.status === "importable"
-                                    ? "\u0130\u00e7e Aktar\u0131labilir"
+                                    ? "İçe Aktarılabilir"
                                     : sheet.status === "parasut"
-                                    ? "Para\u015f\u00fct ile sync"
+                                    ? "Paraşüt ile sync"
                                     : "Desteklenmiyor";
 
                                 return (
@@ -652,7 +652,7 @@ export default function ImportPage() {
                                             )}
                                         </div>
                                         <span style={{ fontSize: "11px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
-                                            {sheet.rows.toLocaleString("tr-TR")} sat\u0131r
+                                            {sheet.rows.toLocaleString("tr-TR")} satır
                                         </span>
                                         <span style={{
                                             fontSize: "10px", padding: "2px 8px",
@@ -672,7 +672,7 @@ export default function ImportPage() {
                             fontSize: "12px", padding: "7px 14px",
                             border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
                             background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                        }}>\u2190 Geri</button>
+                        }}>← Geri</button>
                         <button
                             onClick={handleParse}
                             disabled={importableSelected.length === 0}
@@ -684,7 +684,7 @@ export default function ImportPage() {
                                 cursor: importableSelected.length > 0 ? "pointer" : "not-allowed", fontWeight: 600,
                             }}
                         >
-                            AI Analiz Ba\u015flat \u2192
+                            AI Analiz Başlat →
                         </button>
                     </div>
                 </>
@@ -709,7 +709,7 @@ export default function ImportPage() {
                         AI analiz ediyor...
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>
-                        {importableSelected.reduce((sum, s) => sum + s.rows, 0).toLocaleString("tr-TR")} sat\u0131r i\u015fleniyor
+                        {importableSelected.reduce((sum, s) => sum + s.rows, 0).toLocaleString("tr-TR")} satır işleniyor
                     </div>
                     <div style={{ maxWidth: "320px", margin: "0 auto", height: "4px", background: "var(--border-tertiary)", borderRadius: "2px", overflow: "hidden" }}>
                         <div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: "2px", transition: "width 0.35s ease" }} />
@@ -731,7 +731,7 @@ export default function ImportPage() {
                             fontSize: "12px",
                             color: "var(--warning-text)",
                         }}>
-                            AI devre d\u0131\u015f\u0131 \u2014 basit kolon e\u015fle\u015ftirmesi kullan\u0131ld\u0131. G\u00fcven skorlar\u0131 d\u00fc\u015f\u00fck olabilir.
+                            AI devre dışı — basit kolon eşleştirmesi kullanıldı. Güven skorları düşük olabilir.
                         </div>
                     )}
 
@@ -756,16 +756,16 @@ export default function ImportPage() {
                     }}>
                         <span style={{ color: "var(--text-secondary)" }}>Toplam: <strong>{drafts.length}</strong> draft</span>
                         <span style={{ color: "var(--success-text)" }}>
-                            Y\u00fcksek: {drafts.filter(d => (d.confidence ?? 0) >= 0.8).length}
+                            Yüksek: {drafts.filter(d => (d.confidence ?? 0) >= 0.8).length}
                         </span>
                         <span style={{ color: "var(--warning-text)" }}>
                             Orta: {drafts.filter(d => (d.confidence ?? 0) >= 0.5 && (d.confidence ?? 0) < 0.8).length}
                         </span>
                         <span style={{ color: "var(--danger-text)" }}>
-                            D\u00fc\u015f\u00fck: {drafts.filter(d => (d.confidence ?? 0) < 0.5).length}
+                            Düşük: {drafts.filter(d => (d.confidence ?? 0) < 0.5).length}
                         </span>
                         <span style={{ marginLeft: "auto", fontSize: "11px", color: "var(--text-tertiary)" }}>
-                            {aiAvailable ? "AI \u00d6nerisi" : "Basit E\u015fle\u015ftirme"}
+                            {aiAvailable ? "AI Önerisi" : "Basit Eşleştirme"}
                         </span>
                     </div>
 
@@ -818,7 +818,7 @@ export default function ImportPage() {
                                                 color: "var(--danger-text)",
                                                 fontWeight: 600,
                                             }}>
-                                                \u0130nceleme Gerekli
+                                                İnceleme Gerekli
                                             </span>
                                         )}
                                         {!aiAvailable && (
@@ -829,7 +829,7 @@ export default function ImportPage() {
                                                 background: "var(--bg-tertiary)",
                                                 color: "var(--text-tertiary)",
                                             }}>
-                                                Basit E\u015fle\u015ftirme
+                                                Basit Eşleştirme
                                             </span>
                                         )}
                                     </div>
@@ -865,7 +865,7 @@ export default function ImportPage() {
                                             borderRadius: "4px",
                                             marginTop: "4px",
                                         }}>
-                                            E\u015fle\u015ftirilemeyen alanlar: {unmatchedFields.join(", ")}
+                                            Eşleştirilemeyen alanlar: {unmatchedFields.join(", ")}
                                         </div>
                                     )}
                                 </div>
@@ -889,14 +889,14 @@ export default function ImportPage() {
                             fontSize: "12px", padding: "7px 14px",
                             border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
                             background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                        }}>\u2190 Geri</button>
+                        }}>← Geri</button>
                         <button onClick={handleImport} style={{
                             fontSize: "12px", padding: "7px 18px",
                             border: "0.5px solid var(--accent-border)", borderRadius: "6px",
                             background: "var(--accent-bg)", color: "var(--accent-text)",
                             cursor: "pointer", fontWeight: 600,
                         }}>
-                            Onayla ve \u0130\u00e7e Aktar \u2192
+                            Onayla ve İçe Aktar →
                         </button>
                     </div>
                 </>
@@ -909,7 +909,7 @@ export default function ImportPage() {
                     borderRadius: "8px", padding: "24px",
                 }}>
                     <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "20px" }}>
-                        \u0130\u00e7e aktar\u0131l\u0131yor...
+                        İçe aktarılıyor...
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                         {sheets.filter(s => s.status === "importable" && s.selected).map(sheet => {
@@ -922,7 +922,7 @@ export default function ImportPage() {
                                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
                                         <span style={{ fontSize: "12px", color: "var(--text-primary)" }}>{sheet.displayName}</span>
                                         <span style={{ fontSize: "11px", color: done ? "var(--success-text)" : "var(--text-tertiary)" }}>
-                                            {done ? `\u2713 ${total.toLocaleString("tr-TR")}` : `${count.toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")}`}
+                                            {done ? `✓ ${total.toLocaleString("tr-TR")}` : `${count.toLocaleString("tr-TR")} / ${total.toLocaleString("tr-TR")}`}
                                         </span>
                                     </div>
                                     <div style={{ height: "5px", background: "var(--border-tertiary)", borderRadius: "3px", overflow: "hidden" }}>
@@ -955,7 +955,7 @@ export default function ImportPage() {
                             </svg>
                         </div>
                         <div>
-                            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>\u0130\u00e7eri aktar\u0131m tamamland\u0131</div>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>İçeri aktarım tamamlandı</div>
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>{fileName}</div>
                         </div>
                     </div>
@@ -964,15 +964,15 @@ export default function ImportPage() {
                         {confirmResult ? (
                             <>
                                 <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
-                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Ba\u015far\u0131l\u0131</div>
+                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Başarılı</div>
                                     <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--success-text)", marginBottom: "2px" }}>{confirmResult.merged}</div>
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.merged} kay\u0131t eklendi</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.merged} kayıt eklendi</div>
                                 </div>
                                 {confirmResult.skipped > 0 && (
                                     <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Atlanan</div>
                                         <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--warning-text)", marginBottom: "2px" }}>{confirmResult.skipped}</div>
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.skipped} kay\u0131t atland\u0131</div>
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.skipped} kayıt atlandı</div>
                                     </div>
                                 )}
                                 {confirmResult.errors.length > 0 && (
@@ -986,13 +986,13 @@ export default function ImportPage() {
                                     <div key={ps.name} style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{ps.displayName}</div>
                                         <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--accent-text)", marginBottom: "2px" }}>{ps.rows}</div>
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Para\u015f\u00fct Sync ile i\u015flenecek</div>
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Paraşüt Sync ile işlenecek</div>
                                     </div>
                                 ))}
                             </>
                         ) : (
                             <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px", gridColumn: "1 / -1" }}>
-                                <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>\u0130\u00e7e aktar\u0131m tamamland\u0131</div>
+                                <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>İçe aktarım tamamlandı</div>
                             </div>
                         )}
                     </div>
@@ -1004,7 +1004,7 @@ export default function ImportPage() {
                             background: "var(--accent-bg)", color: "var(--accent-text)",
                             textDecoration: "none", fontWeight: 500,
                         }}>
-                            Cariler sayfas\u0131na git \u2192
+                            Cariler sayfasına git →
                         </Link>
                         <Link href="/dashboard/orders" style={{
                             fontSize: "12px", padding: "6px 14px",
@@ -1012,7 +1012,7 @@ export default function ImportPage() {
                             background: "var(--accent-bg)", color: "var(--accent-text)",
                             textDecoration: "none", fontWeight: 500,
                         }}>
-                            Sipari\u015fler sayfas\u0131na git \u2192
+                            Siparişler sayfasına git →
                         </Link>
                         <Link href="/dashboard/products" style={{
                             fontSize: "12px", padding: "6px 14px",
@@ -1020,14 +1020,14 @@ export default function ImportPage() {
                             background: "var(--accent-bg)", color: "var(--accent-text)",
                             textDecoration: "none", fontWeight: 500,
                         }}>
-                            Stok & \u00dcr\u00fcnler \u2192
+                            Stok & Ürünler →
                         </Link>
                         <button onClick={reset} style={{
                             fontSize: "12px", padding: "6px 16px",
                             border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
                             background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
                         }}>
-                            Yeni Dosya Y\u00fckle
+                            Yeni Dosya Yükle
                         </button>
                     </div>
                 </div>

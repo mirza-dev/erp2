@@ -36,17 +36,17 @@ const PARSE_SYSTEM: Record<string, string> = {
     customer: `You are a data extraction assistant for a B2B ERP system.
 Extract customer fields from the raw text and return ONLY a JSON object with these keys (omit missing fields):
 { "name": string, "email": string, "phone": string, "country": string (ISO 2-letter), "currency": string (ISO 3-letter), "tax_number": string, "tax_office": string, "address": string, "notes": string }
-After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and then "REASON:" a short explanation.
+After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and then "REASON:" a short explanation in Turkish.
 Also add "UNMATCHED:" a comma-separated list of any fields you could not extract.`,
     product: `You are a data extraction assistant for a B2B ERP system.
 Extract product fields from the raw text and return ONLY a JSON object with these keys (omit missing fields):
 { "name": string, "sku": string, "category": string, "unit": string, "price": number, "currency": string (ISO 3-letter), "min_stock_level": number }
-After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and then "REASON:" a short explanation.
+After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and then "REASON:" a short explanation in Turkish.
 Also add "UNMATCHED:" a comma-separated list of any fields you could not extract.`,
     order: `You are a data extraction assistant for a B2B ERP system.
 Extract order fields from the raw text and return ONLY a JSON object with these keys (omit missing fields):
 { "customer_name": string, "currency": string (ISO 3-letter), "notes": string, "lines": [{ "product_name": string, "quantity": number, "unit_price": number, "discount_pct": number }] }
-After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and then "REASON:" a short explanation.
+After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and then "REASON:" a short explanation in Turkish.
 Also add "UNMATCHED:" a comma-separated list of any fields you could not extract.`,
 };
 
@@ -137,7 +137,7 @@ Return ONLY a JSON object in this exact format:
     ...
   ]
 }
-Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation. unmatched_fields lists column names that could not be mapped.`,
+Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
 
     product: `You are a data extraction assistant for a B2B ERP system.
 You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
@@ -151,7 +151,7 @@ Return ONLY a JSON object in this exact format:
     ...
   ]
 }
-Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation. unmatched_fields lists column names that could not be mapped.`,
+Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
 
     order: `You are a data extraction assistant for a B2B ERP system.
 You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
@@ -165,7 +165,7 @@ Return ONLY a JSON object in this exact format:
     ...
   ]
 }
-Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation. unmatched_fields lists column names that could not be mapped.`,
+Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
 };
 
 /**
