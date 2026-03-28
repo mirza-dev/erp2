@@ -38,6 +38,7 @@ vi.mock("@/lib/supabase/recommendations", () => ({
 
 import { POST } from "@/app/api/ai/purchase-copilot/route";
 import { ConfigError } from "@/lib/supabase/service";
+import { isValidISO } from "./test-helpers";
 
 // Reset all mocks before every test to prevent state leakage
 beforeEach(() => {
@@ -75,11 +76,6 @@ function makeProduct(overrides: Partial<ProductWithStock> = {}): ProductWithStoc
         updated_at: "2024-01-01T00:00:00Z",
         ...overrides,
     };
-}
-
-function isValidISO(dateString: string): boolean {
-    const d = new Date(dateString);
-    return !isNaN(d.getTime()) && dateString.includes("T");
 }
 
 // ─── Counts computation ───────────────────────────────────────────────────────

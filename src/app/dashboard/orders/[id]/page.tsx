@@ -677,7 +677,7 @@ export default function OrderDetailPage() {
                                 </div>
                             )}
 
-                            {/* AI Değerlendirme */}
+                            {/* AI Risk Değerlendirmesi */}
                             <div style={{
                                 background: "var(--bg-primary)",
                                 border: "0.5px solid var(--border-tertiary)",
@@ -688,7 +688,7 @@ export default function OrderDetailPage() {
                             }}>
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                                     <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
-                                        AI Değerlendirme
+                                        AI Risk Değerlendirmesi
                                     </div>
                                     <button onClick={handleRescore} disabled={rescoring} style={{
                                         fontSize: "10px", padding: "2px 7px", borderRadius: "4px",
@@ -729,7 +729,7 @@ export default function OrderDetailPage() {
                                     </>
                                 ) : (
                                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.6 }}>
-                                        Henüz AI değerlendirmesi yapılmadı
+                                        Henüz AI risk değerlendirmesi yapılmadı
                                     </div>
                                 )}
                             </div>

@@ -96,6 +96,7 @@ export default function ProductsPage() {
     const [riskData, setRiskData] = useState<Map<string, RiskItem>>(new Map());
     const [riskLoading, setRiskLoading] = useState(false);
     const [riskCounts, setRiskCounts] = useState<{ at_risk: number } | null>(null);
+    const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
@@ -116,6 +117,7 @@ export default function ProductsPage() {
                 for (const item of data.items ?? []) map.set(item.productId, item);
                 setRiskData(map);
                 setRiskCounts({ at_risk: data.counts?.at_risk ?? 0 });
+                setAiAvailable(data.ai_available ?? null);
             } catch { /* graceful: risk data missing = no badges */ }
             finally { if (!cancelled) setRiskLoading(false); }
         }
@@ -204,10 +206,13 @@ export default function ProductsPage() {
                             <span style={{ color: "var(--danger-text)", fontWeight: 600 }}> · {criticalCount} kritik</span>
                         )}
                         {(riskCounts?.at_risk ?? 0) > 0 && (
-                            <span style={{ color: "var(--accent-text)" }}> · {riskCounts!.at_risk} riskli</span>
+                            <span style={{ color: "var(--accent-text)" }}> · {riskCounts!.at_risk} riskli{aiAvailable ? " (AI)" : ""}</span>
                         )}
                         {riskLoading && (
                             <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}> · Risk analizi…</span>
+                        )}
+                        {!riskLoading && aiAvailable === false && (
+                            <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}> · Deterministik mod</span>
                         )}
                     </div>
                 </div>
@@ -352,7 +357,14 @@ export default function ProductsPage() {
                                         <span className={`badge ${status.cls}`}>{status.label}</span>
                                         {risk && (
                                             <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px", whiteSpace: "normal", maxWidth: "160px", margin: "2px auto 0" }}>
-                                                {risk.aiExplanation || risk.deterministicReason}
+                                                {risk.aiExplanation ? (
+                                                    <>
+                                                        <span style={{ fontSize: "9px", fontWeight: 600, color: "var(--accent-text)", letterSpacing: "0.04em" }}>AI </span>
+                                                        {risk.aiExplanation}
+                                                    </>
+                                                ) : (
+                                                    risk.deterministicReason
+                                                )}
                                             </div>
                                         )}
                                     </td>

@@ -162,7 +162,7 @@ export default function AISummaryCard() {
                         animation: "spin 1s linear infinite",
                     }} />
                     <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                        AI ozet yukleniyor...
+                        AI analizi yükleniyor...
                     </span>
                 </div>
                 <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -194,7 +194,7 @@ export default function AISummaryCard() {
                             textTransform: "uppercase",
                             color: "var(--accent-text)",
                         }}>
-                            Operasyon Ozeti
+                            Operasyon Özeti
                         </span>
                         <span style={{
                             fontSize: "10px",
@@ -212,7 +212,7 @@ export default function AISummaryCard() {
                 {data?.metrics && <MetricsContextBar metrics={data.metrics} />}
                 {data?.metrics && <DeterministicSummary metrics={data.metrics} />}
                 <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "12px" }}>
-                    AI servisi yapilandirilmamis — veriye dayali ozet gosteriliyor.
+                    AI servisi yapılandırılmamış — veriye dayalı özet gösteriliyor.
                 </div>
             </div>
         );
@@ -236,7 +236,7 @@ export default function AISummaryCard() {
                     color: "var(--text-tertiary)",
                     marginBottom: "14px",
                 }}>
-                    AI Operasyon Ozeti
+                    AI Operasyon Özeti
                 </div>
                 {data?.metrics && <MetricsContextBar metrics={data.metrics} />}
                 {data?.metrics && <DeterministicSummary metrics={data.metrics} />}
@@ -252,7 +252,7 @@ export default function AISummaryCard() {
                     gap: "12px",
                 }}>
                     <span style={{ fontSize: "12px", color: "var(--warning-text)" }}>
-                        AI servisi yanit vermedi.
+                        AI servisi yanıt vermedi.
                     </span>
                     <button
                         onClick={fetchSummary}
@@ -304,7 +304,7 @@ export default function AISummaryCard() {
                         textTransform: "uppercase",
                         color: "var(--accent-text)",
                     }}>
-                        AI Operasyon Ozeti
+                        AI Operasyon Özeti
                     </span>
                     <span style={{
                         fontSize: "10px",
@@ -315,7 +315,7 @@ export default function AISummaryCard() {
                         color: "var(--accent-text)",
                         border: "1px solid var(--accent-border)",
                     }}>
-                        {Math.round(data.confidence * 100)}%
+                        Güven: %{Math.round(data.confidence * 100)}
                     </span>
                     <span style={{
                         fontSize: "10px",
@@ -432,7 +432,7 @@ export default function AISummaryCard() {
                 color: "var(--text-tertiary)",
                 textAlign: "right",
             }}>
-                Son guncelleme: {timeStr}
+                Son güncelleme: {timeStr}
             </div>
         </div>
     );

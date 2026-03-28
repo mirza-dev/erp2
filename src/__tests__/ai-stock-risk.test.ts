@@ -54,16 +54,7 @@ const VALID_AI_RESPONSE = JSON.stringify({
 const GARBLED_RESPONSE = "I cannot provide stock risk assessments.";
 const PARTIAL_RESPONSE = JSON.stringify({ assessments: [{ productId: "p-1" }] });
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function makeTextResponse(text: string) {
-    return { content: [{ type: "text", text }] };
-}
-
-function isValidISO(dateString: string): boolean {
-    const d = new Date(dateString);
-    return !isNaN(d.getTime()) && dateString.includes("T");
-}
+import { makeTextResponse, isValidISO } from "./test-helpers";
 
 // ─── Save/restore env ─────────────────────────────────────────────────────────
 

@@ -188,7 +188,8 @@ describe("fallbackParseRow — normalization edge cases", () => {
     // Documents the known latent bug: ülke (with Turkish ü) does NOT map via normalization
     // because regex converts ü → _ giving _lke which doesn't match "ulke" or "ülke" in the map.
     // The working key is "ulke" (ASCII-only). See FALLBACK_FIELD_MAP in ai-service.ts.
-    it("BUG: ülke with Turkish ü does not map to country via normalization (dead code key)", () => {
+    it("[KNOWN BUG #fallback-1] ülke (Turkish ü) → _lke after normalization, country never resolves", () => {
+        // Tracked: FALLBACK_FIELD_MAP key "ülke" is dead code — normalization strips diacritics
         const { parsed_data, unmatched_fields } = fallbackParseRow({ ülke: "DE" }, "customer");
         // ülke → toLowerCase → ülke → regex replaces ü → _ → _lke → no match
         expect(parsed_data.country).toBeUndefined();

@@ -807,7 +807,7 @@ export default function ImportPage() {
                                             color: confidenceColor(conf),
                                             fontWeight: 600,
                                         }}>
-                                            {Math.round(conf * 100)}% {confidenceLabel(conf)}
+                                            %{Math.round(conf * 100)} {confidenceLabel(conf)}
                                         </span>
                                         {needsReview && (
                                             <span style={{

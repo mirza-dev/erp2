@@ -47,16 +47,7 @@ const GARBLED_RESPONSE = "Sorry, I cannot process this.";
 const PARTIAL_RESPONSE = JSON.stringify({ summary: "Durum normal." });
 const EMPTY_JSON = JSON.stringify({});
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function makeTextResponse(text: string) {
-    return { content: [{ type: "text", text }] };
-}
-
-function isValidISO(dateString: string): boolean {
-    const d = new Date(dateString);
-    return !isNaN(d.getTime()) && dateString.includes("T");
-}
+import { makeTextResponse, isValidISO } from "./test-helpers";
 
 // ─── Save/restore env ─────────────────────────────────────────────────────────
 

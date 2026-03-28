@@ -26,6 +26,7 @@ vi.mock("@/lib/services/ai-service", () => ({
 
 import { POST } from "@/app/api/ai/stock-risk/route";
 import { ConfigError } from "@/lib/supabase/service";
+import { isValidISO } from "./test-helpers";
 
 // Reset all mocks before every test to prevent state leakage between describe blocks
 beforeEach(() => {
@@ -60,11 +61,6 @@ function makeProduct(overrides: Partial<ProductWithStock> = {}): ProductWithStoc
         updated_at: "2024-01-01T00:00:00Z",
         ...overrides,
     };
-}
-
-function isValidISO(dateString: string): boolean {
-    const d = new Date(dateString);
-    return !isNaN(d.getTime()) && dateString.includes("T");
 }
 
 // ─── counts computation ───────────────────────────────────────────────────────

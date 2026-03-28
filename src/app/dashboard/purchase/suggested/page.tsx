@@ -63,7 +63,7 @@ function AiEnrichmentBadge({ enrichment, loading }: {
                 </span>
                 {confidence != null && (
                     <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                        %{confidence} güven
+                        Güven: %{confidence}
                     </span>
                 )}
             </div>
@@ -408,6 +408,7 @@ export default function PurchaseSuggestedPage() {
         recommendations?: Array<{ productId: string; recommendationId: string | null; status: string }>;
     } | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
+    const [aiError, setAiError] = useState(false);
 
     // recMap: productId → { id, status, editedQty? }
     const [recMap, setRecMap] = useState<Map<string, RecEntry & { editedQty?: number }>>(new Map());
@@ -438,7 +439,7 @@ export default function PurchaseSuggestedPage() {
                     }
                 }
             })
-            .catch(() => {})
+            .catch(() => { setAiError(true); })
             .finally(() => setAiLoading(false));
     }, [reorderSuggestions.length]);
 
@@ -549,8 +550,10 @@ export default function PurchaseSuggestedPage() {
                 Minimum stok seviyesinin altına düşen ürünler · Öncelik sırasına göre
             </p>
             <div style={{ marginTop: "4px", fontSize: "11px" }}>
-                {aiLoading ? (
-                    <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>AI analizi...</span>
+                {aiError ? (
+                    <span style={{ color: "var(--warning-text)" }}>AI kullanılamıyor — deterministik mod</span>
+                ) : aiLoading ? (
+                    <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>AI analizi yükleniyor...</span>
                 ) : aiData?.ai_available ? (
                     <span style={{ color: "var(--success-text)" }}>AI zenginleştirme aktif</span>
                 ) : (

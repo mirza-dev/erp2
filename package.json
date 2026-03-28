@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "smoke": "tsx scripts/smoke.ts"
   },
   "dependencies": {

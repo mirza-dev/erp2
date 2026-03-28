@@ -318,7 +318,7 @@ describe("serviceConfirmBatch — §9.2: order merge never creates approved enti
     // Documents the latent bug: serviceCreateOrder validates lines.length > 0,
     // but import passes lines:[]. Without mocking serviceCreateOrder to succeed,
     // order drafts always fail with validation error and land in errors/skipped.
-    it("BUG: order import fails validation when serviceCreateOrder rejects empty lines", async () => {
+    it("[KNOWN BUG #import-1] order drafts always fail: import passes lines:[] but serviceCreateOrder requires lines.length > 0", async () => {
         mockServiceCreateOrder.mockRejectedValue(new Error("En az bir satır ürün girilmelidir."));
         const draft = makeDraft({
             entity_type: "order",

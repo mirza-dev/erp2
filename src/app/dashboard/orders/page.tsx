@@ -224,9 +224,9 @@ function OrdersList() {
                                                 {order.aiRiskLevel && order.aiConfidence != null && order.aiConfidence > 0 && (
                                                     <span
                                                         title={
-                                                            order.aiRiskLevel === "high" ? "Yüksek inceleme riski"
-                                                            : order.aiRiskLevel === "medium" ? "Orta inceleme riski"
-                                                            : "Düşük inceleme riski"
+                                                            order.aiRiskLevel === "high" ? "AI Risk: Yüksek"
+                                                            : order.aiRiskLevel === "medium" ? "AI Risk: Orta"
+                                                            : "AI Risk: Düşük"
                                                         }
                                                         style={{
                                                             display: "inline-block",

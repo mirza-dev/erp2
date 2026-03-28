@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { mapProduct, mapCustomer, mapOrderSummary, mapOrderDetail, mapProductionEntry } from "@/lib/api-mappers";
-import type { ProductWithStock, CustomerRow, SalesOrderRow, SalesOrderWithLines, ProductionEntryRow } from "@/lib/database.types";
+import { mapProduct, mapCustomer, mapOrderSummary, mapOrderDetail, mapProductionEntry, mapRecommendation } from "@/lib/api-mappers";
+import type { ProductWithStock, CustomerRow, SalesOrderRow, SalesOrderWithLines, ProductionEntryRow, AiRecommendationRow } from "@/lib/database.types";
 
 // ── mapProduct ────────────────────────────────────────────────
 
@@ -333,5 +333,78 @@ describe("mapProductionEntry", () => {
     const k = mapProductionEntry(base); // entered_by and notes are null
     expect(k.girenKullanici).toBe("");
     expect(k.notlar).toBe("");
+  });
+});
+
+// ── mapRecommendation ─────────────────────────────────────
+
+describe("mapRecommendation", () => {
+  const baseRec: AiRecommendationRow = {
+    id: "rec-1",
+    entity_type: "product",
+    entity_id: "prod-1",
+    recommendation_type: "purchase_suggestion",
+    title: "Test öneri",
+    body: "Detay",
+    confidence: 0.85,
+    severity: "warning",
+    status: "suggested",
+    model_version: "v1",
+    metadata: { suggestQty: 50 },
+    edited_metadata: null,
+    decided_at: null,
+    expired_at: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+  };
+
+  it("maps all snake_case fields to camelCase", () => {
+    const result = mapRecommendation(baseRec);
+    expect(result.id).toBe("rec-1");
+    expect(result.entityType).toBe("product");
+    expect(result.entityId).toBe("prod-1");
+    expect(result.recommendationType).toBe("purchase_suggestion");
+    expect(result.title).toBe("Test öneri");
+    expect(result.modelVersion).toBe("v1");
+    expect(result.decidedAt).toBeNull();
+    expect(result.createdAt).toBe("2026-01-01T00:00:00Z");
+  });
+
+  it("nullable fields pass through as null", () => {
+    const result = mapRecommendation({
+      ...baseRec,
+      body: null,
+      confidence: null,
+      model_version: null,
+      metadata: null,
+      edited_metadata: null,
+      decided_at: null,
+    });
+    expect(result.body).toBeNull();
+    expect(result.confidence).toBeNull();
+    expect(result.modelVersion).toBeNull();
+    expect(result.metadata).toBeNull();
+    expect(result.editedMetadata).toBeNull();
+    expect(result.decidedAt).toBeNull();
+  });
+
+  it("metadata and editedMetadata are preserved as objects", () => {
+    const result = mapRecommendation({
+      ...baseRec,
+      metadata: { suggestQty: 50, formula: "lead_time" },
+      edited_metadata: { suggestQty: 40 },
+    });
+    expect(result.metadata).toEqual({ suggestQty: 50, formula: "lead_time" });
+    expect(result.editedMetadata).toEqual({ suggestQty: 40 });
+  });
+
+  it("schema contract — exactly 14 output keys", () => {
+    const result = mapRecommendation(baseRec);
+    const expectedKeys = [
+      "body", "confidence", "createdAt", "decidedAt", "editedMetadata",
+      "entityId", "entityType", "id", "metadata", "modelVersion",
+      "recommendationType", "severity", "status", "title",
+    ].sort();
+    expect(Object.keys(result).sort()).toEqual(expectedKeys);
   });
 });

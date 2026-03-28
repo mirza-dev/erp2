@@ -31,11 +31,7 @@ vi.mock("@/lib/supabase/service", () => ({
 
 import { aiScoreOrder } from "@/lib/services/ai-service";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function makeTextResponse(text: string) {
-    return { content: [{ type: "text", text }] };
-}
+import { makeTextResponse } from "./test-helpers";
 
 const VALID_SCORE_RESPONSE = "CONFIDENCE: 0.87\nRISK_LEVEL: low\nREASON: Bilinen müşteri, standart sipariş";
 const GARBLED_RESPONSE = "Sorry, I cannot process this request.";

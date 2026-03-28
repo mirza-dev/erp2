@@ -34,6 +34,7 @@ vi.mock("@/lib/services/ai-service", () => ({
 
 import { POST } from "@/app/api/ai/ops-summary/route";
 import { ConfigError } from "@/lib/supabase/service";
+import { isValidISO } from "./test-helpers";
 
 // ─── Factory functions ────────────────────────────────────────────────────────
 
@@ -116,11 +117,6 @@ function makeAlert(id: string): AlertRow {
         created_at: "2024-01-01T00:00:00Z",
         source: "system",
     };
-}
-
-function isValidISO(dateString: string): boolean {
-    const d = new Date(dateString);
-    return !isNaN(d.getTime()) && dateString.includes("T");
 }
 
 // ─── gatherMetrics computation ────────────────────────────────────────────────

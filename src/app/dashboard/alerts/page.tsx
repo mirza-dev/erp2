@@ -48,7 +48,7 @@ const severityColors: Record<AlertSeverity, { dot: string; bg: string; border: s
         bg: "var(--accent-bg)",
         border: "var(--accent-border)",
         text: "var(--accent-text)",
-        badge: "AI ÖNERİ",
+        badge: "AI Önerisi",
     },
 };
 
@@ -254,7 +254,7 @@ export default function AlertsPage() {
                 {[
                     { label: "Kritik", count: criticalCount, severity: "critical" as AlertSeverity },
                     { label: "Uyarı", count: warningCount, severity: "warning" as AlertSeverity },
-                    { label: "AI Öneri", count: infoCount, severity: "info" as AlertSeverity },
+                    { label: "AI Önerisi", count: infoCount, severity: "info" as AlertSeverity },
                 ].map(({ label, count, severity }) => (
                     <div
                         key={severity}
@@ -442,7 +442,7 @@ export default function AlertsPage() {
                                                     }}
                                                 >
                                                     {alert.source === "ai" && alert.aiConfidence
-                                                        ? `AI ÖNERİ (%${Math.round(alert.aiConfidence * 100)})`
+                                                        ? `AI Önerisi · Güven: %${Math.round(alert.aiConfidence * 100)}`
                                                         : colors.badge}
                                                 </span>
                                                 <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>

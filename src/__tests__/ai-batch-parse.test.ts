@@ -25,11 +25,7 @@ vi.mock("@/lib/supabase/service", () => ({ createServiceClient: vi.fn() }));
 
 import { aiBatchParse } from "@/lib/services/ai-service";
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function makeAnthropicTextResponse(text: string) {
-    return { content: [{ type: "text", text }] };
-}
+import { makeTextResponse } from "./test-helpers";
 
 const VALID_AI_BATCH_RESPONSE = JSON.stringify({
     items: [
@@ -144,21 +140,21 @@ describe("aiBatchParse — §7.2 graceful degradation: unparseable response", ()
     });
 
     it("returns fallback items when AI returns plain text (no JSON)", async () => {
-        mockCreate.mockResolvedValue(makeAnthropicTextResponse("This is plain text with no JSON."));
+        mockCreate.mockResolvedValue(makeTextResponse("This is plain text with no JSON."));
         const result = await aiBatchParse({ entity_type: "customer", rows: CUSTOMER_ROWS });
         expect(result.items).toHaveLength(CUSTOMER_ROWS.length);
         result.items.forEach(item => expect(item.confidence).toBe(0.5));
     });
 
     it("returns fallback items when AI JSON has no 'items' array", async () => {
-        mockCreate.mockResolvedValue(makeAnthropicTextResponse(JSON.stringify({ result: "ok" })));
+        mockCreate.mockResolvedValue(makeTextResponse(JSON.stringify({ result: "ok" })));
         const result = await aiBatchParse({ entity_type: "customer", rows: CUSTOMER_ROWS });
         expect(result.items).toHaveLength(CUSTOMER_ROWS.length);
         result.items.forEach(item => expect(item.confidence).toBe(0.5));
     });
 
     it("returns fallback when AI response has malformed JSON", async () => {
-        mockCreate.mockResolvedValue(makeAnthropicTextResponse("{items: [broken]"));
+        mockCreate.mockResolvedValue(makeTextResponse("{items: [broken]"));
         const result = await aiBatchParse({ entity_type: "product", rows: [{ urun_kodu: "X" }] });
         expect(result.items).toHaveLength(1);
         expect(result.items[0].confidence).toBe(0.5);
@@ -170,7 +166,7 @@ describe("aiBatchParse — §7.2 graceful degradation: unparseable response", ()
 describe("aiBatchParse — happy path: AI available and responds correctly", () => {
     beforeEach(() => {
         process.env.ANTHROPIC_API_KEY = "test-key";
-        mockCreate.mockResolvedValue(makeAnthropicTextResponse(VALID_AI_BATCH_RESPONSE));
+        mockCreate.mockResolvedValue(makeTextResponse(VALID_AI_BATCH_RESPONSE));
     });
 
     it("returns parsed items from AI response", async () => {
@@ -215,14 +211,14 @@ describe("aiBatchParse — §11.1 output contract: AI advisory fields always pre
             label: "unparseable response (fallback)",
             setup: () => {
                 process.env.ANTHROPIC_API_KEY = "test-key";
-                mockCreate.mockResolvedValue(makeAnthropicTextResponse("no json here"));
+                mockCreate.mockResolvedValue(makeTextResponse("no json here"));
             },
         },
         {
             label: "valid AI response (happy path)",
             setup: () => {
                 process.env.ANTHROPIC_API_KEY = "test-key";
-                mockCreate.mockResolvedValue(makeAnthropicTextResponse(VALID_AI_BATCH_RESPONSE));
+                mockCreate.mockResolvedValue(makeTextResponse(VALID_AI_BATCH_RESPONSE));
             },
         },
     ];
