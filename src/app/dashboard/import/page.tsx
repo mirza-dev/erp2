@@ -294,14 +294,32 @@ export default function ImportPage() {
         selectedSheets.forEach(s => (init[s.name] = 0));
         setImportProgress(init);
 
-        try {
-            // Simulate progress per sheet
-            for (const sheet of selectedSheets) {
-                setImportProgress(prev => ({ ...prev, [sheet.name]: sheet.rows }));
-            }
+        const steps: Record<string, number> = {};
+        selectedSheets.forEach(s => {
+            steps[s.name] = Math.max(1, s.rows / 40);
+        });
 
+        let ticker: ReturnType<typeof setInterval> | null = setInterval(() => {
+            setImportProgress(prev => {
+                const next = { ...prev };
+                selectedSheets.forEach(s => {
+                    const ceiling = s.rows * 0.9;
+                    next[s.name] = Math.min((next[s.name] ?? 0) + steps[s.name], ceiling);
+                });
+                return next;
+            });
+        }, 100);
+
+        try {
             // Confirm batch → merge drafts to real entities
             const confirmRes = await fetch(`/api/import/${batchId}/confirm`, { method: "POST" });
+            clearInterval(ticker);
+            ticker = null;
+
+            const done: Record<string, number> = {};
+            selectedSheets.forEach(s => (done[s.name] = s.rows));
+            setImportProgress(done);
+
             if (confirmRes.ok) {
                 const result = await confirmRes.json();
                 setConfirmResult(result);
@@ -310,6 +328,7 @@ export default function ImportPage() {
             await refetchAll();
             setState("done");
         } catch (err) {
+            if (ticker) clearInterval(ticker);
             console.error("Import failed:", err);
             setConfirmResult({ merged: 0, skipped: 0, errors: [String(err)] });
             setState("done");
