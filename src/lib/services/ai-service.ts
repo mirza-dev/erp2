@@ -524,7 +524,7 @@ Görevin: Verilen sipariş JSON'ını inceleyerek, siparişin operasyonel açıd
 - Bilinmeyen veya alışılmadık para birimi
 - Satır sayısına göre sipariş büyüklüğü tutarsızlığı
 
-SADECE aşağıdaki formatta cevap ver:
+SADECE aşağıdaki formatta cevap ver (REASON değeri Türkçe olmalıdır):
 CONFIDENCE: <0-1 arası ondalık sayı>
 RISK_LEVEL: <low|medium|high>
 REASON: <Türkçe tek cümle — neyin inceleme gerektirdiğini açıkla>`;
