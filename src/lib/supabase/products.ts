@@ -42,6 +42,17 @@ export async function dbGetProductById(id: string): Promise<ProductWithStock | n
     return { ...data, available_now: data.on_hand - data.reserved };
 }
 
+export async function dbFindProductBySku(sku: string): Promise<ProductWithStock | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("sku", sku)
+        .maybeSingle();
+    if (error || !data) return null;
+    return { ...data, available_now: data.on_hand - data.reserved };
+}
+
 export async function dbListProducts(filter: ListProductsFilter = {}): Promise<ProductWithStock[]> {
     const supabase = createServiceClient();
     const { page = 1, pageSize = 100, category, product_type, is_active } = filter;

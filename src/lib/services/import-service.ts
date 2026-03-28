@@ -10,7 +10,7 @@ import {
     type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
 import { dbCreateCustomer, dbFindCustomerByName } from "@/lib/supabase/customers";
-import { dbCreateProduct } from "@/lib/supabase/products";
+import { dbCreateProduct, dbFindProductBySku, dbUpdateProduct } from "@/lib/supabase/products";
 import { serviceCreateOrder } from "@/lib/services/order-service";
 
 // ── Batch ────────────────────────────────────────────────────
@@ -72,18 +72,24 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
         try {
             if (draft.entity_type === "customer") {
-                const customer = await dbCreateCustomer({
-                    name: String(data.name ?? ""),
-                    email: data.email ? String(data.email) : undefined,
-                    phone: data.phone ? String(data.phone) : undefined,
-                    address: data.address ? String(data.address) : undefined,
-                    tax_number: data.tax_number ? String(data.tax_number) : undefined,
-                    tax_office: data.tax_office ? String(data.tax_office) : undefined,
-                    country: data.country ? String(data.country) : undefined,
-                    currency: data.currency ? String(data.currency) : "USD",
-                    notes: data.notes ? String(data.notes) : undefined,
-                });
-                await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: customer.id });
+                const customerName = String(data.name ?? "");
+                const existingCustomer = customerName ? await dbFindCustomerByName(customerName) : null;
+                if (existingCustomer) {
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existingCustomer.id });
+                } else {
+                    const customer = await dbCreateCustomer({
+                        name: customerName,
+                        email: data.email ? String(data.email) : undefined,
+                        phone: data.phone ? String(data.phone) : undefined,
+                        address: data.address ? String(data.address) : undefined,
+                        tax_number: data.tax_number ? String(data.tax_number) : undefined,
+                        tax_office: data.tax_office ? String(data.tax_office) : undefined,
+                        country: data.country ? String(data.country) : undefined,
+                        currency: data.currency ? String(data.currency) : "USD",
+                        notes: data.notes ? String(data.notes) : undefined,
+                    });
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: customer.id });
+                }
 
             } else if (draft.entity_type === "product") {
                 if (!data.sku || !data.name || !data.unit) {
@@ -91,18 +97,36 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     skipped++;
                     continue;
                 }
-                const product = await dbCreateProduct({
-                    name: String(data.name),
-                    sku: String(data.sku),
-                    category: data.category ? String(data.category) : undefined,
-                    unit: String(data.unit),
-                    price: data.price ? Number(data.price) : undefined,
-                    currency: data.currency ? String(data.currency) : "USD",
-                    min_stock_level: data.min_stock_level ? Number(data.min_stock_level) : undefined,
-                    reorder_qty: data.reorder_qty ? Number(data.reorder_qty) : undefined,
-                    preferred_vendor: data.preferred_vendor ? String(data.preferred_vendor) : undefined,
-                });
-                await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: product.id });
+                const existingProduct = await dbFindProductBySku(String(data.sku));
+                if (existingProduct) {
+                    // SKU zaten var → güncelle (on_hand, price vb.)
+                    const updated = await dbUpdateProduct(existingProduct.id, {
+                        name: String(data.name),
+                        category: data.category ? String(data.category) : undefined,
+                        unit: String(data.unit),
+                        price: data.price ? Number(data.price) : undefined,
+                        currency: data.currency ? String(data.currency) : undefined,
+                        on_hand: data.on_hand !== undefined ? Number(data.on_hand) : undefined,
+                        min_stock_level: data.min_stock_level ? Number(data.min_stock_level) : undefined,
+                        reorder_qty: data.reorder_qty ? Number(data.reorder_qty) : undefined,
+                        preferred_vendor: data.preferred_vendor ? String(data.preferred_vendor) : undefined,
+                    });
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: updated.id });
+                } else {
+                    const product = await dbCreateProduct({
+                        name: String(data.name),
+                        sku: String(data.sku),
+                        category: data.category ? String(data.category) : undefined,
+                        unit: String(data.unit),
+                        price: data.price ? Number(data.price) : undefined,
+                        currency: data.currency ? String(data.currency) : "USD",
+                        on_hand: data.on_hand ? Number(data.on_hand) : undefined,
+                        min_stock_level: data.min_stock_level ? Number(data.min_stock_level) : undefined,
+                        reorder_qty: data.reorder_qty ? Number(data.reorder_qty) : undefined,
+                        preferred_vendor: data.preferred_vendor ? String(data.preferred_vendor) : undefined,
+                    });
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: product.id });
+                }
 
             } else if (draft.entity_type === "order") {
                 // §9.2: import creates DRAFT orders — never approved
@@ -129,8 +153,16 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 });
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: order.id });
 
-            } else if (draft.entity_type === "order_line" || draft.entity_type === "stock") {
-                // Order lines and stock updates are informational — mark merged
+            } else if (draft.entity_type === "stock") {
+                // Stok güncellemesi: ürünü SKU ile bul ve on_hand'i güncelle
+                if (data.sku && data.on_hand !== undefined) {
+                    const prod = await dbFindProductBySku(String(data.sku));
+                    if (prod) {
+                        await dbUpdateProduct(prod.id, { on_hand: Number(data.on_hand) });
+                    }
+                }
+                await dbUpdateDraft(draft.id, { status: "merged" });
+            } else if (draft.entity_type === "order_line") {
                 await dbUpdateDraft(draft.id, { status: "merged" });
             }
 
