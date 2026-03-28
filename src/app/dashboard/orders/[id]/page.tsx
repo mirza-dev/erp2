@@ -10,19 +10,19 @@ import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 
-const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
-    draft:            { label: "Taslak",      cls: "badge-neutral" },
-    pending_approval: { label: "Bekliyor",    cls: "badge-warning" },
-    approved:         { label: "Onaylı",      cls: "badge-accent"  },
-    cancelled:        { label: "İptal",       cls: "badge-danger"  },
+const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string; description: string }> = {
+    draft:            { label: "Taslak",      cls: "badge-neutral", description: "Onaya gönderilmedi" },
+    pending_approval: { label: "Bekliyor",    cls: "badge-warning", description: "Stok kontrol bekleniyor" },
+    approved:         { label: "Onaylı",      cls: "badge-accent",  description: "Stok rezerve edildi" },
+    cancelled:        { label: "İptal",       cls: "badge-danger",  description: "Sipariş kapatıldı" },
 };
 
-const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: string }> = {
-    unallocated:         { label: "Rezervesiz",    cls: "badge-neutral"  },
-    partially_allocated: { label: "Kısmi Rezerve", cls: "badge-warning"  },
-    allocated:           { label: "Rezerveli",     cls: "badge-warning"  },
-    partially_shipped:   { label: "Kısmi Sevk",    cls: "badge-accent"   },
-    shipped:             { label: "Sevk Edildi",   cls: "badge-success"  },
+const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: string; description: string }> = {
+    unallocated:         { label: "Rezervesiz",    cls: "badge-neutral",  description: "Stok henüz ayrılmadı" },
+    partially_allocated: { label: "Kısmi Rezerve", cls: "badge-warning",  description: "Stok kısmen ayrıldı" },
+    allocated:           { label: "Rezerveli",     cls: "badge-warning",  description: "Stok ayrıldı, sevkiyata hazır" },
+    partially_shipped:   { label: "Kısmi Sevk",    cls: "badge-accent",   description: "Kısmen gönderildi" },
+    shipped:             { label: "Sevk Edildi",   cls: "badge-success",  description: "Müşteriye gönderildi" },
 };
 
 const riskColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -32,6 +32,11 @@ const riskColors: Record<string, { bg: string; text: string; border: string }> =
 };
 const riskLabels: Record<string, string> = {
     low: "Düşük", medium: "Orta", high: "Yüksek",
+};
+const riskDescriptions: Record<string, string> = {
+    low:    "Onaylamak güvenli",
+    medium: "Bazı noktaları gözden geçir",
+    high:   "Onaylamadan önce kontrol et",
 };
 
 const thStyle: React.CSSProperties = {
@@ -548,13 +553,14 @@ export default function OrderDetailPage() {
                                     const isCurrent = s === commercialStatus;
                                     const isJust = justTransitionedCommercial === s;
                                     return (
-                                        <div key={s} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: i < commercialSteps.length - 1 ? "6px" : 0 }}>
+                                        <div key={s} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: i < commercialSteps.length - 1 ? "6px" : 0 }}>
                                             <div
                                                 style={{
                                                     width: isJust ? "8px" : "6px",
                                                     height: isJust ? "8px" : "6px",
                                                     borderRadius: "50%",
                                                     flexShrink: 0,
+                                                    marginTop: "3px",
                                                     background: isCurrent
                                                         ? "var(--accent)"
                                                         : isDone
@@ -563,22 +569,29 @@ export default function OrderDetailPage() {
                                                     boxShadow: isJust ? "0 0 8px var(--accent)" : "none",
                                                 }}
                                             />
-                                            <span
-                                                style={{
-                                                    fontSize: "12px",
-                                                    color: isCurrent
-                                                        ? "var(--accent-text)"
-                                                        : isDone
-                                                        ? "var(--success-text)"
-                                                        : "var(--text-tertiary)",
-                                                    fontWeight: isCurrent ? 600 : 400,
-                                                    background: isJust ? "var(--accent-bg)" : "transparent",
-                                                    padding: isJust ? "1px 6px" : "0",
-                                                    borderRadius: "3px",
-                                                }}
-                                            >
-                                                {commercialStatusConfig[s].label}
-                                            </span>
+                                            <div style={{ display: "flex", flexDirection: "column" }}>
+                                                <span
+                                                    style={{
+                                                        fontSize: "12px",
+                                                        color: isCurrent
+                                                            ? "var(--accent-text)"
+                                                            : isDone
+                                                            ? "var(--success-text)"
+                                                            : "var(--text-tertiary)",
+                                                        fontWeight: isCurrent ? 600 : 400,
+                                                        background: isJust ? "var(--accent-bg)" : "transparent",
+                                                        padding: isJust ? "1px 6px" : "0",
+                                                        borderRadius: "3px",
+                                                    }}
+                                                >
+                                                    {commercialStatusConfig[s].label}
+                                                </span>
+                                                {isCurrent && (
+                                                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "1px" }}>
+                                                        {commercialStatusConfig[s].description}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -623,13 +636,14 @@ export default function OrderDetailPage() {
                                     const isCurrent = s === fulfillmentStatus;
                                     const isJust = justTransitionedFulfillment === s;
                                     return (
-                                        <div key={s} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: i < 2 ? "6px" : 0 }}>
+                                        <div key={s} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: i < 2 ? "6px" : 0 }}>
                                             <div
                                                 style={{
                                                     width: isJust ? "8px" : "6px",
                                                     height: isJust ? "8px" : "6px",
                                                     borderRadius: "50%",
                                                     flexShrink: 0,
+                                                    marginTop: "3px",
                                                     background: isCurrent && s === "shipped"
                                                         ? "var(--success)"
                                                         : isCurrent
@@ -640,24 +654,31 @@ export default function OrderDetailPage() {
                                                     boxShadow: isJust ? "0 0 8px var(--accent)" : "none",
                                                 }}
                                             />
-                                            <span
-                                                style={{
-                                                    fontSize: "12px",
-                                                    color: isCurrent && s === "shipped"
-                                                        ? "var(--success-text)"
-                                                        : isCurrent
-                                                        ? "var(--accent-text)"
-                                                        : isDone
-                                                        ? "var(--success-text)"
-                                                        : "var(--text-tertiary)",
-                                                    fontWeight: isCurrent ? 600 : 400,
-                                                    background: isJust ? "var(--accent-bg)" : "transparent",
-                                                    padding: isJust ? "1px 6px" : "0",
-                                                    borderRadius: "3px",
-                                                }}
-                                            >
-                                                {fulfillmentStatusConfig[s].label}
-                                            </span>
+                                            <div style={{ display: "flex", flexDirection: "column" }}>
+                                                <span
+                                                    style={{
+                                                        fontSize: "12px",
+                                                        color: isCurrent && s === "shipped"
+                                                            ? "var(--success-text)"
+                                                            : isCurrent
+                                                            ? "var(--accent-text)"
+                                                            : isDone
+                                                            ? "var(--success-text)"
+                                                            : "var(--text-tertiary)",
+                                                        fontWeight: isCurrent ? 600 : 400,
+                                                        background: isJust ? "var(--accent-bg)" : "transparent",
+                                                        padding: isJust ? "1px 6px" : "0",
+                                                        borderRadius: "3px",
+                                                    }}
+                                                >
+                                                    {fulfillmentStatusConfig[s].label}
+                                                </span>
+                                                {isCurrent && (
+                                                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "1px" }}>
+                                                        {fulfillmentStatusConfig[s].description}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -715,6 +736,9 @@ export default function OrderDetailPage() {
                                             <span style={{ fontSize: "11px", color: "var(--text-tertiary)", marginLeft: "8px" }}>
                                                 Güven: %{Math.round(order.aiConfidence * 100)}
                                             </span>
+                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "4px" }}>
+                                                {riskDescriptions[order.aiRiskLevel ?? "medium"]}
+                                            </div>
                                         </div>
 
                                         {order.aiReason && (
@@ -724,7 +748,7 @@ export default function OrderDetailPage() {
                                         )}
 
                                         <div style={{ fontSize: "10px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
-                                            AI tavsiyesi — operasyonel inceleme riski
+                                            Siparişteki eksiklik ve tutarsızlıkları analiz eder — ödeme riski değerlendirmesi değildir
                                         </div>
                                     </>
                                 ) : (

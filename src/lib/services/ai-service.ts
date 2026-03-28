@@ -226,6 +226,51 @@ export function fallbackParseRow(
     return { parsed_data, unmatched_fields };
 }
 
+const CHUNK_SIZE = 20;
+
+async function parseChunk(
+    chunk: Array<Record<string, string>>,
+    systemPrompt: string,
+    entity_type: string,
+): Promise<BatchParseResult["items"]> {
+    try {
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: [{ role: "user", content: JSON.stringify(chunk) }],
+        });
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (Array.isArray(parsed.items)) {
+                return parsed.items.map((item: Record<string, unknown>) => ({
+                    parsed_data: (item.parsed_data ?? {}) as Record<string, unknown>,
+                    confidence: typeof item.confidence === "number" ? item.confidence : 0.5,
+                    ai_reason: typeof item.ai_reason === "string" ? item.ai_reason : "",
+                    unmatched_fields: Array.isArray(item.unmatched_fields) ? item.unmatched_fields : [],
+                }));
+            }
+        }
+        // JSON parse başarısız — chunk fallback
+        return chunk.map(row => {
+            const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
+            return { parsed_data, confidence: 0.5, ai_reason: "AI yanıtı ayrıştırılamadı — fallback eşleştirme", unmatched_fields };
+        });
+    } catch {
+        return chunk.map(row => {
+            const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
+            return { parsed_data, confidence: 0.5, ai_reason: "AI servisi yanıt veremedi — fallback eşleştirme", unmatched_fields };
+        });
+    }
+}
+
 export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseResult> {
     const { entity_type, rows } = input;
 
@@ -246,7 +291,6 @@ export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseRe
 
     const systemPrompt = BATCH_PARSE_SYSTEM[entity_type];
     if (!systemPrompt) {
-        // Unsupported entity type — fallback
         return {
             items: rows.map(row => {
                 const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
@@ -260,60 +304,18 @@ export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseRe
         };
     }
 
-    try {
-        const message = await client.messages.create({
-            model: MODEL,
-            max_tokens: 4096,
-            system: systemPrompt,
-            messages: [{ role: "user", content: JSON.stringify(rows) }],
-        });
-
-        const text = message.content
-            .filter(c => c.type === "text")
-            .map(c => (c as { type: "text"; text: string }).text)
-            .join("\n");
-
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (Array.isArray(parsed.items)) {
-                return {
-                    items: parsed.items.map((item: Record<string, unknown>) => ({
-                        parsed_data: (item.parsed_data ?? {}) as Record<string, unknown>,
-                        confidence: typeof item.confidence === "number" ? item.confidence : 0.5,
-                        ai_reason: typeof item.ai_reason === "string" ? item.ai_reason : "",
-                        unmatched_fields: Array.isArray(item.unmatched_fields) ? item.unmatched_fields : [],
-                    })),
-                };
-            }
-        }
-
-        // Could not parse AI response — fallback
-        return {
-            items: rows.map(row => {
-                const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
-                return {
-                    parsed_data,
-                    confidence: 0.5,
-                    ai_reason: "AI yanıtı ayrıştırılamadı — fallback eşleştirme",
-                    unmatched_fields,
-                };
-            }),
-        };
-    } catch (err) {
-        console.error("[AI BatchParse] graceful degradation:", err);
-        return {
-            items: rows.map(row => {
-                const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
-                return {
-                    parsed_data,
-                    confidence: 0.5,
-                    ai_reason: "AI servisi yanıt veremedi — fallback eşleştirme",
-                    unmatched_fields,
-                };
-            }),
-        };
+    const chunks: Array<Array<Record<string, string>>> = [];
+    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+        chunks.push(rows.slice(i, i + CHUNK_SIZE));
     }
+
+    const allItems: BatchParseResult["items"] = [];
+    for (const chunk of chunks) {
+        const items = await parseChunk(chunk, systemPrompt, entity_type);
+        allItems.push(...items);
+    }
+
+    return { items: allItems };
 }
 
 // ── Ops Summary ──────────────────────────────────────────────
@@ -527,7 +529,7 @@ Görevin: Verilen sipariş JSON'ını inceleyerek, siparişin operasyonel açıd
 SADECE aşağıdaki formatta cevap ver (REASON değeri Türkçe olmalıdır):
 CONFIDENCE: <0-1 arası ondalık sayı>
 RISK_LEVEL: <low|medium|high>
-REASON: <Türkçe tek cümle — neyin inceleme gerektirdiğini açıkla>`;
+REASON: <Türkçe, maksimum 2 cümle: birinci cümle sorunu veya durumu açıkla, ikinci cümle ne yapılması gerektiğini söyle>`;
 
 export function parseScoreResponse(text: string): ScoreOrderResult {
     const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
