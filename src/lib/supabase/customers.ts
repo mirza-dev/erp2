@@ -11,6 +11,9 @@ export interface CreateCustomerInput {
     country?: string;
     currency?: string;
     notes?: string;
+    payment_terms_days?: number;
+    default_incoterm?: string;
+    customer_code?: string;
 }
 
 export async function dbListCustomers(): Promise<CustomerRow[]> {
@@ -37,6 +40,18 @@ export async function dbGetCustomerById(id: string): Promise<CustomerRow | null>
     const supabase = createServiceClient();
     const { data, error } = await supabase
         .from("customers").select("*").eq("id", id).single();
+    if (error || !data) return null;
+    return data;
+}
+
+export async function dbFindCustomerByCode(code: string): Promise<CustomerRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("customers")
+        .select("*")
+        .eq("customer_code", code)
+        .limit(1)
+        .maybeSingle();
     if (error || !data) return null;
     return data;
 }
@@ -71,6 +86,9 @@ export async function dbCreateCustomer(input: CreateCustomerInput): Promise<Cust
             total_orders: 0,
             total_revenue: 0,
             last_order_date: null,
+            payment_terms_days: input.payment_terms_days ?? null,
+            default_incoterm: input.default_incoterm ?? null,
+            customer_code: input.customer_code ?? null,
         })
         .select("*")
         .single();

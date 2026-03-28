@@ -183,6 +183,9 @@ const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
         vergi_dairesi: "tax_office",
         adres: "address",
         notlar: "notes", not: "notes",
+        odeme_vadesi_gun: "payment_terms_days",
+        incoterm_tercihi: "default_incoterm",
+        musteri_kodu: "customer_code",
     },
     product: {
         urun_adi: "name", ad: "name", isim: "name",
@@ -192,12 +195,63 @@ const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
         liste_fiyati_usd: "price", fiyat: "price", liste_fiyati: "price",
         para_birimi: "currency",
         min_siparis_miktari: "min_stock_level", guvenlik_stogu: "min_stock_level",
+        urun_ailesi: "product_family",
+        alt_kategori: "sub_category",
+        sektor_uygunlugu: "sector_compatibility",
+        standart_maliyet_usd: "cost_price",
+        birim_agirlik_kg: "weight_kg",
     },
     order: {
-        musteri_kodu: "customer_name", musteri_adi: "customer_name", firma_adi: "customer_name",
+        musteri_kodu: "customer_code", musteri_adi: "customer_name", firma_adi: "customer_name",
         para_birimi: "currency",
         toplam_tutar_usd: "grand_total", toplam_tutar: "grand_total", tutar: "grand_total",
         notlar: "notes", not: "notes",
+        incoterm: "incoterm",
+        planlanan_sevk_tarihi: "planned_shipment_date",
+        teklif_no: "quote_number",
+        siparis_no: "original_order_number",
+        siparis_tarihi: "order_date",
+    },
+    order_line: {
+        siparis_no: "order_number",
+        urun_kodu: "product_sku",
+        miktar: "quantity",
+        birim: "unit",
+        birim_fiyat_usd: "unit_price",
+        toplam_tutar_usd: "line_total",
+    },
+    quote: {
+        teklif_no: "quote_number",
+        teklif_tarihi: "quote_date",
+        musteri_kodu: "customer_code",
+        para_birimi: "currency",
+        incoterm: "incoterm",
+        gecerlilik_gun: "validity_days",
+        toplam_tutar_usd: "total_amount",
+    },
+    shipment: {
+        sevkiyat_no: "shipment_number",
+        siparis_no: "order_number",
+        sevkiyat_tarihi: "shipment_date",
+        tasima_turu: "transport_type",
+        net_agirlik_kg: "net_weight_kg",
+        brut_agirlik_kg: "gross_weight_kg",
+    },
+    invoice: {
+        fatura_no: "invoice_number",
+        fatura_tarihi: "invoice_date",
+        siparis_no: "order_number",
+        musteri_kodu: "customer_code",
+        para_birimi: "currency",
+        fatura_tutari_para_birimi: "amount",
+        vade_tarihi: "due_date",
+    },
+    payment: {
+        tahsilat_no: "payment_number",
+        fatura_no: "invoice_number",
+        tahsilat_tarihi: "payment_date",
+        tahsil_edilen_tutar_usd: "amount",
+        odeme_yontemi: "payment_method",
     },
 };
 
@@ -215,7 +269,13 @@ export function fallbackParseRow(
         if (erpField) {
             // Try to convert numeric values
             const num = Number(value);
-            parsed_data[erpField] = !isNaN(num) && value.trim() !== "" && ["price", "grand_total", "min_stock_level"].includes(erpField)
+            const NUMERIC_FIELDS = new Set([
+                "price", "grand_total", "min_stock_level", "on_hand",
+                "cost_price", "weight_kg", "payment_terms_days",
+                "total_amount", "net_weight_kg", "gross_weight_kg",
+                "amount", "validity_days", "quantity", "unit_price", "line_total",
+            ]);
+            parsed_data[erpField] = !isNaN(num) && value.trim() !== "" && NUMERIC_FIELDS.has(erpField)
                 ? num
                 : value;
         } else {

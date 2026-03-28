@@ -27,6 +27,10 @@ export interface CreateOrderInput {
     grand_total: number;
     notes?: string;
     created_by?: string;
+    incoterm?: string;
+    planned_shipment_date?: string;
+    quote_id?: string;
+    original_order_number?: string;
     lines: {
         product_id: string;
         product_name: string;
@@ -57,6 +61,18 @@ export async function dbGenerateOrderNumber(): Promise<string> {
 }
 
 // ── Queries ──────────────────────────────────────────────────
+
+export async function dbFindOrderByOriginalNumber(originalNumber: string): Promise<SalesOrderRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("sales_orders")
+        .select("*")
+        .eq("original_order_number", originalNumber)
+        .limit(1)
+        .maybeSingle();
+    if (error || !data) return null;
+    return data;
+}
 
 export async function dbGetOrderById(id: string): Promise<OrderWithLines | null> {
     const supabase = createServiceClient();
@@ -121,6 +137,10 @@ export async function dbCreateOrder(input: CreateOrderInput): Promise<{ id: stri
             notes: input.notes ?? null,
             item_count: input.lines.length,
             created_by: input.created_by ?? null,
+            incoterm: input.incoterm ?? null,
+            planned_shipment_date: input.planned_shipment_date ?? null,
+            quote_id: input.quote_id ?? null,
+            original_order_number: input.original_order_number ?? null,
         })
         .select("id, order_number")
         .single();

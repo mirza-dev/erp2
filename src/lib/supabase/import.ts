@@ -63,7 +63,7 @@ export async function dbUpdateBatchStatus(
 
 export interface CreateDraftInput {
     batch_id: string;
-    entity_type: "customer" | "product" | "order";
+    entity_type: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment";
     raw_data?: Json;
     parsed_data?: Json;
     matched_entity_id?: string;

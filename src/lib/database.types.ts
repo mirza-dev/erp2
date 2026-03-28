@@ -45,6 +45,9 @@ export interface CustomerRow {
     created_at: string
     updated_at: string
     created_by: string | null
+    payment_terms_days: number | null
+    default_incoterm: string | null
+    customer_code: string | null
 }
 
 export interface ProductRow {
@@ -67,6 +70,11 @@ export interface ProductRow {
     lead_time_days: number | null
     created_at: string
     updated_at: string
+    product_family: string | null
+    sub_category: string | null
+    sector_compatibility: string | null
+    cost_price: number | null
+    weight_kg: number | null
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */
@@ -111,6 +119,10 @@ export interface SalesOrderRow {
     ai_reason: string | null
     ai_model_version: string | null
     ai_risk_level: "low" | "medium" | "high" | null
+    incoterm: string | null
+    planned_shipment_date: string | null
+    quote_id: string | null
+    original_order_number: string | null
 }
 
 export interface OrderLineRow {
@@ -212,10 +224,70 @@ export interface ImportBatchRow {
     confirmed_at: string | null
 }
 
+export interface QuoteRow {
+    id: string
+    quote_number: string
+    quote_date: string
+    customer_id: string | null
+    customer_code: string | null
+    currency: string
+    incoterm: string | null
+    validity_days: number | null
+    total_amount: number | null
+    notes: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface ShipmentRow {
+    id: string
+    shipment_number: string
+    order_id: string | null
+    order_number: string | null
+    shipment_date: string
+    transport_type: string | null
+    net_weight_kg: number | null
+    gross_weight_kg: number | null
+    notes: string | null
+    created_at: string
+}
+
+export type InvoiceStatus = "open" | "partially_paid" | "paid" | "cancelled"
+
+export interface InvoiceRow {
+    id: string
+    invoice_number: string
+    invoice_date: string
+    order_id: string | null
+    order_number: string | null
+    customer_id: string | null
+    customer_code: string | null
+    currency: string
+    amount: number
+    due_date: string | null
+    status: InvoiceStatus
+    notes: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface PaymentRow {
+    id: string
+    payment_number: string
+    invoice_id: string | null
+    invoice_number: string | null
+    payment_date: string
+    amount: number
+    currency: string
+    payment_method: string | null
+    notes: string | null
+    created_at: string
+}
+
 export interface ImportDraftRow {
     id: string
     batch_id: string
-    entity_type: "customer" | "product" | "order"
+    entity_type: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"
     raw_data: Json | null
     parsed_data: Json | null
     matched_entity_id: string | null

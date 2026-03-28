@@ -13,8 +13,8 @@ interface SheetInfo {
     displayName: string;
     rows: number;
     entity: string;
-    entityType: "customer" | "product" | "order" | "order_line" | "stock" | null;
-    status: "importable" | "parasut" | "unsupported";
+    entityType: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment" | null;
+    status: "importable" | "unsupported";
     selected: boolean;
     headers: string[];
     previewRows: Array<Record<string, string>>;
@@ -22,15 +22,17 @@ interface SheetInfo {
 }
 
 // Known sheet → entity type mapping
-const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "order" | "order_line" | "stock"; displayName: string; entity: string; status: "importable" }> = {
+const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"; displayName: string; entity: string; status: "importable" }> = {
     Urunler: { entityType: "product", displayName: "Ürünler", entity: "Ürünler", status: "importable" },
     Musteriler: { entityType: "customer", displayName: "Müşteriler", entity: "Müşteriler", status: "importable" },
+    Teklifler: { entityType: "quote", displayName: "Teklifler", entity: "Teklifler", status: "importable" },
     Siparisler: { entityType: "order", displayName: "Siparişler", entity: "Siparişler", status: "importable" },
     Siparis_Kalemleri: { entityType: "order_line", displayName: "Sipariş Kalemleri", entity: "Sipariş Kalemleri", status: "importable" },
+    Sevkiyatlar: { entityType: "shipment", displayName: "Sevkiyatlar", entity: "Sevkiyatlar", status: "importable" },
+    Faturalar: { entityType: "invoice", displayName: "Faturalar", entity: "Faturalar", status: "importable" },
+    Tahsilatlar: { entityType: "payment", displayName: "Tahsilatlar", entity: "Tahsilatlar", status: "importable" },
     Stok: { entityType: "stock", displayName: "Stok", entity: "Stok Güncellemesi", status: "importable" },
 };
-
-const PARASUT_SHEETS = new Set(["Faturalar", "Tahsilatlar"]);
 
 // Entity types that support AI parse (customer/product/order only)
 const AI_PARSEABLE: Set<string> = new Set(["customer", "product", "order"]);
@@ -122,15 +124,14 @@ export default function ImportPage() {
 
                     // Determine entity type and status
                     const known = SHEET_ENTITY_MAP[name];
-                    const isParasut = PARASUT_SHEETS.has(name);
 
                     return {
                         name,
                         displayName: known?.displayName ?? name,
                         rows: jsonRows.length,
-                        entity: known?.entity ?? (isParasut ? name : name),
+                        entity: known?.entity ?? name,
                         entityType: known?.entityType ?? null,
-                        status: known ? "importable" : isParasut ? "parasut" : "unsupported",
+                        status: known ? "importable" : "unsupported",
                         selected: !!known,
                         headers,
                         previewRows: jsonRows.slice(0, 5).map(row =>
@@ -351,7 +352,6 @@ export default function ImportPage() {
     };
 
     const importableSelected = sheets.filter(s => s.status === "importable" && s.selected);
-    const parasutSheets = sheets.filter(s => s.status === "parasut");
 
     // Group drafts by entity_type for the preview/review step
     const draftEntityTypes = [...new Set(drafts.map(d => d.entity_type))];
@@ -361,8 +361,12 @@ export default function ImportPage() {
     const entityTypeLabels: Record<string, string> = {
         customer: "Müşteriler",
         product: "Ürünler",
+        quote: "Teklifler",
         order: "Siparişler",
         order_line: "Sipariş Kalemleri",
+        shipment: "Sevkiyatlar",
+        invoice: "Faturalar",
+        payment: "Tahsilatlar",
         stock: "Stok",
     };
 
@@ -621,18 +625,12 @@ export default function ImportPage() {
                             {sheets.map((sheet, idx) => {
                                 const statusColor = sheet.status === "importable"
                                     ? "var(--success-text)"
-                                    : sheet.status === "parasut"
-                                    ? "var(--accent-text)"
                                     : "var(--text-tertiary)";
                                 const statusBg = sheet.status === "importable"
                                     ? "var(--success-bg)"
-                                    : sheet.status === "parasut"
-                                    ? "var(--accent-bg)"
                                     : "var(--bg-tertiary)";
                                 const statusLabel = sheet.status === "importable"
                                     ? "İçe Aktarılabilir"
-                                    : sheet.status === "parasut"
-                                    ? "Paraşüt ile sync"
                                     : "Desteklenmiyor";
 
                                 return (
@@ -1001,13 +999,6 @@ export default function ImportPage() {
                                         <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.errors[0]}</div>
                                     </div>
                                 )}
-                                {parasutSheets.length > 0 && parasutSheets.map(ps => (
-                                    <div key={ps.name} style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
-                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{ps.displayName}</div>
-                                        <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--accent-text)", marginBottom: "2px" }}>{ps.rows}</div>
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Paraşüt Sync ile işlenecek</div>
-                                    </div>
-                                ))}
                             </>
                         ) : (
                             <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px", gridColumn: "1 / -1" }}>

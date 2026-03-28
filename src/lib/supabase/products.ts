@@ -18,6 +18,11 @@ export interface CreateProductInput {
     preferred_vendor?: string;
     daily_usage?: number;
     lead_time_days?: number;
+    product_family?: string;
+    sub_category?: string;
+    sector_compatibility?: string;
+    cost_price?: number;
+    weight_kg?: number;
 }
 
 export interface ListProductsFilter {
@@ -94,6 +99,11 @@ export async function dbCreateProduct(input: CreateProductInput): Promise<Produc
             preferred_vendor: input.preferred_vendor ?? null,
             daily_usage: input.daily_usage ?? null,
             ...(input.lead_time_days !== undefined ? { lead_time_days: input.lead_time_days } : {}),
+            product_family: input.product_family ?? null,
+            sub_category: input.sub_category ?? null,
+            sector_compatibility: input.sector_compatibility ?? null,
+            cost_price: input.cost_price ?? null,
+            weight_kg: input.weight_kg ?? null,
         })
         .select("*")
         .single();
