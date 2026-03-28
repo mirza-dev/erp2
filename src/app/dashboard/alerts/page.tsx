@@ -365,7 +365,10 @@ export default function AlertsPage() {
                             >
                                 {filter === "ai" ? (
                                     <div>
-                                        <div style={{ marginBottom: "12px" }}>Henüz AI önerisi yok.</div>
+                                        <div style={{ marginBottom: "8px", fontWeight: 500 }}>Henüz AI önerisi yok.</div>
+                                        <div style={{ marginBottom: "16px", fontSize: "12px", color: "var(--text-tertiary)", maxWidth: "320px", margin: "0 auto 16px" }}>
+                                            AI stok risk değerlendirmesi; kritik seviyenin üstünde olan ve günlük kullanım verisi bulunan ürünlere uygulanır.
+                                        </div>
                                         <button
                                             onClick={handleAiSuggest}
                                             disabled={aiGenerating}

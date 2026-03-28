@@ -95,7 +95,7 @@ export default function ProductsPage() {
     );
     const [riskData, setRiskData] = useState<Map<string, RiskItem>>(new Map());
     const [riskLoading, setRiskLoading] = useState(false);
-    const [riskCounts, setRiskCounts] = useState<{ at_risk: number } | null>(null);
+    const [riskCounts, setRiskCounts] = useState<{ at_risk: number; excluded_no_usage?: number } | null>(null);
     const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
 
     useEffect(() => {
@@ -116,7 +116,10 @@ export default function ProductsPage() {
                 const map = new Map<string, RiskItem>();
                 for (const item of data.items ?? []) map.set(item.productId, item);
                 setRiskData(map);
-                setRiskCounts({ at_risk: data.counts?.at_risk ?? 0 });
+                setRiskCounts({
+                    at_risk: data.counts?.at_risk ?? 0,
+                    excluded_no_usage: data.counts?.excluded_no_usage ?? 0,
+                });
                 setAiAvailable(data.ai_available ?? null);
             } catch { /* graceful: risk data missing = no badges */ }
             finally { if (!cancelled) setRiskLoading(false); }
@@ -207,6 +210,12 @@ export default function ProductsPage() {
                         )}
                         {(riskCounts?.at_risk ?? 0) > 0 && (
                             <span style={{ color: "var(--accent-text)" }}> · {riskCounts!.at_risk} riskli{aiAvailable ? " (AI)" : ""}</span>
+                        )}
+                        {!riskLoading && riskCounts !== null && riskCounts.at_risk === 0 && aiAvailable && (
+                            <span style={{ color: "var(--success-text)" }}> · AI: risk yok</span>
+                        )}
+                        {!riskLoading && riskCounts !== null && (riskCounts.excluded_no_usage ?? 0) > 0 && (
+                            <span style={{ color: "var(--text-tertiary)" }}> · {riskCounts.excluded_no_usage} ürün veri eksik</span>
                         )}
                         {riskLoading && (
                             <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}> · Risk analizi…</span>

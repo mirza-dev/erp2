@@ -175,7 +175,7 @@ export function computeStockRiskLevel(
     }
 
     // Step 5: approaching_critical
-    if (coverageDays !== null && coverageDays <= 14) {
+    if (coverageDays !== null && coverageDays <= 30) {
         return {
             riskLevel: "approaching_critical",
             coverageDays,

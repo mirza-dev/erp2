@@ -84,6 +84,11 @@ export async function POST() {
         };
     });
 
+    const excludedNoUsage = products.filter(p =>
+        p.available_now > Math.ceil(p.min_stock_level * 1.5) &&
+        (!p.daily_usage || p.daily_usage <= 0)
+    ).length;
+
     return NextResponse.json({
         ai_available: aiAvailable,
         counts: {
@@ -91,6 +96,7 @@ export async function POST() {
             critical: criticalCount,
             warning: warningCount,
             at_risk: atRisk.length,
+            excluded_no_usage: excludedNoUsage,
         },
         items,
         generatedAt: new Date().toISOString(),
