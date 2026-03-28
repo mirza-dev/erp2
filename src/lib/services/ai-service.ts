@@ -526,10 +526,12 @@ Görevin: Verilen sipariş JSON'ını inceleyerek, siparişin operasyonel açıd
 - Bilinmeyen veya alışılmadık para birimi
 - Satır sayısına göre sipariş büyüklüğü tutarsızlığı
 
-SADECE aşağıdaki formatta cevap ver (REASON değeri Türkçe olmalıdır):
+MUTLAKA TÜRKÇE YAZI. Her yanıtın REASON kısmı Türkçe olmak zorunda. İngilizce kesinlikle yasak.
+
+SADECE aşağıdaki formatta cevap ver:
 CONFIDENCE: <0-1 arası ondalık sayı>
 RISK_LEVEL: <low|medium|high>
-REASON: <Türkçe, maksimum 2 cümle: birinci cümle sorunu veya durumu açıkla, ikinci cümle ne yapılması gerektiğini söyle>`;
+REASON: <TÜRKÇE, maksimum 2 cümle: birinci cümle durumu açıkla, ikinci cümle ne yapılması gerektiğini söyle>`;
 
 export function parseScoreResponse(text: string): ScoreOrderResult {
     const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
