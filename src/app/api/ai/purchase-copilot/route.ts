@@ -108,13 +108,11 @@ export async function POST() {
     try {
         const activeProductIds = responseItems.map(i => i.productId);
 
-        // Expire suggestions for products that no longer need purchase
-        if (activeProductIds.length > 0) {
-            await dbExpireSuggestedRecommendations("product", activeProductIds, "purchase_suggestion");
-        }
+        const expirePromise = activeProductIds.length > 0
+            ? dbExpireSuggestedRecommendations("product", activeProductIds, "purchase_suggestion")
+            : Promise.resolve(0);
 
-        // Upsert a recommendation for each item
-        for (const item of responseItems) {
+        const upsertPromises = responseItems.map(async item => {
             const ai = aiMap.get(item.productId);
             const urgencyPct = item.urgencyPct;
             const severity = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
@@ -140,11 +138,14 @@ export async function POST() {
                         formula: item.formula,
                     },
                 });
-                recommendations.push({ productId: item.productId, recommendationId: rec.id, status: rec.status });
+                return { productId: item.productId, recommendationId: rec.id, status: rec.status };
             } catch {
-                recommendations.push({ productId: item.productId, recommendationId: null, status: "error" });
+                return { productId: item.productId, recommendationId: null, status: "error" };
             }
-        }
+        });
+
+        const [, upsertResults] = await Promise.all([expirePromise, Promise.all(upsertPromises)]);
+        recommendations.push(...upsertResults);
     } catch {
         // Persistence errors must not affect the main response
     }
