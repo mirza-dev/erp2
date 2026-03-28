@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 interface OpsMetrics {
     criticalStockCount: number;
     warningStockCount: number;
+    atRiskCount: number;
     pendingOrderCount: number;
     approvedOrderCount: number;
     highRiskOrderCount: number;
@@ -28,6 +29,7 @@ function MetricsContextBar({ metrics }: { metrics: OpsMetrics }) {
     const items: { label: string; value: number; danger?: boolean }[] = [
         { label: "kritik stok", value: metrics.criticalStockCount, danger: true },
         { label: "uyarı stok", value: metrics.warningStockCount },
+        { label: "AI risk", value: metrics.atRiskCount, danger: metrics.atRiskCount > 0 },
         { label: "bekleyen sipariş", value: metrics.pendingOrderCount },
         { label: "onaylı sipariş", value: metrics.approvedOrderCount },
         { label: "yüksek riskli", value: metrics.highRiskOrderCount, danger: true },
@@ -360,35 +362,57 @@ export default function AISummaryCard() {
 
             {/* Insights */}
             {data.insights.length > 0 && (
-                <ul style={{
-                    listStyle: "none",
-                    padding: 0,
-                    margin: "0 0 14px 0",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "6px",
-                }}>
-                    {data.insights.map((item, i) => (
-                        <li key={i} style={{
-                            fontSize: "12px",
-                            color: "var(--text-primary)",
-                            display: "flex",
-                            alignItems: "flex-start",
-                            gap: "8px",
-                        }}>
-                            <span style={{
-                                color: "var(--accent-text)",
-                                fontWeight: 700,
-                                fontSize: "10px",
-                                marginTop: "2px",
-                                flexShrink: 0,
+                <>
+                    <ul style={{
+                        listStyle: "none",
+                        padding: 0,
+                        margin: "0 0 14px 0",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "6px",
+                    }}>
+                        {data.insights.map((item, i) => (
+                            <li key={i} style={{
+                                fontSize: "12px",
+                                color: "var(--text-primary)",
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: "8px",
                             }}>
-                                ●
-                            </span>
-                            {item}
-                        </li>
-                    ))}
-                </ul>
+                                <span style={{
+                                    color: "var(--accent-text)",
+                                    fontWeight: 700,
+                                    fontSize: "10px",
+                                    marginTop: "2px",
+                                    flexShrink: 0,
+                                }}>
+                                    ●
+                                </span>
+                                {item}
+                            </li>
+                        ))}
+                    </ul>
+                    <div style={{
+                        display: "flex", gap: "12px", flexWrap: "wrap",
+                        marginTop: "-4px", paddingTop: "10px",
+                        borderTop: "0.5px solid var(--border-tertiary)",
+                        marginBottom: "14px",
+                    }}>
+                        {[
+                            { label: "Uyarılar", href: "/dashboard/alerts" },
+                            { label: "Ürünler", href: "/dashboard/products" },
+                            { label: "Siparişler", href: "/dashboard/orders" },
+                            { label: "Satın Alma", href: "/dashboard/purchase/suggested" },
+                        ].map(link => (
+                            <a key={link.href} href={link.href} style={{
+                                fontSize: "11px", color: "var(--accent-text)",
+                                textDecoration: "none", fontWeight: 500,
+                            }}>
+                                {link.label} →
+                            </a>
+                        ))}
+                    </div>
+                </>
             )}
 
             {/* Anomalies */}

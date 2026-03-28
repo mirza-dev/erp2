@@ -383,6 +383,7 @@ export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseRe
 export interface OpsSummaryInput {
     criticalStockCount: number;
     warningStockCount: number;
+    atRiskCount: number;
     topCriticalItems: { name: string; available: number; min: number; coverageDays: number | null }[];
     pendingOrderCount: number;
     approvedOrderCount: number;

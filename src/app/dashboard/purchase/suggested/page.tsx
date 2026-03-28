@@ -759,8 +759,19 @@ export default function PurchaseSuggestedPage() {
                                         }}>
                                             {isRaw ? "Hammadde" : "Bitmiş Ürün"}
                                         </span>
-                                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
-                                            {p.name}
+                                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
+                                                {p.name}
+                                            </div>
+                                            {aiMap.get(p.id) && !aiLoading && (
+                                                <span style={{
+                                                    fontSize: "9px", fontWeight: 700,
+                                                    color: "var(--accent-text)",
+                                                    background: "var(--accent-bg)",
+                                                    border: "0.5px solid var(--accent-border)",
+                                                    padding: "1px 5px", borderRadius: "3px",
+                                                }}>✦ AI</span>
+                                            )}
                                         </div>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace", marginTop: "2px" }}>
                                             {p.sku}

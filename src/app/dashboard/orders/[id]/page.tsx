@@ -724,6 +724,10 @@ export default function OrderDetailPage() {
 
                                 {order.aiConfidence != null && order.aiConfidence > 0 ? (
                                     <>
+                                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "10px" }}>
+                                            Siparişteki eksiklik ve tutarsızlıkları analiz eder — ödeme riski değerlendirmesi değildir
+                                        </div>
+
                                         <div style={{ marginBottom: "8px" }}>
                                             <span style={{
                                                 fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px",
@@ -746,10 +750,6 @@ export default function OrderDetailPage() {
                                                 {order.aiReason}
                                             </div>
                                         )}
-
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
-                                            Siparişteki eksiklik ve tutarsızlıkları analiz eder — ödeme riski değerlendirmesi değildir
-                                        </div>
                                     </>
                                 ) : (
                                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.6 }}>

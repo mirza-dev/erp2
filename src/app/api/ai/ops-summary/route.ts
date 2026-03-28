@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { dbListProducts } from "@/lib/supabase/products";
 import { dbListAlerts } from "@/lib/supabase/alerts";
 import { dbListOrders } from "@/lib/supabase/orders";
-import { computeCoverageDays } from "@/lib/stock-utils";
+import { computeCoverageDays, computeStockRiskLevel } from "@/lib/stock-utils";
 import { aiGenerateOpsSummary, isAIAvailable, type OpsSummaryInput } from "@/lib/services/ai-service";
 import { handleApiError } from "@/lib/api-error";
 
@@ -34,9 +34,15 @@ async function gatherMetrics(): Promise<OpsSummaryInput> {
         .filter(o => o.ai_risk_level === "high")
         .length;
 
+    const atRiskCount = products.filter(p =>
+        computeStockRiskLevel(p.available_now, p.min_stock_level, p.daily_usage, p.lead_time_days)
+            .riskLevel !== "none"
+    ).length;
+
     return {
         criticalStockCount: critical.length,
         warningStockCount: warning.length,
+        atRiskCount,
         topCriticalItems: topCritical,
         pendingOrderCount: pendingOrders.length,
         approvedOrderCount: approvedOrders.length,
