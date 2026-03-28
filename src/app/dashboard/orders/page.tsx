@@ -61,11 +61,29 @@ function matchesTab(order: { commercial_status: CommercialStatus; fulfillment_st
 }
 
 function OrdersList() {
-    const { orders: mockOrders } = useData();
+    const { orders: mockOrders, refetchAll } = useData();
     const router = useRouter();
     const searchParams = useSearchParams();
     const [search, setSearch] = useState("");
     const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [confirmId, setConfirmId] = useState<string | null>(null);
+
+    const handleDelete = async (e: React.MouseEvent, orderId: string) => {
+        e.stopPropagation();
+        if (confirmId !== orderId) {
+            setConfirmId(orderId);
+            return;
+        }
+        setDeletingId(orderId);
+        setConfirmId(null);
+        try {
+            await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+            await refetchAll();
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     useEffect(() => {
         const customer = searchParams.get("customer");
@@ -207,6 +225,8 @@ function OrdersList() {
                                             });
                                             const chevron = e.currentTarget.querySelector("[data-chevron]") as HTMLElement;
                                             if (chevron) chevron.style.opacity = "1";
+                                            const deleteBtn = e.currentTarget.querySelector("[data-delete]") as HTMLElement;
+                                            if (deleteBtn) deleteBtn.style.opacity = "1";
                                         }}
                                         onMouseLeave={(e) => {
                                             const tds = e.currentTarget.querySelectorAll("td");
@@ -216,6 +236,9 @@ function OrdersList() {
                                             });
                                             const chevron = e.currentTarget.querySelector("[data-chevron]") as HTMLElement;
                                             if (chevron) chevron.style.opacity = "0";
+                                            const deleteBtn = e.currentTarget.querySelector("[data-delete]") as HTMLElement;
+                                            if (deleteBtn) deleteBtn.style.opacity = "0";
+                                            if (confirmId === order.id) setConfirmId(null);
                                         }}
                                     >
                                         <td style={{ ...tdStyle, fontWeight: 500, borderLeft: "2px solid transparent" }}>
@@ -268,12 +291,49 @@ function OrdersList() {
                                         <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
                                             {formatCurrency(order.grandTotal, order.currency)}
                                         </td>
-                                        <td style={{ ...tdStyle, width: "32px", textAlign: "center", padding: "10px 8px" }}>
-                                            <span data-chevron="" style={{ opacity: 0, color: "var(--text-tertiary)", fontSize: "12px" }}>
-                                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                                    <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                                </svg>
-                                            </span>
+                                        <td
+                                            style={{ ...tdStyle, width: "64px", textAlign: "right", padding: "10px 8px" }}
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
+                                                {confirmId === order.id ? (
+                                                    <button
+                                                        onClick={(e) => handleDelete(e, order.id)}
+                                                        disabled={deletingId === order.id}
+                                                        style={{
+                                                            fontSize: "11px", color: "var(--danger-text)",
+                                                            background: "var(--danger-bg)", border: "0.5px solid var(--danger-border)",
+                                                            borderRadius: "4px", padding: "2px 7px", cursor: "pointer",
+                                                            whiteSpace: "nowrap",
+                                                        }}
+                                                    >
+                                                        Evet, iptal et
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        data-delete=""
+                                                        onClick={(e) => handleDelete(e, order.id)}
+                                                        disabled={deletingId === order.id}
+                                                        style={{
+                                                            opacity: 0, background: "transparent", border: "none",
+                                                            cursor: "pointer", color: "var(--text-tertiary)",
+                                                            padding: "2px 4px", borderRadius: "3px",
+                                                            display: "flex", alignItems: "center",
+                                                            transition: "opacity 0.1s, color 0.1s",
+                                                        }}
+                                                    >
+                                                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                                                            <path d="M2 3.5h9M5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v3.5M7.5 6v3.5M3 3.5l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7"
+                                                                stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+                                                        </svg>
+                                                    </button>
+                                                )}
+                                                <span data-chevron="" style={{ opacity: 0, color: "var(--text-tertiary)" }}>
+                                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                                        <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                </span>
+                                            </div>
                                         </td>
                                     </tr>
                                 );
