@@ -421,13 +421,19 @@ export default function PurchaseSuggestedPage() {
 
     useEffect(() => {
         if (reorderSuggestions.length === 0) return;
-        setAiLoading(true);
-        fetch("/api/ai/purchase-copilot", { method: "POST" })
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
+
+        const controller = new AbortController();
+
+        async function load() {
+            setAiLoading(true);
+            try {
+                const res = await fetch("/api/ai/purchase-copilot", {
+                    method: "POST",
+                    signal: controller.signal,
+                });
+                const data = res.ok ? await res.json() : null;
                 if (data) {
                     setAiData(data);
-                    // Populate recMap from response
                     if (data.recommendations) {
                         const newMap = new Map<string, RecEntry & { editedQty?: number }>();
                         for (const r of data.recommendations) {
@@ -438,9 +444,17 @@ export default function PurchaseSuggestedPage() {
                         setRecMap(newMap);
                     }
                 }
-            })
-            .catch(() => { setAiError(true); })
-            .finally(() => setAiLoading(false));
+            } catch (e) {
+                if (!(e instanceof Error && e.name === "AbortError")) {
+                    setAiError(true);
+                }
+            } finally {
+                setAiLoading(false);
+            }
+        }
+
+        load();
+        return () => controller.abort();
     }, [reorderSuggestions.length]);
 
     const aiMap = useMemo(() => {

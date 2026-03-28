@@ -38,7 +38,6 @@ vi.mock("@/lib/supabase/recommendations", () => ({
 
 import { POST } from "@/app/api/ai/purchase-copilot/route";
 import { ConfigError } from "@/lib/supabase/service";
-import { isValidISO } from "./test-helpers";
 
 // Reset all mocks before every test to prevent state leakage
 beforeEach(() => {

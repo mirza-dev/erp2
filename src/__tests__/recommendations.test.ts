@@ -7,21 +7,17 @@ import { NextRequest } from "next/server";
 
 // ─── Supabase service mock ─────────────────────────────────────────────────────
 
-const mockSelect = vi.fn();
-const mockEq = vi.fn();
 const mockMaybeSingle = vi.fn();
 const mockSingle = vi.fn();
-const mockInsert = vi.fn();
-const mockUpdate = vi.fn();
 const mockNot = vi.fn();
 
 // Builder that returns itself for chaining
 function makeBuilder() {
     const b: Record<string, unknown> = {};
-    b.select = (..._args: unknown[]) => b;
-    b.eq = (..._args: unknown[]) => b;
+    b.select = () => b;
+    b.eq = () => b;
     b.not = mockNot.mockReturnValue(b);
-    b.order = (..._args: unknown[]) => b;
+    b.order = () => b;
     b.maybeSingle = mockMaybeSingle;
     b.single = mockSingle;
     return b;
@@ -109,13 +105,11 @@ describe("dbUpsertRecommendation — creates new recommendation", () => {
         const row = makeRow();
         setupFrom({
             ai_recommendations: () => {
-                let callCount = 0;
                 const b: Record<string, unknown> = {};
                 b.select = () => b;
                 b.eq = () => b;
                 b.maybeSingle = async () => ({ data: null, error: null }); // no existing
-                b.insert = (_data: unknown) => {
-                    callCount++;
+                b.insert = () => {
                     return {
                         select: () => ({ single: async () => ({ data: row, error: null }) }),
                     };
@@ -149,7 +143,7 @@ describe("dbUpsertRecommendation — refreshes existing suggested row", () => {
                 b.select = () => b;
                 b.eq = () => b;
                 b.maybeSingle = async () => ({ data: existingRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: updatedRow, error: null }) }),
                     }),
@@ -186,7 +180,7 @@ describe("dbUpsertRecommendation — does not overwrite accepted row", () => {
                 b.eq = () => b;
                 // maybeSingle: no "suggested" row found (accepted rows filtered out by .eq("status","suggested"))
                 b.maybeSingle = async () => ({ data: null, error: null });
-                b.insert = (_data: unknown) => {
+                b.insert = () => {
                     insertCalled = true;
                     return {
                         select: () => ({ single: async () => ({ data: newRow, error: null }) }),
@@ -310,7 +304,7 @@ describe("dbUpdateRecommendationStatus — suggested → accepted", () => {
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => {
+                b.update = () => {
                     updateCalled = true;
                     return {
                         eq: () => ({
@@ -347,7 +341,7 @@ describe("dbUpdateRecommendationStatus — suggested → edited with metadata", 
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: editedRow, error: null }) }),
                     }),
@@ -378,7 +372,7 @@ describe("dbUpdateRecommendationStatus — suggested → rejected", () => {
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: rejectedRow, error: null }) }),
                     }),
@@ -474,7 +468,7 @@ describe("ai_feedback row created on status change", () => {
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: acceptedRow, error: null }) }),
                     }),
@@ -484,7 +478,7 @@ describe("ai_feedback row created on status change", () => {
                 return b;
             },
             ai_feedback: () => ({
-                insert: async (_data: unknown) => {
+                insert: async () => {
                     feedbackInserted = true;
                     return { data: null, error: null };
                 },
@@ -506,7 +500,7 @@ describe("ai_feedback row created on status change", () => {
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: expiredRow, error: null }) }),
                     }),
@@ -542,7 +536,7 @@ describe("ai_feedback content — accepted transition inserts correct payload", 
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: acceptedRow, error: null }) }),
                     }),
@@ -581,7 +575,7 @@ describe("ai_feedback content — edited transition includes edited_values", () 
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: editedRow, error: null }) }),
                     }),
@@ -618,7 +612,7 @@ describe("ai_feedback content — rejected transition stores feedbackNote", () =
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: rejectedRow, error: null }) }),
                     }),
@@ -656,7 +650,7 @@ describe("PATCH /api/recommendations/[id] — returns updated recommendation", (
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: acceptedRow, error: null }) }),
                     }),
@@ -771,7 +765,7 @@ describe("PATCH /api/recommendations/[id] — edited status with editedMetadata"
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: editedRow, error: null }) }),
                     }),
@@ -811,7 +805,7 @@ describe("PATCH /api/recommendations/[id] — feedbackNote passed to feedback in
                 b.select = () => b;
                 b.eq = () => b;
                 b.single = async () => ({ data: suggestedRow, error: null });
-                b.update = (_data: unknown) => ({
+                b.update = () => ({
                     eq: () => ({
                         select: () => ({ single: async () => ({ data: rejectedRow, error: null }) }),
                     }),
@@ -899,7 +893,7 @@ describe("GET /api/recommendations — returns 500 on DB error", () => {
         errorBuilder.eq = () => errorBuilder;
         errorBuilder.order = () => errorBuilder;
         // Supabase returns { data, error } — we resolve with an error field to simulate DB failure
-        errorBuilder.then = (resolve: (v: unknown) => void, _reject?: (e: unknown) => void) => {
+        errorBuilder.then = (resolve: (v: unknown) => void) => {
             resolve({ data: null, error: { message: "DB connection failed" } });
         };
         setupFrom({ ai_recommendations: () => errorBuilder });
