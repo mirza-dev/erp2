@@ -101,6 +101,7 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
         return { parsed_data: {}, confidence: 0, ai_reason: "AI servisi yapılandırılmamış", unmatched_fields: ["all"] };
     }
 
+    const t0 = Date.now();
     try {
         const message = await client.messages.create({
             model: MODEL,
@@ -114,7 +115,16 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
             .map(c => (c as { type: "text"; text: string }).text)
             .join("\n");
 
-        return parseAIResponse(text);
+        const result = parseAIResponse(text);
+        void logAiRun({
+            feature: "import_parse",
+            entity_id: null,
+            input_hash: hashInput(input.raw_text),
+            confidence: result.confidence,
+            latency_ms: Date.now() - t0,
+            model: MODEL,
+        });
+        return result;
     } catch (err) {
         console.error("[AI Parse] graceful degradation:", err);
         return {
@@ -481,11 +491,18 @@ export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsS
 
     const t0 = Date.now();
     try {
+        const sanitizedInput = {
+            ...input,
+            topCriticalItems: input.topCriticalItems.map(item => ({
+                ...item,
+                name: sanitizeAiInput(item.name, 200),
+            })),
+        };
         const message = await client.messages.create({
             model: MODEL,
             max_tokens: 512,
             system: OPS_SUMMARY_SYSTEM,
-            messages: [{ role: "user", content: JSON.stringify(input) }],
+            messages: [{ role: "user", content: JSON.stringify(sanitizedInput) }],
         });
 
         const text = message.content
@@ -591,11 +608,17 @@ export async function aiAssessStockRisk(items: StockRiskItem[]): Promise<StockRi
 
     const t0 = Date.now();
     try {
+        const sanitizedItems = items.map(item => ({
+            ...item,
+            productName: sanitizeAiInput(item.productName, 200),
+            sku: sanitizeAiInput(item.sku, 100),
+            deterministicReason: sanitizeAiInput(item.deterministicReason, 300),
+        }));
         const message = await client.messages.create({
             model: MODEL,
             max_tokens: 1024,
             system: STOCK_RISK_SYSTEM,
-            messages: [{ role: "user", content: JSON.stringify(items) }],
+            messages: [{ role: "user", content: JSON.stringify(sanitizedItems) }],
         });
 
         const text = message.content
@@ -771,11 +794,19 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
 
     const t0 = Date.now();
     try {
+        const sanitizedItems = items.map(item => ({
+            ...item,
+            productName: sanitizeAiInput(item.productName, 200),
+            sku: sanitizeAiInput(item.sku, 100),
+            preferredVendor: item.preferredVendor != null
+                ? sanitizeAiInput(item.preferredVendor, 200)
+                : null,
+        }));
         const message = await client.messages.create({
             model: MODEL,
             max_tokens: 2048,
             system: PURCHASE_COPILOT_SYSTEM,
-            messages: [{ role: "user", content: JSON.stringify(items) }],
+            messages: [{ role: "user", content: JSON.stringify(sanitizedItems) }],
         });
 
         const text = message.content
@@ -843,7 +874,7 @@ export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
             notes: sanitizeAiInput(order.notes ?? "", 500),
             line_count: order.lines.length,
             lines: order.lines.map(l => ({
-                product: l.product_name,
+                product: sanitizeAiInput(l.product_name ?? "", 200),
                 qty: l.quantity,
                 unit_price: l.unit_price,
                 discount_pct: l.discount_pct,
