@@ -98,6 +98,28 @@ interface PurchaseScenario {
 - **No real API in CI** — `ANTHROPIC_API_KEY` is not required. All AI calls are intercepted by `mockCreate`.
 - **Universal degradation** — `ALL_UNIVERSAL_FAILURES` in `golden-responses.ts` covers 5 error conditions (garbled, empty JSON, malformed, HTML, empty) that every capability must survive without throwing.
 
+## Acceptance Eval Script
+
+Structural regression testlerinin ötesinde, gerçek sistem davranışını doğrulamak için:
+
+```bash
+npm run eval
+```
+
+Bu script iki kategori kontrol çalıştırır:
+
+**1. Graceful Degradation (CI'da çalışabilir — DB gerektirmez):**
+- `ANTHROPIC_API_KEY` geçici kaldırılarak her AI yüzeyi çağrılır
+- `aiBatchParse`, `aiGenerateOpsSummary`, `aiAssessStockRisk`, `aiEnrichPurchaseSuggestions`
+- Her biri exception fırlatmadan valid shape döndürüyor mu?
+
+**2. DB Coverage (opsiyonel — Supabase bağlantısı gerekir):**
+- `ai_runs` tablosunda son 24h'te 5 feature için kayıt var mı?
+- `sales_orders`'da son 30 girişin ≥%30'unda `ai_confidence` dolu mu?
+- `import_batches`'te son 10 girişte `confidence` dolu mu?
+
+DB bağlantısı yoksa (`.env.local` eksik veya `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` tanımsızsa) DB kontrolleri otomatik SKIP olur — script başarısız sayılmaz.
+
 ## When to update golden responses
 
 Update a golden response when:

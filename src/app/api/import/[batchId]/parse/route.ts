@@ -30,6 +30,24 @@ export async function POST(
             return NextResponse.json({ error: "En az bir sheet gerekli." }, { status: 400 });
         }
 
+        const VALID_ENTITY_TYPES = new Set<string>(["customer", "product", "order"]);
+        const MAX_ROWS_PER_SHEET = 200;
+
+        for (const sheet of body.sheets) {
+            if (!VALID_ENTITY_TYPES.has(sheet.entity_type)) {
+                return NextResponse.json(
+                    { error: `Geçersiz entity tipi: ${sheet.entity_type}` },
+                    { status: 400 }
+                );
+            }
+            if (sheet.rows.length > MAX_ROWS_PER_SHEET) {
+                return NextResponse.json(
+                    { error: `Sheet başına en fazla ${MAX_ROWS_PER_SHEET} satır kabul edilir.` },
+                    { status: 400 }
+                );
+            }
+        }
+
         // 1. Batch status → processing
         await dbUpdateBatchStatus(batchId, "processing");
 

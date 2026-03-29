@@ -154,6 +154,12 @@ describe("aiScoreOrder — happy path", () => {
         await aiScoreOrder("order-1");
         expect(mockEq).toHaveBeenCalledWith("id", "order-1");
     });
+
+    it("fires audit log — service client called for ai_runs table", async () => {
+        await aiScoreOrder("order-1");
+        const calledTables = mockFrom.mock.calls.map((c: unknown[]) => c[0]);
+        expect(calledTables).toContain("ai_runs");
+    });
 });
 
 // ─── Result shape contract ────────────────────────────────────────────────────

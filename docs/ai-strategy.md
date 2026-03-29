@@ -559,6 +559,31 @@ AI başarısız olduğunda:
 Modele yalnızca ilgili yetenek için gereken veri gönderilmelidir.
 Gereksiz alan paylaşımından kaçınılmalıdır.
 
+### 12.5 Teknik Guardrail Kuralları (G1–G4)
+
+`ai-layer-ops-strategy.md §3`'te tanımlanan ve `ai-service.ts`'te uygulanan kurallar:
+
+**G1 — Input Sanitization**
+AI prompt'a gönderilen her kullanıcı kaynaklı metin sanitize edilir.
+Zero-width chars (`\u200B`–`\u200D`, `\uFEFF`, bidi-override), C0 kontrol kodları temizlenir.
+Girdi 4096 karakterle sınırlandırılır.
+Kapsam: `aiBatchParse`, `aiParseEntity`, `aiScoreOrder` (notes, customer_name).
+Uygulama: `src/lib/ai-guards.ts → sanitizeAiInput()`.
+
+**G2 — Confidence Clamping**
+AI'dan dönen confidence değeri [0, 1] aralığına sıkıştırılır.
+NaN veya sayı olmayan değer → 0.5 fallback.
+Uygulama: `src/lib/ai-guards.ts → clampConfidence()`.
+
+**G3 — High Risk Requires Reason**
+`risk_level === "high"` ve `reason` boşsa, risk otomatik olarak "medium"'a düşürülür.
+Uygulama: `ai-service.ts → parseScoreResponse()`.
+
+**G4 — No Silent Operational Mutation**
+AI çıktısı hiçbir zaman doğrudan operational truth'u değiştirmez.
+Yazılan alanlar: `ai_confidence`, `ai_reason`, `ai_risk_level`, `ai_model_version` (advisory).
+Dokunulmayan alanlar: `commercial_status`, `fulfillment_status`, `available_now`, `reserved`.
+
 ---
 
 ## 13. Bu Fazın Non-Goal'ları

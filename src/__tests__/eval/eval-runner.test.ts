@@ -40,7 +40,9 @@ import {
     aiScoreOrder,
     aiGenerateOpsSummary,
     aiEnrichPurchaseSuggestions,
+    aiAssessStockRisk,
 } from "@/lib/services/ai-service";
+import type { StockRiskItem } from "@/lib/services/ai-service";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -49,6 +51,7 @@ import { ALL_ORDER_RISK_SCENARIOS } from "../fixtures/order-risk-fixtures";
 import { ALL_OPS_SCENARIOS } from "../fixtures/ops-summary-fixtures";
 import { ALL_PURCHASE_SCENARIOS } from "../fixtures/purchase-fixtures";
 import { ALL_UNIVERSAL_FAILURES } from "../fixtures/golden-responses";
+import { ALL_STOCK_RISK_EVAL_SCENARIOS } from "../fixtures/stock-risk-eval-fixtures";
 
 // ─── Eval helpers ─────────────────────────────────────────────────────────────
 
@@ -333,10 +336,74 @@ describe("Eval: Purchase Copilot", () => {
     }
 });
 
+// ─── Eval: Stock Risk Assessment ─────────────────────────────────────────────
+
+describe("Eval: Stock Risk Assessment", () => {
+    for (const scenario of ALL_STOCK_RISK_EVAL_SCENARIOS) {
+        describe(`scenario: ${scenario.label}`, () => {
+            beforeEach(() => {
+                mockCreate.mockResolvedValue(makeTextResponse(scenario.goldenResponse));
+            });
+
+            it("returns correct number of assessments", async () => {
+                const result = await aiAssessStockRisk(scenario.items);
+                expect(result.assessments).toHaveLength(scenario.expected.count);
+            });
+
+            it("each assessment has required structural keys", async () => {
+                const result = await aiAssessStockRisk(scenario.items);
+                for (const assessment of result.assessments) {
+                    const check = checkRequiredKeys(
+                        assessment as unknown as Record<string, unknown>,
+                        ["productId", "explanation", "recommendation", "confidence"],
+                        {
+                            productId: "string" as const,
+                            explanation: "string" as const,
+                            recommendation: "string" as const,
+                            confidence: "number" as const,
+                        },
+                    );
+                    expect(check.pass, check.message).toBe(true);
+                }
+            });
+
+            it("confidence is within expected range", async () => {
+                const result = await aiAssessStockRisk(scenario.items);
+                for (const assessment of result.assessments) {
+                    const check = checkConfidenceRange(assessment.confidence, {
+                        min: scenario.expected.minConfidence,
+                        max: scenario.expected.maxConfidence,
+                    });
+                    expect(check.pass, check.message).toBe(true);
+                }
+            });
+
+            it("generatedAt is valid ISO string", async () => {
+                const result = await aiAssessStockRisk(scenario.items);
+                expect(isValidISO(result.generatedAt)).toBe(true);
+            });
+        });
+    }
+});
+
 // ─── Eval: Universal Degradation ─────────────────────────────────────────────
 
 describe("Eval: Universal Degradation", () => {
     const CUSTOMER_ROW = [{ firma_adi: "Test" }];
+    const STOCK_RISK_ITEMS: StockRiskItem[] = [
+        {
+            productId: "p-deg-001",
+            productName: "Degradation Ürünü",
+            sku: "DEG-001",
+            available: 15,
+            min: 10,
+            dailyUsage: 2,
+            coverageDays: 7,
+            leadTimeDays: 14,
+            riskLevel: "coverage_risk",
+            deterministicReason: "Degradation test item",
+        },
+    ];
     const OPS_METRICS = {
         criticalStockCount: 1,
         warningStockCount: 0,
@@ -444,6 +511,18 @@ describe("Eval: Universal Degradation", () => {
                     },
                 ]);
                 expect(Array.isArray(result.enrichments)).toBe(true);
+                expect(isValidISO(result.generatedAt)).toBe(true);
+            });
+
+            it("aiAssessStockRisk does not throw", async () => {
+                await expect(
+                    aiAssessStockRisk(STOCK_RISK_ITEMS),
+                ).resolves.toBeDefined();
+            });
+
+            it("aiAssessStockRisk returns valid shape", async () => {
+                const result = await aiAssessStockRisk(STOCK_RISK_ITEMS);
+                expect(Array.isArray(result.assessments)).toBe(true);
                 expect(isValidISO(result.generatedAt)).toBe(true);
             });
 

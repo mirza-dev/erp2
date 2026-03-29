@@ -42,6 +42,9 @@ export {
     ALL_FOUR_PURCHASE_GOLDEN,
 } from "./purchase-fixtures";
 
+// ── Re-exports: Stock risk eval fixtures ──────────────────────
+export { ALL_STOCK_RISK_EVAL_SCENARIOS } from "./stock-risk-eval-fixtures";
+
 // ── Universal failure variants ────────────────────────────────
 // These simulate degraded / error conditions common to all AI capabilities.
 // Use these in eval tests to verify graceful degradation.

@@ -478,6 +478,13 @@ Sistemde mümkünse bu sonuçlar ayrıca tutulur:
 - edited
 - rejected
 
+### 11.5 Teknik Guardrail Referansı
+Kod seviyesinde uygulanmış AI koruma kuralları (`ai-layer-ops-strategy.md §3`, `ai-strategy.md §12.5`):
+- **G1:** Import ve order notu gibi kullanıcı kaynaklı tüm girdi AI prompt'a geçmeden sanitize edilir
+- **G2:** AI confidence çıktısı [0, 1] dışındaysa otomatik düzeltilir; NaN → 0.5
+- **G3:** "high" risk kararı her zaman bir reason içermelidir — içermiyorsa "medium"'a düşürülür
+- **G4:** AI çıktısı hiçbir zaman doğrudan operational alan değişimi tetikleyemez
+
 ---
 
 ## 12. Alerts Domain

@@ -8,6 +8,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { dbGetOrderById } from "@/lib/supabase/orders";
 import { createServiceClient } from "@/lib/supabase/service";
 import { logAiRun, hashInput } from "@/lib/supabase/ai-runs";
+import {
+    sanitizeAiInput,
+    sanitizeAiInputRecord,
+    clampConfidence,
+    sanitizeAiOutput,
+    capAiStringArray,
+} from "@/lib/ai-guards";
 
 export function isAIAvailable(): boolean {
     return !!process.env.ANTHROPIC_API_KEY;
@@ -18,19 +25,6 @@ const client = new Anthropic({
 });
 
 const MODEL = "claude-haiku-4-5-20251001";
-
-// ── Guardrails §12 ────────────────────────────────────────────
-
-/**
- * Strips zero-width, bidi-override, and C0 control characters from import
- * field values before they reach the AI prompt. Truncates at 4 096 chars.
- */
-function sanitizeImportField(value: string): string {
-    return value
-        .replace(/[\u200B-\u200D\uFEFF\u202A-\u202E]/g, "")   // zero-width + bidi override
-        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "") // C0 control chars (keep \t \n \r)
-        .slice(0, 4096);
-}
 
 // ── Parse ─────────────────────────────────────────────────────
 
@@ -64,6 +58,11 @@ After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and 
 Also add "UNMATCHED:" a comma-separated list of any fields you could not extract.`,
 };
 
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Writes: parsed_data, confidence, ai_reason, unmatched_fields (non-authoritative).
+ * Approval gate: user confirms/rejects each ImportDraft before entity creation.
+ */
 export function parseAIResponse(text: string): { parsed_data: Record<string, unknown>; confidence: number; ai_reason: string; unmatched_fields: string[] } {
     // Extract JSON block
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -72,13 +71,13 @@ export function parseAIResponse(text: string): { parsed_data: Record<string, unk
         try { parsed_data = JSON.parse(jsonMatch[0]); } catch { /* ignore */ }
     }
 
-    // Extract confidence (clamped to [0, 1])
+    // Extract confidence (G2 — clamped via clampConfidence)
     const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
-    const confidence = Math.min(1, Math.max(0, confMatch ? parseFloat(confMatch[1]) : 0.5));
+    const confidence = clampConfidence(confMatch ? parseFloat(confMatch[1]) : 0.5);
 
-    // Extract reason
+    // Extract reason (output cap — 300 chars)
     const reasonMatch = text.match(/REASON:\s*([^\n]+)/);
-    const ai_reason = reasonMatch ? reasonMatch[1].trim() : "";
+    const ai_reason = reasonMatch ? sanitizeAiOutput(reasonMatch[1].trim(), 300) : "";
 
     // Extract unmatched
     const unmatchedMatch = text.match(/UNMATCHED:\s*(.+?)$/im);
@@ -89,6 +88,11 @@ export function parseAIResponse(text: string): { parsed_data: Record<string, unk
     return { parsed_data, confidence, ai_reason, unmatched_fields };
 }
 
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Writes: parsed_data, confidence, ai_reason, unmatched_fields (non-authoritative).
+ * Approval gate: user confirms/rejects each ImportDraft before entity creation.
+ */
 export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntityResult> {
     const systemPrompt = PARSE_SYSTEM[input.entity_type];
     if (!systemPrompt) throw new Error(`Unknown entity_type: ${input.entity_type}`);
@@ -102,7 +106,7 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
             model: MODEL,
             max_tokens: 1024,
             system: systemPrompt,
-            messages: [{ role: "user", content: sanitizeImportField(input.raw_text) }],
+            messages: [{ role: "user", content: sanitizeAiInput(input.raw_text) }],
         });
 
         const text = message.content
@@ -326,9 +330,11 @@ async function parseChunk(
             if (Array.isArray(parsed.items)) {
                 return parsed.items.map((item: Record<string, unknown>) => ({
                     parsed_data: (item.parsed_data ?? {}) as Record<string, unknown>,
-                    confidence: typeof item.confidence === "number" ? Math.min(1, Math.max(0, item.confidence)) : 0.5,
-                    ai_reason: typeof item.ai_reason === "string" ? item.ai_reason : "",
-                    unmatched_fields: Array.isArray(item.unmatched_fields) ? item.unmatched_fields : [],
+                    confidence: clampConfidence(item.confidence),
+                    ai_reason: sanitizeAiOutput(typeof item.ai_reason === "string" ? item.ai_reason : "", 300),
+                    unmatched_fields: Array.isArray(item.unmatched_fields)
+                        ? (item.unmatched_fields as unknown[]).slice(0, 50)
+                        : [],
                 }));
             }
         }
@@ -345,6 +351,11 @@ async function parseChunk(
     }
 }
 
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Writes: parsed_data, confidence, ai_reason, unmatched_fields per row (non-authoritative).
+ * Approval gate: user confirms/rejects each ImportDraft before entity creation.
+ */
 export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseResult> {
     const { entity_type, rows } = input;
 
@@ -378,12 +389,8 @@ export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseRe
         };
     }
 
-    // Sanitize all string fields before they reach the AI prompt (§12 guardrail)
-    const sanitizedRows = rows.map(row =>
-        Object.fromEntries(
-            Object.entries(row).map(([k, v]) => [k, sanitizeImportField(v)])
-        ) as Record<string, string>
-    );
+    // G1 — Sanitize all string fields before they reach the AI prompt (§12 guardrail)
+    const sanitizedRows = rows.map(row => sanitizeAiInputRecord(row));
 
     const t0 = Date.now();
     const chunks: Array<Array<Record<string, string>>> = [];
@@ -460,6 +467,11 @@ Kurallar:
 - Insight'ları aciliyet sırasına göre sırala (en acil olan ilk)
 - Her şey normalse summary'yi tek kısa cümleyle bitir, insights ve anomalies boş dizi olsun`;
 
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Writes: summary, insights, anomalies (non-authoritative, ephemeral — no DB mutation).
+ * Approval gate: display-only; user navigates from insights manually.
+ */
 export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsSummaryResult> {
     const now = new Date().toISOString();
 
@@ -493,9 +505,9 @@ export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsS
                 model: MODEL,
             });
             return {
-                summary: parsed.summary ?? "",
-                insights: Array.isArray(parsed.insights) ? parsed.insights : [],
-                anomalies: Array.isArray(parsed.anomalies) ? parsed.anomalies : [],
+                summary: sanitizeAiOutput(parsed.summary ?? "", 800),
+                insights: capAiStringArray(parsed.insights, 5),
+                anomalies: capAiStringArray(parsed.anomalies, 3),
                 confidence: 0.75,
                 generatedAt: now,
             };
@@ -561,6 +573,11 @@ Kurallar:
   - sadece dailyUsage varsa (leadTimeDays yok): 0.50–0.70
 - Her ürün için tam olarak bir assessment döndür`;
 
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Writes: explanation, recommendation, confidence per product (non-authoritative, ephemeral).
+ * Approval gate: display-only; deterministic riskLevel is the operational truth.
+ */
 export async function aiAssessStockRisk(items: StockRiskItem[]): Promise<StockRiskResult> {
     const now = new Date().toISOString();
 
@@ -591,10 +608,10 @@ export async function aiAssessStockRisk(items: StockRiskItem[]): Promise<StockRi
             const parsed = JSON.parse(jsonMatch[0]);
             if (Array.isArray(parsed.assessments)) {
                 const assessments = parsed.assessments.map((a: Record<string, unknown>) => ({
-                    productId: typeof a.productId === "string" ? a.productId : "",
-                    explanation: typeof a.explanation === "string" ? a.explanation : "",
-                    recommendation: typeof a.recommendation === "string" ? a.recommendation : "",
-                    confidence: typeof a.confidence === "number" ? Math.min(1, Math.max(0, a.confidence)) : 0.5,
+                    productId: sanitizeAiOutput(typeof a.productId === "string" ? a.productId : "", 100),
+                    explanation: sanitizeAiOutput(typeof a.explanation === "string" ? a.explanation : "", 500),
+                    recommendation: sanitizeAiOutput(typeof a.recommendation === "string" ? a.recommendation : "", 500),
+                    confidence: clampConfidence(a.confidence),
                 }));
                 const avgConf = assessments.length > 0
                     ? assessments.reduce((s: number, a: { confidence: number }) => s + a.confidence, 0) / assessments.length
@@ -647,14 +664,19 @@ CONFIDENCE: <0-1 arası ondalık sayı>
 RISK_LEVEL: <low|medium|high>
 REASON: <TÜRKÇE, maksimum 2 cümle: birinci cümle durumu açıkla, ikinci cümle ne yapılması gerektiğini söyle>`;
 
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Writes: confidence, risk_level, reason (non-authoritative).
+ * Approval gate: commercial_status is human-only; ai_risk_level is advisory metadata.
+ */
 export function parseScoreResponse(text: string): ScoreOrderResult {
     const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
     const riskMatch = text.match(/RISK_LEVEL:\s*(low|medium|high)/i);
     const reasonMatch = text.match(/REASON:\s*(.+?)$/im);
 
-    const confidence = Math.min(1, Math.max(0, confMatch ? parseFloat(confMatch[1]) : 0.5));
+    const confidence = clampConfidence(confMatch ? parseFloat(confMatch[1]) : 0.5);
     const risk_level = (riskMatch ? riskMatch[1].toLowerCase() : "medium") as "low" | "medium" | "high";
-    const reason = reasonMatch ? reasonMatch[1].trim() : "";
+    const reason = reasonMatch ? sanitizeAiOutput(reasonMatch[1].trim(), 400) : "";
 
     // G3 guardrail: high risk without any reason is suspicious — downgrade to medium
     const safeRiskLevel = (risk_level === "high" && !reason) ? "medium" : risk_level;
@@ -730,6 +752,11 @@ Kurallar:
 - Sahte kesinlik kullanma — veri yetersizse bunu belirt
 - Her ürün için tam olarak bir enrichment döndür`;
 
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Writes: whyNow, quantityRationale, urgencyLevel, confidence per product (non-authoritative).
+ * Approval gate: user accepts/edits/rejects each suggestion before purchase order creation.
+ */
 export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[]): Promise<PurchaseEnrichmentResult> {
     const now = new Date().toISOString();
 
@@ -760,13 +787,13 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
             const parsed = JSON.parse(jsonMatch[0]);
             if (Array.isArray(parsed.enrichments)) {
                 const enrichments = parsed.enrichments.map((e: Record<string, unknown>) => ({
-                    productId: typeof e.productId === "string" ? e.productId : "",
-                    whyNow: typeof e.whyNow === "string" ? e.whyNow : "",
-                    quantityRationale: typeof e.quantityRationale === "string" ? e.quantityRationale : "",
+                    productId: sanitizeAiOutput(typeof e.productId === "string" ? e.productId : "", 100),
+                    whyNow: sanitizeAiOutput(typeof e.whyNow === "string" ? e.whyNow : "", 500),
+                    quantityRationale: sanitizeAiOutput(typeof e.quantityRationale === "string" ? e.quantityRationale : "", 500),
                     urgencyLevel: (e.urgencyLevel === "critical" || e.urgencyLevel === "high" || e.urgencyLevel === "moderate")
                         ? e.urgencyLevel
                         : "moderate",
-                    confidence: typeof e.confidence === "number" ? Math.min(1, Math.max(0, e.confidence)) : 0.5,
+                    confidence: clampConfidence(e.confidence),
                 }));
                 const avgConf = enrichments.length > 0
                     ? enrichments.reduce((s: number, e: { confidence: number }) => s + e.confidence, 0) / enrichments.length
@@ -790,6 +817,11 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
     }
 }
 
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Writes: ai_confidence, ai_reason, ai_risk_level, ai_model_version (non-authoritative).
+ * Approval gate: commercial_status transitions are human-only and unaffected by AI score.
+ */
 export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
     const order = await dbGetOrderById(orderId);
     if (!order) throw new Error("Sipariş bulunamadı.");
@@ -802,12 +834,12 @@ export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
     try {
         const orderSummary = JSON.stringify({
             order_number: order.order_number,
-            customer_name: order.customer_name,
+            customer_name: sanitizeAiInput(order.customer_name ?? "", 200),
             customer_country: order.customer_country,
             currency: order.currency,
             grand_total: order.grand_total,
             commercial_status: order.commercial_status,
-            notes: order.notes,
+            notes: sanitizeAiInput(order.notes ?? "", 500),
             line_count: order.lines.length,
             lines: order.lines.map(l => ({
                 product: l.product_name,
