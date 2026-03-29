@@ -164,6 +164,15 @@ export default function AIAlerts() {
             }}>
               {alert.title}
             </span>
+            {alert.source === "ai" && alert.ai_confidence != null && (
+              <span style={{
+                fontSize: "11px",
+                color: "var(--text-tertiary)",
+                flexShrink: 0,
+              }}>
+                Güven: %{Math.round(alert.ai_confidence * 100)}
+              </span>
+            )}
           </div>
           {alert.description && (
             <div style={{

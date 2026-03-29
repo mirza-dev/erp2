@@ -667,7 +667,8 @@ REASON: <TÜRKÇE, maksimum 2 cümle: birinci cümle durumu açıkla, ikinci cü
 /**
  * Advisory-only — domain-rules §11.1.
  * Writes: confidence, risk_level, reason (non-authoritative).
- * Approval gate: commercial_status is human-only; ai_risk_level is advisory metadata.
+ * Approval gate: commercial_status transitions are human-only; ai_risk_level is advisory metadata.
+ * G3: risk_level "high" without reason is downgraded to "medium".
  */
 export function parseScoreResponse(text: string): ScoreOrderResult {
     const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);

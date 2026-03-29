@@ -52,6 +52,7 @@ export interface OpenAlert {
   description?: string;
   type: string;
   source: "system" | "ai" | "ui";
+  ai_confidence?: number | null;
   created_at: string;
   entity_id?: string;
 }

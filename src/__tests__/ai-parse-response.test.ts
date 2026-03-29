@@ -3,7 +3,7 @@
  * No AI calls, no mocks — pure function tested with synthetic Claude-style response strings.
  */
 import { describe, it, expect } from "vitest";
-import { parseAIResponse } from "@/lib/services/ai-service";
+import { parseAIResponse, parseScoreResponse } from "@/lib/services/ai-service";
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -128,6 +128,95 @@ describe("parseAIResponse — unmatched_fields extraction", () => {
     it("trims whitespace from individual field names", () => {
         const r = parseAIResponse(`{"x":1}\nCONFIDENCE: 0.5\nREASON: ok\nUNMATCHED:  field1 ,  field2 `);
         expect(r.unmatched_fields).toEqual(["field1", "field2"]);
+    });
+});
+
+// ─── G2: parseAIResponse confidence clamp ────────────────────────────────────
+
+describe("parseAIResponse — G2 confidence clamp", () => {
+    it("clamps confidence > 1 to 1", () => {
+        const r = parseAIResponse(`{"x":1}\nCONFIDENCE: 1.5\nREASON: ok`);
+        expect(r.confidence).toBe(1);
+    });
+
+    it("negative confidence string (regex misses minus) → 0.5 fallback", () => {
+        // Regex [\d.]+ doesn't match minus sign, so -0.2 → no match → clampConfidence(0.5)
+        const r = parseAIResponse(`{"x":1}\nCONFIDENCE: -0.2\nREASON: ok`);
+        expect(r.confidence).toBe(0.5);
+    });
+
+    it("NaN confidence → 0.5", () => {
+        const r = parseAIResponse(`{"x":1}\nCONFIDENCE: abc\nREASON: ok`);
+        expect(r.confidence).toBe(0.5);
+    });
+
+    it("ai_reason truncated at 300 chars", () => {
+        const longReason = "x".repeat(400);
+        const r = parseAIResponse(`{"x":1}\nCONFIDENCE: 0.8\nREASON: ${longReason}`);
+        expect(r.ai_reason.length).toBeLessThanOrEqual(300);
+    });
+});
+
+// ─── G3: parseScoreResponse — high-risk-needs-reason ─────────────────────────
+
+describe("parseScoreResponse — G3 high-risk-needs-reason", () => {
+    it("high risk with reason → stays high", () => {
+        const r = parseScoreResponse("CONFIDENCE: 0.9\nRISK_LEVEL: high\nREASON: Eksik bilgi var.");
+        expect(r.risk_level).toBe("high");
+        expect(r.reason).not.toBe("");
+    });
+
+    it("high risk without reason → downgraded to medium", () => {
+        const r = parseScoreResponse("CONFIDENCE: 0.9\nRISK_LEVEL: high");
+        expect(r.risk_level).toBe("medium");
+    });
+
+    it("medium risk without reason → stays medium", () => {
+        const r = parseScoreResponse("CONFIDENCE: 0.6\nRISK_LEVEL: medium");
+        expect(r.risk_level).toBe("medium");
+    });
+
+    it("low risk stays low", () => {
+        const r = parseScoreResponse("CONFIDENCE: 0.9\nRISK_LEVEL: low\nREASON: Her şey normal.");
+        expect(r.risk_level).toBe("low");
+    });
+
+    it("confidence > 1 clamped to 1", () => {
+        const r = parseScoreResponse("CONFIDENCE: 2.5\nRISK_LEVEL: low\nREASON: ok");
+        expect(r.confidence).toBe(1);
+    });
+
+    it("negative confidence string (regex misses minus) → 0.5 fallback", () => {
+        // Regex [\d.]+ doesn't capture the minus sign
+        const r = parseScoreResponse("CONFIDENCE: -1\nRISK_LEVEL: low\nREASON: ok");
+        expect(r.confidence).toBe(0.5);
+    });
+
+    it("reason truncated at 400 chars", () => {
+        const longReason = "y".repeat(500);
+        const r = parseScoreResponse(`CONFIDENCE: 0.8\nRISK_LEVEL: high\nREASON: ${longReason}`);
+        expect(r.reason.length).toBeLessThanOrEqual(400);
+        expect(r.risk_level).toBe("high");
+    });
+
+    it("unknown risk_level → medium fallback", () => {
+        const r = parseScoreResponse("CONFIDENCE: 0.7\nRISK_LEVEL: extreme\nREASON: ok");
+        expect(r.risk_level).toBe("medium");
+    });
+
+    it("missing RISK_LEVEL line → medium", () => {
+        const r = parseScoreResponse("CONFIDENCE: 0.7\nREASON: ok");
+        expect(r.risk_level).toBe("medium");
+    });
+
+    it("always returns all three keys", () => {
+        const r = parseScoreResponse("");
+        expect(r).toHaveProperty("confidence");
+        expect(r).toHaveProperty("risk_level");
+        expect(r).toHaveProperty("reason");
+        expect(typeof r.confidence).toBe("number");
+        expect(typeof r.risk_level).toBe("string");
+        expect(typeof r.reason).toBe("string");
     });
 });
 
