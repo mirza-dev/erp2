@@ -85,7 +85,7 @@ function makeThenableBuilder(rows: unknown[], eqSpy?: ReturnType<typeof vi.fn>) 
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.eq = eqSpy
-        ? (...args: unknown[]) => { eqSpy(...args); return b; }
+        ? (...args: unknown[]) => { (eqSpy as (...args: unknown[]) => unknown)(...args); return b; }
         : () => b;
     b.order = () => b;
     b.then = (resolve: (v: unknown) => void, reject?: (e: unknown) => void) =>
@@ -555,7 +555,7 @@ describe("ai_feedback content — accepted transition inserts correct payload", 
 
         await dbUpdateRecommendationStatus("rec-1", "accepted");
         expect(feedbackPayload).not.toBeNull();
-        const fp = feedbackPayload as Record<string, unknown>;
+        const fp = feedbackPayload as unknown as Record<string, unknown>;
         expect(fp.feedback_type).toBe("accepted");
         expect(fp.recommendation_id).toBe("rec-1");
         expect(fp.edited_values).toBeNull();
@@ -594,7 +594,7 @@ describe("ai_feedback content — edited transition includes edited_values", () 
 
         await dbUpdateRecommendationStatus("rec-1", "edited", { editedMetadata: { suggestQty: 40 } });
         expect(feedbackPayload).not.toBeNull();
-        const fp = feedbackPayload as Record<string, unknown>;
+        const fp = feedbackPayload as unknown as Record<string, unknown>;
         expect(fp.feedback_type).toBe("edited");
         expect(fp.edited_values).toEqual({ suggestQty: 40 });
     });
@@ -631,7 +631,7 @@ describe("ai_feedback content — rejected transition stores feedbackNote", () =
 
         await dbUpdateRecommendationStatus("rec-1", "rejected", { feedbackNote: "Fiyat çok yüksek" });
         expect(feedbackPayload).not.toBeNull();
-        const fp = feedbackPayload as Record<string, unknown>;
+        const fp = feedbackPayload as unknown as Record<string, unknown>;
         expect(fp.feedback_type).toBe("rejected");
         expect(fp.feedback_note).toBe("Fiyat çok yüksek");
     });
@@ -832,7 +832,7 @@ describe("PATCH /api/recommendations/[id] — feedbackNote passed to feedback in
 
         await PATCH(req as Parameters<typeof PATCH>[0], { params: Promise.resolve({ id: "rec-1" }) });
         expect(feedbackPayload).not.toBeNull();
-        expect((feedbackPayload as Record<string, unknown>).feedback_note).toBe("Fiyat uygun değil");
+        expect((feedbackPayload as unknown as Record<string, unknown>).feedback_note).toBe("Fiyat uygun değil");
     });
 });
 

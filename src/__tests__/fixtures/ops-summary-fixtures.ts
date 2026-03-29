@@ -38,6 +38,7 @@ export const CRISIS_METRICS: OpsSummaryInput = {
     approvedOrderCount: 5,
     highRiskOrderCount: 5,
     openAlertCount: 15,
+    atRiskCount: 8,
 };
 
 export const CRISIS_GOLDEN = JSON.stringify({
@@ -65,6 +66,7 @@ export const NORMAL_METRICS: OpsSummaryInput = {
     approvedOrderCount: 10,
     highRiskOrderCount: 0,
     openAlertCount: 1,
+    atRiskCount: 1,
 };
 
 export const NORMAL_GOLDEN = JSON.stringify({
@@ -86,6 +88,7 @@ export const MIXED_METRICS: OpsSummaryInput = {
     approvedOrderCount: 8,
     highRiskOrderCount: 2,
     openAlertCount: 7,
+    atRiskCount: 5,
 };
 
 export const MIXED_GOLDEN = JSON.stringify({

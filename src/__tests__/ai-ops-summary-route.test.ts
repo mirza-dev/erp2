@@ -58,6 +58,11 @@ function makeProduct(overrides: Partial<ProductWithStock> = {}): ProductWithStoc
         preferred_vendor: null,
         daily_usage: 5,
         lead_time_days: null,
+        product_family: null,
+        sub_category: null,
+        sector_compatibility: null,
+        cost_price: null,
+        weight_kg: null,
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
         ...overrides,
@@ -92,6 +97,10 @@ function makeOrder(overrides: Partial<SalesOrderRow> = {}): SalesOrderRow {
         ai_reason: null,
         ai_model_version: null,
         ai_risk_level: null,
+        incoterm: null,
+        planned_shipment_date: null,
+        quote_id: null,
+        original_order_number: null,
         ...overrides,
     };
 }

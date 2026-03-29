@@ -24,6 +24,11 @@ describe("mapProduct", () => {
     preferred_vendor: null,
     daily_usage: null,
     lead_time_days: null,
+    product_family: null,
+    sub_category: null,
+    sector_compatibility: null,
+    cost_price: null,
+    weight_kg: null,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
   };
@@ -81,6 +86,10 @@ describe("mapCustomer", () => {
     last_order_date: "2024-12-01",
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
+    created_by: null,
+    payment_terms_days: null,
+    default_incoterm: null,
+    customer_code: null,
   };
 
   it("maps required fields correctly", () => {
@@ -145,6 +154,10 @@ describe("mapOrderSummary", () => {
     created_at: "2024-01-15T10:00:00Z",
     updated_at: "2024-01-15T10:00:00Z",
     created_by: null,
+    incoterm: null,
+    planned_shipment_date: null,
+    quote_id: null,
+    original_order_number: null,
   };
 
   it("maps all summary fields", () => {
@@ -191,6 +204,10 @@ describe("mapOrderSummary — AI fields", () => {
     created_at: "2024-01-15T10:00:00Z",
     updated_at: "2024-01-15T10:00:00Z",
     created_by: null,
+    incoterm: null,
+    planned_shipment_date: null,
+    quote_id: null,
+    original_order_number: null,
   };
 
   it("maps ai_risk_level to aiRiskLevel when present", () => {
@@ -244,6 +261,10 @@ describe("mapOrderDetail", () => {
     created_at: "2024-01-15T10:00:00Z",
     updated_at: "2024-01-15T10:00:00Z",
     created_by: null,
+    incoterm: null,
+    planned_shipment_date: null,
+    quote_id: null,
+    original_order_number: null,
   };
 
   const detailBase: SalesOrderWithLines = {

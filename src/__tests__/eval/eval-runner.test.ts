@@ -345,6 +345,7 @@ describe("Eval: Universal Degradation", () => {
         approvedOrderCount: 1,
         highRiskOrderCount: 0,
         openAlertCount: 0,
+        atRiskCount: 0,
     };
     const SCORE_ORDER_ID = "order-degradation-test";
 

@@ -63,7 +63,7 @@ export function checkCategory<T extends string>(
 export function checkRequiredKeys(
     obj: Record<string, unknown>,
     keys: string[],
-    typeChecks?: Record<string, "string" | "number" | "array">,
+    typeChecks?: Record<string, "string" | "number" | "array" | "object">,
 ): EvalResult {
     const missing: string[] = [];
     const typeMismatches: string[] = [];
@@ -79,7 +79,9 @@ export function checkRequiredKeys(
             const ok =
                 expected === "array"
                     ? Array.isArray(value)
-                    : typeof value === expected;
+                    : expected === "object"
+                        ? typeof value === "object" && value !== null && !Array.isArray(value)
+                        : typeof value === expected;
             if (!ok) {
                 typeMismatches.push(
                     `${key}: expected ${expected}, got ${Array.isArray(value) ? "array" : typeof value}`,

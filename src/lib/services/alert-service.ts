@@ -187,6 +187,7 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
     const metrics: OpsSummaryInput = {
         criticalStockCount: critical.length,
         warningStockCount: warning.length,
+        atRiskCount: warning.length,
         topCriticalItems: topCritical,
         pendingOrderCount: pendingOrders.length,
         approvedOrderCount: approvedOrders.length,

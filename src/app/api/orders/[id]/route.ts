@@ -6,6 +6,7 @@ import {
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { handleApiError } from "@/lib/api-error";
+import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
 
 // GET /api/orders/[id]
 export async function GET(
@@ -64,21 +65,41 @@ export async function PATCH(
     }
 }
 
-// DELETE /api/orders/[id] — cancels the order
+// DELETE /api/orders/[id] — soft cancel (default) or hard delete (?permanent=1)
 export async function DELETE(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    try {
-        const { id } = await params;
-        const result = await serviceTransitionOrder(id, "cancelled");
+    const { id } = await params;
+    const permanent = req.nextUrl.searchParams.get("permanent") === "1";
 
-        if (!result.success) {
-            return NextResponse.json({ error: result.error }, { status: 400 });
+    if (!permanent) {
+        try {
+            const result = await serviceTransitionOrder(id, "cancelled");
+            if (!result.success) {
+                return NextResponse.json({ error: result.error }, { status: 400 });
+            }
+            return NextResponse.json({ ok: true });
+        } catch (err) {
+            return handleApiError(err, "DELETE /api/orders/[id]");
         }
+    }
 
-        return NextResponse.json({ ok: true });
+    // Hard delete — only draft or cancelled
+    try {
+        const order = await dbGetOrderById(id);
+        if (!order) {
+            return NextResponse.json({ error: "Sipariş bulunamadı." }, { status: 404 });
+        }
+        if (!["draft", "cancelled"].includes(order.commercial_status)) {
+            return NextResponse.json(
+                { error: "Yalnızca taslak veya iptal edilmiş siparişler kalıcı silinebilir." },
+                { status: 409 }
+            );
+        }
+        await dbHardDeleteOrder(id);
+        return NextResponse.json({ success: true });
     } catch (err) {
-        return handleApiError(err, "DELETE /api/orders/[id]");
+        return handleApiError(err, "DELETE /api/orders/[id]?permanent=1");
     }
 }

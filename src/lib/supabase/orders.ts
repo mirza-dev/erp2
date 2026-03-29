@@ -345,6 +345,24 @@ export async function dbShipOrder(orderId: string, lines: OrderLineRow[]): Promi
         .eq("status", "open");
 }
 
+// ── Hard Delete ──────────────────────────────────────────────
+
+export async function dbHardDeleteOrder(id: string): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase.from("sales_orders").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+}
+
+export async function dbCountOrdersByCustomer(customerId: string): Promise<number> {
+    const supabase = createServiceClient();
+    const { count, error } = await supabase
+        .from("sales_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", customerId);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+}
+
 // ── Audit ────────────────────────────────────────────────────
 
 export async function dbLogOrderAction(

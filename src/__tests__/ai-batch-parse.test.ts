@@ -34,7 +34,7 @@ const VALID_AI_BATCH_RESPONSE = JSON.stringify({
     ],
 });
 
-const CUSTOMER_ROWS = [
+const CUSTOMER_ROWS: Record<string, string>[] = [
     { firma_adi: "Acme Vana", email: "acme@example.com", ulke: "TR" },
     { firma_adi: "Beta Corp", xyz_col: "value" },
 ];

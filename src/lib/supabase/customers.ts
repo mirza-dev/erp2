@@ -29,10 +29,7 @@ export async function dbListCustomers(): Promise<CustomerRow[]> {
 
 export async function dbDeleteCustomer(id: string): Promise<void> {
     const supabase = createServiceClient();
-    const { error } = await supabase
-        .from("customers")
-        .update({ is_active: false })
-        .eq("id", id);
+    const { error } = await supabase.from("customers").delete().eq("id", id);
     if (error) throw new Error(error.message);
 }
 

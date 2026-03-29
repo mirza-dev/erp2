@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useData, type ConflictItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { mapOrderDetail } from "@/lib/api-mappers";
@@ -61,6 +61,7 @@ const tdStyle: React.CSSProperties = {
 
 export default function OrderDetailPage() {
     const params = useParams();
+    const router = useRouter();
     const { updateOrderStatus } = useData();
     const { toast } = useToast();
     const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -140,6 +141,9 @@ export default function OrderDetailPage() {
         confirmLabel: string;
         variant: "primary" | "danger";
     } | null>(null);
+
+    const [hardDeleteOpen, setHardDeleteOpen] = useState(false);
+    const [hardDeleteLoading, setHardDeleteLoading] = useState(false);
 
     type ParasutStatus = "idle" | "sending" | "sent" | "error";
     const [parasutStatus, setParasutStatus] = useState<ParasutStatus>("idle");
@@ -290,6 +294,26 @@ export default function OrderDetailPage() {
         }
     };
 
+    const handleHardDelete = async () => {
+        setHardDeleteLoading(true);
+        try {
+            const res = await fetch(`/api/orders/${order.id}?permanent=1`, { method: "DELETE" });
+            if (res.ok) {
+                toast({ type: "success", message: "Sipariş kalıcı olarak silindi" });
+                router.push("/dashboard/orders");
+            } else {
+                const data = await res.json();
+                toast({ type: "error", message: data.error || "Sipariş silinemedi." });
+                setHardDeleteOpen(false);
+            }
+        } catch {
+            toast({ type: "error", message: "Beklenmeyen bir hata oluştu." });
+            setHardDeleteOpen(false);
+        } finally {
+            setHardDeleteLoading(false);
+        }
+    };
+
     const commercialCfg = commercialStatusConfig[commercialStatus];
     const fulfillmentCfg = fulfillmentStatusConfig[fulfillmentStatus];
 
@@ -365,6 +389,16 @@ export default function OrderDetailPage() {
                     <div style={{ display: "flex", gap: "8px" }}>
                         {commercialStatus === "draft" && (
                             <>
+                                <button
+                                    onClick={() => setHardDeleteOpen(true)}
+                                    style={{
+                                        fontSize: "11px", padding: "5px 10px",
+                                        borderRadius: "5px", border: "1px solid var(--danger-border)",
+                                        background: "transparent", color: "var(--danger-text)", cursor: "pointer",
+                                    }}
+                                >
+                                    Kalıcı Sil
+                                </button>
                                 <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={loading !== null} loading={loading === "cancelled"}>
                                     İptal Et
                                 </Button>
@@ -394,8 +428,22 @@ export default function OrderDetailPage() {
                             </>
                         )}
                         {(fulfillmentStatus === "shipped" || commercialStatus === "cancelled") && (
-                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)", padding: "6px 0" }}>
-                                {fulfillmentStatus === "shipped" ? "Teslim edildi — kapalı" : "İptal edildi — kapalı"}
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                {commercialStatus === "cancelled" && (
+                                    <button
+                                        onClick={() => setHardDeleteOpen(true)}
+                                        style={{
+                                            fontSize: "11px", padding: "5px 10px",
+                                            borderRadius: "5px", border: "1px solid var(--danger-border)",
+                                            background: "transparent", color: "var(--danger-text)", cursor: "pointer",
+                                        }}
+                                    >
+                                        Kalıcı Sil
+                                    </button>
+                                )}
+                                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", padding: "6px 0" }}>
+                                    {fulfillmentStatus === "shipped" ? "Teslim edildi — kapalı" : "İptal edildi — kapalı"}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -918,6 +966,51 @@ export default function OrderDetailPage() {
                                 style={{ flex: 1 }}
                             >
                                 {confirmDialog.confirmLabel}
+                            </Button>
+                        </div>
+                    </div>
+                </>
+            )}
+
+            {/* Hard Delete Confirmation Modal */}
+            {hardDeleteOpen && (
+                <>
+                    <div
+                        onClick={() => !hardDeleteLoading && setHardDeleteOpen(false)}
+                        style={{
+                            position: "fixed",
+                            inset: 0,
+                            zIndex: 100,
+                            background: "rgba(0,0,0,0.6)",
+                        }}
+                    />
+                    <div
+                        style={{
+                            position: "fixed",
+                            top: "50%",
+                            left: "50%",
+                            transform: "translate(-50%, -50%)",
+                            zIndex: 101,
+                            background: "var(--bg-primary)",
+                            border: "0.5px solid var(--danger-border)",
+                            borderRadius: "8px",
+                            padding: "20px 24px",
+                            width: "400px",
+                            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                        }}
+                    >
+                        <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "10px" }}>
+                            Siparişi Kalıcı Sil
+                        </div>
+                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "16px" }}>
+                            <strong style={{ color: "var(--text-primary)" }}>{order.orderNumber}</strong> numaralı sipariş kalıcı olarak silinecek. Bu işlem geri alınamaz. Sipariş satırları ve rezervasyonlar da silinir.
+                        </div>
+                        <div style={{ display: "flex", gap: "8px" }}>
+                            <Button variant="secondary" onClick={() => setHardDeleteOpen(false)} disabled={hardDeleteLoading} style={{ flex: 1 }}>
+                                Vazgeç
+                            </Button>
+                            <Button variant="danger" onClick={handleHardDelete} disabled={hardDeleteLoading} style={{ flex: 1 }}>
+                                {hardDeleteLoading ? "Siliniyor..." : "Evet, kalıcı sil"}
                             </Button>
                         </div>
                     </div>

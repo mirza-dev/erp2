@@ -35,6 +35,7 @@ const FIXTURE_METRICS: OpsSummaryInput = {
     approvedOrderCount: 8,
     highRiskOrderCount: 2,
     openAlertCount: 7,
+    atRiskCount: 5,
 };
 
 const VALID_AI_RESPONSE = JSON.stringify({

@@ -293,7 +293,7 @@ export default function CustomersPage() {
                                     >
                                         {confirmDeleteId === customer.id ? (
                                             <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
-                                                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Emin misin?</span>
+                                                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Kalıcı silinecek. Emin misin?</span>
                                                 <button
                                                     disabled={deletingId === customer.id}
                                                     onClick={() => handleDelete(customer.id)}
@@ -307,7 +307,7 @@ export default function CustomersPage() {
                                                         cursor: "pointer",
                                                     }}
                                                 >
-                                                    {deletingId === customer.id ? "…" : "Evet"}
+                                                    {deletingId === customer.id ? "…" : "Kalıcı Sil"}
                                                 </button>
                                                 <button
                                                     onClick={() => setConfirmDeleteId(null)}
@@ -345,7 +345,7 @@ export default function CustomersPage() {
                                                     e.currentTarget.style.color = "var(--text-tertiary)";
                                                 }}
                                             >
-                                                Sil
+                                                Kalıcı Sil
                                             </button>
                                         )}
                                     </td>
