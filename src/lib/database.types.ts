@@ -354,6 +354,17 @@ export interface AiFeedbackRow {
     created_at: string
 }
 
+export interface AiEntityAliasRow {
+    id: string
+    raw_value: string
+    normalized: string
+    entity_type: "customer" | "product"
+    resolved_id: string
+    resolved_name: string | null
+    created_at: string
+    updated_at: string
+}
+
 // ── Composite / joined types ──────────────────────────────────
 
 export interface SalesOrderWithLines extends SalesOrderRow {

@@ -9,6 +9,7 @@ import {
     type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
 import { dbCreateCustomer, dbFindCustomerByName, dbFindCustomerByCode } from "@/lib/supabase/customers";
+import { dbLookupEntityAlias, dbSaveEntityAlias } from "@/lib/supabase/entity-aliases";
 import { dbCreateProduct, dbFindProductBySku, dbUpdateProduct } from "@/lib/supabase/products";
 import { dbFindOrderByOriginalNumber } from "@/lib/supabase/orders";
 import { dbCreateQuote, dbFindQuoteByNumber } from "@/lib/supabase/quotes";
@@ -94,14 +95,24 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 let customerId: string;
                 const existingByCode = customerCode ? await dbFindCustomerByCode(customerCode) : null;
-                const existingByName = !existingByCode && customerName
+                // Alias memory: geçmiş import'larda öğrenilen ham değer → entity eşlemesi
+                const aliasMatch = !existingByCode && customerName
+                    ? await dbLookupEntityAlias(customerName, "customer")
+                    : null;
+                const existingByName = !existingByCode && !aliasMatch && customerName
                     ? await dbFindCustomerByName(customerName)
                     : null;
                 const existing = existingByCode ?? existingByName;
 
-                if (existing) {
+                if (aliasMatch) {
+                    // Alias hit — önceki import'tan öğrenilmiş, doğrudan çözümlendi
+                    customerId = aliasMatch;
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: aliasMatch });
+                } else if (existing) {
                     customerId = existing.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
+                    // Bu eşleşmeyi gelecek import'lar için kaydet
+                    if (customerName) void dbSaveEntityAlias(customerName, "customer", existing.id, existing.name);
                 } else {
                     const customer = await dbCreateCustomer({
                         name: customerName,
@@ -119,6 +130,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     customerId = customer.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: customer.id });
+                    // Yeni müşteri — bu ismi gelecek import'lar için kaydet
+                    if (customerName) void dbSaveEntityAlias(customerName, "customer", customer.id, customerName);
                 }
                 if (customerCode) refMap.customerCodes.set(customerCode, customerId);
 
