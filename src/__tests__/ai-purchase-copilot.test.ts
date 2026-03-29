@@ -283,20 +283,20 @@ describe("aiEnrichPurchaseSuggestions — confidence bounds", () => {
         process.env.ANTHROPIC_API_KEY = "test-key";
     });
 
-    it("confidence > 1 passed through without clamping", async () => {
+    it("confidence > 1 is clamped to 1 (§12 guardrail)", async () => {
         mockCreate.mockResolvedValue(makeTextResponse(JSON.stringify({
             enrichments: [{ productId: "p-1", whyNow: "test", quantityRationale: "test", urgencyLevel: "high", confidence: 1.5 }],
         })));
         const result = await aiEnrichPurchaseSuggestions([makePurchaseItem()]);
-        expect(result.enrichments[0].confidence).toBe(1.5);
+        expect(result.enrichments[0].confidence).toBe(1);
     });
 
-    it("confidence < 0 passed through without clamping", async () => {
+    it("confidence < 0 is clamped to 0 (§12 guardrail)", async () => {
         mockCreate.mockResolvedValue(makeTextResponse(JSON.stringify({
             enrichments: [{ productId: "p-1", whyNow: "test", quantityRationale: "test", urgencyLevel: "high", confidence: -0.3 }],
         })));
         const result = await aiEnrichPurchaseSuggestions([makePurchaseItem()]);
-        expect(result.enrichments[0].confidence).toBe(-0.3);
+        expect(result.enrichments[0].confidence).toBe(0);
     });
 
     it("non-number confidence defaults to 0.5", async () => {

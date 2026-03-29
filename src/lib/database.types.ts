@@ -24,6 +24,7 @@ export type AuditSource = "ui" | "system" | "ai" | "integration"
 export type RecommendationType = "purchase_suggestion" | "stock_risk" | "order_risk"
 export type RecommendationStatus = "suggested" | "accepted" | "edited" | "rejected" | "expired"
 export type FeedbackType = "accepted" | "edited" | "rejected" | "note"
+export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "ops_summary" | "purchase_enrich"
 
 // ── Row Types ────────────────────────────────────────────────
 
@@ -363,6 +364,17 @@ export interface AiEntityAliasRow {
     resolved_name: string | null
     created_at: string
     updated_at: string
+}
+
+export interface AiRunRow {
+    id: string
+    feature: AiFeature
+    entity_id: string | null
+    input_hash: string | null
+    confidence: number | null
+    latency_ms: number | null
+    model: string | null
+    created_at: string
 }
 
 // ── Composite / joined types ──────────────────────────────────

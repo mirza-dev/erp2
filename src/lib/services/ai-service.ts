@@ -7,6 +7,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { dbGetOrderById } from "@/lib/supabase/orders";
 import { createServiceClient } from "@/lib/supabase/service";
+import { logAiRun, hashInput } from "@/lib/supabase/ai-runs";
 
 export function isAIAvailable(): boolean {
     return !!process.env.ANTHROPIC_API_KEY;
@@ -17,6 +18,19 @@ const client = new Anthropic({
 });
 
 const MODEL = "claude-haiku-4-5-20251001";
+
+// ── Guardrails §12 ────────────────────────────────────────────
+
+/**
+ * Strips zero-width, bidi-override, and C0 control characters from import
+ * field values before they reach the AI prompt. Truncates at 4 096 chars.
+ */
+function sanitizeImportField(value: string): string {
+    return value
+        .replace(/[\u200B-\u200D\uFEFF\u202A-\u202E]/g, "")   // zero-width + bidi override
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "") // C0 control chars (keep \t \n \r)
+        .slice(0, 4096);
+}
 
 // ── Parse ─────────────────────────────────────────────────────
 
@@ -58,9 +72,9 @@ export function parseAIResponse(text: string): { parsed_data: Record<string, unk
         try { parsed_data = JSON.parse(jsonMatch[0]); } catch { /* ignore */ }
     }
 
-    // Extract confidence
+    // Extract confidence (clamped to [0, 1])
     const confMatch = text.match(/CONFIDENCE:\s*([\d.]+)/i);
-    const confidence = confMatch ? parseFloat(confMatch[1]) : 0.5;
+    const confidence = Math.min(1, Math.max(0, confMatch ? parseFloat(confMatch[1]) : 0.5));
 
     // Extract reason
     const reasonMatch = text.match(/REASON:\s*([^\n]+)/);
@@ -88,7 +102,7 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
             model: MODEL,
             max_tokens: 1024,
             system: systemPrompt,
-            messages: [{ role: "user", content: input.raw_text }],
+            messages: [{ role: "user", content: sanitizeImportField(input.raw_text) }],
         });
 
         const text = message.content
@@ -312,7 +326,7 @@ async function parseChunk(
             if (Array.isArray(parsed.items)) {
                 return parsed.items.map((item: Record<string, unknown>) => ({
                     parsed_data: (item.parsed_data ?? {}) as Record<string, unknown>,
-                    confidence: typeof item.confidence === "number" ? item.confidence : 0.5,
+                    confidence: typeof item.confidence === "number" ? Math.min(1, Math.max(0, item.confidence)) : 0.5,
                     ai_reason: typeof item.ai_reason === "string" ? item.ai_reason : "",
                     unmatched_fields: Array.isArray(item.unmatched_fields) ? item.unmatched_fields : [],
                 }));
@@ -364,9 +378,17 @@ export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseRe
         };
     }
 
+    // Sanitize all string fields before they reach the AI prompt (§12 guardrail)
+    const sanitizedRows = rows.map(row =>
+        Object.fromEntries(
+            Object.entries(row).map(([k, v]) => [k, sanitizeImportField(v)])
+        ) as Record<string, string>
+    );
+
+    const t0 = Date.now();
     const chunks: Array<Array<Record<string, string>>> = [];
-    for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-        chunks.push(rows.slice(i, i + CHUNK_SIZE));
+    for (let i = 0; i < sanitizedRows.length; i += CHUNK_SIZE) {
+        chunks.push(sanitizedRows.slice(i, i + CHUNK_SIZE));
     }
 
     const allItems: BatchParseResult["items"] = [];
@@ -374,6 +396,18 @@ export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseRe
         const items = await parseChunk(chunk, systemPrompt, entity_type);
         allItems.push(...items);
     }
+
+    const avgConfidence = allItems.length > 0
+        ? allItems.reduce((sum, item) => sum + item.confidence, 0) / allItems.length
+        : null;
+    void logAiRun({
+        feature: "import_parse",
+        entity_id: null,
+        input_hash: hashInput(JSON.stringify(sanitizedRows)),
+        confidence: avgConfidence,
+        latency_ms: Date.now() - t0,
+        model: MODEL,
+    });
 
     return { items: allItems };
 }
@@ -433,6 +467,7 @@ export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsS
         return { summary: "", insights: [], anomalies: [], confidence: 0, generatedAt: now };
     }
 
+    const t0 = Date.now();
     try {
         const message = await client.messages.create({
             model: MODEL,
@@ -449,6 +484,14 @@ export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsS
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
+            void logAiRun({
+                feature: "ops_summary",
+                entity_id: null,
+                input_hash: hashInput(JSON.stringify(input)),
+                confidence: 0.75,
+                latency_ms: Date.now() - t0,
+                model: MODEL,
+            });
             return {
                 summary: parsed.summary ?? "",
                 insights: Array.isArray(parsed.insights) ? parsed.insights : [],
@@ -529,6 +572,7 @@ export async function aiAssessStockRisk(items: StockRiskItem[]): Promise<StockRi
         return { assessments: [], generatedAt: now };
     }
 
+    const t0 = Date.now();
     try {
         const message = await client.messages.create({
             model: MODEL,
@@ -546,15 +590,24 @@ export async function aiAssessStockRisk(items: StockRiskItem[]): Promise<StockRi
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             if (Array.isArray(parsed.assessments)) {
-                return {
-                    assessments: parsed.assessments.map((a: Record<string, unknown>) => ({
-                        productId: typeof a.productId === "string" ? a.productId : "",
-                        explanation: typeof a.explanation === "string" ? a.explanation : "",
-                        recommendation: typeof a.recommendation === "string" ? a.recommendation : "",
-                        confidence: typeof a.confidence === "number" ? a.confidence : 0.5,
-                    })),
-                    generatedAt: now,
-                };
+                const assessments = parsed.assessments.map((a: Record<string, unknown>) => ({
+                    productId: typeof a.productId === "string" ? a.productId : "",
+                    explanation: typeof a.explanation === "string" ? a.explanation : "",
+                    recommendation: typeof a.recommendation === "string" ? a.recommendation : "",
+                    confidence: typeof a.confidence === "number" ? Math.min(1, Math.max(0, a.confidence)) : 0.5,
+                }));
+                const avgConf = assessments.length > 0
+                    ? assessments.reduce((s: number, a: { confidence: number }) => s + a.confidence, 0) / assessments.length
+                    : null;
+                void logAiRun({
+                    feature: "stock_risk",
+                    entity_id: null,
+                    input_hash: hashInput(JSON.stringify(items)),
+                    confidence: avgConf,
+                    latency_ms: Date.now() - t0,
+                    model: MODEL,
+                });
+                return { assessments, generatedAt: now };
             }
         }
 
@@ -599,11 +652,14 @@ export function parseScoreResponse(text: string): ScoreOrderResult {
     const riskMatch = text.match(/RISK_LEVEL:\s*(low|medium|high)/i);
     const reasonMatch = text.match(/REASON:\s*(.+?)$/im);
 
-    const confidence = confMatch ? parseFloat(confMatch[1]) : 0.5;
+    const confidence = Math.min(1, Math.max(0, confMatch ? parseFloat(confMatch[1]) : 0.5));
     const risk_level = (riskMatch ? riskMatch[1].toLowerCase() : "medium") as "low" | "medium" | "high";
     const reason = reasonMatch ? reasonMatch[1].trim() : "";
 
-    return { confidence, risk_level, reason };
+    // G3 guardrail: high risk without any reason is suspicious — downgrade to medium
+    const safeRiskLevel = (risk_level === "high" && !reason) ? "medium" : risk_level;
+
+    return { confidence, risk_level: safeRiskLevel, reason };
 }
 
 // ── Purchase Copilot ──────────────────────────────────────────
@@ -685,6 +741,7 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
         return { enrichments: [], generatedAt: now };
     }
 
+    const t0 = Date.now();
     try {
         const message = await client.messages.create({
             model: MODEL,
@@ -702,18 +759,27 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             if (Array.isArray(parsed.enrichments)) {
-                return {
-                    enrichments: parsed.enrichments.map((e: Record<string, unknown>) => ({
-                        productId: typeof e.productId === "string" ? e.productId : "",
-                        whyNow: typeof e.whyNow === "string" ? e.whyNow : "",
-                        quantityRationale: typeof e.quantityRationale === "string" ? e.quantityRationale : "",
-                        urgencyLevel: (e.urgencyLevel === "critical" || e.urgencyLevel === "high" || e.urgencyLevel === "moderate")
-                            ? e.urgencyLevel
-                            : "moderate",
-                        confidence: typeof e.confidence === "number" ? e.confidence : 0.5,
-                    })),
-                    generatedAt: now,
-                };
+                const enrichments = parsed.enrichments.map((e: Record<string, unknown>) => ({
+                    productId: typeof e.productId === "string" ? e.productId : "",
+                    whyNow: typeof e.whyNow === "string" ? e.whyNow : "",
+                    quantityRationale: typeof e.quantityRationale === "string" ? e.quantityRationale : "",
+                    urgencyLevel: (e.urgencyLevel === "critical" || e.urgencyLevel === "high" || e.urgencyLevel === "moderate")
+                        ? e.urgencyLevel
+                        : "moderate",
+                    confidence: typeof e.confidence === "number" ? Math.min(1, Math.max(0, e.confidence)) : 0.5,
+                }));
+                const avgConf = enrichments.length > 0
+                    ? enrichments.reduce((s: number, e: { confidence: number }) => s + e.confidence, 0) / enrichments.length
+                    : null;
+                void logAiRun({
+                    feature: "purchase_enrich",
+                    entity_id: null,
+                    input_hash: hashInput(JSON.stringify(items)),
+                    confidence: avgConf,
+                    latency_ms: Date.now() - t0,
+                    model: MODEL,
+                });
+                return { enrichments, generatedAt: now };
             }
         }
 
@@ -732,6 +798,7 @@ export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
         return { confidence: 0, risk_level: "medium", reason: "AI servisi yapılandırılmamış" };
     }
 
+    const t0 = Date.now();
     try {
         const orderSummary = JSON.stringify({
             order_number: order.order_number,
@@ -772,6 +839,15 @@ export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
             ai_model_version: MODEL,
             ai_risk_level: risk_level,
         }).eq("id", orderId);
+
+        void logAiRun({
+            feature: "order_score",
+            entity_id: orderId,
+            input_hash: hashInput(orderSummary),
+            confidence,
+            latency_ms: Date.now() - t0,
+            model: MODEL,
+        });
 
         return { confidence, risk_level, reason };
     } catch (err) {
