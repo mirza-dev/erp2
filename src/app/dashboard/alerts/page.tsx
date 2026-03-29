@@ -26,6 +26,7 @@ interface Alert {
     dismissible: boolean;
     createdAt: string;
     aiConfidence?: number;
+    aiReason?: string;
 }
 
 const severityColors: Record<AlertSeverity, { dot: string; bg: string; border: string; text: string; badge: string }> = {
@@ -69,6 +70,7 @@ function mapAlertRow(row: AlertRow): Alert {
         dismissible: row.status === "open",
         createdAt: row.created_at,
         aiConfidence: row.ai_confidence ?? undefined,
+        aiReason: row.ai_reason ?? undefined,
     };
 }
 
@@ -474,6 +476,18 @@ export default function AlertsPage() {
                                         >
                                             {alert.description}
                                         </p>
+
+                                        {alert.source === "ai" && alert.aiReason && (
+                                            <p style={{
+                                                margin: "0 0 8px",
+                                                fontSize: "11px",
+                                                color: "var(--text-tertiary)",
+                                                lineHeight: 1.5,
+                                                fontStyle: "italic",
+                                            }}>
+                                                {alert.aiReason}
+                                            </p>
+                                        )}
 
                                         {alert.meta && (
                                             <div

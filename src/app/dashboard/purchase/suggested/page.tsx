@@ -30,7 +30,17 @@ function AiEnrichmentBadge({ enrichment, loading }: {
         );
     }
 
-    if (!enrichment || (!enrichment.aiWhyNow && !enrichment.aiQuantityRationale)) return null;
+    if (!enrichment || (!enrichment.aiWhyNow && !enrichment.aiQuantityRationale)) {
+        return (
+            <div style={{
+                marginTop: "6px",
+                fontSize: "11px",
+                color: "var(--text-tertiary)",
+            }}>
+                AI açıklaması yok
+            </div>
+        );
+    }
 
     const urgency = enrichment.aiUrgencyLevel ?? "moderate";
     const borderColor = urgency === "critical" ? "var(--danger)" : urgency === "high" ? "var(--warning)" : "var(--accent)";

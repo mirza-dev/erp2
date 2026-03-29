@@ -368,8 +368,30 @@ export default function ProductsPage() {
                                             <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px", whiteSpace: "normal", maxWidth: "160px", margin: "2px auto 0" }}>
                                                 {risk.aiExplanation ? (
                                                     <>
-                                                        <span style={{ fontSize: "9px", fontWeight: 600, color: "var(--accent-text)", letterSpacing: "0.04em" }}>AI </span>
+                                                        <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "2px" }}>
+                                                            <span style={{
+                                                                fontSize: "9px", fontWeight: 600, letterSpacing: "0.06em",
+                                                                padding: "1px 4px", borderRadius: "3px",
+                                                                background: "var(--accent-bg)", color: "var(--accent-text)",
+                                                            }}>
+                                                                AI Önerisi
+                                                            </span>
+                                                            {risk.aiConfidence != null && (
+                                                                <span style={{ fontSize: "9px", color: "var(--text-tertiary)" }}>
+                                                                    %{Math.round(risk.aiConfidence * 100)}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         {risk.aiExplanation}
+                                                        {risk.aiRecommendation && (
+                                                            <div style={{
+                                                                fontSize: "11px", color: "var(--accent-text)",
+                                                                marginTop: "3px", display: "flex", gap: "4px", alignItems: "flex-start",
+                                                            }}>
+                                                                <span style={{ flexShrink: 0 }}>→</span>
+                                                                <span>{risk.aiRecommendation}</span>
+                                                            </div>
+                                                        )}
                                                     </>
                                                 ) : (
                                                     risk.deterministicReason
