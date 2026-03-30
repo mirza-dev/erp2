@@ -115,6 +115,7 @@ export default function OrderDetailPage() {
             });
             if (res.ok) {
                 toast({ type: "success", message: "AI skorlama tamamlandı" });
+                setLastRescoredAt(new Date().toISOString());
                 await refetchOrder();
             } else {
                 toast({ type: "error", message: "Skorlama başarısız" });
@@ -151,6 +152,7 @@ export default function OrderDetailPage() {
     const [parasutInvoiceId, setParasutInvoiceId] = useState<string | null>(null);
     const [parasutError, setParasutError] = useState<string | null>(null);
     const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
+    const [lastRescoredAt, setLastRescoredAt] = useState<string | null>(null);
 
     // Update parasut state when order loads
     useEffect(() => {
@@ -1042,6 +1044,11 @@ export default function OrderDetailPage() {
                                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
                                     Güven: %{Math.round(order.aiConfidence * 100)}
                                 </div>
+                                {lastRescoredAt && (
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                                        Güncellendi: {new Date(lastRescoredAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                                    </div>
+                                )}
                             </div>
                             {order.aiReason && (
                                 <div style={{

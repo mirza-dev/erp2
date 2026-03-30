@@ -393,6 +393,7 @@ export default function PurchaseSuggestedPage() {
         ai_available: boolean;
         items: AiEnrichmentItem[];
         recommendations?: Array<{ productId: string; recommendationId: string | null; status: string }>;
+        generatedAt?: string;
     } | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(false);
@@ -1106,6 +1107,12 @@ export default function PurchaseSuggestedPage() {
                         ) : (
                             <div style={{ fontSize: "12px", color: "var(--text-tertiary)", padding: "10px 0" }}>
                                 Şu an aktif AI değerlendirmesi yok — deterministik mod
+                            </div>
+                        )}
+
+                        {aiData?.generatedAt && (
+                            <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
+                                Analiz: {new Date(aiData.generatedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
                             </div>
                         )}
 
