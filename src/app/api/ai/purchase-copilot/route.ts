@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { dbListProducts } from "@/lib/supabase/products";
 import { computeTargetStock, computeCoverageDays, computeUrgencyPct } from "@/lib/stock-utils";
 import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem } from "@/lib/services/ai-service";
-import { dbUpsertRecommendation, dbExpireSuggestedRecommendations } from "@/lib/supabase/recommendations";
+import {
+    dbUpsertRecommendation,
+    dbExpireSuggestedRecommendations,
+    dbGetActiveRecommendationsForEntities,
+} from "@/lib/supabase/recommendations";
+import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
 
 export async function POST() {
@@ -48,28 +53,80 @@ export async function POST() {
     });
 
     const aiAvailable = isAIAvailable();
-    let enrichments: Array<{
+    const activeProductIds = items.map(i => i.productId);
+
+    // ── Load existing active recommendations ──────────────────────────────────
+    // Products with an active rec (suggested/accepted/edited/rejected) skip AI
+    // re-enrichment. Stability: the user sees the same suggestion on refresh.
+    let existingRecMap = new Map<string, AiRecommendationRow>();
+    try {
+        const existingRecs = await dbGetActiveRecommendationsForEntities(
+            "product",
+            activeProductIds,
+            "purchase_suggestion"
+        );
+        existingRecMap = new Map(existingRecs.map(r => [r.entity_id, r]));
+    } catch {
+        // Non-fatal: if we can't load existing, treat all as needing fresh AI
+    }
+
+    // Split: need fresh AI vs. reuse from DB
+    const needsAiItems = items.filter(i => !existingRecMap.has(i.productId));
+    const hasExistingItems = items.filter(i => existingRecMap.has(i.productId));
+
+    // ── AI enrichment: only for products with no active recommendation ────────
+    type EnrichmentEntry = {
         productId: string;
         whyNow: string;
         quantityRationale: string;
         urgencyLevel: "critical" | "high" | "moderate";
         confidence: number;
-    }> = [];
+    };
+    let freshEnrichments: EnrichmentEntry[] = [];
 
-    if (aiAvailable && items.length > 0) {
+    if (aiAvailable && needsAiItems.length > 0) {
         try {
-            const result = await aiEnrichPurchaseSuggestions(items);
-            enrichments = result.enrichments;
+            const result = await aiEnrichPurchaseSuggestions(needsAiItems);
+            freshEnrichments = result.enrichments;
         } catch {
             // AI error doesn't bring down the route
         }
     }
 
-    const aiMap = new Map(enrichments.map(e => [e.productId, e]));
+    const freshAiMap = new Map(freshEnrichments.map(e => [e.productId, e]));
+
+    // Build merged AI map: fresh enrichments + content recovered from existing rec metadata
+    const mergedAiMap = new Map<string, {
+        aiWhyNow: string | null;
+        aiQuantityRationale: string | null;
+        aiUrgencyLevel: "critical" | "high" | "moderate" | null;
+        aiConfidence: number | null;
+    }>();
+
+    for (const item of needsAiItems) {
+        const ai = freshAiMap.get(item.productId);
+        mergedAiMap.set(item.productId, {
+            aiWhyNow: ai?.whyNow ?? null,
+            aiQuantityRationale: ai?.quantityRationale ?? null,
+            aiUrgencyLevel: ai?.urgencyLevel ?? null,
+            aiConfidence: ai?.confidence ?? null,
+        });
+    }
+
+    for (const item of hasExistingItems) {
+        const rec = existingRecMap.get(item.productId)!;
+        const meta = rec.metadata as Record<string, unknown> | null;
+        mergedAiMap.set(item.productId, {
+            aiWhyNow: (meta?.aiWhyNow as string) ?? null,
+            aiQuantityRationale: (meta?.aiQuantityRationale as string) ?? null,
+            aiUrgencyLevel: (meta?.aiUrgencyLevel as "critical" | "high" | "moderate") ?? null,
+            aiConfidence: rec.confidence ?? null,
+        });
+    }
 
     const responseItems = items
         .map(item => {
-            const ai = aiMap.get(item.productId);
+            const ai = mergedAiMap.get(item.productId);
             const urgencyPct = computeUrgencyPct(item.available, item.min);
             return {
                 productId: item.productId,
@@ -89,10 +146,10 @@ export async function POST() {
                 leadTimeDemand: item.leadTimeDemand,
                 preferredVendor: item.preferredVendor,
                 urgencyPct,
-                aiWhyNow: ai?.whyNow ?? null,
-                aiQuantityRationale: ai?.quantityRationale ?? null,
-                aiUrgencyLevel: ai?.urgencyLevel ?? null,
-                aiConfidence: ai?.confidence ?? null,
+                aiWhyNow: ai?.aiWhyNow ?? null,
+                aiQuantityRationale: ai?.aiQuantityRationale ?? null,
+                aiUrgencyLevel: ai?.aiUrgencyLevel ?? null,
+                aiConfidence: ai?.aiConfidence ?? null,
             };
         })
         .sort((a, b) => {
@@ -102,19 +159,20 @@ export async function POST() {
             return a.coverageDays - b.coverageDays;
         });
 
-    // ── Persist recommendations (non-blocking) ────────────────────────────────
+    // ── Persist recommendations ───────────────────────────────────────────────
+    // Only upsert for products that needed fresh AI. Existing recs are returned as-is.
     const recommendations: Array<{ productId: string; recommendationId: string | null; status: string }> = [];
 
     try {
-        const activeProductIds = responseItems.map(i => i.productId);
-
+        // Expire suggestions for products no longer below min stock
         const expirePromise = activeProductIds.length > 0
             ? dbExpireSuggestedRecommendations("product", activeProductIds, "purchase_suggestion")
             : Promise.resolve(0);
 
-        const upsertPromises = responseItems.map(async item => {
-            const ai = aiMap.get(item.productId);
-            const urgencyPct = item.urgencyPct;
+        // Insert new recommendations only for products without an existing active rec
+        const upsertPromises = needsAiItems.map(async item => {
+            const ai = freshAiMap.get(item.productId);
+            const urgencyPct = computeUrgencyPct(item.available, item.min);
             const severity = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
             try {
                 const rec = await dbUpsertRecommendation({
@@ -129,7 +187,7 @@ export async function POST() {
                     metadata: {
                         suggestQty: item.suggestQty,
                         moq: item.moq,
-                        urgencyPct: item.urgencyPct,
+                        urgencyPct,
                         aiWhyNow: ai?.whyNow ?? null,
                         aiQuantityRationale: ai?.quantityRationale ?? null,
                         aiUrgencyLevel: ai?.urgencyLevel ?? null,
@@ -144,8 +202,14 @@ export async function POST() {
             }
         });
 
+        // Collect existing rec references (no DB write needed)
+        const existingRefs = hasExistingItems.map(item => {
+            const rec = existingRecMap.get(item.productId)!;
+            return { productId: item.productId, recommendationId: rec.id, status: rec.status };
+        });
+
         const [, upsertResults] = await Promise.all([expirePromise, Promise.all(upsertPromises)]);
-        recommendations.push(...upsertResults);
+        recommendations.push(...upsertResults, ...existingRefs);
     } catch {
         // Persistence errors must not affect the main response
     }

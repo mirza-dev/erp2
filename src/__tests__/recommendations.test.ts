@@ -132,10 +132,12 @@ describe("dbUpsertRecommendation — creates new recommendation", () => {
     });
 });
 
-describe("dbUpsertRecommendation — refreshes existing suggested row", () => {
-    it("updates body+confidence when suggested row exists", async () => {
-        const existingRow = makeRow({ body: "old body" });
-        const updatedRow = makeRow({ body: "new body", confidence: 0.9 });
+// Behavior changed (idempotent): existing suggested rows are returned unchanged,
+// not overwritten. Callers must use dbGetActiveRecommendationsForEntities to
+// check first and skip the upsert call entirely for stable recommendations.
+describe("dbUpsertRecommendation — idempotent for existing suggested row", () => {
+    it("returns existing row unchanged when suggested row exists (no overwrite)", async () => {
+        const existingRow = makeRow({ body: "old body", confidence: 0.7 });
 
         setupFrom({
             ai_recommendations: () => {
@@ -143,11 +145,7 @@ describe("dbUpsertRecommendation — refreshes existing suggested row", () => {
                 b.select = () => b;
                 b.eq = () => b;
                 b.maybeSingle = async () => ({ data: existingRow, error: null });
-                b.update = () => ({
-                    eq: () => ({
-                        select: () => ({ single: async () => ({ data: updatedRow, error: null }) }),
-                    }),
-                });
+                b.update = () => { throw new Error("Should not update when existing row found"); };
                 b.insert = () => { throw new Error("Should not insert when existing row found"); };
                 b.not = () => b;
                 b.order = () => b;
@@ -160,11 +158,13 @@ describe("dbUpsertRecommendation — refreshes existing suggested row", () => {
             entity_id: "prod-1",
             recommendation_type: "purchase_suggestion",
             title: "Test öneri",
-            body: "new body",
-            confidence: 0.9,
+            body: "new body",    // ignored — existing row is returned as-is
+            confidence: 0.9,     // ignored — existing row is returned as-is
         });
-        expect(result.body).toBe("new body");
-        expect(result.confidence).toBe(0.9);
+        // Returns the EXISTING row, not the new values
+        expect(result.body).toBe("old body");
+        expect(result.confidence).toBe(0.7);
+        expect(result.id).toBe(existingRow.id);
     });
 });
 

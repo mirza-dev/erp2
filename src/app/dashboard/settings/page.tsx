@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 
-type Tab = "firma" | "kullanici" | "bildirimler" | "api";
+type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
@@ -588,6 +588,105 @@ function ApiTab() {
     );
 }
 
+// ─── Yapay Zeka Metrikleri ─────────────────────────────────────────────────────
+
+interface ObservabilityData {
+    runs: {
+        last7d: number;
+        byFeature: Record<string, number>;
+        fallbackCount: number;
+    };
+    recommendations: {
+        byStatus: Record<string, number>;
+        activeCount: number;
+        decidedCount: number;
+    };
+    feedback: {
+        last7d: Record<string, number>;
+    };
+    generatedAt: string;
+}
+
+const featureLabels: Record<string, string> = {
+    purchase_enrich: "Satın alma",
+    stock_risk: "Stok risk",
+    order_score: "Sipariş skoru",
+    ops_summary: "Ops özeti",
+    import_parse: "Import parse",
+};
+
+function MetricRow({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
+    return (
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "5px 0", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+            <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{label}</span>
+            <span style={{ fontSize: "13px", fontWeight: 500, color: highlight ? "var(--warning-text)" : "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{value}</span>
+        </div>
+    );
+}
+
+function SectionHeader({ children }: { children: React.ReactNode }) {
+    return (
+        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px", marginTop: "20px" }}>
+            {children}
+        </div>
+    );
+}
+
+function AiTab() {
+    const [data, setData] = useState<ObservabilityData | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        fetch("/api/ai/observability")
+            .then(r => r.json())
+            .then(setData)
+            .catch(() => setError("Veriler yüklenemedi."))
+            .finally(() => setLoading(false));
+    }, []);
+
+    if (loading) {
+        return <div style={{ fontSize: "13px", color: "var(--text-tertiary)", padding: "20px 0" }}>Yükleniyor…</div>;
+    }
+    if (error || !data) {
+        return <div style={{ fontSize: "13px", color: "var(--danger-text)", padding: "20px 0" }}>{error ?? "Bilinmeyen hata"}</div>;
+    }
+
+    const { runs, recommendations, feedback } = data;
+    const fallbackPct = runs.last7d > 0 ? Math.round((runs.fallbackCount / runs.last7d) * 100) : 0;
+    const decidePct = (recommendations.decidedCount + recommendations.byStatus.suggested) > 0
+        ? Math.round((recommendations.decidedCount / (recommendations.decidedCount + recommendations.byStatus.suggested)) * 100)
+        : 0;
+
+    return (
+        <div style={{ paddingBottom: "32px" }}>
+            <SectionHeader>AI Çalıştırmaları — Son 7 Gün</SectionHeader>
+            <MetricRow label="Toplam çalıştırma" value={runs.last7d} />
+            <MetricRow label="Fallback (model yok)" value={`${runs.fallbackCount} (%${fallbackPct})`} highlight={fallbackPct > 30} />
+            {Object.entries(runs.byFeature).map(([feature, count]) => (
+                <MetricRow key={feature} label={featureLabels[feature] ?? feature} value={count} />
+            ))}
+
+            <SectionHeader>Öneri Yaşam Döngüsü</SectionHeader>
+            <MetricRow label="Aktif (suggested)" value={recommendations.byStatus.suggested ?? 0} />
+            <MetricRow label="Kabul edildi" value={recommendations.byStatus.accepted ?? 0} />
+            <MetricRow label="Düzenlendi" value={recommendations.byStatus.edited ?? 0} />
+            <MetricRow label="Reddedildi" value={recommendations.byStatus.rejected ?? 0} />
+            <MetricRow label="Süresi doldu" value={recommendations.byStatus.expired ?? 0} />
+            <MetricRow label="Karar oranı" value={`%${decidePct}`} />
+
+            <SectionHeader>Kullanıcı Kararları — Son 7 Gün</SectionHeader>
+            <MetricRow label="Kabul" value={feedback.last7d.accepted ?? 0} />
+            <MetricRow label="Düzenle" value={feedback.last7d.edited ?? 0} />
+            <MetricRow label="Reddet" value={feedback.last7d.rejected ?? 0} />
+
+            <div style={{ marginTop: "16px", fontSize: "11px", color: "var(--text-tertiary)" }}>
+                Güncellendi: {new Date(data.generatedAt).toLocaleTimeString("tr-TR")}
+            </div>
+        </div>
+    );
+}
+
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
     const [activeTab, setActiveTab] = useState<Tab>("firma");
@@ -598,6 +697,7 @@ export default function SettingsPage() {
         { key: "kullanici", label: "Kullanıcı" },
         { key: "bildirimler", label: "Bildirimler" },
         { key: "api", label: "API Anahtarları" },
+        { key: "yapay-zeka", label: "Yapay Zeka" },
     ];
 
     const handleDirtyChange = (tab: Tab, isDirty: boolean) => {
@@ -684,6 +784,7 @@ export default function SettingsPage() {
                     {activeTab === "kullanici" && <KullaniciTab onDirtyChange={(d) => handleDirtyChange("kullanici", d)} />}
                     {activeTab === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
                     {activeTab === "api" && <ApiTab />}
+                    {activeTab === "yapay-zeka" && <AiTab />}
                 </div>
             </div>
         </div>

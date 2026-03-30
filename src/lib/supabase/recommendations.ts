@@ -39,14 +39,18 @@ const VALID_TRANSITIONS: Partial<Record<RecommendationStatus, RecommendationStat
 // ── Queries ──────────────────────────────────────────────────
 
 /**
- * Upsert a recommendation: if a "suggested" row already exists for
- * entity+type, refresh it. Otherwise insert a new row.
+ * Insert a new recommendation row. Only call this when there is no active
+ * recommendation for the entity+type (i.e. after checking with
+ * dbGetActiveRecommendationsForEntities). Does not overwrite existing rows.
  */
 export async function dbUpsertRecommendation(
     input: UpsertRecommendationInput
 ): Promise<AiRecommendationRow> {
     const supabase = createServiceClient();
 
+    // Guard: if a "suggested" row already exists, return it unchanged.
+    // Callers should use dbGetActiveRecommendationsForEntities to check first;
+    // this is a safety net to prevent silent overwrites.
     const { data: existing } = await supabase
         .from("ai_recommendations")
         .select("*")
@@ -56,23 +60,7 @@ export async function dbUpsertRecommendation(
         .eq("status", "suggested")
         .maybeSingle();
 
-    if (existing) {
-        const { data, error } = await supabase
-            .from("ai_recommendations")
-            .update({
-                title: input.title,
-                body: input.body ?? null,
-                confidence: input.confidence ?? null,
-                severity: input.severity ?? "info",
-                model_version: input.model_version ?? null,
-                metadata: input.metadata ?? null,
-            })
-            .eq("id", existing.id)
-            .select("*")
-            .single();
-        if (error || !data) throw new Error(error?.message ?? "Recommendation update failed");
-        return data;
-    }
+    if (existing) return existing;
 
     const { data, error } = await supabase
         .from("ai_recommendations")
@@ -172,6 +160,36 @@ export async function dbUpdateRecommendationStatus(
     }
 
     return data;
+}
+
+/**
+ * Fetch the most-recent active recommendation (suggested | accepted | edited | rejected)
+ * per entity_id for a set of entity IDs. Used to skip AI re-enrichment and re-upsert
+ * for entities that already have a decision on record.
+ */
+export async function dbGetActiveRecommendationsForEntities(
+    entityType: string,
+    entityIds: string[],
+    recommendationType: RecommendationType
+): Promise<AiRecommendationRow[]> {
+    if (entityIds.length === 0) return [];
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("ai_recommendations")
+        .select("*")
+        .eq("entity_type", entityType)
+        .eq("recommendation_type", recommendationType)
+        .in("entity_id", entityIds)
+        .in("status", ["suggested", "accepted", "edited", "rejected"])
+        .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    // One row per entity_id — keep most recent
+    const seen = new Set<string>();
+    return (data ?? []).filter(r => {
+        if (seen.has(r.entity_id)) return false;
+        seen.add(r.entity_id);
+        return true;
+    });
 }
 
 /**
