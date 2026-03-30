@@ -247,11 +247,13 @@ function RecActionCell({
     suggestQty: number;
     unit: string;
     onAccept: (productId: string) => void;
-    onReject: (productId: string) => void;
+    onReject: (productId: string, feedbackNote?: string) => void;
     onEdit: (productId: string, qty: number) => void;
 }) {
     const [editMode, setEditMode] = useState(false);
     const [editQty, setEditQty] = useState(suggestQty);
+    const [rejectMode, setRejectMode] = useState(false);
+    const [rejectNote, setRejectNote] = useState("");
 
     const status = recEntry?.status ?? "no_rec";
 
@@ -334,6 +336,52 @@ function RecActionCell({
         );
     }
 
+    if (rejectMode) {
+        return (
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <input
+                    type="text"
+                    value={rejectNote}
+                    placeholder="Ret sebebi (isteğe bağlı)"
+                    onChange={e => setRejectNote(e.target.value)}
+                    autoFocus
+                    style={{
+                        padding: "3px 8px",
+                        fontSize: "12px",
+                        border: "1px solid var(--border-secondary)",
+                        borderRadius: "4px",
+                        background: "var(--bg-primary)",
+                        color: "var(--text-primary)",
+                        width: "180px",
+                        boxSizing: "border-box",
+                    }}
+                />
+                <div style={{ display: "flex", gap: "6px" }}>
+                    <button
+                        onClick={() => { onReject(productId, rejectNote || undefined); setRejectMode(false); setRejectNote(""); }}
+                        style={{
+                            fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                            background: "transparent", color: "var(--danger-text)",
+                            border: "0.5px solid var(--danger)", cursor: "pointer",
+                        }}
+                    >
+                        Reddet
+                    </button>
+                    <button
+                        onClick={() => { setRejectMode(false); setRejectNote(""); }}
+                        style={{
+                            fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
+                            background: "transparent", color: "var(--text-tertiary)",
+                            border: "0.5px solid var(--border-secondary)", cursor: "pointer",
+                        }}
+                    >
+                        İptal
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
     // suggested or no_rec
     if (!recEntry) {
         return (
@@ -370,7 +418,7 @@ function RecActionCell({
                 Düzenle
             </button>
             <button
-                onClick={() => onReject(productId)}
+                onClick={() => { setRejectNote(""); setRejectMode(true); }}
                 style={{
                     fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
                     background: "transparent", color: "var(--text-tertiary)",
@@ -468,7 +516,7 @@ export default function PurchaseSuggestedPage() {
         }
     };
 
-    const handleReject = async (productId: string) => {
+    const handleReject = async (productId: string, feedbackNote?: string) => {
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
@@ -477,7 +525,10 @@ export default function PurchaseSuggestedPage() {
             await fetch(`/api/recommendations/${rec.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "rejected" }),
+                body: JSON.stringify({
+                    status: "rejected",
+                    ...(feedbackNote ? { feedbackNote } : {}),
+                }),
             });
         } catch {
             setRecMap(m => new Map(m).set(productId, prev));

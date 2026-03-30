@@ -31,6 +31,7 @@ export async function PATCH(
         const updated = await dbUpdateRecommendationStatus(id, status, {
             editedMetadata: body.editedMetadata,
             feedbackNote: body.feedbackNote,
+            actor: "user", // placeholder until auth (Stage 3)
         });
         return NextResponse.json({ recommendation: mapRecommendation(updated) });
     } catch (err) {
