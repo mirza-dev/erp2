@@ -427,7 +427,7 @@ export default function CustomersPage() {
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                                 <div>
                                     <label style={modalLabelStyle}>Ülke</label>
-                                    <input style={modalInputStyle} value={newCustomer.country} onChange={setField("country")} placeholder="TR, US, AE..." />
+                                    <input style={modalInputStyle} value={newCustomer.country} onChange={e => setNewCustomer(prev => ({ ...prev, country: e.target.value.toUpperCase().slice(0, 2) }))} placeholder="TR, US, AE..." maxLength={2} />
                                 </div>
                                 <div>
                                     <label style={modalLabelStyle}>Para Birimi</label>

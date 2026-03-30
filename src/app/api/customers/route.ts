@@ -16,6 +16,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
+        if (body.country && body.country.length > 2) {
+            return NextResponse.json({ error: "Ülke kodu en fazla 2 karakter olabilir (ISO 3166-1 alpha-2)" }, { status: 400 });
+        }
         const customer = await dbCreateCustomer(body);
         return NextResponse.json(customer, { status: 201 });
     } catch (err) {
