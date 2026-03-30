@@ -25,6 +25,31 @@ interface OpsSummaryResponse {
 
 type CardState = "loading" | "loaded" | "error" | "disabled";
 
+const CACHE_KEY = "kokpit_ops_summary";
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 dakika
+
+interface CacheEntry {
+    data: OpsSummaryResponse;
+    state: CardState;
+    cachedAt: number;
+}
+
+function readCache(): CacheEntry | null {
+    try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const entry: CacheEntry = JSON.parse(raw);
+        if (Date.now() - entry.cachedAt > CACHE_TTL_MS) return null;
+        return entry;
+    } catch { return null; }
+}
+
+function writeCache(data: OpsSummaryResponse, state: CardState) {
+    try {
+        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, state, cachedAt: Date.now() }));
+    } catch { /* storage full — non-fatal */ }
+}
+
 function MetricsContextBar({ metrics }: { metrics: OpsMetrics }) {
     const items: { label: string; value: number; danger?: boolean }[] = [
         { label: "kritik stok", value: metrics.criticalStockCount, danger: true },
@@ -121,9 +146,20 @@ function DeterministicSummary({ metrics }: { metrics: OpsMetrics }) {
 export default function AISummaryCard() {
     const [state, setState] = useState<CardState>("loading");
     const [data, setData] = useState<OpsSummaryResponse | null>(null);
+    const [fromCache, setFromCache] = useState(false);
 
-    const fetchSummary = useCallback(async () => {
+    const fetchSummary = useCallback(async (bypassCache = false) => {
+        if (!bypassCache) {
+            const cached = readCache();
+            if (cached) {
+                setData(cached.data);
+                setState(cached.state);
+                setFromCache(true);
+                return;
+            }
+        }
         setState("loading");
+        setFromCache(false);
         try {
             const res = await fetch("/api/ai/ops-summary", { method: "POST" });
             if (!res.ok) throw new Error("API error");
@@ -131,6 +167,7 @@ export default function AISummaryCard() {
             setData(result);
             if (result.ai_available === false) {
                 setState("disabled");
+                writeCache(result, "disabled");
                 return;
             }
             if (!result.summary) {
@@ -138,6 +175,7 @@ export default function AISummaryCard() {
                 return;
             }
             setState("loaded");
+            writeCache(result, "loaded");
         } catch {
             setState("error");
         }
@@ -257,7 +295,7 @@ export default function AISummaryCard() {
                         AI servisi yanıt vermedi.
                     </span>
                     <button
-                        onClick={fetchSummary}
+                        onClick={() => fetchSummary(true)}
                         style={{
                             fontSize: "11px",
                             padding: "4px 10px",
@@ -332,7 +370,7 @@ export default function AISummaryCard() {
                     </span>
                 </div>
                 <button
-                    onClick={fetchSummary}
+                    onClick={() => fetchSummary(true)}
                     style={{
                         fontSize: "11px",
                         padding: "4px 10px",
@@ -456,7 +494,7 @@ export default function AISummaryCard() {
                 color: "var(--text-tertiary)",
                 textAlign: "right",
             }}>
-                Son güncelleme: {timeStr}
+                Son güncelleme: {timeStr}{fromCache ? " (önbellekten)" : ""}
             </div>
         </div>
     );
