@@ -183,13 +183,43 @@ export async function dbGetActiveRecommendationsForEntities(
         .in("status", ["suggested", "accepted", "edited", "rejected"])
         .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    // One row per entity_id — keep most recent
+    // One row per entity_id — keep most recent.
+    // accepted/edited/rejected are treated as "active" only for 7 days after
+    // the decision (decided_at). Older decided rows are treated as stale so
+    // the caller regenerates a fresh suggestion for the entity.
+    const DECIDED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
     const seen = new Set<string>();
     return (data ?? []).filter(r => {
         if (seen.has(r.entity_id)) return false;
         seen.add(r.entity_id);
-        return true;
+        if (r.status === "suggested") return true;
+        // accepted / edited / rejected: check decision age
+        const pivot = r.decided_at ?? r.created_at;
+        return now - new Date(pivot).getTime() < DECIDED_MAX_AGE_MS;
     });
+}
+
+/**
+ * Expire all "suggested" recommendations that were created more than
+ * `olderThanHours` hours ago and have not yet been acted on.
+ * Call at the start of every copilot route run so stale suggestions
+ * don't block re-generation indefinitely.
+ */
+export async function dbExpireStaleRecommendations(
+    olderThanHours = 48
+): Promise<number> {
+    const supabase = createServiceClient();
+    const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+        .from("ai_recommendations")
+        .update({ status: "expired", expired_at: now })
+        .eq("status", "suggested")
+        .lt("created_at", cutoff)
+        .select("id");
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
 }
 
 /**

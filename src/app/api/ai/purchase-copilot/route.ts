@@ -5,12 +5,17 @@ import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem
 import {
     dbUpsertRecommendation,
     dbExpireSuggestedRecommendations,
+    dbExpireStaleRecommendations,
     dbGetActiveRecommendationsForEntities,
 } from "@/lib/supabase/recommendations";
 import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
 
 export async function POST() {
+    // Expire suggested recommendations that were never acted on after 48 hours.
+    // Runs before any DB read so stale rows don't block re-generation.
+    try { await dbExpireStaleRecommendations(48); } catch { /* non-fatal */ }
+
     let products: Awaited<ReturnType<typeof dbListProducts>>;
     try {
         products = await dbListProducts({ is_active: true, pageSize: 500 });

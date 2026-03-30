@@ -16,6 +16,8 @@ function makeBuilder() {
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.eq = () => b;
+    b.in = () => b;
+    b.lt = () => b;
     b.not = mockNot.mockReturnValue(b);
     b.order = () => b;
     b.maybeSingle = mockMaybeSingle;
@@ -46,6 +48,8 @@ import {
     dbGetRecommendationById,
     dbUpdateRecommendationStatus,
     dbExpireSuggestedRecommendations,
+    dbExpireStaleRecommendations,
+    dbGetActiveRecommendationsForEntities,
 } from "@/lib/supabase/recommendations";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -902,5 +906,129 @@ describe("GET /api/recommendations — returns 500 on DB error", () => {
         const req = new NextRequest("http://localhost/api/recommendations");
         const res = await GET(req);
         expect(res.status).toBe(500);
+    });
+});
+
+// ─── dbExpireStaleRecommendations ─────────────────────────────────────────────
+
+describe("dbExpireStaleRecommendations — marks old suggested rows as expired", () => {
+    it("calls update with status=expired and returns count", async () => {
+        let updatePayload: Record<string, unknown> | null = null;
+
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.update = (data: Record<string, unknown>) => {
+                    updatePayload = data;
+                    return {
+                        eq: () => ({
+                            lt: () => ({
+                                select: async () => ({ data: [{ id: "rec-old" }, { id: "rec-old-2" }], error: null }),
+                            }),
+                        }),
+                    };
+                };
+                return b;
+            },
+        });
+
+        const count = await dbExpireStaleRecommendations(48);
+        expect(count).toBe(2);
+        expect(updatePayload).not.toBeNull();
+        expect((updatePayload as Record<string, unknown>).status).toBe("expired");
+        expect((updatePayload as Record<string, unknown>).expired_at).toBeDefined();
+    });
+
+    it("returns 0 and still calls DB when no stale rows found", async () => {
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.update = () => ({
+                    eq: () => ({
+                        lt: () => ({
+                            select: async () => ({ data: [], error: null }),
+                        }),
+                    }),
+                });
+                return b;
+            },
+        });
+
+        const count = await dbExpireStaleRecommendations(48);
+        expect(count).toBe(0);
+    });
+});
+
+// ─── dbGetActiveRecommendationsForEntities — 7-day decided window ─────────────
+
+describe("dbGetActiveRecommendationsForEntities — accepted within 7 days is active", () => {
+    it("includes accepted row decided 1 day ago", async () => {
+        const recentDecidedAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const row = makeRow({ status: "accepted", decided_at: recentDecidedAt });
+
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.select = () => b;
+                b.eq = () => b;
+                b.in = () => b;
+                b.order = () => b;
+                b.then = (resolve: (v: unknown) => void) =>
+                    Promise.resolve({ data: [row], error: null }).then(resolve);
+                return b;
+            },
+        });
+
+        const result = await dbGetActiveRecommendationsForEntities("product", ["prod-1"], "purchase_suggestion");
+        expect(result).toHaveLength(1);
+        expect(result[0].status).toBe("accepted");
+    });
+});
+
+describe("dbGetActiveRecommendationsForEntities — accepted older than 7 days is stale", () => {
+    it("excludes accepted row decided 8 days ago", async () => {
+        const oldDecidedAt = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+        const row = makeRow({ status: "accepted", decided_at: oldDecidedAt });
+
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.select = () => b;
+                b.eq = () => b;
+                b.in = () => b;
+                b.order = () => b;
+                b.then = (resolve: (v: unknown) => void) =>
+                    Promise.resolve({ data: [row], error: null }).then(resolve);
+                return b;
+            },
+        });
+
+        const result = await dbGetActiveRecommendationsForEntities("product", ["prod-1"], "purchase_suggestion");
+        expect(result).toHaveLength(0);
+    });
+});
+
+describe("dbGetActiveRecommendationsForEntities — suggested row is always active regardless of age", () => {
+    it("includes suggested row created 10 days ago", async () => {
+        const oldCreatedAt = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+        const row = makeRow({ status: "suggested", created_at: oldCreatedAt, decided_at: null });
+
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.select = () => b;
+                b.eq = () => b;
+                b.in = () => b;
+                b.order = () => b;
+                b.then = (resolve: (v: unknown) => void) =>
+                    Promise.resolve({ data: [row], error: null }).then(resolve);
+                return b;
+            },
+        });
+
+        const result = await dbGetActiveRecommendationsForEntities("product", ["prod-1"], "purchase_suggestion");
+        // suggested is always "active" (TTL expiry is handled by dbExpireStaleRecommendations,
+        // which runs at route start before this query)
+        expect(result).toHaveLength(1);
     });
 });
