@@ -31,6 +31,12 @@ interface RiskItem {
     aiConfidence: number | null;
 }
 
+interface RiskRecEntry {
+    id: string;
+    status: string;
+    decidedAt?: string | null;
+}
+
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -100,6 +106,9 @@ export default function ProductsPage() {
     const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
     const [riskGeneratedAt, setRiskGeneratedAt] = useState<string | null>(null);
     const [aiDrawerProductId, setAiDrawerProductId] = useState<string | null>(null);
+    const [recMap, setRecMap] = useState<Map<string, RiskRecEntry>>(new Map());
+    const [rejectMode, setRejectMode] = useState(false);
+    const [rejectNote, setRejectNote] = useState("");
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
@@ -125,6 +134,13 @@ export default function ProductsPage() {
                 });
                 setAiAvailable(data.ai_available ?? null);
                 setRiskGeneratedAt(data.generatedAt ?? null);
+                const recMapData = new Map<string, RiskRecEntry>();
+                for (const rec of data.recommendations ?? []) {
+                    if (rec.recommendationId) {
+                        recMapData.set(rec.productId, { id: rec.recommendationId, status: rec.status, decidedAt: rec.decidedAt ?? null });
+                    }
+                }
+                setRecMap(recMapData);
             } catch { /* graceful: risk data missing = no badges */ }
             finally { if (!cancelled) setRiskLoading(false); }
         }
@@ -181,6 +197,44 @@ export default function ProductsPage() {
         } finally {
             setCreateSubmitting(false);
         }
+    };
+
+    const handleAccept = async (productId: string) => {
+        const rec = recMap.get(productId);
+        if (!rec || rec.status !== "suggested") return;
+        try {
+            const res = await fetch(`/api/recommendations/${rec.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "accepted" }),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            setRecMap(prev => new Map(prev).set(productId, {
+                id: rec.id,
+                status: data.recommendation.status,
+                decidedAt: data.recommendation.decidedAt ?? null,
+            }));
+        } catch { /* graceful */ }
+    };
+
+    const handleReject = async (productId: string, feedbackNote?: string) => {
+        const rec = recMap.get(productId);
+        if (!rec || rec.status !== "suggested") return;
+        try {
+            const res = await fetch(`/api/recommendations/${rec.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "rejected", feedbackNote }),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            setRecMap(prev => new Map(prev).set(productId, {
+                id: rec.id,
+                status: data.recommendation.status,
+                decidedAt: data.recommendation.decidedAt ?? null,
+            }));
+        } catch { /* graceful */ }
     };
 
     return (
@@ -503,10 +557,15 @@ export default function ProductsPage() {
             {(() => {
                 const drawerRisk = aiDrawerProductId ? riskData.get(aiDrawerProductId) : undefined;
                 const drawerProduct = aiDrawerProductId ? mockProducts.find(p => p.id === aiDrawerProductId) : undefined;
+                const drawerRec = aiDrawerProductId ? recMap.get(aiDrawerProductId) : undefined;
                 return (
                     <AIDetailDrawer
                         open={aiDrawerProductId !== null}
-                        onClose={() => setAiDrawerProductId(null)}
+                        onClose={() => {
+                            setAiDrawerProductId(null);
+                            setRejectMode(false);
+                            setRejectNote("");
+                        }}
                         title="Stok Risk Analizi"
                     >
                         {drawerRisk && drawerProduct ? (
@@ -606,6 +665,67 @@ export default function ProductsPage() {
                                         <div style={{ fontSize: "12px", color: "var(--accent-text)", lineHeight: 1.5 }}>
                                             → {drawerRisk.aiRecommendation}
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* Karar section */}
+                                {drawerRec && (
+                                    <div>
+                                        <div style={{
+                                            fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
+                                            textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
+                                        }}>
+                                            Karar
+                                        </div>
+                                        {drawerRec.status === "suggested" ? (
+                                            rejectMode ? (
+                                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Red nedeni (isteğe bağlı)"
+                                                        value={rejectNote}
+                                                        onChange={e => setRejectNote(e.target.value)}
+                                                        style={{
+                                                            fontSize: "12px", padding: "6px 10px",
+                                                            border: "0.5px solid var(--border-secondary)",
+                                                            borderRadius: "6px",
+                                                            background: "var(--bg-tertiary)",
+                                                            color: "var(--text-primary)", outline: "none",
+                                                        }}
+                                                    />
+                                                    <div style={{ display: "flex", gap: "6px" }}>
+                                                        <Button variant="danger" onClick={() => {
+                                                            handleReject(aiDrawerProductId!, rejectNote || undefined);
+                                                            setRejectMode(false);
+                                                            setRejectNote("");
+                                                        }}>Reddet</Button>
+                                                        <Button variant="secondary" onClick={() => {
+                                                            setRejectMode(false);
+                                                            setRejectNote("");
+                                                        }}>İptal</Button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: "flex", gap: "6px" }}>
+                                                    <Button variant="primary" onClick={() => handleAccept(aiDrawerProductId!)}>Kabul Et</Button>
+                                                    <Button variant="secondary" onClick={() => setRejectMode(true)}>Reddet</Button>
+                                                </div>
+                                            )
+                                        ) : (
+                                            <div style={{ fontSize: "12px" }}>
+                                                <span style={{
+                                                    color: drawerRec.status === "accepted" ? "var(--success-text)" : "var(--danger-text)",
+                                                    fontWeight: 500,
+                                                }}>
+                                                    {drawerRec.status === "accepted" ? "Kabul edildi" : "Reddedildi"}
+                                                </span>
+                                                {drawerRec.decidedAt && (
+                                                    <span style={{ color: "var(--text-tertiary)", marginLeft: "6px" }}>
+                                                        · {new Date(drawerRec.decidedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>

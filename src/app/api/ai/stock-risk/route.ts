@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { dbListProducts } from "@/lib/supabase/products";
 import { computeStockRiskLevel, type StockRiskLevel } from "@/lib/stock-utils";
 import { aiAssessStockRisk, isAIAvailable, type StockRiskItem } from "@/lib/services/ai-service";
+import {
+    dbUpsertRecommendation,
+    dbExpireSuggestedRecommendations,
+    dbExpireStaleRecommendations,
+    dbGetActiveRecommendationsForEntities,
+} from "@/lib/supabase/recommendations";
+import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
 
 interface StockRiskResponseItem {
@@ -17,6 +24,9 @@ interface StockRiskResponseItem {
 }
 
 export async function POST() {
+    // Expire suggested recommendations not acted on after 48 hours.
+    try { await dbExpireStaleRecommendations(48); } catch { /* non-fatal */ }
+
     let products: Awaited<ReturnType<typeof dbListProducts>>;
     try {
         products = await dbListProducts({ is_active: true, pageSize: 500 });
@@ -41,13 +51,42 @@ export async function POST() {
     }));
 
     const atRisk = riskComputations.filter(r => r.computation.riskLevel !== "none");
+    const atRiskIds = atRisk.map(r => r.product.id);
 
-    let aiAvailable = isAIAvailable();
-    let aiAssessments: Array<{ productId: string; explanation: string; recommendation: string; confidence: number }> = [];
+    const aiAvailable = isAIAvailable();
 
-    if (aiAvailable && atRisk.length > 0) {
+    // ── Load existing active recommendations ──────────────────────────────────
+    // Products with an active rec skip AI re-enrichment (stability on refresh).
+    let existingRecMap = new Map<string, AiRecommendationRow>();
+    try {
+        if (atRiskIds.length > 0) {
+            const existingRecs = await dbGetActiveRecommendationsForEntities(
+                "product",
+                atRiskIds,
+                "stock_risk"
+            );
+            existingRecMap = new Map(existingRecs.map(r => [r.entity_id, r]));
+        }
+    } catch {
+        // Non-fatal: if we can't load existing, treat all as needing fresh AI
+    }
+
+    // Split: need fresh AI vs. reuse from DB
+    const needsAiItems = atRisk.filter(r => !existingRecMap.has(r.product.id));
+    const hasExistingItems = atRisk.filter(r => existingRecMap.has(r.product.id));
+
+    // ── AI enrichment: only for products with no active recommendation ────────
+    type AssessmentEntry = {
+        productId: string;
+        explanation: string;
+        recommendation: string;
+        confidence: number;
+    };
+    let freshAssessments: AssessmentEntry[] = [];
+
+    if (aiAvailable && needsAiItems.length > 0) {
         try {
-            const riskItems: StockRiskItem[] = atRisk.map(r => ({
+            const riskItems: StockRiskItem[] = needsAiItems.map(r => ({
                 productId: r.product.id,
                 productName: r.product.name,
                 sku: r.product.sku,
@@ -60,17 +99,42 @@ export async function POST() {
                 deterministicReason: r.computation.reason,
             }));
             const result = await aiAssessStockRisk(riskItems);
-            aiAssessments = result.assessments;
+            freshAssessments = result.assessments;
         } catch {
             // AI error doesn't bring down the route
-            aiAvailable = false;
         }
     }
 
-    const aiMap = new Map(aiAssessments.map(a => [a.productId, a]));
+    const freshAiMap = new Map(freshAssessments.map(a => [a.productId, a]));
+
+    // Build merged AI map: fresh enrichments + content recovered from existing rec metadata
+    const mergedAiMap = new Map<string, {
+        aiExplanation: string | null;
+        aiRecommendation: string | null;
+        aiConfidence: number | null;
+    }>();
+
+    for (const r of needsAiItems) {
+        const ai = freshAiMap.get(r.product.id);
+        mergedAiMap.set(r.product.id, {
+            aiExplanation: ai?.explanation ?? null,
+            aiRecommendation: ai?.recommendation ?? null,
+            aiConfidence: ai?.confidence ?? null,
+        });
+    }
+
+    for (const r of hasExistingItems) {
+        const rec = existingRecMap.get(r.product.id)!;
+        const meta = rec.metadata as Record<string, unknown> | null;
+        mergedAiMap.set(r.product.id, {
+            aiExplanation: (meta?.aiExplanation as string) ?? null,
+            aiRecommendation: (meta?.aiRecommendation as string) ?? null,
+            aiConfidence: rec.confidence ?? null,
+        });
+    }
 
     const items: StockRiskResponseItem[] = atRisk.map(r => {
-        const ai = aiMap.get(r.product.id);
+        const ai = mergedAiMap.get(r.product.id);
         return {
             productId: r.product.id,
             riskLevel: r.computation.riskLevel,
@@ -78,9 +142,9 @@ export async function POST() {
             leadTimeDays: r.computation.leadTimeDays,
             dailyUsage: r.computation.dailyUsage,
             deterministicReason: r.computation.reason,
-            aiExplanation: ai?.explanation ?? null,
-            aiRecommendation: ai?.recommendation ?? null,
-            aiConfidence: ai?.confidence ?? null,
+            aiExplanation: ai?.aiExplanation ?? null,
+            aiRecommendation: ai?.aiRecommendation ?? null,
+            aiConfidence: ai?.aiConfidence ?? null,
         };
     });
 
@@ -88,6 +152,56 @@ export async function POST() {
         p.available_now > Math.ceil(p.min_stock_level * 1.5) &&
         (!p.daily_usage || p.daily_usage <= 0)
     ).length;
+
+    // ── Persist recommendations ───────────────────────────────────────────────
+    const recommendations: Array<{ productId: string; recommendationId: string | null; status: string; decidedAt: string | null }> = [];
+
+    try {
+        // Expire suggestions for products no longer at risk
+        const expirePromise = atRiskIds.length > 0
+            ? dbExpireSuggestedRecommendations("product", atRiskIds, "stock_risk")
+            : Promise.resolve(0);
+
+        // Insert new recommendations only for products without an existing active rec
+        const upsertPromises = needsAiItems.map(async r => {
+            const ai = freshAiMap.get(r.product.id);
+            const severity = r.computation.riskLevel === "coverage_risk" ? "critical" : "warning";
+            try {
+                const rec = await dbUpsertRecommendation({
+                    entity_type: "product",
+                    entity_id: r.product.id,
+                    recommendation_type: "stock_risk",
+                    title: `${r.product.name} — Stok risk uyarısı`,
+                    body: ai?.explanation ?? r.computation.reason,
+                    confidence: ai?.confidence ?? null,
+                    severity,
+                    model_version: aiAvailable ? "stock-risk-v1" : null,
+                    metadata: {
+                        riskLevel: r.computation.riskLevel,
+                        coverageDays: r.computation.coverageDays,
+                        leadTimeDays: r.computation.leadTimeDays,
+                        deterministicReason: r.computation.reason,
+                        aiExplanation: ai?.explanation ?? null,
+                        aiRecommendation: ai?.recommendation ?? null,
+                    },
+                });
+                return { productId: r.product.id, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at };
+            } catch {
+                return { productId: r.product.id, recommendationId: null, status: "error", decidedAt: null };
+            }
+        });
+
+        // Collect existing rec references (no DB write needed)
+        const existingRefs = hasExistingItems.map(r => {
+            const rec = existingRecMap.get(r.product.id)!;
+            return { productId: r.product.id, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at };
+        });
+
+        const [, upsertResults] = await Promise.all([expirePromise, Promise.all(upsertPromises)]);
+        recommendations.push(...upsertResults, ...existingRefs);
+    } catch {
+        // Persistence errors must not affect the main response
+    }
 
     return NextResponse.json({
         ai_available: aiAvailable,
@@ -99,6 +213,7 @@ export async function POST() {
             excluded_no_usage: excludedNoUsage,
         },
         items,
+        recommendations,
         generatedAt: new Date().toISOString(),
     });
 }
