@@ -909,6 +909,48 @@ describe("GET /api/recommendations — returns 500 on DB error", () => {
     });
 });
 
+// ─── GET /api/recommendations/[id] ──────────────────────────────────────────
+
+describe("GET /api/recommendations/[id] — returns recommendation by id", () => {
+    it("returns 200 with mapped recommendation", async () => {
+        const row = makeRow({ decided_at: "2026-01-02T10:00:00Z" });
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.select = () => b;
+                b.eq = () => b;
+                b.single = async () => ({ data: row, error: null });
+                return b;
+            },
+        });
+
+        const { GET } = await import("@/app/api/recommendations/[id]/route");
+        const req = new Request("http://localhost/api/recommendations/rec-1", { method: "GET" });
+        const res = await GET(req as Parameters<typeof GET>[0], { params: Promise.resolve({ id: "rec-1" }) });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.recommendation.id).toBe("rec-1");
+        expect(body.recommendation.decidedAt).toBe("2026-01-02T10:00:00Z");
+    });
+
+    it("returns 404 when not found", async () => {
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.select = () => b;
+                b.eq = () => b;
+                b.single = async () => ({ data: null, error: { message: "Row not found" } });
+                return b;
+            },
+        });
+
+        const { GET } = await import("@/app/api/recommendations/[id]/route");
+        const req = new Request("http://localhost/api/recommendations/rec-999", { method: "GET" });
+        const res = await GET(req as Parameters<typeof GET>[0], { params: Promise.resolve({ id: "rec-999" }) });
+        expect(res.status).toBe(404);
+    });
+});
+
 // ─── dbExpireStaleRecommendations ─────────────────────────────────────────────
 
 describe("dbExpireStaleRecommendations — marks old suggested rows as expired", () => {

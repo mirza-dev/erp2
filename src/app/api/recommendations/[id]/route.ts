@@ -1,8 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbUpdateRecommendationStatus } from "@/lib/supabase/recommendations";
+import { dbGetRecommendationById, dbUpdateRecommendationStatus } from "@/lib/supabase/recommendations";
 import { mapRecommendation } from "@/lib/api-mappers";
 import { handleApiError } from "@/lib/api-error";
 import type { RecommendationStatus } from "@/lib/database.types";
+
+export async function GET(
+    _req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const { id } = await params;
+    try {
+        const row = await dbGetRecommendationById(id);
+        if (!row) {
+            return NextResponse.json({ error: `Recommendation ${id} not found` }, { status: 404 });
+        }
+        return NextResponse.json({ recommendation: mapRecommendation(row) });
+    } catch (err) {
+        return handleApiError(err, "Öneri getirilemedi.");
+    }
+}
 
 const ALLOWED_STATUSES: RecommendationStatus[] = ["accepted", "edited", "rejected"];
 

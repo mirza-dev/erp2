@@ -166,7 +166,7 @@ export async function POST() {
 
     // ── Persist recommendations ───────────────────────────────────────────────
     // Only upsert for products that needed fresh AI. Existing recs are returned as-is.
-    const recommendations: Array<{ productId: string; recommendationId: string | null; status: string }> = [];
+    const recommendations: Array<{ productId: string; recommendationId: string | null; status: string; decidedAt: string | null }> = [];
 
     try {
         // Expire suggestions for products no longer below min stock
@@ -201,16 +201,16 @@ export async function POST() {
                         formula: item.formula,
                     },
                 });
-                return { productId: item.productId, recommendationId: rec.id, status: rec.status };
+                return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at };
             } catch {
-                return { productId: item.productId, recommendationId: null, status: "error" };
+                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null };
             }
         });
 
         // Collect existing rec references (no DB write needed)
         const existingRefs = hasExistingItems.map(item => {
             const rec = existingRecMap.get(item.productId)!;
-            return { productId: item.productId, recommendationId: rec.id, status: rec.status };
+            return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at };
         });
 
         const [, upsertResults] = await Promise.all([expirePromise, Promise.all(upsertPromises)]);

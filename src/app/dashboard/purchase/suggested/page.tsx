@@ -17,6 +17,7 @@ interface AiEnrichmentItem {
 interface RecEntry {
     id: string;
     status: string;
+    decidedAt?: string | null;
 }
 
 /** Compact AI signal button — click to open drawer */
@@ -257,6 +258,10 @@ function RecActionCell({
 
     const status = recEntry?.status ?? "no_rec";
 
+    const decidedTime = recEntry?.decidedAt
+        ? new Date(recEntry.decidedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+        : null;
+
     if (status === "accepted") {
         return (
             <span style={{
@@ -264,7 +269,7 @@ function RecActionCell({
                 background: "var(--success-bg)", color: "var(--success-text)",
                 border: "0.5px solid var(--success-border)",
             }}>
-                ✓ Kabul Edildi
+                ✓ Kabul Edildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
             </span>
         );
     }
@@ -277,7 +282,7 @@ function RecActionCell({
                 background: "var(--accent-bg)", color: "var(--accent-text)",
                 border: "0.5px solid var(--accent-border)",
             }}>
-                ✎ Düzenlendi{editedQty != null ? `: ${editedQty} ${unit}` : ""}
+                ✎ Düzenlendi{editedQty != null ? `: ${editedQty} ${unit}` : ""}{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
             </span>
         );
     }
@@ -288,7 +293,7 @@ function RecActionCell({
                 fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
                 color: "var(--danger-text)",
             }}>
-                ✕ Reddedildi
+                ✕ Reddedildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
             </span>
         );
     }
@@ -440,7 +445,7 @@ export default function PurchaseSuggestedPage() {
     const [aiData, setAiData] = useState<{
         ai_available: boolean;
         items: AiEnrichmentItem[];
-        recommendations?: Array<{ productId: string; recommendationId: string | null; status: string }>;
+        recommendations?: Array<{ productId: string; recommendationId: string | null; status: string; decidedAt?: string | null }>;
         generatedAt?: string;
     } | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
@@ -475,7 +480,7 @@ export default function PurchaseSuggestedPage() {
                         const newMap = new Map<string, RecEntry & { editedQty?: number }>();
                         for (const r of data.recommendations) {
                             if (r.recommendationId) {
-                                newMap.set(r.productId, { id: r.recommendationId, status: r.status });
+                                newMap.set(r.productId, { id: r.recommendationId, status: r.status, decidedAt: r.decidedAt ?? null });
                             }
                         }
                         setRecMap(newMap);
@@ -503,14 +508,17 @@ export default function PurchaseSuggestedPage() {
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
-        // Optimistic
-        setRecMap(m => new Map(m).set(productId, { ...rec, status: "accepted" }));
+        setRecMap(m => new Map(m).set(productId, { ...rec, status: "accepted", decidedAt: new Date().toISOString() }));
         try {
-            await fetch(`/api/recommendations/${rec.id}`, {
+            const res = await fetch(`/api/recommendations/${rec.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "accepted" }),
             });
+            if (res.ok) {
+                const { recommendation } = await res.json();
+                setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, decidedAt: recommendation.decidedAt }));
+            }
         } catch {
             setRecMap(m => new Map(m).set(productId, prev));
         }
@@ -520,9 +528,9 @@ export default function PurchaseSuggestedPage() {
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
-        setRecMap(m => new Map(m).set(productId, { ...rec, status: "rejected" }));
+        setRecMap(m => new Map(m).set(productId, { ...rec, status: "rejected", decidedAt: new Date().toISOString() }));
         try {
-            await fetch(`/api/recommendations/${rec.id}`, {
+            const res = await fetch(`/api/recommendations/${rec.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -530,6 +538,10 @@ export default function PurchaseSuggestedPage() {
                     ...(feedbackNote ? { feedbackNote } : {}),
                 }),
             });
+            if (res.ok) {
+                const { recommendation } = await res.json();
+                setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, decidedAt: recommendation.decidedAt }));
+            }
         } catch {
             setRecMap(m => new Map(m).set(productId, prev));
         }
@@ -539,13 +551,17 @@ export default function PurchaseSuggestedPage() {
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
-        setRecMap(m => new Map(m).set(productId, { ...rec, status: "edited", editedQty: qty }));
+        setRecMap(m => new Map(m).set(productId, { ...rec, status: "edited", editedQty: qty, decidedAt: new Date().toISOString() }));
         try {
-            await fetch(`/api/recommendations/${rec.id}`, {
+            const res = await fetch(`/api/recommendations/${rec.id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "edited", editedMetadata: { suggestQty: qty } }),
             });
+            if (res.ok) {
+                const { recommendation } = await res.json();
+                setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, editedQty: qty, decidedAt: recommendation.decidedAt }));
+            }
         } catch {
             setRecMap(m => new Map(m).set(productId, prev));
         }
