@@ -48,6 +48,19 @@ export function mapProduct(row: ProductWithStock): Product {
     preferredVendor: row.preferred_vendor ?? undefined,
     dailyUsage: row.daily_usage ?? undefined,
     leadTimeDays: row.lead_time_days ?? undefined,
+    productFamily: row.product_family ?? undefined,
+    subCategory: row.sub_category ?? undefined,
+    sectorCompatibility: row.sector_compatibility ?? undefined,
+    costPrice: row.cost_price ?? undefined,
+    weightKg: row.weight_kg ?? undefined,
+    materialQuality: row.material_quality ?? undefined,
+    originCountry: row.origin_country ?? undefined,
+    productionSite: row.production_site ?? undefined,
+    useCases: row.use_cases ?? undefined,
+    industries: row.industries ?? undefined,
+    standards: row.standards ?? undefined,
+    certifications: row.certifications ?? undefined,
+    productNotes: row.product_notes ?? undefined,
   };
 }
 

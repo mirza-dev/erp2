@@ -76,6 +76,14 @@ export interface ProductRow {
     sector_compatibility: string | null
     cost_price: number | null
     weight_kg: number | null
+    material_quality: string | null
+    origin_country: string | null
+    production_site: string | null
+    use_cases: string | null
+    industries: string | null
+    standards: string | null
+    certifications: string | null
+    product_notes: string | null
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */

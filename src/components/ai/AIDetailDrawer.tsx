@@ -6,18 +6,21 @@ interface AIDetailDrawerProps {
     open: boolean;
     onClose: () => void;
     title?: string;
+    /** Set to false to hide the "✦ AI" header badge. Default: true. */
+    showAiBadge?: boolean;
     children: React.ReactNode;
 }
 
 /**
- * Generic AI detail drawer — slides in from right.
+ * Generic detail drawer — slides in from right.
  * Handles: ESC key, backdrop click, focus management (store → restore).
- * Used by: products, purchase/suggested, orders/[id]
+ * Used by: products (product detail), purchase/suggested, orders/[id]
  */
 export default function AIDetailDrawer({
     open,
     onClose,
     title = "AI Analizi",
+    showAiBadge = true,
     children,
 }: AIDetailDrawerProps) {
     const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -106,20 +109,22 @@ export default function AIDetailDrawer({
                     }}
                 >
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span
-                            style={{
-                                fontSize: "9px",
-                                fontWeight: 700,
-                                letterSpacing: "0.06em",
-                                textTransform: "uppercase",
-                                background: "var(--accent-bg)",
-                                color: "var(--accent-text)",
-                                padding: "2px 6px",
-                                borderRadius: "3px",
-                            }}
-                        >
-                            ✦ AI
-                        </span>
+                        {showAiBadge && (
+                            <span
+                                style={{
+                                    fontSize: "9px",
+                                    fontWeight: 700,
+                                    letterSpacing: "0.06em",
+                                    textTransform: "uppercase",
+                                    background: "var(--accent-bg)",
+                                    color: "var(--accent-text)",
+                                    padding: "2px 6px",
+                                    borderRadius: "3px",
+                                }}
+                            >
+                                ✦ AI
+                            </span>
+                        )}
                         <span
                             style={{
                                 fontSize: "14px",

@@ -37,6 +37,34 @@ interface RiskRecEntry {
     decidedAt?: string | null;
 }
 
+interface AlertItem {
+    id: string;
+    title: string;
+    description: string | null;
+    type: string;
+    severity: "critical" | "warning" | "info";
+}
+
+function coverageDaysColor(days: number | null): string {
+    if (days === null) return "var(--text-tertiary)";
+    if (days < 7) return "var(--danger-text)";
+    if (days < 14) return "var(--warning-text)";
+    return "var(--success-text)";
+}
+
+function IdField({ label, value }: { label: string; value: string | undefined | null }) {
+    if (!value) return null;
+    return (
+        <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "90px", flexShrink: 0 }}>
+                {label}
+            </span>
+            <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                {value}
+            </span>
+        </div>
+    );
+}
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -91,10 +119,15 @@ export default function ProductsPage() {
         name: string; sku: string; category: string; unit: string;
         price: number; currency: string; on_hand: number; minStockLevel: number;
         productType: "finished" | "raw_material"; warehouse: string;
+        materialQuality: string; originCountry: string; productionSite: string;
+        useCases: string; industries: string; standards: string;
+        certifications: string; productNotes: string;
     }>({
         name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
         price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
         productType: "finished", warehouse: "Sevkiyat Deposu",
+        materialQuality: "", originCountry: "", productionSite: "",
+        useCases: "", industries: "", standards: "", certifications: "", productNotes: "",
     });
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [windowWidth, setWindowWidth] = useState<number>(
@@ -105,10 +138,12 @@ export default function ProductsPage() {
     const [riskCounts, setRiskCounts] = useState<{ at_risk: number; excluded_no_usage?: number } | null>(null);
     const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
     const [riskGeneratedAt, setRiskGeneratedAt] = useState<string | null>(null);
-    const [aiDrawerProductId, setAiDrawerProductId] = useState<string | null>(null);
+    const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [recMap, setRecMap] = useState<Map<string, RiskRecEntry>>(new Map());
     const [rejectMode, setRejectMode] = useState(false);
     const [rejectNote, setRejectNote] = useState("");
+    const [drawerAlerts, setDrawerAlerts] = useState<AlertItem[]>([]);
+    const [drawerAlertsLoading, setDrawerAlertsLoading] = useState(false);
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
@@ -147,6 +182,19 @@ export default function ProductsPage() {
         fetchRisk();
         return () => { cancelled = true; };
     }, []);
+
+    // Fetch active alerts for the selected product whenever drawer opens
+    useEffect(() => {
+        if (!selectedProductId) { setDrawerAlerts([]); return; }
+        let cancelled = false;
+        setDrawerAlertsLoading(true);
+        fetch(`/api/alerts?entity_type=product&entity_id=${selectedProductId}&status=open`)
+            .then(r => r.ok ? r.json() : [])
+            .then(data => { if (!cancelled) setDrawerAlerts(Array.isArray(data) ? data : []); })
+            .catch(() => { if (!cancelled) setDrawerAlerts([]); })
+            .finally(() => { if (!cancelled) setDrawerAlertsLoading(false); });
+        return () => { cancelled = true; };
+    }, [selectedProductId]);
 
     const isMobile = windowWidth < 768;
 
@@ -189,6 +237,8 @@ export default function ProductsPage() {
                 name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
                 price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
                 productType: "finished" as const, warehouse: "Sevkiyat Deposu",
+                materialQuality: "", originCountry: "", productionSite: "",
+                useCases: "", industries: "", standards: "", certifications: "", productNotes: "",
             });
             toast({ type: "success", message: `${createForm.name} ürün olarak eklendi` });
         } catch (err) {
@@ -369,9 +419,8 @@ export default function ProductsPage() {
                             <th style={thStyle}>SKU</th>
                             <th style={thStyle}>Ürün Adı</th>
                             <th style={thStyle}>Kategori</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Fiyat</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Stok</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Rezerve</th>
+                            <th style={{ ...thStyle, textAlign: "right" }}>Stok / Min</th>
+                            <th style={{ ...thStyle, textAlign: "right" }}>Kapsam</th>
                             <th style={{ ...thStyle, textAlign: "right" }}>Satılabilir</th>
                             <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
                             <th style={{ ...thStyle, width: "120px" }}></th>
@@ -384,7 +433,17 @@ export default function ProductsPage() {
                             return (
                                 <tr
                                     key={product.id}
+                                    tabIndex={0}
+                                    role="button"
+                                    aria-label={`${product.name} detayını gör`}
                                     style={{ cursor: "pointer" }}
+                                    onClick={() => setSelectedProductId(product.id)}
+                                    onKeyDown={e => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setSelectedProductId(product.id);
+                                        }
+                                    }}
                                     onMouseEnter={(e) => {
                                         e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "var(--bg-secondary)"));
                                     }}
@@ -401,14 +460,15 @@ export default function ProductsPage() {
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
                                         {product.category}
                                     </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
-                                        {formatCurrency(product.price, product.currency)}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
+                                    <td style={{
+                                        ...tdStyle, textAlign: "right", fontWeight: 500,
+                                        color: product.on_hand <= product.minStockLevel ? "var(--danger-text)" : "var(--text-primary)",
+                                    }}>
                                         {formatNumber(product.on_hand)}
+                                        <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}> / {formatNumber(product.minStockLevel)}</span>
                                     </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", color: "var(--warning-text)" }}>
-                                        {formatNumber(product.reserved)}
+                                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: coverageDaysColor(risk?.coverageDays ?? null) }}>
+                                        {risk?.coverageDays != null ? `${risk.coverageDays}g` : <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>—</span>}
                                     </td>
                                     <td
                                         style={{
@@ -422,48 +482,14 @@ export default function ProductsPage() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center" }}>
                                         <span className={`badge ${status.cls}`}>{status.label}</span>
-                                        {risk && (
-                                            <div style={{ marginTop: "4px" }}>
-                                                {/* Deterministic reason — always visible */}
-                                                {!risk.aiExplanation && risk.deterministicReason && (
-                                                    <div style={{
-                                                        fontSize: "11px",
-                                                        color: "var(--text-secondary)",
-                                                        lineHeight: 1.4,
-                                                        whiteSpace: "normal",
-                                                        maxWidth: "160px",
-                                                        margin: "0 auto",
-                                                    }}>
-                                                        {risk.deterministicReason}
-                                                    </div>
-                                                )}
-                                                {/* AI signal — compact, click to open drawer */}
-                                                {risk.aiExplanation && (
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setAiDrawerProductId(product.id); }}
-                                                        aria-label="AI önerisi detaylarını gör"
-                                                        style={{
-                                                            background: "var(--accent-bg)",
-                                                            color: "var(--accent-text)",
-                                                            border: "0.5px solid var(--accent-border)",
-                                                            borderRadius: "4px",
-                                                            padding: "2px 7px",
-                                                            fontSize: "10px",
-                                                            fontWeight: 600,
-                                                            cursor: "pointer",
-                                                            display: "inline-flex",
-                                                            alignItems: "center",
-                                                            gap: "4px",
-                                                            marginTop: "2px",
-                                                        }}
-                                                    >
-                                                        <span>✦ AI</span>
-                                                        {risk.aiConfidence != null && (
-                                                            <span>%{Math.round(risk.aiConfidence * 100)}</span>
-                                                        )}
-                                                        <span style={{ opacity: 0.7 }}>→</span>
-                                                    </button>
-                                                )}
+                                        {risk?.aiConfidence != null && (
+                                            <div style={{ marginTop: "3px" }}>
+                                                <span style={{
+                                                    fontSize: "10px", color: "var(--accent-text)",
+                                                    fontWeight: 600,
+                                                }}>
+                                                    ✦ AI %{Math.round(risk.aiConfidence * 100)}
+                                                </span>
                                             </div>
                                         )}
                                     </td>
@@ -542,198 +568,369 @@ export default function ProductsPage() {
                         color: "var(--text-tertiary)",
                         fontSize: "13px",
                     }}>
-                        <div style={{ fontSize: "28px", marginBottom: "8px" }}>📦</div>
                         <div style={{ fontWeight: 500, color: "var(--text-secondary)", marginBottom: "4px" }}>
                             Ürün bulunamadı
                         </div>
                         <div style={{ fontSize: "12px" }}>
-                            {search ? `"${search}" ile eşleşen ürün yok` : `"${activeCategory}" kategorisinde ürün yok`}
+                            {search ? `"${search}" ile eşleşen ürün yok` : `"${activeCategory}" kategorisinde kayıtlı ürün yok`}
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* AI Detail Drawer */}
+            {/* Product Drawer */}
             {(() => {
-                const drawerRisk = aiDrawerProductId ? riskData.get(aiDrawerProductId) : undefined;
-                const drawerProduct = aiDrawerProductId ? mockProducts.find(p => p.id === aiDrawerProductId) : undefined;
-                const drawerRec = aiDrawerProductId ? recMap.get(aiDrawerProductId) : undefined;
+                const product = selectedProductId ? mockProducts.find(p => p.id === selectedProductId) : undefined;
+                const risk = selectedProductId ? riskData.get(selectedProductId) : undefined;
+                const drawerRec = selectedProductId ? recMap.get(selectedProductId) : undefined;
+
+                const alertSeverityColor = (sev: string) =>
+                    sev === "critical" ? "var(--danger-text)" : sev === "warning" ? "var(--warning-text)" : "var(--accent-text)";
+                const alertSeverityBg = (sev: string) =>
+                    sev === "critical" ? "var(--danger-bg)" : sev === "warning" ? "var(--warning-bg)" : "var(--accent-bg)";
+                const alertSeverityBorder = (sev: string) =>
+                    sev === "critical" ? "var(--danger-border)" : sev === "warning" ? "var(--warning-border)" : "var(--accent-border)";
+                const alertSeverityLabel = (sev: string) =>
+                    sev === "critical" ? "KRİTİK" : sev === "warning" ? "UYARI" : "BİLGİ";
+
+                const sectionLabel = (text: string) => (
+                    <div style={{
+                        fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)",
+                        textTransform: "uppercase", letterSpacing: "0.06em",
+                        marginBottom: "10px",
+                        paddingBottom: "6px",
+                        borderBottom: "0.5px solid var(--border-tertiary)",
+                    }}>
+                        {text}
+                    </div>
+                );
+
                 return (
                     <AIDetailDrawer
-                        open={aiDrawerProductId !== null}
+                        open={selectedProductId !== null}
                         onClose={() => {
-                            setAiDrawerProductId(null);
+                            setSelectedProductId(null);
                             setRejectMode(false);
                             setRejectNote("");
                         }}
-                        title="Stok Risk Analizi"
+                        title={product?.name ?? "Ürün Detayı"}
+                        showAiBadge={false}
                     >
-                        {drawerRisk && drawerProduct ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                                {/* Product name */}
+                        {product ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+
+                                {/* ── Block 1: Ürün Kimliği ─────────────────────── */}
                                 <div>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                                        {drawerProduct.name}
+                                    {sectionLabel("Ürün Kimliği")}
+
+                                    {/* Name + type badge */}
+                                    <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "4px" }}>
+                                        <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
+                                            {product.name}
+                                        </div>
+                                        <span style={{
+                                            fontSize: "10px", fontWeight: 600, padding: "2px 7px",
+                                            borderRadius: "4px", flexShrink: 0, marginTop: "2px",
+                                            background: product.productType === "finished" ? "var(--accent-bg)" : "var(--bg-tertiary)",
+                                            color: product.productType === "finished" ? "var(--accent-text)" : "var(--text-secondary)",
+                                            border: `0.5px solid ${product.productType === "finished" ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                        }}>
+                                            {product.productType === "finished" ? "Mamul" : "Hammadde"}
+                                        </span>
                                     </div>
-                                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontFamily: "monospace", marginTop: "2px" }}>
-                                        {drawerProduct.sku}
+
+                                    {/* SKU */}
+                                    <div style={{ fontFamily: "var(--font-mono)", fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "12px" }}>
+                                        {product.sku}
                                     </div>
+
+                                    {/* Identity fields */}
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                                        <IdField label="Kategori" value={[product.category, product.subCategory].filter(Boolean).join(" / ")} />
+                                        <IdField label="Ürün Ailesi" value={product.productFamily} />
+                                        <IdField label="Sektör" value={product.sectorCompatibility} />
+                                        <IdField label="Sektörler" value={product.industries} />
+                                        <IdField label="Kullanım" value={product.useCases} />
+                                        <IdField label="Malzeme" value={product.materialQuality} />
+                                        <IdField label="Menşei" value={product.originCountry} />
+                                        <IdField label="Üretim Tesisi" value={product.productionSite} />
+                                        <IdField label="Standartlar" value={product.standards} />
+                                        <IdField label="Sertifikalar" value={product.certifications} />
+                                        <IdField label="Birim / Depo" value={[product.unit, product.warehouse].filter(Boolean).join(" · ")} />
+                                        <IdField
+                                            label="Tedarikçi"
+                                            value={[product.preferredVendor, product.leadTimeDays ? `${product.leadTimeDays} gün tedarik` : null].filter(Boolean).join(" · ")}
+                                        />
+                                        {product.weightKg && <IdField label="Ağırlık" value={`${product.weightKg} kg`} />}
+                                    </div>
+
+                                    {/* Prices */}
+                                    {(product.price > 0 || product.costPrice) && (
+                                        <div style={{ display: "flex", gap: "16px", marginTop: "10px" }}>
+                                            {product.price > 0 && (
+                                                <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                                    <span style={{ color: "var(--text-tertiary)", marginRight: "4px" }}>Satış</span>
+                                                    <span style={{ fontWeight: 600 }}>{formatCurrency(product.price, product.currency)}</span>
+                                                </div>
+                                            )}
+                                            {product.costPrice && (
+                                                <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                                    <span style={{ color: "var(--text-tertiary)", marginRight: "4px" }}>Maliyet</span>
+                                                    <span style={{ fontWeight: 600 }}>{formatCurrency(product.costPrice, product.currency)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Notes */}
+                                    {product.productNotes && (
+                                        <div style={{
+                                            marginTop: "10px", padding: "8px 10px",
+                                            background: "var(--bg-secondary)", borderRadius: "5px",
+                                            border: "0.5px solid var(--border-tertiary)",
+                                            fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5,
+                                        }}>
+                                            {product.productNotes}
+                                        </div>
+                                    )}
                                 </div>
 
-                                {/* Deterministic section */}
-                                <div style={{
-                                    padding: "12px 14px",
-                                    background: "var(--bg-secondary)",
-                                    borderRadius: "6px",
-                                    border: "0.5px solid var(--border-tertiary)",
-                                }}>
-                                    <div style={{
-                                        fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
-                                        textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
-                                    }}>
-                                        Deterministik Analiz
-                                    </div>
-                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                                        {drawerRisk.deterministicReason || "Günlük kullanım verisi hesaplanamıyor"}
-                                    </div>
-                                    <div style={{ display: "flex", gap: "16px", marginTop: "10px", flexWrap: "wrap" }}>
-                                        {drawerRisk.coverageDays != null && (
-                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-                                                <span style={{ color: "var(--text-tertiary)" }}>Kapsam:</span>{" "}
-                                                <span style={{ fontWeight: 600 }}>{drawerRisk.coverageDays} gün</span>
-                                            </div>
-                                        )}
-                                        {drawerRisk.leadTimeDays != null && (
-                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-                                                <span style={{ color: "var(--text-tertiary)" }}>Tedarik:</span>{" "}
-                                                <span style={{ fontWeight: 600 }}>{drawerRisk.leadTimeDays} gün</span>
-                                            </div>
-                                        )}
-                                        {drawerRisk.dailyUsage != null && (
-                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
-                                                <span style={{ color: "var(--text-tertiary)" }}>Günlük:</span>{" "}
-                                                <span style={{ fontWeight: 600 }}>{drawerRisk.dailyUsage}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                {/* ── Block 2: Operasyonel Durum ───────────────── */}
+                                <div>
+                                    {sectionLabel("Operasyonel Durum")}
 
-                                {/* AI explanation */}
-                                {drawerRisk.aiExplanation && (
-                                    <div>
-                                        <div style={{
-                                            fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
-                                            textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
-                                            display: "flex", alignItems: "center", gap: "6px",
-                                        }}>
-                                            <span style={{
-                                                background: "var(--accent-bg)", color: "var(--accent-text)",
-                                                padding: "1px 5px", borderRadius: "3px", fontSize: "9px",
-                                            }}>✦ AI</span>
-                                            Açıklama
-                                        </div>
-                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                                            {drawerRisk.aiExplanation}
-                                        </div>
-                                        {drawerRisk.aiConfidence != null && (
-                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "6px" }}>
-                                                Güven skoru: %{Math.round(drawerRisk.aiConfidence * 100)}
-                                            </div>
-                                        )}
-                                        {riskGeneratedAt && (
-                                            <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                                                Analiz: {new Date(riskGeneratedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* AI recommendation */}
-                                {drawerRisk.aiRecommendation && (
-                                    <div style={{
-                                        padding: "12px 14px",
-                                        background: "var(--accent-bg)",
-                                        borderRadius: "6px",
-                                        border: "0.5px solid var(--accent-border)",
-                                    }}>
-                                        <div style={{
-                                            fontSize: "10px", fontWeight: 600, color: "var(--accent-text)",
-                                            textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px",
-                                        }}>
-                                            Öneri
-                                        </div>
-                                        <div style={{ fontSize: "12px", color: "var(--accent-text)", lineHeight: 1.5 }}>
-                                            → {drawerRisk.aiRecommendation}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Karar section */}
-                                {drawerRec && (
-                                    <div>
-                                        <div style={{
-                                            fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
-                                            textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
-                                        }}>
-                                            Karar
-                                        </div>
-                                        {drawerRec.status === "suggested" ? (
-                                            rejectMode ? (
-                                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Red nedeni (isteğe bağlı)"
-                                                        value={rejectNote}
-                                                        onChange={e => setRejectNote(e.target.value)}
-                                                        style={{
-                                                            fontSize: "12px", padding: "6px 10px",
-                                                            border: "0.5px solid var(--border-secondary)",
-                                                            borderRadius: "6px",
-                                                            background: "var(--bg-tertiary)",
-                                                            color: "var(--text-primary)", outline: "none",
-                                                        }}
-                                                    />
-                                                    <div style={{ display: "flex", gap: "6px" }}>
-                                                        <Button variant="danger" onClick={() => {
-                                                            handleReject(aiDrawerProductId!, rejectNote || undefined);
-                                                            setRejectMode(false);
-                                                            setRejectNote("");
-                                                        }}>Reddet</Button>
-                                                        <Button variant="secondary" onClick={() => {
-                                                            setRejectMode(false);
-                                                            setRejectNote("");
-                                                        }}>İptal</Button>
-                                                    </div>
+                                    {/* 4-cell metric grid */}
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "6px", marginBottom: "12px" }}>
+                                        {[
+                                            { label: "Stokta", value: formatNumber(product.on_hand), color: "var(--text-primary)" },
+                                            { label: "Rezerve", value: formatNumber(product.reserved), color: product.reserved > 0 ? "var(--warning-text)" : "var(--text-tertiary)" },
+                                            { label: "Satılabilir", value: formatNumber(product.available_now), color: product.available_now <= product.minStockLevel ? "var(--danger-text)" : "var(--success-text)" },
+                                            { label: "Minimum", value: formatNumber(product.minStockLevel), color: "var(--text-tertiary)" },
+                                        ].map(cell => (
+                                            <div key={cell.label} style={{
+                                                padding: "8px 6px", background: "var(--bg-secondary)",
+                                                borderRadius: "6px", border: "0.5px solid var(--border-tertiary)",
+                                                textAlign: "center",
+                                            }}>
+                                                <div style={{ fontSize: "16px", fontWeight: 700, color: cell.color, lineHeight: 1.2 }}>
+                                                    {cell.value}
                                                 </div>
-                                            ) : (
-                                                <div style={{ display: "flex", gap: "6px" }}>
-                                                    <Button variant="primary" onClick={() => handleAccept(aiDrawerProductId!)}>Kabul Et</Button>
-                                                    <Button variant="secondary" onClick={() => setRejectMode(true)}>Reddet</Button>
+                                                <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                                    {cell.label}
                                                 </div>
-                                            )
-                                        ) : (
-                                            <div style={{ fontSize: "12px" }}>
-                                                <span style={{
-                                                    color: drawerRec.status === "accepted" ? "var(--success-text)" : "var(--danger-text)",
-                                                    fontWeight: 500,
-                                                }}>
-                                                    {drawerRec.status === "accepted" ? "Kabul edildi" : "Reddedildi"}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Coverage days */}
+                                    {risk?.coverageDays != null && (
+                                        <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "8px" }}>
+                                            <span style={{ fontSize: "24px", fontWeight: 700, color: coverageDaysColor(risk.coverageDays), lineHeight: 1 }}>
+                                                {risk.coverageDays}
+                                            </span>
+                                            <span style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>gün kapsam</span>
+                                            {risk.leadTimeDays != null && (
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", marginLeft: "auto" }}>
+                                                    Tedarik: {risk.leadTimeDays} gün
                                                 </span>
-                                                {drawerRec.decidedAt && (
-                                                    <span style={{ color: "var(--text-tertiary)", marginLeft: "6px" }}>
-                                                        · {new Date(drawerRec.decidedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Daily usage */}
+                                    {(product.dailyUsage || risk?.dailyUsage) && (
+                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px" }}>
+                                            <span style={{ color: "var(--text-tertiary)" }}>Günlük kullanım: </span>
+                                            <span style={{ fontWeight: 500 }}>{product.dailyUsage ?? risk?.dailyUsage} {product.unit}/gün</span>
+                                        </div>
+                                    )}
+
+                                    {/* Risk reason block */}
+                                    {risk && (
+                                        <div style={{
+                                            padding: "8px 10px", borderRadius: "5px",
+                                            border: `0.5px solid ${risk.riskLevel === "coverage_risk" ? "var(--danger-border)" : "var(--warning-border)"}`,
+                                            background: risk.riskLevel === "coverage_risk" ? "var(--danger-bg)" : "var(--warning-bg)",
+                                            fontSize: "12px",
+                                            color: risk.riskLevel === "coverage_risk" ? "var(--danger-text)" : "var(--warning-text)",
+                                            lineHeight: 1.5,
+                                        }}>
+                                            {risk.deterministicReason}
+                                        </div>
+                                    )}
+
+                                    {/* No usage data */}
+                                    {!risk && !product.dailyUsage && (
+                                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+                                            Günlük kullanım verisi yok — risk analizi hesaplanamıyor.
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ── Block 3: İlişkiler / Etki ────────────────── */}
+                                <div>
+                                    {sectionLabel("İlişkiler / Etki")}
+
+                                    {/* AI risk analysis */}
+                                    {risk?.aiExplanation && (
+                                        <div style={{ marginBottom: "16px" }}>
+                                            <div style={{
+                                                fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
+                                                textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px",
+                                                display: "flex", alignItems: "center", gap: "6px",
+                                            }}>
+                                                <span style={{
+                                                    background: "var(--accent-bg)", color: "var(--accent-text)",
+                                                    padding: "1px 5px", borderRadius: "3px", fontSize: "9px",
+                                                }}>✦ AI</span>
+                                                Risk Analizi
+                                                {risk.aiConfidence != null && (
+                                                    <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>
+                                                        · %{Math.round(risk.aiConfidence * 100)} güven
                                                     </span>
                                                 )}
                                             </div>
+                                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "8px" }}>
+                                                {risk.aiExplanation}
+                                            </div>
+                                            {risk.aiRecommendation && (
+                                                <div style={{
+                                                    padding: "10px 12px", background: "var(--accent-bg)",
+                                                    borderRadius: "5px", border: "0.5px solid var(--accent-border)",
+                                                    fontSize: "12px", color: "var(--accent-text)", lineHeight: 1.5,
+                                                }}>
+                                                    → {risk.aiRecommendation}
+                                                </div>
+                                            )}
+                                            {riskGeneratedAt && (
+                                                <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                                                    Analiz: {new Date(riskGeneratedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* AI recommendation decision */}
+                                    {drawerRec && (
+                                        <div style={{ marginBottom: "16px" }}>
+                                            <div style={{
+                                                fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
+                                                textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
+                                            }}>
+                                                AI Öneri Kararı
+                                            </div>
+                                            {drawerRec.status === "suggested" ? (
+                                                rejectMode ? (
+                                                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="Red nedeni (isteğe bağlı)"
+                                                            value={rejectNote}
+                                                            onChange={e => setRejectNote(e.target.value)}
+                                                            style={{
+                                                                fontSize: "12px", padding: "6px 10px",
+                                                                border: "0.5px solid var(--border-secondary)",
+                                                                borderRadius: "6px",
+                                                                background: "var(--bg-tertiary)",
+                                                                color: "var(--text-primary)", outline: "none",
+                                                                width: "100%",
+                                                            }}
+                                                        />
+                                                        <div style={{ display: "flex", gap: "6px" }}>
+                                                            <Button variant="danger" onClick={() => {
+                                                                handleReject(selectedProductId!, rejectNote || undefined);
+                                                                setRejectMode(false);
+                                                                setRejectNote("");
+                                                            }}>Reddet</Button>
+                                                            <Button variant="secondary" onClick={() => {
+                                                                setRejectMode(false);
+                                                                setRejectNote("");
+                                                            }}>İptal</Button>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ display: "flex", gap: "6px" }}>
+                                                        <Button variant="primary" onClick={() => handleAccept(selectedProductId!)}>Kabul Et</Button>
+                                                        <Button variant="secondary" onClick={() => setRejectMode(true)}>Reddet</Button>
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <div style={{ fontSize: "12px" }}>
+                                                    <span style={{
+                                                        color: drawerRec.status === "accepted" ? "var(--success-text)" : "var(--danger-text)",
+                                                        fontWeight: 500,
+                                                    }}>
+                                                        {drawerRec.status === "accepted" ? "Kabul edildi" : "Reddedildi"}
+                                                    </span>
+                                                    {drawerRec.decidedAt && (
+                                                        <span style={{ color: "var(--text-tertiary)", marginLeft: "6px" }}>
+                                                            · {new Date(drawerRec.decidedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Active alerts */}
+                                    <div>
+                                        <div style={{
+                                            fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
+                                            textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
+                                        }}>
+                                            Aktif Uyarılar
+                                        </div>
+                                        {drawerAlertsLoading ? (
+                                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+                                                Yükleniyor…
+                                            </div>
+                                        ) : drawerAlerts.length > 0 ? (
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                                {drawerAlerts.map(alert => (
+                                                    <div key={alert.id} style={{
+                                                        padding: "8px 10px", background: "var(--bg-secondary)",
+                                                        borderRadius: "5px", border: "0.5px solid var(--border-tertiary)",
+                                                        display: "flex", gap: "8px", alignItems: "flex-start",
+                                                    }}>
+                                                        <span style={{
+                                                            fontSize: "9px", fontWeight: 700, padding: "2px 5px",
+                                                            borderRadius: "3px", flexShrink: 0,
+                                                            background: alertSeverityBg(alert.severity),
+                                                            color: alertSeverityColor(alert.severity),
+                                                            border: `0.5px solid ${alertSeverityBorder(alert.severity)}`,
+                                                            textTransform: "uppercase", letterSpacing: "0.04em",
+                                                        }}>
+                                                            {alertSeverityLabel(alert.severity)}
+                                                        </span>
+                                                        <div>
+                                                            <div style={{ fontSize: "12px", color: "var(--text-primary)", fontWeight: 500, lineHeight: 1.3 }}>
+                                                                {alert.title}
+                                                            </div>
+                                                            {alert.description && (
+                                                                <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px", lineHeight: 1.4 }}>
+                                                                    {alert.description}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <a href="/dashboard/alerts" style={{
+                                                    fontSize: "11px", color: "var(--accent-text)",
+                                                    textDecoration: "none", fontWeight: 500, marginTop: "2px",
+                                                }}>
+                                                    Tüm uyarılar →
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
+                                                Bu ürün için açık uyarı yok.
+                                            </div>
                                         )}
                                     </div>
-                                )}
+                                </div>
+
                             </div>
-                        ) : (
-                            <div style={{ fontSize: "13px", color: "var(--text-tertiary)", textAlign: "center", paddingTop: "32px" }}>
-                                Şu an aktif AI önerisi yok
-                            </div>
-                        )}
+                        ) : null}
                     </AIDetailDrawer>
                 );
             })()}
@@ -890,6 +1087,94 @@ export default function ProductsPage() {
                                         style={modalInputStyle}
                                         value={createForm.warehouse}
                                         onChange={e => setCreateForm(f => ({ ...f, warehouse: e.target.value }))}
+                                    />
+                                </FormField>
+                            </div>
+
+                            {/* Kimlik Bilgileri — opsiyonel */}
+                            <div style={{
+                                borderTop: "0.5px solid var(--border-tertiary)",
+                                paddingTop: "12px",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "10px",
+                            }}>
+                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                    Kimlik Bilgileri <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(isteğe bağlı)</span>
+                                </div>
+
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                    <FormField label="Malzeme Kalitesi">
+                                        <input
+                                            style={modalInputStyle}
+                                            value={createForm.materialQuality}
+                                            onChange={e => setCreateForm(f => ({ ...f, materialQuality: e.target.value }))}
+                                            placeholder="CF8M, WCB, 316SS..."
+                                        />
+                                    </FormField>
+                                    <FormField label="Menşei Ülke">
+                                        <input
+                                            style={modalInputStyle}
+                                            value={createForm.originCountry}
+                                            onChange={e => setCreateForm(f => ({ ...f, originCountry: e.target.value }))}
+                                            placeholder="Türkiye, İtalya..."
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <FormField label="Üretim Tesisi">
+                                    <input
+                                        style={modalInputStyle}
+                                        value={createForm.productionSite}
+                                        onChange={e => setCreateForm(f => ({ ...f, productionSite: e.target.value }))}
+                                        placeholder="Tesis adı veya şehir"
+                                    />
+                                </FormField>
+
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                    <FormField label="Sektörler">
+                                        <input
+                                            style={modalInputStyle}
+                                            value={createForm.industries}
+                                            onChange={e => setCreateForm(f => ({ ...f, industries: e.target.value }))}
+                                            placeholder="Petrokimya, Denizcilik..."
+                                        />
+                                    </FormField>
+                                    <FormField label="Kullanım Alanları">
+                                        <input
+                                            style={modalInputStyle}
+                                            value={createForm.useCases}
+                                            onChange={e => setCreateForm(f => ({ ...f, useCases: e.target.value }))}
+                                            placeholder="Akış kontrolü, izolasyon..."
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                                    <FormField label="Standartlar">
+                                        <input
+                                            style={modalInputStyle}
+                                            value={createForm.standards}
+                                            onChange={e => setCreateForm(f => ({ ...f, standards: e.target.value }))}
+                                            placeholder="DIN, ANSI, EN..."
+                                        />
+                                    </FormField>
+                                    <FormField label="Sertifikalar">
+                                        <input
+                                            style={modalInputStyle}
+                                            value={createForm.certifications}
+                                            onChange={e => setCreateForm(f => ({ ...f, certifications: e.target.value }))}
+                                            placeholder="ISO 9001, CE, ATEX..."
+                                        />
+                                    </FormField>
+                                </div>
+
+                                <FormField label="Ürün Notları">
+                                    <textarea
+                                        style={{ ...modalInputStyle, minHeight: "60px", resize: "vertical" }}
+                                        value={createForm.productNotes}
+                                        onChange={e => setCreateForm(f => ({ ...f, productNotes: e.target.value }))}
+                                        placeholder="Özel kullanım notları, uyarılar..."
                                     />
                                 </FormField>
                             </div>

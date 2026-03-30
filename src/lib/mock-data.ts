@@ -32,6 +32,19 @@ export interface Product {
     preferredVendor?: string;
     dailyUsage?: number;
     leadTimeDays?: number;
+    productFamily?: string;
+    subCategory?: string;
+    sectorCompatibility?: string;
+    costPrice?: number;
+    weightKg?: number;
+    materialQuality?: string;
+    originCountry?: string;
+    productionSite?: string;
+    useCases?: string;
+    industries?: string;
+    standards?: string;
+    certifications?: string;
+    productNotes?: string;
 }
 
 export interface Customer {

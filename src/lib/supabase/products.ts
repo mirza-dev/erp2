@@ -23,6 +23,14 @@ export interface CreateProductInput {
     sector_compatibility?: string;
     cost_price?: number;
     weight_kg?: number;
+    material_quality?: string;
+    origin_country?: string;
+    production_site?: string;
+    use_cases?: string;
+    industries?: string;
+    standards?: string;
+    certifications?: string;
+    product_notes?: string;
 }
 
 export interface ListProductsFilter {
@@ -104,6 +112,14 @@ export async function dbCreateProduct(input: CreateProductInput): Promise<Produc
             sector_compatibility: input.sector_compatibility ?? null,
             cost_price: input.cost_price ?? null,
             weight_kg: input.weight_kg ?? null,
+            material_quality: input.material_quality ?? null,
+            origin_country: input.origin_country ?? null,
+            production_site: input.production_site ?? null,
+            use_cases: input.use_cases ?? null,
+            industries: input.industries ?? null,
+            standards: input.standards ?? null,
+            certifications: input.certifications ?? null,
+            product_notes: input.product_notes ?? null,
         })
         .select("*")
         .single();
