@@ -81,10 +81,10 @@ export const AI_RISK_PRODUCT: ProductWithStock = {
 };
 
 // ── HEALTHY_PRODUCT ───────────────────────────────────────────
-// available (100) >> thresholds → no risk at all
-// coverageDays = round(100/5) = 20; leadTimeDays = 14 → 20 ≥ 14 → none
+// available (200) >> thresholds → no risk at all
+// coverageDays = round(200/5) = 40; leadTimeDays = 14 → 40 ≥ 14 → none; 40 > 30 → none
 // computeStockRiskLevel → "none"
-// getStatusBadge(100, 10, false) → "Hazır" / badge-success
+// getStatusBadge(200, 10, false) → "Hazır" / badge-success
 // Must NOT appear in route items
 
 export const HEALTHY_PRODUCT: ProductWithStock = {
@@ -95,9 +95,9 @@ export const HEALTHY_PRODUCT: ProductWithStock = {
     unit: "adet",
     price: 100,
     currency: "USD",
-    on_hand: 100,
+    on_hand: 200,
     reserved: 0,
-    available_now: 100,
+    available_now: 200,
     min_stock_level: 10,
     is_active: true,
     product_type: "finished",

@@ -110,9 +110,9 @@ describe("fallbackParseRow — order mapping", () => {
         expect(parsed_data.customer_name).toBe("Acme Vana");
     });
 
-    it("maps musteri_kodu to customer_name", () => {
+    it("maps musteri_kodu to customer_code", () => {
         const { parsed_data } = fallbackParseRow({ musteri_kodu: "MUS-001" }, "order");
-        expect(parsed_data.customer_name).toBe("MUS-001");
+        expect(parsed_data.customer_code).toBe("MUS-001");
     });
 
     it("maps toplam_tutar to grand_total and converts to number", () => {

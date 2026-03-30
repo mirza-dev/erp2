@@ -114,8 +114,8 @@ describe("POST /api/ai/stock-risk — counts computation", () => {
             makeProduct({ id: "p-2", available_now: 14, min_stock_level: 10, daily_usage: 5 }),
             // at-risk: available=20, min=10 → above threshold(15), dailyUsage=3, coverageDays=7, leadTimeDays=14 → coverage_risk
             makeProduct({ id: "p-3", available_now: 20, min_stock_level: 10, daily_usage: 3, lead_time_days: 14 }),
-            // healthy: available=100, min=10, coverageDays=20 > 14 → none
-            makeProduct({ id: "p-4", available_now: 100, min_stock_level: 10, daily_usage: 5 }),
+            // healthy: available=200, min=10, coverageDays=40 > 30 → none
+            makeProduct({ id: "p-4", available_now: 200, min_stock_level: 10, daily_usage: 5 }),
         ]);
         const res = await POST();
         const body = await res.json();
@@ -349,8 +349,8 @@ describe("POST /api/ai/stock-risk — no at-risk products", () => {
     beforeEach(() => {
         mockIsAIAvailable.mockReturnValue(true);
         mockDbListProducts.mockResolvedValue([
-            // healthy: available=100, coverageDays=20 > 14, no leadTimeDays
-            makeProduct({ id: "p-healthy", available_now: 100, min_stock_level: 10, daily_usage: 5 }),
+            // healthy: available=200, coverageDays=40 > 30, no leadTimeDays
+            makeProduct({ id: "p-healthy", available_now: 200, min_stock_level: 10, daily_usage: 5 }),
         ]);
     });
 

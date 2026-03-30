@@ -109,15 +109,15 @@ describe("computeStockRiskLevel — approaching_critical", () => {
 // ─── healthy — no risk ────────────────────────────────────────────────────────
 
 describe("computeStockRiskLevel — healthy, no risk", () => {
-    it("coverageDays > 14 and no leadTimeDays → 'none'", () => {
-        // available=100, dailyUsage=5 → coverageDays = round(100/5) = 20
-        const result = computeStockRiskLevel(100, 10, 5, null);
+    it("coverageDays > 30 and no leadTimeDays → 'none'", () => {
+        // available=200, dailyUsage=5 → coverageDays = round(200/5) = 40
+        const result = computeStockRiskLevel(200, 10, 5, null);
         expect(result.riskLevel).toBe("none");
     });
 
-    it("coverageDays > 14 and coverageDays >= leadTimeDays → 'none'", () => {
-        // coverageDays=20, leadTimeDays=14 → 20 >= 14 (not coverage_risk); 20 > 14 (not approaching)
-        const result = computeStockRiskLevel(100, 10, 5, 14);
+    it("coverageDays > 30 and coverageDays >= leadTimeDays → 'none'", () => {
+        // coverageDays=40, leadTimeDays=14 → 40 >= 14 (not coverage_risk); 40 > 30 (not approaching)
+        const result = computeStockRiskLevel(200, 10, 5, 14);
         expect(result.riskLevel).toBe("none");
     });
 

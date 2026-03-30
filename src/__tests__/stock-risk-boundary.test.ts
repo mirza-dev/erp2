@@ -291,7 +291,7 @@ describe("Data contract — route response shape", () => {
         const res = await POST();
         const body = await res.json();
         expect(Object.keys(body.counts).sort()).toEqual(
-            ["at_risk", "critical", "total_products", "warning"]
+            ["at_risk", "critical", "excluded_no_usage", "total_products", "warning"]
         );
     });
 

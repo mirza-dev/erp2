@@ -19,7 +19,12 @@ const mockDbListDrafts = vi.fn();
 const mockDbUpdateDraft = vi.fn();
 const mockDbCreateCustomer = vi.fn();
 const mockDbFindCustomerByName = vi.fn();
+const mockDbFindCustomerByCode = vi.fn();
+const mockDbLookupEntityAlias = vi.fn();
+const mockDbSaveEntityAlias = vi.fn();
 const mockDbCreateProduct = vi.fn();
+const mockDbFindProductBySku = vi.fn();
+const mockDbUpdateProduct = vi.fn();
 const mockServiceCreateOrder = vi.fn();
 
 vi.mock("@/lib/supabase/import", () => ({
@@ -32,9 +37,16 @@ vi.mock("@/lib/supabase/import", () => ({
 vi.mock("@/lib/supabase/customers", () => ({
     dbCreateCustomer: (...args: unknown[]) => mockDbCreateCustomer(...args),
     dbFindCustomerByName: (...args: unknown[]) => mockDbFindCustomerByName(...args),
+    dbFindCustomerByCode: (...args: unknown[]) => mockDbFindCustomerByCode(...args),
+}));
+vi.mock("@/lib/supabase/entity-aliases", () => ({
+    dbLookupEntityAlias: (...args: unknown[]) => mockDbLookupEntityAlias(...args),
+    dbSaveEntityAlias: (...args: unknown[]) => mockDbSaveEntityAlias(...args),
 }));
 vi.mock("@/lib/supabase/products", () => ({
     dbCreateProduct: (...args: unknown[]) => mockDbCreateProduct(...args),
+    dbFindProductBySku: (...args: unknown[]) => mockDbFindProductBySku(...args),
+    dbUpdateProduct: (...args: unknown[]) => mockDbUpdateProduct(...args),
 }));
 vi.mock("@/lib/services/order-service", () => ({
     serviceCreateOrder: (...args: unknown[]) => mockServiceCreateOrder(...args),
@@ -123,6 +135,9 @@ describe("serviceConfirmBatch — customer merge", () => {
         mockDbGetBatch.mockResolvedValue(makeBatch());
         mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
         mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+        mockDbFindCustomerByCode.mockResolvedValue(null);
+        mockDbLookupEntityAlias.mockResolvedValue(null);
+        mockDbSaveEntityAlias.mockResolvedValue(undefined);
     });
 
     it("calls dbCreateCustomer with fields from parsed_data", async () => {
@@ -184,6 +199,7 @@ describe("serviceConfirmBatch — product merge", () => {
         mockDbGetBatch.mockResolvedValue(makeBatch());
         mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
         mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+        mockDbFindProductBySku.mockResolvedValue(null);
     });
 
     it("skips draft and adds error when sku is missing", async () => {
@@ -340,6 +356,8 @@ describe("serviceConfirmBatch — error isolation", () => {
     beforeEach(() => {
         mockDbGetBatch.mockResolvedValue(makeBatch());
         mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbLookupEntityAlias.mockResolvedValue(null);
+        mockDbSaveEntityAlias.mockResolvedValue(undefined);
     });
 
     it("continues processing remaining drafts when one fails", async () => {
