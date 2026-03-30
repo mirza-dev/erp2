@@ -6,6 +6,7 @@ import { getStatusBadge } from "@/lib/stock-utils";
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 
 const categories = [
     "Tümü",
@@ -97,6 +98,7 @@ export default function ProductsPage() {
     const [riskLoading, setRiskLoading] = useState(false);
     const [riskCounts, setRiskCounts] = useState<{ at_risk: number; excluded_no_usage?: number } | null>(null);
     const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
+    const [aiDrawerProductId, setAiDrawerProductId] = useState<string | null>(null);
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
@@ -365,36 +367,46 @@ export default function ProductsPage() {
                                     <td style={{ ...tdStyle, textAlign: "center" }}>
                                         <span className={`badge ${status.cls}`}>{status.label}</span>
                                         {risk && (
-                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px", whiteSpace: "normal", maxWidth: "160px", margin: "2px auto 0" }}>
-                                                {risk.aiExplanation ? (
-                                                    <>
-                                                        <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "2px" }}>
-                                                            <span style={{
-                                                                fontSize: "9px", fontWeight: 600, letterSpacing: "0.06em",
-                                                                padding: "1px 4px", borderRadius: "3px",
-                                                                background: "var(--accent-bg)", color: "var(--accent-text)",
-                                                            }}>
-                                                                AI Önerisi
-                                                            </span>
-                                                            {risk.aiConfidence != null && (
-                                                                <span style={{ fontSize: "9px", color: "var(--text-tertiary)" }}>
-                                                                    %{Math.round(risk.aiConfidence * 100)}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        {risk.aiExplanation}
-                                                        {risk.aiRecommendation && (
-                                                            <div style={{
-                                                                fontSize: "11px", color: "var(--accent-text)",
-                                                                marginTop: "3px", display: "flex", gap: "4px", alignItems: "flex-start",
-                                                            }}>
-                                                                <span style={{ flexShrink: 0 }}>→</span>
-                                                                <span>{risk.aiRecommendation}</span>
-                                                            </div>
+                                            <div style={{ marginTop: "4px" }}>
+                                                {/* Deterministic reason — always visible */}
+                                                {!risk.aiExplanation && risk.deterministicReason && (
+                                                    <div style={{
+                                                        fontSize: "11px",
+                                                        color: "var(--text-secondary)",
+                                                        lineHeight: 1.4,
+                                                        whiteSpace: "normal",
+                                                        maxWidth: "160px",
+                                                        margin: "0 auto",
+                                                    }}>
+                                                        {risk.deterministicReason}
+                                                    </div>
+                                                )}
+                                                {/* AI signal — compact, click to open drawer */}
+                                                {risk.aiExplanation && (
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setAiDrawerProductId(product.id); }}
+                                                        aria-label="AI önerisi detaylarını gör"
+                                                        style={{
+                                                            background: "var(--accent-bg)",
+                                                            color: "var(--accent-text)",
+                                                            border: "0.5px solid var(--accent-border)",
+                                                            borderRadius: "4px",
+                                                            padding: "2px 7px",
+                                                            fontSize: "10px",
+                                                            fontWeight: 600,
+                                                            cursor: "pointer",
+                                                            display: "inline-flex",
+                                                            alignItems: "center",
+                                                            gap: "4px",
+                                                            marginTop: "2px",
+                                                        }}
+                                                    >
+                                                        <span>✦ AI</span>
+                                                        {risk.aiConfidence != null && (
+                                                            <span>%{Math.round(risk.aiConfidence * 100)}</span>
                                                         )}
-                                                    </>
-                                                ) : (
-                                                    risk.deterministicReason
+                                                        <span style={{ opacity: 0.7 }}>→</span>
+                                                    </button>
                                                 )}
                                             </div>
                                         )}
@@ -484,6 +496,120 @@ export default function ProductsPage() {
                     </div>
                 )}
             </div>
+
+            {/* AI Detail Drawer */}
+            {(() => {
+                const drawerRisk = aiDrawerProductId ? riskData.get(aiDrawerProductId) : undefined;
+                const drawerProduct = aiDrawerProductId ? mockProducts.find(p => p.id === aiDrawerProductId) : undefined;
+                return (
+                    <AIDetailDrawer
+                        open={aiDrawerProductId !== null}
+                        onClose={() => setAiDrawerProductId(null)}
+                        title="Stok Risk Analizi"
+                    >
+                        {drawerRisk && drawerProduct ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                                {/* Product name */}
+                                <div>
+                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                                        {drawerProduct.name}
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontFamily: "monospace", marginTop: "2px" }}>
+                                        {drawerProduct.sku}
+                                    </div>
+                                </div>
+
+                                {/* Deterministic section */}
+                                <div style={{
+                                    padding: "12px 14px",
+                                    background: "var(--bg-secondary)",
+                                    borderRadius: "6px",
+                                    border: "0.5px solid var(--border-tertiary)",
+                                }}>
+                                    <div style={{
+                                        fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
+                                        textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
+                                    }}>
+                                        Deterministik Analiz
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                                        {drawerRisk.deterministicReason || "Günlük kullanım verisi hesaplanamıyor"}
+                                    </div>
+                                    <div style={{ display: "flex", gap: "16px", marginTop: "10px", flexWrap: "wrap" }}>
+                                        {drawerRisk.coverageDays != null && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                                                <span style={{ color: "var(--text-tertiary)" }}>Kapsam:</span>{" "}
+                                                <span style={{ fontWeight: 600 }}>{drawerRisk.coverageDays} gün</span>
+                                            </div>
+                                        )}
+                                        {drawerRisk.leadTimeDays != null && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                                                <span style={{ color: "var(--text-tertiary)" }}>Tedarik:</span>{" "}
+                                                <span style={{ fontWeight: 600 }}>{drawerRisk.leadTimeDays} gün</span>
+                                            </div>
+                                        )}
+                                        {drawerRisk.dailyUsage != null && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                                                <span style={{ color: "var(--text-tertiary)" }}>Günlük:</span>{" "}
+                                                <span style={{ fontWeight: 600 }}>{drawerRisk.dailyUsage}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* AI explanation */}
+                                {drawerRisk.aiExplanation && (
+                                    <div>
+                                        <div style={{
+                                            fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
+                                            textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
+                                            display: "flex", alignItems: "center", gap: "6px",
+                                        }}>
+                                            <span style={{
+                                                background: "var(--accent-bg)", color: "var(--accent-text)",
+                                                padding: "1px 5px", borderRadius: "3px", fontSize: "9px",
+                                            }}>✦ AI</span>
+                                            Açıklama
+                                        </div>
+                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                                            {drawerRisk.aiExplanation}
+                                        </div>
+                                        {drawerRisk.aiConfidence != null && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "6px" }}>
+                                                Güven skoru: %{Math.round(drawerRisk.aiConfidence * 100)}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* AI recommendation */}
+                                {drawerRisk.aiRecommendation && (
+                                    <div style={{
+                                        padding: "12px 14px",
+                                        background: "var(--accent-bg)",
+                                        borderRadius: "6px",
+                                        border: "0.5px solid var(--accent-border)",
+                                    }}>
+                                        <div style={{
+                                            fontSize: "10px", fontWeight: 600, color: "var(--accent-text)",
+                                            textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px",
+                                        }}>
+                                            Öneri
+                                        </div>
+                                        <div style={{ fontSize: "12px", color: "var(--accent-text)", lineHeight: 1.5 }}>
+                                            → {drawerRisk.aiRecommendation}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: "13px", color: "var(--text-tertiary)", textAlign: "center", paddingTop: "32px" }}>
+                                Şu an aktif AI önerisi yok
+                            </div>
+                        )}
+                    </AIDetailDrawer>
+                );
+            })()}
 
             {/* Create Product Modal */}
             {createOpen && (

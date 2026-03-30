@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/lib/data-context";
 import { computeCoverageDays, computeTargetStock, daysColor, daysBg } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
+import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -18,76 +19,52 @@ interface RecEntry {
     status: string;
 }
 
-function AiEnrichmentBadge({ enrichment, loading }: {
+/** Compact AI signal button — click to open drawer */
+function AiSignalButton({ enrichment, loading, onClick }: {
     enrichment: AiEnrichmentItem | undefined;
     loading: boolean;
+    onClick: () => void;
 }) {
     if (loading) {
         return (
-            <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
-                AI analizi yükleniyor...
+            <div style={{ marginTop: "4px", fontSize: "10px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+                AI...
             </div>
         );
     }
-
-    if (!enrichment || (!enrichment.aiWhyNow && !enrichment.aiQuantityRationale)) {
-        return (
-            <div style={{
-                marginTop: "6px",
-                fontSize: "11px",
-                color: "var(--text-tertiary)",
-            }}>
-                AI açıklaması yok
-            </div>
-        );
-    }
+    if (!enrichment) return null;
 
     const urgency = enrichment.aiUrgencyLevel ?? "moderate";
-    const borderColor = urgency === "critical" ? "var(--danger)" : urgency === "high" ? "var(--warning)" : "var(--accent)";
     const urgencyLabel = urgency === "critical" ? "Kritik" : urgency === "high" ? "Yüksek" : "Orta";
     const urgencyBg = urgency === "critical" ? "var(--danger-bg)" : urgency === "high" ? "var(--warning-bg)" : "var(--accent-bg)";
     const urgencyText = urgency === "critical" ? "var(--danger-text)" : urgency === "high" ? "var(--warning-text)" : "var(--accent-text)";
+    const urgencyBorder = urgency === "critical" ? "var(--danger-border)" : urgency === "high" ? "var(--warning-border)" : "var(--accent-border)";
     const confidence = enrichment.aiConfidence != null ? Math.round(enrichment.aiConfidence * 100) : null;
 
     return (
-        <div style={{
-            marginTop: "6px",
-            borderLeft: `3px solid ${borderColor}`,
-            paddingLeft: "8px",
-            paddingTop: "4px",
-            paddingBottom: "4px",
-        }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
-                <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    AI Önerisi
-                </span>
-                <span style={{
-                    fontSize: "10px",
-                    fontWeight: 600,
-                    padding: "1px 5px",
-                    borderRadius: "3px",
-                    background: urgencyBg,
-                    color: urgencyText,
-                }}>
-                    {urgencyLabel}
-                </span>
-                {confidence != null && (
-                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                        Güven: %{confidence}
-                    </span>
-                )}
-            </div>
-            {enrichment.aiWhyNow && (
-                <p style={{ margin: 0, fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                    {enrichment.aiWhyNow}
-                </p>
-            )}
-            {enrichment.aiQuantityRationale && (
-                <p style={{ margin: "3px 0 0", fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
-                    {enrichment.aiQuantityRationale}
-                </p>
-            )}
-        </div>
+        <button
+            onClick={onClick}
+            aria-label="AI analizi detaylarını gör"
+            style={{
+                marginTop: "4px",
+                background: urgencyBg,
+                color: urgencyText,
+                border: `0.5px solid ${urgencyBorder}`,
+                borderRadius: "4px",
+                padding: "2px 7px",
+                fontSize: "10px",
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+            }}
+        >
+            <span>✦ AI</span>
+            <span>{urgencyLabel}</span>
+            {confidence != null && <span style={{ opacity: 0.8 }}>%{confidence}</span>}
+            <span style={{ opacity: 0.6 }}>→</span>
+        </button>
     );
 }
 
@@ -419,6 +396,7 @@ export default function PurchaseSuggestedPage() {
     } | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(false);
+    const [aiDrawerProductId, setAiDrawerProductId] = useState<string | null>(null);
 
     // recMap: productId → { id, status, editedQty? }
     const [recMap, setRecMap] = useState<Map<string, RecEntry & { editedQty?: number }>>(new Map());
@@ -552,6 +530,11 @@ export default function PurchaseSuggestedPage() {
     const mostUrgentDays = mostUrgent
         ? computeCoverageDays(mostUrgent.available_now, mostUrgent.dailyUsage)
         : null;
+
+    const aiDrawerProduct = aiDrawerProductId ? sorted.find(p => p.id === aiDrawerProductId) : undefined;
+    const aiDrawerEnrichment = aiDrawerProductId ? aiMap.get(aiDrawerProductId) : undefined;
+    const aiDrawerRecEntry = aiDrawerProductId ? recMap.get(aiDrawerProductId) : undefined;
+    const aiDrawerSuggestQty = aiDrawerProduct ? computeSuggestion(aiDrawerProduct).suggestQty : 1;
 
     const tabs: { key: FilterType; label: string; count: number }[] = [
         { key: "all", label: "Tümü", count: reorderSuggestions.length },
@@ -787,7 +770,11 @@ export default function PurchaseSuggestedPage() {
                                             {p.sku}
                                         </div>
                                         <WhyBadge daysLeft={daysLeft} urgency={urgency} leadTimeDays={p.leadTimeDays} />
-                                        <AiEnrichmentBadge enrichment={aiMap.get(p.id)} loading={aiLoading} />
+                                        <AiSignalButton
+                                            enrichment={aiMap.get(p.id)}
+                                            loading={aiLoading}
+                                            onClick={() => setAiDrawerProductId(p.id)}
+                                        />
                                     </div>
                                     <div style={{ fontSize: "18px", fontWeight: 700, color: urgency >= 80 ? "var(--danger-text)" : "var(--warning-text)", whiteSpace: "nowrap" }}>
                                         {urgency}%
@@ -841,17 +828,28 @@ export default function PurchaseSuggestedPage() {
                                     <FormulaLabel p={p} formula={formula} leadTimeDemand={leadTimeDemand} />
                                 </div>
 
-                                {/* Action */}
+                                {/* Action — open drawer to decide */}
                                 <div style={{ marginTop: "12px" }}>
-                                    <RecActionCell
-                                        productId={p.id}
-                                        recEntry={recMap.get(p.id)}
-                                        suggestQty={suggestQty}
-                                        unit={p.unit}
-                                        onAccept={handleAccept}
-                                        onReject={handleReject}
-                                        onEdit={handleEdit}
-                                    />
+                                    {(() => {
+                                        const rec = recMap.get(p.id);
+                                        const st = rec?.status ?? "no_rec";
+                                        if (st === "accepted") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--success-bg)", color: "var(--success-text)", border: "0.5px solid var(--success-border)" }}>✓ Kabul Edildi</span>;
+                                        if (st === "rejected") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", color: "var(--danger-text)" }}>✕ Reddedildi</span>;
+                                        if (st === "edited") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--accent-border)" }}>✎ Düzenlendi{(rec as { editedQty?: number })?.editedQty != null ? `: ${(rec as { editedQty?: number }).editedQty} ${p.unit}` : ""}</span>;
+                                        if (!rec) return null;
+                                        return (
+                                            <button
+                                                onClick={() => setAiDrawerProductId(p.id)}
+                                                style={{
+                                                    fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px",
+                                                    background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                    border: "0.5px solid var(--warning-border)", cursor: "pointer",
+                                                }}
+                                            >
+                                                Karar ver →
+                                            </button>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         );
@@ -919,7 +917,11 @@ export default function PurchaseSuggestedPage() {
                                         <td style={{ padding: "10px 12px", maxWidth: "200px" }}>
                                             <div style={{ color: "var(--text-primary)", fontWeight: 500 }}>{p.name}</div>
                                             <WhyBadge daysLeft={daysLeft} urgency={urgency} leadTimeDays={p.leadTimeDays} />
-                                            <AiEnrichmentBadge enrichment={aiMap.get(p.id)} loading={aiLoading} />
+                                            <AiSignalButton
+                                                enrichment={aiMap.get(p.id)}
+                                                loading={aiLoading}
+                                                onClick={() => setAiDrawerProductId(p.id)}
+                                            />
                                         </td>
                                         {/* SKU */}
                                         <td style={{ padding: "10px 12px", fontFamily: "monospace", color: "var(--text-secondary)", fontSize: "12px" }}>
@@ -1013,17 +1015,27 @@ export default function PurchaseSuggestedPage() {
                                                 </span>
                                             )}
                                         </td>
-                                        {/* Karar */}
-                                        <td style={{ padding: "10px 12px" }}>
-                                            <RecActionCell
-                                                productId={p.id}
-                                                recEntry={recEntry}
-                                                suggestQty={suggestQty}
-                                                unit={p.unit}
-                                                onAccept={handleAccept}
-                                                onReject={handleReject}
-                                                onEdit={handleEdit}
-                                            />
+                                        {/* Karar — status only; actions in AI drawer */}
+                                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
+                                            {(() => {
+                                                const st = recEntry?.status ?? "no_rec";
+                                                if (st === "accepted") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--success-bg)", color: "var(--success-text)", border: "0.5px solid var(--success-border)" }}>✓ Kabul</span>;
+                                                if (st === "rejected") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", color: "var(--danger-text)" }}>✕ Red</span>;
+                                                if (st === "edited") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--accent-border)" }}>✎ Düzenlendi</span>;
+                                                if (!recEntry) return <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>—</span>;
+                                                return (
+                                                    <button
+                                                        onClick={() => setAiDrawerProductId(p.id)}
+                                                        style={{
+                                                            fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px",
+                                                            background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                            border: "0.5px solid var(--warning-border)", cursor: "pointer",
+                                                        }}
+                                                    >
+                                                        Karar ver →
+                                                    </button>
+                                                );
+                                            })()}
                                         </td>
                                     </tr>
                                 );
@@ -1032,6 +1044,95 @@ export default function PurchaseSuggestedPage() {
                     </table>
                 </div>
             )}
+
+            {/* AI Detail Drawer — AI analizi + karar aksiyonları */}
+            <AIDetailDrawer
+                open={aiDrawerProductId !== null}
+                onClose={() => setAiDrawerProductId(null)}
+                title="Satın Alma Analizi"
+            >
+                {aiDrawerProduct ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                        {/* Ürün başlığı */}
+                        <div>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                                {aiDrawerProduct.name}
+                            </div>
+                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontFamily: "monospace", marginTop: "2px" }}>
+                                {aiDrawerProduct.sku}
+                            </div>
+                        </div>
+
+                        {/* AI Değerlendirmesi */}
+                        {aiDrawerEnrichment ? (
+                            <div>
+                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                                    <span style={{ background: "var(--accent-bg)", color: "var(--accent-text)", padding: "1px 5px", borderRadius: "3px", fontSize: "9px" }}>✦ AI</span>
+                                    Değerlendirme
+                                </div>
+                                {(() => {
+                                    const urgency = aiDrawerEnrichment.aiUrgencyLevel ?? "moderate";
+                                    const urgencyLabel = urgency === "critical" ? "Kritik" : urgency === "high" ? "Yüksek" : "Orta";
+                                    const urgencyBg = urgency === "critical" ? "var(--danger-bg)" : urgency === "high" ? "var(--warning-bg)" : "var(--accent-bg)";
+                                    const urgencyText = urgency === "critical" ? "var(--danger-text)" : urgency === "high" ? "var(--warning-text)" : "var(--accent-text)";
+                                    const confidence = aiDrawerEnrichment.aiConfidence != null ? Math.round(aiDrawerEnrichment.aiConfidence * 100) : null;
+                                    return (
+                                        <>
+                                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                                                <span style={{ fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px", background: urgencyBg, color: urgencyText }}>
+                                                    {urgencyLabel} Aciliyet
+                                                </span>
+                                                {confidence != null && (
+                                                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                                        Güven: %{confidence}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {aiDrawerEnrichment.aiWhyNow && (
+                                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "8px" }}>
+                                                    {aiDrawerEnrichment.aiWhyNow}
+                                                </div>
+                                            )}
+                                            {aiDrawerEnrichment.aiQuantityRationale && (
+                                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6, padding: "10px 12px", background: "var(--bg-secondary)", borderRadius: "6px", border: "0.5px solid var(--border-tertiary)" }}>
+                                                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", display: "block", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Miktar Gerekçesi</span>
+                                                    {aiDrawerEnrichment.aiQuantityRationale}
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        ) : (
+                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)", padding: "10px 0" }}>
+                                Şu an aktif AI değerlendirmesi yok — deterministik mod
+                            </div>
+                        )}
+
+                        {/* Karar bölümü */}
+                        {aiDrawerRecEntry && (
+                            <div style={{ borderTop: "0.5px solid var(--border-tertiary)", paddingTop: "16px" }}>
+                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>
+                                    Karar
+                                </div>
+                                <RecActionCell
+                                    productId={aiDrawerProduct.id}
+                                    recEntry={aiDrawerRecEntry}
+                                    suggestQty={aiDrawerSuggestQty}
+                                    unit={aiDrawerProduct.unit}
+                                    onAccept={handleAccept}
+                                    onReject={handleReject}
+                                    onEdit={handleEdit}
+                                />
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div style={{ fontSize: "13px", color: "var(--text-tertiary)", textAlign: "center", paddingTop: "32px" }}>
+                        Şu an aktif AI önerisi yok
+                    </div>
+                )}
+            </AIDetailDrawer>
         </div>
     );
 }

@@ -9,6 +9,7 @@ import { mapOrderDetail } from "@/lib/api-mappers";
 import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string; description: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral", description: "Onaya gönderilmedi" },
@@ -149,6 +150,7 @@ export default function OrderDetailPage() {
     const [parasutStatus, setParasutStatus] = useState<ParasutStatus>("idle");
     const [parasutInvoiceId, setParasutInvoiceId] = useState<string | null>(null);
     const [parasutError, setParasutError] = useState<string | null>(null);
+    const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
 
     // Update parasut state when order loads
     useEffect(() => {
@@ -771,36 +773,32 @@ export default function OrderDetailPage() {
                                 </div>
 
                                 {order.aiConfidence != null && order.aiConfidence > 0 ? (
-                                    <>
-                                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "10px" }}>
-                                            Siparişteki eksiklik ve tutarsızlıkları analiz eder — ödeme riski değerlendirmesi değildir
-                                        </div>
-
-                                        <div style={{ marginBottom: "8px" }}>
-                                            <span style={{
-                                                fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px",
-                                                background: riskColors[order.aiRiskLevel ?? "medium"].bg,
-                                                color: riskColors[order.aiRiskLevel ?? "medium"].text,
-                                                border: `0.5px solid ${riskColors[order.aiRiskLevel ?? "medium"].border}`,
-                                            }}>
-                                                İnceleme: {riskLabels[order.aiRiskLevel ?? "medium"]}
-                                            </span>
-                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", marginLeft: "8px" }}>
-                                                Güven: %{Math.round(order.aiConfidence * 100)}
-                                            </span>
-                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "4px" }}>
-                                                {riskDescriptions[order.aiRiskLevel ?? "medium"]}
-                                            </div>
-                                        </div>
-
-                                        {order.aiReason && (
-                                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "8px" }}>
-                                                {order.aiReason}
-                                            </div>
-                                        )}
-                                    </>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                        <span style={{
+                                            fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                                            background: riskColors[order.aiRiskLevel ?? "medium"].bg,
+                                            color: riskColors[order.aiRiskLevel ?? "medium"].text,
+                                            border: `0.5px solid ${riskColors[order.aiRiskLevel ?? "medium"].border}`,
+                                        }}>
+                                            {riskLabels[order.aiRiskLevel ?? "medium"]}
+                                        </span>
+                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                            %{Math.round(order.aiConfidence * 100)} güven
+                                        </span>
+                                        <button
+                                            onClick={() => setAiDrawerOpen(true)}
+                                            style={{
+                                                background: "transparent", border: "none",
+                                                cursor: "pointer", color: "var(--accent-text)",
+                                                fontSize: "11px", padding: 0,
+                                                textDecoration: "underline", textUnderlineOffset: "2px",
+                                            }}
+                                        >
+                                            Detaylar →
+                                        </button>
+                                    </div>
                                 ) : (
-                                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.6 }}>
+                                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
                                         Henüz AI risk değerlendirmesi yapılmadı
                                     </div>
                                 )}
@@ -1015,6 +1013,56 @@ export default function OrderDetailPage() {
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* AI Risk Detail Drawer */}
+            {order && (
+                <AIDetailDrawer
+                    open={aiDrawerOpen}
+                    onClose={() => setAiDrawerOpen(false)}
+                    title="Risk Değerlendirmesi"
+                >
+                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: "16px" }}>
+                        Siparişteki eksiklik ve tutarsızlıkları analiz eder — ödeme riski değerlendirmesi değildir
+                    </div>
+                    {order.aiConfidence != null && order.aiConfidence > 0 ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                            <div>
+                                <span style={{
+                                    fontSize: "13px", fontWeight: 600, padding: "4px 12px", borderRadius: "4px",
+                                    background: riskColors[order.aiRiskLevel ?? "medium"].bg,
+                                    color: riskColors[order.aiRiskLevel ?? "medium"].text,
+                                    border: `0.5px solid ${riskColors[order.aiRiskLevel ?? "medium"].border}`,
+                                }}>
+                                    İnceleme: {riskLabels[order.aiRiskLevel ?? "medium"]}
+                                </span>
+                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "8px" }}>
+                                    {riskDescriptions[order.aiRiskLevel ?? "medium"]}
+                                </div>
+                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                                    Güven: %{Math.round(order.aiConfidence * 100)}
+                                </div>
+                            </div>
+                            {order.aiReason && (
+                                <div style={{
+                                    padding: "12px 14px",
+                                    background: "var(--bg-secondary)",
+                                    borderRadius: "6px",
+                                    border: "0.5px solid var(--border-tertiary)",
+                                    fontSize: "12px",
+                                    color: "var(--text-secondary)",
+                                    lineHeight: 1.6,
+                                }}>
+                                    {order.aiReason}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+                            Henüz AI risk değerlendirmesi yapılmadı
+                        </div>
+                    )}
+                </AIDetailDrawer>
             )}
         </>
     );
