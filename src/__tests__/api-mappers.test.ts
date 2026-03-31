@@ -172,6 +172,16 @@ describe("mapOrderSummary", () => {
     expect(o.itemCount).toBe(2);
     expect(o.createdAt).toBe("2024-01-15T10:00:00Z");
   });
+
+  it("maps customer_id to customerId", () => {
+    const o = mapOrderSummary(base); // customer_id: "c1"
+    expect(o.customerId).toBe("c1");
+  });
+
+  it("maps null customer_id to undefined", () => {
+    const o = mapOrderSummary({ ...base, customer_id: null });
+    expect(o.customerId).toBeUndefined();
+  });
 });
 
 // ── mapOrderSummary — AI fields ───────────────────────────────

@@ -91,6 +91,7 @@ export function mapOrderSummary(row: SalesOrderRow): Order {
   return {
     id: row.id,
     orderNumber: row.order_number,
+    customerId: row.customer_id ?? undefined,
     customerName: row.customer_name,
     commercial_status: row.commercial_status,
     fulfillment_status: row.fulfillment_status,

@@ -67,6 +67,7 @@ export interface Customer {
 export interface Order {
     id: string;
     orderNumber: string;
+    customerId?: string;
     customerName: string;
     commercial_status: "draft" | "pending_approval" | "approved" | "cancelled";
     fulfillment_status: "unallocated" | "partially_allocated" | "allocated" | "partially_shipped" | "shipped";

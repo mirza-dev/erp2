@@ -60,7 +60,9 @@ export default function CustomerDetailPanel({
     if (!customer) return null;
 
     // Dynamic stats from actual orders
-    const customerOrders = orders.filter(o => o.customerName === customer.name);
+    const customerOrders = orders.filter(o =>
+        o.customerId ? o.customerId === customer.id : o.customerName === customer.name
+    );
     const totalOrders = customerOrders.length;
     const totalRevenue = customerOrders.reduce((sum, o) => sum + o.grandTotal, 0);
     const recentOrders = [...customerOrders]
