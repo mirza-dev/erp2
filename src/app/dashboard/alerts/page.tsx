@@ -603,6 +603,79 @@ function ProductRow({ group, onOpenDrawer }: ProductRowProps) {
     );
 }
 
+// ── Drawer helpers ────────────────────────────────────────────
+
+function drawerDetailedReason(group: ProductAlertGroup): string {
+    const types = group.alerts.map((a) => a.type);
+    if (types.includes("order_shortage")) {
+        const shortfall = group.reserved - group.available;
+        return `Onaylı siparişler için ${group.reserved} ${group.unit} rezerve edilmiş, ancak satılabilir stok sadece ${group.available} ${group.unit}. ${shortfall} ${group.unit} karşılanamıyor.`;
+    }
+    if (types.includes("stock_critical")) {
+        return `Mevcut stok (${group.available} ${group.unit}), minimum seviye olan ${group.minStock} ${group.unit} altına düştü. Satılabilir stok kritik sınırı aştı.`;
+    }
+    if (types.includes("stock_risk")) {
+        return `Mevcut stok (${group.available} ${group.unit}), minimum seviyenin (${group.minStock} ${group.unit}) 1.5 katı sınırına yaklaştı. Yakın vadede kritik seviyeye düşme riski var.`;
+    }
+    return `Bu ürün için stok riski tespit edildi. Mevcut: ${group.available} ${group.unit}, minimum: ${group.minStock} ${group.unit}.`;
+}
+
+function drawerDetailedImpact(group: ProductAlertGroup): string {
+    const types = group.alerts.map((a) => a.type);
+    if (types.includes("order_shortage")) {
+        const shortfall = group.reserved - group.available;
+        return `${shortfall} ${group.unit} eksik. Onaylı siparişler tam karşılanamıyor. Teslimatta gecikme veya kısmi sevkiyat riski var.`;
+    }
+    const { coverageDays } = group;
+    if (coverageDays === 0) return "Stok tükendi. Yeni sipariş alınsa da karşılanamaz.";
+    if (coverageDays !== null && coverageDays <= 7) return `Güncel kullanım hızıyla ~${coverageDays} gün içinde stok tükenebilir. Acil tedarik gerekiyor.`;
+    if (coverageDays !== null) return `Güncel kullanım hızıyla ~${coverageDays} günlük stok var. Tedarik planlanmazsa minimum seviye altına düşer.`;
+    return "Stok minimum seviyenin altında. Yeni sipariş alınması durumunda karşılama riski oluşabilir.";
+}
+
+function drawerActionLinks(group: ProductAlertGroup): Array<{ label: string; href: string; primary: boolean }> {
+    const types = group.alerts.map((a) => a.type);
+    if (types.includes("order_shortage")) return [
+        { label: "Siparişleri incele",     href: "/dashboard/orders",              primary: true  },
+        { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: false },
+    ];
+    if (types.includes("stock_critical")) return [
+        { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: true  },
+        { label: "Siparişleri kontrol et", href: "/dashboard/orders",              primary: false },
+    ];
+    return [
+        { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: true  },
+    ];
+}
+
+function drawerRelatedLinks(group: ProductAlertGroup): Array<{ label: string; href: string }> {
+    const types = group.alerts.map((a) => a.type);
+    const links: Array<{ label: string; href: string }> = [
+        { label: "Ürün kartına git",           href: "/dashboard/products" },
+        { label: "Satın alma önerisine git",   href: "/dashboard/purchase/suggested" },
+    ];
+    if (types.includes("order_shortage")) {
+        links.push({ label: "İlgili siparişe git", href: "/dashboard/orders" });
+    }
+    return links;
+}
+
+// ── DrawerSection ─────────────────────────────────────────────
+
+function DrawerSection({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <div style={{
+                fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
+                letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "8px",
+            }}>
+                {title}
+            </div>
+            {children}
+        </div>
+    );
+}
+
 // ── AlertDetailDrawer ─────────────────────────────────────────
 
 interface DrawerProps {
@@ -613,9 +686,10 @@ interface DrawerProps {
 }
 
 function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerProps) {
-    const panelRef   = useRef<HTMLDivElement>(null);
+    const panelRef    = useRef<HTMLDivElement>(null);
     const closeBtnRef = useRef<HTMLButtonElement>(null);
-    const sev        = SEV[group.topSeverity];
+    const sev         = SEV[group.topSeverity];
+    const covDays     = group.coverageDays;
 
     // ESC + Tab focus trap
     useEffect(() => {
@@ -648,7 +722,8 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
         return () => { if (prev instanceof HTMLElement) prev.focus(); };
     }, []);
 
-    const covDays = group.coverageDays;
+    const actionLinks  = drawerActionLinks(group);
+    const relatedLinks = drawerRelatedLinks(group);
 
     return (
         <>
@@ -667,7 +742,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                 aria-labelledby="alert-drawer-title"
                 style={{
                     position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 201,
-                    width: "min(420px, 100vw)",
+                    width: "min(440px, 100vw)",
                     background: "var(--bg-primary)",
                     borderLeft: "0.5px solid var(--border-secondary)",
                     boxShadow: "-8px 0 32px rgba(0,0,0,0.25)",
@@ -723,56 +798,138 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                 </div>
 
                 {/* Scrollable body */}
-                <div style={{ flex: 1, overflowY: "auto", padding: "20px" }}>
+                <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
 
-                    {/* Stock metrics */}
+                    {/* ── 1. Uyarı Özeti ── */}
                     <div style={{
-                        padding: "12px 14px",
-                        background: "var(--bg-secondary)",
-                        border: "0.5px solid var(--border-tertiary)",
+                        padding: "14px",
+                        background: sev.bg,
+                        border: `0.5px solid ${sev.border}`,
                         borderRadius: "6px",
-                        marginBottom: "20px",
                     }}>
                         <div style={{
-                            fontSize: "10px", color: "var(--text-tertiary)", fontWeight: 600,
-                            letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "10px",
+                            fontSize: "10px", fontWeight: 700, color: sev.text,
+                            letterSpacing: "0.06em", marginBottom: "6px",
                         }}>
-                            Stok Durumu
+                            UYARI ÖZETİ
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                        <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)", marginBottom: "8px", lineHeight: 1.45 }}>
+                            {group.reason}
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "12px", color: sev.text, fontWeight: 600 }}>
+                                {group.available} / min {group.minStock} {group.unit}
+                            </span>
+                            {covDays !== null && (
+                                <span style={{
+                                    fontSize: "11px", fontWeight: 600, color: daysColor(covDays),
+                                    padding: "1px 6px", borderRadius: "3px",
+                                    background: "rgba(0,0,0,0.15)",
+                                }}>
+                                    ~{covDays} gün
+                                </span>
+                            )}
+                            <span style={{ fontSize: "11px", color: sev.text, opacity: 0.7 }}>
+                                {group.alerts.length} aktif uyarı
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* ── 2. Neden ── */}
+                    <DrawerSection title="NEDEN">
+                        <p style={{ margin: "0 0 12px", fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
+                            {drawerDetailedReason(group)}
+                        </p>
+                        <div style={{
+                            display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+                            gap: "10px",
+                            padding: "10px 12px",
+                            background: "var(--bg-secondary)",
+                            border: "0.5px solid var(--border-tertiary)",
+                            borderRadius: "5px",
+                        }}>
                             {[
-                                { label: "Mevcut",  value: `${group.available} ${group.unit}`, color: sev.text },
-                                { label: "Minimum", value: `${group.minStock} ${group.unit}`,  color: "var(--text-primary)" },
-                                { label: "Rezerve", value: `${group.reserved} ${group.unit}`,  color: "var(--text-primary)" },
+                                { label: "Mevcut",  value: group.available, color: sev.text },
+                                { label: "Minimum", value: group.minStock,  color: "var(--text-secondary)" },
+                                { label: "Rezerve", value: group.reserved,  color: "var(--text-secondary)" },
                             ].map(({ label, value, color }) => (
                                 <div key={label}>
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px" }}>{label}</div>
-                                    <div style={{ fontSize: "13px", fontWeight: 600, color }}>{value}</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{label}</div>
+                                    <div style={{ fontSize: "15px", fontWeight: 700, color, lineHeight: 1.2 }}>
+                                        {value}
+                                        <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "3px" }}>
+                                            {group.unit}
+                                        </span>
+                                    </div>
                                 </div>
                             ))}
                         </div>
-                        {covDays !== null && (
-                            <div style={{
-                                marginTop: "10px", paddingTop: "10px",
-                                borderTop: "0.5px solid var(--border-tertiary)",
-                                display: "flex", alignItems: "center", gap: "6px",
-                            }}>
-                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Tahmini ömür:</span>
-                                <span style={{ fontSize: "12px", fontWeight: 600, color: daysColor(covDays) }}>
-                                    ~{covDays} gün
-                                </span>
-                            </div>
-                        )}
-                    </div>
+                    </DrawerSection>
 
-                    {/* Alert list */}
-                    <div style={{ marginBottom: "20px" }}>
-                        <div style={{
-                            fontSize: "10px", color: "var(--text-tertiary)", fontWeight: 600,
-                            letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "10px",
-                        }}>
-                            Aktif Uyarılar
+                    {/* ── 3. Etki ── */}
+                    <DrawerSection title="ETKİ">
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
+                            {drawerDetailedImpact(group)}
+                        </p>
+                    </DrawerSection>
+
+                    {/* ── 4. Önerilen Aksiyon ── */}
+                    <DrawerSection title="ÖNERİLEN AKSİYON">
+                        <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                            {actionLinks.map((link) => (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        padding: "10px 14px",
+                                        background: link.primary ? sev.bg : "transparent",
+                                        border: `0.5px solid ${link.primary ? sev.border : "var(--border-secondary)"}`,
+                                        borderRadius: "5px",
+                                        fontSize: "13px",
+                                        fontWeight: link.primary ? 600 : 400,
+                                        color: link.primary ? sev.text : "var(--text-secondary)",
+                                        textDecoration: "none",
+                                    }}
+                                >
+                                    <span>{link.label}</span>
+                                    <span>→</span>
+                                </Link>
+                            ))}
                         </div>
+                    </DrawerSection>
+
+                    {/* ── 5. İlgili Kayıtlar ── */}
+                    <DrawerSection title="İLGİLİ KAYITLAR">
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            {relatedLinks.map((link) => (
+                                <Link
+                                    key={link.href + link.label}
+                                    href={link.href}
+                                    style={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        padding: "8px 12px",
+                                        background: "var(--bg-secondary)",
+                                        border: "0.5px solid var(--border-tertiary)",
+                                        borderRadius: "5px",
+                                        fontSize: "12px",
+                                        color: "var(--text-secondary)",
+                                        textDecoration: "none",
+                                    }}
+                                >
+                                    <span>{link.label}</span>
+                                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>→</span>
+                                </Link>
+                            ))}
+                        </div>
+                    </DrawerSection>
+
+                    {/* ── 6. Uyarı Durumu (ack / dismiss) ── */}
+                    <DrawerSection title="UYARI DURUMU">
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                             {group.alerts.map((alert) => {
                                 const alertSev = SEV[alert.severity as Severity] ?? SEV.info;
@@ -791,7 +948,8 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                     >
                                         <div style={{
                                             display: "flex", alignItems: "center",
-                                            justifyContent: "space-between", marginBottom: "5px",
+                                            justifyContent: "space-between",
+                                            marginBottom: isAck ? 0 : "8px",
                                         }}>
                                             <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-primary)" }}>
                                                 {ALERT_TYPE_LABEL[alert.type] ?? alert.type}
@@ -800,14 +958,6 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                                 {formatRelTime(alert.created_at)}
                                             </span>
                                         </div>
-                                        {alert.description && (
-                                            <p style={{
-                                                margin: "0 0 8px", fontSize: "12px",
-                                                color: "var(--text-secondary)", lineHeight: 1.5,
-                                            }}>
-                                                {alert.description}
-                                            </p>
-                                        )}
                                         {isAck ? (
                                             <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
                                                 Kabul edildi
@@ -817,7 +967,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                                 <button
                                                     onClick={() => onAcknowledge(alert.id)}
                                                     style={{
-                                                        fontSize: "11px", padding: "3px 8px",
+                                                        fontSize: "11px", padding: "4px 10px",
                                                         border: "0.5px solid var(--border-secondary)",
                                                         borderRadius: "4px", background: "transparent",
                                                         color: "var(--text-secondary)", cursor: "pointer",
@@ -828,7 +978,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                                 <button
                                                     onClick={() => onDismiss(alert.id)}
                                                     style={{
-                                                        fontSize: "11px", padding: "3px 8px",
+                                                        fontSize: "11px", padding: "4px 10px",
                                                         border: "0.5px solid var(--border-secondary)",
                                                         borderRadius: "4px", background: "transparent",
                                                         color: "var(--text-tertiary)", cursor: "pointer",
@@ -842,21 +992,8 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                 );
                             })}
                         </div>
-                    </div>
+                    </DrawerSection>
 
-                    {/* CTA */}
-                    <Link
-                        href={group.actionHref}
-                        style={{
-                            display: "block", textAlign: "center",
-                            padding: "10px 16px",
-                            background: sev.bg, border: `0.5px solid ${sev.border}`,
-                            borderRadius: "6px", fontSize: "13px", fontWeight: 500,
-                            color: sev.text, textDecoration: "none",
-                        }}
-                    >
-                        {group.actionLabel} →
-                    </Link>
                 </div>
             </div>
         </>
