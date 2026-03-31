@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { getStatusBadge } from "@/lib/stock-utils";
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -184,6 +183,8 @@ export default function ProductsPage() {
     const [rejectNote, setRejectNote] = useState("");
     const [drawerAlerts, setDrawerAlerts] = useState<AlertItem[]>([]);
     const [drawerAlertsLoading, setDrawerAlertsLoading] = useState(false);
+    const [alertFilter, setAlertFilter] = useState<"tumu" | "riskli" | "uyarili" | "oneri">("tumu");
+    const [productsWithAlerts, setProductsWithAlerts] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
@@ -236,6 +237,21 @@ export default function ProductsPage() {
         return () => { cancelled = true; };
     }, [selectedProductId]);
 
+    // Fetch all open product alerts on mount to power signal filtering
+    useEffect(() => {
+        let cancelled = false;
+        fetch("/api/alerts?entity_type=product&status=open")
+            .then(r => r.ok ? r.json() : [])
+            .then((data: Array<{ entity_id?: string | null }>) => {
+                if (cancelled) return;
+                const ids = new Set<string>();
+                for (const a of data) { if (a.entity_id) ids.add(a.entity_id); }
+                setProductsWithAlerts(ids);
+            })
+            .catch(() => { /* graceful */ });
+        return () => { cancelled = true; };
+    }, []);
+
     const isMobile = windowWidth < 768;
 
     const filtered = mockProducts.filter((p) => {
@@ -243,7 +259,14 @@ export default function ProductsPage() {
             p.name.toLowerCase().includes(search.toLowerCase()) ||
             p.sku.toLowerCase().includes(search.toLowerCase());
         const matchCategory = activeCategory === "Tümü" || p.category === activeCategory;
-        return matchSearch && matchCategory;
+        const pRisk = riskData.get(p.id);
+        const pRec = recMap.get(p.id);
+        const matchSignal =
+            alertFilter === "riskli" ? !!pRisk :
+            alertFilter === "uyarili" ? productsWithAlerts.has(p.id) :
+            alertFilter === "oneri" ? pRec?.status === "suggested" :
+            true;
+        return matchSearch && matchCategory && matchSignal;
     });
 
     const criticalCount = mockProducts.filter(p => p.available_now <= p.minStockLevel).length;
@@ -252,6 +275,10 @@ export default function ProductsPage() {
     categories.slice(1).forEach(cat => {
         categoryCounts[cat] = mockProducts.filter(p => p.category === cat).length;
     });
+
+    const riskliCount = mockProducts.filter(p => riskData.has(p.id)).length;
+    const uyariliCount = productsWithAlerts.size;
+    const oneriCount = mockProducts.filter(p => recMap.get(p.id)?.status === "suggested").length;
 
     const handleDelete = async (id: string) => {
         setDeletingId(id);
@@ -399,6 +426,7 @@ export default function ProductsPage() {
                 {categories.map((cat) => (
                     <button
                         key={cat}
+                        aria-pressed={activeCategory === cat}
                         onClick={() => setActiveCategory(cat)}
                         style={{
                             fontSize: "12px",
@@ -443,6 +471,58 @@ export default function ProductsPage() {
                 ))}
             </div>
 
+            {/* Signal filter */}
+            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
+                <span style={{ fontSize: "10px", color: "var(--text-tertiary)", marginRight: "2px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    Sinyal:
+                </span>
+                {([
+                    { key: "tumu", label: "Tümü", count: mockProducts.length, color: null },
+                    { key: "riskli", label: "Riskli", count: riskLoading ? null : riskliCount, color: "var(--warning-text)" },
+                    { key: "uyarili", label: "Uyarı var", count: uyariliCount, color: "var(--warning-text)" },
+                    { key: "oneri", label: "Öneri bekliyor", count: oneriCount, color: "var(--accent-text)" },
+                ] as const).map(f => {
+                    const active = alertFilter === f.key;
+                    return (
+                        <button
+                            key={f.key}
+                            aria-pressed={active}
+                            onClick={() => setAlertFilter(f.key)}
+                            style={{
+                                fontSize: "11px",
+                                padding: "3px 10px",
+                                border: `0.5px solid ${active ? "var(--border-primary)" : "var(--border-tertiary)"}`,
+                                borderRadius: "5px",
+                                background: active ? "var(--bg-secondary)" : "transparent",
+                                color: active ? "var(--text-primary)" : "var(--text-tertiary)",
+                                cursor: "pointer",
+                                fontWeight: active ? 600 : 400,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "4px",
+                            }}
+                            onMouseEnter={e => {
+                                if (!active) e.currentTarget.style.color = "var(--text-secondary)";
+                            }}
+                            onMouseLeave={e => {
+                                if (!active) e.currentTarget.style.color = "var(--text-tertiary)";
+                            }}
+                        >
+                            {f.label}
+                            {f.count !== null && (
+                                <span style={{
+                                    fontSize: "10px",
+                                    fontWeight: 700,
+                                    color: active ? (f.color ?? "var(--text-secondary)") : (f.color ?? "var(--text-tertiary)"),
+                                }}>
+                                    {f.count}
+                                </span>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
             {/* Table */}
             <div
                 style={{
@@ -459,17 +539,18 @@ export default function ProductsPage() {
                             <th style={thStyle}>SKU</th>
                             <th style={thStyle}>Ürün Adı</th>
                             <th style={thStyle}>Kategori</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Stok / Min</th>
+                            <th style={{ ...thStyle, textAlign: "right" }}>Stok</th>
                             <th style={{ ...thStyle, textAlign: "right" }}>Kapsam</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Satılabilir</th>
-                            <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
-                            <th style={{ ...thStyle, width: "120px" }}></th>
+                            <th style={{ ...thStyle, textAlign: "center" }}>Sinyal</th>
+                            <th style={{ ...thStyle, width: "100px" }}></th>
                         </tr>
                     </thead>
                     <tbody>
                         {filtered.map((product) => {
                             const risk = riskData.get(product.id);
-                            const status = getStatusBadge(product.available_now, product.minStockLevel, !!risk);
+                            const isCritical = product.available_now <= product.minStockLevel;
+                            const hasAlert = productsWithAlerts.has(product.id);
+                            const pendingRec = recMap.get(product.id)?.status === "suggested";
                             return (
                                 <tr
                                     key={product.id}
@@ -491,7 +572,7 @@ export default function ProductsPage() {
                                         e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "transparent"));
                                     }}
                                 >
-                                    <td style={{ ...tdStyle, color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
+                                    <td style={{ ...tdStyle, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "12px" }}>
                                         {product.sku}
                                     </td>
                                     <td style={{ ...tdStyle, fontWeight: 500, maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -500,37 +581,51 @@ export default function ProductsPage() {
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
                                         {product.category}
                                     </td>
-                                    <td style={{
-                                        ...tdStyle, textAlign: "right", fontWeight: 500,
-                                        color: product.on_hand <= product.minStockLevel ? "var(--danger-text)" : "var(--text-primary)",
-                                    }}>
-                                        {formatNumber(product.on_hand)}
-                                        <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}> / {formatNumber(product.minStockLevel)}</span>
+                                    <td style={{ ...tdStyle, textAlign: "right" }}>
+                                        <div style={{
+                                            fontSize: "14px", fontWeight: 700, lineHeight: 1.2,
+                                            color: isCritical ? "var(--danger-text)" : "var(--success-text)",
+                                        }}>
+                                            {formatNumber(product.available_now)}
+                                        </div>
+                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 400, marginTop: "1px" }}>
+                                            {formatNumber(product.on_hand)} · min {formatNumber(product.minStockLevel)}
+                                        </div>
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: coverageDaysColor(risk?.coverageDays ?? null) }}>
                                         {risk?.coverageDays != null ? `${risk.coverageDays}g` : <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>—</span>}
                                     </td>
-                                    <td
-                                        style={{
-                                            ...tdStyle,
-                                            textAlign: "right",
-                                            fontWeight: 500,
-                                            color: product.available_now <= product.minStockLevel ? "var(--danger-text)" : "var(--success-text)",
-                                        }}
-                                    >
-                                        {formatNumber(product.available_now)}
-                                    </td>
                                     <td style={{ ...tdStyle, textAlign: "center" }}>
-                                        <span className={`badge ${status.cls}`}>{status.label}</span>
-                                        {risk?.aiConfidence != null && (
-                                            <div style={{ marginTop: "3px" }}>
-                                                <span style={{
-                                                    fontSize: "10px", color: "var(--accent-text)",
-                                                    fontWeight: 600,
-                                                }}>
-                                                    ✦ AI %{Math.round(risk.aiConfidence * 100)}
-                                                </span>
-                                            </div>
+                                        {isCritical ? (
+                                            <span style={{
+                                                fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                background: "var(--danger-bg)", color: "var(--danger-text)",
+                                                border: "0.5px solid var(--danger-border)",
+                                                textTransform: "uppercase", letterSpacing: "0.04em",
+                                            }}>KRİTİK</span>
+                                        ) : risk ? (
+                                            <span style={{
+                                                fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                border: "0.5px solid var(--warning-border)",
+                                                textTransform: "uppercase", letterSpacing: "0.04em",
+                                            }}>Risk</span>
+                                        ) : hasAlert ? (
+                                            <span style={{
+                                                fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                border: "0.5px solid var(--warning-border)",
+                                                textTransform: "uppercase", letterSpacing: "0.04em",
+                                            }}>Uyarı</span>
+                                        ) : pendingRec ? (
+                                            <span style={{
+                                                fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                background: "var(--accent-bg)", color: "var(--accent-text)",
+                                                border: "0.5px solid var(--accent-border)",
+                                                textTransform: "uppercase", letterSpacing: "0.04em",
+                                            }}>Öneri</span>
+                                        ) : (
+                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>—</span>
                                         )}
                                     </td>
                                     <td
@@ -611,9 +706,30 @@ export default function ProductsPage() {
                         <div style={{ fontWeight: 500, color: "var(--text-secondary)", marginBottom: "4px" }}>
                             Ürün bulunamadı
                         </div>
-                        <div style={{ fontSize: "12px" }}>
-                            {search ? `"${search}" ile eşleşen ürün yok` : `"${activeCategory}" kategorisinde kayıtlı ürün yok`}
+                        <div style={{ fontSize: "12px", marginBottom: (search || alertFilter !== "tumu") ? "12px" : "0" }}>
+                            {search
+                                ? `"${search}" aramasıyla eşleşen ürün yok`
+                                : alertFilter === "riskli" ? "Şu an riskli ürün yok"
+                                : alertFilter === "uyarili" ? "Aktif uyarısı olan ürün yok"
+                                : alertFilter === "oneri" ? "Bekleyen önerisi olan ürün yok"
+                                : `"${activeCategory}" kategorisinde ürün yok`}
                         </div>
+                        {(search || alertFilter !== "tumu") && (
+                            <button
+                                onClick={() => { setSearch(""); setAlertFilter("tumu"); }}
+                                style={{
+                                    fontSize: "12px",
+                                    padding: "4px 12px",
+                                    border: "0.5px solid var(--border-secondary)",
+                                    borderRadius: "5px",
+                                    background: "transparent",
+                                    color: "var(--text-secondary)",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                Filtreleri temizle
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
