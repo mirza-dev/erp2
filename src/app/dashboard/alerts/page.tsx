@@ -11,7 +11,7 @@ import type { AlertRow } from "@/lib/database.types";
 // ── Types ──────────────────────────────────────────────────────
 
 type Severity = "critical" | "warning" | "info";
-type SeverityFilter = "all" | "critical" | "warning";
+type AlertFilter = "all" | "critical" | "warning" | "order_shortage";
 
 interface ProductAlertGroup {
     entityId: string;
@@ -97,7 +97,8 @@ export default function AlertsPage() {
 
     const [rawAlerts, setRawAlerts]         = useState<AlertRow[]>([]);
     const [loading, setLoading]             = useState(true);
-    const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
+    const [activeFilter, setActiveFilter]   = useState<AlertFilter>("all");
+    const [showResolved, setShowResolved]   = useState(false);
     const [refreshing, setRefreshing]       = useState(false);
     const [aiGenerating, setAiGenerating]   = useState(false);
     const [drawerGroup, setDrawerGroup]     = useState<ProductAlertGroup | null>(null);
@@ -119,8 +120,12 @@ export default function AlertsPage() {
     // ── Group by product ──
     const productMap = new Map(products.map((p) => [p.id, p]));
 
+    const activeAlerts = showResolved
+        ? rawAlerts
+        : rawAlerts.filter((a) => a.status === "open" || a.status === "acknowledged");
+
     const productGroups: ProductAlertGroup[] = (() => {
-        const sysAlerts = rawAlerts.filter((a) => a.source !== "ai" && a.entity_id);
+        const sysAlerts = activeAlerts.filter((a) => a.source !== "ai" && a.entity_id);
         const byProduct = new Map<string, AlertRow[]>();
         for (const alert of sysAlerts) {
             const id = alert.entity_id!;
@@ -164,12 +169,14 @@ export default function AlertsPage() {
         });
     })();
 
-    const aiAlerts    = rawAlerts.filter((a) => a.source === "ai");
+    const aiAlerts      = activeAlerts.filter((a) => a.source === "ai");
     const criticalCount = productGroups.filter((g) => g.topSeverity === "critical").length;
     const warningCount  = productGroups.filter((g) => g.topSeverity === "warning").length;
-    const filtered      = severityFilter === "all"
-        ? productGroups
-        : productGroups.filter((g) => g.topSeverity === severityFilter);
+    const shortageCount = productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage")).length;
+    const filtered      = activeFilter === "all"            ? productGroups
+        : activeFilter === "critical"       ? productGroups.filter((g) => g.topSeverity === "critical")
+        : activeFilter === "warning"        ? productGroups.filter((g) => g.topSeverity === "warning")
+        : productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage"));
 
     // ── Actions ──
     const handleRefresh = async () => {
@@ -204,6 +211,39 @@ export default function AlertsPage() {
         } finally {
             setAiGenerating(false);
         }
+    };
+
+    const resolveAlert = async (alertId: string) => {
+        try {
+            await fetch(`/api/alerts/${alertId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "resolved" }),
+            });
+            const patch = (a: AlertRow) =>
+                a.id === alertId ? { ...a, status: "resolved" as const } : a;
+            setRawAlerts((prev) => prev.map(patch));
+            if (drawerGroup) setDrawerGroup({ ...drawerGroup, alerts: drawerGroup.alerts.map(patch) });
+            toast({ type: "success", message: "Uyarı çözüldü" });
+        } catch {
+            toast({ type: "error", message: "İşlem başarısız" });
+        }
+    };
+
+    const dismissGroup = async (group: ProductAlertGroup) => {
+        const open = group.alerts.filter((a) => a.status === "open" || a.status === "acknowledged");
+        if (open.length === 0) return;
+        const ids = new Set(open.map((a) => a.id));
+        setRawAlerts((prev) => prev.filter((a) => !ids.has(a.id)));
+        if (drawerGroup?.entityId === group.entityId) setDrawerGroup(null);
+        await Promise.all(open.map((a) =>
+            fetch(`/api/alerts/${a.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "dismissed" }),
+            })
+        ));
+        toast({ type: "info", message: `${open.length} uyarı yoksayıldı` });
     };
 
     const dismissAlert = async (alertId: string) => {
@@ -295,56 +335,75 @@ export default function AlertsPage() {
                 </div>
             </div>
 
-            {/* ── Severity Filter Tabs ── */}
+            {/* ── Filter Tabs ── */}
             <div style={{
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "space-between",
                 padding: "0 24px",
                 borderBottom: "0.5px solid var(--border-tertiary)",
             }}>
-                {(
-                    [
-                        { key: "all"      as SeverityFilter, label: "Tümü",   count: productGroups.length, dot: null },
-                        { key: "critical" as SeverityFilter, label: "Kritik", count: criticalCount, dot: "var(--danger)" },
-                        { key: "warning"  as SeverityFilter, label: "Uyarı",  count: warningCount,  dot: "var(--warning)" },
-                    ]
-                ).map((tab) => (
-                    <button
-                        key={tab.key}
-                        onClick={() => setSeverityFilter(tab.key)}
-                        style={{
-                            fontSize: "12px",
-                            padding: "10px 14px",
-                            border: "none",
-                            borderBottom: severityFilter === tab.key ? "2px solid var(--accent)" : "2px solid transparent",
-                            background: "transparent",
-                            color: severityFilter === tab.key ? "var(--accent-text)" : "var(--text-secondary)",
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            fontWeight: severityFilter === tab.key ? 500 : 400,
-                        }}
-                    >
-                        {tab.dot && (
-                            <span style={{
-                                width: "6px", height: "6px", borderRadius: "50%",
-                                background: tab.dot, flexShrink: 0,
-                            }} />
-                        )}
-                        {tab.label}
-                        {tab.count > 0 && (
-                            <span style={{
-                                fontSize: "10px", padding: "1px 5px", borderRadius: "10px",
-                                background: severityFilter === tab.key ? "var(--accent-bg)" : "var(--bg-tertiary)",
-                                color: severityFilter === tab.key ? "var(--accent-text)" : "var(--text-tertiary)",
-                                fontWeight: 500,
-                            }}>
-                                {tab.count}
-                            </span>
-                        )}
-                    </button>
-                ))}
+                <div style={{ display: "flex", alignItems: "center" }}>
+                    {(
+                        [
+                            { key: "all"            as AlertFilter, label: "Tümü",         count: productGroups.length, dot: null                },
+                            { key: "critical"       as AlertFilter, label: "Kritik",        count: criticalCount,        dot: "var(--danger)"     },
+                            { key: "warning"        as AlertFilter, label: "Uyarı",         count: warningCount,         dot: "var(--warning)"    },
+                            { key: "order_shortage" as AlertFilter, label: "Sipariş Eksik", count: shortageCount,        dot: "var(--danger)"     },
+                        ]
+                    ).map((tab) => (
+                        <button
+                            key={tab.key}
+                            onClick={() => setActiveFilter(tab.key)}
+                            style={{
+                                fontSize: "12px",
+                                padding: "10px 14px",
+                                border: "none",
+                                borderBottom: activeFilter === tab.key ? "2px solid var(--accent)" : "2px solid transparent",
+                                background: "transparent",
+                                color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-secondary)",
+                                cursor: "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                fontWeight: activeFilter === tab.key ? 500 : 400,
+                            }}
+                        >
+                            {tab.dot && (
+                                <span style={{
+                                    width: "6px", height: "6px", borderRadius: "50%",
+                                    background: tab.dot, flexShrink: 0,
+                                }} />
+                            )}
+                            {tab.label}
+                            {tab.count > 0 && (
+                                <span style={{
+                                    fontSize: "10px", padding: "1px 5px", borderRadius: "10px",
+                                    background: activeFilter === tab.key ? "var(--accent-bg)" : "var(--bg-tertiary)",
+                                    color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-tertiary)",
+                                    fontWeight: 500,
+                                }}>
+                                    {tab.count}
+                                </span>
+                            )}
+                        </button>
+                    ))}
+                </div>
+                <button
+                    onClick={() => setShowResolved((v) => !v)}
+                    style={{
+                        fontSize: "11px",
+                        padding: "4px 10px",
+                        border: "0.5px solid var(--border-secondary)",
+                        borderRadius: "4px",
+                        background: showResolved ? "var(--bg-tertiary)" : "transparent",
+                        color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
+                        cursor: "pointer",
+                        flexShrink: 0,
+                    }}
+                >
+                    {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
+                </button>
             </div>
 
             {/* ── Product Alert Table ── */}
@@ -358,15 +417,25 @@ export default function AlertsPage() {
                 />
             ) : filtered.length === 0 ? (
                 <EmptyState
-                    title="Bu filtrede uyarı yok"
-                    description="Farklı bir filtre seçin veya tümünü görün."
+                    title={
+                        activeFilter === "critical"       ? "Kritik uyarı yok" :
+                        activeFilter === "warning"        ? "Uyarı seviyesinde ürün yok" :
+                        activeFilter === "order_shortage" ? "Sipariş eksik yok" :
+                        "Bu filtrede uyarı yok"
+                    }
+                    description={
+                        activeFilter === "critical"       ? "Tüm ürünler güvenli stok seviyesinde." :
+                        activeFilter === "warning"        ? "Şu an uyarı eşiğini geçen ürün yok." :
+                        activeFilter === "order_shortage" ? "Tüm siparişler mevcut stokla karşılanabiliyor." :
+                        "Farklı bir filtre seçin veya tümünü görün."
+                    }
                 />
             ) : (
                 <div>
                     {/* Column headers */}
                     <div style={{
                         display: "grid",
-                        gridTemplateColumns: "3px 1fr 170px 120px 148px 88px",
+                        gridTemplateColumns: "3px 1fr 170px 120px 148px 110px",
                         alignItems: "center",
                         borderBottom: "0.5px solid var(--border-tertiary)",
                     }}>
@@ -376,7 +445,7 @@ export default function AlertsPage() {
                             { label: "NEDEN",           pad: "8px 12px" },
                             { label: "ETKİ",            pad: "8px 12px" },
                             { label: "ÖNERİLEN ADIM",   pad: "8px 12px" },
-                            { label: "DETAY",           pad: "8px 12px" },
+                            { label: "",                pad: "8px 12px" },
                         ].map(({ label, pad }) => (
                             <div key={label} style={{
                                 padding: pad,
@@ -396,6 +465,7 @@ export default function AlertsPage() {
                             key={group.entityId}
                             group={group}
                             onOpenDrawer={() => setDrawerGroup(group)}
+                            onDismissGroup={() => dismissGroup(group)}
                         />
                     ))}
                 </div>
@@ -436,7 +506,7 @@ export default function AlertsPage() {
                 {aiAlerts.length === 0 ? (
                     <div style={{ padding: "0 24px 16px" }}>
                         <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                            Henüz çalıştırılmadı. AI; stok riski, sipariş anomalileri ve tedarik boşluklarını analiz eder.
+                            Henüz çalıştırılmadı — stok riski, sipariş anomalileri ve tedarik boşluklarını analiz eder.
                         </span>
                     </div>
                 ) : (
@@ -480,6 +550,7 @@ export default function AlertsPage() {
                     onClose={() => setDrawerGroup(null)}
                     onDismiss={dismissAlert}
                     onAcknowledge={acknowledgeAlert}
+                    onResolve={resolveAlert}
                 />
             )}
         </div>
@@ -491,18 +562,19 @@ export default function AlertsPage() {
 interface ProductRowProps {
     group: ProductAlertGroup;
     onOpenDrawer: () => void;
+    onDismissGroup: () => void;
 }
 
-function ProductRow({ group, onOpenDrawer }: ProductRowProps) {
+function ProductRow({ group, onOpenDrawer, onDismissGroup }: ProductRowProps) {
     const sev      = SEV[group.topSeverity];
-    const isAllAck = group.alerts.every((a) => a.status === "acknowledged" || a.status === "resolved");
+    const isAllAck = group.alerts.every((a) => a.status === "acknowledged" || a.status === "resolved" || a.status === "dismissed");
     const covDays  = group.coverageDays;
 
     return (
         <div
             style={{
                 display: "grid",
-                gridTemplateColumns: "3px 1fr 170px 120px 148px 88px",
+                gridTemplateColumns: "3px 1fr 170px 120px 148px 110px",
                 alignItems: "center",
                 borderBottom: "0.5px solid var(--border-tertiary)",
                 opacity: isAllAck ? 0.6 : 1,
@@ -578,8 +650,8 @@ function ProductRow({ group, onOpenDrawer }: ProductRowProps) {
                 </Link>
             </div>
 
-            {/* Detail */}
-            <div style={{ padding: "12px 12px", display: "flex", flexDirection: "column", gap: "4px" }}>
+            {/* Quick actions */}
+            <div style={{ padding: "12px 12px", display: "flex", alignItems: "center", gap: "6px" }}>
                 <button
                     onClick={onOpenDrawer}
                     aria-label={`${group.productName} detayını aç`}
@@ -593,9 +665,24 @@ function ProductRow({ group, onOpenDrawer }: ProductRowProps) {
                 >
                     Detay
                 </button>
-                {isAllAck && (
-                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                        Kabul edildi
+                {!isAllAck ? (
+                    <button
+                        onClick={onDismissGroup}
+                        aria-label={`${group.productName} uyarılarını yoksay`}
+                        title="Tüm uyarıları yoksay"
+                        style={{
+                            fontSize: "13px", padding: "2px 7px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "4px", background: "transparent",
+                            color: "var(--text-tertiary)", cursor: "pointer",
+                            lineHeight: 1,
+                        }}
+                    >
+                        ×
+                    </button>
+                ) : (
+                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
+                        Görüldü
                     </span>
                 )}
             </div>
@@ -612,10 +699,10 @@ function drawerDetailedReason(group: ProductAlertGroup): string {
         return `Onaylı siparişler için ${group.reserved} ${group.unit} rezerve edilmiş, ancak satılabilir stok sadece ${group.available} ${group.unit}. ${shortfall} ${group.unit} karşılanamıyor.`;
     }
     if (types.includes("stock_critical")) {
-        return `Mevcut stok (${group.available} ${group.unit}), minimum seviye olan ${group.minStock} ${group.unit} altına düştü. Satılabilir stok kritik sınırı aştı.`;
+        return `Mevcut stok (${group.available} ${group.unit}), minimum güvenlik seviyesi olan ${group.minStock} ${group.unit} altına indi.`;
     }
     if (types.includes("stock_risk")) {
-        return `Mevcut stok (${group.available} ${group.unit}), minimum seviyenin (${group.minStock} ${group.unit}) 1.5 katı sınırına yaklaştı. Yakın vadede kritik seviyeye düşme riski var.`;
+        return `Mevcut stok (${group.available} ${group.unit}), uyarı eşiğine yaklaştı (min: ${group.minStock} ${group.unit}). Kısa vadede kritik seviyeye düşme riski var.`;
     }
     return `Bu ürün için stok riski tespit edildi. Mevcut: ${group.available} ${group.unit}, minimum: ${group.minStock} ${group.unit}.`;
 }
@@ -627,10 +714,13 @@ function drawerDetailedImpact(group: ProductAlertGroup): string {
         return `${shortfall} ${group.unit} eksik. Onaylı siparişler tam karşılanamıyor. Teslimatta gecikme veya kısmi sevkiyat riski var.`;
     }
     const { coverageDays } = group;
-    if (coverageDays === 0) return "Stok tükendi. Yeni sipariş alınsa da karşılanamaz.";
-    if (coverageDays !== null && coverageDays <= 7) return `Güncel kullanım hızıyla ~${coverageDays} gün içinde stok tükenebilir. Acil tedarik gerekiyor.`;
-    if (coverageDays !== null) return `Güncel kullanım hızıyla ~${coverageDays} günlük stok var. Tedarik planlanmazsa minimum seviye altına düşer.`;
-    return "Stok minimum seviyenin altında. Yeni sipariş alınması durumunda karşılama riski oluşabilir.";
+    if (coverageDays === 0) return "Stok tükendi. Mevcut siparişler karşılanamıyor.";
+    if (coverageDays !== null && coverageDays <= 7) return `~${coverageDays} gün içinde stok tükeniyor. Acil satın alma yapılmalı.`;
+    if (coverageDays !== null) {
+        if (group.topSeverity === "critical") return `Stok minimum seviyenin altında. ~${coverageDays} günlük kullanım kapasitesi var.`;
+        return `~${coverageDays} günlük stok var — yakında minimum seviyeye düşebilir.`;
+    }
+    return "Stok minimum seviyenin altında. Yeni siparişler tam karşılanamayabilir.";
 }
 
 function drawerActionLinks(group: ProductAlertGroup): Array<{ label: string; href: string; primary: boolean }> {
@@ -641,7 +731,7 @@ function drawerActionLinks(group: ProductAlertGroup): Array<{ label: string; hre
     ];
     if (types.includes("stock_critical")) return [
         { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: true  },
-        { label: "Siparişleri kontrol et", href: "/dashboard/orders",              primary: false },
+        { label: "Siparişleri incele",      href: "/dashboard/orders",              primary: false },
     ];
     return [
         { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: true  },
@@ -683,9 +773,10 @@ interface DrawerProps {
     onClose: () => void;
     onDismiss: (alertId: string) => void;
     onAcknowledge: (alertId: string) => void;
+    onResolve: (alertId: string) => void;
 }
 
-function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerProps) {
+function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve }: DrawerProps) {
     const panelRef    = useRef<HTMLDivElement>(null);
     const closeBtnRef = useRef<HTMLButtonElement>(null);
     const sev         = SEV[group.topSeverity];
@@ -932,8 +1023,8 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                     <DrawerSection title="UYARI DURUMU">
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                             {group.alerts.map((alert) => {
-                                const alertSev = SEV[alert.severity as Severity] ?? SEV.info;
-                                const isAck    = alert.status === "acknowledged" || alert.status === "resolved";
+                                const alertSev  = SEV[alert.severity as Severity] ?? SEV.info;
+                                const isSettled = alert.status === "resolved" || alert.status === "dismissed";
                                 return (
                                     <div
                                         key={alert.id}
@@ -943,13 +1034,13 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                             border: "0.5px solid var(--border-tertiary)",
                                             borderLeft: `3px solid ${alertSev.dot}`,
                                             borderRadius: "5px",
-                                            opacity: isAck ? 0.6 : 1,
+                                            opacity: isSettled ? 0.55 : 1,
                                         }}
                                     >
-                                        <div style={{
+                                                        <div style={{
                                             display: "flex", alignItems: "center",
                                             justifyContent: "space-between",
-                                            marginBottom: isAck ? 0 : "8px",
+                                            marginBottom: "8px",
                                         }}>
                                             <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-primary)" }}>
                                                 {ALERT_TYPE_LABEL[alert.type] ?? alert.type}
@@ -958,11 +1049,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                                 {formatRelTime(alert.created_at)}
                                             </span>
                                         </div>
-                                        {isAck ? (
-                                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                                                Kabul edildi
-                                            </span>
-                                        ) : (
+                                        {alert.status === "open" && (
                                             <div style={{ display: "flex", gap: "6px" }}>
                                                 <button
                                                     onClick={() => onAcknowledge(alert.id)}
@@ -973,7 +1060,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                                         color: "var(--text-secondary)", cursor: "pointer",
                                                     }}
                                                 >
-                                                    Kabul Et
+                                                    Görüldü
                                                 </button>
                                                 <button
                                                     onClick={() => onDismiss(alert.id)}
@@ -984,9 +1071,41 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge }: DrawerP
                                                         color: "var(--text-tertiary)", cursor: "pointer",
                                                     }}
                                                 >
-                                                    Kapat
+                                                    Yoksay
                                                 </button>
                                             </div>
+                                        )}
+                                        {alert.status === "acknowledged" && (
+                                            <div style={{ display: "flex", gap: "6px" }}>
+                                                <button
+                                                    onClick={() => onResolve(alert.id)}
+                                                    style={{
+                                                        fontSize: "11px", padding: "4px 10px",
+                                                        border: "0.5px solid var(--success-border)",
+                                                        borderRadius: "4px", background: "var(--success-bg)",
+                                                        color: "var(--success-text)", cursor: "pointer",
+                                                    }}
+                                                >
+                                                    Çözüldü
+                                                </button>
+                                                <button
+                                                    onClick={() => onDismiss(alert.id)}
+                                                    style={{
+                                                        fontSize: "11px", padding: "4px 10px",
+                                                        border: "0.5px solid var(--border-secondary)",
+                                                        borderRadius: "4px", background: "transparent",
+                                                        color: "var(--text-tertiary)", cursor: "pointer",
+                                                    }}
+                                                >
+                                                    Yoksay
+                                                </button>
+                                            </div>
+                                        )}
+                                        {alert.status === "resolved" && (
+                                            <span style={{ fontSize: "10px", color: "var(--success-text)" }}>Çözüldü ✓</span>
+                                        )}
+                                        {alert.status === "dismissed" && (
+                                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Yoksayıldı</span>
                                         )}
                                     </div>
                                 );

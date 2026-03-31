@@ -108,9 +108,9 @@ export function buildStockAlertDescription(
         const base = `Mevcut stok ${available} ${unit} (min: ${min}).`;
         if (dailyUsage && coverageDays !== null) {
             const ltPart = leadTimeDays ? ` Tedarik süresi: ${leadTimeDays} gün.` : "";
-            return `${base} Günlük kullanım: ${dailyUsage} ${unit}/gün → ~${coverageDays} gün sonra tükenebilir.${ltPart}`;
+            return `${base} Günlük kullanım: ${dailyUsage} ${unit}/gün → ~${coverageDays} günlük stok kaldı.${ltPart}`;
         }
-        return `${base} Günlük kullanım verisi yok — tükenme süresi hesaplanamıyor.`;
+        return `${base} Günlük kullanım verisi yok.`;
     }
 
     // warning
