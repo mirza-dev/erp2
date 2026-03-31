@@ -237,18 +237,22 @@ export default function ProductsPage() {
         return () => { cancelled = true; };
     }, [selectedProductId]);
 
-    // Fetch all open product alerts on mount to power signal filtering
+    // Scan stock alerts on mount, then fetch all open product alerts for signal filtering
     useEffect(() => {
         let cancelled = false;
-        fetch("/api/alerts?entity_type=product&status=open")
-            .then(r => r.ok ? r.json() : [])
-            .then((data: Array<{ entity_id?: string | null }>) => {
+        async function scanThenFetch() {
+            try { await fetch("/api/alerts/scan", { method: "POST" }); } catch { /* non-fatal */ }
+            if (cancelled) return;
+            try {
+                const res = await fetch("/api/alerts?entity_type=product&status=open");
+                const data: Array<{ entity_id?: string | null }> = res.ok ? await res.json() : [];
                 if (cancelled) return;
                 const ids = new Set<string>();
                 for (const a of data) { if (a.entity_id) ids.add(a.entity_id); }
                 setProductsWithAlerts(ids);
-            })
-            .catch(() => { /* graceful */ });
+            } catch { /* graceful */ }
+        }
+        scanThenFetch();
         return () => { cancelled = true; };
     }, []);
 
