@@ -5,6 +5,7 @@ import { useData } from "@/lib/data-context";
 import { computeCoverageDays, computeTargetStock, daysColor, daysBg } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
+import { useToast } from "@/components/ui/Toast";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -192,6 +193,20 @@ function SegmentBanner({ filter, rawCount, finishedCount, rawItems }: {
     );
 }
 
+function useIsMobile(breakpoint = 768): boolean {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+        setIsMobile(mq.matches);
+        const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+        mq.addEventListener("change", handler);
+        return () => mq.removeEventListener("change", handler);
+    }, [breakpoint]);
+    return isMobile;
+}
+
+type DecisionFilter = "all" | "pending" | "accepted" | "rejected";
+
 /** Compute suggestion for a single product row */
 function computeSuggestion(p: Product) {
     const { target, formula, leadTimeDemand } = computeTargetStock(
@@ -249,7 +264,7 @@ function RecActionCell({
     unit: string;
     onAccept: (productId: string) => void;
     onReject: (productId: string, feedbackNote?: string) => void;
-    onEdit: (productId: string, qty: number) => void;
+    onEdit: (productId: string, qty: number, unit: string) => void;
 }) {
     const [editMode, setEditMode] = useState(false);
     const [editQty, setEditQty] = useState(suggestQty);
@@ -318,7 +333,7 @@ function RecActionCell({
                 />
                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{unit}</span>
                 <button
-                    onClick={() => { onEdit(productId, editQty); setEditMode(false); }}
+                    onClick={() => { onEdit(productId, editQty, unit); setEditMode(false); }}
                     style={{
                         fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
                         background: "var(--accent-bg)", color: "var(--accent-text)",
@@ -439,9 +454,9 @@ function RecActionCell({
 export default function PurchaseSuggestedPage() {
     const { reorderSuggestions } = useData();
     const [filter, setFilter] = useState<FilterType>("all");
-    const [windowWidth, setWindowWidth] = useState(
-        typeof window !== "undefined" ? window.innerWidth : 1200
-    );
+    const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>("all");
+    const isMobile = useIsMobile();
+    const { toast } = useToast();
     const [aiData, setAiData] = useState<{
         ai_available: boolean;
         items: AiEnrichmentItem[];
@@ -454,12 +469,6 @@ export default function PurchaseSuggestedPage() {
 
     // recMap: productId → { id, status, editedQty? }
     const [recMap, setRecMap] = useState<Map<string, RecEntry & { editedQty?: number }>>(new Map());
-
-    useEffect(() => {
-        const handleResize = () => setWindowWidth(window.innerWidth);
-        window.addEventListener("resize", handleResize);
-        return () => window.removeEventListener("resize", handleResize);
-    }, []);
 
     useEffect(() => {
         if (reorderSuggestions.length === 0) return;
@@ -518,9 +527,14 @@ export default function PurchaseSuggestedPage() {
             if (res.ok) {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, decidedAt: recommendation.decidedAt }));
+                toast({ type: "success", message: "Sipariş önerisi kabul edildi" });
+            } else {
+                setRecMap(m => new Map(m).set(productId, prev));
+                toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
             }
         } catch {
             setRecMap(m => new Map(m).set(productId, prev));
+            toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
         }
     };
 
@@ -541,13 +555,18 @@ export default function PurchaseSuggestedPage() {
             if (res.ok) {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, decidedAt: recommendation.decidedAt }));
+                toast({ type: "info", message: "Öneri reddedildi" });
+            } else {
+                setRecMap(m => new Map(m).set(productId, prev));
+                toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
             }
         } catch {
             setRecMap(m => new Map(m).set(productId, prev));
+            toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
         }
     };
 
-    const handleEdit = async (productId: string, qty: number) => {
+    const handleEdit = async (productId: string, qty: number, unit: string) => {
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
@@ -561,13 +580,16 @@ export default function PurchaseSuggestedPage() {
             if (res.ok) {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, editedQty: qty, decidedAt: recommendation.decidedAt }));
+                toast({ type: "success", message: `Miktar güncellendi: ${qty} ${unit}` });
+            } else {
+                setRecMap(m => new Map(m).set(productId, prev));
+                toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
             }
         } catch {
             setRecMap(m => new Map(m).set(productId, prev));
+            toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
         }
     };
-
-    const isMobile = windowWidth < 768;
 
     const rawItems = reorderSuggestions.filter(p => p.productType === "raw_material");
     const finishedItems = reorderSuggestions.filter(p => p.productType === "finished");
@@ -585,6 +607,13 @@ export default function PurchaseSuggestedPage() {
         const urgA = 1 - a.available_now / a.minStockLevel;
         const urgB = 1 - b.available_now / b.minStockLevel;
         return urgB - urgA;
+    }).filter(p => {
+        if (decisionFilter === "all") return true;
+        const st = recMap.get(p.id)?.status;
+        if (decisionFilter === "accepted") return st === "accepted";
+        if (decisionFilter === "rejected") return st === "rejected";
+        // pending: no decision yet, or edited (quantity changed but not finalized)
+        return !st || (st !== "accepted" && st !== "rejected");
     });
 
     const avgRisk = reorderSuggestions.length > 0
@@ -599,10 +628,16 @@ export default function PurchaseSuggestedPage() {
         ? computeCoverageDays(mostUrgent.available_now, mostUrgent.dailyUsage)
         : null;
 
-    const aiDrawerProduct = aiDrawerProductId ? sorted.find(p => p.id === aiDrawerProductId) : undefined;
+    const aiDrawerProduct = aiDrawerProductId
+        ? (sorted.find(p => p.id === aiDrawerProductId) ?? reorderSuggestions.find(p => p.id === aiDrawerProductId))
+        : undefined;
     const aiDrawerEnrichment = aiDrawerProductId ? aiMap.get(aiDrawerProductId) : undefined;
     const aiDrawerRecEntry = aiDrawerProductId ? recMap.get(aiDrawerProductId) : undefined;
-    const aiDrawerSuggestQty = aiDrawerProduct ? computeSuggestion(aiDrawerProduct).suggestQty : 1;
+    const aiDrawerSuggestion = aiDrawerProduct ? computeSuggestion(aiDrawerProduct) : null;
+    const aiDrawerSuggestQty = aiDrawerSuggestion?.suggestQty ?? 1;
+    const aiDrawerCoverageDays = aiDrawerProduct
+        ? computeCoverageDays(aiDrawerProduct.available_now, aiDrawerProduct.dailyUsage)
+        : null;
 
     const tabs: { key: FilterType; label: string; count: number }[] = [
         { key: "all", label: "Tümü", count: reorderSuggestions.length },
@@ -638,7 +673,7 @@ export default function PurchaseSuggestedPage() {
 
             {/* Summary cards */}
             {reorderSuggestions.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginTop: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "12px", marginTop: "20px" }}>
                     <div style={{
                         background: "var(--bg-secondary)",
                         border: "1px solid var(--danger-border)",
@@ -718,14 +753,44 @@ export default function PurchaseSuggestedPage() {
                 </div>
             )}
 
-            {/* Decision summary */}
+            {/* Decision summary — clickable filters */}
             {recMap.size > 0 && (
-                <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--text-secondary)" }}>
-                    <span style={{ color: "var(--success-text)", fontWeight: 600 }}>{acceptedCount} kabul</span>
-                    {" · "}
-                    <span style={{ color: "var(--danger-text)", fontWeight: 600 }}>{rejectedCount} red</span>
-                    {" · "}
-                    <span style={{ color: "var(--text-tertiary)" }}>{pendingCount} beklemede</span>
+                <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    {([
+                        { key: "accepted" as DecisionFilter, count: acceptedCount, color: "var(--success-text)", label: "kabul" },
+                        { key: "rejected" as DecisionFilter, count: rejectedCount, color: "var(--danger-text)", label: "red" },
+                        { key: "pending" as DecisionFilter, count: pendingCount, color: "var(--text-tertiary)", label: "beklemede" },
+                    ] as const).map((item, i) => (
+                        <span key={item.key} style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                            {i > 0 && <span style={{ color: "var(--border-secondary)" }}>·</span>}
+                            <button
+                                onClick={() => setDecisionFilter(decisionFilter === item.key ? "all" : item.key)}
+                                style={{
+                                    background: "transparent",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    padding: "0",
+                                    color: item.color,
+                                    fontWeight: decisionFilter === item.key ? 700 : 600,
+                                    fontSize: "12px",
+                                    textDecoration: decisionFilter === item.key ? "underline" : "none",
+                                }}
+                            >
+                                {item.count} {item.label}
+                            </button>
+                        </span>
+                    ))}
+                    {decisionFilter !== "all" && (
+                        <button
+                            onClick={() => setDecisionFilter("all")}
+                            style={{
+                                background: "transparent", border: "none", cursor: "pointer",
+                                fontSize: "11px", color: "var(--text-tertiary)", padding: "0 2px",
+                            }}
+                        >
+                            × tümünü göster
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -1130,6 +1195,87 @@ export default function PurchaseSuggestedPage() {
                                 {aiDrawerProduct.sku}
                             </div>
                         </div>
+
+                        {/* Stok Durumu */}
+                        <div style={{ background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "8px", padding: "12px 14px" }}>
+                            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>
+                                Stok Durumu
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "10px" }}>
+                                {[
+                                    { label: "Mevcut", value: `${aiDrawerProduct.available_now.toLocaleString("tr-TR")} ${aiDrawerProduct.unit}`, color: "var(--danger-text)" },
+                                    { label: "Minimum", value: `${aiDrawerProduct.minStockLevel.toLocaleString("tr-TR")} ${aiDrawerProduct.unit}`, color: "var(--text-secondary)" },
+                                    { label: "Açık", value: `-${(aiDrawerProduct.minStockLevel - aiDrawerProduct.available_now).toLocaleString("tr-TR")} ${aiDrawerProduct.unit}`, color: "var(--danger-text)" },
+                                ].map(item => (
+                                    <div key={item.label}>
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{item.label}</div>
+                                        <div style={{ fontSize: "12px", fontWeight: 600, color: item.color }}>{item.value}</div>
+                                    </div>
+                                ))}
+                            </div>
+                            <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px", overflow: "hidden", marginBottom: "6px" }}>
+                                <div style={{
+                                    width: `${Math.min(100, Math.round((aiDrawerProduct.available_now / aiDrawerProduct.minStockLevel) * 100))}%`,
+                                    height: "100%",
+                                    background: "var(--danger)",
+                                    borderRadius: "2px",
+                                }} />
+                            </div>
+                            {aiDrawerCoverageDays !== null && (
+                                <span style={{
+                                    display: "inline-block",
+                                    fontSize: "11px", fontWeight: 700,
+                                    background: daysBg(aiDrawerCoverageDays),
+                                    color: daysColor(aiDrawerCoverageDays),
+                                    padding: "2px 8px", borderRadius: "4px",
+                                }}>
+                                    ~{aiDrawerCoverageDays} gün kaldı
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Sipariş Planı */}
+                        {aiDrawerSuggestion && (
+                            <div style={{ background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "8px", padding: "12px 14px" }}>
+                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>
+                                    Sipariş Planı
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Önerilen miktar</span>
+                                        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-primary)" }}>
+                                            {aiDrawerSuggestion.suggestQty.toLocaleString("tr-TR")} {aiDrawerProduct.unit}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Formül</span>
+                                        <span style={{ fontSize: "11px", fontFamily: "monospace", color: "var(--accent-text)" }}>
+                                            {aiDrawerSuggestion.formula === "lead_time" && aiDrawerSuggestion.leadTimeDemand !== null && aiDrawerProduct.leadTimeDays && aiDrawerProduct.dailyUsage
+                                                ? `${aiDrawerProduct.leadTimeDays}g × ${aiDrawerProduct.dailyUsage} + ${aiDrawerProduct.minStockLevel} emniyet`
+                                                : "2 × min (tedarik süresi bilinmiyor)"}
+                                        </span>
+                                    </div>
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Minimum sipariş</span>
+                                        <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                                            {aiDrawerSuggestion.moq.toLocaleString("tr-TR")} {aiDrawerProduct.unit}
+                                        </span>
+                                    </div>
+                                    {aiDrawerProduct.preferredVendor && (
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Tedarikçi</span>
+                                            <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-primary)" }}>{aiDrawerProduct.preferredVendor}</span>
+                                        </div>
+                                    )}
+                                    {aiDrawerProduct.leadTimeDays != null && (
+                                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Tedarik süresi</span>
+                                            <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--warning-text)" }}>{aiDrawerProduct.leadTimeDays} gün</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {/* AI Değerlendirmesi */}
                         {aiDrawerEnrichment ? (
