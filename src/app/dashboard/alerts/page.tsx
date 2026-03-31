@@ -274,7 +274,7 @@ export default function AlertsPage() {
                 if (remaining.length === 0) setDrawerGroup(null);
                 else setDrawerGroup({ ...drawerGroup, alerts: remaining });
             }
-            toast({ type: "info", message: "Uyarı kapatıldı" });
+            toast({ type: "info", message: "Uyarı yoksayıldı" });
         } catch {
             toast({ type: "error", message: "İşlem başarısız" });
         }
@@ -911,14 +911,17 @@ function drawerActionLinks(group: ProductAlertGroup): Array<{ label: string; hre
 
 function drawerRelatedLinks(group: ProductAlertGroup): Array<{ label: string; href: string }> {
     const types = group.alerts.map((a) => a.type);
-    const links: Array<{ label: string; href: string }> = [
+    // order_shortage: Önerilen Aksiyon'da zaten /orders (primary) ve /purchase/suggested (secondary) var.
+    // Tekrar eden linkleri İlgili Kayıtlar'dan çıkar; sadece ürün kartı göster.
+    if (types.includes("order_shortage")) {
+        return [
+            { label: "Ürün kartına git", href: "/dashboard/products" },
+        ];
+    }
+    return [
         { label: "Ürün kartına git",           href: "/dashboard/products" },
         { label: "Satın alma önerisine git",   href: "/dashboard/purchase/suggested" },
     ];
-    if (types.includes("order_shortage")) {
-        links.push({ label: "İlgili siparişe git", href: "/dashboard/orders" });
-    }
-    return links;
 }
 
 // ── DrawerSection ─────────────────────────────────────────────
