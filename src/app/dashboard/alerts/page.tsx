@@ -89,11 +89,26 @@ const ALERT_TYPE_LABEL: Record<string, string> = {
     purchase_recommended: "Satın Alma Önerisi",
 };
 
+// ── useIsMobile ────────────────────────────────────────────────
+
+function useIsMobile(breakpoint = 768): boolean {
+    const [isMobile, setIsMobile] = useState(false);
+    useEffect(() => {
+        const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+        setIsMobile(mq.matches);
+        const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+        mq.addEventListener("change", handler);
+        return () => mq.removeEventListener("change", handler);
+    }, [breakpoint]);
+    return isMobile;
+}
+
 // ── Page ──────────────────────────────────────────────────────
 
 export default function AlertsPage() {
     const { toast } = useToast();
     const { products } = useData();
+    const isMobile = useIsMobile();
 
     const [rawAlerts, setRawAlerts]         = useState<AlertRow[]>([]);
     const [loading, setLoading]             = useState(true);
@@ -337,73 +352,105 @@ export default function AlertsPage() {
 
             {/* ── Filter Tabs ── */}
             <div style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0 24px",
-                borderBottom: "0.5px solid var(--border-tertiary)",
+                borderBottom: isMobile ? "none" : "0.5px solid var(--border-tertiary)",
             }}>
-                <div style={{ display: "flex", alignItems: "center" }}>
-                    {(
-                        [
-                            { key: "all"            as AlertFilter, label: "Tümü",         count: productGroups.length, dot: null                },
-                            { key: "critical"       as AlertFilter, label: "Kritik",        count: criticalCount,        dot: "var(--danger)"     },
-                            { key: "warning"        as AlertFilter, label: "Uyarı",         count: warningCount,         dot: "var(--warning)"    },
-                            { key: "order_shortage" as AlertFilter, label: "Sipariş Eksik", count: shortageCount,        dot: "var(--danger)"     },
-                        ]
-                    ).map((tab) => (
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: isMobile ? undefined : "space-between",
+                    padding: "0 24px",
+                    borderBottom: isMobile ? "0.5px solid var(--border-tertiary)" : "none",
+                    overflowX: isMobile ? "auto" : undefined,
+                    scrollbarWidth: "none" as React.CSSProperties["scrollbarWidth"],
+                    WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"],
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                        {(
+                            [
+                                { key: "all"            as AlertFilter, label: "Tümü",         count: productGroups.length, dot: null                },
+                                { key: "critical"       as AlertFilter, label: "Kritik",        count: criticalCount,        dot: "var(--danger)"     },
+                                { key: "warning"        as AlertFilter, label: "Uyarı",         count: warningCount,         dot: "var(--warning)"    },
+                                { key: "order_shortage" as AlertFilter, label: "Sipariş Eksik", count: shortageCount,        dot: "var(--danger)"     },
+                            ]
+                        ).map((tab) => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setActiveFilter(tab.key)}
+                                style={{
+                                    fontSize: "12px",
+                                    padding: "10px 14px",
+                                    border: "none",
+                                    borderBottom: activeFilter === tab.key ? "2px solid var(--accent)" : "2px solid transparent",
+                                    background: "transparent",
+                                    color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-secondary)",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    fontWeight: activeFilter === tab.key ? 500 : 400,
+                                    whiteSpace: "nowrap",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                {tab.dot && (
+                                    <span style={{
+                                        width: "6px", height: "6px", borderRadius: "50%",
+                                        background: tab.dot, flexShrink: 0,
+                                    }} />
+                                )}
+                                {tab.label}
+                                {tab.count > 0 && (
+                                    <span style={{
+                                        fontSize: "10px", padding: "1px 5px", borderRadius: "10px",
+                                        background: activeFilter === tab.key ? "var(--accent-bg)" : "var(--bg-tertiary)",
+                                        color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-tertiary)",
+                                        fontWeight: 500,
+                                    }}>
+                                        {tab.count}
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                    {!isMobile && (
                         <button
-                            key={tab.key}
-                            onClick={() => setActiveFilter(tab.key)}
+                            onClick={() => setShowResolved((v) => !v)}
                             style={{
-                                fontSize: "12px",
-                                padding: "10px 14px",
-                                border: "none",
-                                borderBottom: activeFilter === tab.key ? "2px solid var(--accent)" : "2px solid transparent",
-                                background: "transparent",
-                                color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-secondary)",
+                                fontSize: "11px",
+                                padding: "4px 10px",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "4px",
+                                background: showResolved ? "var(--bg-tertiary)" : "transparent",
+                                color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
                                 cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                                fontWeight: activeFilter === tab.key ? 500 : 400,
+                                flexShrink: 0,
                             }}
                         >
-                            {tab.dot && (
-                                <span style={{
-                                    width: "6px", height: "6px", borderRadius: "50%",
-                                    background: tab.dot, flexShrink: 0,
-                                }} />
-                            )}
-                            {tab.label}
-                            {tab.count > 0 && (
-                                <span style={{
-                                    fontSize: "10px", padding: "1px 5px", borderRadius: "10px",
-                                    background: activeFilter === tab.key ? "var(--accent-bg)" : "var(--bg-tertiary)",
-                                    color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-tertiary)",
-                                    fontWeight: 500,
-                                }}>
-                                    {tab.count}
-                                </span>
-                            )}
+                            {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
                         </button>
-                    ))}
+                    )}
                 </div>
-                <button
-                    onClick={() => setShowResolved((v) => !v)}
-                    style={{
-                        fontSize: "11px",
-                        padding: "4px 10px",
-                        border: "0.5px solid var(--border-secondary)",
-                        borderRadius: "4px",
-                        background: showResolved ? "var(--bg-tertiary)" : "transparent",
-                        color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
-                        cursor: "pointer",
-                        flexShrink: 0,
-                    }}
-                >
-                    {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
-                </button>
+                {isMobile && (
+                    <div style={{
+                        padding: "6px 24px 6px",
+                        borderBottom: "0.5px solid var(--border-tertiary)",
+                    }}>
+                        <button
+                            onClick={() => setShowResolved((v) => !v)}
+                            style={{
+                                fontSize: "11px",
+                                padding: "4px 10px",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "4px",
+                                background: showResolved ? "var(--bg-tertiary)" : "transparent",
+                                color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
+                                cursor: "pointer",
+                            }}
+                        >
+                            {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
+                        </button>
+                    </div>
+                )}
             </div>
 
             {/* ── Product Alert Table ── */}
@@ -432,32 +479,34 @@ export default function AlertsPage() {
                 />
             ) : (
                 <div>
-                    {/* Column headers */}
-                    <div style={{
-                        display: "grid",
-                        gridTemplateColumns: "3px 1fr 170px 120px 148px 110px",
-                        alignItems: "center",
-                        borderBottom: "0.5px solid var(--border-tertiary)",
-                    }}>
-                        <div />
-                        {[
-                            { label: "ÜRÜN",            pad: "8px 16px" },
-                            { label: "NEDEN",           pad: "8px 12px" },
-                            { label: "ETKİ",            pad: "8px 12px" },
-                            { label: "ÖNERİLEN ADIM",   pad: "8px 12px" },
-                            { label: "",                pad: "8px 12px" },
-                        ].map(({ label, pad }) => (
-                            <div key={label} style={{
-                                padding: pad,
-                                fontSize: "10px",
-                                color: "var(--text-tertiary)",
-                                fontWeight: 600,
-                                letterSpacing: "0.06em",
-                            }}>
-                                {label}
-                            </div>
-                        ))}
-                    </div>
+                    {/* Column headers — desktop only */}
+                    {!isMobile && (
+                        <div style={{
+                            display: "grid",
+                            gridTemplateColumns: "3px 1fr 170px 120px 148px 110px",
+                            alignItems: "center",
+                            borderBottom: "0.5px solid var(--border-tertiary)",
+                        }}>
+                            <div />
+                            {[
+                                { label: "ÜRÜN",            pad: "8px 16px" },
+                                { label: "NEDEN",           pad: "8px 12px" },
+                                { label: "ETKİ",            pad: "8px 12px" },
+                                { label: "ÖNERİLEN ADIM",   pad: "8px 12px" },
+                                { label: "",                pad: "8px 12px" },
+                            ].map(({ label, pad }) => (
+                                <div key={label} style={{
+                                    padding: pad,
+                                    fontSize: "10px",
+                                    color: "var(--text-tertiary)",
+                                    fontWeight: 600,
+                                    letterSpacing: "0.06em",
+                                }}>
+                                    {label}
+                                </div>
+                            ))}
+                        </div>
+                    )}
 
                     {/* Rows */}
                     {filtered.map((group) => (
@@ -466,6 +515,7 @@ export default function AlertsPage() {
                             group={group}
                             onOpenDrawer={() => setDrawerGroup(group)}
                             onDismissGroup={() => dismissGroup(group)}
+                            isMobile={isMobile}
                         />
                     ))}
                 </div>
@@ -563,13 +613,134 @@ interface ProductRowProps {
     group: ProductAlertGroup;
     onOpenDrawer: () => void;
     onDismissGroup: () => void;
+    isMobile: boolean;
 }
 
-function ProductRow({ group, onOpenDrawer, onDismissGroup }: ProductRowProps) {
+function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRowProps) {
     const sev      = SEV[group.topSeverity];
     const isAllAck = group.alerts.every((a) => a.status === "acknowledged" || a.status === "resolved" || a.status === "dismissed");
     const covDays  = group.coverageDays;
 
+    // ── Mobile card layout ──
+    if (isMobile) {
+        return (
+            <div
+                style={{
+                    display: "flex",
+                    borderBottom: "0.5px solid var(--border-tertiary)",
+                    opacity: isAllAck ? 0.6 : 1,
+                }}
+            >
+                {/* Severity stripe */}
+                <div style={{ width: "3px", background: sev.dot, flexShrink: 0 }} />
+
+                {/* Card content */}
+                <div style={{
+                    flex: 1,
+                    padding: "12px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "5px",
+                    minWidth: 0,
+                }}>
+                    {/* Row 1: severity badge + product name */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                        <span style={{
+                            fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em",
+                            padding: "1px 5px", borderRadius: "3px",
+                            background: sev.bg, color: sev.text, border: `0.5px solid ${sev.border}`,
+                            flexShrink: 0,
+                        }}>
+                            {sev.label}
+                        </span>
+                        <span style={{
+                            fontSize: "13px", fontWeight: 500, color: "var(--text-primary)",
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                            {group.productName}
+                        </span>
+                    </div>
+
+                    {/* Row 2: SKU + coverage */}
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
+                            {group.sku}
+                        </span>
+                        {covDays !== null && (
+                            <span style={{ fontSize: "10px", fontWeight: 600, color: daysColor(covDays) }}>
+                                ~{covDays}g
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Row 3: reason */}
+                    <span style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                        {group.reason}
+                    </span>
+
+                    {/* Row 4: impact */}
+                    <span style={{
+                        fontSize: "12px", fontWeight: 600,
+                        color: group.topSeverity === "critical" ? "var(--danger-text)" : "var(--warning-text)",
+                    }}>
+                        {group.impact}
+                    </span>
+
+                    {/* Row 5: actions */}
+                    <div style={{
+                        display: "flex", alignItems: "center", gap: "8px",
+                        flexWrap: "wrap", marginTop: "4px",
+                    }}>
+                        <Link
+                            href={group.actionHref}
+                            style={{
+                                fontSize: "12px", fontWeight: 500,
+                                padding: "5px 12px", borderRadius: "4px",
+                                background: sev.bg, color: sev.text,
+                                border: `0.5px solid ${sev.border}`,
+                                textDecoration: "none", whiteSpace: "nowrap",
+                            }}
+                        >
+                            {group.actionLabel} →
+                        </Link>
+                        <button
+                            onClick={onOpenDrawer}
+                            aria-label={`${group.productName} detayını aç`}
+                            style={{
+                                fontSize: "11px", padding: "5px 12px",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "4px", background: "transparent",
+                                color: "var(--text-secondary)", cursor: "pointer",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Detay
+                        </button>
+                        {!isAllAck ? (
+                            <button
+                                onClick={onDismissGroup}
+                                aria-label={`${group.productName} uyarılarını yoksay`}
+                                title="Tüm uyarıları yoksay"
+                                style={{
+                                    fontSize: "13px", padding: "3px 9px",
+                                    border: "0.5px solid var(--border-secondary)",
+                                    borderRadius: "4px", background: "transparent",
+                                    color: "var(--text-tertiary)", cursor: "pointer",
+                                    lineHeight: 1,
+                                }}
+                            >
+                                ×
+                            </button>
+                        ) : (
+                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Görüldü</span>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    // ── Desktop grid layout ──
     return (
         <div
             style={{
