@@ -296,3 +296,25 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================
+   Focus visibility — WCAG 2.4.11
+   Visible focus for keyboard navigation.
+   !important overrides inline outline:none
+   ============================================ */
+
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent) !important;
+  outline-offset: 2px !important;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none !important;
+  border-color: var(--accent-border) !important;
+  box-shadow: 0 0 0 1px var(--accent-border) !important;
+}

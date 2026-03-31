@@ -131,7 +131,6 @@ const modalInputStyle: React.CSSProperties = {
     borderRadius: "6px",
     background: "var(--bg-tertiary)",
     color: "var(--text-primary)",
-    outline: "none",
     width: "100%",
 };
 
@@ -414,7 +413,6 @@ export default function ProductsPage() {
                             background: "var(--bg-primary)",
                             color: "var(--text-primary)",
                             width: isMobile ? "140px" : "200px",
-                            outline: "none",
                         }}
                     />
                     <Button variant="primary" onClick={() => setCreateOpen(true)}>+ Yeni Ürün</Button>
@@ -533,16 +531,16 @@ export default function ProductsPage() {
                     overflowX: "auto",
                 }}
             >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "640px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: isMobile ? "360px" : "640px" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)" }}>
                             <th style={thStyle}>SKU</th>
                             <th style={thStyle}>Ürün Adı</th>
-                            <th style={thStyle}>Kategori</th>
+                            {!isMobile && <th style={thStyle}>Kategori</th>}
                             <th style={{ ...thStyle, textAlign: "right" }}>Stok</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Kapsam</th>
+                            {!isMobile && <th style={{ ...thStyle, textAlign: "right" }}>Kapsam</th>}
                             <th style={{ ...thStyle, textAlign: "center" }}>Sinyal</th>
-                            <th style={{ ...thStyle, width: "100px" }}></th>
+                            <th style={{ ...thStyle, width: isMobile ? "56px" : "100px" }}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -578,9 +576,11 @@ export default function ProductsPage() {
                                     <td style={{ ...tdStyle, fontWeight: 500, maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis" }}>
                                         {product.name}
                                     </td>
-                                    <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
-                                        {product.category}
-                                    </td>
+                                    {!isMobile && (
+                                        <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
+                                            {product.category}
+                                        </td>
+                                    )}
                                     <td style={{ ...tdStyle, textAlign: "right" }}>
                                         <div style={{
                                             fontSize: "14px", fontWeight: 700, lineHeight: 1.2,
@@ -592,9 +592,11 @@ export default function ProductsPage() {
                                             {formatNumber(product.on_hand)} · min {formatNumber(product.minStockLevel)}
                                         </div>
                                     </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: coverageDaysColor(risk?.coverageDays ?? null) }}>
-                                        {risk?.coverageDays != null ? `${risk.coverageDays}g` : <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>—</span>}
-                                    </td>
+                                    {!isMobile && (
+                                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: coverageDaysColor(risk?.coverageDays ?? null) }}>
+                                            {risk?.coverageDays != null ? `${risk.coverageDays}g` : <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>—</span>}
+                                        </td>
+                                    )}
                                     <td style={{ ...tdStyle, textAlign: "center" }}>
                                         {isCritical ? (
                                             <span style={{
@@ -925,7 +927,7 @@ export default function ProductsPage() {
 
                                 {/* ── Block 3: İlişkiler / Etki ────────────────── */}
                                 <div>
-                                    {sectionLabel("İlişkiler / Etki")}
+                                    {sectionLabel("Uyarılar & Öneriler")}
 
                                     {/* AI risk analysis + recommendation + decision — single flow */}
                                     {(risk?.aiExplanation || risk?.aiRecommendation || drawerRec) && (
@@ -989,7 +991,7 @@ export default function ProductsPage() {
                                                                     border: "0.5px solid var(--border-secondary)",
                                                                     borderRadius: "6px",
                                                                     background: "var(--bg-tertiary)",
-                                                                    color: "var(--text-primary)", outline: "none",
+                                                                    color: "var(--text-primary)",
                                                                     width: "100%",
                                                                 }}
                                                             />
