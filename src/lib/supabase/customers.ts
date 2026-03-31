@@ -65,6 +65,40 @@ export async function dbFindCustomerByName(name: string): Promise<CustomerRow | 
     return data;
 }
 
+export interface UpdateCustomerInput {
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    tax_number?: string;
+    tax_office?: string;
+    country?: string;
+    currency?: string;
+    notes?: string;
+}
+
+export async function dbUpdateCustomer(id: string, input: UpdateCustomerInput): Promise<CustomerRow> {
+    const supabase = createServiceClient();
+    const patch: Record<string, unknown> = {};
+    if (input.name !== undefined)       patch.name = input.name;
+    if (input.email !== undefined)      patch.email = input.email || null;
+    if (input.phone !== undefined)      patch.phone = input.phone || null;
+    if (input.address !== undefined)    patch.address = input.address || null;
+    if (input.tax_number !== undefined) patch.tax_number = input.tax_number || null;
+    if (input.tax_office !== undefined) patch.tax_office = input.tax_office || null;
+    if (input.country !== undefined)    patch.country = input.country || null;
+    if (input.currency !== undefined)   patch.currency = input.currency;
+    if (input.notes !== undefined)      patch.notes = input.notes || null;
+    const { data, error } = await supabase
+        .from("customers")
+        .update(patch)
+        .eq("id", id)
+        .select("*")
+        .single();
+    if (error || !data) throw new Error(error?.message ?? "Customer update failed");
+    return data;
+}
+
 export async function dbCreateCustomer(input: CreateCustomerInput): Promise<CustomerRow> {
     const supabase = createServiceClient();
     const { data, error } = await supabase

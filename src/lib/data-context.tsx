@@ -79,7 +79,7 @@ interface DataContextValue {
   addCustomer: (
     c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">
   ) => Promise<void>;
-  updateCustomer: (id: string, updates: Partial<Customer>) => void;
+  updateCustomer: (id: string, updates: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   addProduct: (
     p: Omit<Product, "id" | "reserved" | "available_now" | "isActive">
@@ -208,10 +208,28 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateCustomer = (id: string, updates: Partial<Customer>) => {
-    setCustomers((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
-    );
+  const updateCustomer = async (id: string, updates: Partial<Customer>): Promise<void> => {
+    const body: Record<string, unknown> = {};
+    if (updates.name !== undefined)      body.name = updates.name;
+    if (updates.email !== undefined)     body.email = updates.email;
+    if (updates.phone !== undefined)     body.phone = updates.phone;
+    if (updates.address !== undefined)   body.address = updates.address;
+    if (updates.taxNumber !== undefined) body.tax_number = updates.taxNumber;
+    if (updates.taxOffice !== undefined) body.tax_office = updates.taxOffice;
+    if (updates.country !== undefined)   body.country = updates.country;
+    if (updates.currency !== undefined)  body.currency = updates.currency;
+    if (updates.notes !== undefined)     body.notes = updates.notes;
+    const res = await fetch(`/api/customers/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(errBody?.error ?? "Müşteri güncellenemedi.");
+    }
+    const data = await res.json();
+    setCustomers((prev) => prev.map((c) => (c.id === id ? mapCustomer(data) : c)));
   };
 
   const deleteCustomer = async (id: string) => {

@@ -53,6 +53,8 @@ export default function CustomerDetailPanel({
     const { orders, updateCustomer } = useData();
     const [editMode, setEditMode] = useState(false);
     const [editSaved, setEditSaved] = useState(false);
+    const [editSaving, setEditSaving] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
     const [editForm, setEditForm] = useState<Customer | null>(null);
 
     if (!customer) return null;
@@ -69,17 +71,25 @@ export default function CustomerDetailPanel({
         setEditForm({ ...customer });
         setEditMode(true);
         setEditSaved(false);
+        setEditError(null);
     };
 
-    const handleSave = () => {
-        if (editForm) {
-            updateCustomer(customer.id, editForm);
+    const handleSave = async () => {
+        if (!editForm) return;
+        setEditSaving(true);
+        setEditError(null);
+        try {
+            await updateCustomer(customer.id, editForm);
+            setEditSaved(true);
+            setTimeout(() => {
+                setEditMode(false);
+                setEditSaved(false);
+            }, 1500);
+        } catch (err) {
+            setEditError(err instanceof Error ? err.message : "Kaydedilemedi.");
+        } finally {
+            setEditSaving(false);
         }
-        setEditSaved(true);
-        setTimeout(() => {
-            setEditMode(false);
-            setEditSaved(false);
-        }, 1500);
     };
 
     const setField = (key: keyof Customer) => (
@@ -228,9 +238,16 @@ export default function CustomerDetailPanel({
                             />
                         </div>
 
+                        {editError && (
+                            <div style={{ fontSize: "12px", color: "var(--danger-text)", padding: "6px 10px", background: "var(--danger-bg)", borderRadius: "6px", border: "0.5px solid var(--danger-border)" }}>
+                                {editError}
+                            </div>
+                        )}
+
                         <div style={{ display: "flex", gap: "8px", marginTop: "4px", alignItems: "center" }}>
                             <button
                                 onClick={handleSave}
+                                disabled={editSaving || editSaved}
                                 style={{
                                     flex: 1,
                                     fontSize: "12px",
@@ -239,13 +256,15 @@ export default function CustomerDetailPanel({
                                     borderRadius: "6px",
                                     background: "var(--accent-bg)",
                                     color: "var(--accent-text)",
-                                    cursor: "pointer",
+                                    cursor: editSaving || editSaved ? "default" : "pointer",
+                                    opacity: editSaving ? 0.6 : 1,
                                 }}
                             >
-                                {editSaved ? "✓ Kaydedildi" : "Kaydet"}
+                                {editSaved ? "✓ Kaydedildi" : editSaving ? "Kaydediliyor..." : "Kaydet"}
                             </button>
                             <button
                                 onClick={() => setEditMode(false)}
+                                disabled={editSaving}
                                 style={{
                                     flex: 1,
                                     fontSize: "12px",
@@ -254,7 +273,8 @@ export default function CustomerDetailPanel({
                                     borderRadius: "6px",
                                     background: "transparent",
                                     color: "var(--text-secondary)",
-                                    cursor: "pointer",
+                                    cursor: editSaving ? "default" : "pointer",
+                                    opacity: editSaving ? 0.4 : 1,
                                 }}
                             >
                                 İptal
