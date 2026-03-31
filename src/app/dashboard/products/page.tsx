@@ -25,6 +25,7 @@ interface RiskItem {
     leadTimeDays: number | null;
     dailyUsage: number | null;
     deterministicReason: string;
+    displayReason?: string;
     aiExplanation: string | null;
     aiRecommendation: string | null;
     aiConfidence: number | null;
@@ -913,7 +914,7 @@ export default function ProductsPage() {
                                             color: risk.riskLevel === "coverage_risk" ? "var(--danger-text)" : "var(--warning-text)",
                                             lineHeight: 1.5,
                                         }}>
-                                            {risk.deterministicReason}
+                                            {risk.displayReason || risk.deterministicReason}
                                         </div>
                                     )}
 

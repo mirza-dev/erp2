@@ -18,6 +18,7 @@ interface StockRiskResponseItem {
     leadTimeDays: number | null;
     dailyUsage: number | null;
     deterministicReason: string;
+    displayReason: string;
     aiExplanation: string | null;
     aiRecommendation: string | null;
     aiConfidence: number | null;
@@ -142,6 +143,7 @@ export async function POST() {
             leadTimeDays: r.computation.leadTimeDays,
             dailyUsage: r.computation.dailyUsage,
             deterministicReason: r.computation.reason,
+            displayReason: r.computation.displayReason,
             aiExplanation: ai?.aiExplanation ?? null,
             aiRecommendation: ai?.aiRecommendation ?? null,
             aiConfidence: ai?.aiConfidence ?? null,

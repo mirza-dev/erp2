@@ -132,7 +132,8 @@ export interface StockRiskComputation {
     coverageDays: number | null;
     leadTimeDays: number | null;
     dailyUsage: number | null;
-    reason: string;
+    reason: string;        // iç/ham — metadata'ya yazılır, AI'a gönderilir
+    displayReason: string; // kısa, müşteri dili — drawer'da gösterilir
 }
 
 /**
@@ -152,6 +153,7 @@ export function computeStockRiskLevel(
         leadTimeDays: leadTimeDays ?? null,
         dailyUsage: dailyUsage ?? null,
         reason: "",
+        displayReason: "",
     });
 
     // Step 1: Already in deterministic alert zone — alert-service handles these
@@ -171,6 +173,7 @@ export function computeStockRiskLevel(
             leadTimeDays: leadTimeDays ?? null,
             dailyUsage: dailyUsage ?? null,
             reason: `Kalan stok (~${coverageDays} gün) tedarik süresinden (${leadTimeDays} gün) kısa.`,
+            displayReason: `~${coverageDays} günlük stok var, yeni sipariş ${leadTimeDays} gün sürer.`,
         };
     }
 
@@ -182,6 +185,7 @@ export function computeStockRiskLevel(
             leadTimeDays: leadTimeDays ?? null,
             dailyUsage: dailyUsage ?? null,
             reason: `Mevcut tüketim hızıyla ~${coverageDays} gün içinde kritik seviyeye düşebilir.`,
+            displayReason: `~${coverageDays} gün içinde stok kritik seviyeye düşebilir.`,
         };
     }
 
