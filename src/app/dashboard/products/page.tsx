@@ -66,6 +66,46 @@ function IdField({ label, value }: { label: string; value: string | undefined | 
     );
 }
 
+function getAlertContext(type: string): {
+    neden: string | null;
+    etki: string | null;
+    ctaHref: string | null;
+    ctaLabel: string | null;
+} {
+    switch (type) {
+        case "stock_critical":
+            return {
+                neden: "Mevcut stok minimum eşiğin altına düştü.",
+                etki: "Yeni siparişler karşılanamaz.",
+                ctaHref: "/dashboard/purchase/suggested",
+                ctaLabel: "Satın alma önerilerini incele →",
+            };
+        case "stock_risk":
+            return {
+                neden: "Kapsam süresi kritik seviyenin altında.",
+                etki: "Yakın vadede stok tükenme riski var.",
+                ctaHref: "/dashboard/purchase/suggested",
+                ctaLabel: "Satın alma önerilerini incele →",
+            };
+        case "purchase_recommended":
+            return {
+                neden: "Stok yeniden sipariş noktasına ulaştı.",
+                etki: "Temin süresi göz önüne alındığında stok açığı riski var.",
+                ctaHref: "/dashboard/purchase/suggested",
+                ctaLabel: "Satın alma önerisini görüntüle →",
+            };
+        case "order_shortage":
+            return {
+                neden: "Onaylı siparişler için yeterli stok rezerve edilemiyor.",
+                etki: "Sipariş teslimatı gecikebilir.",
+                ctaHref: "/dashboard/orders",
+                ctaLabel: "Siparişleri görüntüle →",
+            };
+        default:
+            return { neden: null, etki: null, ctaHref: null, ctaLabel: null };
+    }
+}
+
 const thStyle: React.CSSProperties = {
     textAlign: "left",
     padding: "10px 14px",
@@ -771,103 +811,105 @@ export default function ProductsPage() {
                                 <div>
                                     {sectionLabel("İlişkiler / Etki")}
 
-                                    {/* AI risk analysis */}
-                                    {risk?.aiExplanation && (
+                                    {/* AI risk analysis + recommendation + decision — single flow */}
+                                    {(risk?.aiExplanation || risk?.aiRecommendation || drawerRec) && (
                                         <div style={{ marginBottom: "16px" }}>
                                             <div style={{
-                                                fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
-                                                textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px",
                                                 display: "flex", alignItems: "center", gap: "6px",
+                                                marginBottom: "8px",
                                             }}>
                                                 <span style={{
                                                     background: "var(--accent-bg)", color: "var(--accent-text)",
-                                                    padding: "1px 5px", borderRadius: "3px", fontSize: "9px",
+                                                    padding: "1px 5px", borderRadius: "3px",
+                                                    fontSize: "9px", fontWeight: 700, letterSpacing: "0.04em",
                                                 }}>✦ AI</span>
-                                                Risk Analizi
-                                                {risk.aiConfidence != null && (
-                                                    <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>
-                                                        · %{Math.round(risk.aiConfidence * 100)} güven
+                                                {risk?.aiConfidence != null && (
+                                                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                                        %{Math.round(risk.aiConfidence * 100)} güven
                                                     </span>
                                                 )}
                                             </div>
-                                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "8px" }}>
-                                                {risk.aiExplanation}
-                                            </div>
-                                            {risk.aiRecommendation && (
+                                            {risk?.aiExplanation && (
                                                 <div style={{
-                                                    padding: "10px 12px", background: "var(--accent-bg)",
-                                                    borderRadius: "5px", border: "0.5px solid var(--accent-border)",
-                                                    fontSize: "12px", color: "var(--accent-text)", lineHeight: 1.5,
+                                                    fontSize: "12px", color: "var(--text-secondary)",
+                                                    lineHeight: 1.6, marginBottom: "10px",
                                                 }}>
-                                                    → {risk.aiRecommendation}
+                                                    {risk.aiExplanation}
                                                 </div>
                                             )}
-                                            {riskGeneratedAt && (
-                                                <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                                                    Analiz: {new Date(riskGeneratedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
-                                                </div>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {/* AI recommendation decision */}
-                                    {drawerRec && (
-                                        <div style={{ marginBottom: "16px" }}>
-                                            <div style={{
-                                                fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
-                                                textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
-                                            }}>
-                                                AI Öneri Kararı
-                                            </div>
-                                            {drawerRec.status === "suggested" ? (
-                                                rejectMode ? (
-                                                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="Red nedeni (isteğe bağlı)"
-                                                            value={rejectNote}
-                                                            onChange={e => setRejectNote(e.target.value)}
-                                                            style={{
-                                                                fontSize: "12px", padding: "6px 10px",
-                                                                border: "0.5px solid var(--border-secondary)",
-                                                                borderRadius: "6px",
-                                                                background: "var(--bg-tertiary)",
-                                                                color: "var(--text-primary)", outline: "none",
-                                                                width: "100%",
-                                                            }}
-                                                        />
-                                                        <div style={{ display: "flex", gap: "6px" }}>
-                                                            <Button variant="danger" onClick={() => {
-                                                                handleReject(selectedProductId!, rejectNote || undefined);
-                                                                setRejectMode(false);
-                                                                setRejectNote("");
-                                                            }}>Reddet</Button>
-                                                            <Button variant="secondary" onClick={() => {
-                                                                setRejectMode(false);
-                                                                setRejectNote("");
-                                                            }}>İptal</Button>
-                                                        </div>
+                                            {risk?.aiRecommendation && (
+                                                <div style={{
+                                                    padding: "10px 12px", borderRadius: "5px",
+                                                    background: "var(--accent-bg)",
+                                                    border: "0.5px solid var(--accent-border)",
+                                                    marginBottom: drawerRec ? "10px" : "0",
+                                                }}>
+                                                    <div style={{
+                                                        fontSize: "10px", fontWeight: 700,
+                                                        color: "var(--accent-text)",
+                                                        textTransform: "uppercase", letterSpacing: "0.05em",
+                                                        marginBottom: "4px",
+                                                    }}>
+                                                        Önerilen Adım
                                                     </div>
+                                                    <div style={{
+                                                        fontSize: "12px", color: "var(--accent-text)", lineHeight: 1.5,
+                                                    }}>
+                                                        {risk.aiRecommendation}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {drawerRec && (
+                                                drawerRec.status === "suggested" ? (
+                                                    rejectMode ? (
+                                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Red nedeni (isteğe bağlı)"
+                                                                value={rejectNote}
+                                                                onChange={e => setRejectNote(e.target.value)}
+                                                                style={{
+                                                                    fontSize: "12px", padding: "6px 10px",
+                                                                    border: "0.5px solid var(--border-secondary)",
+                                                                    borderRadius: "6px",
+                                                                    background: "var(--bg-tertiary)",
+                                                                    color: "var(--text-primary)", outline: "none",
+                                                                    width: "100%",
+                                                                }}
+                                                            />
+                                                            <div style={{ display: "flex", gap: "6px" }}>
+                                                                <Button variant="danger" onClick={() => {
+                                                                    handleReject(selectedProductId!, rejectNote || undefined);
+                                                                    setRejectMode(false);
+                                                                    setRejectNote("");
+                                                                }}>Reddet</Button>
+                                                                <Button variant="secondary" onClick={() => {
+                                                                    setRejectMode(false);
+                                                                    setRejectNote("");
+                                                                }}>İptal</Button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <div style={{ display: "flex", gap: "6px" }}>
+                                                            <Button variant="primary" onClick={() => handleAccept(selectedProductId!)}>Kabul Et</Button>
+                                                            <Button variant="secondary" onClick={() => setRejectMode(true)}>Reddet</Button>
+                                                        </div>
+                                                    )
                                                 ) : (
-                                                    <div style={{ display: "flex", gap: "6px" }}>
-                                                        <Button variant="primary" onClick={() => handleAccept(selectedProductId!)}>Kabul Et</Button>
-                                                        <Button variant="secondary" onClick={() => setRejectMode(true)}>Reddet</Button>
+                                                    <div style={{ fontSize: "12px" }}>
+                                                        <span style={{
+                                                            color: drawerRec.status === "accepted" ? "var(--success-text)" : "var(--danger-text)",
+                                                            fontWeight: 500,
+                                                        }}>
+                                                            {drawerRec.status === "accepted" ? "Kabul edildi" : "Reddedildi"}
+                                                        </span>
+                                                        {drawerRec.decidedAt && (
+                                                            <span style={{ color: "var(--text-tertiary)", marginLeft: "6px" }}>
+                                                                · {new Date(drawerRec.decidedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 )
-                                            ) : (
-                                                <div style={{ fontSize: "12px" }}>
-                                                    <span style={{
-                                                        color: drawerRec.status === "accepted" ? "var(--success-text)" : "var(--danger-text)",
-                                                        fontWeight: 500,
-                                                    }}>
-                                                        {drawerRec.status === "accepted" ? "Kabul edildi" : "Reddedildi"}
-                                                    </span>
-                                                    {drawerRec.decidedAt && (
-                                                        <span style={{ color: "var(--text-tertiary)", marginLeft: "6px" }}>
-                                                            · {new Date(drawerRec.decidedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
-                                                        </span>
-                                                    )}
-                                                </div>
                                             )}
                                         </div>
                                     )}
@@ -876,7 +918,7 @@ export default function ProductsPage() {
                                     <div>
                                         <div style={{
                                             fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
-                                            textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px",
+                                            textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px",
                                         }}>
                                             Aktif Uyarılar
                                         </div>
@@ -885,35 +927,70 @@ export default function ProductsPage() {
                                                 Yükleniyor…
                                             </div>
                                         ) : drawerAlerts.length > 0 ? (
-                                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                                {drawerAlerts.map(alert => (
-                                                    <div key={alert.id} style={{
-                                                        padding: "8px 10px", background: "var(--bg-secondary)",
-                                                        borderRadius: "5px", border: "0.5px solid var(--border-tertiary)",
-                                                        display: "flex", gap: "8px", alignItems: "flex-start",
-                                                    }}>
-                                                        <span style={{
-                                                            fontSize: "9px", fontWeight: 700, padding: "2px 5px",
-                                                            borderRadius: "3px", flexShrink: 0,
-                                                            background: alertSeverityBg(alert.severity),
-                                                            color: alertSeverityColor(alert.severity),
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                                {drawerAlerts.map(alert => {
+                                                    const ctx = getAlertContext(alert.type);
+                                                    return (
+                                                        <div key={alert.id} style={{
+                                                            padding: "10px 12px", background: "var(--bg-secondary)",
+                                                            borderRadius: "5px",
                                                             border: `0.5px solid ${alertSeverityBorder(alert.severity)}`,
-                                                            textTransform: "uppercase", letterSpacing: "0.04em",
                                                         }}>
-                                                            {alertSeverityLabel(alert.severity)}
-                                                        </span>
-                                                        <div>
-                                                            <div style={{ fontSize: "12px", color: "var(--text-primary)", fontWeight: 500, lineHeight: 1.3 }}>
-                                                                {alert.title}
+                                                            <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "6px" }}>
+                                                                <span style={{
+                                                                    fontSize: "9px", fontWeight: 700, padding: "2px 5px",
+                                                                    borderRadius: "3px", flexShrink: 0, marginTop: "2px",
+                                                                    background: alertSeverityBg(alert.severity),
+                                                                    color: alertSeverityColor(alert.severity),
+                                                                    border: `0.5px solid ${alertSeverityBorder(alert.severity)}`,
+                                                                    textTransform: "uppercase", letterSpacing: "0.04em",
+                                                                }}>
+                                                                    {alertSeverityLabel(alert.severity)}
+                                                                </span>
+                                                                <div style={{
+                                                                    fontSize: "12px", color: "var(--text-primary)",
+                                                                    fontWeight: 600, lineHeight: 1.3,
+                                                                }}>
+                                                                    {alert.title}
+                                                                </div>
                                                             </div>
-                                                            {alert.description && (
-                                                                <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "2px", lineHeight: 1.4 }}>
+                                                            {(ctx.neden || ctx.etki) ? (
+                                                                <div style={{
+                                                                    display: "flex", flexDirection: "column", gap: "3px",
+                                                                    marginBottom: ctx.ctaHref ? "8px" : "0",
+                                                                }}>
+                                                                    {ctx.neden && (
+                                                                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                                                                            <span style={{ fontWeight: 600 }}>Neden:</span> {ctx.neden}
+                                                                        </div>
+                                                                    )}
+                                                                    {ctx.etki && (
+                                                                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                                                                            <span style={{ fontWeight: 600 }}>Etki:</span> {ctx.etki}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ) : alert.description ? (
+                                                                <div style={{
+                                                                    fontSize: "11px", color: "var(--text-secondary)",
+                                                                    lineHeight: 1.4, marginBottom: ctx.ctaHref ? "6px" : "0",
+                                                                }}>
                                                                     {alert.description}
                                                                 </div>
+                                                            ) : null}
+                                                            {ctx.ctaHref && (
+                                                                <a href={ctx.ctaHref} style={{
+                                                                    fontSize: "11px", fontWeight: 600,
+                                                                    color: alertSeverityColor(alert.severity),
+                                                                    textDecoration: "none", display: "block",
+                                                                    marginTop: "4px",
+                                                                }}>
+                                                                    {ctx.ctaLabel}
+                                                                </a>
                                                             )}
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                                 <a href="/dashboard/alerts" style={{
                                                     fontSize: "11px", color: "var(--accent-text)",
                                                     textDecoration: "none", fontWeight: 500, marginTop: "2px",
