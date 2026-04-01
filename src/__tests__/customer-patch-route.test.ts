@@ -158,3 +158,24 @@ describe("PATCH /api/customers/[id] — valid patches", () => {
         expect(data.name).toBe("Yeni İsim");
     });
 });
+
+// ─── DB error path ────────────────────────────────────────────────────────────
+
+describe("PATCH /api/customers/[id] — DB error handling", () => {
+    it("dbUpdateCustomer throws → 500 with error message", async () => {
+        mockDbUpdateCustomer.mockRejectedValueOnce(new Error("connection refused"));
+        const res = await PATCH(makeRequest({ name: "Acme" }), makeParams());
+        expect(res.status).toBe(500);
+        const body = await res.json();
+        expect(body.error).toContain("connection refused");
+    });
+
+    it("ConfigError from DB layer → 503", async () => {
+        const { ConfigError } = await import("@/lib/supabase/service");
+        mockDbUpdateCustomer.mockRejectedValueOnce(new ConfigError("MISSING ENV: SUPABASE_URL"));
+        const res = await PATCH(makeRequest({ name: "Acme" }), makeParams());
+        expect(res.status).toBe(503);
+        const body = await res.json();
+        expect(body.code).toBe("CONFIG_ERROR");
+    });
+});
