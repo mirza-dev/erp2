@@ -54,7 +54,7 @@ export async function GET() {
             { error: rpcError },    // 002 — stock RPCs
             { error: rpc3Error },   // 003/007 — order RPCs
             { error: rpc4Error },   // 004/008 — inventory RPCs
-            { error: rpc11Error },  // 011 — ship_order_full uuid fix
+            { data: m011ok, error: m011Err },  // 011 — ship_order_full uuid fix (via 016 diagnostic)
             col005,                 // 005 — sales_orders.ai_risk_level
             col006,                 // 006 — products.lead_time_days
             col009,                 // 009 — audit_log.entity_id text type
@@ -76,12 +76,11 @@ export async function GET() {
                 p_movement_type: "adjustment",
                 p_quantity: 0,
             }),
-            // 011: nil UUID probe — PGRST202 = function missing (migration not applied)
-            // Note: cannot distinguish 007 vs 011 body via nil UUID (both return "not found"
-            // before reaching the INSERT). Existence check is the best available signal.
-            supabase.rpc("ship_order_full", {
-                p_order_id: "00000000-0000-0000-0000-000000000000",
-            }),
+            // 011: pg_proc body probe via 016 diagnostic function.
+            // Returns true  → 011 applied (uuid fix present in ship_order_full body).
+            // Returns false → only 007 applied (p_order_id::text cast bug still present).
+            // PGRST202     → 016 migration not applied (diagnostic function missing).
+            supabase.rpc("check_migration_011_applied"),
             pingColumn(supabase, "sales_orders", "ai_risk_level"),
             pingColumn(supabase, "products", "lead_time_days"),
             // 009: text/uuid type probe — eq with a string value throws on uuid columns
@@ -99,8 +98,11 @@ export async function GET() {
             ? `missing: ${rpc3Error.message}` : "ok";
         checks["db.rpc_inventory_functions"] = rpc4Error?.code === "PGRST202"
             ? `missing: ${rpc4Error.message}` : "ok";
-        checks["db.migration_011"]           = rpc11Error?.code === "PGRST202"
-            ? `missing: ${rpc11Error.message}` : "ok";
+        checks["db.migration_011"]           = m011Err?.code === "PGRST202"
+            ? `missing: ${m011Err.message}`
+            : (!m011ok
+                ? "fix_missing: ship_order_full has uuid cast bug — apply migration 011"
+                : "ok");
         checks["db.migration_005"] = col005;
         checks["db.migration_006"] = col006;
         checks["db.migration_009"] = col009.error

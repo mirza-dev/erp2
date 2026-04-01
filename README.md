@@ -63,6 +63,7 @@ curl http://localhost:3000/api/health
 | 13 | `013_ai_entity_aliases.sql` | `ai_entity_aliases` tablosu — import dedup öğrenme (ham değer → DB entity eşleşmesi) |
 | 14 | `014_ai_runs.sql` | `ai_runs` tablosu — AI çağrı gözlemlenebilirlik kaydı (fire-and-forget, opsiyonel) |
 | 15 | `015_product_identity_fields.sql` | `products`'a 8 kimlik alanı (material_quality, origin_country, certifications vb.) — products CRUD bağımlı, zorunlu |
+| 16 | `016_health_check_utils.sql` | `check_migration_011_applied()` tanı fonksiyonu — `pg_proc.prosrc` üzerinden 011 UUID fix'ini doğrular, `/api/health` bağımlısı |
 
 **Supabase CLI ile:**
 ```bash
@@ -71,7 +72,7 @@ supabase db push
 
 **Dashboard ile:** SQL Editor → her dosyayı sırayla çalıştır.
 
-> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi, `009` olmadan bazı sipariş transition'larında `entity_id uuid / text` hatası görülebilir. `010` olmadan AI öneri kararları ve satın alma önerileri, `011` olmadan sevkiyat sırasında UUID/text tip hatası, `012` olmadan Excel import flow, `013` olmadan import dedup çalışmaz. `015` olmadan ürün oluşturma ve güncelleme işlemleri kırılır (identity alanları her INSERT/UPDATE'e dahil edilir).
+> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi, `009` olmadan bazı sipariş transition'larında `entity_id uuid / text` hatası görülebilir. `010` olmadan AI öneri kararları ve satın alma önerileri, `011` olmadan sevkiyat sırasında UUID/text tip hatası, `012` olmadan Excel import flow, `013` olmadan import dedup çalışmaz. `015` olmadan ürün oluşturma ve güncelleme işlemleri kırılır (identity alanları her INSERT/UPDATE'e dahil edilir). `016` olmadan `/api/health` 011 fix'ini doğrulayamaz (`db.migration_011` check'i PGRST202 döndürür).
 
 ---
 
