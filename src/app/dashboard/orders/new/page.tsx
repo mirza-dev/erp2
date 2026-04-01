@@ -61,9 +61,14 @@ function NewOrderForm() {
     );
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    // Pre-fill customer from query param
+    // Pre-fill customer from query param — prefer customerId, fall back to customerName
     useEffect(() => {
+        const id   = searchParams.get("customerId");
         const name = searchParams.get("customerName");
+        if (id) {
+            const found = customers.find(c => c.id === id);
+            if (found) { setSelectedCustomer(found); return; }
+        }
         if (name) {
             const found = customers.find(c => c.name === decodeURIComponent(name));
             if (found) setSelectedCustomer(found);

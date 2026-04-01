@@ -332,7 +332,7 @@ export default function CustomerDetailPanel({
                                 </div>
                                 {totalOrders > 0 && (
                                     <Link
-                                        href={`/dashboard/orders?customer=${encodeURIComponent(customer.name)}`}
+                                        href={`/dashboard/orders?customerId=${customer.id}`}
                                         onClick={onClose}
                                         style={{ fontSize: "11px", color: "var(--accent-text)", textDecoration: "none" }}
                                     >

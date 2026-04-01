@@ -65,6 +65,7 @@ function OrdersList() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const [search, setSearch] = useState("");
+    const [customerIdFilter, setCustomerIdFilter] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -86,13 +87,17 @@ function OrdersList() {
     };
 
     useEffect(() => {
-        const customer = searchParams.get("customer");
-        if (customer) setSearch(decodeURIComponent(customer));
+        const customerId = searchParams.get("customerId");
+        const customer   = searchParams.get("customer"); // legacy name-based
+        if (customerId) setCustomerIdFilter(customerId);
+        else if (customer) setSearch(decodeURIComponent(customer));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const filtered = mockOrders.filter((o) => {
+        if (customerIdFilter && o.customerId !== customerIdFilter) return false;
         const matchSearch =
+            !search ||
             o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
             o.customerName.toLowerCase().includes(search.toLowerCase());
         return matchSearch && matchesTab(o, activeTab);
