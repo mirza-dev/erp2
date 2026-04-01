@@ -78,6 +78,10 @@ export default function CustomerDetailPanel({
 
     const handleSave = async () => {
         if (!editForm) return;
+        if (!editForm.name.trim()) {
+            setEditError("Firma adı boş olamaz.");
+            return;
+        }
         setEditSaving(true);
         setEditError(null);
         try {
