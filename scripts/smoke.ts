@@ -172,6 +172,104 @@ async function runProductionCheck() {
   }
 }
 
+async function runShipOrderSmoke() {
+  console.log("\n[11] ship_order_full — 011 UUID fix smoke testi");
+
+  // 1. Kontrollü stoklu test ürünü oluştur
+  const sku = `SMOKE-SHIP-${Date.now()}`;
+  const { status: ps, body: product } = await post("/api/products", {
+    name: "[SMOKE] Ship Test Product",
+    sku,
+    unit: "adet",
+    price: 100,
+    currency: "USD",
+    on_hand: 10,
+  });
+
+  if (ps !== 201 || !(product as { id?: string })?.id) {
+    fail("ship_order_full smoke: ürün oluşturulamadı", JSON.stringify(product));
+    return;
+  }
+  const { id: productId } = product as { id: string };
+  ok(`Ürün oluşturuldu (sku: ${sku}, on_hand: 10)`);
+
+  // 2. Sipariş oluştur (qty=1, stok yeterli → tam tahsis garantili)
+  const { status: os, body: order } = await post("/api/orders", {
+    customer_name: "[SMOKE] Ship Test",
+    commercial_status: "draft",
+    fulfillment_status: "unallocated",
+    currency: "USD",
+    subtotal: 100,
+    vat_total: 20,
+    grand_total: 120,
+    lines: [{
+      product_id: productId,
+      product_name: "[SMOKE] Ship Test Product",
+      product_sku: sku,
+      unit: "adet",
+      quantity: 1,
+      unit_price: 100,
+      discount_pct: 0,
+      line_total: 100,
+    }],
+  });
+
+  if (os !== 201 || !(order as { id?: string })?.id) {
+    fail("ship_order_full smoke: sipariş oluşturulamadı", JSON.stringify(order));
+    await cleanupProduct(productId);
+    return;
+  }
+  const { id: orderId } = order as { id: string };
+  ok(`Sipariş oluşturuldu (id: ${orderId})`);
+
+  // 3. draft → pending_approval
+  const { status: s1 } = await patch(`/api/orders/${orderId}`, { transition: "pending_approval" });
+  if (s1 !== 200) {
+    fail(`ship_order_full smoke: pending_approval → ${s1}`);
+    await cleanupProduct(productId);
+    return;
+  }
+
+  // 4. pending_approval → approved; on_hand=10 > qty=1 → fulfillment_status "allocated" beklenir
+  const { status: s2, body: approveBody } = await patch(`/api/orders/${orderId}`, { transition: "approved" });
+  if (s2 !== 200) {
+    fail(`ship_order_full smoke: approve → ${s2}`, JSON.stringify(approveBody));
+    await cleanupProduct(productId);
+    return;
+  }
+  const fulfillment = (approveBody as { fulfillment_status?: string })?.fulfillment_status;
+  if (fulfillment !== "allocated") {
+    fail(`ship_order_full smoke: fulfillment_status beklenen "allocated", alınan "${fulfillment}"`);
+    await cleanupProduct(productId);
+    return;
+  }
+  ok(`Sipariş onaylandı, fulfillment_status: ${fulfillment}`);
+
+  // 5. approved → shipped — ship_order_full RPC çağrılır
+  //    011 öncesinde p_order_id::text cast → inventory_movements.reference_id (uuid) type mismatch → hata
+  //    011 sonrasında uuid doğrudan geçilir → başarılı sevkiyat
+  const { status: s3, body: shipBody } = await patch(`/api/orders/${orderId}`, { transition: "shipped" });
+  if (s3 !== 200) {
+    fail(`ship_order_full smoke: sevk → ${s3} (uuid cast bug olabilir — migration 011 uygulandı mı?)`, JSON.stringify(shipBody));
+    await cleanupProduct(productId);
+    return;
+  }
+  ok(`ship_order_full → 200 ✓ (011 UUID fix doğrulandı)`);
+
+  // 6. Cleanup: test ürününü soft-delete
+  await cleanupProduct(productId);
+  // Not: Sevk edilmiş sipariş DB'de kalır ([SMOKE] prefix ile filtreleriz)
+}
+
+async function cleanupProduct(productId: string): Promise<void> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/products/${productId}`, { method: "DELETE" });
+    if (!res.ok) console.warn(`  ⚠ Cleanup: ürün silinemedi (${productId})`);
+  } catch {
+    console.warn(`  ⚠ Cleanup: ürün silme isteği başarısız (${productId})`);
+  }
+}
+
 async function runImportCheck() {
   console.log("\n[10] Import Batch");
   const { status, body } = await post("/api/import", {
@@ -206,6 +304,7 @@ async function main() {
     await runAlertsCheck();
     await runProductionCheck();
     await runImportCheck();
+    await runShipOrderSmoke();
   } catch (err) {
     fail("Beklenmedik hata", err instanceof Error ? err.message : String(err));
   }
