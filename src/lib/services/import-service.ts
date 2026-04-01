@@ -442,7 +442,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
             merged++;
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            errors.push(`Satır ${rowNum}: İşlem hatası — ${msg}`);
+            errors.push(`${draft.id} (Satır ${rowNum}): İşlem hatası — ${msg}`);
             skipped++;
         }
     }

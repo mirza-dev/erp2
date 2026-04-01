@@ -283,7 +283,7 @@ describe("Data contract — route response shape", () => {
         const res = await POST();
         const body = await res.json();
         expect(Object.keys(body).sort()).toEqual(
-            ["ai_available", "counts", "generatedAt", "items"]
+            ["ai_available", "counts", "generatedAt", "items", "recommendations"]
         );
     });
 
@@ -300,7 +300,7 @@ describe("Data contract — route response shape", () => {
         const body = await res.json();
         const expectedKeys = [
             "aiConfidence", "aiExplanation", "aiRecommendation",
-            "coverageDays", "dailyUsage", "deterministicReason",
+            "coverageDays", "dailyUsage", "deterministicReason", "displayReason",
             "leadTimeDays", "productId", "riskLevel",
         ];
         expect(Object.keys(body.items[0]).sort()).toEqual(expectedKeys);

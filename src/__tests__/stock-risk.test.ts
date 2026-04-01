@@ -151,7 +151,7 @@ describe("computeStockRiskLevel — result shape contract", () => {
     it("always returns all five fields", () => {
         const result = computeStockRiskLevel(100, 10, 5, 14);
         expect(Object.keys(result).sort()).toEqual(
-            ["coverageDays", "dailyUsage", "leadTimeDays", "reason", "riskLevel"]
+            ["coverageDays", "dailyUsage", "displayReason", "leadTimeDays", "reason", "riskLevel"]
         );
     });
 
