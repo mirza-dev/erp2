@@ -48,7 +48,7 @@ After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and 
 Also add "UNMATCHED:" a comma-separated list of any fields you could not extract.`,
     product: `You are a data extraction assistant for a B2B ERP system.
 Extract product fields from the raw text and return ONLY a JSON object with these keys (omit missing fields):
-{ "name": string, "sku": string, "category": string, "unit": string, "price": number, "currency": string (ISO 3-letter), "min_stock_level": number }
+{ "name": string, "sku": string, "category": string, "unit": string, "price": number, "currency": string (ISO 3-letter), "min_stock_level": number, "material_quality": string, "production_site": string, "use_cases": string, "industries": string, "standards": string, "certifications": string, "product_notes": string }
 After the JSON, on a new line starting with "CONFIDENCE:", give a float 0-1 and then "REASON:" a short explanation in Turkish.
 Also add "UNMATCHED:" a comma-separated list of any fields you could not extract.`,
     order: `You are a data extraction assistant for a B2B ERP system.
@@ -170,7 +170,7 @@ Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is
     product: `You are a data extraction assistant for a B2B ERP system.
 You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
 For each row, extract product fields and return a JSON array with objects containing these keys (omit missing fields):
-{ "name": string, "sku": string, "category": string, "unit": string, "price": number, "currency": string (ISO 3-letter), "min_stock_level": number }
+{ "name": string, "sku": string, "category": string, "unit": string, "price": number, "currency": string (ISO 3-letter), "min_stock_level": number, "material_quality": string, "production_site": string, "use_cases": string, "industries": string, "standards": string, "certifications": string, "product_notes": string }
 
 Return ONLY a JSON object in this exact format:
 {
@@ -228,6 +228,13 @@ const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
         sektor_uygunlugu: "sector_compatibility",
         standart_maliyet_usd: "cost_price",
         birim_agirlik_kg: "weight_kg",
+        malzeme_kalitesi: "material_quality", malzeme: "material_quality",
+        uretim_tesisi: "production_site", tesis: "production_site",
+        kullanim_alanlari: "use_cases", kullanim: "use_cases",
+        sektorler: "industries",
+        standartlar: "standards",
+        sertifikalar: "certifications",
+        urun_notlari: "product_notes", notlar: "product_notes",
     },
     order: {
         musteri_kodu: "customer_code", musteri_adi: "customer_name", firma_adi: "customer_name",

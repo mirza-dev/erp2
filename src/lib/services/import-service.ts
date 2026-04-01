@@ -160,6 +160,13 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         sector_compatibility: data.sector_compatibility ? String(data.sector_compatibility) : undefined,
                         cost_price: data.cost_price ? Number(data.cost_price) : undefined,
                         weight_kg: data.weight_kg ? Number(data.weight_kg) : undefined,
+                        material_quality: data.material_quality ? String(data.material_quality) : undefined,
+                        production_site: data.production_site ? String(data.production_site) : undefined,
+                        use_cases: data.use_cases ? String(data.use_cases) : undefined,
+                        industries: data.industries ? String(data.industries) : undefined,
+                        standards: data.standards ? String(data.standards) : undefined,
+                        certifications: data.certifications ? String(data.certifications) : undefined,
+                        product_notes: data.product_notes ? String(data.product_notes) : undefined,
                     });
                     productId = updated.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: updated.id });
@@ -180,6 +187,13 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         sector_compatibility: data.sector_compatibility ? String(data.sector_compatibility) : undefined,
                         cost_price: data.cost_price ? Number(data.cost_price) : undefined,
                         weight_kg: data.weight_kg ? Number(data.weight_kg) : undefined,
+                        material_quality: data.material_quality ? String(data.material_quality) : undefined,
+                        production_site: data.production_site ? String(data.production_site) : undefined,
+                        use_cases: data.use_cases ? String(data.use_cases) : undefined,
+                        industries: data.industries ? String(data.industries) : undefined,
+                        standards: data.standards ? String(data.standards) : undefined,
+                        certifications: data.certifications ? String(data.certifications) : undefined,
+                        product_notes: data.product_notes ? String(data.product_notes) : undefined,
                     });
                     productId = product.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: product.id });
