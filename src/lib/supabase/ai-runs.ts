@@ -32,8 +32,9 @@ export function logAiRun(params: LogAiRunParams): void {
                 latency_ms: params.latency_ms ?? null,
                 model: params.model ?? null,
             });
-        } catch {
+        } catch (err) {
             // Fire-and-forget — audit failures must never break core flows
+            console.warn("[ai_runs] audit write failed:", err instanceof Error ? err.message : err);
         }
     })();
 }

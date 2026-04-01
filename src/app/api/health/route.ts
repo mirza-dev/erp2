@@ -8,6 +8,11 @@ async function pingTable(supabase: Supabase, table: string): Promise<string> {
     return error ? `error: ${error.message}` : "ok";
 }
 
+async function pingColumn(supabase: Supabase, table: string, column: string): Promise<string> {
+    const { error } = await supabase.from(table).select(column).limit(1);
+    return error ? `missing_or_error: ${error.message}` : "ok";
+}
+
 export async function GET() {
     const checks: Record<string, string> = {};
 
@@ -27,7 +32,7 @@ export async function GET() {
     try {
         const supabase = createServiceClient();
 
-        // Migration 001 — core tables (001_initial_schema.sql)
+        // Phase 1 — Migration 001 core tables (001_initial_schema.sql)
         const [customers, salesOrders, productionEntries, alerts] = await Promise.all([
             pingTable(supabase, "customers"),
             pingTable(supabase, "sales_orders"),
@@ -39,115 +44,70 @@ export async function GET() {
         checks["db.production_entries"] = productionEntries;
         checks["db.alerts"]             = alerts;
 
-        // Migration 002 — stock RPC functions (002_stock_rpc_functions.sql)
-        // Calling with a nil UUID triggers "Product not found" inside the function (expected).
-        // PGRST202 means the function itself doesn't exist → migration not applied.
-        const { error: rpcError } = await supabase.rpc("increment_reserved", {
-            p_product_id: "00000000-0000-0000-0000-000000000000",
-            p_qty: 0,
-        });
-        checks["db.rpc_stock_functions"] = rpcError?.code === "PGRST202"
-            ? `missing: ${rpcError.message}`
-            : "ok";
+        // Phase 2 — RPC existence + column checks (all independent → parallel)
+        //
+        // RPC checks: PGRST202 = function doesn't exist (migration not applied).
+        // Calling with a nil UUID triggers a domain error inside the function (expected).
+        // Column checks: any error means column missing (migration not applied).
+        // Migration 009 is special: eq("entity_id", text) verifies column type is text, not uuid.
+        const [
+            { error: rpcError },    // 002 — stock RPCs
+            { error: rpc3Error },   // 003/007 — order RPCs
+            { error: rpc4Error },   // 004/008 — inventory RPCs
+            col005,                 // 005 — sales_orders.ai_risk_level
+            col006,                 // 006 — products.lead_time_days
+            col009,                 // 009 — audit_log.entity_id text type
+            tbl010,                 // 010 — ai_recommendations table
+            col012,                 // 012 — sales_orders.incoterm
+            tbl013,                 // 013 — ai_entity_aliases table
+            tbl014,                 // 014 — ai_runs table (optional)
+            col015,                 // 015 — products.material_quality (optional)
+        ] = await Promise.all([
+            supabase.rpc("increment_reserved", {
+                p_product_id: "00000000-0000-0000-0000-000000000000",
+                p_qty: 0,
+            }),
+            supabase.rpc("approve_order_with_allocation", {
+                p_order_id: "00000000-0000-0000-0000-000000000000",
+            }),
+            supabase.rpc("record_stock_movement", {
+                p_product_id: "00000000-0000-0000-0000-000000000000",
+                p_movement_type: "adjustment",
+                p_quantity: 0,
+            }),
+            pingColumn(supabase, "sales_orders", "ai_risk_level"),
+            pingColumn(supabase, "products", "lead_time_days"),
+            // 009: text/uuid type probe — eq with a string value throws on uuid columns
+            supabase.from("audit_log").select("id").eq("entity_id", "__healthcheck_text__").limit(1),
+            pingTable(supabase, "ai_recommendations"),
+            pingColumn(supabase, "sales_orders", "incoterm"),
+            pingTable(supabase, "ai_entity_aliases"),
+            pingTable(supabase, "ai_runs"),
+            pingColumn(supabase, "products", "material_quality"),
+        ]);
 
-        // Migration 003 — order RPCs (approve_order_with_allocation, ship_order_full, cancel_order)
-        const { error: rpc3Error } = await supabase.rpc("approve_order_with_allocation", {
-            p_order_id: "00000000-0000-0000-0000-000000000000",
-        });
-        checks["db.rpc_order_functions"] = rpc3Error?.code === "PGRST202"
-            ? `missing: ${rpc3Error.message}`
-            : "ok";
-
-        // Migration 004 — inventory RPCs (record_stock_movement, complete_production, etc.)
-        const { error: rpc4Error } = await supabase.rpc("record_stock_movement", {
-            p_product_id: "00000000-0000-0000-0000-000000000000",
-            p_movement_type: "adjustment",
-            p_quantity: 0,
-        });
+        checks["db.rpc_stock_functions"]     = rpcError?.code === "PGRST202"
+            ? `missing: ${rpcError.message}` : "ok";
+        checks["db.rpc_order_functions"]     = rpc3Error?.code === "PGRST202"
+            ? `missing: ${rpc3Error.message}` : "ok";
         checks["db.rpc_inventory_functions"] = rpc4Error?.code === "PGRST202"
-            ? `missing: ${rpc4Error.message}`
-            : "ok";
-
-        // Migration 005 — ai_risk_level column on sales_orders
-        const { error: col5Error } = await supabase
-            .from("sales_orders")
-            .select("ai_risk_level")
-            .limit(1);
-        checks["db.migration_005"] = col5Error
-            ? `missing_or_error: ${col5Error.message}`
-            : "ok";
-
-        // Migration 006 — lead_time_days column on products
-        const { error: col6Error } = await supabase
-            .from("products")
-            .select("lead_time_days")
-            .limit(1);
-        checks["db.migration_006"] = col6Error
-            ? `missing_or_error: ${col6Error.message}`
-            : "ok";
-
-        // Migration 009 — audit_log.entity_id should be text
-        // Text column accepts arbitrary string comparison; uuid column throws.
-        const { error: col9Error } = await supabase
-            .from("audit_log")
-            .select("id")
-            .eq("entity_id", "__healthcheck_text__")
-            .limit(1);
-        checks["db.migration_009"] = col9Error
-            ? `missing_or_error: ${col9Error.message}`
-            : "ok";
-
-        // Migration 010 — ai_recommendations table (AI karar yaşam döngüsü)
-        const { error: mig010Error } = await supabase
-            .from("ai_recommendations")
-            .select("id")
-            .limit(1);
-        checks["db.migration_010"] = mig010Error
-            ? `missing_or_error: ${mig010Error.message}`
-            : "ok";
-
-        // Migration 012 — Excel import alanları (incoterm, cost_price vb. — sales_orders genişletmesi)
-        const { error: mig012Error } = await supabase
-            .from("sales_orders")
-            .select("incoterm")
-            .limit(1);
-        checks["db.migration_012"] = mig012Error
-            ? `missing_or_error: ${mig012Error.message}`
-            : "ok";
-
-        // Migration 013 — ai_entity_aliases table (import dedup öğrenme)
-        const { error: mig013Error } = await supabase
-            .from("ai_entity_aliases")
-            .select("id")
-            .limit(1);
-        checks["db.migration_013"] = mig013Error
-            ? `missing_or_error: ${mig013Error.message}`
-            : "ok";
-
-        // Migration 014 — ai_runs table (opsiyonel — observability, uygulama bloklamaz)
-        const { error: mig014Error } = await supabase
-            .from("ai_runs")
-            .select("id")
-            .limit(1);
-        checks["db.migration_014"] = mig014Error
-            ? `missing_or_error: ${mig014Error.message}`
-            : "ok";
-
-        // Migration 015 — products identity fields (opsiyonel — drawer display)
-        const { error: mig015Error } = await supabase
-            .from("products")
-            .select("material_quality")
-            .limit(1);
-        checks["db.migration_015"] = mig015Error
-            ? `missing_or_error: ${mig015Error.message}`
-            : "ok";
+            ? `missing: ${rpc4Error.message}` : "ok";
+        checks["db.migration_005"] = col005;
+        checks["db.migration_006"] = col006;
+        checks["db.migration_009"] = col009.error
+            ? `missing_or_error: ${col009.error.message}` : "ok";
+        checks["db.migration_010"] = tbl010;
+        checks["db.migration_012"] = col012;
+        checks["db.migration_013"] = tbl013;
+        checks["db.migration_014"] = tbl014;
+        checks["db.migration_015"] = col015;
 
     } catch (e) {
         checks["db.error"] = `exception: ${e}`;
     }
 
     // ── Overall status ───────────────────────────────────────────────────
-    // Optional keys (PARASUT_CLIENT_ID) are excluded from the required set.
+    // Optional keys (PARASUT_CLIENT_ID, migration_014, migration_015) excluded from required set.
     const requiredKeys = [
         "env.SUPABASE_URL",
         "env.SERVICE_ROLE_KEY",
@@ -155,15 +115,15 @@ export async function GET() {
         "db.sales_orders",
         "db.production_entries",
         "db.alerts",
-        "db.rpc_stock_functions",       // 002
-        "db.rpc_order_functions",       // 003
-        "db.rpc_inventory_functions",   // 004
-        "db.migration_005",             // 005 — ai_risk_level
-        "db.migration_006",             // 006 — lead_time_days
-        "db.migration_009",             // 009 — audit_log.entity_id text hotfix
-        "db.migration_010",             // 010 — ai_recommendations table
-        "db.migration_012",             // 012 — sales_orders.incoterm (Excel import alanları)
-        "db.migration_013",             // 013 — ai_entity_aliases table (import dedup)
+        "db.rpc_stock_functions",        // 002
+        "db.rpc_order_functions",        // 003/007
+        "db.rpc_inventory_functions",    // 004/008
+        "db.migration_005",              // ai_risk_level
+        "db.migration_006",              // lead_time_days
+        "db.migration_009",              // audit_log.entity_id text
+        "db.migration_010",              // ai_recommendations table
+        "db.migration_012",              // sales_orders.incoterm
+        "db.migration_013",              // ai_entity_aliases table
         // db.migration_014 (ai_runs) ve db.migration_015 (product identity) opsiyonel — 503 tetiklemez
     ];
     const allOk = requiredKeys.every((k) => checks[k] === "ok");
