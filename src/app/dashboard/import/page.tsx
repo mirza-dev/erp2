@@ -996,7 +996,7 @@ export default function ImportPage() {
                                     <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Hatalar</div>
                                         <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "2px" }}>{confirmResult.errors.length}</div>
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.errors[0]}</div>
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.errors.length} satırda sorun var</div>
                                     </div>
                                 )}
                             </>
@@ -1006,6 +1006,25 @@ export default function ImportPage() {
                             </div>
                         )}
                     </div>
+
+                    {confirmResult && confirmResult.errors.length > 0 && (
+                        <div style={{
+                            marginBottom: "16px",
+                            background: "var(--danger-bg)",
+                            border: "0.5px solid var(--danger-border)",
+                            borderRadius: "6px",
+                            padding: "12px 14px",
+                        }}>
+                            <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "8px" }}>
+                                {confirmResult.errors.length} satırda sorun oluştu
+                            </div>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                {confirmResult.errors.map((err, i) => (
+                                    <div key={i} style={{ fontSize: "11px", color: "var(--text-secondary)" }}>· {err}</div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         <Link href="/dashboard/customers" style={{

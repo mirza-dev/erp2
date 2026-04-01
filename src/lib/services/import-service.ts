@@ -81,7 +81,9 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
         productSkus:   new Map<string, string>(),   // Urun_Kodu → product uuid
     };
 
+    let rowNum = 0;
     for (const draft of toMerge) {
+        rowNum++;
         if (draft.status === "rejected") { skipped++; continue; }
 
         const base = (draft.parsed_data ?? {}) as Record<string, unknown>;
@@ -137,7 +139,11 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "product") {
                 if (!data.sku || !data.name || !data.unit) {
-                    errors.push(`Draft ${draft.id}: sku, name, unit zorunlu.`);
+                    const missing: string[] = [];
+                    if (!data.name) missing.push("ürün adı");
+                    if (!data.sku)  missing.push("ürün kodu (SKU)");
+                    if (!data.unit) missing.push("ölçü birimi");
+                    errors.push(`Satır ${rowNum}: ${missing.join(", ")} eksik.`);
                     skipped++;
                     continue;
                 }
@@ -202,7 +208,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "quote") {
                 const quoteNumber = String(data.quote_number ?? "");
-                if (!quoteNumber) { errors.push(`Draft ${draft.id}: quote_number zorunlu.`); skipped++; continue; }
+                if (!quoteNumber) { errors.push(`Satır ${rowNum}: Teklif numarası eksik.`); skipped++; continue; }
 
                 const customerCode = data.customer_code ? String(data.customer_code) : undefined;
                 const customerId = customerCode
@@ -280,7 +286,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 const productSku = data.product_sku ? String(data.product_sku) : undefined;
 
                 if (!orderNumber || !productSku) {
-                    errors.push(`Draft ${draft.id}: order_number ve product_sku zorunlu.`);
+                    errors.push(`Satır ${rowNum}: Sipariş numarası ve ürün kodu (SKU) zorunludur.`);
                     skipped++;
                     continue;
                 }
@@ -288,7 +294,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 const orderId = refMap.orderNumbers.get(orderNumber)
                     ?? (await dbFindOrderByOriginalNumber(orderNumber))?.id;
                 if (!orderId) {
-                    errors.push(`Draft ${draft.id}: Sipariş bulunamadı — ${orderNumber}`);
+                    errors.push(`Satır ${rowNum}: '${orderNumber}' numaralı sipariş bulunamadı.`);
                     skipped++;
                     continue;
                 }
@@ -349,7 +355,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "shipment") {
                 const shipmentNumber = String(data.shipment_number ?? "");
-                if (!shipmentNumber) { errors.push(`Draft ${draft.id}: shipment_number zorunlu.`); skipped++; continue; }
+                if (!shipmentNumber) { errors.push(`Satır ${rowNum}: Sevkiyat numarası eksik.`); skipped++; continue; }
 
                 const orderNumber = data.order_number ? String(data.order_number) : undefined;
                 const orderId = orderNumber
@@ -369,7 +375,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "invoice") {
                 const invoiceNumber = String(data.invoice_number ?? "");
-                if (!invoiceNumber) { errors.push(`Draft ${draft.id}: invoice_number zorunlu.`); skipped++; continue; }
+                if (!invoiceNumber) { errors.push(`Satır ${rowNum}: Fatura numarası eksik.`); skipped++; continue; }
 
                 const orderNumber = data.order_number ? String(data.order_number) : undefined;
                 const orderId = orderNumber
@@ -403,7 +409,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "payment") {
                 const paymentNumber = String(data.payment_number ?? "");
-                if (!paymentNumber) { errors.push(`Draft ${draft.id}: payment_number zorunlu.`); skipped++; continue; }
+                if (!paymentNumber) { errors.push(`Satır ${rowNum}: Ödeme numarası eksik.`); skipped++; continue; }
 
                 const invoiceNumber = data.invoice_number ? String(data.invoice_number) : undefined;
                 const invoiceId = invoiceNumber
@@ -436,7 +442,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
             merged++;
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
-            errors.push(`Draft ${draft.id}: ${msg}`);
+            errors.push(`Satır ${rowNum}: İşlem hatası — ${msg}`);
             skipped++;
         }
     }
