@@ -2,7 +2,7 @@
 
 PMT Endüstriyel için yapay zeka destekli ERP sistemi. Endüstriyel vana satışı (B2B).
 
-**Stack:** Next.js 15 · TypeScript · Supabase · Tailwind CSS (inline styles ile)
+**Stack:** Next.js 16 · TypeScript · Supabase · Tailwind CSS (inline styles ile)
 
 ---
 
@@ -57,6 +57,12 @@ curl http://localhost:3000/api/health
 | 7 | `007_rpc_hotfix.sql` | Sipariş RPC hotfix'leri |
 | 8 | `008_inventory_rpc_hotfix.sql` | Envanter/üretim RPC hotfix'leri |
 | 9 | `009_audit_log_entity_id_text.sql` | `audit_log.entity_id` kolonu `text` hotfix'i — runtime uuid/text hatasını kapatır |
+| 10 | `010_ai_recommendations.sql` | `ai_recommendations` + `ai_feedback` tabloları — AI karar yaşam döngüsü (kabul/düzenle/reddet) |
+| 11 | `011_fix_ship_order_uuid.sql` | `ship_order_full()` RPC'de UUID/text tip uyumsuzluğu hotfix'i |
+| 12 | `012_excel_full_import.sql` | `quotes`, `shipments`, `invoices`, `payments` tabloları + `sales_orders`/`customers`/`products` genişletilmiş alanlar (incoterm, cost_price, weight_kg vb.) |
+| 13 | `013_ai_entity_aliases.sql` | `ai_entity_aliases` tablosu — import dedup öğrenme (ham değer → DB entity eşleşmesi) |
+| 14 | `014_ai_runs.sql` | `ai_runs` tablosu — AI çağrı gözlemlenebilirlik kaydı (fire-and-forget, opsiyonel) |
+| 15 | `015_product_identity_fields.sql` | `products`'a 8 opsiyonel kimlik alanı (material_quality, origin_country, certifications vb.) |
 
 **Supabase CLI ile:**
 ```bash
@@ -65,7 +71,7 @@ supabase db push
 
 **Dashboard ile:** SQL Editor → her dosyayı sırayla çalıştır.
 
-> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi, `009` olmadan bazı sipariş transition'larında `entity_id uuid / text` hatası görülebilir.
+> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi, `009` olmadan bazı sipariş transition'larında `entity_id uuid / text` hatası görülebilir. `010` olmadan AI öneri kararları ve satın alma önerileri, `012` olmadan Excel import flow, `013` olmadan import dedup çalışmaz.
 
 ---
 
@@ -139,10 +145,14 @@ src/
 │   │   ├── products/          — CRUD
 │   │   ├── customers/         — CRUD
 │   │   ├── production/        — CRUD
-│   │   ├── alerts/            — CRUD + scan
-│   │   ├── import/            — AI dosya parse akışı
-│   │   ├── ai/                — parse + score + ops-summary endpoint'leri
-│   │   └── parasut/           — Muhasebe sync
+│   │   ├── alerts/            — CRUD + scan + AI öneri
+│   │   ├── import/            — AI dosya parse akışı (batch → drafts → confirm)
+│   │   ├── inventory/movements/ — Stok hareketi kayıt (üretim/giriş/düzeltme)
+│   │   ├── purchase/          — scan + suggestions
+│   │   ├── recommendations/   — AI öneri CRUD + karar (kabul/düzenle/reddet)
+│   │   ├── ai/                — parse + score + ops-summary + stock-risk + observability
+│   │   ├── parasut/           — Muhasebe sync
+│   │   └── seed/              — Test verisi seed endpoint'i
 │   └── globals.css            — CSS variables (dark theme)
 ├── components/
 │   ├── layout/                — Sidebar, Topbar
@@ -184,7 +194,7 @@ supabase/
 - DB tipleri: `src/lib/database.types.ts` (snake_case, Supabase şemasına parallel)
 - Frontend tipleri: `src/lib/mock-data.ts` (camelCase interfaces)
 - İş mantığı: `src/lib/services/` klasörü (order, alert, production, parasut, AI...)
-- 38 API route: `src/app/api/` altında Next.js App Router route handler'ları
+- 37 API route: `src/app/api/` altında Next.js App Router route handler'ları
 
 ### Order Durum Eksenları
 ```

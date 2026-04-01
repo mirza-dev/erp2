@@ -97,6 +97,51 @@ export async function GET() {
             ? `missing_or_error: ${col9Error.message}`
             : "ok";
 
+        // Migration 010 — ai_recommendations table (AI karar yaşam döngüsü)
+        const { error: mig010Error } = await supabase
+            .from("ai_recommendations")
+            .select("id")
+            .limit(1);
+        checks["db.migration_010"] = mig010Error
+            ? `missing_or_error: ${mig010Error.message}`
+            : "ok";
+
+        // Migration 012 — Excel import alanları (incoterm, cost_price vb. — sales_orders genişletmesi)
+        const { error: mig012Error } = await supabase
+            .from("sales_orders")
+            .select("incoterm")
+            .limit(1);
+        checks["db.migration_012"] = mig012Error
+            ? `missing_or_error: ${mig012Error.message}`
+            : "ok";
+
+        // Migration 013 — ai_entity_aliases table (import dedup öğrenme)
+        const { error: mig013Error } = await supabase
+            .from("ai_entity_aliases")
+            .select("id")
+            .limit(1);
+        checks["db.migration_013"] = mig013Error
+            ? `missing_or_error: ${mig013Error.message}`
+            : "ok";
+
+        // Migration 014 — ai_runs table (opsiyonel — observability, uygulama bloklamaz)
+        const { error: mig014Error } = await supabase
+            .from("ai_runs")
+            .select("id")
+            .limit(1);
+        checks["db.migration_014"] = mig014Error
+            ? `missing_or_error: ${mig014Error.message}`
+            : "ok";
+
+        // Migration 015 — products identity fields (opsiyonel — drawer display)
+        const { error: mig015Error } = await supabase
+            .from("products")
+            .select("material_quality")
+            .limit(1);
+        checks["db.migration_015"] = mig015Error
+            ? `missing_or_error: ${mig015Error.message}`
+            : "ok";
+
     } catch (e) {
         checks["db.error"] = `exception: ${e}`;
     }
@@ -116,6 +161,10 @@ export async function GET() {
         "db.migration_005",             // 005 — ai_risk_level
         "db.migration_006",             // 006 — lead_time_days
         "db.migration_009",             // 009 — audit_log.entity_id text hotfix
+        "db.migration_010",             // 010 — ai_recommendations table
+        "db.migration_012",             // 012 — sales_orders.incoterm (Excel import alanları)
+        "db.migration_013",             // 013 — ai_entity_aliases table (import dedup)
+        // db.migration_014 (ai_runs) ve db.migration_015 (product identity) opsiyonel — 503 tetiklemez
     ];
     const allOk = requiredKeys.every((k) => checks[k] === "ok");
 

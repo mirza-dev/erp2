@@ -120,6 +120,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // ── Fetch all lists from API ─────────────────────────────
 
   const refetchAll = useCallback(async () => {
+    setLoadError(null);
     try {
       const [productsRes, customersRes, ordersRes, productionRes, alertsRes] =
         await Promise.all([
@@ -130,9 +131,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           fetch("/api/alerts"),
         ]);
 
-      const failed = [productsRes, customersRes, ordersRes, productionRes].find(r => !r.ok);
-      if (failed) {
-        setLoadError(`Veriler yüklenemedi (HTTP ${failed.status}). Backend bağlantısını kontrol edin.`);
+      const coreFailure = [productsRes, customersRes, ordersRes, productionRes].find(r => !r.ok);
+      if (coreFailure) {
+        setLoadError(`Veriler yüklenemedi (HTTP ${coreFailure.status}). Backend bağlantısını kontrol edin.`);
+      } else if (!alertsRes.ok) {
+        setLoadError(`Uyarı servisi yanıt vermedi (HTTP ${alertsRes.status}). Stok uyarıları güncel olmayabilir.`);
       }
 
       if (productsRes.ok) {
