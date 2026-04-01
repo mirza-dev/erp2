@@ -39,6 +39,9 @@ begin
         where id = v_line.product_id;
 
         -- FIX: was p_order_id::text, but reference_id column is uuid
+        -- HEALTH DIAGNOSTIC DEPENDENCY: Bu yorum satırı migration 016'daki
+        -- check_migration_011_applied() fonksiyonu tarafından fix marker olarak
+        -- kullanılmaktadır. Bu yorumu değiştirmeyin veya silmeyin.
         insert into inventory_movements (product_id, movement_type, quantity, reference_type, reference_id, source)
         values (v_line.product_id, 'shipment', -v_line.quantity, 'order', p_order_id, 'ui');
     end loop;

@@ -1,7 +1,7 @@
 -- 016_health_check_utils.sql
--- Health check diagnostic helper for /api/health.
+-- Fix marker doğrulama helper for /api/health.
 --
--- Exposes a single boolean probe that verifies whether the
+-- Exposes a single boolean probe (fix marker) that verifies whether the
 -- ship_order_full UUID fix from migration 011 is actually in place.
 --
 -- Background: 007 introduced ship_order_full with a p_order_id::text cast
@@ -11,8 +11,8 @@
 -- two versions because the function returns early ("Sipariş bulunamadı")
 -- before reaching the buggy INSERT.
 --
--- This function inspects pg_proc.prosrc for the comment string that
--- 011 added alongside the fix. That comment is absent in the 007 body.
+-- This function inspects pg_proc.prosrc for the fix marker comment that
+-- 011 added alongside the fix. That marker is absent in the 007 body.
 
 CREATE OR REPLACE FUNCTION check_migration_011_applied()
 RETURNS boolean
