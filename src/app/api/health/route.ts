@@ -13,6 +13,32 @@ type Supabase = ReturnType<typeof createServiceClient>;
  *
  * Pure function — test edilebilir, side effect yok.
  */
+/**
+ * Health check için zorunlu key seti.
+ * Bu listede olmayan key'ler (PARASUT_CLIENT_ID, migration_014) optional —
+ * eksik olsa bile HTTP 503 dönmez.
+ * Export: regression testi bu listeyi kilitler.
+ */
+export const REQUIRED_KEYS = [
+    "env.SUPABASE_URL",
+    "env.SERVICE_ROLE_KEY",
+    "db.customers",
+    "db.sales_orders",
+    "db.production_entries",
+    "db.alerts",
+    "db.rpc_stock_functions",        // 002
+    "db.rpc_order_functions",        // 003/007
+    "db.rpc_inventory_functions",    // 004/008
+    "db.migration_011",              // ship_order_full (sevkiyat RPC)
+    "db.migration_005",              // ai_risk_level
+    "db.migration_006",              // lead_time_days
+    "db.migration_009",              // audit_log.entity_id text
+    "db.migration_010",              // ai_recommendations table
+    "db.migration_012",              // sales_orders.incoterm
+    "db.migration_013",              // ai_entity_aliases table
+    "db.migration_015",              // products identity fields (CRUD bağımlı)
+];
+
 export function interpretMigration011Result(
     data: boolean | null | undefined,
     error: { code?: string; message?: string } | null | undefined,
@@ -133,26 +159,7 @@ export async function GET() {
     // ── Overall status ───────────────────────────────────────────────────
     // Optional keys (PARASUT_CLIENT_ID, migration_014) excluded from required set.
     // migration_014 (ai_runs) opsiyonel — fire-and-forget audit, eksikse 503 dönmez
-    const requiredKeys = [
-        "env.SUPABASE_URL",
-        "env.SERVICE_ROLE_KEY",
-        "db.customers",
-        "db.sales_orders",
-        "db.production_entries",
-        "db.alerts",
-        "db.rpc_stock_functions",        // 002
-        "db.rpc_order_functions",        // 003/007
-        "db.rpc_inventory_functions",    // 004/008
-        "db.migration_011",              // ship_order_full (sevkiyat RPC)
-        "db.migration_005",              // ai_risk_level
-        "db.migration_006",              // lead_time_days
-        "db.migration_009",              // audit_log.entity_id text
-        "db.migration_010",              // ai_recommendations table
-        "db.migration_012",              // sales_orders.incoterm
-        "db.migration_013",              // ai_entity_aliases table
-        "db.migration_015",              // products identity fields (CRUD bağımlı)
-    ];
-    const allOk = requiredKeys.every((k) => checks[k] === "ok");
+    const allOk = REQUIRED_KEYS.every((k) => checks[k] === "ok");
 
     return NextResponse.json(checks, { status: allOk ? 200 : 503 });
 }
