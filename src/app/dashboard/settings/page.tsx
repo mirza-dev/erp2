@@ -422,9 +422,9 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
 function ApiTab() {
     const { toast } = useToast();
     const [keys, setKeys] = useState([
-        { id: "parasut", label: "Paraşüt API", key: "sk_live_prs_xK9mW2pQrTv3nLhBfZeYuD1234", visible: false },
-        { id: "claude", label: "Claude AI (Anthropic)", key: "sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", visible: false },
-        { id: "vercel", label: "Vercel", key: "vrce_live_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", visible: false },
+        { id: "parasut", label: "Paraşüt API", key: "", visible: false },
+        { id: "claude", label: "Claude AI (Anthropic)", key: "", visible: false },
+        { id: "vercel", label: "Vercel", key: "", visible: false },
     ]);
     const [showAddForm, setShowAddForm] = useState(false);
     const [newKeyLabel, setNewKeyLabel] = useState("");
