@@ -54,6 +54,7 @@ export async function GET() {
             { error: rpcError },    // 002 — stock RPCs
             { error: rpc3Error },   // 003/007 — order RPCs
             { error: rpc4Error },   // 004/008 — inventory RPCs
+            { error: rpc11Error },  // 011 — ship_order_full uuid fix
             col005,                 // 005 — sales_orders.ai_risk_level
             col006,                 // 006 — products.lead_time_days
             col009,                 // 009 — audit_log.entity_id text type
@@ -61,7 +62,7 @@ export async function GET() {
             col012,                 // 012 — sales_orders.incoterm
             tbl013,                 // 013 — ai_entity_aliases table
             tbl014,                 // 014 — ai_runs table (optional)
-            col015,                 // 015 — products.material_quality (optional)
+            col015,                 // 015 — products identity fields
         ] = await Promise.all([
             supabase.rpc("increment_reserved", {
                 p_product_id: "00000000-0000-0000-0000-000000000000",
@@ -74,6 +75,12 @@ export async function GET() {
                 p_product_id: "00000000-0000-0000-0000-000000000000",
                 p_movement_type: "adjustment",
                 p_quantity: 0,
+            }),
+            // 011: nil UUID probe — PGRST202 = function missing (migration not applied)
+            // Note: cannot distinguish 007 vs 011 body via nil UUID (both return "not found"
+            // before reaching the INSERT). Existence check is the best available signal.
+            supabase.rpc("ship_order_full", {
+                p_order_id: "00000000-0000-0000-0000-000000000000",
             }),
             pingColumn(supabase, "sales_orders", "ai_risk_level"),
             pingColumn(supabase, "products", "lead_time_days"),
@@ -92,6 +99,8 @@ export async function GET() {
             ? `missing: ${rpc3Error.message}` : "ok";
         checks["db.rpc_inventory_functions"] = rpc4Error?.code === "PGRST202"
             ? `missing: ${rpc4Error.message}` : "ok";
+        checks["db.migration_011"]           = rpc11Error?.code === "PGRST202"
+            ? `missing: ${rpc11Error.message}` : "ok";
         checks["db.migration_005"] = col005;
         checks["db.migration_006"] = col006;
         checks["db.migration_009"] = col009.error
@@ -107,7 +116,8 @@ export async function GET() {
     }
 
     // ── Overall status ───────────────────────────────────────────────────
-    // Optional keys (PARASUT_CLIENT_ID, migration_014, migration_015) excluded from required set.
+    // Optional keys (PARASUT_CLIENT_ID, migration_014) excluded from required set.
+    // migration_014 (ai_runs) opsiyonel — fire-and-forget audit, eksikse 503 dönmez
     const requiredKeys = [
         "env.SUPABASE_URL",
         "env.SERVICE_ROLE_KEY",
@@ -118,13 +128,14 @@ export async function GET() {
         "db.rpc_stock_functions",        // 002
         "db.rpc_order_functions",        // 003/007
         "db.rpc_inventory_functions",    // 004/008
+        "db.migration_011",              // ship_order_full (sevkiyat RPC)
         "db.migration_005",              // ai_risk_level
         "db.migration_006",              // lead_time_days
         "db.migration_009",              // audit_log.entity_id text
         "db.migration_010",              // ai_recommendations table
         "db.migration_012",              // sales_orders.incoterm
         "db.migration_013",              // ai_entity_aliases table
-        // db.migration_014 (ai_runs) ve db.migration_015 (product identity) opsiyonel — 503 tetiklemez
+        "db.migration_015",              // products identity fields (CRUD bağımlı)
     ];
     const allOk = requiredKeys.every((k) => checks[k] === "ok");
 

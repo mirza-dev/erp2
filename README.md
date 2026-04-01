@@ -62,7 +62,7 @@ curl http://localhost:3000/api/health
 | 12 | `012_excel_full_import.sql` | `quotes`, `shipments`, `invoices`, `payments` tabloları + `sales_orders`/`customers`/`products` genişletilmiş alanlar (incoterm, cost_price, weight_kg vb.) |
 | 13 | `013_ai_entity_aliases.sql` | `ai_entity_aliases` tablosu — import dedup öğrenme (ham değer → DB entity eşleşmesi) |
 | 14 | `014_ai_runs.sql` | `ai_runs` tablosu — AI çağrı gözlemlenebilirlik kaydı (fire-and-forget, opsiyonel) |
-| 15 | `015_product_identity_fields.sql` | `products`'a 8 opsiyonel kimlik alanı (material_quality, origin_country, certifications vb.) |
+| 15 | `015_product_identity_fields.sql` | `products`'a 8 kimlik alanı (material_quality, origin_country, certifications vb.) — products CRUD bağımlı, zorunlu |
 
 **Supabase CLI ile:**
 ```bash
@@ -71,7 +71,7 @@ supabase db push
 
 **Dashboard ile:** SQL Editor → her dosyayı sırayla çalıştır.
 
-> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi, `009` olmadan bazı sipariş transition'larında `entity_id uuid / text` hatası görülebilir. `010` olmadan AI öneri kararları ve satın alma önerileri, `012` olmadan Excel import flow, `013` olmadan import dedup çalışmaz.
+> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi, `009` olmadan bazı sipariş transition'larında `entity_id uuid / text` hatası görülebilir. `010` olmadan AI öneri kararları ve satın alma önerileri, `011` olmadan sevkiyat sırasında UUID/text tip hatası, `012` olmadan Excel import flow, `013` olmadan import dedup çalışmaz. `015` olmadan ürün oluşturma ve güncelleme işlemleri kırılır (identity alanları her INSERT/UPDATE'e dahil edilir).
 
 ---
 
@@ -83,7 +83,7 @@ GET /api/health
 
 Env değişkenlerini ve tablo/migration varlığını kontrol eder.
 
-- **HTTP 200** → sistem hazır (AI opsiyonel, eksikse 503 dönmez)
+- **HTTP 200** → sistem hazır (AI ve Paraşüt opsiyonel, eksikse 503 dönmez; `ai_runs` tablosu da opsiyonel)
 - **HTTP 503** → eksik zorunlu env (Supabase) veya uygulanmamış migration
 
 ```jsonc
