@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -71,6 +71,7 @@ function OrdersList() {
     const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
+    const filterAppliedRef = useRef(false);
 
     const handleDelete = async (e: React.MouseEvent, orderId: string) => {
         e.stopPropagation();
@@ -93,13 +94,18 @@ function OrdersList() {
         }
     };
 
+    // Apply URL filter params once — depends on `searchParams` so it re-fires
+    // when Suspense resolves on cold/deep-link loads.
+    // filterAppliedRef ensures the filter is applied at most once.
     useEffect(() => {
+        if (filterAppliedRef.current) return;
         const customerId = searchParams.get("customerId");
         const customer   = searchParams.get("customer"); // legacy name-based
+        if (!customerId && !customer) return;
+        filterAppliedRef.current = true;
         if (customerId) setCustomerIdFilter(customerId);
         else if (customer) setSearch(decodeURIComponent(customer));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [searchParams]);
 
     const filtered = mockOrders.filter((o) => {
         if (customerIdFilter && o.customerId !== customerIdFilter) return false;

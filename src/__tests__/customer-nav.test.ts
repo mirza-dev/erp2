@@ -161,3 +161,45 @@ describe("findCustomerForPrefill — async data arrival (cold-load regression)",
         expect(findCustomerForPrefill(customers, "c1", null)?.id).toBe("c1"); // post-load — hit
     });
 });
+
+// ─── filterOrders — cold-load regression (orders list) ───────────────────────
+// Guards the orders list page filter: even though customerIdFilter is a plain
+// string (no async lookup needed), the filtered result depends on `orders` from
+// data-context which arrives async. On cold/deep-link load:
+//   1. effect fires at mount  → customerIdFilter set, but orders=[] → empty list
+//   2. orders arrive          → filtered recomputes with customerIdFilter → correct
+// These tests exercise both points of that timeline via the pure filterOrders helper.
+
+describe("filterOrders — cold-load regression (async orders arrival)", () => {
+    it("orders boşken customerIdFilter uygulansa da sonuç boş döner", () => {
+        expect(filterOrders([], "c1", "")).toEqual([]);
+    });
+
+    it("orders yüklenince customerIdFilter doğru filtre uygular", () => {
+        const orders = [
+            makeOrder("o1", "c1", "Acme Ltd"),
+            makeOrder("o2", "c2", "Beta A.Ş."),
+        ];
+        const result = filterOrders(orders, "c1", "");
+        expect(result.map(o => o.id)).toEqual(["o1"]);
+    });
+
+    it("orders boş → dolu geçişinde filter sonucu doğru (sequence)", () => {
+        const orders = [
+            makeOrder("o1", "c1", "Acme Ltd"),
+            makeOrder("o2", "c2", "Beta A.Ş."),
+        ];
+        expect(filterOrders([], "c1", "")).toEqual([]);          // mount — miss
+        expect(filterOrders(orders, "c1", "").length).toBe(1);  // data geldi — hit
+    });
+
+    it("legacy customer name filter cold-load: orders boş → dolu geçişinde çalışır", () => {
+        const orders = [
+            makeOrder("o1", "c1", "Acme Ltd"),
+            makeOrder("o2", "c2", "Beta A.Ş."),
+        ];
+        // legacy filter uses search string (customerName), no customerIdFilter
+        expect(filterOrders([], null, "Acme")).toEqual([]);             // mount — miss
+        expect(filterOrders(orders, null, "Acme").length).toBe(1);     // data geldi — hit
+    });
+});
