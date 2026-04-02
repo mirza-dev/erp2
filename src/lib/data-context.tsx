@@ -485,8 +485,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         prev.map((o) => (o.id === orderId ? mapped : o))
       );
 
-      // If shipped, refetch products (stock has changed)
-      if (transition === "shipped") {
+      // Refetch products for any transition that affects stock (reserved/on_hand)
+      if (transition === "approved" || transition === "cancelled" || transition === "shipped") {
         const productsRes = await fetch("/api/products");
         if (productsRes.ok) {
           const data = await productsRes.json();
