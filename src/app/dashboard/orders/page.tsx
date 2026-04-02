@@ -8,6 +8,7 @@ import { useData } from "@/lib/data-context";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
+import { useToast } from "@/components/ui/Toast";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral" },
@@ -64,6 +65,7 @@ function OrdersList() {
     const { orders: mockOrders, refetchAll } = useData();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const toast = useToast();
     const [search, setSearch] = useState("");
     const [customerIdFilter, setCustomerIdFilter] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
@@ -79,7 +81,12 @@ function OrdersList() {
         setDeletingId(orderId);
         setConfirmId(null);
         try {
-            await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+            const res = await fetch(`/api/orders/${orderId}`, { method: "DELETE" });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                toast({ type: "error", message: errBody.error || `İşlem başarısız (${res.status})` });
+                return;
+            }
             await refetchAll();
         } finally {
             setDeletingId(null);
