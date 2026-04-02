@@ -75,4 +75,15 @@ describe("REQUIRED_KEYS — readiness kontrat", () => {
         checks["db.migration_015"] = "missing_or_error: column does not exist";
         expect(REQUIRED_KEYS.every(k => checks[k] === "ok")).toBe(false);
     });
+
+    it("db.migration_018 required (create_order_with_lines — atomik sipariş RPC)", () => {
+        expect(REQUIRED_KEYS).toContain("db.migration_018");
+    });
+
+    it("allOk semantiği: migration_018 missing → false döner", () => {
+        const checks: Record<string, string> = {};
+        REQUIRED_KEYS.forEach(k => { checks[k] = "ok"; });
+        checks["db.migration_018"] = "missing: Could not find the function create_order_with_lines";
+        expect(REQUIRED_KEYS.every(k => checks[k] === "ok")).toBe(false);
+    });
 });

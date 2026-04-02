@@ -37,6 +37,7 @@ export const REQUIRED_KEYS = [
     "db.migration_012",              // sales_orders.incoterm
     "db.migration_013",              // ai_entity_aliases table
     "db.migration_015",              // products identity fields (CRUD bağımlı)
+    "db.migration_018",              // create_order_with_lines (atomik sipariş oluşturma RPC)
 ];
 
 export function interpretMigration011Result(
@@ -108,6 +109,7 @@ export async function GET() {
             tbl013,                 // 013 — ai_entity_aliases table
             tbl014,                 // 014 — ai_runs table (optional)
             col015,                 // 015 — products identity fields
+            { error: rpc018Error }, // 018 — create_order_with_lines atomik sipariş RPC
         ] = await Promise.all([
             supabase.rpc("increment_reserved", {
                 p_product_id: "00000000-0000-0000-0000-000000000000",
@@ -133,6 +135,9 @@ export async function GET() {
             pingTable(supabase, "ai_entity_aliases"),
             pingTable(supabase, "ai_runs"),
             pingColumn(supabase, "products", "material_quality"),
+            // 018: PGRST202 = RPC yok (migration uygulanmamış).
+            // Fonksiyon varsa boş param domain error verir → transaction rollback, side effect yok.
+            supabase.rpc("create_order_with_lines", { p_header: {}, p_lines: [] }),
         ]);
 
         checks["db.rpc_stock_functions"]     = rpcError?.code === "PGRST202"
@@ -151,6 +156,8 @@ export async function GET() {
         checks["db.migration_013"] = tbl013;
         checks["db.migration_014"] = tbl014;
         checks["db.migration_015"] = col015;
+        checks["db.migration_018"] = rpc018Error?.code === "PGRST202"
+            ? `missing: ${rpc018Error.message}` : "ok";
 
     } catch (e) {
         checks["db.error"] = `exception: ${e}`;
