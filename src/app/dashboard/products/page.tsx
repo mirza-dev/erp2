@@ -591,14 +591,16 @@ export default function ProductsPage() {
                                             fontSize: "14px", fontWeight: 700, lineHeight: 1.2,
                                             color: isCritical ? "var(--danger-text)" : "var(--success-text)",
                                         }}>
-                                            {formatNumber(product.available_now)}
+                                            {formatNumber(product.on_hand)} elde
                                         </div>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 400, marginTop: "1px" }}>
-                                            {formatNumber(product.on_hand)} elde
-                                            {product.reserved > 0 && (
+                                            {product.reserved > 0 ? (
                                                 <span style={{ color: "var(--warning-text)" }}>
+                                                    {formatNumber(product.available_now)} satılabilir
                                                     {" · "}{formatNumber(product.reserved)} rez.
                                                 </span>
+                                            ) : (
+                                                <span>{formatNumber(product.available_now)} satılabilir</span>
                                             )}
                                             {" · "}min {formatNumber(product.minStockLevel)}
                                         </div>
