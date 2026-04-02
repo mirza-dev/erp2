@@ -65,7 +65,7 @@ function OrdersList() {
     const { orders: mockOrders, refetchAll } = useData();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const toast = useToast();
+    const { toast } = useToast();
     const [search, setSearch] = useState("");
     const [customerIdFilter, setCustomerIdFilter] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
