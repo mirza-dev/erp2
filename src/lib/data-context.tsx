@@ -79,16 +79,18 @@ export interface OpenAlert {
   entity_id?: string;
 }
 
-export interface ConflictItem {
-  productName: string;
+export interface ShortageItem {
+  product_name: string;
   requested: number;
-  available: number;
+  reserved: number;
+  shortage: number;
 }
 
 export interface UpdateStatusResult {
   ok: boolean;
-  conflicts?: ConflictItem[];
   error?: string;
+  fulfillment_status?: FulfillmentStatus;
+  shortages?: ShortageItem[];
 }
 
 // ── Internal types ──────────────────────────────────────────
@@ -472,11 +474,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ transition }),
       });
 
-      if (res.status === 409) {
-        const data = await res.json();
-        return { ok: false, conflicts: data.conflicts };
-      }
-
       if (!res.ok) {
         const errBody = await res.json().catch(() => ({}));
         return { ok: false, error: errBody.error || `API error: ${res.status}` };
@@ -499,7 +496,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      return { ok: true };
+      return {
+        ok: true,
+        fulfillment_status: updated.fulfillment_status as FulfillmentStatus | undefined,
+        shortages: Array.isArray(updated.shortages) ? updated.shortages as ShortageItem[] : undefined,
+      };
     } catch (err) {
       console.error("updateOrderStatus failed:", err);
       return { ok: false, error: err instanceof Error ? err.message : undefined };

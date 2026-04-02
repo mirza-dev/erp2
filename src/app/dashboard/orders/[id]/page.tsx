@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { useData, type ConflictItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
+import { useData, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { mapOrderDetail } from "@/lib/api-mappers";
 import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
@@ -129,8 +129,8 @@ export default function OrderDetailPage() {
 
     const [commercialStatus, setCommercialStatus] = useState<CommercialStatus>(order?.commercial_status ?? "draft");
     const [fulfillmentStatus, setFulfillmentStatus] = useState<FulfillmentStatus>(order?.fulfillment_status ?? "unallocated");
-    const [conflictOpen, setConflictOpen] = useState(false);
-    const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
+    const [shortageDialogOpen, setShortageDialogOpen] = useState(false);
+    const [shortages, setShortages] = useState<ShortageItem[]>([]);
     const [loading, setLoading] = useState<string | null>(null);
     const [justTransitionedCommercial, setJustTransitionedCommercial] = useState<CommercialStatus | null>(null);
     const [justTransitionedFulfillment, setJustTransitionedFulfillment] = useState<FulfillmentStatus | null>(null);
@@ -233,20 +233,21 @@ export default function OrderDetailPage() {
             if (next === "approved") {
                 const result = await updateOrderStatus(order.id, "approved");
                 if (!result.ok) {
-                    if (result.conflicts) {
-                        setConflicts(result.conflicts);
-                        setConflictOpen(true);
-                        toast({ type: "error", message: "Stok yetersiz — sipariş onaylanamadı" });
-                    } else {
-                        toast({ type: "error", message: result.error || "Onaylama başarısız." });
-                    }
+                    toast({ type: "error", message: result.error || "Onaylama başarısız." });
                     return;
                 }
+                const realFulfillment = result.fulfillment_status ?? "allocated";
                 setCommercialStatus("approved");
-                setFulfillmentStatus("allocated");
+                setFulfillmentStatus(realFulfillment);
                 setJustTransitionedCommercial("approved");
                 setTimeout(() => setJustTransitionedCommercial(null), 1500);
-                toast({ type: "success", message: "Sipariş onaylandı ve stok rezerve edildi" });
+                if (realFulfillment === "partially_allocated" && result.shortages?.length) {
+                    setShortages(result.shortages);
+                    setShortageDialogOpen(true);
+                    toast({ type: "warning", message: "Sipariş kısmi rezerve ile onaylandı" });
+                } else {
+                    toast({ type: "success", message: "Sipariş onaylandı ve stok rezerve edildi" });
+                }
                 return;
             }
 
@@ -810,11 +811,11 @@ export default function OrderDetailPage() {
                 </div>
             </div>
 
-            {/* Conflict Dialog */}
-            {conflictOpen && (
+            {/* Shortage Dialog — partial allocation warning */}
+            {shortageDialogOpen && (
                 <>
                     <div
-                        onClick={() => setConflictOpen(false)}
+                        onClick={() => setShortageDialogOpen(false)}
                         style={{
                             position: "fixed",
                             inset: 0,
@@ -830,10 +831,10 @@ export default function OrderDetailPage() {
                             transform: "translate(-50%, -50%)",
                             zIndex: 101,
                             background: "var(--bg-primary)",
-                            border: "0.5px solid var(--danger-border)",
+                            border: "0.5px solid var(--warning-border)",
                             borderRadius: "8px",
                             padding: "20px 24px",
-                            width: "380px",
+                            width: "400px",
                             boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
                         }}
                     >
@@ -843,7 +844,7 @@ export default function OrderDetailPage() {
                                     width: "22px",
                                     height: "22px",
                                     borderRadius: "4px",
-                                    background: "var(--danger-bg)",
+                                    background: "var(--warning-bg)",
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "center",
@@ -851,15 +852,15 @@ export default function OrderDetailPage() {
                                 }}
                             >
                                 <svg width="10" height="10" viewBox="0 0 10 10">
-                                    <path d="M5 1L9 9H1z" fill="var(--danger-text)" />
+                                    <path d="M5 1L9 9H1z" fill="var(--warning-text)" />
                                 </svg>
                             </div>
-                            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--danger-text)" }}>
-                                Stok Yetersiz
+                            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--warning-text)" }}>
+                                Kısmi Rezervasyon
                             </div>
                         </div>
                         <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "14px" }}>
-                            Aşağıdaki ürünlerde satılabilir stok yetersiz. Sipariş onaylanamıyor.
+                            Sipariş onaylandı ancak aşağıdaki ürünlerde stok yetersiz kaldı. Eksik stok tamamlanmadan sevk yapılamaz.
                         </div>
                         <div
                             style={{
@@ -872,17 +873,17 @@ export default function OrderDetailPage() {
                         >
                             <div style={{ display: "flex", justifyContent: "space-between", color: "var(--text-tertiary)", marginBottom: "6px", fontWeight: 500 }}>
                                 <span>Ürün</span>
-                                <span>Talep / Satılabilir</span>
+                                <span>Rezerve / Talep (Eksik)</span>
                             </div>
-                            {conflicts.map((c, i) => (
+                            {shortages.map((s, i) => (
                                 <div key={i} style={{ display: "flex", justifyContent: "space-between", color: "var(--text-primary)", marginTop: i > 0 ? "4px" : 0 }}>
-                                    <span>{c.productName}</span>
-                                    <span style={{ color: "var(--danger-text)" }}>{c.requested} / {c.available} adet</span>
+                                    <span>{s.product_name}</span>
+                                    <span style={{ color: "var(--warning-text)" }}>{s.reserved} / {s.requested} adet ({s.shortage} eksik)</span>
                                 </div>
                             ))}
                         </div>
                         <div style={{ display: "flex", gap: "8px" }}>
-                            <Button variant="secondary" onClick={() => setConflictOpen(false)} style={{ flex: 1 }}>
+                            <Button variant="secondary" onClick={() => setShortageDialogOpen(false)} style={{ flex: 1 }}>
                                 Kapat
                             </Button>
                         </div>
