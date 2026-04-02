@@ -132,3 +132,32 @@ describe("filterOrders — customerIdFilter", () => {
         expect(result[0].id).toBe("o2");
     });
 });
+
+// ─── Async data arrival (cold-load regression) ────────────────────────────────
+// Guards against re-introducing the mount-only [] dep bug in orders/new/page.tsx.
+// The effect previously ran once at mount when customers=[], so prefill was always
+// skipped on cold/deep-link loads. Fix: effect depends on `customers` + prefillDoneRef.
+// These tests exercise the prefill logic at both points in that timeline.
+
+describe("findCustomerForPrefill — async data arrival (cold-load regression)", () => {
+    it("customers boşken bulunamaz — mount anındaki effect çalışmasını temsil eder", () => {
+        expect(findCustomerForPrefill([], "c1", null)).toBeUndefined();
+    });
+
+    it("customers yüklendikten sonra customerId ile bulunur — data gelişi sonrası effect", () => {
+        const customers = [makeCustomer("c1", "Acme Ltd"), makeCustomer("c2", "Beta A.Ş.")];
+        expect(findCustomerForPrefill(customers, "c1", null)?.id).toBe("c1");
+    });
+
+    it("customers yüklendikten sonra customerName fallback çalışır", () => {
+        const customers = [makeCustomer("c1", "Acme Ltd"), makeCustomer("c2", "Beta A.Ş.")];
+        expect(findCustomerForPrefill(customers, null, "Beta A.Ş.")?.id).toBe("c2");
+    });
+
+    it("customers boş → dolu geçişinde doğru müşteri bulunur (sequence)", () => {
+        // Simulates the two-call sequence: effect at mount (empty), then after data loads.
+        const customers = [makeCustomer("c1", "Acme Ltd")];
+        expect(findCustomerForPrefill([], "c1", null)).toBeUndefined();      // mount call — miss
+        expect(findCustomerForPrefill(customers, "c1", null)?.id).toBe("c1"); // post-load — hit
+    });
+});

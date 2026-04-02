@@ -3,7 +3,7 @@ import { dbListProducts, dbCreateProduct, type CreateProductInput } from "@/lib/
 import { handleApiError } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 
-// GET /api/products?category=xxx&product_type=finished&low_stock=true&page=1
+// GET /api/products?category=xxx&product_type=finished&is_active=false&page=1
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;

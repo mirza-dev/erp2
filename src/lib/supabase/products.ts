@@ -37,7 +37,6 @@ export interface ListProductsFilter {
     category?: string;
     product_type?: "finished" | "raw_material";
     is_active?: boolean;
-    low_stock?: boolean;  // available_now <= min_stock_level
     page?: number;
     pageSize?: number;
 }

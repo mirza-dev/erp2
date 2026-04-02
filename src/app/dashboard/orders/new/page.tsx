@@ -59,22 +59,28 @@ function NewOrderForm() {
     const [windowWidth, setWindowWidth] = useState<number>(
         typeof window !== "undefined" ? window.innerWidth : 1200
     );
-    const dropdownRef = useRef<HTMLDivElement>(null);
+    const dropdownRef    = useRef<HTMLDivElement>(null);
+    const prefillDoneRef = useRef(false);
+    // Capture URL params once — searchParams identity can change between renders in Next.js
+    const prefillIdRef   = useRef(searchParams.get("customerId"));
+    const prefillNameRef = useRef(searchParams.get("customerName"));
 
-    // Pre-fill customer from query param — prefer customerId, fall back to customerName
+    // Pre-fill customer from query param — prefer customerId, fall back to customerName.
+    // Depends on `customers` so the effect re-fires after async data loads on cold/deep-link.
+    // prefillDoneRef ensures the lookup runs at most once regardless of how many times
+    // `customers` updates.
     useEffect(() => {
-        const id   = searchParams.get("customerId");
-        const name = searchParams.get("customerName");
-        if (id) {
-            const found = customers.find(c => c.id === id);
-            if (found) { setSelectedCustomer(found); return; }
-        }
-        if (name) {
-            const found = customers.find(c => c.name === decodeURIComponent(name));
-            if (found) setSelectedCustomer(found);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        if (prefillDoneRef.current) return;
+        if (customers.length === 0) return;
+        prefillDoneRef.current = true;
+        const id   = prefillIdRef.current;
+        const name = prefillNameRef.current;
+        if (!id && !name) return;
+        let found: Customer | undefined;
+        if (id) found = customers.find(c => c.id === id);
+        if (!found && name) found = customers.find(c => c.name === decodeURIComponent(name));
+        if (found) setSelectedCustomer(found);
+    }, [customers]);
 
     // Close dropdown on outside click
     useEffect(() => {
