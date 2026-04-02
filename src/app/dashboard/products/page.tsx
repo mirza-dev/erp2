@@ -594,7 +594,13 @@ export default function ProductsPage() {
                                             {formatNumber(product.available_now)}
                                         </div>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 400, marginTop: "1px" }}>
-                                            {formatNumber(product.on_hand)} · min {formatNumber(product.minStockLevel)}
+                                            {formatNumber(product.on_hand)} elde
+                                            {product.reserved > 0 && (
+                                                <span style={{ color: "var(--warning-text)" }}>
+                                                    {" · "}{formatNumber(product.reserved)} rez.
+                                                </span>
+                                            )}
+                                            {" · "}min {formatNumber(product.minStockLevel)}
                                         </div>
                                     </td>
                                     {!isMobile && (
