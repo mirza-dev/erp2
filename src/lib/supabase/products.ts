@@ -230,6 +230,28 @@ export async function dbTryResolveShortages(productId: string): Promise<ResolveS
     return data as ResolveShortagesResult;
 }
 
+/**
+ * Returns a map of product_id → total open shortage qty for approved orders.
+ * Source of truth for order_shortage alert logic (domain-rules §12).
+ */
+export async function dbGetOpenShortagesByProduct(): Promise<Map<string, number>> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("shortages")
+        .select("product_id, shortage_qty, sales_orders!inner(commercial_status)")
+        .eq("status", "open")
+        .eq("sales_orders.commercial_status", "approved");
+    if (error) throw new Error(error.message);
+
+    const map = new Map<string, number>();
+    for (const row of data ?? []) {
+        const productId = row.product_id as string;
+        const qty = row.shortage_qty as number;
+        map.set(productId, (map.get(productId) ?? 0) + qty);
+    }
+    return map;
+}
+
 export async function dbListMovements(productId: string, limit = 50) {
     const supabase = createServiceClient();
     const { data, error } = await supabase

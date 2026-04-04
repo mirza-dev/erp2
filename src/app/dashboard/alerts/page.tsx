@@ -201,7 +201,8 @@ export default function AlertsPage() {
         if (refreshing) return;
         setRefreshing(true);
         try {
-            await fetch("/api/alerts/scan", { method: "POST" });
+            const res = await fetch("/api/alerts/scan", { method: "POST" });
+            if (!res.ok) throw new Error(String(res.status));
             await refetch();
             setLastRefreshed(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
             toast({ type: "success", message: "Uyarılar güncellendi" });
@@ -216,7 +217,8 @@ export default function AlertsPage() {
         if (aiGenerating) return;
         setAiGenerating(true);
         try {
-            const res  = await fetch("/api/alerts/ai-suggest", { method: "POST" });
+            const res = await fetch("/api/alerts/ai-suggest", { method: "POST" });
+            if (!res.ok) throw new Error(String(res.status));
             const data = await res.json();
             if (!data.ai_available) {
                 toast({ type: "warning", message: "AI servisi yapılandırılmamış (ANTHROPIC_API_KEY gerekli)" });
@@ -233,11 +235,12 @@ export default function AlertsPage() {
 
     const resolveAlert = async (alertId: string) => {
         try {
-            await fetch(`/api/alerts/${alertId}`, {
+            const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "resolved" }),
             });
+            if (!res.ok) throw new Error(String(res.status));
             const patch = (a: AlertRow) =>
                 a.id === alertId ? { ...a, status: "resolved" as const } : a;
             setRawAlerts((prev) => prev.map(patch));
@@ -251,26 +254,51 @@ export default function AlertsPage() {
     const dismissGroup = async (group: ProductAlertGroup) => {
         const open = group.alerts.filter((a) => a.status === "open" || a.status === "acknowledged");
         if (open.length === 0) return;
-        const ids = new Set(open.map((a) => a.id));
-        setRawAlerts((prev) => prev.filter((a) => !ids.has(a.id)));
-        if (drawerGroup?.entityId === group.entityId) setDrawerGroup(null);
-        await Promise.all(open.map((a) =>
-            fetch(`/api/alerts/${a.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "dismissed" }),
+
+        const results = await Promise.allSettled(
+            open.map(async (a) => {
+                const res = await fetch(`/api/alerts/${a.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ status: "dismissed" }),
+                });
+                if (!res.ok) throw new Error(String(res.status));
+                return a.id;
             })
-        ));
-        toast({ type: "info", message: `${open.length} uyarı yoksayıldı` });
+        );
+
+        const succeeded = results
+            .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
+            .map((r) => r.value);
+        const failedCount = results.filter((r) => r.status === "rejected").length;
+
+        if (succeeded.length > 0) {
+            const successIds = new Set(succeeded);
+            setRawAlerts((prev) => prev.filter((a) => !successIds.has(a.id)));
+            if (drawerGroup?.entityId === group.entityId) {
+                const remaining = drawerGroup.alerts.filter((a) => !successIds.has(a.id));
+                if (remaining.length === 0) setDrawerGroup(null);
+                else setDrawerGroup({ ...drawerGroup, alerts: remaining });
+            }
+        }
+
+        if (failedCount > 0 && succeeded.length > 0) {
+            toast({ type: "warning", message: `${succeeded.length} yoksayıldı, ${failedCount} işlem başarısız` });
+        } else if (failedCount > 0) {
+            toast({ type: "error", message: "Yoksayma işlemi başarısız" });
+        } else {
+            toast({ type: "info", message: `${succeeded.length} uyarı yoksayıldı` });
+        }
     };
 
     const dismissAlert = async (alertId: string) => {
         try {
-            await fetch(`/api/alerts/${alertId}`, {
+            const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "dismissed" }),
             });
+            if (!res.ok) throw new Error(String(res.status));
             setRawAlerts((prev) => prev.filter((a) => a.id !== alertId));
             if (drawerGroup) {
                 const remaining = drawerGroup.alerts.filter((a) => a.id !== alertId);
@@ -285,11 +313,12 @@ export default function AlertsPage() {
 
     const acknowledgeAlert = async (alertId: string) => {
         try {
-            await fetch(`/api/alerts/${alertId}`, {
+            const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "acknowledged" }),
             });
+            if (!res.ok) throw new Error(String(res.status));
             const patch = (a: AlertRow) =>
                 a.id === alertId ? { ...a, status: "acknowledged" as const } : a;
             setRawAlerts((prev) => prev.map(patch));

@@ -51,7 +51,11 @@ export async function dbGetAlertById(id: string): Promise<AlertRow | null> {
     return data;
 }
 
-/** Check if an open alert already exists for this entity (deduplicate) */
+/**
+ * Check if an active (open OR acknowledged) alert already exists for this entity.
+ * Acknowledged alerts are still active — user has seen them but condition persists.
+ * Both statuses block new alert creation (deduplicate).
+ */
 export async function dbOpenAlertExists(type: AlertType, entityId: string): Promise<boolean> {
     const supabase = createServiceClient();
     const { count } = await supabase
@@ -59,7 +63,7 @@ export async function dbOpenAlertExists(type: AlertType, entityId: string): Prom
         .select("*", { count: "exact", head: true })
         .eq("type", type)
         .eq("entity_id", entityId)
-        .eq("status", "open");
+        .in("status", ["open", "acknowledged"]);
     return (count ?? 0) > 0;
 }
 
@@ -106,7 +110,10 @@ export async function dbUpdateAlertStatus(
     return data;
 }
 
-/** Dismiss all open alerts from a given source (e.g. "ai") */
+/**
+ * Dismiss all active (open OR acknowledged) alerts from a given source (e.g. "ai").
+ * Acknowledged AI alerts are still active and should be replaced on regeneration.
+ */
 export async function dbDismissAlertsBySource(source: "system" | "ai" | "ui"): Promise<number> {
     const supabase = createServiceClient();
     const now = new Date().toISOString();
@@ -114,13 +121,17 @@ export async function dbDismissAlertsBySource(source: "system" | "ai" | "ui"): P
         .from("alerts")
         .update({ status: "dismissed", dismissed_at: now, resolution_reason: "replaced_by_new_generation" })
         .eq("source", source)
-        .eq("status", "open")
+        .in("status", ["open", "acknowledged"])
         .select("id");
     if (error) throw new Error(error.message);
     return data?.length ?? 0;
 }
 
-/** Resolve all open alerts of a given type for an entity (stock recovered) */
+/**
+ * Resolve all active (open OR acknowledged) alerts of a given type for an entity.
+ * Acknowledged alerts represent a condition the user has seen but not yet resolved;
+ * when the underlying condition clears, they must be auto-resolved too.
+ */
 export async function dbResolveAlertsForEntity(
     type: AlertType,
     entityId: string,
@@ -133,7 +144,7 @@ export async function dbResolveAlertsForEntity(
         .update({ status: "resolved", resolved_at: now, resolution_reason: reason })
         .eq("type", type)
         .eq("entity_id", entityId)
-        .eq("status", "open")
+        .in("status", ["open", "acknowledged"])
         .select("id");
     if (error) throw new Error(error.message);
     return data?.length ?? 0;

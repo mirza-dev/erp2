@@ -3,7 +3,7 @@
  * Follows domain-rules.md §6 (critical/warning rules) + §12 (alert lifecycle).
  */
 
-import { dbListProducts } from "@/lib/supabase/products";
+import { dbListProducts, dbGetOpenShortagesByProduct } from "@/lib/supabase/products";
 import { dbListOrders } from "@/lib/supabase/orders";
 import {
     dbListAlerts,
@@ -47,7 +47,10 @@ export interface ScanResult {
  *   warning:  available_now > min_stock_level AND available_now <= min_stock_level * 1.5
  */
 export async function serviceScanStockAlerts(): Promise<ScanResult> {
-    const products = await dbListProducts({ is_active: true, pageSize: 500 });
+    const [products, shortageMap] = await Promise.all([
+        dbListProducts({ is_active: true, pageSize: 500 }),
+        dbGetOpenShortagesByProduct(),
+    ]);
 
     let created = 0;
     let resolved = 0;
@@ -102,25 +105,27 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
             resolved += r1 + r2;
         }
 
-        // Order shortage: reserved stock exceeds available — active orders at risk
-        const reserved = product.reserved ?? 0;
-        if (reserved > 0 && available < reserved) {
+        // Order shortage: source of truth is the shortages table.
+        // available_now = on_hand - reserved, so (available < reserved) ≡ (on_hand < 2*reserved)
+        // which fires false positives when stock is healthy but heavily reserved.
+        // Correct check: open shortage records for approved orders in the shortages table.
+        const openShortageQty = shortageMap.get(product.id) ?? 0;
+        if (openShortageQty > 0) {
             const shortageExists = await dbOpenAlertExists("order_shortage", entityId);
             if (!shortageExists) {
-                const shortfall = reserved - available;
                 await dbCreateAlert({
                     type: "order_shortage",
                     severity: "critical",
                     title: `Sipariş Eksik: ${product.name}`,
-                    description: `${reserved} ${product.unit} rezerve edilmiş, ancak sadece ${available} ${product.unit} mevcut. ${shortfall} ${product.unit} eksik.`,
+                    description: `${openShortageQty} ${product.unit} eksik — onaylı sipariş karşılanamıyor.`,
                     entity_type: "product",
                     entity_id: entityId,
                 });
                 created++;
             }
-        } else if (reserved > 0 && available >= reserved) {
-            // Shortage resolved
-            resolved += await dbResolveAlertsForEntity("order_shortage", entityId, "stock_recovered");
+        } else {
+            // No open shortages for this product — resolve any stale alert
+            resolved += await dbResolveAlertsForEntity("order_shortage", entityId, "shortage_resolved");
         }
     }
 
