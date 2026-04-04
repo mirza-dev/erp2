@@ -77,17 +77,19 @@ export default function OrderDetailPage() {
                 setOrder(mapOrderDetail(data));
             }
         } catch (err) {
+            if (err instanceof DOMException && err.name === "AbortError") return;
             console.error("Failed to fetch order:", err);
         }
     };
 
     // Fetch order from API on mount
     useEffect(() => {
+        const controller = new AbortController();
         const fetchOrder = async () => {
             setOrderLoading(true);
             setOrder(null);
             try {
-                const res = await fetch(`/api/orders/${params.id}`);
+                const res = await fetch(`/api/orders/${params.id}`, { signal: controller.signal });
                 if (res.ok) {
                     const data = await res.json();
                     setOrder(mapOrderDetail(data));
@@ -95,6 +97,7 @@ export default function OrderDetailPage() {
                     setOrder(null);
                 }
             } catch (err) {
+                if (err instanceof DOMException && err.name === "AbortError") return;
                 setOrder(null);
                 console.error("Failed to fetch order:", err);
             } finally {
@@ -102,6 +105,7 @@ export default function OrderDetailPage() {
             }
         };
         if (params.id) fetchOrder();
+        return () => controller.abort();
     }, [params.id]);
 
     const handleRescore = async () => {

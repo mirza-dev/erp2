@@ -544,8 +544,8 @@ export default function ProductsPage() {
                             {!isMobile && <th style={thStyle}>Kategori</th>}
                             <th style={{ ...thStyle, textAlign: "right" }}>Stok</th>
                             {!isMobile && <th style={{ ...thStyle, textAlign: "right" }}>Kapsam</th>}
-                            <th style={{ ...thStyle, textAlign: "center" }}>Sinyal</th>
-                            <th style={{ ...thStyle, width: isMobile ? "56px" : "100px" }}></th>
+                            {!isMobile && <th style={{ ...thStyle, textAlign: "center" }}>Sinyal</th>}
+                            <th style={{ ...thStyle, width: isMobile ? "36px" : "100px" }}></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -588,10 +588,22 @@ export default function ProductsPage() {
                                     )}
                                     <td style={{ ...tdStyle, textAlign: "right" }}>
                                         <div style={{
-                                            fontSize: "14px", fontWeight: 700, lineHeight: 1.2,
-                                            color: isCritical ? "var(--danger-text)" : "var(--success-text)",
+                                            display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px",
                                         }}>
-                                            {formatNumber(product.on_hand)} elde
+                                            {isMobile && isCritical && (
+                                                <span style={{
+                                                    fontSize: "8px", fontWeight: 700, padding: "1px 4px", borderRadius: "3px",
+                                                    background: "var(--danger-bg)", color: "var(--danger-text)",
+                                                    border: "0.5px solid var(--danger-border)",
+                                                    textTransform: "uppercase", letterSpacing: "0.04em", flexShrink: 0,
+                                                }}>!</span>
+                                            )}
+                                            <span style={{
+                                                fontSize: isMobile ? "13px" : "14px", fontWeight: 700, lineHeight: 1.2,
+                                                color: isCritical ? "var(--danger-text)" : "var(--success-text)",
+                                            }}>
+                                                {formatNumber(product.on_hand)} elde
+                                            </span>
                                         </div>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 400, marginTop: "1px" }}>
                                             {product.reserved > 0 ? (
@@ -610,39 +622,41 @@ export default function ProductsPage() {
                                             {risk?.coverageDays != null ? `${risk.coverageDays}g` : <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>—</span>}
                                         </td>
                                     )}
-                                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                                        {isCritical ? (
-                                            <span style={{
-                                                fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
-                                                background: "var(--danger-bg)", color: "var(--danger-text)",
-                                                border: "0.5px solid var(--danger-border)",
-                                                textTransform: "uppercase", letterSpacing: "0.04em",
-                                            }}>KRİTİK</span>
-                                        ) : risk ? (
-                                            <span style={{
-                                                fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
-                                                background: "var(--warning-bg)", color: "var(--warning-text)",
-                                                border: "0.5px solid var(--warning-border)",
-                                                textTransform: "uppercase", letterSpacing: "0.04em",
-                                            }}>Risk</span>
-                                        ) : hasAlert ? (
-                                            <span style={{
-                                                fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
-                                                background: "var(--warning-bg)", color: "var(--warning-text)",
-                                                border: "0.5px solid var(--warning-border)",
-                                                textTransform: "uppercase", letterSpacing: "0.04em",
-                                            }}>Uyarı</span>
-                                        ) : pendingRec ? (
-                                            <span style={{
-                                                fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
-                                                background: "var(--accent-bg)", color: "var(--accent-text)",
-                                                border: "0.5px solid var(--accent-border)",
-                                                textTransform: "uppercase", letterSpacing: "0.04em",
-                                            }}>Öneri</span>
-                                        ) : (
-                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>—</span>
-                                        )}
-                                    </td>
+                                    {!isMobile && (
+                                        <td style={{ ...tdStyle, textAlign: "center" }}>
+                                            {isCritical ? (
+                                                <span style={{
+                                                    fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                    background: "var(--danger-bg)", color: "var(--danger-text)",
+                                                    border: "0.5px solid var(--danger-border)",
+                                                    textTransform: "uppercase", letterSpacing: "0.04em",
+                                                }}>KRİTİK</span>
+                                            ) : risk ? (
+                                                <span style={{
+                                                    fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                    background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                    border: "0.5px solid var(--warning-border)",
+                                                    textTransform: "uppercase", letterSpacing: "0.04em",
+                                                }}>Risk</span>
+                                            ) : hasAlert ? (
+                                                <span style={{
+                                                    fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                    background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                    border: "0.5px solid var(--warning-border)",
+                                                    textTransform: "uppercase", letterSpacing: "0.04em",
+                                                }}>Uyarı</span>
+                                            ) : pendingRec ? (
+                                                <span style={{
+                                                    fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                    background: "var(--accent-bg)", color: "var(--accent-text)",
+                                                    border: "0.5px solid var(--accent-border)",
+                                                    textTransform: "uppercase", letterSpacing: "0.04em",
+                                                }}>Öneri</span>
+                                            ) : (
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>—</span>
+                                            )}
+                                        </td>
+                                    )}
                                     <td
                                         style={{ ...tdStyle, textAlign: "right", paddingRight: "12px" }}
                                         onClick={e => e.stopPropagation()}

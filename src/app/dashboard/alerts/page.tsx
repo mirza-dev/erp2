@@ -28,6 +28,7 @@ interface ProductAlertGroup {
     impact: string;
     actionLabel: string;
     actionHref: string;
+    isOrphaned: boolean;
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -151,6 +152,7 @@ export default function AlertsPage() {
         const groups: ProductAlertGroup[] = [];
         for (const [entityId, alerts] of byProduct) {
             const product   = productMap.get(entityId);
+            const isOrphaned = !product;
             const topSev    = alerts.some((a) => a.severity === "critical") ? "critical" : "warning";
             const available = product?.available_now ?? 0;
             const minStock  = product?.minStockLevel  ?? 0;
@@ -162,7 +164,7 @@ export default function AlertsPage() {
 
             groups.push({
                 entityId,
-                productName: product?.name ?? "Bilinmeyen Ürün",
+                productName: product?.name ?? "Silinmiş Ürün",
                 sku:         product?.sku  ?? "—",
                 available,
                 minStock,
@@ -171,10 +173,11 @@ export default function AlertsPage() {
                 coverageDays: covDays,
                 topSeverity:  topSev as "critical" | "warning",
                 alerts,
-                reason:       shortReason(alerts),
-                impact:       shortImpact(alerts, available, reserved, unit, covDays),
+                reason:       isOrphaned ? "Ürün silindi, uyarı geçersiz" : shortReason(alerts),
+                impact:       isOrphaned ? "Bu uyarı kapatılabilir" : shortImpact(alerts, available, reserved, unit, covDays),
                 actionLabel:  action.label,
                 actionHref:   action.href,
+                isOrphaned,
             });
         }
 
@@ -911,15 +914,16 @@ function drawerActionLinks(group: ProductAlertGroup): Array<{ label: string; hre
 
 function drawerRelatedLinks(group: ProductAlertGroup): Array<{ label: string; href: string }> {
     const types = group.alerts.map((a) => a.type);
+    const productHref = `/dashboard/products?highlight=${group.entityId}`;
     // order_shortage: Önerilen Aksiyon'da zaten /orders (primary) ve /purchase/suggested (secondary) var.
     // Tekrar eden linkleri İlgili Kayıtlar'dan çıkar; sadece ürün kartı göster.
     if (types.includes("order_shortage")) {
         return [
-            { label: "Ürün kartına git", href: "/dashboard/products" },
+            { label: "Ürün kartına git", href: productHref },
         ];
     }
     return [
-        { label: "Ürün kartına git",           href: "/dashboard/products" },
+        { label: "Ürün kartına git",           href: productHref },
         { label: "Satın alma önerisine git",   href: "/dashboard/purchase/suggested" },
     ];
 }
@@ -1102,41 +1106,52 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
 
                     {/* ── 2. Neden ── */}
                     <DrawerSection title="NEDEN">
-                        <p style={{ margin: "0 0 12px", fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
-                            {drawerDetailedReason(group)}
-                        </p>
-                        <div style={{
-                            display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
-                            gap: "10px",
-                            padding: "10px 12px",
-                            background: "var(--bg-secondary)",
-                            border: "0.5px solid var(--border-tertiary)",
-                            borderRadius: "5px",
-                        }}>
-                            {[
-                                { label: "Mevcut",  value: group.available, color: sev.text },
-                                { label: "Minimum", value: group.minStock,  color: "var(--text-secondary)" },
-                                { label: "Rezerve", value: group.reserved,  color: "var(--text-secondary)" },
-                            ].map(({ label, value, color }) => (
-                                <div key={label}>
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{label}</div>
-                                    <div style={{ fontSize: "15px", fontWeight: 700, color, lineHeight: 1.2 }}>
-                                        {value}
-                                        <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "3px" }}>
-                                            {group.unit}
-                                        </span>
-                                    </div>
+                        {group.isOrphaned ? (
+                            <p style={{ margin: 0, fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                                Bu uyarının bağlı olduğu ürün sistemden silinmiş.
+                                Uyarı artık geçersiz — aşağıdan &quot;Yoksay&quot; ile kapatabilirsiniz.
+                            </p>
+                        ) : (
+                            <>
+                                <p style={{ margin: "0 0 12px", fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
+                                    {drawerDetailedReason(group)}
+                                </p>
+                                <div style={{
+                                    display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
+                                    gap: "10px",
+                                    padding: "10px 12px",
+                                    background: "var(--bg-secondary)",
+                                    border: "0.5px solid var(--border-tertiary)",
+                                    borderRadius: "5px",
+                                }}>
+                                    {[
+                                        { label: "Mevcut",  value: group.available, color: sev.text },
+                                        { label: "Minimum", value: group.minStock,  color: "var(--text-secondary)" },
+                                        { label: "Rezerve", value: group.reserved,  color: "var(--text-secondary)" },
+                                    ].map(({ label, value, color }) => (
+                                        <div key={label}>
+                                            <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{label}</div>
+                                            <div style={{ fontSize: "15px", fontWeight: 700, color, lineHeight: 1.2 }}>
+                                                {value}
+                                                <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "3px" }}>
+                                                    {group.unit}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
+                            </>
+                        )}
                     </DrawerSection>
 
                     {/* ── 3. Etki ── */}
-                    <DrawerSection title="ETKİ">
-                        <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
-                            {drawerDetailedImpact(group)}
-                        </p>
-                    </DrawerSection>
+                    {!group.isOrphaned && (
+                        <DrawerSection title="ETKİ">
+                            <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
+                                {drawerDetailedImpact(group)}
+                            </p>
+                        </DrawerSection>
+                    )}
 
                     {/* ── 4. Önerilen Aksiyon ── */}
                     <DrawerSection title="ÖNERİLEN AKSİYON">
@@ -1167,31 +1182,33 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                     </DrawerSection>
 
                     {/* ── 5. İlgili Kayıtlar ── */}
-                    <DrawerSection title="İLGİLİ KAYITLAR">
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                            {relatedLinks.map((link) => (
-                                <Link
-                                    key={link.href + link.label}
-                                    href={link.href}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        padding: "8px 12px",
-                                        background: "var(--bg-secondary)",
-                                        border: "0.5px solid var(--border-tertiary)",
-                                        borderRadius: "5px",
-                                        fontSize: "12px",
-                                        color: "var(--text-secondary)",
-                                        textDecoration: "none",
-                                    }}
-                                >
-                                    <span>{link.label}</span>
-                                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>→</span>
-                                </Link>
-                            ))}
-                        </div>
-                    </DrawerSection>
+                    {!group.isOrphaned && (
+                        <DrawerSection title="İLGİLİ KAYITLAR">
+                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                {relatedLinks.map((link) => (
+                                    <Link
+                                        key={link.href + link.label}
+                                        href={link.href}
+                                        style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            padding: "8px 12px",
+                                            background: "var(--bg-secondary)",
+                                            border: "0.5px solid var(--border-tertiary)",
+                                            borderRadius: "5px",
+                                            fontSize: "12px",
+                                            color: "var(--text-secondary)",
+                                            textDecoration: "none",
+                                        }}
+                                    >
+                                        <span>{link.label}</span>
+                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>→</span>
+                                    </Link>
+                                ))}
+                            </div>
+                        </DrawerSection>
+                    )}
 
                     {/* ── 6. Uyarı Durumu (ack / dismiss) ── */}
                     <DrawerSection title="UYARI DURUMU">
