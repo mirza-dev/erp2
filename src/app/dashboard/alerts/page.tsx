@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { computeCoverageDays, daysColor } from "@/lib/stock-utils";
 import { EmptyState, LoadingState } from "@/components/ui/StateViews";
 import type { AlertRow } from "@/lib/database.types";
+import { extractShortageQty, shortReason, shortImpact } from "@/lib/alert-ui-helpers";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -32,31 +33,6 @@ interface ProductAlertGroup {
 }
 
 // ── Helpers ────────────────────────────────────────────────────
-
-function shortReason(alerts: AlertRow[]): string {
-    const types = alerts.map((a) => a.type);
-    if (types.includes("order_shortage"))  return "Rezerve stok, mevcudu aşıyor";
-    if (types.includes("stock_critical"))  return "Stok kritik seviyenin altında";
-    if (types.includes("stock_risk"))      return "Stok uyarı eşiğine yaklaşıyor";
-    return "Stok riski tespit edildi";
-}
-
-function shortImpact(
-    alerts: AlertRow[],
-    available: number,
-    reserved: number,
-    unit: string,
-    covDays: number | null
-): string {
-    const hasShortage = alerts.some((a) => a.type === "order_shortage");
-    if (hasShortage) {
-        const shortfall = reserved - available;
-        return `${shortfall} ${unit} eksik`;
-    }
-    if (available === 0) return "Stok tükendi";
-    if (covDays !== null && covDays <= 14) return `~${covDays} günlük stok`;
-    return `${available} ${unit} mevcut`;
-}
 
 function actionFor(alerts: AlertRow[]): { label: string; href: string } {
     const types = alerts.map((a) => a.type);
@@ -898,8 +874,10 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
 function drawerDetailedReason(group: ProductAlertGroup): string {
     const types = group.alerts.map((a) => a.type);
     if (types.includes("order_shortage")) {
-        const shortfall = group.reserved - group.available;
-        return `Onaylı siparişler için ${group.reserved} ${group.unit} rezerve edilmiş, ancak satılabilir stok sadece ${group.available} ${group.unit}. ${shortfall} ${group.unit} karşılanamıyor.`;
+        const qty = extractShortageQty(group.alerts);
+        return qty !== null
+            ? `Onaylı sipariş için ${qty} ${group.unit} eksik — mevcut stok yetersiz.`
+            : "Onaylı sipariş stokla karşılanamıyor.";
     }
     if (types.includes("stock_critical")) {
         return `Mevcut stok (${group.available} ${group.unit}), minimum güvenlik seviyesi olan ${group.minStock} ${group.unit} altına indi.`;
@@ -913,8 +891,10 @@ function drawerDetailedReason(group: ProductAlertGroup): string {
 function drawerDetailedImpact(group: ProductAlertGroup): string {
     const types = group.alerts.map((a) => a.type);
     if (types.includes("order_shortage")) {
-        const shortfall = group.reserved - group.available;
-        return `${shortfall} ${group.unit} eksik. Onaylı siparişler tam karşılanamıyor. Teslimatta gecikme veya kısmi sevkiyat riski var.`;
+        const qty = extractShortageQty(group.alerts);
+        return qty !== null
+            ? `${qty} ${group.unit} eksik. Onaylı siparişler tam karşılanamıyor. Teslimatta gecikme veya kısmi sevkiyat riski var.`
+            : "Onaylı siparişler tam karşılanamıyor. Teslimatta gecikme riski var.";
     }
     const { coverageDays } = group;
     if (coverageDays === 0) return "Stok tükendi. Mevcut siparişler karşılanamıyor.";
