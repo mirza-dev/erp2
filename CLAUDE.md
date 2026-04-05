@@ -1,8 +1,22 @@
 # KokpitERP — Claude Code Rehberi
 
+## Mevcut Durum
+_Son güncelleme: 2026-04-05_
+
+**Son tamamlanan iş:** Demo mode credential/PII güvenliği (commit 99bbc55)
+- `/api/parasut/config` → demo kullanıcıya credential gösterilmiyor (null döner)
+- `/api/settings/api-keys-status` → demo kullanıcıya entegrasyon bilgisi gizli (hepsi false)
+- `settings/page.tsx` → PII bundle'dan çıkarıldı, Firma/Kullanıcı tabları demo'da placeholder gösteriyor
+
+**Aktif odak:** —
+**Bilinen açık sorunlar:** —
+**Test sayısı:** 45 dosya · 1059 test
+
+---
+
 ## Proje Özeti
 PMT Endüstriyel için yapay zeka destekli ERP sistemi. Endüstriyel vana satışı (B2B).
-**Stack:** Next.js 15 · TypeScript · Supabase (aktif, 5 migration) · Tailwind CSS kurulu ama kullanılmıyor (inline styles kullanıyoruz)
+**Stack:** Next.js 15 · TypeScript · Supabase (aktif, 18+ migration) · Tailwind CSS kurulu ama kullanılmıyor (inline styles kullanıyoruz)
 
 ---
 

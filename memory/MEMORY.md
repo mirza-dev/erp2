@@ -1,7 +1,12 @@
 # Memory Index
 
 ## Project
-- [project_kokpiterp.md](project_kokpiterp.md) — KokpitERP: PMT Endüstriyel için AI destekli ERP, Next.js 15 + Supabase, erp2/ dizini, Faz 0-10 tamamlandı, Stage 2A AI layer aktif
+- [project_stack.md](project_stack.md) — Stack, inline style kuralları, klasör yapısı, veri modelleri
+- [project_domain.md](project_domain.md) — Sipariş çift ekseni, stok modeli, KDV hesaplama, import kontratı, tamamlanan fazlar
+- [project_security.md](project_security.md) — RLS, middleware, demo mode mimarisi, credential güvenliği
+- [project_integrations.md](project_integrations.md) — Paraşüt mock, AI Stage 2A/2B, health check, test altyapısı
+- [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
+- [current_focus.md](current_focus.md) — Aktif sprint ve sonraki adımlar
 
 ## Feedback
 - [feedback_no_silent_deletes.md](feedback_no_silent_deletes.md) — Kod silmeden önce onay veya net gerekçe gerekiyor; işe yarar kodu sessizce silme
