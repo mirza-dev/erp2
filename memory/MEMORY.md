@@ -11,3 +11,4 @@
 ## Feedback
 - [feedback_no_silent_deletes.md](feedback_no_silent_deletes.md) — Kod silmeden önce onay veya net gerekçe gerekiyor; işe yarar kodu sessizce silme
 - [feedback_memory_updates.md](feedback_memory_updates.md) — MEMORY.md ve memory dosyaları düzenli güncel tutulmalı; önemli değişikliklerde güncelle
+- [feedback_auto_context_update.md](feedback_auto_context_update.md) — current_focus.md ve CLAUDE.md Mevcut Durum bölümü her iş sonunda otomatik güncellenmeli, kullanıcı manuel yapmamalı
