@@ -242,6 +242,21 @@ describe("serviceConfirmBatch — product merge", () => {
         expect(mockDbCreateProduct).not.toHaveBeenCalled();
     });
 
+    it("skips draft and adds error when unit is missing", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50", sku: "GV-050" }, // unit missing
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(result.errors.length).toBeGreaterThan(0);
+        expect(mockDbCreateProduct).not.toHaveBeenCalled();
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+    });
+
     it("calls dbCreateProduct with correct fields when all required fields present", async () => {
         const draft = makeDraft({
             entity_type: "product",
@@ -430,6 +445,21 @@ describe("serviceConfirmBatch — on_hand rules", () => {
         expect(mockDbUpdateProduct).toHaveBeenCalledWith("existing-p", { on_hand: 80 });
     });
 
+    it("new product with on_hand in parsed_data → on_hand IS included in dbCreateProduct call", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "New Valve", sku: "NV-999", unit: "adet", on_hand: 42 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "NV-999" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [createPayload] = mockDbCreateProduct.mock.calls[0];
+        expect(createPayload).toHaveProperty("on_hand", 42);
+    });
+
     it("stock entity_type without on_hand → dbUpdateProduct not called", async () => {
         const draft = makeDraft({
             entity_type: "stock",
@@ -614,6 +644,80 @@ describe("serviceConfirmBatch — §9.2: order merge never creates approved enti
         expect(result.skipped).toBe(1);
         expect(result.added).toBe(0);
         expect(result.errors[0]).toContain("draft-1");
+    });
+});
+
+// ─── Contract: added/updated/skipped are tracked independently ───────────────
+//
+// Regression guard: ensures no one can accidentally revert to a single "merged"
+// counter that collapses all successful operations into one number.
+// If this describe fails, the three counters have been incorrectly merged.
+
+describe("serviceConfirmBatch — contract: added/updated/skipped are tracked independently", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("three-way batch: new SKU → added, existing SKU → updated, missing field → skipped", async () => {
+        // Önceki "hepsi merged" mantığı added=2, updated=0, skipped=0 döndürürdü.
+        const drafts = [
+            makeDraft({
+                id: "d-new",
+                entity_type: "product",
+                parsed_data: { name: "Brand New Valve", sku: "NV-NEW", unit: "adet" },
+            }),
+            makeDraft({
+                id: "d-existing",
+                entity_type: "product",
+                parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet" },
+            }),
+            makeDraft({
+                id: "d-skip",
+                entity_type: "product",
+                parsed_data: { name: "Incomplete Valve" }, // sku + unit missing
+            }),
+        ];
+        mockDbListDrafts.mockResolvedValue(drafts);
+
+        mockDbFindProductBySku
+            .mockResolvedValueOnce(null)                                          // d-new: SKU not found → create
+            .mockResolvedValueOnce({ id: "existing-p", sku: "GV-050", on_hand: 10 }); // d-existing: found → update
+
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "NV-NEW" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(result.updated).toBe(1);
+        expect(result.skipped).toBe(1);
+        expect(result.errors).toHaveLength(1);
+    });
+
+    it("added + updated + skipped = total processed drafts", async () => {
+        const drafts = [
+            makeDraft({ id: "d1", entity_type: "product", parsed_data: { name: "A", sku: "SKU-A", unit: "adet" } }),
+            makeDraft({ id: "d2", entity_type: "product", parsed_data: { name: "B", sku: "SKU-B", unit: "adet" } }),
+            makeDraft({ id: "d3", entity_type: "product", parsed_data: { sku: "SKU-C" } }), // name + unit missing → skip
+        ];
+        mockDbListDrafts.mockResolvedValue(drafts);
+
+        mockDbFindProductBySku
+            .mockResolvedValueOnce(null)                              // SKU-A: new
+            .mockResolvedValueOnce({ id: "p2", sku: "SKU-B", on_hand: 0 }); // SKU-B: existing
+
+        mockDbCreateProduct.mockResolvedValue({ id: "new" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "p2" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added + result.updated + result.skipped).toBe(drafts.length);
+        expect(result.added).toBe(1);
+        expect(result.updated).toBe(1);
+        expect(result.skipped).toBe(1);
     });
 });
 
