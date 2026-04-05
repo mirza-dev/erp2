@@ -43,7 +43,8 @@ export async function serviceAddDraftsToBatch(
 // ── Confirm ──────────────────────────────────────────────────
 
 export interface ConfirmResult {
-    merged: number;
+    added: number;    // gerçekten INSERT edilen yeni kayıtlar
+    updated: number;  // mevcut kaydın UPDATE edildiği veya eşlendiği durumlar
     skipped: number;
     errors: string[];
 }
@@ -68,7 +69,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
         .filter(d => d.status === "confirmed" || d.status === "pending")
         .sort((a, b) => (ENTITY_PRIORITY[a.entity_type] ?? 99) - (ENTITY_PRIORITY[b.entity_type] ?? 99));
 
-    let merged = 0;
+    let added = 0;
+    let updated = 0;
     let skipped = 0;
     const errors: string[] = [];
 
@@ -110,11 +112,13 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     // Alias hit — önceki import'tan öğrenilmiş, doğrudan çözümlendi
                     customerId = aliasMatch;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: aliasMatch });
+                    updated++;
                 } else if (existing) {
                     customerId = existing.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
                     // Bu eşleşmeyi gelecek import'lar için kaydet
                     if (customerName) void dbSaveEntityAlias(customerName, "customer", existing.id, existing.name);
+                    updated++;
                 } else {
                     const customer = await dbCreateCustomer({
                         name: customerName,
@@ -134,6 +138,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: customer.id });
                     // Yeni müşteri — bu ismi gelecek import'lar için kaydet
                     if (customerName) void dbSaveEntityAlias(customerName, "customer", customer.id, customerName);
+                    added++;
                 }
                 if (customerCode) refMap.customerCodes.set(customerCode, customerId);
 
@@ -151,7 +156,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 const existingProduct = await dbFindProductBySku(sku);
                 let productId: string;
                 if (existingProduct) {
-                    const updated = await dbUpdateProduct(existingProduct.id, {
+                    const updatedProduct = await dbUpdateProduct(existingProduct.id, {
                         name: String(data.name),
                         category: data.category ? String(data.category) : undefined,
                         unit: String(data.unit),
@@ -174,8 +179,9 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         certifications: data.certifications ? String(data.certifications) : undefined,
                         product_notes: data.product_notes ? String(data.product_notes) : undefined,
                     });
-                    productId = updated.id;
-                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: updated.id });
+                    productId = updatedProduct.id;
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: updatedProduct.id });
+                    updated++;
                 } else {
                     const product = await dbCreateProduct({
                         name: String(data.name),
@@ -203,6 +209,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     productId = product.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: product.id });
+                    added++;
                 }
                 refMap.productSkus.set(sku, productId);
 
@@ -219,6 +226,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 if (existing) {
                     refMap.quoteNumbers.set(quoteNumber, existing.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
+                    updated++;
                 } else {
                     const quote = await dbCreateQuote({
                         quote_number: quoteNumber,
@@ -232,6 +240,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     refMap.quoteNumbers.set(quoteNumber, quote.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: quote.id });
+                    added++;
                 }
 
             } else if (draft.entity_type === "order") {
@@ -280,6 +289,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 if (originalOrderNumber) refMap.orderNumbers.set(originalOrderNumber, order.id);
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: order.id });
+                added++;
 
             } else if (draft.entity_type === "order_line") {
                 const orderNumber = data.order_number ? String(data.order_number) : undefined;
@@ -345,6 +355,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 }).eq("id", orderId);
 
                 await dbUpdateDraft(draft.id, { status: "merged" });
+                added++;
 
             } else if (draft.entity_type === "stock") {
                 if (data.sku && data.on_hand !== undefined) {
@@ -352,6 +363,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     if (prod) await dbUpdateProduct(prod.id, { on_hand: Number(data.on_hand) });
                 }
                 await dbUpdateDraft(draft.id, { status: "merged" });
+                updated++;
 
             } else if (draft.entity_type === "shipment") {
                 const shipmentNumber = String(data.shipment_number ?? "");
@@ -372,6 +384,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     gross_weight_kg: data.gross_weight_kg ? Number(data.gross_weight_kg) : undefined,
                 });
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: shipment.id });
+                added++;
 
             } else if (draft.entity_type === "invoice") {
                 const invoiceNumber = String(data.invoice_number ?? "");
@@ -391,6 +404,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 if (existing) {
                     refMap.invoiceNumbers.set(invoiceNumber, existing.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
+                    updated++;
                 } else {
                     const invoice = await dbCreateInvoice({
                         invoice_number: invoiceNumber,
@@ -405,6 +419,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     refMap.invoiceNumbers.set(invoiceNumber, invoice.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: invoice.id });
+                    added++;
                 }
 
             } else if (draft.entity_type === "payment") {
@@ -437,9 +452,9 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 }
 
                 await dbUpdateDraft(draft.id, { status: "merged" });
+                added++;
             }
 
-            merged++;
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             errors.push(`${draft.id} (Satır ${rowNum}): İşlem hatası — ${msg}`);
@@ -448,5 +463,5 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
     }
 
     await dbUpdateBatchStatus(batchId, "confirmed");
-    return { merged, skipped, errors };
+    return { added, updated, skipped, errors };
 }

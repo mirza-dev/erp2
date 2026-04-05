@@ -91,7 +91,7 @@ export default function ImportPage() {
     const [sheets, setSheets] = useState<SheetInfo[]>([]);
     const [activeTab, setActiveTab] = useState("");
     const [importProgress, setImportProgress] = useState<Record<string, number>>({});
-    const [confirmResult, setConfirmResult] = useState<{ merged: number; skipped: number; errors: string[] } | null>(null);
+    const [confirmResult, setConfirmResult] = useState<{ added: number; updated: number; skipped: number; errors: string[] } | null>(null);
     const [drafts, setDrafts] = useState<DraftRow[]>([]);
     const [aiAvailable, setAiAvailable] = useState(true);
     const [parseError, setParseError] = useState<string | null>(null);
@@ -331,7 +331,7 @@ export default function ImportPage() {
         } catch (err) {
             if (ticker) clearInterval(ticker);
             console.error("Import failed:", err);
-            setConfirmResult({ merged: 0, skipped: 0, errors: [String(err)] });
+            setConfirmResult({ added: 0, updated: 0, skipped: 0, errors: [String(err)] });
             setState("done");
         }
     };
@@ -977,26 +977,31 @@ export default function ImportPage() {
                         </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "16px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px", marginBottom: "16px" }}>
                         {confirmResult ? (
                             <>
                                 <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
-                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Başarılı</div>
-                                    <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--success-text)", marginBottom: "2px" }}>{confirmResult.merged}</div>
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.merged} kayıt eklendi</div>
+                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Eklendi</div>
+                                    <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--success-text)", marginBottom: "2px" }}>{confirmResult.added}</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>yeni kayıt</div>
+                                </div>
+                                <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
+                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Güncellendi</div>
+                                    <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--accent-text)", marginBottom: "2px" }}>{confirmResult.updated}</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>mevcut kayıt</div>
                                 </div>
                                 {confirmResult.skipped > 0 && (
                                     <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Atlanan</div>
                                         <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--warning-text)", marginBottom: "2px" }}>{confirmResult.skipped}</div>
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.skipped} kayıt atlandı</div>
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>kayıt atlandı</div>
                                     </div>
                                 )}
                                 {confirmResult.errors.length > 0 && (
                                     <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Hatalar</div>
                                         <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "2px" }}>{confirmResult.errors.length}</div>
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{confirmResult.errors.length} satırda sorun var</div>
+                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>satırda sorun</div>
                                     </div>
                                 )}
                             </>

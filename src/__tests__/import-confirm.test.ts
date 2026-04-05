@@ -112,17 +112,19 @@ describe("serviceConfirmBatch — batch lifecycle", () => {
         expect(mockDbUpdateBatchStatus).toHaveBeenCalledWith("batch-1", "confirmed");
     });
 
-    it("returns { merged, skipped, errors } result shape", async () => {
+    it("returns { added, updated, skipped, errors } result shape", async () => {
         mockDbGetBatch.mockResolvedValue(makeBatch());
         mockDbListDrafts.mockResolvedValue([]);
         mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
 
         const result = await serviceConfirmBatch("batch-1");
 
-        expect(result).toHaveProperty("merged");
+        expect(result).toHaveProperty("added");
+        expect(result).toHaveProperty("updated");
         expect(result).toHaveProperty("skipped");
         expect(result).toHaveProperty("errors");
-        expect(typeof result.merged).toBe("number");
+        expect(typeof result.added).toBe("number");
+        expect(typeof result.updated).toBe("number");
         expect(typeof result.skipped).toBe("number");
         expect(Array.isArray(result.errors)).toBe(true);
     });
@@ -182,13 +184,25 @@ describe("serviceConfirmBatch — customer merge", () => {
         );
     });
 
-    it("increments merged counter on success", async () => {
+    it("increments added counter when new customer is created", async () => {
         mockDbListDrafts.mockResolvedValue([makeDraft()]);
+        mockDbFindCustomerByName.mockResolvedValue(null);
         mockDbCreateCustomer.mockResolvedValue({ id: "c-1", name: "Acme" });
 
         const result = await serviceConfirmBatch("batch-1");
-        expect(result.merged).toBe(1);
+        expect(result.added).toBe(1);
+        expect(result.updated).toBe(0);
         expect(result.skipped).toBe(0);
+    });
+
+    it("increments updated (not added) when customer already exists by name", async () => {
+        mockDbListDrafts.mockResolvedValue([makeDraft()]);
+        mockDbFindCustomerByName.mockResolvedValue({ id: "existing-c", name: "Acme Vana" });
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+
+        const result = await serviceConfirmBatch("batch-1");
+        expect(result.updated).toBe(1);
+        expect(result.added).toBe(0);
     });
 });
 
@@ -241,6 +255,34 @@ describe("serviceConfirmBatch — product merge", () => {
         expect(mockDbCreateProduct).toHaveBeenCalledWith(
             expect.objectContaining({ name: "Gate Valve DN50", sku: "GV-050", unit: "adet" })
         );
+    });
+
+    it("increments added when product SKU is new", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Ball Valve DN25", sku: "BV-025", unit: "adet" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+        expect(result.added).toBe(1);
+        expect(result.updated).toBe(0);
+    });
+
+    it("increments updated when product SKU already exists", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", name: "Gate Valve" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+        expect(result.updated).toBe(1);
+        expect(result.added).toBe(0);
     });
 });
 
@@ -345,7 +387,7 @@ describe("serviceConfirmBatch — §9.2: order merge never creates approved enti
         const result = await serviceConfirmBatch("batch-1");
 
         expect(result.skipped).toBe(1);
-        expect(result.merged).toBe(0);
+        expect(result.added).toBe(0);
         expect(result.errors[0]).toContain("draft-1");
     });
 });
@@ -372,7 +414,7 @@ describe("serviceConfirmBatch — error isolation", () => {
 
         const result = await serviceConfirmBatch("batch-1");
 
-        expect(result.merged).toBe(1);
+        expect(result.added).toBe(1);
         expect(result.skipped).toBe(1);
     });
 
