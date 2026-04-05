@@ -56,8 +56,8 @@ export async function middleware(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-        // /login sayfası — auth gerektirmiyor, geç
-        if (pathname === "/login") {
+        // Public sayfalar — auth gerektirmiyor
+        if (pathname === "/login" || pathname === "/") {
             return NextResponse.next();
         }
         // API → 401 JSON
@@ -73,8 +73,8 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
     }
 
-    // Auth'lu kullanıcı /login'e gelirse → dashboard'a yönlendir
-    if (pathname === "/login") {
+    // Auth'lu kullanıcı /login veya / → dashboard'a yönlendir
+    if (pathname === "/login" || pathname === "/") {
         const url = request.nextUrl.clone();
         url.pathname = "/dashboard";
         return NextResponse.redirect(url);
