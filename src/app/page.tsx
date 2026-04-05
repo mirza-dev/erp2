@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import DemoButton from "@/components/ui/DemoButton";
 
 export const metadata: Metadata = {
     title: "KokpitERP — AI Destekli ERP",
@@ -116,7 +117,7 @@ export default function LandingPage() {
                     Sipariş yönetiminden Paraşüt muhasebe entegrasyonuna kadar
                     tüm operasyonlar tek ekranda.
                 </p>
-                <div style={{ display: "flex", gap: "10px", justifyContent: "center" }}>
+                <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
                     <Link
                         href="/login"
                         style={{
@@ -129,8 +130,9 @@ export default function LandingPage() {
                             fontWeight: 500,
                         }}
                     >
-                        Giriş Yap →
+                        Giriş Yap
                     </Link>
+                    <DemoButton />
                     <a
                         href="https://github.com/mirza-dev/erp2"
                         target="_blank"

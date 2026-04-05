@@ -27,6 +27,7 @@ import {
 } from "./api-mappers";
 
 import type { CreateOrderInput } from "./supabase/orders";
+import { isDemoMode as checkDemoMode, clearDemoMode } from "./demo-utils";
 
 // ── Pure helpers (exported for testing) ────────────────────
 // Mirrors data-context-error.test.ts pattern: extract pure logic, test directly.
@@ -141,6 +142,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // ── Demo guard — redirects to login if in demo mode ──────
+  const demoGuard = useCallback((): boolean => {
+    if (checkDemoMode()) {
+      clearDemoMode();
+      window.location.href = "/login";
+      return true;
+    }
+    return false;
+  }, []);
+
   // ── Fetch all lists from API ─────────────────────────────
 
   const refetchAll = useCallback(async () => {
@@ -206,6 +217,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive"
     >
   ) => {
+    if (demoGuard()) return;
     try {
       const body = {
         name: fields.name,
@@ -236,6 +248,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateCustomer = async (id: string, updates: Partial<Customer>): Promise<void> => {
+    if (demoGuard()) return;
     const body = buildCustomerPatch(updates);
     const res = await fetch(`/api/customers/${id}`, {
       method: "PATCH",
@@ -251,6 +264,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteCustomer = async (id: string) => {
+    if (demoGuard()) return;
     const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const errBody = await res.json().catch(() => null);
@@ -264,6 +278,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addProduct = async (
     fields: Omit<Product, "id" | "reserved" | "available_now" | "isActive">
   ) => {
+    if (demoGuard()) return;
     try {
       const body = {
         name: fields.name,
@@ -311,6 +326,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteProduct = async (id: string) => {
+    if (demoGuard()) return;
     const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const errBody = await res.json().catch(() => null);
@@ -322,6 +338,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // ── Production (Uretim) ──────────────────────────────────
 
   const addUretimKaydi = async (k: Omit<UretimKaydi, "id">): Promise<{ refetchFailed?: boolean }> => {
+    if (demoGuard()) return {};
     try {
       const body = {
         product_id: k.productId,
@@ -368,6 +385,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteUretimKaydi = async (id: string): Promise<{ refetchFailed?: boolean }> => {
+    if (demoGuard()) return {};
     try {
       const res = await fetch(`/api/production/${id}`, { method: "DELETE" });
       if (!res.ok) {
@@ -409,6 +427,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const addOrder = async (
     detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">
   ): Promise<string> => {
+    if (demoGuard()) return "";
     try {
       const body: CreateOrderInput = {
         customer_id: detail.customerId,
@@ -467,6 +486,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     orderId: string,
     transition: OrderTransition
   ): Promise<UpdateStatusResult> => {
+    if (demoGuard()) return { ok: false };
     try {
       const res = await fetch(`/api/orders/${orderId}`, {
         method: "PATCH",

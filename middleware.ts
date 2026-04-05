@@ -56,6 +56,28 @@ export async function middleware(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
+        // Demo mode — oturumu yok ama demo cookie var
+        const isDemoMode = request.cookies.get("demo_mode")?.value === "1";
+
+        if (isDemoMode) {
+            // Dashboard sayfaları → izin ver
+            if (pathname.startsWith("/dashboard")) {
+                return NextResponse.next();
+            }
+            // GET API → izin ver (DataProvider veri çekebilsin)
+            if (pathname.startsWith("/api/") && request.method === "GET") {
+                return NextResponse.next();
+            }
+            // Non-GET API (POST/PATCH/DELETE) → 403
+            if (pathname.startsWith("/api/")) {
+                return NextResponse.json(
+                    { error: "Demo modunda değişiklik yapılamaz." },
+                    { status: 403 }
+                );
+            }
+            // / veya /login → mevcut davranışa düş
+        }
+
         // Public sayfalar — auth gerektirmiyor
         if (pathname === "/login" || pathname === "/") {
             return NextResponse.next();

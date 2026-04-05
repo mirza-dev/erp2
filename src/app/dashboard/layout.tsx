@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import { DataProvider } from "@/lib/data-context";
 import { ToastProvider } from "@/components/ui/Toast";
+import DemoBanner from "@/components/ui/DemoBanner";
+import { isDemoMode } from "@/lib/demo-utils";
 
 export default function DashboardLayout({
     children,
@@ -12,6 +14,8 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [isDemo, setIsDemo] = useState(false);
+    useEffect(() => { setIsDemo(isDemoMode()); }, []);
 
     return (
         <DataProvider>
@@ -44,6 +48,14 @@ export default function DashboardLayout({
                             minWidth: 0,
                         }}
                     >
+                        {isDemo && (
+                            <DemoBanner storageKey="demo-readonly">
+                                Demo modundasınız — değişiklik yapabilmek için{" "}
+                                <a href="/login" style={{ color: "var(--accent-text)", textDecoration: "underline" }}>
+                                    giriş yapın
+                                </a>.
+                            </DemoBanner>
+                        )}
                         {children}
                     </main>
                 </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import DemoButton from "@/components/ui/DemoButton";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -151,6 +152,10 @@ export default function LoginPage() {
                 >
                     {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
                 </button>
+
+                <div style={{ textAlign: "center", marginTop: "4px" }}>
+                    <DemoButton variant="link" />
+                </div>
             </form>
         </div>
     );

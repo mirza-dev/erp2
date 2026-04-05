@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
+import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
 
 interface NavItem {
     label: string;
@@ -23,6 +25,9 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const { reorderSuggestions, orders, activeAlertCount } = useData();
+
+    const [isDemo, setIsDemo] = useState(false);
+    useEffect(() => { setIsDemo(isDemoMode()); }, []);
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
@@ -172,24 +177,49 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
                     borderTop: "0.5px solid var(--border-tertiary)",
                 }}
             >
-                <button
-                    onClick={handleLogout}
-                    style={{
-                        width: "100%",
-                        padding: "8px 12px",
-                        fontSize: "12px",
-                        color: "var(--text-tertiary)",
-                        background: "transparent",
-                        border: "0.5px solid var(--border-tertiary)",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                    }}
-                >
-                    Çıkış Yap
-                </button>
+                {isDemo ? (
+                    <Link
+                        href="/login"
+                        onClick={clearDemoMode}
+                        style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            fontSize: "12px",
+                            color: "var(--accent-text)",
+                            background: "var(--accent-bg)",
+                            border: "0.5px solid var(--accent-border)",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: "6px",
+                            textDecoration: "none",
+                            boxSizing: "border-box",
+                        }}
+                    >
+                        Giriş Yap
+                    </Link>
+                ) : (
+                    <button
+                        onClick={handleLogout}
+                        style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            fontSize: "12px",
+                            color: "var(--text-tertiary)",
+                            background: "transparent",
+                            border: "0.5px solid var(--border-tertiary)",
+                            borderRadius: "6px",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                        }}
+                    >
+                        Çıkış Yap
+                    </button>
+                )}
             </div>
         </aside>
     );
