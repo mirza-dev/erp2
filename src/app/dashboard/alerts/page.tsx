@@ -8,6 +8,7 @@ import { computeCoverageDays, daysColor } from "@/lib/stock-utils";
 import { EmptyState, LoadingState } from "@/components/ui/StateViews";
 import type { AlertRow } from "@/lib/database.types";
 import { extractShortageQty, shortReason, shortImpact } from "@/lib/alert-ui-helpers";
+import { isDemoMode } from "@/lib/demo-utils";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -177,6 +178,7 @@ export default function AlertsPage() {
 
     // ── Actions ──
     const handleRefresh = async () => {
+        if (isDemoMode()) return;
         if (refreshing) return;
         setRefreshing(true);
         try {
@@ -196,6 +198,7 @@ export default function AlertsPage() {
     };
 
     const handleAiSuggest = async () => {
+        if (isDemoMode()) return;
         if (aiGenerating) return;
         setAiGenerating(true);
         try {
@@ -219,6 +222,7 @@ export default function AlertsPage() {
     };
 
     const resolveAlert = async (alertId: string) => {
+        if (isDemoMode()) return;
         try {
             const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",
@@ -237,6 +241,7 @@ export default function AlertsPage() {
     };
 
     const dismissGroup = async (group: ProductAlertGroup) => {
+        if (isDemoMode()) return;
         const open = group.alerts.filter((a) => a.status === "open" || a.status === "acknowledged");
         if (open.length === 0) return;
 
@@ -277,6 +282,7 @@ export default function AlertsPage() {
     };
 
     const dismissAlert = async (alertId: string) => {
+        if (isDemoMode()) return;
         try {
             const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",
@@ -297,6 +303,7 @@ export default function AlertsPage() {
     };
 
     const acknowledgeAlert = async (alertId: string) => {
+        if (isDemoMode()) return;
         try {
             const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",

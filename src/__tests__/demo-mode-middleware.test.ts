@@ -142,3 +142,46 @@ describe("middleware — authenticated user with demo cookie", () => {
         expect(res.headers.get("location")).toContain("/dashboard");
     });
 });
+
+// ─── Demo mode blocks sensitive write endpoints ────────────────���──────────────
+//
+// Regression guard: even if a future refactor changes the path list, these
+// specific high-value endpoints must remain blocked for demo users.
+
+describe("middleware — demo mode blocks sensitive write endpoints", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockGetUser.mockResolvedValue(ANON);
+    });
+
+    const sensitiveWrites: Array<[string, string]> = [
+        ["POST",   "/api/admin/users"],
+        ["DELETE", "/api/admin/users/user-1"],
+        ["POST",   "/api/alerts/scan"],
+        ["POST",   "/api/alerts/ai-suggest"],
+        ["POST",   "/api/import/batch-1/confirm"],
+        ["POST",   "/api/parasut/sync-all"],
+        ["POST",   "/api/parasut/retry"],
+        ["PATCH",  "/api/recommendations/rec-1"],
+        ["POST",   "/api/ai/purchase-copilot"],
+        ["DELETE", "/api/orders/order-1"],
+        ["PATCH",  "/api/orders/order-1"],
+        ["DELETE", "/api/customers/cust-1"],
+        ["POST",   "/api/production"],
+        ["DELETE", "/api/production/entry-1"],
+    ];
+
+    for (const [method, path] of sensitiveWrites) {
+        it(`${method} ${path} → 403 in demo mode`, async () => {
+            const res = await middleware(makeRequest(path, { method, cookies: DEMO_COOKIE }));
+            expect(res.status).toBe(403);
+            const body = await res.json();
+            expect(body.error).toMatch(/demo/i);
+        });
+    }
+
+    it("GET /api/admin/users → 200 in demo mode (read-only list allowed)", async () => {
+        const res = await middleware(makeRequest("/api/admin/users", { cookies: DEMO_COOKIE }));
+        expect(res.status).toBe(200);
+    });
+});

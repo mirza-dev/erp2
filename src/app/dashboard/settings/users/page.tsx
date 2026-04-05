@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { isDemoMode } from "@/lib/demo-utils";
 import { createClient } from "@/lib/supabase/client";
 
 interface User {
@@ -82,6 +83,7 @@ export default function UsersPage() {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (isDemoMode()) return;
         setSubmitting(true);
         try {
             const res = await fetch("/api/admin/users", {
@@ -107,6 +109,7 @@ export default function UsersPage() {
     };
 
     const handleDelete = async (user: User) => {
+        if (isDemoMode()) return;
         if (user.email === currentEmail) {
             toast({ type: "error", message: "Kendi hesabınızı silemezsiniz." });
             return;

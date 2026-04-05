@@ -6,6 +6,7 @@ import { computeCoverageDays, computeTargetStock, daysColor, daysBg } from "@/li
 import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { useToast } from "@/components/ui/Toast";
+import { isDemoMode } from "@/lib/demo-utils";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -517,6 +518,7 @@ export default function PurchaseSuggestedPage() {
     }, [aiData]);
 
     const handleAccept = async (productId: string) => {
+        if (isDemoMode()) return;
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
@@ -542,6 +544,7 @@ export default function PurchaseSuggestedPage() {
     };
 
     const handleReject = async (productId: string, feedbackNote?: string) => {
+        if (isDemoMode()) return;
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
@@ -570,6 +573,7 @@ export default function PurchaseSuggestedPage() {
     };
 
     const handleEdit = async (productId: string, qty: number, unit: string) => {
+        if (isDemoMode()) return;
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };

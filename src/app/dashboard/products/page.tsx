@@ -6,6 +6,7 @@ import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
+import { isDemoMode } from "@/lib/demo-utils";
 
 const categories = [
     "Tümü",
@@ -321,6 +322,7 @@ export default function ProductsPage() {
     };
 
     const handleAccept = async (productId: string) => {
+        if (isDemoMode()) return;
         const rec = recMap.get(productId);
         if (!rec || rec.status !== "suggested") return;
         try {
@@ -340,6 +342,7 @@ export default function ProductsPage() {
     };
 
     const handleReject = async (productId: string, feedbackNote?: string) => {
+        if (isDemoMode()) return;
         const rec = recMap.get(productId);
         if (!rec || rec.status !== "suggested") return;
         try {

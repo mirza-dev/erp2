@@ -4,6 +4,7 @@ import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
 import * as XLSX from "xlsx";
+import { isDemoMode } from "@/lib/demo-utils";
 
 type ImportState = "idle" | "analyzing" | "sheet_select" | "parsing" | "preview" | "importing" | "done";
 
@@ -191,6 +192,7 @@ export default function ImportPage() {
 
     // ─── AI Parse step ────────────────────────────────────────────────
     const handleParse = async () => {
+        if (isDemoMode()) return;
         setState("parsing");
         setProgress(0);
         setProgressLabel("AI analiz başlatılıyor...");
@@ -287,6 +289,7 @@ export default function ImportPage() {
 
     // ─── Import (confirm) step ────────────────────────────────────────
     const handleImport = async () => {
+        if (isDemoMode()) return;
         if (!batchId) return;
         setState("importing");
 

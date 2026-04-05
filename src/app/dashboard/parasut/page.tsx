@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/components/ui/Toast";
+import { isDemoMode } from "@/lib/demo-utils";
 import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types";
 
 type SyncStatus = "idle" | "syncing" | "done";
@@ -93,6 +94,7 @@ export default function ParasutPage() {
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
     const runSync = async () => {
+        if (isDemoMode()) return;
         if (syncStatus === "syncing") return;
         setSyncStatus("syncing");
         setSyncStep(1);
@@ -132,6 +134,7 @@ export default function ParasutPage() {
     };
 
     const retrySync = async (logId: string) => {
+        if (isDemoMode()) return;
         if (retryingId) return;
         setRetryingId(logId);
         try {

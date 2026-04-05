@@ -9,6 +9,7 @@ import { mapOrderDetail } from "@/lib/api-mappers";
 import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import { isDemoMode } from "@/lib/demo-utils";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string; description: string }> = {
@@ -308,6 +309,7 @@ export default function OrderDetailPage() {
     };
 
     const handleHardDelete = async () => {
+        if (isDemoMode()) return;
         setHardDeleteLoading(true);
         try {
             const res = await fetch(`/api/orders/${order.id}?permanent=1`, { method: "DELETE" });

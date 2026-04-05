@@ -9,6 +9,7 @@ import type { CommercialStatus, FulfillmentStatus } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
+import { isDemoMode } from "@/lib/demo-utils";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral" },
@@ -75,6 +76,7 @@ function OrdersList() {
 
     const handleDelete = async (e: React.MouseEvent, orderId: string) => {
         e.stopPropagation();
+        if (isDemoMode()) return;
         if (confirmId !== orderId) {
             setConfirmId(orderId);
             return;
