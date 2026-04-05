@@ -162,7 +162,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         unit: String(data.unit),
                         price: data.price ? Number(data.price) : undefined,
                         currency: data.currency ? String(data.currency) : undefined,
-                        on_hand: data.on_hand !== undefined ? Number(data.on_hand) : undefined,
+                        // on_hand intentionally omitted — product import is master-data only; stock is managed via the stock sheet
                         min_stock_level: data.min_stock_level ? Number(data.min_stock_level) : undefined,
                         reorder_qty: data.reorder_qty ? Number(data.reorder_qty) : undefined,
                         preferred_vendor: data.preferred_vendor ? String(data.preferred_vendor) : undefined,
@@ -360,7 +360,11 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
             } else if (draft.entity_type === "stock") {
                 if (data.sku && data.on_hand !== undefined) {
                     const prod = await dbFindProductBySku(String(data.sku));
-                    if (prod) await dbUpdateProduct(prod.id, { on_hand: Number(data.on_hand) });
+                    if (prod) {
+                        // Additive: imported qty is added to existing stock (not overwrite)
+                        const newOnHand = prod.on_hand + Number(data.on_hand);
+                        await dbUpdateProduct(prod.id, { on_hand: newOnHand });
+                    }
                 }
                 await dbUpdateDraft(draft.id, { status: "merged" });
                 updated++;

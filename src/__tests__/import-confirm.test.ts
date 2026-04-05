@@ -374,6 +374,75 @@ describe("serviceConfirmBatch — product SKU dedup contract", () => {
     });
 });
 
+// ─── Stock field rules — product=master-data-only, stock=additive ────────────
+
+describe("serviceConfirmBatch — on_hand rules", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("product update with on_hand in parsed_data → on_hand NOT sent to dbUpdateProduct", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet", on_hand: 999 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 50 });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.updated).toBe(1);
+        const [, updatePayload] = mockDbUpdateProduct.mock.calls[0];
+        expect(updatePayload).not.toHaveProperty("on_hand");
+    });
+
+    it("product update without on_hand → on_hand not in payload (baseline)", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 50 });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [, updatePayload] = mockDbUpdateProduct.mock.calls[0];
+        expect(updatePayload).not.toHaveProperty("on_hand");
+    });
+
+    it("stock entity_type → additive: existing 50 + imported 30 = 80", async () => {
+        const draft = makeDraft({
+            entity_type: "stock",
+            parsed_data: { sku: "GV-050", on_hand: 30 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", on_hand: 50 });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.updated).toBe(1);
+        expect(mockDbUpdateProduct).toHaveBeenCalledWith("existing-p", { on_hand: 80 });
+    });
+
+    it("stock entity_type without on_hand → dbUpdateProduct not called", async () => {
+        const draft = makeDraft({
+            entity_type: "stock",
+            parsed_data: { sku: "GV-050" }, // no on_hand
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+
+        await serviceConfirmBatch("batch-1");
+
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+    });
+});
+
 // ─── §9.2 Order merge — never creates approved entities ──────────────────────
 
 describe("serviceConfirmBatch — §9.2: order merge never creates approved entities", () => {
