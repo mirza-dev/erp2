@@ -8,12 +8,13 @@ import { dbListOrders } from "@/lib/supabase/orders";
 import {
     dbListAlerts,
     dbGetAlertById,
-    dbOpenAlertExists,
     dbCreateAlert,
     dbUpdateAlertStatus,
-    dbResolveAlertsForEntity,
     dbDismissAlertsBySource,
+    dbListActiveAlerts,
+    dbBatchResolveAlerts,
     type ListAlertsFilter,
+    type BatchResolveEntry,
 } from "@/lib/supabase/alerts";
 import type { AlertStatus } from "@/lib/database.types";
 import { computeCoverageDays, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
@@ -45,15 +46,26 @@ export interface ScanResult {
  * domain-rules §6.1:
  *   critical: available_now <= min_stock_level
  *   warning:  available_now > min_stock_level AND available_now <= min_stock_level * 1.5
+ *
+ * N+1 optimized: pre-fetches active alerts into an in-memory Set, collects
+ * resolve operations into a batch, and relies on the unique index
+ * idx_alerts_active_dedup as a safety net against duplicate creates.
  */
 export async function serviceScanStockAlerts(): Promise<ScanResult> {
-    const [products, shortageMap] = await Promise.all([
+    const [products, shortageMap, activeAlerts] = await Promise.all([
         dbListProducts({ is_active: true, pageSize: 500 }),
         dbGetOpenShortagesByProduct(),
+        dbListActiveAlerts(),
     ]);
 
+    // Build dedup set: "type:entityId" for O(1) lookups
+    const activeSet = new Set<string>();
+    for (const a of activeAlerts) {
+        if (a.entity_id) activeSet.add(`${a.type}:${a.entity_id}`);
+    }
+
     let created = 0;
-    let resolved = 0;
+    const toResolve: BatchResolveEntry[] = [];
 
     for (const product of products) {
         const available = product.available_now;
@@ -69,11 +81,10 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
 
         if (isCritical) {
             // Resolve any existing warning for this product (escalate)
-            resolved += await dbResolveAlertsForEntity("stock_risk", entityId, "escalated_to_critical");
+            toResolve.push({ type: "stock_risk", entityId, reason: "escalated_to_critical" });
 
-            const exists = await dbOpenAlertExists("stock_critical", entityId);
-            if (!exists) {
-                await dbCreateAlert({
+            if (!activeSet.has(`stock_critical:${entityId}`)) {
+                const alert = await dbCreateAlert({
                     type: "stock_critical",
                     severity: "critical",
                     title: `Kritik Stok: ${product.name}`,
@@ -82,12 +93,11 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     entity_id: entityId,
                     ai_inputs_summary: { available, min, dailyUsage, coverageDays, leadTimeDays, unit: product.unit },
                 });
-                created++;
+                if (alert) created++;
             }
         } else if (isWarning) {
-            const exists = await dbOpenAlertExists("stock_risk", entityId);
-            if (!exists) {
-                await dbCreateAlert({
+            if (!activeSet.has(`stock_risk:${entityId}`)) {
+                const alert = await dbCreateAlert({
                     type: "stock_risk",
                     severity: "warning",
                     title: `Stok Uyarısı: ${product.name}`,
@@ -96,24 +106,19 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     entity_id: entityId,
                     ai_inputs_summary: { available, min, dailyUsage, coverageDays, leadTimeDays, unit: product.unit },
                 });
-                created++;
+                if (alert) created++;
             }
         } else {
             // Stock is healthy — resolve any open stock alerts
-            const r1 = await dbResolveAlertsForEntity("stock_critical", entityId);
-            const r2 = await dbResolveAlertsForEntity("stock_risk", entityId);
-            resolved += r1 + r2;
+            toResolve.push({ type: "stock_critical", entityId, reason: "stock_recovered" });
+            toResolve.push({ type: "stock_risk", entityId, reason: "stock_recovered" });
         }
 
         // Order shortage: source of truth is the shortages table.
-        // available_now = on_hand - reserved, so (available < reserved) ≡ (on_hand < 2*reserved)
-        // which fires false positives when stock is healthy but heavily reserved.
-        // Correct check: open shortage records for approved orders in the shortages table.
         const openShortageQty = shortageMap.get(product.id) ?? 0;
         if (openShortageQty > 0) {
-            const shortageExists = await dbOpenAlertExists("order_shortage", entityId);
-            if (!shortageExists) {
-                await dbCreateAlert({
+            if (!activeSet.has(`order_shortage:${entityId}`)) {
+                const alert = await dbCreateAlert({
                     type: "order_shortage",
                     severity: "critical",
                     title: `Sipariş Eksik: ${product.name}`,
@@ -121,13 +126,16 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     entity_type: "product",
                     entity_id: entityId,
                 });
-                created++;
+                if (alert) created++;
             }
         } else {
             // No open shortages for this product — resolve any stale alert
-            resolved += await dbResolveAlertsForEntity("order_shortage", entityId, "shortage_resolved");
+            toResolve.push({ type: "order_shortage", entityId, reason: "shortage_resolved" });
         }
     }
+
+    // Batch resolve — groups by type+reason, ~3-5 DB calls instead of ~1000
+    const resolved = await dbBatchResolveAlerts(toResolve);
 
     return { scanned: products.length, created, resolved };
 }
@@ -210,7 +218,7 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
     let created = 0;
 
     for (const insight of result.insights) {
-        await dbCreateAlert({
+        const alert = await dbCreateAlert({
             type: "purchase_recommended",
             severity: "info",
             title: insight,
@@ -220,11 +228,11 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
             ai_reason: insight,
             ai_model_version: "claude-haiku-4-5-20251001",
         });
-        created++;
+        if (alert) created++;
     }
 
     for (const anomaly of result.anomalies) {
-        await dbCreateAlert({
+        const alert = await dbCreateAlert({
             type: "stock_risk",
             severity: "warning",
             title: anomaly,
@@ -234,7 +242,7 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
             ai_reason: anomaly,
             ai_model_version: "claude-haiku-4-5-20251001",
         });
-        created++;
+        if (alert) created++;
     }
 
     return { ai_available: true, dismissed, created, summary: result.summary };

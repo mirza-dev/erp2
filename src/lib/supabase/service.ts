@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Thrown when a required environment variable is missing.
@@ -13,14 +13,20 @@ export class ConfigError extends Error {
     }
 }
 
+let cachedClient: SupabaseClient | null = null;
+
 /**
  * Service-role client — bypasses RLS, use only in server-side API routes.
  * Never import this in client components.
+ * Singleton: reuses the same client instance across calls to avoid
+ * creating hundreds of instances during batch operations (e.g., alert scan).
  */
-export function createServiceClient() {
+export function createServiceClient(): SupabaseClient {
+    if (cachedClient) return cachedClient;
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url) throw new ConfigError("MISSING ENV: NEXT_PUBLIC_SUPABASE_URL");
     if (!key) throw new ConfigError("MISSING ENV: SUPABASE_SERVICE_ROLE_KEY");
-    return createClient(url, key);
+    cachedClient = createClient(url, key);
+    return cachedClient;
 }

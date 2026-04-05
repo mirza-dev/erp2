@@ -182,8 +182,11 @@ export default function AlertsPage() {
             await refetch();
             setLastRefreshed(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
             toast({ type: "success", message: "Uyarılar güncellendi" });
-        } catch {
-            toast({ type: "error", message: "Yenileme başarısız" });
+        } catch (err) {
+            const msg = err instanceof Error && err.message === "409"
+                ? "Tarama zaten devam ediyor"
+                : "Yenileme başarısız";
+            toast({ type: "error", message: msg });
         } finally {
             setRefreshing(false);
         }
@@ -202,8 +205,11 @@ export default function AlertsPage() {
             }
             await refetch();
             toast({ type: "success", message: `${data.created} AI önerisi oluşturuldu` });
-        } catch {
-            toast({ type: "error", message: "AI önerisi oluşturulamadı" });
+        } catch (err) {
+            const msg = err instanceof Error && err.message === "409"
+                ? "AI analiz zaten devam ediyor"
+                : "AI önerisi oluşturulamadı";
+            toast({ type: "error", message: msg });
         } finally {
             setAiGenerating(false);
         }

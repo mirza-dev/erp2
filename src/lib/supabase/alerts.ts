@@ -67,7 +67,11 @@ export async function dbOpenAlertExists(type: AlertType, entityId: string): Prom
     return (count ?? 0) > 0;
 }
 
-export async function dbCreateAlert(input: CreateAlertInput): Promise<AlertRow> {
+/**
+ * Creates an alert. Returns null if a duplicate active alert exists
+ * (unique index idx_alerts_active_dedup blocks it — error code 23505).
+ */
+export async function dbCreateAlert(input: CreateAlertInput): Promise<AlertRow | null> {
     const supabase = createServiceClient();
     const { data, error } = await supabase
         .from("alerts")
@@ -87,7 +91,11 @@ export async function dbCreateAlert(input: CreateAlertInput): Promise<AlertRow> 
         })
         .select("*")
         .single();
-    if (error || !data) throw new Error(error?.message ?? "Alert creation failed");
+    if (error) {
+        // 23505 = unique_violation — duplicate active alert, safe to ignore
+        if (error.code === "23505") return null;
+        throw new Error(error.message);
+    }
     return data;
 }
 
@@ -148,4 +156,61 @@ export async function dbResolveAlertsForEntity(
         .select("id");
     if (error) throw new Error(error.message);
     return data?.length ?? 0;
+}
+
+// ── Batch operations (N+1 optimization) ─────────────────────────
+
+/**
+ * Fetch all active (open + acknowledged) alerts in one query.
+ * Used by serviceScanStockAlerts to build an in-memory dedup Set
+ * instead of querying dbOpenAlertExists per product.
+ */
+export async function dbListActiveAlerts(): Promise<AlertRow[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("alerts")
+        .select("*")
+        .in("status", ["open", "acknowledged"]);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}
+
+export interface BatchResolveEntry {
+    type: AlertType;
+    entityId: string;
+    reason: string;
+}
+
+/**
+ * Batch-resolve active alerts, grouped by type+reason for efficient DB calls.
+ * Replaces per-product dbResolveAlertsForEntity calls in the scan loop.
+ */
+export async function dbBatchResolveAlerts(entries: BatchResolveEntry[]): Promise<number> {
+    if (entries.length === 0) return 0;
+    const supabase = createServiceClient();
+    const now = new Date().toISOString();
+    let total = 0;
+
+    // Group by type::reason → entityIds[]
+    const groups = new Map<string, string[]>();
+    for (const e of entries) {
+        const key = `${e.type}::${e.reason}`;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key)!.push(e.entityId);
+    }
+
+    for (const [key, entityIds] of groups) {
+        const [type, reason] = key.split("::");
+        const { data, error } = await supabase
+            .from("alerts")
+            .update({ status: "resolved", resolved_at: now, resolution_reason: reason })
+            .eq("type", type)
+            .in("entity_id", entityIds)
+            .in("status", ["open", "acknowledged"])
+            .select("id");
+        if (error) throw new Error(error.message);
+        total += data?.length ?? 0;
+    }
+
+    return total;
 }

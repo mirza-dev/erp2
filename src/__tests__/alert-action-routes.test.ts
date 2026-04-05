@@ -7,8 +7,8 @@
  * correct HTTP status codes so the UI can distinguish success from failure.
  *
  * Covered routes:
- *   POST /api/alerts/scan        — stock scan trigger
- *   POST /api/alerts/ai-suggest  — AI alert generation
+ *   POST /api/alerts/scan        — stock scan trigger (with advisory lock)
+ *   POST /api/alerts/ai-suggest  — AI alert generation (with advisory lock)
  *   PATCH /api/alerts/[id]       — single alert status update
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -26,6 +26,23 @@ vi.mock("@/lib/services/alert-service", () => ({
     serviceGenerateAiAlerts:  () => mockServiceGenerateAiAlerts(),
     serviceGetAlert:          (id: string) => mockServiceGetAlert(id),
     serviceUpdateAlertStatus: (...args: unknown[]) => mockServiceUpdateAlertStatus(...args),
+}));
+
+// Advisory lock mock — scan and ai-suggest routes acquire/release locks
+const mockRpc = vi.fn();
+
+vi.mock("@/lib/supabase/service", () => ({
+    createServiceClient: () => ({
+        rpc: (...args: unknown[]) => mockRpc(...args),
+    }),
+}));
+
+// handleApiError mock (used by ai-suggest route)
+vi.mock("@/lib/api-error", () => ({
+    handleApiError: (_err: unknown, msg: string) => {
+        const { NextResponse } = require("next/server");
+        return NextResponse.json({ error: msg }, { status: 500 });
+    },
 }));
 
 import { POST as scanPost }      from "@/app/api/alerts/scan/route";
@@ -61,6 +78,13 @@ const stubAlert = {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    // Default: advisory lock acquired successfully (must return Promise for .catch() chaining)
+    mockRpc.mockImplementation((name: string) => {
+        if (name === "try_acquire_scan_lock" || name === "try_acquire_ai_suggest_lock") {
+            return Promise.resolve({ data: true });
+        }
+        return Promise.resolve({ data: null });
+    });
 });
 
 // ── POST /api/alerts/scan ─────────────────────────────────────────────────────
@@ -83,7 +107,6 @@ describe("POST /api/alerts/scan — HTTP status contract", () => {
         const res = await scanPost();
 
         expect(res.status).toBe(500);
-        // UI: if (!res.ok) throw → error toast shown, success toast suppressed
     });
 
     it("500 body has error field", async () => {
@@ -93,6 +116,18 @@ describe("POST /api/alerts/scan — HTTP status contract", () => {
         const body = await res.json();
 
         expect(body.error).toBeDefined();
+    });
+
+    it("409 when advisory lock already held (concurrent scan)", async () => {
+        mockRpc.mockImplementation((name: string) => {
+            if (name === "try_acquire_scan_lock") return Promise.resolve({ data: false });
+            return Promise.resolve({ data: null });
+        });
+
+        const res = await scanPost();
+
+        expect(res.status).toBe(409);
+        expect(mockServiceScanStockAlerts).not.toHaveBeenCalled();
     });
 });
 
@@ -127,7 +162,6 @@ describe("POST /api/alerts/ai-suggest — HTTP status contract", () => {
         const body = await res.json();
 
         expect(res.status).toBe(200);
-        // res.ok is true → UI parses body → sees ai_available:false → shows warning toast
         expect(body.ai_available).toBe(false);
     });
 
@@ -136,8 +170,6 @@ describe("POST /api/alerts/ai-suggest — HTTP status contract", () => {
 
         const res = await aiSuggestPost();
 
-        // res.ok false → UI throws before trying to read ai_available
-        // (old bug: would parse { error: "..." }, ai_available=undefined → wrong warning)
         expect(res.status).toBe(500);
     });
 
@@ -149,6 +181,18 @@ describe("POST /api/alerts/ai-suggest — HTTP status contract", () => {
 
         expect(body.ai_available).toBeUndefined();
         expect(body.error).toBeDefined();
+    });
+
+    it("409 when advisory lock already held (concurrent AI generation)", async () => {
+        mockRpc.mockImplementation((name: string) => {
+            if (name === "try_acquire_ai_suggest_lock") return Promise.resolve({ data: false });
+            return Promise.resolve({ data: null });
+        });
+
+        const res = await aiSuggestPost();
+
+        expect(res.status).toBe(409);
+        expect(mockServiceGenerateAiAlerts).not.toHaveBeenCalled();
     });
 });
 
@@ -194,7 +238,6 @@ describe("PATCH /api/alerts/[id] — HTTP status contract", () => {
         const res = await PATCH(makePatchRequest({}), makeParams());
 
         expect(res.status).toBe(400);
-        // UI: res.ok false → stays in catch block → error toast shown
     });
 
     it("400 when transition is invalid (e.g. resolved → acknowledged)", async () => {
@@ -206,7 +249,6 @@ describe("PATCH /api/alerts/[id] — HTTP status contract", () => {
         const res = await PATCH(makePatchRequest({ status: "acknowledged" }), makeParams());
 
         expect(res.status).toBe(400);
-        // UI: res.ok false → state NOT updated → no ghost data
     });
 
     it("400 body has error message for invalid transition", async () => {
@@ -244,7 +286,6 @@ describe("PATCH /api/alerts/[id] — HTTP status contract", () => {
         mockServiceUpdateAlertStatus.mockResolvedValue({ success: false, error: "Hata" });
         const failRes = await PATCH(makePatchRequest({ status: "resolved" }), makeParams());
         expect(failRes.status).toBe(400);
-        // UI: if (!res.ok) throw → state NOT updated to "resolved"
     });
 
     it("dismiss: 400 → UI does NOT remove alert from list", async () => {
@@ -252,7 +293,6 @@ describe("PATCH /api/alerts/[id] — HTTP status contract", () => {
 
         const res = await PATCH(makePatchRequest({ status: "dismissed" }), makeParams());
         expect(res.status).toBe(400);
-        // UI: if (!res.ok) throw → setRawAlerts filter NOT called
     });
 
     it("acknowledge: 400 → UI does NOT patch state to acknowledged", async () => {
@@ -260,6 +300,5 @@ describe("PATCH /api/alerts/[id] — HTTP status contract", () => {
 
         const res = await PATCH(makePatchRequest({ status: "acknowledged" }), makeParams());
         expect(res.status).toBe(400);
-        // UI: if (!res.ok) throw → status NOT updated in local state
     });
 });

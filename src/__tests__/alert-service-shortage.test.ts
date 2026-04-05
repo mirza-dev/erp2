@@ -23,22 +23,22 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbListOrders: (...args: unknown[]) => mockDbListOrders(...args),
 }));
 
-const mockDbOpenAlertExists    = vi.fn();
-const mockDbCreateAlert        = vi.fn();
-const mockDbResolveAlertsForEntity = vi.fn();
-const mockDbListAlerts         = vi.fn();
-const mockDbGetAlertById       = vi.fn();
-const mockDbUpdateAlertStatus  = vi.fn();
-const mockDbDismissAlertsBySource = vi.fn();
+const mockDbCreateAlert            = vi.fn();
+const mockDbListAlerts             = vi.fn();
+const mockDbGetAlertById           = vi.fn();
+const mockDbUpdateAlertStatus      = vi.fn();
+const mockDbDismissAlertsBySource  = vi.fn();
+const mockDbListActiveAlerts       = vi.fn();
+const mockDbBatchResolveAlerts     = vi.fn();
 
 vi.mock("@/lib/supabase/alerts", () => ({
-    dbListAlerts:               (...args: unknown[]) => mockDbListAlerts(...args),
-    dbGetAlertById:             (...args: unknown[]) => mockDbGetAlertById(...args),
-    dbOpenAlertExists:          (...args: unknown[]) => mockDbOpenAlertExists(...args),
-    dbCreateAlert:              (...args: unknown[]) => mockDbCreateAlert(...args),
-    dbUpdateAlertStatus:        (...args: unknown[]) => mockDbUpdateAlertStatus(...args),
-    dbResolveAlertsForEntity:   (...args: unknown[]) => mockDbResolveAlertsForEntity(...args),
-    dbDismissAlertsBySource:    (...args: unknown[]) => mockDbDismissAlertsBySource(...args),
+    dbListAlerts:             (...args: unknown[]) => mockDbListAlerts(...args),
+    dbGetAlertById:           (...args: unknown[]) => mockDbGetAlertById(...args),
+    dbCreateAlert:            (...args: unknown[]) => mockDbCreateAlert(...args),
+    dbUpdateAlertStatus:      (...args: unknown[]) => mockDbUpdateAlertStatus(...args),
+    dbDismissAlertsBySource:  (...args: unknown[]) => mockDbDismissAlertsBySource(...args),
+    dbListActiveAlerts:       (...args: unknown[]) => mockDbListActiveAlerts(...args),
+    dbBatchResolveAlerts:     (...args: unknown[]) => mockDbBatchResolveAlerts(...args),
 }));
 
 vi.mock("@/lib/services/ai-service", () => ({
@@ -60,26 +60,16 @@ const HEAVILY_RESERVED_NO_SHORTAGE: ProductWithStock = {
     unit: "adet",
     price: 500,
     currency: "USD",
-    // on_hand=100, reserved=60 → available_now=40
-    // Old buggy check: available(40) < reserved(60) → true → FALSE POSITIVE
     on_hand: 100,
     reserved: 60,
-    available_now: 40,   // = on_hand - reserved
-    min_stock_level: 20,  // available(40) > min(20)*1.5=30 → healthy stock
+    available_now: 40,
+    min_stock_level: 20,
     is_active: true,
     product_type: "finished",
-    warehouse: null,
-    reorder_qty: null,
-    preferred_vendor: null,
-    daily_usage: null,
-    lead_time_days: null,
-    product_family: null,
-    sub_category: null,
-    sector_compatibility: null,
-    cost_price: null,
-    weight_kg: null,
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
+    warehouse: null, reorder_qty: null, preferred_vendor: null,
+    daily_usage: null, lead_time_days: null, product_family: null,
+    sub_category: null, sector_compatibility: null, cost_price: null,
+    weight_kg: null, created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
 };
 
 /** Product with a real open shortage in the shortages table */
@@ -91,25 +81,16 @@ const PRODUCT_WITH_REAL_SHORTAGE: ProductWithStock = {
     unit: "adet",
     price: 200,
     currency: "USD",
-    // Order wanted 50, only 30 could be reserved → shortage_qty=20
     on_hand: 30,
     reserved: 30,
     available_now: 0,
     min_stock_level: 5,
     is_active: true,
     product_type: "finished",
-    warehouse: null,
-    reorder_qty: null,
-    preferred_vendor: null,
-    daily_usage: null,
-    lead_time_days: null,
-    product_family: null,
-    sub_category: null,
-    sector_compatibility: null,
-    cost_price: null,
-    weight_kg: null,
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
+    warehouse: null, reorder_qty: null, preferred_vendor: null,
+    daily_usage: null, lead_time_days: null, product_family: null,
+    sub_category: null, sector_compatibility: null, cost_price: null,
+    weight_kg: null, created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
 };
 
 /** Healthy product — no reservations, no shortages */
@@ -127,18 +108,10 @@ const HEALTHY_PRODUCT: ProductWithStock = {
     min_stock_level: 10,
     is_active: true,
     product_type: "finished",
-    warehouse: null,
-    reorder_qty: null,
-    preferred_vendor: null,
-    daily_usage: null,
-    lead_time_days: null,
-    product_family: null,
-    sub_category: null,
-    sector_compatibility: null,
-    cost_price: null,
-    weight_kg: null,
-    created_at: "2024-01-01T00:00:00Z",
-    updated_at: "2024-01-01T00:00:00Z",
+    warehouse: null, reorder_qty: null, preferred_vendor: null,
+    daily_usage: null, lead_time_days: null, product_family: null,
+    sub_category: null, sector_compatibility: null, cost_price: null,
+    weight_kg: null, created_at: "2024-01-01T00:00:00Z", updated_at: "2024-01-01T00:00:00Z",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -151,28 +124,25 @@ function shortageMapFor(productId: string, qty: number): Map<string, number> {
     return new Map([[productId, qty]]);
 }
 
-function setupDefaultAlertMocks() {
-    mockDbOpenAlertExists.mockResolvedValue(false);
+function setupDefaultMocks() {
+    mockDbListActiveAlerts.mockResolvedValue([]);
     mockDbCreateAlert.mockResolvedValue({ id: "alert-new" });
-    mockDbResolveAlertsForEntity.mockResolvedValue(0);
+    mockDbBatchResolveAlerts.mockResolvedValue(0);
 }
 
 beforeEach(() => {
     mockDbListProducts.mockReset();
     mockDbGetOpenShortagesByProduct.mockReset();
-    mockDbOpenAlertExists.mockReset();
+    mockDbListActiveAlerts.mockReset();
     mockDbCreateAlert.mockReset();
-    mockDbResolveAlertsForEntity.mockReset();
-    setupDefaultAlertMocks();
+    mockDbBatchResolveAlerts.mockReset();
+    setupDefaultMocks();
 });
 
 // ── Block 1: False positive prevention ───────────────────────────────────────
 
 describe("order_shortage — false positive prevention", () => {
     it("available < reserved ama shortages tablosunda kayıt yok → alert açılmaz", async () => {
-        // HEAVILY_RESERVED_NO_SHORTAGE: available(40) < reserved(60)
-        // Eski bug: bu koşul true → false positive alert açılırdı
-        // Yeni davranış: shortageMap boş → alert açılmamalı
         mockDbListProducts.mockResolvedValue([HEAVILY_RESERVED_NO_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
 
@@ -194,16 +164,17 @@ describe("order_shortage — false positive prevention", () => {
         expect(result.created).toBe(0);
     });
 
-    it("available < reserved ama shortages yok → dbOpenAlertExists order_shortage için çağrılmaz", async () => {
+    it("available < reserved ama shortages yok → activeSet'te order_shortage kontrolü yapılmaz", async () => {
         mockDbListProducts.mockResolvedValue([HEAVILY_RESERVED_NO_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
 
         await serviceScanStockAlerts();
 
-        const shortageExistsCalls = mockDbOpenAlertExists.mock.calls.filter(
-            ([type]) => type === "order_shortage"
+        // No shortage alert created → no duplicate check needed
+        const shortageCreates = mockDbCreateAlert.mock.calls.filter(
+            ([input]) => input.type === "order_shortage"
         );
-        expect(shortageExistsCalls).toHaveLength(0);
+        expect(shortageCreates).toHaveLength(0);
     });
 });
 
@@ -215,7 +186,7 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
         mockDbGetOpenShortagesByProduct.mockResolvedValue(
             shortageMapFor(PRODUCT_WITH_REAL_SHORTAGE.id, 20)
         );
-        mockDbOpenAlertExists.mockResolvedValue(false);
+        mockDbListActiveAlerts.mockResolvedValue([]);
 
         await serviceScanStockAlerts();
 
@@ -232,7 +203,7 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
         mockDbGetOpenShortagesByProduct.mockResolvedValue(
             shortageMapFor(PRODUCT_WITH_REAL_SHORTAGE.id, 20)
         );
-        mockDbOpenAlertExists.mockResolvedValue(false);
+        mockDbListActiveAlerts.mockResolvedValue([]);
 
         await serviceScanStockAlerts();
 
@@ -240,12 +211,15 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
         expect(input.description).toContain("20");
     });
 
-    it("alert zaten açıksa duplicate açılmaz", async () => {
+    it("alert zaten açıksa (activeSet'te var) duplicate açılmaz", async () => {
         mockDbListProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(
             shortageMapFor(PRODUCT_WITH_REAL_SHORTAGE.id, 20)
         );
-        mockDbOpenAlertExists.mockResolvedValue(true); // already open
+        mockDbListActiveAlerts.mockResolvedValue([
+            { type: "order_shortage", entity_id: PRODUCT_WITH_REAL_SHORTAGE.id, status: "open" },
+            { type: "stock_critical", entity_id: PRODUCT_WITH_REAL_SHORTAGE.id, status: "open" },
+        ]);
 
         await serviceScanStockAlerts();
 
@@ -260,7 +234,7 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
         mockDbGetOpenShortagesByProduct.mockResolvedValue(
             shortageMapFor(PRODUCT_WITH_REAL_SHORTAGE.id, 15)
         );
-        mockDbOpenAlertExists.mockResolvedValue(false);
+        mockDbListActiveAlerts.mockResolvedValue([]);
         mockDbCreateAlert.mockResolvedValue({ id: "new-alert" });
 
         const result = await serviceScanStockAlerts();
@@ -271,45 +245,48 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
 // ── Block 3: Resolution — shortage kapanınca alert kapanır ───────────────────
 
 describe("order_shortage — shortage çözülünce alert resolve edilir", () => {
-    it("openShortageQty=0 → dbResolveAlertsForEntity order_shortage için çağrılır", async () => {
+    it("openShortageQty=0 → batch resolve order_shortage içerir", async () => {
         mockDbListProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap()); // shortage resolved
-        mockDbResolveAlertsForEntity.mockResolvedValue(1);
+        mockDbBatchResolveAlerts.mockResolvedValue(1);
 
         await serviceScanStockAlerts();
 
-        const resolveCalls = mockDbResolveAlertsForEntity.mock.calls.filter(
-            ([type]) => type === "order_shortage"
+        const entries = mockDbBatchResolveAlerts.mock.calls[0][0];
+        const resolveEntries = entries.filter(
+            (e: { type: string }) => e.type === "order_shortage"
         );
-        expect(resolveCalls).toHaveLength(1);
-        expect(resolveCalls[0][1]).toBe(PRODUCT_WITH_REAL_SHORTAGE.id);
+        expect(resolveEntries).toHaveLength(1);
+        expect(resolveEntries[0].entityId).toBe(PRODUCT_WITH_REAL_SHORTAGE.id);
     });
 
     it("shortage yok → resolve reason 'shortage_resolved'", async () => {
         mockDbListProducts.mockResolvedValue([HEALTHY_PRODUCT]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
+        mockDbBatchResolveAlerts.mockResolvedValue(0);
 
         await serviceScanStockAlerts();
 
-        const resolveCalls = mockDbResolveAlertsForEntity.mock.calls.filter(
-            ([type]) => type === "order_shortage"
+        const entries = mockDbBatchResolveAlerts.mock.calls[0][0];
+        const shortageEntries = entries.filter(
+            (e: { type: string }) => e.type === "order_shortage"
         );
-        expect(resolveCalls[0][2]).toBe("shortage_resolved");
+        expect(shortageEntries[0].reason).toBe("shortage_resolved");
     });
 
-    it("rezervasyon sıfırlandıktan sonra bile (reserved=0) shortage yok → alert resolve edilir", async () => {
-        // Eski bug: reserved=0 → else if (reserved > 0 && ...) false → asla resolve edilmezdi
+    it("rezervasyon sıfırlandıktan sonra bile (reserved=0) shortage yok → batch resolve'da order_shortage var", async () => {
         const cancelledProduct = { ...HEALTHY_PRODUCT, id: "prod-cancelled", reserved: 0, available_now: 200 };
         mockDbListProducts.mockResolvedValue([cancelledProduct]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
-        mockDbResolveAlertsForEntity.mockResolvedValue(1);
+        mockDbBatchResolveAlerts.mockResolvedValue(1);
 
         await serviceScanStockAlerts();
 
-        const resolveCalls = mockDbResolveAlertsForEntity.mock.calls.filter(
-            ([type]) => type === "order_shortage"
+        const entries = mockDbBatchResolveAlerts.mock.calls[0][0];
+        const shortageEntries = entries.filter(
+            (e: { type: string }) => e.type === "order_shortage"
         );
-        expect(resolveCalls).toHaveLength(1);
+        expect(shortageEntries).toHaveLength(1);
     });
 });
 
@@ -330,10 +307,9 @@ describe("order_shortage — doğru veri kaynağı: shortages tablosu", () => {
             HEAVILY_RESERVED_NO_SHORTAGE,  // available < reserved, NO shortage
             PRODUCT_WITH_REAL_SHORTAGE,     // has real shortage
         ]);
-        // Only PRODUCT_WITH_REAL_SHORTAGE has a shortage
         const map = new Map([[PRODUCT_WITH_REAL_SHORTAGE.id, 10]]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(map);
-        mockDbOpenAlertExists.mockResolvedValue(false);
+        mockDbListActiveAlerts.mockResolvedValue([]);
 
         await serviceScanStockAlerts();
 
