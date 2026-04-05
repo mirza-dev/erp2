@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
@@ -542,24 +542,66 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
     );
 }
 
+const AI_FETCH_TIMEOUT_MS = 8000;
+
 function AiTab() {
     const [data, setData] = useState<ObservabilityData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetch("/api/ai/observability")
-            .then(r => r.json())
-            .then(setData)
-            .catch(() => setError("Veriler yüklenemedi."))
-            .finally(() => setLoading(false));
+    const load = useCallback(() => {
+        setLoading(true);
+        setError(null);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
+
+        fetch("/api/ai/observability", { signal: controller.signal })
+            .then(r => {
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                return r.json();
+            })
+            .then((d: ObservabilityData) => setData(d))
+            .catch(err => {
+                setError(err.name === "AbortError"
+                    ? "Zaman aşımı — sunucu yanıt vermedi."
+                    : "Veriler yüklenemedi.");
+            })
+            .finally(() => {
+                clearTimeout(timer);
+                setLoading(false);
+            });
+
+        return () => { controller.abort(); clearTimeout(timer); };
     }, []);
+
+    useEffect(() => load(), [load]);
 
     if (loading) {
         return <div style={{ fontSize: "13px", color: "var(--text-tertiary)", padding: "20px 0" }}>Yükleniyor…</div>;
     }
     if (error || !data) {
-        return <div style={{ fontSize: "13px", color: "var(--danger-text)", padding: "20px 0" }}>{error ?? "Bilinmeyen hata"}</div>;
+        return (
+            <div style={{ padding: "20px 0", display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ fontSize: "13px", color: "var(--danger-text)" }}>
+                    {error ?? "Bilinmeyen hata"}
+                </div>
+                <button
+                    onClick={load}
+                    style={{
+                        alignSelf: "flex-start",
+                        fontSize: "12px",
+                        padding: "6px 14px",
+                        border: "0.5px solid var(--border-secondary)",
+                        borderRadius: "6px",
+                        background: "transparent",
+                        color: "var(--text-secondary)",
+                        cursor: "pointer",
+                    }}
+                >
+                    Yeniden Dene
+                </button>
+            </div>
+        );
     }
 
     const { runs, recommendations, feedback } = data;
