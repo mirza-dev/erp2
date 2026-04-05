@@ -7,6 +7,12 @@ import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types"
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
 
+interface ParasutConfig {
+    companyId: string | null;
+    clientId: string | null;
+    clientSecretConfigured: boolean;
+}
+
 interface ParasutStats {
     customers: number;
     synced_invoices: number;
@@ -43,7 +49,7 @@ export default function ParasutPage() {
     const { toast } = useToast();
 
     const [connection, setConnection] = useState<ConnectionStatus>("connected");
-    const [showCredentials, setShowCredentials] = useState(false);
+    const [config, setConfig] = useState<ParasutConfig | null>(null);
     const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
     const [syncStep, setSyncStep] = useState(0);
     const [syncProgress, setSyncProgress] = useState(0);
@@ -56,10 +62,11 @@ export default function ParasutPage() {
 
     const fetchAll = useCallback(async () => {
         try {
-            const [logsRes, statsRes, invoicesRes] = await Promise.all([
+            const [logsRes, statsRes, invoicesRes, configRes] = await Promise.all([
                 fetch("/api/parasut/logs?limit=50"),
                 fetch("/api/parasut/stats"),
                 fetch("/api/parasut/invoices"),
+                fetch("/api/parasut/config"),
             ]);
             if (logsRes.ok) {
                 const data = await logsRes.json();
@@ -71,6 +78,9 @@ export default function ParasutPage() {
             if (invoicesRes.ok) {
                 const data = await invoicesRes.json();
                 setSyncedOrders(Array.isArray(data) ? data : []);
+            }
+            if (configRes.ok) {
+                setConfig(await configRes.json());
             }
         } catch (err) {
             console.error("Failed to fetch parasut data:", err);
@@ -250,32 +260,13 @@ export default function ParasutPage() {
                                 api.parasut.com · Son sync: {lastSyncTime}
                             </span>
                         </div>
-                        <button
-                            onClick={() => {
-                                const next = !showCredentials;
-                                setShowCredentials(next);
-                                toast({ type: "info", message: next ? "API kimlik bilgileri gösterildi" : "API kimlik bilgileri gizlendi" });
-                            }}
-                            style={{
-                                fontSize: "11px",
-                                padding: "4px 10px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: "transparent",
-                                color: "var(--text-secondary)",
-                                cursor: "pointer",
-                            }}
-                        >
-                            {showCredentials ? "Gizle" : "Göster"}
-                        </button>
                     </div>
 
-                    {/* Credentials */}
+                    {/* Credentials — masked values fetched server-side */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
                         {[
-                            { label: "Company ID", value: "pmt-endustriyel-9471" },
-                            { label: "Client ID", value: "cl_k9x2m4nw8qabcdef" },
-                            { label: "Client Secret", value: "cs_xK9mW2pQrTv3nLhBfZeYuD" },
+                            { label: "Company ID", value: config?.companyId ?? "—" },
+                            { label: "Client ID", value: config?.clientId ?? "—" },
                         ].map(({ label, value }) => (
                             <div key={label}>
                                 <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
@@ -290,15 +281,29 @@ export default function ParasutPage() {
                                         padding: "5px 8px",
                                         borderRadius: "4px",
                                         border: "0.5px solid var(--border-tertiary)",
-                                        filter: showCredentials ? "none" : "blur(5px)",
-                                        userSelect: showCredentials ? "text" : "none",
-                                        transition: "filter 0.2s",
                                     }}
                                 >
                                     {value}
                                 </div>
                             </div>
                         ))}
+                        <div>
+                            <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                Client Secret
+                            </div>
+                            <div
+                                style={{
+                                    fontSize: "12px",
+                                    background: "var(--bg-tertiary)",
+                                    padding: "5px 8px",
+                                    borderRadius: "4px",
+                                    border: "0.5px solid var(--border-tertiary)",
+                                    color: config?.clientSecretConfigured ? "var(--success-text)" : "var(--warning-text)",
+                                }}
+                            >
+                                {config === null ? "—" : config.clientSecretConfigured ? "Yapılandırıldı ✓" : "Eksik"}
+                            </div>
+                        </div>
                     </div>
                 </div>
 

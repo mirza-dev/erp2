@@ -419,38 +419,27 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
 }
 
 // ─── API Anahtarları ───────────────────────────────────────────────────────────
+interface KeyStatus {
+    parasut: boolean;
+    claude: boolean;
+    vercel: boolean;
+}
+
 function ApiTab() {
-    const { toast } = useToast();
-    const [keys, setKeys] = useState([
-        { id: "parasut", label: "Paraşüt API", key: "", visible: false },
-        { id: "claude", label: "Claude AI (Anthropic)", key: "", visible: false },
-        { id: "vercel", label: "Vercel", key: "", visible: false },
-    ]);
-    const [showAddForm, setShowAddForm] = useState(false);
-    const [newKeyLabel, setNewKeyLabel] = useState("");
-    const [newKeyValue, setNewKeyValue] = useState("");
-    const [copied, setCopied] = useState<string | null>(null);
+    const [status, setStatus] = useState<KeyStatus | null>(null);
 
-    const toggleVisible = (id: string) => setKeys(ks => ks.map(k => k.id === id ? { ...k, visible: !k.visible } : k));
+    useEffect(() => {
+        fetch("/api/settings/api-keys-status")
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setStatus(data); })
+            .catch(() => {});
+    }, []);
 
-    const handleCopy = (id: string, key: string) => {
-        navigator.clipboard.writeText(key).catch(() => {});
-        setCopied(id);
-        setTimeout(() => setCopied(null), 2000);
-    };
-
-    const handleAdd = () => {
-        if (!newKeyLabel || !newKeyValue) return;
-        setKeys(ks => [...ks, { id: `key-${Date.now()}`, label: newKeyLabel, key: newKeyValue, visible: false }]);
-        setNewKeyLabel("");
-        setNewKeyValue("");
-        setShowAddForm(false);
-    };
-
-    const obfuscate = (key: string) => {
-        const last = key.slice(-8);
-        return "●".repeat(12) + last;
-    };
+    const entries: { id: keyof KeyStatus; label: string }[] = [
+        { id: "parasut", label: "Paraşüt API" },
+        { id: "claude", label: "Claude AI (Anthropic)" },
+        { id: "vercel", label: "Vercel" },
+    ];
 
     return (
         <div>
@@ -463,127 +452,48 @@ function ApiTab() {
                     overflow: "hidden",
                 }}
             >
-                {keys.map((k, i) => (
-                    <div
-                        key={k.id}
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "12px",
-                            padding: "12px 16px",
-                            borderBottom: i < keys.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
-                        }}
-                    >
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "3px" }}>
-                                {k.label}
+                {entries.map((entry, i) => {
+                    const configured = status ? status[entry.id] : null;
+                    return (
+                        <div
+                            key={entry.id}
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                padding: "12px 16px",
+                                borderBottom: i < entries.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+                            }}
+                        >
+                            <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>
+                                {entry.label}
                             </div>
-                            <div
+                            <span
                                 style={{
-                                    fontSize: "12px",
-                                    fontFamily: "monospace",
-                                    color: "var(--text-primary)",
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
+                                    fontSize: "11px",
+                                    padding: "2px 8px",
+                                    borderRadius: "4px",
+                                    background: configured === null
+                                        ? "var(--bg-tertiary)"
+                                        : configured
+                                            ? "var(--success-bg)"
+                                            : "var(--warning-bg)",
+                                    color: configured === null
+                                        ? "var(--text-tertiary)"
+                                        : configured
+                                            ? "var(--success-text)"
+                                            : "var(--warning-text)",
                                 }}
                             >
-                                {k.visible ? k.key : obfuscate(k.key)}
-                            </div>
+                                {configured === null ? "—" : configured ? "Yapılandırıldı ✓" : "Eksik"}
+                            </span>
                         </div>
-                        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                            <button
-                                onClick={() => toggleVisible(k.id)}
-                                style={{
-                                    fontSize: "11px",
-                                    padding: "4px 8px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "4px",
-                                    background: "transparent",
-                                    color: "var(--text-tertiary)",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                {k.visible ? "Gizle" : "Göster"}
-                            </button>
-                            <button
-                                onClick={() => handleCopy(k.id, k.key)}
-                                style={{
-                                    fontSize: "11px",
-                                    padding: "4px 8px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "4px",
-                                    background: copied === k.id ? "var(--success-bg)" : "transparent",
-                                    color: copied === k.id ? "var(--success-text)" : "var(--text-tertiary)",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                {copied === k.id ? "Kopyalandı ✓" : "Kopyala"}
-                            </button>
-                            <button
-                                onClick={() => toast({ type: "info", message: "API anahtarı yenileme yakında açılacak" })}
-                                style={{
-                                    fontSize: "11px",
-                                    padding: "4px 8px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "4px",
-                                    background: "transparent",
-                                    color: "var(--text-tertiary)",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                Yenile
-                            </button>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
-
-            {/* Add new key */}
-            {showAddForm ? (
-                <div
-                    style={{
-                        marginTop: "12px",
-                        background: "var(--bg-secondary)",
-                        border: "0.5px solid var(--border-tertiary)",
-                        borderRadius: "8px",
-                        padding: "14px 16px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "10px",
-                    }}
-                >
-                    <div>
-                        <label style={labelStyle}>Servis Adı</label>
-                        <input style={inputStyle} value={newKeyLabel} onChange={e => setNewKeyLabel(e.target.value)} placeholder="örn. Stripe, SendGrid..." />
-                    </div>
-                    <div>
-                        <label style={labelStyle}>API Anahtarı</label>
-                        <input style={inputStyle} value={newKeyValue} onChange={e => setNewKeyValue(e.target.value)} placeholder="sk_..." type="password" />
-                    </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                        <Button variant="primary" onClick={handleAdd}>Ekle</Button>
-                        <Button variant="secondary" onClick={() => setShowAddForm(false)}>İptal</Button>
-                    </div>
-                </div>
-            ) : (
-                <button
-                    onClick={() => setShowAddForm(true)}
-                    style={{
-                        marginTop: "12px",
-                        fontSize: "12px",
-                        padding: "7px 14px",
-                        border: "0.5px dashed var(--border-secondary)",
-                        borderRadius: "6px",
-                        background: "transparent",
-                        color: "var(--text-secondary)",
-                        cursor: "pointer",
-                        width: "100%",
-                    }}
-                >
-                    + Yeni Anahtar Ekle
-                </button>
-            )}
+            <div style={{ marginTop: "10px", fontSize: "11px", color: "var(--text-tertiary)" }}>
+                Anahtarlar <code>.env.local</code> üzerinden yönetilir.
+            </div>
         </div>
     );
 }

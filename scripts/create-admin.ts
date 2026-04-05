@@ -25,15 +25,19 @@ if (!url || !key) {
 
 const supabase = createClient(url, key);
 
-const { data, error } = await supabase.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-});
+async function main() {
+    const { data, error } = await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+    });
 
-if (error) {
-    console.error("Kullanıcı oluşturulamadı:", error.message);
-    process.exit(1);
+    if (error) {
+        console.error("Kullanıcı oluşturulamadı:", error.message);
+        process.exit(1);
+    }
+
+    console.log("Kullanıcı oluşturuldu:", data.user.email, "(id:", data.user.id + ")");
 }
 
-console.log("Kullanıcı oluşturuldu:", data.user.email, "(id:", data.user.id + ")");
+main();
