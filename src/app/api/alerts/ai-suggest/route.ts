@@ -21,6 +21,6 @@ export async function POST() {
     } catch (err) {
         return handleApiError(err, "AI öneri oluşturulamadı.");
     } finally {
-        await supabase.rpc("release_ai_suggest_lock").catch(() => {});
+        try { await supabase.rpc("release_ai_suggest_lock"); } catch { /* ignore */ }
     }
 }

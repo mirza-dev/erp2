@@ -22,6 +22,6 @@ export async function POST() {
         console.error("[POST /api/alerts/scan]", err);
         return NextResponse.json({ error: "Tarama başarısız." }, { status: 500 });
     } finally {
-        await supabase.rpc("release_scan_lock").catch(() => {});
+        try { await supabase.rpc("release_scan_lock"); } catch { /* ignore */ }
     }
 }
