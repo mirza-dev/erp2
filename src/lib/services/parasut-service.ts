@@ -62,6 +62,14 @@ function mapOrderToParasut(order: OrderWithLines): ParasutInvoicePayload {
     };
 }
 
+// ── Enable guard ─────────────────────────────────────────────
+// Paraşüt integration must be explicitly opted in via PARASUT_ENABLED=true.
+// When disabled (staging, dev, unconfigured prod), all sync functions return
+// early without touching the database.
+function isParasutEnabled(): boolean {
+    return process.env.PARASUT_ENABLED === "true";
+}
+
 // ── Sync ─────────────────────────────────────────────────────
 
 export interface SyncOrderResult {
@@ -72,6 +80,7 @@ export interface SyncOrderResult {
 }
 
 export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOrderResult> {
+    if (!isParasutEnabled()) return { success: false, error: "Paraşüt entegrasyonu devre dışı." };
     const order = await dbGetOrderById(orderId);
     if (!order) return { success: false, error: "Sipariş bulunamadı." };
     if (order.commercial_status !== "approved") {
@@ -121,6 +130,7 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
 // ── Retry ────────────────────────────────────────────────────
 
 export async function serviceRetrySyncLog(syncLogId: string): Promise<SyncOrderResult> {
+    if (!isParasutEnabled()) return { success: false, error: "Paraşüt entegrasyonu devre dışı." };
     const log = await dbGetSyncLog(syncLogId);
     if (!log) return { success: false, error: "Sync log bulunamadı." };
     if (!log.entity_id) return { success: false, error: "entity_id eksik." };
@@ -152,6 +162,7 @@ export async function serviceSyncAllPending(): Promise<{
     failed: number;
     errors: string[];
 }> {
+    if (!isParasutEnabled()) return { synced: 0, failed: 0, errors: [] };
     const supabase = createServiceClient();
 
     // Find approved orders with no parasut_invoice_id and no parasut_error

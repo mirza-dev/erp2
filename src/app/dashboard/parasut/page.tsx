@@ -8,6 +8,7 @@ type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
 
 interface ParasutConfig {
+    enabled: boolean;
     companyId: string | null;
     clientId: string | null;
     clientSecretConfigured: boolean;
@@ -48,8 +49,9 @@ const tdStyle: React.CSSProperties = {
 export default function ParasutPage() {
     const { toast } = useToast();
 
-    const [connection, setConnection] = useState<ConnectionStatus>("connected");
     const [config, setConfig] = useState<ParasutConfig | null>(null);
+    // connection is derived from server-side config — never set locally
+    const connection: ConnectionStatus = config?.enabled ? "connected" : "disconnected";
     const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
     const [syncStep, setSyncStep] = useState(0);
     const [syncProgress, setSyncProgress] = useState(0);
@@ -198,27 +200,6 @@ export default function ParasutPage() {
                         }}
                     >
                         {syncStatus === "syncing" ? "Sync ediliyor..." : "▶ Manuel Sync"}
-                    </button>
-                    <button
-                        onClick={() => {
-                            const next = connection === "connected" ? "disconnected" : "connected";
-                            setConnection(next);
-                            toast({
-                                type: next === "connected" ? "success" : "warning",
-                                message: next === "connected" ? "Paraşüt bağlantısı kuruldu" : "Paraşüt bağlantısı kesildi",
-                            });
-                        }}
-                        style={{
-                            fontSize: "12px",
-                            padding: "6px 14px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "6px",
-                            background: "transparent",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                        }}
-                    >
-                        {connection === "connected" ? "Bağlantıyı Kes" : "Bağlan"}
                     </button>
                 </div>
             </div>

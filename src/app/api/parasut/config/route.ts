@@ -12,6 +12,7 @@ function mask(val: string | undefined): string | null {
 // Full secret values are NEVER sent to the client.
 export async function GET() {
     return NextResponse.json({
+        enabled: process.env.PARASUT_ENABLED === "true",
         companyId: mask(process.env.PARASUT_COMPANY_ID),
         clientId: mask(process.env.PARASUT_CLIENT_ID),
         clientSecretConfigured: !!process.env.PARASUT_CLIENT_SECRET,
