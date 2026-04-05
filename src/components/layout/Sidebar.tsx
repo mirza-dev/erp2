@@ -65,6 +65,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
             label: "Sistem",
             items: [
                 { label: "Ayarlar", href: "/dashboard/settings" },
+                { label: "Kullanıcılar", href: "/dashboard/settings/users" },
             ],
         },
     ];
