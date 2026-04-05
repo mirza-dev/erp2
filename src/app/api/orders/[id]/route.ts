@@ -46,10 +46,10 @@ export async function PATCH(
             return NextResponse.json({ error: result.error }, { status: 400 });
         }
 
-        // Fire-and-forget Parasut sync when order is shipped
+        // Await Parasut sync so the subsequent serviceGetOrder returns up-to-date parasut fields
         if (transition === "shipped" && result.success) {
-            serviceSyncOrderToParasut(id).catch(err =>
-                console.error("[Parasut sync] fire-and-forget:", err)
+            await serviceSyncOrderToParasut(id).catch(err =>
+                console.error("[Parasut sync]:", err)
             );
         }
 

@@ -207,6 +207,7 @@ export default function OrderDetailPage() {
                 const result = await updateOrderStatus(order.id, "shipped");
                 if (!result.ok) {
                     toast({ type: "error", message: result.error || "Sevk işlemi başarısız." });
+                    setParasutStatus("idle");
                     return;
                 }
                 setFulfillmentStatus("shipped");
@@ -226,10 +227,13 @@ export default function OrderDetailPage() {
                             setParasutStatus("error");
                             setParasutError(data.parasut_error);
                             toast({ type: "error", message: "Paraşüt sync başarısız" });
+                        } else {
+                            setParasutStatus("idle");
                         }
                     }
                 } catch (err) {
                     console.error("Failed to fetch updated order:", err);
+                    setParasutStatus("idle");
                 }
                 return;
             }
