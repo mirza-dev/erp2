@@ -286,6 +286,94 @@ describe("serviceConfirmBatch — product merge", () => {
     });
 });
 
+// ─── Product SKU dedup — behavioural contract ────────────────────────────────
+//
+// Each test starts with vi.clearAllMocks() so call-count assertions are
+// unaffected by sibling tests.  The contract:
+//   existing SKU  → dbUpdateProduct called, dbCreateProduct never called
+//   new SKU       → dbCreateProduct called, dbUpdateProduct never called
+//   missing field → both skipped, neither called
+
+describe("serviceConfirmBatch — product SKU dedup contract", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("existing SKU → update existing record, dbCreateProduct never called", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.updated).toBe(1);
+        expect(result.added).toBe(0);
+        expect(mockDbUpdateProduct).toHaveBeenCalledWith(
+            "existing-p",
+            expect.objectContaining({ name: "Gate Valve DN50" })
+        );
+        expect(mockDbCreateProduct).not.toHaveBeenCalled();
+    });
+
+    it("new SKU → insert new product row, dbUpdateProduct never called", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Ball Valve DN25", sku: "BV-025", unit: "adet" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "BV-025" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(result.updated).toBe(0);
+        expect(mockDbCreateProduct).toHaveBeenCalledWith(
+            expect.objectContaining({ sku: "BV-025", name: "Ball Valve DN25" })
+        );
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+    });
+
+    it("missing required field (sku) → skipped, neither create nor update called", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve", unit: "adet" }, // sku missing
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(result.added).toBe(0);
+        expect(result.updated).toBe(0);
+        expect(mockDbCreateProduct).not.toHaveBeenCalled();
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+    });
+
+    it("repeated import of same SKU never creates additional rows", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        await serviceConfirmBatch("batch-1");
+        await serviceConfirmBatch("batch-1");
+
+        expect(mockDbCreateProduct).not.toHaveBeenCalled();
+        expect(mockDbUpdateProduct).toHaveBeenCalledTimes(2); // update on each run, never insert
+    });
+});
+
 // ─── §9.2 Order merge — never creates approved entities ──────────────────────
 
 describe("serviceConfirmBatch — §9.2: order merge never creates approved entities", () => {
