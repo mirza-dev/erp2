@@ -1,34 +1,34 @@
 "use client";
 
-import { enterDemoMode } from "@/lib/demo-utils";
-
 interface DemoButtonProps {
     variant?: "button" | "link";
 }
 
+/**
+ * Navigates to /api/auth/demo (server route) which sets the demo cookie
+ * and redirects to /dashboard. Using a plain <a> avoids React event-system
+ * issues when browser translation (e.g. Google Translate) is active.
+ */
 export default function DemoButton({ variant = "button" }: DemoButtonProps) {
     if (variant === "link") {
         return (
-            <button
-                onClick={enterDemoMode}
+            <a
+                href="/api/auth/demo"
                 style={{
-                    background: "none",
-                    border: "none",
                     fontSize: "12px",
                     color: "var(--text-tertiary)",
-                    cursor: "pointer",
                     textDecoration: "underline",
-                    padding: 0,
+                    cursor: "pointer",
                 }}
             >
                 Demo ile gezin
-            </button>
+            </a>
         );
     }
 
     return (
-        <button
-            onClick={enterDemoMode}
+        <a
+            href="/api/auth/demo"
             style={{
                 fontSize: "13px",
                 padding: "9px 22px",
@@ -37,9 +37,11 @@ export default function DemoButton({ variant = "button" }: DemoButtonProps) {
                 borderRadius: "7px",
                 background: "transparent",
                 cursor: "pointer",
+                textDecoration: "none",
+                display: "inline-block",
             }}
         >
             Demo Gez
-        </button>
+        </a>
     );
 }

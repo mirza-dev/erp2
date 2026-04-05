@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
-const ALWAYS_PUBLIC = ["/api/health"];
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo"];
 
 // Cron/external servisler: CRON_SECRET Bearer token ile erişir
 const CRON_PATHS = [
