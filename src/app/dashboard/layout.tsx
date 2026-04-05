@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import { DataProvider } from "@/lib/data-context";
@@ -14,8 +14,7 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [isDemo, setIsDemo] = useState(false);
-    useEffect(() => { setIsDemo(isDemoMode()); }, []);
+    const [isDemo] = useState(() => isDemoMode());
 
     return (
         <DataProvider>

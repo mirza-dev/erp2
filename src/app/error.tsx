@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
+
 export default function GlobalError({
-    error,
     reset,
 }: {
     error: Error & { digest?: string };
@@ -55,7 +56,7 @@ export default function GlobalError({
                     >
                         Tekrar Dene
                     </button>
-                    <a
+                    <Link
                         href="/"
                         style={{
                             fontSize: "13px",
@@ -67,7 +68,7 @@ export default function GlobalError({
                         }}
                     >
                         Ana Sayfa
-                    </a>
+                    </Link>
                 </div>
             </div>
         </div>

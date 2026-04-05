@@ -12,7 +12,7 @@
  *   PATCH /api/alerts/[id]       — single alert status update
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -39,10 +39,8 @@ vi.mock("@/lib/supabase/service", () => ({
 
 // handleApiError mock (used by ai-suggest route)
 vi.mock("@/lib/api-error", () => ({
-    handleApiError: (_err: unknown, msg: string) => {
-        const { NextResponse } = require("next/server");
-        return NextResponse.json({ error: msg }, { status: 500 });
-    },
+    handleApiError: (_err: unknown, msg: string) =>
+        NextResponse.json({ error: msg }, { status: 500 }),
 }));
 
 import { POST as scanPost }      from "@/app/api/alerts/scan/route";

@@ -550,8 +550,6 @@ function AiTab() {
     const [error, setError] = useState<string | null>(null);
 
     const load = useCallback(() => {
-        setLoading(true);
-        setError(null);
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
 
@@ -586,7 +584,7 @@ function AiTab() {
                     {error ?? "Bilinmeyen hata"}
                 </div>
                 <button
-                    onClick={load}
+                    onClick={() => { setLoading(true); setError(null); load(); }}
                     style={{
                         alignSelf: "flex-start",
                         fontSize: "12px",

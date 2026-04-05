@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
@@ -26,8 +26,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
     const router = useRouter();
     const { reorderSuggestions, orders, activeAlertCount } = useData();
 
-    const [isDemo, setIsDemo] = useState(false);
-    useEffect(() => { setIsDemo(isDemoMode()); }, []);
+    const [isDemo] = useState(() => isDemoMode());
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
