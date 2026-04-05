@@ -5,7 +5,13 @@
  *   - GET /api/parasut/config  — masked identifiers + boolean for secret
  *   - GET /api/settings/api-keys-status — boolean-only response
  */
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Simulate authenticated request (no demo_mode cookie)
+vi.mock("next/headers", () => ({
+    cookies: () => Promise.resolve({ get: () => undefined }),
+}));
+
 import { GET as parasutConfigGET } from "@/app/api/parasut/config/route";
 import { GET as apiKeysStatusGET } from "@/app/api/settings/api-keys-status/route";
 

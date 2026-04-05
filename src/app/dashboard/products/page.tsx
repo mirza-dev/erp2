@@ -177,7 +177,6 @@ export default function ProductsPage() {
     const [riskLoading, setRiskLoading] = useState(false);
     const [riskCounts, setRiskCounts] = useState<{ at_risk: number; excluded_no_usage?: number } | null>(null);
     const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
-    const [riskGeneratedAt, setRiskGeneratedAt] = useState<string | null>(null);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
     const [recMap, setRecMap] = useState<Map<string, RiskRecEntry>>(new Map());
     const [rejectMode, setRejectMode] = useState(false);
@@ -210,7 +209,6 @@ export default function ProductsPage() {
                     excluded_no_usage: data.counts?.excluded_no_usage ?? 0,
                 });
                 setAiAvailable(data.ai_available ?? null);
-                setRiskGeneratedAt(data.generatedAt ?? null);
                 const recMapData = new Map<string, RiskRecEntry>();
                 for (const rec of data.recommendations ?? []) {
                     if (rec.recommendationId) {

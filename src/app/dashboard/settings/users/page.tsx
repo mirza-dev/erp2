@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { isDemoMode } from "@/lib/demo-utils";
 import { createClient } from "@/lib/supabase/client";
@@ -55,16 +55,7 @@ export default function UsersPage() {
     const [currentEmail, setCurrentEmail] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
-    useEffect(() => {
-        // Mevcut kullanıcının emailini al (kendini silmeyi engellemek için)
-        const supabase = createClient();
-        supabase.auth.getUser().then(({ data }) => {
-            setCurrentEmail(data.user?.email ?? null);
-        });
-        fetchUsers();
-    }, []);
-
-    const fetchUsers = async () => {
+    const fetchUsers = useCallback(async () => {
         setLoading(true);
         try {
             const res = await fetch("/api/admin/users");
@@ -79,7 +70,16 @@ export default function UsersPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [toast]);
+
+    useEffect(() => {
+        // Mevcut kullanıcının emailini al (kendini silmeyi engellemek için)
+        const supabase = createClient();
+        supabase.auth.getUser().then(({ data }) => {
+            setCurrentEmail(data.user?.email ?? null);
+        });
+        fetchUsers();
+    }, [fetchUsers]);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();

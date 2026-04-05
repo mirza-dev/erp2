@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
+import { isDemoMode } from "@/lib/demo-utils";
 
 type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
 
@@ -53,12 +54,12 @@ function SaveButton({ onClick, loading, dirty }: { onClick: () => void; loading?
 
 // ─── Firma Profili ─────────────────────────────────────────────────────────────
 const initialFirmaForm = {
-    name: "PMT Endüstriyel Ürünler A.Ş.",
-    taxOffice: "Başakşehir",
-    taxNo: "TR-4821937650",
-    address: "Başakşehir OSB, Hadımköy Yolu 45, 34307 İstanbul",
-    phone: "+90 212 555 0142",
-    website: "www.pmt-endustriyel.com.tr",
+    name: "",
+    taxOffice: "",
+    taxNo: "",
+    address: "",
+    phone: "",
+    website: "",
     currency: "USD",
 };
 
@@ -87,6 +88,14 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         setIsSaving(false);
         toast({ type: "success", message: "Firma bilgileri kaydedildi" });
     };
+
+    if (isDemoMode()) {
+        return (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                Firma bilgileri yalnızca yetkili kullanıcılara gösterilir.
+            </div>
+        );
+    }
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -162,7 +171,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
 }
 
 // ─── Kullanıcı / Profil ────────────────────────────────────────────────────────
-const initialProfileForm = { fullName: "Mirza Sarıbıyık", email: "mirza@pmt-endustriyel.com.tr" };
+const initialProfileForm = { fullName: "", email: "" };
 
 function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
@@ -206,6 +215,14 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
         setPwForm({ current: "", next: "", confirm: "" });
         toast({ type: "success", message: "Şifre başarıyla değiştirildi" });
     };
+
+    if (isDemoMode()) {
+        return (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                Kullanıcı bilgileri yalnızca yetkili kullanıcılara gösterilir.
+            </div>
+        );
+    }
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>

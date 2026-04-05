@@ -12,6 +12,11 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+// Simulate authenticated request (no demo_mode cookie)
+vi.mock("next/headers", () => ({
+    cookies: () => Promise.resolve({ get: () => undefined }),
+}));
+
 // ─── DB / parasut mocks ───────────────────────────────────────────────────────
 
 const mockSendInvoice = vi.fn();
