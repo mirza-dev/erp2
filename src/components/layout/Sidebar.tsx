@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 
 interface NavItem {
@@ -21,7 +21,13 @@ interface SidebarProps {
 
 export default function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const { reorderSuggestions, orders, activeAlertCount } = useData();
+
+    const handleLogout = async () => {
+        await fetch("/api/auth/logout", { method: "POST" });
+        router.push("/login");
+    };
     const reorderCount = reorderSuggestions.length;
     const pendingOrderCount = orders.filter(o => o.commercial_status === "pending_approval").length;
 
@@ -157,6 +163,33 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
                     })}
                 </div>
             ))}
+
+            <div
+                style={{
+                    marginTop: "auto",
+                    padding: "12px 16px",
+                    borderTop: "0.5px solid var(--border-tertiary)",
+                }}
+            >
+                <button
+                    onClick={handleLogout}
+                    style={{
+                        width: "100%",
+                        padding: "8px 12px",
+                        fontSize: "12px",
+                        color: "var(--text-tertiary)",
+                        background: "transparent",
+                        border: "0.5px solid var(--border-tertiary)",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                    }}
+                >
+                    Çıkış Yap
+                </button>
+            </div>
         </aside>
     );
 }
