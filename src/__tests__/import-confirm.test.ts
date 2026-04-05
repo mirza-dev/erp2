@@ -443,6 +443,74 @@ describe("serviceConfirmBatch — on_hand rules", () => {
     });
 });
 
+// ─── Mixed scenario: 4 updates + 1 insert ────────────────────────────────────
+
+describe("serviceConfirmBatch — mixed scenario: 4 updates + 1 new SKU", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("4 existing SKUs + 1 new SKU → added:1, updated:4, skipped:0", async () => {
+        const existingSkus = ["GV-050", "GV-080", "BV-025", "BV-040"];
+        const newSku = "NV-100";
+
+        const drafts = [
+            ...existingSkus.map((sku, i) => makeDraft({
+                id: `draft-existing-${i}`,
+                entity_type: "product",
+                parsed_data: { name: `Product ${sku}`, sku, unit: "adet" },
+            })),
+            makeDraft({
+                id: "draft-new",
+                entity_type: "product",
+                parsed_data: { name: "New Product NV-100", sku: newSku, unit: "adet" },
+            }),
+        ];
+
+        mockDbListDrafts.mockResolvedValue(drafts);
+
+        mockDbFindProductBySku
+            .mockResolvedValueOnce({ id: "p1", sku: "GV-050", on_hand: 10 })
+            .mockResolvedValueOnce({ id: "p2", sku: "GV-080", on_hand: 20 })
+            .mockResolvedValueOnce({ id: "p3", sku: "BV-025", on_hand: 5 })
+            .mockResolvedValueOnce({ id: "p4", sku: "BV-040", on_hand: 15 })
+            .mockResolvedValueOnce(null); // 5th call: new SKU, not found
+
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing" });
+        mockDbCreateProduct.mockResolvedValue({ id: "new-product", sku: newSku });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(result.updated).toBe(4);
+        expect(result.skipped).toBe(0);
+        expect(result.errors).toHaveLength(0);
+    });
+
+    it("total dbCreateProduct calls matches added count", async () => {
+        const drafts = [
+            makeDraft({ id: "d1", entity_type: "product", parsed_data: { name: "A", sku: "SKU-1", unit: "adet" } }),
+            makeDraft({ id: "d2", entity_type: "product", parsed_data: { name: "B", sku: "SKU-2", unit: "adet" } }),
+        ];
+        mockDbListDrafts.mockResolvedValue(drafts);
+
+        // SKU-1 exists, SKU-2 is new
+        mockDbFindProductBySku
+            .mockResolvedValueOnce({ id: "existing", sku: "SKU-1", on_hand: 0 })
+            .mockResolvedValueOnce(null);
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing" });
+        mockDbCreateProduct.mockResolvedValue({ id: "new" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(mockDbCreateProduct.mock.calls.length);
+        expect(result.updated).toBe(mockDbUpdateProduct.mock.calls.length);
+    });
+});
+
 // ─── §9.2 Order merge — never creates approved entities ──────────────────────
 
 describe("serviceConfirmBatch — §9.2: order merge never creates approved entities", () => {
