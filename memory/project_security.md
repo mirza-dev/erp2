@@ -23,7 +23,11 @@ Tüm 23 tablo için Row Level Security aktif.
 
 **Entry:** Landing "Demo Gez" → `demo_mode=1` cookie → `/dashboard`
 
-**`src/lib/demo-utils.ts`:** `isDemoMode()`, `enterDemoMode()`, `clearDemoMode()`
+**`src/lib/demo-utils.ts`:**
+- `isDemoMode()`, `enterDemoMode()`, `clearDemoMode()` (mevcut)
+- `useIsDemo(): boolean` — SSR-safe React hook (`useState(() => isDemoMode())`)
+- `DEMO_DISABLED_TOOLTIP` — buton title attribute için canonical Türkçe metin
+- `DEMO_BLOCK_TOAST` — handler toast için canonical Türkçe metin
 
 **Middleware gate (demo_mode=1 + unauthenticated):**
 - `/dashboard/**` → izin ver
@@ -31,9 +35,19 @@ Tüm 23 tablo için Row Level Security aktif.
 - `POST/PATCH/DELETE /api/**` → 403 `{ error: "Demo modunda değişiklik yapılamaz." }`
 - Auth'lu kullanıcılar bu bloktan geçmez
 
-**Client-side guard pattern:** Her mutation handler'ın ilk satırı `if (isDemoMode()) return;`
-- 9 DataContext mutasyonu: `demoGuard()` → `clearDemoMode()` + `/login` redirect
-- 8 sayfa doğrudan fetch: `isDemoMode()` → erken return (hata toast yok)
+**Client-side guard pattern (tüm 12 mutation sayfası):**
+```tsx
+const isDemo = useIsDemo();
+// handler:
+if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+// button:
+<Button disabled={isDemo || ...} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+```
+
+**DataContext `demoGuard()`:** Pure boolean — `return checkDemoMode()`. Artık `clearDemoMode()` çağırmaz, `/login`'e redirect etmez. Ziyaretçi dashboard'da kalır.
+
+**Etkilenen sayfalar (12 dosya):**
+- `settings/users`, `import`, `orders`, `orders/new`, `orders/[id]`, `products`, `customers`, `CustomerDetailPanel`, `production`, `parasut`, `alerts`, `purchase/suggested`
 
 **Settings kısıtlamaları (demo):**
 - `GET /api/parasut/config` → `{ enabled, companyId: null, clientId: null, clientSecretConfigured: false }`

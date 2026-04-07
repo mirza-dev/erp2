@@ -12,7 +12,7 @@
  * by demo-mode-middleware.test.ts.
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -47,7 +47,7 @@ describe("demo-utils constants", () => {
 describe("demoGuard contract — no destructive side effects", () => {
     it("when isDemo=true: returns true WITHOUT clearing cookie or redirecting", () => {
         const clearDemoMode = vi.fn();
-        let locationHref = "http://localhost/dashboard";
+        const locationHref = "http://localhost/dashboard";
 
         // Simulate the refactored demoGuard body:
         //   return checkDemoMode();
@@ -64,7 +64,7 @@ describe("demoGuard contract — no destructive side effects", () => {
 
     it("when isDemo=false: returns false with no side effects", () => {
         const clearDemoMode = vi.fn();
-        let locationHref = "http://localhost/dashboard";
+        const locationHref = "http://localhost/dashboard";
 
         function demoGuardRefactored(checkDemoMode: () => boolean): boolean {
             return checkDemoMode();

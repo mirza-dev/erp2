@@ -48,6 +48,36 @@ export async function dbFindInvoiceByNumber(invoiceNumber: string): Promise<Invo
     return data;
 }
 
+export interface UpdateInvoiceInput {
+    invoice_date?: string;
+    order_id?: string;
+    order_number?: string;
+    customer_id?: string;
+    customer_code?: string;
+    currency?: string;
+    amount?: number;
+    due_date?: string;
+    notes?: string;
+}
+
+export async function dbUpdateInvoice(id: string, input: UpdateInvoiceInput): Promise<InvoiceRow> {
+    const supabase = createServiceClient();
+    const patch: Record<string, unknown> = {};
+    if (input.invoice_date !== undefined)  patch.invoice_date = input.invoice_date;
+    if (input.order_id !== undefined)      patch.order_id = input.order_id || null;
+    if (input.order_number !== undefined)  patch.order_number = input.order_number || null;
+    if (input.customer_id !== undefined)   patch.customer_id = input.customer_id || null;
+    if (input.customer_code !== undefined) patch.customer_code = input.customer_code || null;
+    if (input.currency !== undefined)      patch.currency = input.currency;
+    if (input.amount !== undefined)        patch.amount = input.amount;
+    if (input.due_date !== undefined)      patch.due_date = input.due_date || null;
+    if (input.notes !== undefined)         patch.notes = input.notes || null;
+    const { data, error } = await supabase
+        .from("invoices").update(patch).eq("id", id).select("*").single();
+    if (error || !data) throw new Error(error?.message ?? "Invoice update failed");
+    return data;
+}
+
 export async function dbUpdateInvoiceStatus(id: string, status: InvoiceStatus): Promise<void> {
     const supabase = createServiceClient();
     const { error } = await supabase

@@ -8,15 +8,20 @@ import {
     dbGetBatch, dbUpdateBatchStatus, dbListDrafts, dbUpdateDraft,
     type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
-import { dbCreateCustomer, dbFindCustomerByName, dbFindCustomerByCode } from "@/lib/supabase/customers";
+import { dbCreateCustomer, dbFindCustomerByName, dbFindCustomerByCode, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbLookupEntityAlias, dbSaveEntityAlias } from "@/lib/supabase/entity-aliases";
 import { dbCreateProduct, dbFindProductBySku, dbUpdateProduct } from "@/lib/supabase/products";
-import { dbFindOrderByOriginalNumber } from "@/lib/supabase/orders";
-import { dbCreateQuote, dbFindQuoteByNumber } from "@/lib/supabase/quotes";
+import { dbFindOrderByOriginalNumber, dbCreateOrder } from "@/lib/supabase/orders";
+import { dbCreateQuote, dbFindQuoteByNumber, dbUpdateQuote } from "@/lib/supabase/quotes";
 import { dbCreateShipment } from "@/lib/supabase/shipments";
-import { dbCreateInvoice, dbFindInvoiceByNumber, dbUpdateInvoiceStatus, dbSumPaymentsForInvoice } from "@/lib/supabase/invoices";
+import { dbCreateInvoice, dbFindInvoiceByNumber, dbUpdateInvoice, dbUpdateInvoiceStatus, dbSumPaymentsForInvoice } from "@/lib/supabase/invoices";
 import { dbCreatePayment } from "@/lib/supabase/payments";
-import { serviceCreateOrder } from "@/lib/services/order-service";
+// order-service is intentionally NOT imported here:
+// serviceCreateOrder validates lines.length > 0, which would always fail for
+// import order drafts (lines come separately as order_line entity drafts, processed
+// after the order header in the same batch).  We call dbCreateOrder directly so
+// the RPC receives lines:[] and creates the header only — order_lines are appended
+// in the order_line branch.  §9.2 compliance (draft only) is enforced below.
 import { createServiceClient } from "@/lib/supabase/service";
 
 // ── Batch ────────────────────────────────────────────────────
@@ -119,13 +124,27 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     : null;
                 const existing = existingByCode ?? existingByName;
 
+                const customerUpdateFields = {
+                    name: customerName || undefined,
+                    email: data.email ? String(data.email) : undefined,
+                    phone: data.phone ? String(data.phone) : undefined,
+                    address: data.address ? String(data.address) : undefined,
+                    tax_number: data.tax_number ? String(data.tax_number) : undefined,
+                    tax_office: data.tax_office ? String(data.tax_office) : undefined,
+                    country: data.country ? String(data.country) : undefined,
+                    currency: data.currency ? String(data.currency) : undefined,
+                    notes: data.notes ? String(data.notes) : undefined,
+                };
+
                 if (aliasMatch) {
                     // Alias hit — önceki import'tan öğrenilmiş, doğrudan çözümlendi
                     customerId = aliasMatch;
+                    await dbUpdateCustomer(aliasMatch, customerUpdateFields);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: aliasMatch });
                     updated++;
                 } else if (existing) {
                     customerId = existing.id;
+                    await dbUpdateCustomer(existing.id, customerUpdateFields);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
                     // Bu eşleşmeyi gelecek import'lar için kaydet
                     if (customerName) void dbSaveEntityAlias(customerName, "customer", existing.id, existing.name);
@@ -160,6 +179,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     if (!data.sku)  missing.push("ürün kodu (SKU)");
                     if (!data.unit) missing.push("ölçü birimi");
                     errors.push(`Satır ${rowNum}: ${missing.join(", ")} eksik.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
                     skipped++;
                     continue;
                 }
@@ -235,7 +255,12 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "quote") {
                 const quoteNumber = String(data.quote_number ?? "");
-                if (!quoteNumber) { errors.push(`Satır ${rowNum}: Teklif numarası eksik.`); skipped++; continue; }
+                if (!quoteNumber) {
+                    errors.push(`Satır ${rowNum}: Teklif numarası eksik.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++;
+                    continue;
+                }
 
                 const customerCode = data.customer_code ? String(data.customer_code) : undefined;
                 const customerId = customerCode
@@ -244,6 +269,15 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 const existing = await dbFindQuoteByNumber(quoteNumber);
                 if (existing) {
+                    await dbUpdateQuote(existing.id, {
+                        quote_date: data.quote_date ? String(data.quote_date).split("T")[0] : undefined,
+                        customer_id: customerId,
+                        customer_code: customerCode,
+                        currency: data.currency ? String(data.currency) : undefined,
+                        incoterm: data.incoterm ? String(data.incoterm) : undefined,
+                        validity_days: data.validity_days ? Number(data.validity_days) : undefined,
+                        total_amount: data.total_amount ? Number(data.total_amount) : undefined,
+                    });
                     refMap.quoteNumbers.set(quoteNumber, existing.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
                     updated++;
@@ -290,7 +324,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 const originalOrderNumber = data.original_order_number ? String(data.original_order_number) : undefined;
 
-                const order = await serviceCreateOrder({
+                // §9.2: always draft — never approved on import
+                const order = await dbCreateOrder({
                     customer_id: customerId,
                     customer_name: customerName || "Bilinmeyen Müşteri",
                     currency: String(data.currency ?? "USD"),
@@ -305,6 +340,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     quote_id: quoteId,
                     original_order_number: originalOrderNumber,
                     lines: [],
+                    // lines intentionally empty — order_line entity_type drafts (priority 5)
+                    // are processed after this header and appended via direct DB insert.
                 });
 
                 if (originalOrderNumber) refMap.orderNumbers.set(originalOrderNumber, order.id);
@@ -317,6 +354,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 if (!orderNumber || !productSku) {
                     errors.push(`Satır ${rowNum}: Sipariş numarası ve ürün kodu (SKU) zorunludur.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
                     skipped++;
                     continue;
                 }
@@ -325,6 +363,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     ?? (await dbFindOrderByOriginalNumber(orderNumber))?.id;
                 if (!orderId) {
                     errors.push(`Satır ${rowNum}: '${orderNumber}' numaralı sipariş bulunamadı.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
                     skipped++;
                     continue;
                 }
@@ -405,7 +444,12 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "shipment") {
                 const shipmentNumber = String(data.shipment_number ?? "");
-                if (!shipmentNumber) { errors.push(`Satır ${rowNum}: Sevkiyat numarası eksik.`); skipped++; continue; }
+                if (!shipmentNumber) {
+                    errors.push(`Satır ${rowNum}: Sevkiyat numarası eksik.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++;
+                    continue;
+                }
 
                 const orderNumber = data.order_number ? String(data.order_number) : undefined;
                 const orderId = orderNumber
@@ -426,7 +470,12 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "invoice") {
                 const invoiceNumber = String(data.invoice_number ?? "");
-                if (!invoiceNumber) { errors.push(`Satır ${rowNum}: Fatura numarası eksik.`); skipped++; continue; }
+                if (!invoiceNumber) {
+                    errors.push(`Satır ${rowNum}: Fatura numarası eksik.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++;
+                    continue;
+                }
 
                 const orderNumber = data.order_number ? String(data.order_number) : undefined;
                 const orderId = orderNumber
@@ -440,6 +489,16 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 const existing = await dbFindInvoiceByNumber(invoiceNumber);
                 if (existing) {
+                    await dbUpdateInvoice(existing.id, {
+                        invoice_date: data.invoice_date ? String(data.invoice_date).split("T")[0] : undefined,
+                        order_id: orderId,
+                        order_number: orderNumber,
+                        customer_id: customerId,
+                        customer_code: customerCode,
+                        currency: data.currency ? String(data.currency) : undefined,
+                        amount: data.amount !== undefined ? Number(data.amount) : undefined,
+                        due_date: data.due_date ? String(data.due_date).split("T")[0] : undefined,
+                    });
                     refMap.invoiceNumbers.set(invoiceNumber, existing.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
                     updated++;
@@ -462,7 +521,12 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
             } else if (draft.entity_type === "payment") {
                 const paymentNumber = String(data.payment_number ?? "");
-                if (!paymentNumber) { errors.push(`Satır ${rowNum}: Ödeme numarası eksik.`); skipped++; continue; }
+                if (!paymentNumber) {
+                    errors.push(`Satır ${rowNum}: Ödeme numarası eksik.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++;
+                    continue;
+                }
 
                 const invoiceNumber = data.invoice_number ? String(data.invoice_number) : undefined;
                 const invoiceId = invoiceNumber
@@ -491,11 +555,16 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 await dbUpdateDraft(draft.id, { status: "merged" });
                 added++;
+            } else {
+                errors.push(`Satır ${rowNum}: Bilinmeyen varlık türü — '${draft.entity_type}'.`);
+                await dbUpdateDraft(draft.id, { status: "rejected" });
+                skipped++;
             }
 
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             errors.push(`${draft.id} (Satır ${rowNum}): İşlem hatası — ${msg}`);
+            try { await dbUpdateDraft(draft.id, { status: "rejected" }); } catch { /* best-effort */ }
             skipped++;
         }
     }

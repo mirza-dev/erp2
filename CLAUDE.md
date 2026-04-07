@@ -3,13 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-07_
 
-**Son tamamlanan iş:** Demo mode UX + import service hardening
-- Demo mode: 12 sayfada mutation button'ları disabled+tooltip+toast; `demoGuard()` artık redirect etmiyor
-- Import service: stock sayaç hatası, `parseNumeric()` ile 0-değer kaybı, product contract testleri (9 yeni)
+**Son tamamlanan iş:** Import order latent bug fix + result contract audit + ESLint temizliği
+- 5 bug düzeltildi: customer/quote/invoice existing match'lerde gerçek UPDATE eklendi; tüm skip path'lerde `dbUpdateDraft(rejected)`; bilinmeyen entity_type fallthrough; catch block best-effort reject
+- `dbUpdateQuote` ve `dbUpdateInvoice` DB fonksiyonları oluşturuldu
+- 17 yeni test: quote/invoice/shipment/payment merge, customer update on match, draft rejection, unknown entity, mixed-entity batch
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** —
-**Test sayısı:** 46 dosya · 1080 test
+**Test sayısı:** 46 dosya · 1097 test
 
 ---
 

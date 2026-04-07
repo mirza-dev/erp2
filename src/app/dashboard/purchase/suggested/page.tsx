@@ -6,7 +6,7 @@ import { computeCoverageDays, computeTargetStock, daysColor, daysBg } from "@/li
 import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { useToast } from "@/components/ui/Toast";
-import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 
 interface AiEnrichmentItem {
     productId: string;
