@@ -299,6 +299,22 @@ describe("serviceConfirmBatch — product merge", () => {
         expect(result.updated).toBe(1);
         expect(result.added).toBe(0);
     });
+
+    it("error message for missing fields includes correct Turkish field names", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: {}, // sku, name, unit hepsi eksik
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(result.errors).toHaveLength(1);
+        expect(result.errors[0]).toContain("ürün adı");
+        expect(result.errors[0]).toContain("ürün kodu (SKU)");
+        expect(result.errors[0]).toContain("ölçü birimi");
+    });
 });
 
 // ─── Product SKU dedup — behavioural contract ────────────────────────────────
@@ -387,6 +403,120 @@ describe("serviceConfirmBatch — product SKU dedup contract", () => {
         expect(mockDbCreateProduct).not.toHaveBeenCalled();
         expect(mockDbUpdateProduct).toHaveBeenCalledTimes(2); // update on each run, never insert
     });
+
+    it("currency defaults to USD on create, absent (undefined) on update", async () => {
+        // Create path: no currency in parsed_data → defaults to "USD"
+        const createDraft = makeDraft({
+            id: "d-create",
+            entity_type: "product",
+            parsed_data: { name: "New Valve", sku: "NV-100", unit: "adet" }, // no currency
+        });
+        mockDbListDrafts.mockResolvedValue([createDraft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "NV-100" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [createPayload] = mockDbCreateProduct.mock.calls[0];
+        expect(createPayload).toHaveProperty("currency", "USD");
+
+        // Update path: no currency → undefined (not "USD", not overwritten)
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+
+        const updateDraft = makeDraft({
+            id: "d-update",
+            entity_type: "product",
+            parsed_data: { name: "Existing Valve", sku: "EV-050", unit: "adet" }, // no currency
+        });
+        mockDbListDrafts.mockResolvedValue([updateDraft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "EV-050", name: "Existing Valve", on_hand: 0 });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [, updatePayload] = mockDbUpdateProduct.mock.calls[0];
+        expect(updatePayload.currency).toBeUndefined();
+    });
+
+    it("string identity fields (preferred_vendor, product_family) passed through on update", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: {
+                name: "Gate Valve DN50", sku: "GV-050", unit: "adet",
+                preferred_vendor: "Acme Makine", product_family: "Gate Valves",
+                sub_category: "High-pressure", sector_compatibility: "Oil & Gas",
+            },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 0 });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [, updatePayload] = mockDbUpdateProduct.mock.calls[0];
+        expect(updatePayload).toMatchObject({
+            preferred_vendor: "Acme Makine",
+            product_family: "Gate Valves",
+            sub_category: "High-pressure",
+            sector_compatibility: "Oil & Gas",
+        });
+        expect(mockDbCreateProduct).not.toHaveBeenCalled();
+    });
+
+    it("string identity fields (preferred_vendor, product_family) passed through on create", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: {
+                name: "Ball Valve DN25", sku: "BV-025", unit: "adet",
+                preferred_vendor: "Acme Makine", product_family: "Ball Valves",
+            },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "BV-025" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [createPayload] = mockDbCreateProduct.mock.calls[0];
+        expect(createPayload).toMatchObject({
+            preferred_vendor: "Acme Makine",
+            product_family: "Ball Valves",
+        });
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+    });
+
+    it("two product drafts with same SKU in one batch: first creates, second updates — no duplicate insert", async () => {
+        const draft1 = makeDraft({
+            id: "d-first",
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet" },
+        });
+        const draft2 = makeDraft({
+            id: "d-second",
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50 Updated", sku: "GV-050", unit: "adet" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft1, draft2]);
+
+        // First draft: SKU not in DB yet → create
+        // Second draft: SKU now exists (from first create) → update
+        mockDbFindProductBySku
+            .mockResolvedValueOnce(null)                                              // draft1: new
+            .mockResolvedValueOnce({ id: "new-p", sku: "GV-050", on_hand: 0 });     // draft2: found after create
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "GV-050" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "new-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(result.updated).toBe(1);
+        expect(result.skipped).toBe(0);
+        expect(mockDbCreateProduct).toHaveBeenCalledTimes(1);
+        expect(mockDbUpdateProduct).toHaveBeenCalledTimes(1);
+    });
 });
 
 // ─── Stock field rules — product=master-data-only, stock=additive ────────────
@@ -460,16 +590,255 @@ describe("serviceConfirmBatch — on_hand rules", () => {
         expect(createPayload).toHaveProperty("on_hand", 42);
     });
 
-    it("stock entity_type without on_hand → dbUpdateProduct not called", async () => {
+    it("product update with on_hand AND price → on_hand dropped, price preserved", async () => {
+        // Guard: dropping on_hand must not silently discard other numeric fields
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet", on_hand: 999, price: 50 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 10 });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.updated).toBe(1);
+        const [, updatePayload] = mockDbUpdateProduct.mock.calls[0];
+        expect(updatePayload).not.toHaveProperty("on_hand");
+        expect(updatePayload).toHaveProperty("price", 50);
+    });
+
+    it("new product without on_hand → dbCreateProduct still called, on_hand absent (DB defaults to 0)", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "New Valve", sku: "NV-888", unit: "adet" }, // no on_hand
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "NV-888" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(mockDbCreateProduct).toHaveBeenCalledTimes(1);
+        const [createPayload] = mockDbCreateProduct.mock.calls[0];
+        // on_hand absent from parsed_data → parseNumeric(undefined) = undefined → not in payload
+        expect(createPayload.on_hand).toBeUndefined();
+    });
+
+    it("stock entity_type without on_hand → skipped with error, draft rejected", async () => {
         const draft = makeDraft({
             entity_type: "stock",
             parsed_data: { sku: "GV-050" }, // no on_hand
         });
         mockDbListDrafts.mockResolvedValue([draft]);
 
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(result.updated).toBe(0);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0]).toContain("on_hand");
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "rejected" });
+    });
+
+    it("stock entity_type without sku → skipped with error, not updated", async () => {
+        const draft = makeDraft({
+            entity_type: "stock",
+            parsed_data: { on_hand: 30 }, // no sku
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(result.updated).toBe(0);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0]).toContain("SKU");
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "rejected" });
+    });
+
+    it("stock entity_type with unknown sku → skipped with error, not updated", async () => {
+        const draft = makeDraft({
+            entity_type: "stock",
+            parsed_data: { sku: "NONEXISTENT", on_hand: 30 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(result.updated).toBe(0);
+        expect(result.errors.length).toBe(1);
+        expect(result.errors[0]).toContain("NONEXISTENT");
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "rejected" });
+    });
+});
+
+// ─── user_corrections override — product fields ───────────────────────────────
+//
+// parsed_data and user_corrections are merged (corrections win) before entity
+// processing.  Product import must respect corrections for all field types.
+
+describe("serviceConfirmBatch — product user_corrections override", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("user_corrections override product name on update", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Old Name", sku: "GV-050", unit: "adet" },
+            user_corrections: { name: "Corrected Name" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Old Name", on_hand: 0 });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.updated).toBe(1);
+        const [, updatePayload] = mockDbUpdateProduct.mock.calls[0];
+        expect(updatePayload).toMatchObject({ name: "Corrected Name" });
+    });
+
+    it("user_corrections override product name on create (new SKU)", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Old Name", sku: "NV-NEW", unit: "adet" },
+            user_corrections: { name: "Corrected Name" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "NV-NEW" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        const [createPayload] = mockDbCreateProduct.mock.calls[0];
+        expect(createPayload).toMatchObject({ name: "Corrected Name", sku: "NV-NEW" });
+    });
+});
+
+// ─── Numeric field parsing — 0 must be preserved (not dropped by truthy check) ─
+
+describe("serviceConfirmBatch — product numeric fields preserve 0", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("product update → price:0, min_stock_level:0, reorder_qty:0 preserved (not dropped)", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: {
+                name: "Gate Valve DN50",
+                sku: "GV-050",
+                unit: "adet",
+                price: 0,
+                min_stock_level: 0,
+                reorder_qty: 0,
+                cost_price: 0,
+                weight_kg: 0,
+            },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 50 });
+        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+
         await serviceConfirmBatch("batch-1");
 
-        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+        const [, updatePayload] = mockDbUpdateProduct.mock.calls[0];
+        expect(updatePayload).toHaveProperty("price", 0);
+        expect(updatePayload).toHaveProperty("min_stock_level", 0);
+        expect(updatePayload).toHaveProperty("reorder_qty", 0);
+        expect(updatePayload).toHaveProperty("cost_price", 0);
+        expect(updatePayload).toHaveProperty("weight_kg", 0);
+    });
+
+    it("new product → price:0, min_stock_level:0, reorder_qty:0, on_hand:0 preserved", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: {
+                name: "New Valve",
+                sku: "NV-999",
+                unit: "adet",
+                price: 0,
+                min_stock_level: 0,
+                reorder_qty: 0,
+                on_hand: 0,
+                cost_price: 0,
+                weight_kg: 0,
+            },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "NV-999" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [createPayload] = mockDbCreateProduct.mock.calls[0];
+        expect(createPayload).toHaveProperty("price", 0);
+        expect(createPayload).toHaveProperty("min_stock_level", 0);
+        expect(createPayload).toHaveProperty("reorder_qty", 0);
+        expect(createPayload).toHaveProperty("on_hand", 0);
+        expect(createPayload).toHaveProperty("cost_price", 0);
+        expect(createPayload).toHaveProperty("weight_kg", 0);
+    });
+
+    it("new product with string '0' → coerced to numeric 0 (not dropped)", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: {
+                name: "New Valve",
+                sku: "NV-998",
+                unit: "adet",
+                price: "0",
+                min_stock_level: "0",
+            },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "NV-998" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [createPayload] = mockDbCreateProduct.mock.calls[0];
+        expect(createPayload).toHaveProperty("price", 0);
+        expect(createPayload).toHaveProperty("min_stock_level", 0);
+    });
+
+    it("product with empty string / null numeric fields → undefined (treated as absent)", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: {
+                name: "New Valve",
+                sku: "NV-997",
+                unit: "adet",
+                price: "",
+                min_stock_level: null,
+                reorder_qty: undefined,
+            },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "new-p", sku: "NV-997" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [createPayload] = mockDbCreateProduct.mock.calls[0];
+        expect(createPayload.price).toBeUndefined();
+        expect(createPayload.min_stock_level).toBeUndefined();
+        expect(createPayload.reorder_qty).toBeUndefined();
     });
 });
 

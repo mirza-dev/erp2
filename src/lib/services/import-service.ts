@@ -56,6 +56,17 @@ const ENTITY_PRIORITY: Record<string, number> = {
 };
 
 /**
+ * Numeric field parser that preserves 0 as a valid value.
+ * Treats null/undefined/"" as absent (returns undefined), but keeps 0 and "0".
+ * Truthy checks like `data.price ? Number(data.price) : undefined` silently drop 0.
+ */
+function parseNumeric(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === "") return undefined;
+    const n = Number(value);
+    return Number.isNaN(n) ? undefined : n;
+}
+
+/**
  * Batch'teki tüm confirmed (veya pending) draftları merge et.
  * domain-rules §9.2: hiçbir zaman doğrudan approved order oluşturmaz
  */
@@ -156,21 +167,25 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 const existingProduct = await dbFindProductBySku(sku);
                 let productId: string;
                 if (existingProduct) {
+                    // ── Master-data update ─────────────────────────────────────────
+                    // Product import = identity/catalog data only.
+                    // on_hand is NEVER updated here — stock changes require the
+                    // dedicated "stock" entity_type sheet.  See stock branch below.
+                    // ──────────────────────────────────────────────────────────────
                     const updatedProduct = await dbUpdateProduct(existingProduct.id, {
                         name: String(data.name),
                         category: data.category ? String(data.category) : undefined,
                         unit: String(data.unit),
-                        price: data.price ? Number(data.price) : undefined,
+                        price: parseNumeric(data.price),
                         currency: data.currency ? String(data.currency) : undefined,
-                        // on_hand intentionally omitted — product import is master-data only; stock is managed via the stock sheet
-                        min_stock_level: data.min_stock_level ? Number(data.min_stock_level) : undefined,
-                        reorder_qty: data.reorder_qty ? Number(data.reorder_qty) : undefined,
+                        min_stock_level: parseNumeric(data.min_stock_level),
+                        reorder_qty: parseNumeric(data.reorder_qty),
                         preferred_vendor: data.preferred_vendor ? String(data.preferred_vendor) : undefined,
                         product_family: data.product_family ? String(data.product_family) : undefined,
                         sub_category: data.sub_category ? String(data.sub_category) : undefined,
                         sector_compatibility: data.sector_compatibility ? String(data.sector_compatibility) : undefined,
-                        cost_price: data.cost_price ? Number(data.cost_price) : undefined,
-                        weight_kg: data.weight_kg ? Number(data.weight_kg) : undefined,
+                        cost_price: parseNumeric(data.cost_price),
+                        weight_kg: parseNumeric(data.weight_kg),
                         material_quality: data.material_quality ? String(data.material_quality) : undefined,
                         production_site: data.production_site ? String(data.production_site) : undefined,
                         use_cases: data.use_cases ? String(data.use_cases) : undefined,
@@ -183,22 +198,27 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: updatedProduct.id });
                     updated++;
                 } else {
+                    // ── New product creation ───────────────────────────────────────
+                    // on_hand IS included here to set the initial inventory level
+                    // for a brand-new product.  Subsequent stock adjustments must
+                    // go through the "stock" entity_type sheet.
+                    // ──────────────────────────────────────────────────────────────
                     const product = await dbCreateProduct({
                         name: String(data.name),
                         sku,
                         category: data.category ? String(data.category) : undefined,
                         unit: String(data.unit),
-                        price: data.price ? Number(data.price) : undefined,
+                        price: parseNumeric(data.price),
                         currency: data.currency ? String(data.currency) : "USD",
-                        on_hand: data.on_hand ? Number(data.on_hand) : undefined,
-                        min_stock_level: data.min_stock_level ? Number(data.min_stock_level) : undefined,
-                        reorder_qty: data.reorder_qty ? Number(data.reorder_qty) : undefined,
+                        on_hand: parseNumeric(data.on_hand),
+                        min_stock_level: parseNumeric(data.min_stock_level),
+                        reorder_qty: parseNumeric(data.reorder_qty),
                         preferred_vendor: data.preferred_vendor ? String(data.preferred_vendor) : undefined,
                         product_family: data.product_family ? String(data.product_family) : undefined,
                         sub_category: data.sub_category ? String(data.sub_category) : undefined,
                         sector_compatibility: data.sector_compatibility ? String(data.sector_compatibility) : undefined,
-                        cost_price: data.cost_price ? Number(data.cost_price) : undefined,
-                        weight_kg: data.weight_kg ? Number(data.weight_kg) : undefined,
+                        cost_price: parseNumeric(data.cost_price),
+                        weight_kg: parseNumeric(data.weight_kg),
                         material_quality: data.material_quality ? String(data.material_quality) : undefined,
                         production_site: data.production_site ? String(data.production_site) : undefined,
                         use_cases: data.use_cases ? String(data.use_cases) : undefined,
@@ -358,14 +378,28 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 added++;
 
             } else if (draft.entity_type === "stock") {
-                if (data.sku && data.on_hand !== undefined) {
-                    const prod = await dbFindProductBySku(String(data.sku));
-                    if (prod) {
-                        // Additive: imported qty is added to existing stock (not overwrite)
-                        const newOnHand = prod.on_hand + Number(data.on_hand);
-                        await dbUpdateProduct(prod.id, { on_hand: newOnHand });
-                    }
+                if (!data.sku) {
+                    errors.push(`Satır ${rowNum}: Ürün kodu (SKU) eksik.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++;
+                    continue;
                 }
+                if (data.on_hand === undefined) {
+                    errors.push(`Satır ${rowNum}: Stok miktarı (on_hand) eksik.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++;
+                    continue;
+                }
+                const prod = await dbFindProductBySku(String(data.sku));
+                if (!prod) {
+                    errors.push(`Satır ${rowNum}: '${data.sku}' kodlu ürün bulunamadı.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++;
+                    continue;
+                }
+                // Additive: imported qty is added to existing stock (not overwrite)
+                const newOnHand = prod.on_hand + Number(data.on_hand);
+                await dbUpdateProduct(prod.id, { on_hand: newOnHand });
                 await dbUpdateDraft(draft.id, { status: "merged" });
                 updated++;
 
