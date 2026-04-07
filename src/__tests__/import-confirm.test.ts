@@ -4,9 +4,11 @@
  * §9.2: Import never creates approved entities.
  * All DB and service dependencies are mocked — no database access in CI.
  *
- * NOTE: Documents a known latent bug — order merge passes lines:[] to serviceCreateOrder,
- * which validates lines.length > 0. This means order drafts always fail validation
- * and land in the errors/skipped counts. The test documents this existing behavior.
+ * Order import architecture: order header drafts are processed first (priority 4) and
+ * created via dbCreateOrder with lines:[] — the header-only approach. order_line drafts
+ * (priority 5) are processed afterward and appended to the order. This avoids the
+ * lines.length > 0 validation in serviceCreateOrder, which is intentionally bypassed
+ * for the import path.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ImportDraftRow, ImportBatchRow } from "@/lib/database.types";
@@ -25,7 +27,6 @@ const mockDbSaveEntityAlias = vi.fn();
 const mockDbCreateProduct = vi.fn();
 const mockDbFindProductBySku = vi.fn();
 const mockDbUpdateProduct = vi.fn();
-const mockServiceCreateOrder = vi.fn(); // kept to prevent unused-import TS errors in vi.mock below
 const mockDbCreateOrder = vi.fn();
 const mockDbUpdateCustomer = vi.fn();
 const mockDbCreateQuote = vi.fn();
@@ -61,9 +62,6 @@ vi.mock("@/lib/supabase/products", () => ({
     dbCreateProduct: (...args: unknown[]) => mockDbCreateProduct(...args),
     dbFindProductBySku: (...args: unknown[]) => mockDbFindProductBySku(...args),
     dbUpdateProduct: (...args: unknown[]) => mockDbUpdateProduct(...args),
-}));
-vi.mock("@/lib/services/order-service", () => ({
-    serviceCreateOrder: (...args: unknown[]) => mockServiceCreateOrder(...args),
 }));
 vi.mock("@/lib/supabase/quotes", () => ({
     dbCreateQuote: (...args: unknown[]) => mockDbCreateQuote(...args),
