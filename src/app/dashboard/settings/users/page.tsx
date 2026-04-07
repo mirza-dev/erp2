@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
-import { isDemoMode } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { createClient } from "@/lib/supabase/client";
 
 interface User {
@@ -46,6 +46,7 @@ function formatDate(iso: string | null) {
 
 export default function UsersPage() {
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -83,7 +84,7 @@ export default function UsersPage() {
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setSubmitting(true);
         try {
             const res = await fetch("/api/admin/users", {
@@ -109,7 +110,7 @@ export default function UsersPage() {
     };
 
     const handleDelete = async (user: User) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (user.email === currentEmail) {
             toast({ type: "error", message: "Kendi hesabınızı silemezsiniz." });
             return;
@@ -146,6 +147,8 @@ export default function UsersPage() {
                 </div>
                 <button
                     onClick={() => setShowForm(prev => !prev)}
+                    disabled={isDemo}
+                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                     style={{
                         padding: "7px 14px",
                         fontSize: "13px",
@@ -154,7 +157,8 @@ export default function UsersPage() {
                         background: "var(--accent)",
                         border: "none",
                         borderRadius: "7px",
-                        cursor: "pointer",
+                        cursor: isDemo ? "not-allowed" : "pointer",
+                        opacity: isDemo ? 0.5 : 1,
                     }}
                 >
                     {showForm ? "İptal" : "Kullanıcı Ekle"}
@@ -326,7 +330,8 @@ export default function UsersPage() {
                                         >
                                             <button
                                                 onClick={() => handleDelete(user)}
-                                                disabled={isSelf || deletingId === user.id}
+                                                disabled={isDemo || isSelf || deletingId === user.id}
+                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                                 style={{
                                                     padding: "4px 10px",
                                                     fontSize: "12px",
@@ -334,8 +339,8 @@ export default function UsersPage() {
                                                     background: "transparent",
                                                     border: `0.5px solid ${isSelf ? "var(--border-tertiary)" : "var(--danger-border)"}`,
                                                     borderRadius: "5px",
-                                                    cursor: isSelf ? "not-allowed" : "pointer",
-                                                    opacity: deletingId === user.id ? 0.5 : 1,
+                                                    cursor: isDemo || isSelf ? "not-allowed" : "pointer",
+                                                    opacity: isDemo || deletingId === user.id ? 0.5 : 1,
                                                 }}
                                             >
                                                 {deletingId === user.id ? "Siliniyor..." : "Sil"}

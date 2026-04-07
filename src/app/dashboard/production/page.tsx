@@ -5,6 +5,7 @@ import { useData } from "@/lib/data-context";
 import { formatNumber } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 
 interface FormLine {
     id: string;
@@ -58,6 +59,7 @@ const tdStyle: React.CSSProperties = {
 export default function ProductionPage() {
     const { products, uretimKayitlari, addUretimKaydi, deleteUretimKaydi, loadError } = useData();
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [tarih, setTarih] = useState(today());
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
     const [isSaving, setIsSaving] = useState(false);
@@ -79,6 +81,7 @@ export default function ProductionPage() {
     };
 
     const handleSave = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const valid = lines.filter(l => l.productId && parseInt(l.adet) > 0);
         if (valid.length === 0) {
             toast({ type: "error", message: "Lütfen en az bir ürün seçin ve adet girin" });
@@ -305,7 +308,7 @@ export default function ProductionPage() {
                         + Kalem Ekle
                     </button>
 
-                    <Button variant="primary" size="md" onClick={handleSave} disabled={!canSave || isSaving} loading={isSaving}>
+                    <Button variant="primary" size="md" onClick={handleSave} disabled={isDemo || !canSave || isSaving} loading={isSaving} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                         {isSaving ? "Kaydediliyor..." : "Kaydet & Stoğu Güncelle"}
                     </Button>
                 </div>
@@ -365,6 +368,7 @@ export default function ProductionPage() {
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
                                             onClick={async () => {
+                                                if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
                                                 if (deletingId === kaydi.id) return;
                                                 setDeletingId(kaydi.id);
                                                 try {
@@ -377,8 +381,8 @@ export default function ProductionPage() {
                                                     setDeletingId(null);
                                                 }
                                             }}
-                                            disabled={deletingId === kaydi.id}
-                                            title="Kaydı sil (stok geri alınır)"
+                                            disabled={isDemo || deletingId === kaydi.id}
+                                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Kaydı sil (stok geri alınır)"}
                                             style={{
                                                 fontSize: "14px",
                                                 color: "var(--danger-text)",

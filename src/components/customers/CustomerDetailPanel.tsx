@@ -6,6 +6,8 @@ import Link from "next/link";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Customer } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
+import { useToast } from "@/components/ui/Toast";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 
 interface CustomerDetailPanelProps {
     customer: Customer | null;
@@ -51,6 +53,8 @@ export default function CustomerDetailPanel({
 }: CustomerDetailPanelProps) {
     const router = useRouter();
     const { orders, updateCustomer } = useData();
+    const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [editMode, setEditMode] = useState(false);
     const [editSaved, setEditSaved] = useState(false);
     const [editSaving, setEditSaving] = useState(false);
@@ -77,6 +81,7 @@ export default function CustomerDetailPanel({
     };
 
     const handleSave = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!editForm) return;
         if (!editForm.name.trim()) {
             setEditError("Firma adı boş olamaz.");
@@ -253,7 +258,8 @@ export default function CustomerDetailPanel({
                         <div style={{ display: "flex", gap: "8px", marginTop: "4px", alignItems: "center" }}>
                             <button
                                 onClick={handleSave}
-                                disabled={editSaving || editSaved}
+                                disabled={isDemo || editSaving || editSaved}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                 style={{
                                     flex: 1,
                                     fontSize: "12px",
@@ -262,8 +268,8 @@ export default function CustomerDetailPanel({
                                     borderRadius: "6px",
                                     background: "var(--accent-bg)",
                                     color: "var(--accent-text)",
-                                    cursor: editSaving || editSaved ? "default" : "pointer",
-                                    opacity: editSaving ? 0.6 : 1,
+                                    cursor: isDemo || editSaving || editSaved ? "default" : "pointer",
+                                    opacity: isDemo || editSaving ? 0.6 : 1,
                                 }}
                             >
                                 {editSaved ? "✓ Kaydedildi" : editSaving ? "Kaydediliyor..." : "Kaydet"}
@@ -420,7 +426,9 @@ export default function CustomerDetailPanel({
                                 Yeni Sipariş
                             </button>
                             <button
-                                onClick={openEdit}
+                                onClick={() => !isDemo && openEdit()}
+                                disabled={isDemo}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                 style={{
                                     flex: 1,
                                     fontSize: "12px",
@@ -429,7 +437,8 @@ export default function CustomerDetailPanel({
                                     borderRadius: "6px",
                                     background: "transparent",
                                     color: "var(--text-secondary)",
-                                    cursor: "pointer",
+                                    cursor: isDemo ? "not-allowed" : "pointer",
+                                    opacity: isDemo ? 0.5 : 1,
                                 }}
                             >
                                 Düzenle

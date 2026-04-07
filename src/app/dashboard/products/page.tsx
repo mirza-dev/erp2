@@ -6,7 +6,7 @@ import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
-import { isDemoMode } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 
 const categories = [
     "Tümü",
@@ -150,6 +150,7 @@ function FormField({ label, required, children }: { label: string; required?: bo
 export default function ProductsPage() {
     const { products: mockProducts, addProduct, deleteProduct, loadError } = useData();
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [search, setSearch] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -284,6 +285,7 @@ export default function ProductsPage() {
     const oneriCount = mockProducts.filter(p => recMap.get(p.id)?.status === "suggested").length;
 
     const handleDelete = async (id: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setDeletingId(id);
         try {
             await deleteProduct(id);
@@ -298,6 +300,7 @@ export default function ProductsPage() {
     };
 
     const handleCreate = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!createForm.name.trim() || !createForm.sku.trim()) return;
         setCreateSubmitting(true);
         try {
@@ -320,7 +323,7 @@ export default function ProductsPage() {
     };
 
     const handleAccept = async (productId: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const rec = recMap.get(productId);
         if (!rec || rec.status !== "suggested") return;
         try {
@@ -340,7 +343,7 @@ export default function ProductsPage() {
     };
 
     const handleReject = async (productId: string, feedbackNote?: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const rec = recMap.get(productId);
         if (!rec || rec.status !== "suggested") return;
         try {
@@ -421,7 +424,7 @@ export default function ProductsPage() {
                             width: isMobile ? "140px" : "200px",
                         }}
                     />
-                    <Button variant="primary" onClick={() => setCreateOpen(true)}>+ Yeni Ürün</Button>
+                    <Button variant="primary" onClick={() => setCreateOpen(true)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
                 </div>
             </div>
 
@@ -697,7 +700,9 @@ export default function ProductsPage() {
                                             </span>
                                         ) : (
                                             <button
-                                                onClick={() => setConfirmDeleteId(product.id)}
+                                                onClick={() => !isDemo && setConfirmDeleteId(product.id)}
+                                                disabled={isDemo}
+                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                                 style={{
                                                     fontSize: "11px",
                                                     padding: "2px 8px",
@@ -705,13 +710,16 @@ export default function ProductsPage() {
                                                     borderRadius: "4px",
                                                     background: "transparent",
                                                     color: "var(--text-tertiary)",
-                                                    cursor: "pointer",
+                                                    cursor: isDemo ? "not-allowed" : "pointer",
+                                                    opacity: isDemo ? 0.5 : 1,
                                                 }}
                                                 onMouseEnter={e => {
+                                                    if (isDemo) return;
                                                     e.currentTarget.style.borderColor = "var(--danger-border)";
                                                     e.currentTarget.style.color = "var(--danger-text)";
                                                 }}
                                                 onMouseLeave={e => {
+                                                    if (isDemo) return;
                                                     e.currentTarget.style.borderColor = "var(--border-secondary)";
                                                     e.currentTarget.style.color = "var(--text-tertiary)";
                                                 }}
@@ -1024,7 +1032,7 @@ export default function ProductsPage() {
                                                                 }}
                                                             />
                                                             <div style={{ display: "flex", gap: "6px" }}>
-                                                                <Button variant="danger" onClick={() => {
+                                                                <Button variant="danger" disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined} onClick={() => {
                                                                     handleReject(selectedProductId!, rejectNote || undefined);
                                                                     setRejectMode(false);
                                                                     setRejectNote("");
@@ -1037,8 +1045,8 @@ export default function ProductsPage() {
                                                         </div>
                                                     ) : (
                                                         <div style={{ display: "flex", gap: "6px" }}>
-                                                            <Button variant="primary" onClick={() => handleAccept(selectedProductId!)}>Kabul Et</Button>
-                                                            <Button variant="secondary" onClick={() => setRejectMode(true)}>Reddet</Button>
+                                                            <Button variant="primary" disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined} onClick={() => handleAccept(selectedProductId!)}>Kabul Et</Button>
+                                                            <Button variant="secondary" disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined} onClick={() => setRejectMode(true)}>Reddet</Button>
                                                         </div>
                                                     )
                                                 ) : (
@@ -1416,7 +1424,8 @@ export default function ProductsPage() {
                                 variant="primary"
                                 loading={createSubmitting}
                                 onClick={handleCreate}
-                                disabled={!createForm.name.trim() || !createForm.sku.trim() || createSubmitting}
+                                disabled={isDemo || !createForm.name.trim() || !createForm.sku.trim() || createSubmitting}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             >
                                 {createSubmitting ? "Kaydediliyor…" : "Ürün Oluştur"}
                             </Button>

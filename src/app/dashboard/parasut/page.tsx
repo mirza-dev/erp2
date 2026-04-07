@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/components/ui/Toast";
-import { isDemoMode } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types";
 
 type SyncStatus = "idle" | "syncing" | "done";
@@ -49,6 +49,7 @@ const tdStyle: React.CSSProperties = {
 
 export default function ParasutPage() {
     const { toast } = useToast();
+    const isDemo = useIsDemo();
 
     const [config, setConfig] = useState<ParasutConfig | null>(null);
     // connection is derived from server-side config — never set locally
@@ -94,7 +95,7 @@ export default function ParasutPage() {
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
     const runSync = async () => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (syncStatus === "syncing") return;
         setSyncStatus("syncing");
         setSyncStep(1);
@@ -134,7 +135,7 @@ export default function ParasutPage() {
     };
 
     const retrySync = async (logId: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (retryingId) return;
         setRetryingId(logId);
         try {
@@ -190,7 +191,8 @@ export default function ParasutPage() {
                 <div style={{ display: "flex", gap: "8px" }}>
                     <button
                         onClick={runSync}
-                        disabled={syncStatus === "syncing" || connection === "disconnected"}
+                        disabled={isDemo || syncStatus === "syncing" || connection === "disconnected"}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                         style={{
                             fontSize: "12px",
                             padding: "6px 14px",
@@ -198,8 +200,8 @@ export default function ParasutPage() {
                             borderRadius: "6px",
                             background: syncStatus === "syncing" ? "var(--bg-tertiary)" : "var(--accent-bg)",
                             color: syncStatus === "syncing" ? "var(--text-tertiary)" : "var(--accent-text)",
-                            cursor: syncStatus === "syncing" || connection === "disconnected" ? "not-allowed" : "pointer",
-                            opacity: connection === "disconnected" ? 0.5 : 1,
+                            cursor: isDemo || syncStatus === "syncing" || connection === "disconnected" ? "not-allowed" : "pointer",
+                            opacity: isDemo || connection === "disconnected" ? 0.5 : 1,
                         }}
                     >
                         {syncStatus === "syncing" ? "Sync ediliyor..." : "▶ Manuel Sync"}
@@ -346,7 +348,8 @@ export default function ParasutPage() {
                                 </div>
                                 <button
                                     onClick={runSync}
-                                    disabled={syncStatus === "syncing" || connection === "disconnected"}
+                                    disabled={isDemo || syncStatus === "syncing" || connection === "disconnected"}
+                                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                     style={{
                                         fontSize: "10px",
                                         padding: "2px 7px",
@@ -354,8 +357,8 @@ export default function ParasutPage() {
                                         borderRadius: "4px",
                                         background: "transparent",
                                         color: "var(--text-tertiary)",
-                                        cursor: syncStatus === "syncing" || connection === "disconnected" ? "not-allowed" : "pointer",
-                                        opacity: syncStatus === "syncing" || connection === "disconnected" ? 0.4 : 1,
+                                        cursor: isDemo || syncStatus === "syncing" || connection === "disconnected" ? "not-allowed" : "pointer",
+                                        opacity: isDemo || syncStatus === "syncing" || connection === "disconnected" ? 0.4 : 1,
                                     }}
                                 >
                                     Sync Et
@@ -536,7 +539,8 @@ export default function ParasutPage() {
                                                     ) : (
                                                         <button
                                                             onClick={() => retrySync(log.id)}
-                                                            disabled={retryingId === log.id}
+                                                            disabled={isDemo || retryingId === log.id}
+                                                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                                             style={{
                                                                 fontSize: "11px",
                                                                 padding: "3px 8px",
@@ -544,8 +548,8 @@ export default function ParasutPage() {
                                                                 borderRadius: "4px",
                                                                 background: "var(--warning-bg)",
                                                                 color: "var(--warning-text)",
-                                                                cursor: retryingId === log.id ? "not-allowed" : "pointer",
-                                                                opacity: retryingId === log.id ? 0.5 : 1,
+                                                                cursor: isDemo || retryingId === log.id ? "not-allowed" : "pointer",
+                                                                opacity: isDemo || retryingId === log.id ? 0.5 : 1,
                                                             }}
                                                         >
                                                             {retryingId === log.id ? "..." : `↻ Dene (${log.retry_count ?? 0}/3)`}

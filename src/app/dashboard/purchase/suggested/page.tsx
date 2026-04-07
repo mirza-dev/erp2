@@ -6,7 +6,7 @@ import { computeCoverageDays, computeTargetStock, daysColor, daysBg } from "@/li
 import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { useToast } from "@/components/ui/Toast";
-import { isDemoMode } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -261,6 +261,7 @@ function RecActionCell({
     onAccept,
     onReject,
     onEdit,
+    isDemo,
 }: {
     productId: string;
     recEntry: RecEntry | undefined;
@@ -269,6 +270,7 @@ function RecActionCell({
     onAccept: (productId: string) => void;
     onReject: (productId: string, feedbackNote?: string) => void;
     onEdit: (productId: string, qty: number, unit: string) => void;
+    isDemo?: boolean;
 }) {
     const [editMode, setEditMode] = useState(false);
     const [editQty, setEditQty] = useState(suggestQty);
@@ -423,30 +425,39 @@ function RecActionCell({
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             <button
                 onClick={() => onAccept(productId)}
+                disabled={isDemo}
+                title={isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın." : undefined}
                 style={{
                     fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
                     background: "var(--success-bg)", color: "var(--success-text)",
-                    border: "0.5px solid var(--success-border)", cursor: "pointer",
+                    border: "0.5px solid var(--success-border)", cursor: isDemo ? "not-allowed" : "pointer",
+                    opacity: isDemo ? 0.5 : 1,
                 }}
             >
                 Kabul Et
             </button>
             <button
                 onClick={() => { setEditQty(suggestQty); setEditMode(true); }}
+                disabled={isDemo}
+                title={isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın." : undefined}
                 style={{
                     fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
                     background: "var(--accent-bg)", color: "var(--accent-text)",
-                    border: "0.5px solid var(--accent-border)", cursor: "pointer",
+                    border: "0.5px solid var(--accent-border)", cursor: isDemo ? "not-allowed" : "pointer",
+                    opacity: isDemo ? 0.5 : 1,
                 }}
             >
                 Düzenle
             </button>
             <button
                 onClick={() => { setRejectNote(""); setRejectMode(true); }}
+                disabled={isDemo}
+                title={isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın." : undefined}
                 style={{
                     fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
                     background: "transparent", color: "var(--text-tertiary)",
-                    border: "0.5px solid var(--border-secondary)", cursor: "pointer",
+                    border: "0.5px solid var(--border-secondary)", cursor: isDemo ? "not-allowed" : "pointer",
+                    opacity: isDemo ? 0.5 : 1,
                 }}
             >
                 Reddet
@@ -461,6 +472,7 @@ export default function PurchaseSuggestedPage() {
     const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>("all");
     const isMobile = useIsMobile();
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [aiData, setAiData] = useState<{
         ai_available: boolean;
         items: AiEnrichmentItem[];
@@ -518,7 +530,7 @@ export default function PurchaseSuggestedPage() {
     }, [aiData]);
 
     const handleAccept = async (productId: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
@@ -544,7 +556,7 @@ export default function PurchaseSuggestedPage() {
     };
 
     const handleReject = async (productId: string, feedbackNote?: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
@@ -573,7 +585,7 @@ export default function PurchaseSuggestedPage() {
     };
 
     const handleEdit = async (productId: string, qty: number, unit: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
@@ -1350,6 +1362,7 @@ export default function PurchaseSuggestedPage() {
                                     onAccept={handleAccept}
                                     onReject={handleReject}
                                     onEdit={handleEdit}
+                                    isDemo={isDemo}
                                 />
                             </div>
                         )}

@@ -1,16 +1,15 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-05_
+_Son güncelleme: 2026-04-07_
 
-**Son tamamlanan iş:** Demo mode credential/PII güvenliği (commit 99bbc55)
-- `/api/parasut/config` → demo kullanıcıya credential gösterilmiyor (null döner)
-- `/api/settings/api-keys-status` → demo kullanıcıya entegrasyon bilgisi gizli (hepsi false)
-- `settings/page.tsx` → PII bundle'dan çıkarıldı, Firma/Kullanıcı tabları demo'da placeholder gösteriyor
+**Son tamamlanan iş:** Demo mode UX + import service hardening
+- Demo mode: 12 sayfada mutation button'ları disabled+tooltip+toast; `demoGuard()` artık redirect etmiyor
+- Import service: stock sayaç hatası, `parseNumeric()` ile 0-değer kaybı, product contract testleri (9 yeni)
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** —
-**Test sayısı:** 45 dosya · 1059 test
+**Test sayısı:** 46 dosya · 1080 test
 
 ---
 

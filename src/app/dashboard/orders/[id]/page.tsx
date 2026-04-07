@@ -9,7 +9,7 @@ import { mapOrderDetail } from "@/lib/api-mappers";
 import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
-import { isDemoMode } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string; description: string }> = {
@@ -66,6 +66,7 @@ export default function OrderDetailPage() {
     const router = useRouter();
     const { updateOrderStatus } = useData();
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [order, setOrder] = useState<OrderDetail | null>(null);
     const [orderLoading, setOrderLoading] = useState(true);
     const [rescoring, setRescoring] = useState(false);
@@ -201,6 +202,7 @@ export default function OrderDetailPage() {
     }
 
     const handleTransition = async (next: CommercialStatus | "shipped") => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setLoading(next);
         try {
             if (next === "shipped") {
@@ -309,7 +311,7 @@ export default function OrderDetailPage() {
     };
 
     const handleHardDelete = async () => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setHardDeleteLoading(true);
         try {
             const res = await fetch(`/api/orders/${order.id}?permanent=1`, { method: "DELETE" });
@@ -406,38 +408,42 @@ export default function OrderDetailPage() {
                             <>
                                 <button
                                     onClick={() => setHardDeleteOpen(true)}
+                                    disabled={isDemo}
+                                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                     style={{
                                         fontSize: "11px", padding: "5px 10px",
                                         borderRadius: "5px", border: "1px solid var(--danger-border)",
-                                        background: "transparent", color: "var(--danger-text)", cursor: "pointer",
+                                        background: "transparent", color: "var(--danger-text)",
+                                        cursor: isDemo ? "not-allowed" : "pointer",
+                                        opacity: isDemo ? 0.5 : 1,
                                     }}
                                 >
                                     Kalıcı Sil
                                 </button>
-                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={loading !== null} loading={loading === "cancelled"}>
+                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => handleTransition("pending_approval")} disabled={loading !== null} loading={loading === "pending_approval"}>
+                                <Button variant="primary" onClick={() => handleTransition("pending_approval")} disabled={isDemo || loading !== null} loading={loading === "pending_approval"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     {loading === "pending_approval" ? "Gönderiliyor..." : "Onaya Gönder"}
                                 </Button>
                             </>
                         )}
                         {commercialStatus === "pending_approval" && (
                             <>
-                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={loading !== null} loading={loading === "cancelled"}>
+                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => requestTransition("approved")} disabled={loading !== null} loading={loading === "approved"}>
+                                <Button variant="primary" onClick={() => requestTransition("approved")} disabled={isDemo || loading !== null} loading={loading === "approved"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     {loading === "approved" ? "Kontrol ediliyor..." : "Onayla"}
                                 </Button>
                             </>
                         )}
                         {commercialStatus === "approved" && fulfillmentStatus === "allocated" && (
                             <>
-                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={loading !== null} loading={loading === "cancelled"}>
+                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => handleTransition("shipped")} disabled={loading !== null} loading={loading === "shipped"}>
+                                <Button variant="primary" onClick={() => handleTransition("shipped")} disabled={isDemo || loading !== null} loading={loading === "shipped"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     {loading === "shipped" ? "Paraşüt'e gönderiliyor..." : "Sevket"}
                                 </Button>
                             </>
@@ -447,10 +453,14 @@ export default function OrderDetailPage() {
                                 {commercialStatus === "cancelled" && (
                                     <button
                                         onClick={() => setHardDeleteOpen(true)}
+                                        disabled={isDemo}
+                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                         style={{
                                             fontSize: "11px", padding: "5px 10px",
                                             borderRadius: "5px", border: "1px solid var(--danger-border)",
-                                            background: "transparent", color: "var(--danger-text)", cursor: "pointer",
+                                            background: "transparent", color: "var(--danger-text)",
+                                            cursor: isDemo ? "not-allowed" : "pointer",
+                                            opacity: isDemo ? 0.5 : 1,
                                         }}
                                     >
                                         Kalıcı Sil

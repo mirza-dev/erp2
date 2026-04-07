@@ -27,7 +27,7 @@ import {
 } from "./api-mappers";
 
 import type { CreateOrderInput } from "./supabase/orders";
-import { isDemoMode as checkDemoMode, clearDemoMode } from "./demo-utils";
+import { isDemoMode as checkDemoMode } from "./demo-utils";
 
 // ── Pure helpers (exported for testing) ────────────────────
 // Mirrors data-context-error.test.ts pattern: extract pure logic, test directly.
@@ -142,14 +142,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // ── Demo guard — redirects to login if in demo mode ──────
+  // ── Demo guard — blocks mutation if in demo mode ─────────
+  // Does NOT clear the cookie or redirect; page-level handlers surface the
+  // toast feedback. Server middleware is the real security gate (403).
   const demoGuard = useCallback((): boolean => {
-    if (checkDemoMode()) {
-      clearDemoMode();
-      window.location.href = "/login";
-      return true;
-    }
-    return false;
+    return checkDemoMode();
   }, []);
 
   // ── Fetch all lists from API ─────────────────────────────

@@ -4,7 +4,8 @@ import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
 import * as XLSX from "xlsx";
-import { isDemoMode } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { useToast } from "@/components/ui/Toast";
 
 type ImportState = "idle" | "analyzing" | "sheet_select" | "parsing" | "preview" | "importing" | "done";
 
@@ -84,6 +85,8 @@ function confidenceLabel(c: number): string {
 
 export default function ImportPage() {
     const { refetchAll } = useData();
+    const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [state, setState] = useState<ImportState>("idle");
     const [fileName, setFileName] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
@@ -192,7 +195,7 @@ export default function ImportPage() {
 
     // ─── AI Parse step ────────────────────────────────────────────────
     const handleParse = async () => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setState("parsing");
         setProgress(0);
         setProgressLabel("AI analiz başlatılıyor...");
@@ -289,7 +292,7 @@ export default function ImportPage() {
 
     // ─── Import (confirm) step ────────────────────────────────────────
     const handleImport = async () => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!batchId) return;
         setState("importing");
 
@@ -695,13 +698,14 @@ export default function ImportPage() {
                         }}>← Geri</button>
                         <button
                             onClick={handleParse}
-                            disabled={importableSelected.length === 0}
+                            disabled={isDemo || importableSelected.length === 0}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             style={{
                                 fontSize: "12px", padding: "7px 18px",
                                 border: "0.5px solid var(--accent-border)", borderRadius: "6px",
-                                background: importableSelected.length > 0 ? "var(--accent-bg)" : "var(--bg-tertiary)",
-                                color: importableSelected.length > 0 ? "var(--accent-text)" : "var(--text-tertiary)",
-                                cursor: importableSelected.length > 0 ? "pointer" : "not-allowed", fontWeight: 600,
+                                background: (!isDemo && importableSelected.length > 0) ? "var(--accent-bg)" : "var(--bg-tertiary)",
+                                color: (!isDemo && importableSelected.length > 0) ? "var(--accent-text)" : "var(--text-tertiary)",
+                                cursor: (!isDemo && importableSelected.length > 0) ? "pointer" : "not-allowed", fontWeight: 600,
                             }}
                         >
                             AI Analiz Başlat →
@@ -910,12 +914,19 @@ export default function ImportPage() {
                             border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
                             background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
                         }}>← Geri</button>
-                        <button onClick={handleImport} style={{
-                            fontSize: "12px", padding: "7px 18px",
-                            border: "0.5px solid var(--accent-border)", borderRadius: "6px",
-                            background: "var(--accent-bg)", color: "var(--accent-text)",
-                            cursor: "pointer", fontWeight: 600,
-                        }}>
+                        <button
+                            onClick={handleImport}
+                            disabled={isDemo}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                            style={{
+                                fontSize: "12px", padding: "7px 18px",
+                                border: "0.5px solid var(--accent-border)", borderRadius: "6px",
+                                background: isDemo ? "var(--bg-tertiary)" : "var(--accent-bg)",
+                                color: isDemo ? "var(--text-tertiary)" : "var(--accent-text)",
+                                cursor: isDemo ? "not-allowed" : "pointer", fontWeight: 600,
+                                opacity: isDemo ? 0.5 : 1,
+                            }}
+                        >
                             Onayla ve İçe Aktar →
                         </button>
                     </div>

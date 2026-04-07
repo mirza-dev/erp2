@@ -8,6 +8,7 @@ import { type Customer, type Product, type OrderLineItem } from "@/lib/mock-data
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 
 interface OrderLine {
     id: string;
@@ -47,6 +48,7 @@ const inputStyle: React.CSSProperties = {
 function NewOrderForm() {
     const { customers, products, addOrder } = useData();
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const searchParams = useSearchParams();
     const router = useRouter();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -142,6 +144,7 @@ function NewOrderForm() {
     const disabledReasonText = blockReasons.join(" · ");
 
     const buildAndSave = async (mode: "draft" | "pending_approval") => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setSubmitAttempted(true);
         if (!canSubmit) return;
         setIsSubmitting(true);
@@ -222,10 +225,10 @@ function NewOrderForm() {
                 {!isMobile && (
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
                         <div style={{ display: "flex", gap: "8px" }}>
-                            <Button variant="secondary" loading={isSubmitting} onClick={() => buildAndSave("draft")}>
+                            <Button variant="secondary" loading={isSubmitting} onClick={() => buildAndSave("draft")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                 {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
                             </Button>
-                            <Button variant="primary" loading={isSubmitting} onClick={() => buildAndSave("pending_approval")}>
+                            <Button variant="primary" loading={isSubmitting} onClick={() => buildAndSave("pending_approval")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                 {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
                             </Button>
                         </div>
@@ -663,10 +666,10 @@ function NewOrderForm() {
 
                         {/* Actions */}
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "12px" }}>
-                            <Button variant="primary" size="md" fullWidth loading={isSubmitting} onClick={() => buildAndSave("pending_approval")}>
+                            <Button variant="primary" size="md" fullWidth loading={isSubmitting} onClick={() => buildAndSave("pending_approval")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                 {isSubmitting ? "Gönderiliyor…" : "Siparişi Oluştur ve Gönder"}
                             </Button>
-                            <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("draft")}>
+                            <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("draft")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                 {isSubmitting ? "Kaydediliyor…" : "Taslak Olarak Kaydet"}
                             </Button>
                             {submitAttempted && !canSubmit && !isSubmitting && (
@@ -697,10 +700,10 @@ function NewOrderForm() {
                     }}
                 >
                     <div style={{ display: "flex", gap: "8px" }}>
-                        <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("draft")}>
+                        <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("draft")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                             {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
                         </Button>
-                        <Button variant="primary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("pending_approval")}>
+                        <Button variant="primary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("pending_approval")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                             {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
                         </Button>
                     </div>

@@ -7,6 +7,7 @@ import { useData } from "@/lib/data-context";
 import CustomerDetailPanel from "@/components/customers/CustomerDetailPanel";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -52,6 +53,7 @@ const modalLabelStyle: React.CSSProperties = {
 export default function CustomersPage() {
     const { customers: mockCustomers, addCustomer, deleteCustomer, loadError } = useData();
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [search, setSearch] = useState("");
     const [activeFilter, setActiveFilter] = useState<"all" | "active" | "passive">("all");
@@ -66,6 +68,7 @@ export default function CustomersPage() {
             setNewCustomer(f => ({ ...f, [key]: e.target.value }));
 
     const handleDelete = async (id: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setDeletingId(id);
         try {
             await deleteCustomer(id);
@@ -81,6 +84,7 @@ export default function CustomersPage() {
     };
 
     const handleAdd = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!newCustomer.name || isAdding) return;
         setIsAdding(true);
         try {
@@ -152,7 +156,7 @@ export default function CustomersPage() {
                                 outline: "none",
                             }}
                         />
-                        <Button variant="primary" onClick={() => setShowAddModal(true)}>
+                        <Button variant="primary" onClick={() => setShowAddModal(true)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                             + Yeni Müşteri
                         </Button>
                     </div>
@@ -327,6 +331,8 @@ export default function CustomersPage() {
                                         ) : (
                                             <button
                                                 onClick={() => setConfirmDeleteId(customer.id)}
+                                                disabled={isDemo}
+                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                                 style={{
                                                     fontSize: "11px",
                                                     padding: "2px 8px",
@@ -334,13 +340,16 @@ export default function CustomersPage() {
                                                     borderRadius: "4px",
                                                     background: "transparent",
                                                     color: "var(--text-tertiary)",
-                                                    cursor: "pointer",
+                                                    cursor: isDemo ? "not-allowed" : "pointer",
+                                                    opacity: isDemo ? 0.5 : 1,
                                                 }}
                                                 onMouseEnter={e => {
+                                                    if (isDemo) return;
                                                     e.currentTarget.style.borderColor = "var(--danger-border)";
                                                     e.currentTarget.style.color = "var(--danger-text)";
                                                 }}
                                                 onMouseLeave={e => {
+                                                    if (isDemo) return;
                                                     e.currentTarget.style.borderColor = "var(--border-secondary)";
                                                     e.currentTarget.style.color = "var(--text-tertiary)";
                                                 }}
@@ -481,7 +490,7 @@ export default function CustomersPage() {
                                 borderTop: "0.5px solid var(--border-tertiary)",
                             }}
                         >
-                            <Button variant="primary" size="md" onClick={handleAdd} disabled={!newCustomer.name || isAdding}>
+                            <Button variant="primary" size="md" onClick={handleAdd} disabled={isDemo || !newCustomer.name || isAdding} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                 {isAdding ? "Kaydediliyor…" : "Müşteriyi Kaydet"}
                             </Button>
                             <Button variant="secondary" size="md" onClick={() => setShowAddModal(false)}>

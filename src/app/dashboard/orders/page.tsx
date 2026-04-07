@@ -9,7 +9,7 @@ import type { CommercialStatus, FulfillmentStatus } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
-import { isDemoMode } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral" },
@@ -67,6 +67,7 @@ function OrdersList() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const [search, setSearch] = useState("");
     const [customerIdFilter, setCustomerIdFilter] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
@@ -76,7 +77,7 @@ function OrdersList() {
 
     const handleDelete = async (e: React.MouseEvent, orderId: string) => {
         e.stopPropagation();
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (confirmId !== orderId) {
             setConfirmId(orderId);
             return;
@@ -333,10 +334,11 @@ function OrdersList() {
                                                     <button
                                                         data-delete=""
                                                         onClick={(e) => handleDelete(e, order.id)}
-                                                        disabled={deletingId === order.id}
+                                                        disabled={isDemo || deletingId === order.id}
+                                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                                         style={{
                                                             opacity: 0, background: "transparent", border: "none",
-                                                            cursor: "pointer", color: "var(--text-tertiary)",
+                                                            cursor: isDemo ? "not-allowed" : "pointer", color: "var(--text-tertiary)",
                                                             padding: "2px 4px", borderRadius: "3px",
                                                             display: "flex", alignItems: "center",
                                                             transition: "opacity 0.1s, color 0.1s",

@@ -8,7 +8,7 @@ import { computeCoverageDays, daysColor } from "@/lib/stock-utils";
 import { EmptyState, LoadingState } from "@/components/ui/StateViews";
 import type { AlertRow } from "@/lib/database.types";
 import { extractShortageQty, shortReason, shortImpact } from "@/lib/alert-ui-helpers";
-import { isDemoMode } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -88,6 +88,7 @@ function useIsMobile(breakpoint = 768): boolean {
 
 export default function AlertsPage() {
     const { toast } = useToast();
+    const isDemo = useIsDemo();
     const { products } = useData();
     const isMobile = useIsMobile();
 
@@ -178,7 +179,7 @@ export default function AlertsPage() {
 
     // ── Actions ──
     const handleRefresh = async () => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (refreshing) return;
         setRefreshing(true);
         try {
@@ -198,7 +199,7 @@ export default function AlertsPage() {
     };
 
     const handleAiSuggest = async () => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (aiGenerating) return;
         setAiGenerating(true);
         try {
@@ -222,7 +223,7 @@ export default function AlertsPage() {
     };
 
     const resolveAlert = async (alertId: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         try {
             const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",
@@ -241,7 +242,7 @@ export default function AlertsPage() {
     };
 
     const dismissGroup = async (group: ProductAlertGroup) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const open = group.alerts.filter((a) => a.status === "open" || a.status === "acknowledged");
         if (open.length === 0) return;
 
@@ -282,7 +283,7 @@ export default function AlertsPage() {
     };
 
     const dismissAlert = async (alertId: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         try {
             const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",
@@ -303,7 +304,7 @@ export default function AlertsPage() {
     };
 
     const acknowledgeAlert = async (alertId: string) => {
-        if (isDemoMode()) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         try {
             const res = await fetch(`/api/alerts/${alertId}`, {
                 method: "PATCH",
@@ -347,26 +348,28 @@ export default function AlertsPage() {
                 <div style={{ display: "flex", gap: "6px" }}>
                     <button
                         onClick={handleAiSuggest}
-                        disabled={aiGenerating}
+                        disabled={isDemo || aiGenerating}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                         style={{
                             fontSize: "12px", padding: "6px 12px",
                             border: "0.5px solid var(--accent-border)",
                             borderRadius: "5px", background: "var(--accent-bg)",
-                            color: "var(--accent-text)", cursor: aiGenerating ? "not-allowed" : "pointer",
-                            opacity: aiGenerating ? 0.6 : 1, fontWeight: 500,
+                            color: "var(--accent-text)", cursor: isDemo || aiGenerating ? "not-allowed" : "pointer",
+                            opacity: isDemo || aiGenerating ? 0.6 : 1, fontWeight: 500,
                         }}
                     >
                         {aiGenerating ? "Analiz..." : "✦ AI Analiz"}
                     </button>
                     <button
                         onClick={handleRefresh}
-                        disabled={refreshing}
+                        disabled={isDemo || refreshing}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                         style={{
                             fontSize: "12px", padding: "6px 12px",
                             border: "0.5px solid var(--border-secondary)",
                             borderRadius: "5px", background: "transparent",
-                            color: "var(--text-secondary)", cursor: refreshing ? "not-allowed" : "pointer",
-                            opacity: refreshing ? 0.6 : 1,
+                            color: "var(--text-secondary)", cursor: isDemo || refreshing ? "not-allowed" : "pointer",
+                            opacity: isDemo || refreshing ? 0.6 : 1,
                         }}
                     >
                         {refreshing ? "Yükleniyor..." : "↻ Tara"}
@@ -563,13 +566,14 @@ export default function AlertsPage() {
                     {aiAlerts.length === 0 && (
                         <button
                             onClick={handleAiSuggest}
-                            disabled={aiGenerating}
+                            disabled={isDemo || aiGenerating}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             style={{
                                 fontSize: "11px", padding: "4px 10px",
                                 border: "0.5px solid var(--accent-border)",
                                 borderRadius: "4px", background: "var(--accent-bg)",
-                                color: "var(--accent-text)", cursor: aiGenerating ? "not-allowed" : "pointer",
-                                opacity: aiGenerating ? 0.6 : 1, fontWeight: 500,
+                                color: "var(--accent-text)", cursor: isDemo || aiGenerating ? "not-allowed" : "pointer",
+                                opacity: isDemo || aiGenerating ? 0.6 : 1, fontWeight: 500,
                             }}
                         >
                             {aiGenerating ? "Analiz..." : "Analizi Başlat"}
