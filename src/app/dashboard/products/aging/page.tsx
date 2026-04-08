@@ -64,10 +64,20 @@ export default function AgingPage() {
     const filtered = filter === "all" ? rows : rows.filter(r => r.agingCategory === filter);
 
     // Özet kartlar
+    const CURRENCY_ORDER = ["EUR", "TRY", "USD"];
     const capitalByCurrency = new Map<string, number>();
     for (const r of rows) {
         capitalByCurrency.set(r.currency, (capitalByCurrency.get(r.currency) ?? 0) + r.boundCapital);
     }
+    const capitalEntries = [...capitalByCurrency.entries()].sort(
+        ([a], [b]) => {
+            const ai = CURRENCY_ORDER.indexOf(a);
+            const bi = CURRENCY_ORDER.indexOf(b);
+            const as = ai === -1 ? 999 : ai;
+            const bs = bi === -1 ? 999 : bi;
+            return as - bs;
+        }
+    );
     const counts: Record<AgingCategory, number> = {
         active: 0, slow: 0, stagnant: 0, dead: 0, no_movement: 0,
     };
@@ -107,9 +117,9 @@ export default function AgingPage() {
                     borderRadius: "8px",
                 }}>
                     <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>
-                        {capitalByCurrency.size === 0
+                        {capitalEntries.length === 0
                             ? "—"
-                            : [...capitalByCurrency.entries()]
+                            : capitalEntries
                                 .map(([cur, total]) => formatCurrency(total, cur))
                                 .join(" · ")}
                     </div>
