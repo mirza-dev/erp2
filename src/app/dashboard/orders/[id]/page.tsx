@@ -10,8 +10,6 @@ import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
-
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string; description: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral", description: "Onaya gönderilmedi" },
     pending_approval: { label: "Bekliyor",    cls: "badge-warning", description: "Stok kontrol bekleniyor" },
@@ -25,20 +23,6 @@ const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: s
     allocated:           { label: "Rezerveli",     cls: "badge-warning",  description: "Stok ayrıldı, sevkiyata hazır" },
     partially_shipped:   { label: "Kısmi Sevk",    cls: "badge-accent",   description: "Kısmen gönderildi" },
     shipped:             { label: "Sevk Edildi",   cls: "badge-success",  description: "Müşteriye gönderildi" },
-};
-
-const riskColors: Record<string, { bg: string; text: string; border: string }> = {
-    low:    { bg: "var(--success-bg)", text: "var(--success-text)", border: "var(--success-border)" },
-    medium: { bg: "var(--warning-bg)", text: "var(--warning-text)", border: "var(--warning-border)" },
-    high:   { bg: "var(--danger-bg)",  text: "var(--danger-text)",  border: "var(--danger-border)"  },
-};
-const riskLabels: Record<string, string> = {
-    low: "Düşük", medium: "Orta", high: "Yüksek",
-};
-const riskDescriptions: Record<string, string> = {
-    low:    "Onaylamak güvenli",
-    medium: "Bazı noktaları gözden geçir",
-    high:   "Onaylamadan önce kontrol et",
 };
 
 const thStyle: React.CSSProperties = {
@@ -69,20 +53,6 @@ export default function OrderDetailPage() {
     const isDemo = useIsDemo();
     const [order, setOrder] = useState<OrderDetail | null>(null);
     const [orderLoading, setOrderLoading] = useState(true);
-    const [rescoring, setRescoring] = useState(false);
-
-    const refetchOrder = async () => {
-        try {
-            const res = await fetch(`/api/orders/${params.id}`);
-            if (res.ok) {
-                const data = await res.json();
-                setOrder(mapOrderDetail(data));
-            }
-        } catch (err) {
-            if (err instanceof DOMException && err.name === "AbortError") return;
-            console.error("Failed to fetch order:", err);
-        }
-    };
 
     // Fetch order from API on mount
     useEffect(() => {
@@ -110,29 +80,6 @@ export default function OrderDetailPage() {
         return () => controller.abort();
     }, [params.id]);
 
-    const handleRescore = async () => {
-        if (rescoring || !params.id) return;
-        setRescoring(true);
-        try {
-            const res = await fetch(`/api/ai/score`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ order_id: params.id }),
-            });
-            if (res.ok) {
-                toast({ type: "success", message: "AI skorlama tamamlandı" });
-                setLastRescoredAt(new Date().toISOString());
-                await refetchOrder();
-            } else {
-                toast({ type: "error", message: "Skorlama başarısız" });
-            }
-        } catch {
-            toast({ type: "error", message: "Skorlama başarısız" });
-        } finally {
-            setRescoring(false);
-        }
-    };
-
     const [commercialStatus, setCommercialStatus] = useState<CommercialStatus>(order?.commercial_status ?? "draft");
     const [fulfillmentStatus, setFulfillmentStatus] = useState<FulfillmentStatus>(order?.fulfillment_status ?? "unallocated");
     const [shortageDialogOpen, setShortageDialogOpen] = useState(false);
@@ -157,9 +104,6 @@ export default function OrderDetailPage() {
     const [parasutStatus, setParasutStatus] = useState<ParasutStatus>("idle");
     const [parasutInvoiceId, setParasutInvoiceId] = useState<string | null>(null);
     const [parasutError, setParasutError] = useState<string | null>(null);
-    const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
-    const [lastRescoredAt, setLastRescoredAt] = useState<string | null>(null);
-
     // Update parasut state when order loads
     useEffect(() => {
         if (order) {
@@ -383,23 +327,6 @@ export default function OrderDetailPage() {
                                 {fulfillmentCfg.label}
                             </span>
                         )}
-                        {/* AI confidence + risk badge */}
-                        {order.aiConfidence != null && order.aiConfidence > 0 && (() => {
-                            const risk = order.aiRiskLevel ?? "medium";
-                            const rc = riskColors[risk];
-                            return (
-                                <span
-                                    title={order.aiReason ?? ""}
-                                    style={{
-                                        fontSize: "11px", fontWeight: 500, padding: "2px 8px", borderRadius: "4px",
-                                        background: rc.bg, color: rc.text, border: `0.5px solid ${rc.border}`,
-                                        cursor: order.aiReason ? "help" : "default",
-                                    }}
-                                >
-                                    İnceleme: {riskLabels[risk]}
-                                </span>
-                            );
-                        })()}
                     </div>
 
                     {/* Action buttons by status */}
@@ -771,61 +698,6 @@ export default function OrderDetailPage() {
                                 </div>
                             )}
 
-                            {/* AI Risk Değerlendirmesi */}
-                            <div style={{
-                                background: "var(--bg-primary)",
-                                border: "0.5px solid var(--border-tertiary)",
-                                borderLeft: "3px solid var(--accent-border)",
-                                borderRadius: "6px",
-                                padding: "14px 16px",
-                                marginTop: "12px",
-                            }}>
-                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                                    <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
-                                        AI Risk Değerlendirmesi
-                                    </div>
-                                    <button onClick={handleRescore} disabled={rescoring} style={{
-                                        fontSize: "10px", padding: "2px 7px", borderRadius: "4px",
-                                        border: "0.5px solid var(--border-secondary)",
-                                        background: "transparent", color: "var(--text-tertiary)",
-                                        cursor: rescoring ? "not-allowed" : "pointer",
-                                        opacity: rescoring ? 0.5 : 1,
-                                    }}>
-                                        {rescoring ? "..." : "↻ Yeniden Skorla"}
-                                    </button>
-                                </div>
-
-                                {order.aiConfidence != null && order.aiConfidence > 0 ? (
-                                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                                        <span style={{
-                                            fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
-                                            background: riskColors[order.aiRiskLevel ?? "medium"].bg,
-                                            color: riskColors[order.aiRiskLevel ?? "medium"].text,
-                                            border: `0.5px solid ${riskColors[order.aiRiskLevel ?? "medium"].border}`,
-                                        }}>
-                                            {riskLabels[order.aiRiskLevel ?? "medium"]}
-                                        </span>
-                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                            %{Math.round(order.aiConfidence * 100)} güven
-                                        </span>
-                                        <button
-                                            onClick={() => setAiDrawerOpen(true)}
-                                            style={{
-                                                background: "transparent", border: "none",
-                                                cursor: "pointer", color: "var(--accent-text)",
-                                                fontSize: "11px", padding: 0,
-                                                textDecoration: "underline", textUnderlineOffset: "2px",
-                                            }}
-                                        >
-                                            Detaylar →
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                        Henüz AI risk değerlendirmesi yapılmadı
-                                    </div>
-                                )}
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -1038,60 +910,6 @@ export default function OrderDetailPage() {
                 </>
             )}
 
-            {/* AI Risk Detail Drawer */}
-            {order && (
-                <AIDetailDrawer
-                    open={aiDrawerOpen}
-                    onClose={() => setAiDrawerOpen(false)}
-                    title="Risk Değerlendirmesi"
-                >
-                    <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: "16px" }}>
-                        Siparişteki eksiklik ve tutarsızlıkları analiz eder — ödeme riski değerlendirmesi değildir
-                    </div>
-                    {order.aiConfidence != null && order.aiConfidence > 0 ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                            <div>
-                                <span style={{
-                                    fontSize: "13px", fontWeight: 600, padding: "4px 12px", borderRadius: "4px",
-                                    background: riskColors[order.aiRiskLevel ?? "medium"].bg,
-                                    color: riskColors[order.aiRiskLevel ?? "medium"].text,
-                                    border: `0.5px solid ${riskColors[order.aiRiskLevel ?? "medium"].border}`,
-                                }}>
-                                    İnceleme: {riskLabels[order.aiRiskLevel ?? "medium"]}
-                                </span>
-                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "8px" }}>
-                                    {riskDescriptions[order.aiRiskLevel ?? "medium"]}
-                                </div>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                                    Güven: %{Math.round(order.aiConfidence * 100)}
-                                </div>
-                                {lastRescoredAt && (
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                                        Güncellendi: {new Date(lastRescoredAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
-                                    </div>
-                                )}
-                            </div>
-                            {order.aiReason && (
-                                <div style={{
-                                    padding: "12px 14px",
-                                    background: "var(--bg-secondary)",
-                                    borderRadius: "6px",
-                                    border: "0.5px solid var(--border-tertiary)",
-                                    fontSize: "12px",
-                                    color: "var(--text-secondary)",
-                                    lineHeight: 1.6,
-                                }}>
-                                    {order.aiReason}
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <div style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
-                            Henüz AI risk değerlendirmesi yapılmadı
-                        </div>
-                    )}
-                </AIDetailDrawer>
-            )}
         </>
     );
 }

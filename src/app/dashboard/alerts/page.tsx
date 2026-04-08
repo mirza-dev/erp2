@@ -605,9 +605,7 @@ export default function AlertsPage() {
                                     background: "var(--accent-bg)", color: "var(--accent-text)",
                                     border: "0.5px solid var(--accent-border)",
                                 }}>
-                                    {alert.ai_confidence
-                                        ? `%${Math.round(alert.ai_confidence * 100)}`
-                                        : "AI"}
+                                    AI
                                 </span>
                                 <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: 1, lineHeight: 1.45 }}>
                                     {alert.title}

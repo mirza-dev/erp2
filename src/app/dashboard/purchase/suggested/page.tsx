@@ -42,8 +42,6 @@ function AiSignalButton({ enrichment, loading, onClick }: {
     const urgencyBg = urgency === "critical" ? "var(--danger-bg)" : urgency === "high" ? "var(--warning-bg)" : "var(--accent-bg)";
     const urgencyText = urgency === "critical" ? "var(--danger-text)" : urgency === "high" ? "var(--warning-text)" : "var(--accent-text)";
     const urgencyBorder = urgency === "critical" ? "var(--danger-border)" : urgency === "high" ? "var(--warning-border)" : "var(--accent-border)";
-    const confidence = enrichment.aiConfidence != null ? Math.round(enrichment.aiConfidence * 100) : null;
-
     return (
         <button
             onClick={onClick}
@@ -65,7 +63,6 @@ function AiSignalButton({ enrichment, loading, onClick }: {
         >
             <span>✦ AI</span>
             <span>{urgencyLabel}</span>
-            {confidence != null && <span style={{ opacity: 0.8 }}>%{confidence}</span>}
             <span style={{ opacity: 0.6 }}>→</span>
         </button>
     );
@@ -1308,18 +1305,12 @@ export default function PurchaseSuggestedPage() {
                                     const urgencyLabel = urgency === "critical" ? "Kritik" : urgency === "high" ? "Yüksek" : "Orta";
                                     const urgencyBg = urgency === "critical" ? "var(--danger-bg)" : urgency === "high" ? "var(--warning-bg)" : "var(--accent-bg)";
                                     const urgencyText = urgency === "critical" ? "var(--danger-text)" : urgency === "high" ? "var(--warning-text)" : "var(--accent-text)";
-                                    const confidence = aiDrawerEnrichment.aiConfidence != null ? Math.round(aiDrawerEnrichment.aiConfidence * 100) : null;
                                     return (
                                         <>
                                             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
                                                 <span style={{ fontSize: "12px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px", background: urgencyBg, color: urgencyText }}>
                                                     {urgencyLabel} Aciliyet
                                                 </span>
-                                                {confidence != null && (
-                                                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                                        Güven: %{confidence}
-                                                    </span>
-                                                )}
                                             </div>
                                             {aiDrawerEnrichment.aiWhyNow && (
                                                 <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "8px" }}>

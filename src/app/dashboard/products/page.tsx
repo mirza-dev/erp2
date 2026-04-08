@@ -977,11 +977,6 @@ export default function ProductsPage() {
                                                     padding: "1px 5px", borderRadius: "3px",
                                                     fontSize: "9px", fontWeight: 700, letterSpacing: "0.04em",
                                                 }}>✦ AI</span>
-                                                {risk?.aiConfidence != null && (
-                                                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                                        %{Math.round(risk.aiConfidence * 100)} güven
-                                                    </span>
-                                                )}
                                             </div>
                                             {risk?.aiExplanation && (
                                                 <div style={{
