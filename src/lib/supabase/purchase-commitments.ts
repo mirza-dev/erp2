@@ -1,6 +1,14 @@
 import { createServiceClient } from "./service";
 import type { PurchaseCommitmentRow } from "@/lib/database.types";
 
+// İş kuralı ihlali: commitment bulunamadı veya artık pending değil
+export class CommitmentConflictError extends Error {
+    constructor(id: string) {
+        super(`Commitment bulunamadı veya pending değil: ${id}`);
+        this.name = "CommitmentConflictError";
+    }
+}
+
 // ── Types ────────────────────────────────────────────────────
 
 export interface CreateCommitmentInput {
@@ -64,7 +72,10 @@ export async function dbReceiveCommitment(id: string): Promise<void> {
     const { error } = await supabase.rpc("receive_purchase_commitment", {
         p_commitment_id: id,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+        if (error.message.includes("pending değil")) throw new CommitmentConflictError(id);
+        throw new Error(error.message);
+    }
 }
 
 export async function dbCancelCommitment(id: string): Promise<void> {

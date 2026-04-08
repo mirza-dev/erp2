@@ -3,6 +3,7 @@ import {
     dbGetCommitment,
     dbReceiveCommitment,
     dbCancelCommitment,
+    CommitmentConflictError,
 } from "@/lib/supabase/purchase-commitments";
 import { handleApiError } from "@/lib/api-error";
 
@@ -53,6 +54,9 @@ export async function PATCH(
             { status: 400 }
         );
     } catch (err) {
+        if (err instanceof CommitmentConflictError) {
+            return NextResponse.json({ error: err.message }, { status: 409 });
+        }
         return handleApiError(err, "PATCH /api/purchase-commitments/[id]");
     }
 }

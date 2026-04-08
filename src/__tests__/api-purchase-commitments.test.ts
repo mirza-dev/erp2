@@ -13,7 +13,19 @@ const mockDbGetCommitment      = vi.fn();
 const mockDbReceiveCommitment  = vi.fn();
 const mockDbCancelCommitment   = vi.fn();
 
+// CommitmentConflictError must be the same class reference the route imports
+const { CommitmentConflictError } = vi.hoisted(() => {
+    class CommitmentConflictError extends Error {
+        constructor(id: string) {
+            super(`Commitment bulunamadı veya pending değil: ${id}`);
+            this.name = "CommitmentConflictError";
+        }
+    }
+    return { CommitmentConflictError };
+});
+
 vi.mock("@/lib/supabase/purchase-commitments", () => ({
+    CommitmentConflictError,
     dbListCommitments:   (...args: unknown[]) => mockDbListCommitments(...args),
     dbCreateCommitment:  (...args: unknown[]) => mockDbCreateCommitment(...args),
     dbGetCommitment:     (...args: unknown[]) => mockDbGetCommitment(...args),
@@ -221,5 +233,14 @@ describe("PATCH /api/purchase-commitments/[id]", () => {
         const [req, ctx] = await makePatchRequest("commit-1", { action: "receive" });
         const res = await PATCH(req, ctx);
         expect(res.status).toBe(500);
+    });
+
+    it("action=receive returns 409 when CommitmentConflictError thrown", async () => {
+        mockDbReceiveCommitment.mockRejectedValue(new CommitmentConflictError("commit-1"));
+        const [req, ctx] = await makePatchRequest("commit-1", { action: "receive" });
+        const res = await PATCH(req, ctx);
+        expect(res.status).toBe(409);
+        const data = await res.json();
+        expect(data.error).toMatch(/pending değil/);
     });
 });

@@ -50,6 +50,7 @@ import {
     dbReceiveCommitment,
     dbCancelCommitment,
     dbGetIncomingQuantities,
+    CommitmentConflictError,
 } from "@/lib/supabase/purchase-commitments";
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -232,9 +233,17 @@ describe("dbReceiveCommitment", () => {
         });
     });
 
-    it("throws on RPC error", async () => {
+    it("throws CommitmentConflictError when commitment is not pending", async () => {
+        mockRpc.mockResolvedValue({ error: { message: "Commitment bulunamadı veya pending değil: commit-1" } });
+        await expect(dbReceiveCommitment("commit-1")).rejects.toBeInstanceOf(CommitmentConflictError);
+    });
+
+    it("throws generic Error for non-conflict RPC errors", async () => {
         mockRpc.mockResolvedValue({ error: { message: "RPC failed" } });
-        await expect(dbReceiveCommitment("commit-1")).rejects.toThrow("RPC failed");
+        const err = await dbReceiveCommitment("commit-1").catch(e => e);
+        expect(err).toBeInstanceOf(Error);
+        expect(err).not.toBeInstanceOf(CommitmentConflictError);
+        expect(err.message).toBe("RPC failed");
     });
 });
 
