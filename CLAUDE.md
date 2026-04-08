@@ -3,7 +3,7 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-08_
 
-**Son tamamlanan iş:** Faz 2 — Giriş Takibi (incoming/forecasted + purchase_commitments)
+**Son tamamlanan iş:** Faz 3 — Stok Eskime Raporu
 - DB migration: `purchase_commitments` tablosu + `receive_purchase_commitment` atomik RPC (`020_purchase_commitments.sql`)
 - Yeni stok alanları: `incoming` (bekleyen commitments), `forecasted` (on_hand + incoming - reserved - quoted)
 - `dbGetIncomingQuantities()` → purchase_commitments pending filtreli ürün bazlı toplam
@@ -17,7 +17,7 @@ _Son güncelleme: 2026-04-08_
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** —
-**Test sayısı:** 50 dosya · 1166 test
+**Test sayısı:** 52 dosya · 1205 test
 
 ---
 

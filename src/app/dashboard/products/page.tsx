@@ -445,6 +445,15 @@ export default function ProductsPage() {
                             width: isMobile ? "140px" : "200px",
                         }}
                     />
+                    <a
+                        href="/dashboard/products/aging"
+                        style={{
+                            fontSize: "12px", fontWeight: 500, padding: "6px 12px",
+                            border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
+                            background: "transparent", color: "var(--text-secondary)",
+                            textDecoration: "none", whiteSpace: "nowrap",
+                        }}
+                    >Eskime Raporu →</a>
                     <Button variant="primary" onClick={() => setCreateOpen(true)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
                 </div>
             </div>
