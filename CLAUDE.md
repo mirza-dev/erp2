@@ -3,10 +3,12 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-07_
 
-**Son tamamlanan iş:** Import order latent bug fix + result contract audit + ESLint temizliği
-- 5 bug düzeltildi: customer/quote/invoice existing match'lerde gerçek UPDATE eklendi; tüm skip path'lerde `dbUpdateDraft(rejected)`; bilinmeyen entity_type fallthrough; catch block best-effort reject
-- `dbUpdateQuote` ve `dbUpdateInvoice` DB fonksiyonları oluşturuldu
-- 17 yeni test: quote/invoice/shipment/payment merge, customer update on match, draft rejection, unknown entity, mixed-entity batch
+**Son tamamlanan iş:** AI risk/güven UI temizliği
+- Sipariş listesi: renkli risk dot kaldırıldı
+- Sipariş detay: AI Risk Değerlendirmesi paneli, drawer, "Yeniden Skorla" butonu, header badge kaldırıldı
+- Alert/Dashboard/Ürünler/Satın Alma sayfaları: "%X güven" badge'leri kaldırıldı
+- Import parse güveni korundu (aksiyona dönüşüyor)
+- Backend scoring (aiScoreOrder, DB kolonları, alert engine) değişmedi
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** —
