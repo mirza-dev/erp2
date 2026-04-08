@@ -8,7 +8,7 @@ import { handleApiError } from "@/lib/api-error";
 export async function GET() {
     try {
         const [products, lastSaleDates, lastIncomingDates] = await Promise.all([
-            dbListProducts({ is_active: true }),
+            dbListProducts({ is_active: true, pageSize: 10_000 }),
             dbGetLastSaleDates(),
             dbGetLastIncomingDates(),
         ]);

@@ -156,6 +156,13 @@ describe("GET /api/products/aging", () => {
         expect(mockDbGetLastIncomingDates).toHaveBeenCalledTimes(1);
     });
 
+    it("dbListProducts pageSize: 10_000 ile çağrılır (pagination bypass)", async () => {
+        await GET(makeRequest());
+        expect(mockDbListProducts).toHaveBeenCalledWith(
+            expect.objectContaining({ pageSize: 10_000 })
+        );
+    });
+
     it("response includes all required fields", async () => {
         mockDbListProducts.mockResolvedValue([makeProduct("p1")]);
         const [row] = await (await GET(makeRequest())).json();

@@ -65,22 +65,23 @@ export async function dbGetLastSaleDates(): Promise<Map<string, string>> {
 }
 
 /**
- * Her ürün için en son satın alma girişinin tarihini döner.
- * purchase_commitments (status IN pending, received)
- * JS'te MAX aggregation.
+ * Her ürün için en son gerçek stok girişinin tarihini döner.
+ * Sadece status='received' satırlar — received_at = fiziksel teslim zamanı.
+ * Pending commitments henüz teslim alınmadı, stok hareketi sayılmaz.
  */
 export async function dbGetLastIncomingDates(): Promise<Map<string, string>> {
     const supabase = createServiceClient();
     const { data, error } = await supabase
         .from("purchase_commitments")
-        .select("product_id, created_at")
-        .in("status", ["pending", "received"]);
+        .select("product_id, received_at")
+        .eq("status", "received");
     if (error || !data) return new Map();
     const map = new Map<string, string>();
     for (const row of data) {
+        if (!row.received_at) continue;   // null guard (teorik, ama defensif)
         const existing = map.get(row.product_id);
-        if (!existing || row.created_at > existing) {
-            map.set(row.product_id, row.created_at);
+        if (!existing || row.received_at > existing) {
+            map.set(row.product_id, row.received_at);
         }
     }
     return map;

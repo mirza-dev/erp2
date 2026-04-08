@@ -64,7 +64,10 @@ export default function AgingPage() {
     const filtered = filter === "all" ? rows : rows.filter(r => r.agingCategory === filter);
 
     // Özet kartlar
-    const totalCapital = rows.reduce((s, r) => s + r.boundCapital, 0);
+    const capitalByCurrency = new Map<string, number>();
+    for (const r of rows) {
+        capitalByCurrency.set(r.currency, (capitalByCurrency.get(r.currency) ?? 0) + r.boundCapital);
+    }
     const counts: Record<AgingCategory, number> = {
         active: 0, slow: 0, stagnant: 0, dead: 0, no_movement: 0,
     };
@@ -104,7 +107,11 @@ export default function AgingPage() {
                     borderRadius: "8px",
                 }}>
                     <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>
-                        {formatCurrency(totalCapital, rows[0]?.currency ?? "USD")}
+                        {capitalByCurrency.size === 0
+                            ? "—"
+                            : [...capitalByCurrency.entries()]
+                                .map(([cur, total]) => formatCurrency(total, cur))
+                                .join(" · ")}
                     </div>
                     <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "3px" }}>
                         Bağlanan Sermaye

@@ -138,7 +138,7 @@ describe("dbGetLastSaleDates", () => {
 // ── dbGetLastIncomingDates ────────────────────────────────────
 
 describe("dbGetLastIncomingDates", () => {
-    function setup(rows: { product_id: string; created_at: string }[], error?: unknown) {
+    function setup(rows: { product_id: string; received_at: string | null }[], error?: unknown) {
         mockFrom.mockImplementation(() =>
             makeThenableBuilder({ data: error ? null : rows, error: error ?? null })
         );
@@ -154,16 +154,26 @@ describe("dbGetLastIncomingDates", () => {
         expect((await dbGetLastIncomingDates()).size).toBe(0);
     });
 
-    it("tek satır → doğru product_id ve tarih", async () => {
-        setup([{ product_id: "p1", created_at: "2024-08-01T00:00:00Z" }]);
+    it("tek satır → doğru product_id ve received_at tarihi", async () => {
+        setup([{ product_id: "p1", received_at: "2024-08-01T00:00:00Z" }]);
         const result = await dbGetLastIncomingDates();
         expect(result.get("p1")).toBe("2024-08-01T00:00:00Z");
     });
 
+    it("received_at null olan satırlar atlanır", async () => {
+        setup([
+            { product_id: "p1", received_at: null },
+            { product_id: "p1", received_at: "2024-08-01T00:00:00Z" },
+        ]);
+        const result = await dbGetLastIncomingDates();
+        expect(result.get("p1")).toBe("2024-08-01T00:00:00Z");
+        expect(result.size).toBe(1);
+    });
+
     it("aynı ürün için MAX alınır", async () => {
         setup([
-            { product_id: "p1", created_at: "2024-01-01T00:00:00Z" },
-            { product_id: "p1", created_at: "2024-11-01T00:00:00Z" },
+            { product_id: "p1", received_at: "2024-01-01T00:00:00Z" },
+            { product_id: "p1", received_at: "2024-11-01T00:00:00Z" },
         ]);
         const result = await dbGetLastIncomingDates();
         expect(result.get("p1")).toBe("2024-11-01T00:00:00Z");
@@ -171,8 +181,8 @@ describe("dbGetLastIncomingDates", () => {
 
     it("birden fazla ürün bağımsız takip edilir", async () => {
         setup([
-            { product_id: "p1", created_at: "2024-05-01T00:00:00Z" },
-            { product_id: "p2", created_at: "2024-07-01T00:00:00Z" },
+            { product_id: "p1", received_at: "2024-05-01T00:00:00Z" },
+            { product_id: "p2", received_at: "2024-07-01T00:00:00Z" },
         ]);
         const result = await dbGetLastIncomingDates();
         expect(result.get("p1")).toBe("2024-05-01T00:00:00Z");
@@ -186,9 +196,9 @@ describe("dbGetLastIncomingDates", () => {
         expect(mockFrom).toHaveBeenCalledWith("purchase_commitments");
     });
 
-    it("status IN pending, received filtresi uygulanır", async () => {
+    it("sadece status = received filtresi uygulanır (pending dahil değil)", async () => {
         setup([]);
         await dbGetLastIncomingDates();
-        expect(mockIn).toHaveBeenCalledWith("status", ["pending", "received"]);
+        expect(mockEq).toHaveBeenCalledWith("status", "received");
     });
 });
