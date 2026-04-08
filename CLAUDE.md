@@ -17,7 +17,7 @@ _Son güncelleme: 2026-04-08_
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** —
-**Test sayısı:** 52 dosya · 1205 test
+**Test sayısı:** 52 dosya · 1207 test
 
 ---
 
