@@ -64,6 +64,53 @@ describe("mapProduct", () => {
     expect(p.dailyUsage).toBeUndefined();
     expect(p.leadTimeDays).toBeUndefined();
   });
+
+  it("quoted defaults to 0 when missing from row", () => {
+    const p = mapProduct(base); // base has no quoted field
+    expect(p.quoted).toBe(0);
+  });
+
+  it("promisable defaults to available_now when missing from row", () => {
+    const p = mapProduct(base); // base has no promisable field
+    expect(p.promisable).toBe(base.available_now);
+  });
+
+  it("quoted=0 is preserved (not treated as nullish fallback)", () => {
+    const p = mapProduct({ ...base, quoted: 0 });
+    expect(p.quoted).toBe(0);
+  });
+
+  it("passes through quoted and promisable when present", () => {
+    const p = mapProduct({ ...base, quoted: 15, promisable: 65 });
+    expect(p.quoted).toBe(15);
+    expect(p.promisable).toBe(65);
+  });
+
+  it("promisable can be negative (more quoted than available)", () => {
+    const p = mapProduct({ ...base, quoted: 90, promisable: -10 });
+    expect(p.promisable).toBe(-10);
+  });
+
+  it("incoming defaults to 0 when missing from row", () => {
+    const p = mapProduct(base);
+    expect(p.incoming).toBe(0);
+  });
+
+  it("forecasted defaults to available_now when missing from row", () => {
+    const p = mapProduct(base);
+    expect(p.forecasted).toBe(base.available_now);
+  });
+
+  it("passes through incoming and forecasted when present", () => {
+    const p = mapProduct({ ...base, incoming: 20, forecasted: 70 });
+    expect(p.incoming).toBe(20);
+    expect(p.forecasted).toBe(70);
+  });
+
+  it("forecasted can be negative (valid state)", () => {
+    const p = mapProduct({ ...base, incoming: 0, forecasted: -5 });
+    expect(p.forecasted).toBe(-5);
+  });
 });
 
 // ── mapCustomer ───────────────────────────────────────────────

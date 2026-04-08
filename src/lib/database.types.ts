@@ -25,6 +25,7 @@ export type RecommendationType = "purchase_suggestion" | "stock_risk" | "order_r
 export type RecommendationStatus = "suggested" | "accepted" | "edited" | "rejected" | "expired"
 export type FeedbackType = "accepted" | "edited" | "rejected" | "note"
 export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "ops_summary" | "purchase_enrich"
+export type PurchaseCommitmentStatus = "pending" | "received" | "cancelled"
 
 // ── Row Types ────────────────────────────────────────────────
 
@@ -89,6 +90,26 @@ export interface ProductRow {
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */
 export interface ProductWithStock extends ProductRow {
     available_now: number
+    /** Total quantity in active draft/pending_approval orders — computed by API layer */
+    quoted?: number
+    /** Quantity available to promise = available_now - quoted — computed by API layer */
+    promisable?: number
+    /** Total pending purchase commitments quantity — computed by API layer */
+    incoming?: number
+    /** Full stock outlook = on_hand + incoming - reserved - quoted — computed by API layer */
+    forecasted?: number
+}
+
+export interface PurchaseCommitmentRow {
+    id: string
+    product_id: string
+    quantity: number
+    expected_date: string        // "YYYY-MM-DD"
+    supplier_name: string | null
+    notes: string | null
+    status: PurchaseCommitmentStatus
+    created_at: string
+    received_at: string | null
 }
 
 export interface BillOfMaterialsRow {

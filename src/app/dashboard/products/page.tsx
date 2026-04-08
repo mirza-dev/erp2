@@ -186,6 +186,11 @@ export default function ProductsPage() {
     const [drawerAlertsLoading, setDrawerAlertsLoading] = useState(false);
     const [alertFilter, setAlertFilter] = useState<"tumu" | "riskli" | "uyarili" | "oneri">("tumu");
     const [productsWithAlerts, setProductsWithAlerts] = useState<Set<string>>(new Set());
+    const [commitments, setCommitments] = useState<{ id: string; quantity: number; expected_date: string; supplier_name: string | null; status: string }[]>([]);
+    const [showCommitmentForm, setShowCommitmentForm] = useState(false);
+    const [commitmentForm, setCommitmentForm] = useState({ quantity: "", expected_date: "", supplier_name: "" });
+    const [commitmentSubmitting, setCommitmentSubmitting] = useState(false);
+    const [receivingId, setReceivingId] = useState<string | null>(null);
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
@@ -223,6 +228,22 @@ export default function ProductsPage() {
         fetchRisk();
         return () => { cancelled = true; };
     }, []);
+
+    // Fetch pending commitments for the selected product whenever drawer opens
+    useEffect(() => {
+        if (!selectedProductId) {
+            setCommitments([]);
+            setShowCommitmentForm(false);
+            setCommitmentForm({ quantity: "", expected_date: "", supplier_name: "" });
+            return;
+        }
+        let cancelled = false;
+        fetch(`/api/purchase-commitments?product_id=${selectedProductId}&status=pending`)
+            .then(r => r.ok ? r.json() : [])
+            .then(data => { if (!cancelled) setCommitments(Array.isArray(data) ? data : []); })
+            .catch(() => { if (!cancelled) setCommitments([]); });
+        return () => { cancelled = true; };
+    }, [selectedProductId]);
 
     // Fetch active alerts for the selected product whenever drawer opens
     useEffect(() => {
@@ -273,7 +294,7 @@ export default function ProductsPage() {
         return matchSearch && matchCategory && matchSignal;
     });
 
-    const criticalCount = mockProducts.filter(p => p.available_now <= p.minStockLevel).length;
+    const criticalCount = mockProducts.filter(p => p.promisable <= p.minStockLevel).length;
 
     const categoryCounts: Record<string, number> = { "Tümü": mockProducts.length };
     categories.slice(1).forEach(cat => {
@@ -555,7 +576,7 @@ export default function ProductsPage() {
                     <tbody>
                         {filtered.map((product) => {
                             const risk = riskData.get(product.id);
-                            const isCritical = product.available_now <= product.minStockLevel;
+                            const isCritical = product.promisable <= product.minStockLevel;
                             const hasAlert = productsWithAlerts.has(product.id);
                             const pendingRec = recMap.get(product.id)?.status === "suggested";
                             return (
@@ -610,13 +631,17 @@ export default function ProductsPage() {
                                             </span>
                                         </div>
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 400, marginTop: "1px" }}>
-                                            {product.reserved > 0 ? (
-                                                <span style={{ color: "var(--warning-text)" }}>
-                                                    {formatNumber(product.available_now)} satılabilir
-                                                    {" · "}{formatNumber(product.reserved)} rez.
+                                            {(product.reserved > 0 || product.quoted > 0) ? (
+                                                <span style={{ color: product.promisable <= 0 ? "var(--danger-text)" : "var(--warning-text)" }}>
+                                                    {formatNumber(product.promisable)} verilebilir
+                                                    {product.reserved > 0 && <>{" · "}{formatNumber(product.reserved)} rez.</>}
+                                                    {product.quoted > 0 && <>{" · "}{formatNumber(product.quoted)} teklifte</>}
                                                 </span>
                                             ) : (
-                                                <span>{formatNumber(product.available_now)} satılabilir</span>
+                                                <span>{formatNumber(product.promisable)} verilebilir</span>
+                                            )}
+                                            {product.incoming > 0 && (
+                                                <span style={{ color: "var(--success)" }}>{" · "}+{formatNumber(product.incoming)} bekleniyor</span>
                                             )}
                                             {" · "}min {formatNumber(product.minStockLevel)}
                                         </div>
@@ -628,7 +653,21 @@ export default function ProductsPage() {
                                     )}
                                     {!isMobile && (
                                         <td style={{ ...tdStyle, textAlign: "center" }}>
-                                            {isCritical ? (
+                                            {product.forecasted < 0 ? (
+                                                <span style={{
+                                                    fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                    background: "var(--danger-bg)", color: "var(--danger-text)",
+                                                    border: "0.5px solid var(--danger-border)",
+                                                    textTransform: "uppercase", letterSpacing: "0.04em",
+                                                }}>ÖNGÖRÜLEN KRİTİK</span>
+                                            ) : product.promisable <= 0 ? (
+                                                <span style={{
+                                                    fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
+                                                    background: "var(--danger-bg)", color: "var(--danger-text)",
+                                                    border: "0.5px solid var(--danger-border)",
+                                                    textTransform: "uppercase", letterSpacing: "0.04em",
+                                                }}>TEKLİF DOLU</span>
+                                            ) : isCritical ? (
                                                 <span style={{
                                                     fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "3px",
                                                     background: "var(--danger-bg)", color: "var(--danger-text)",
@@ -893,12 +932,16 @@ export default function ProductsPage() {
                                 <div>
                                     {sectionLabel("Operasyonel Durum")}
 
-                                    {/* 4-cell metric grid */}
+                                    {/* 8-cell metric grid */}
                                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "6px", marginBottom: "12px" }}>
                                         {[
                                             { label: "Stokta", value: formatNumber(product.on_hand), color: "var(--text-primary)" },
                                             { label: "Rezerve", value: formatNumber(product.reserved), color: product.reserved > 0 ? "var(--warning-text)" : "var(--text-tertiary)" },
-                                            { label: "Satılabilir", value: formatNumber(product.available_now), color: product.available_now <= product.minStockLevel ? "var(--danger-text)" : "var(--success-text)" },
+                                            { label: "Teklifte", value: formatNumber(product.quoted), color: product.quoted > 0 ? "var(--warning-text)" : "var(--text-tertiary)" },
+                                            { label: "Satılabilir", value: formatNumber(product.available_now), color: "var(--text-secondary)" },
+                                            { label: "Verilebilir", value: formatNumber(product.promisable), color: product.promisable <= 0 ? "var(--danger-text)" : product.promisable <= product.minStockLevel ? "var(--warning-text)" : "var(--success-text)" },
+                                            { label: "Beklenen", value: formatNumber(product.incoming), color: product.incoming > 0 ? "var(--success-text)" : "var(--text-tertiary)" },
+                                            { label: "Öngörülen", value: formatNumber(product.forecasted), color: product.forecasted < 0 ? "var(--danger-text)" : product.forecasted <= product.minStockLevel ? "var(--warning-text)" : "var(--success-text)" },
                                             { label: "Minimum", value: formatNumber(product.minStockLevel), color: "var(--text-tertiary)" },
                                         ].map(cell => (
                                             <div key={cell.label} style={{
@@ -957,6 +1000,185 @@ export default function ProductsPage() {
                                     {!risk && !product.dailyUsage && (
                                         <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
                                             Günlük kullanım verisi yok — risk analizi hesaplanamıyor.
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ── Block 2b: Bekleyen Teslimatlar ───────────── */}
+                                <div>
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                            Bekleyen Teslimatlar
+                                        </div>
+                                        <button
+                                            onClick={() => setShowCommitmentForm(v => !v)}
+                                            style={{
+                                                fontSize: "11px", fontWeight: 600, color: "var(--accent-text)",
+                                                background: "var(--accent-bg)", border: "0.5px solid var(--accent-border)",
+                                                borderRadius: "4px", padding: "2px 8px", cursor: "pointer",
+                                            }}
+                                        >
+                                            {showCommitmentForm ? "İptal" : "+ Ekle"}
+                                        </button>
+                                    </div>
+
+                                    {/* Inline commit form */}
+                                    {showCommitmentForm && (
+                                        <div style={{
+                                            padding: "10px", marginBottom: "8px",
+                                            background: "var(--bg-secondary)", borderRadius: "6px",
+                                            border: "0.5px solid var(--border-secondary)",
+                                        }}>
+                                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
+                                                <div>
+                                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px" }}>Miktar *</div>
+                                                    <input
+                                                        type="number" min="1"
+                                                        value={commitmentForm.quantity}
+                                                        onChange={e => setCommitmentForm(f => ({ ...f, quantity: e.target.value }))}
+                                                        placeholder="0"
+                                                        style={{
+                                                            width: "100%", padding: "5px 8px", fontSize: "13px",
+                                                            background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                            border: "0.5px solid var(--border-primary)", borderRadius: "4px",
+                                                            boxSizing: "border-box",
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px" }}>Beklenen Tarih *</div>
+                                                    <input
+                                                        type="date"
+                                                        value={commitmentForm.expected_date}
+                                                        onChange={e => setCommitmentForm(f => ({ ...f, expected_date: e.target.value }))}
+                                                        style={{
+                                                            width: "100%", padding: "5px 8px", fontSize: "13px",
+                                                            background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                            border: "0.5px solid var(--border-primary)", borderRadius: "4px",
+                                                            boxSizing: "border-box",
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div style={{ marginBottom: "8px" }}>
+                                                <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px" }}>Tedarikçi (opsiyonel)</div>
+                                                <input
+                                                    type="text"
+                                                    value={commitmentForm.supplier_name}
+                                                    onChange={e => setCommitmentForm(f => ({ ...f, supplier_name: e.target.value }))}
+                                                    placeholder="Tedarikçi adı"
+                                                    style={{
+                                                        width: "100%", padding: "5px 8px", fontSize: "13px",
+                                                        background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                        border: "0.5px solid var(--border-primary)", borderRadius: "4px",
+                                                        boxSizing: "border-box",
+                                                    }}
+                                                />
+                                            </div>
+                                            <button
+                                                disabled={commitmentSubmitting || !commitmentForm.quantity || !commitmentForm.expected_date}
+                                                onClick={async () => {
+                                                    if (!selectedProductId || isDemo) return;
+                                                    setCommitmentSubmitting(true);
+                                                    try {
+                                                        const res = await fetch("/api/purchase-commitments", {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({
+                                                                product_id: selectedProductId,
+                                                                quantity: parseInt(commitmentForm.quantity),
+                                                                expected_date: commitmentForm.expected_date,
+                                                                supplier_name: commitmentForm.supplier_name || undefined,
+                                                            }),
+                                                        });
+                                                        if (res.ok) {
+                                                            window.location.reload();
+                                                        }
+                                                    } catch { /* graceful */ }
+                                                    finally { setCommitmentSubmitting(false); }
+                                                }}
+                                                style={{
+                                                    fontSize: "12px", fontWeight: 600, padding: "5px 12px",
+                                                    background: "var(--accent-bg)", color: "var(--accent-text)",
+                                                    border: "0.5px solid var(--accent-border)", borderRadius: "4px",
+                                                    cursor: commitmentSubmitting ? "not-allowed" : "pointer",
+                                                    opacity: commitmentSubmitting ? 0.6 : 1,
+                                                }}
+                                            >
+                                                {commitmentSubmitting ? "Kaydediliyor..." : "Kaydet"}
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* Commitment list */}
+                                    {commitments.length === 0 ? (
+                                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontStyle: "italic", padding: "6px 0" }}>
+                                            Bekleyen teslimat yok
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                            {commitments.map(c => (
+                                                <div key={c.id} style={{
+                                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                                    padding: "6px 8px", background: "var(--bg-secondary)",
+                                                    borderRadius: "5px", border: "0.5px solid var(--border-tertiary)",
+                                                    fontSize: "12px",
+                                                }}>
+                                                    <span style={{ color: "var(--text-secondary)" }}>
+                                                        <span style={{ fontWeight: 600, color: "var(--success-text)" }}>{formatNumber(c.quantity)} {product.unit}</span>
+                                                        {" · "}
+                                                        {new Date(c.expected_date).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
+                                                        {c.supplier_name && <span style={{ color: "var(--text-tertiary)" }}>{" · "}{c.supplier_name}</span>}
+                                                    </span>
+                                                    <div style={{ display: "flex", gap: "4px" }}>
+                                                        <button
+                                                            disabled={isDemo || receivingId === c.id}
+                                                            onClick={async () => {
+                                                                if (isDemo || receivingId) return;
+                                                                setReceivingId(c.id);
+                                                                try {
+                                                                    const res = await fetch(`/api/purchase-commitments/${c.id}`, {
+                                                                        method: "PATCH",
+                                                                        headers: { "Content-Type": "application/json" },
+                                                                        body: JSON.stringify({ action: "receive" }),
+                                                                    });
+                                                                    if (res.ok) {
+                                                                        window.location.reload();
+                                                                    }
+                                                                } finally { setReceivingId(null); }
+                                                            }}
+                                                            style={{
+                                                                fontSize: "10px", fontWeight: 600, padding: "2px 6px",
+                                                                background: "var(--success-bg)", color: "var(--success-text)",
+                                                                border: "0.5px solid var(--success-border)", borderRadius: "3px",
+                                                                cursor: (isDemo || receivingId === c.id) ? "not-allowed" : "pointer",
+                                                                opacity: (isDemo || receivingId === c.id) ? 0.6 : 1,
+                                                            }}
+                                                        >{receivingId === c.id ? "..." : "Alındı"}</button>
+                                                        <button
+                                                            disabled={isDemo}
+                                                            onClick={async () => {
+                                                                if (isDemo) return;
+                                                                const res = await fetch(`/api/purchase-commitments/${c.id}`, {
+                                                                    method: "PATCH",
+                                                                    headers: { "Content-Type": "application/json" },
+                                                                    body: JSON.stringify({ action: "cancel" }),
+                                                                });
+                                                                if (res.ok) {
+                                                                    window.location.reload();
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                fontSize: "10px", fontWeight: 600, padding: "2px 6px",
+                                                                background: "var(--bg-tertiary)", color: "var(--text-tertiary)",
+                                                                border: "0.5px solid var(--border-tertiary)", borderRadius: "3px",
+                                                                cursor: isDemo ? "not-allowed" : "pointer",
+                                                                opacity: isDemo ? 0.6 : 1,
+                                                            }}
+                                                        >İptal</button>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     )}
                                 </div>

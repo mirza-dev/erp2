@@ -18,10 +18,22 @@ import { NextRequest } from "next/server";
 // ─── DB mock ──────────────────────────────────────────────────────────────────
 
 const mockDbListProducts = vi.fn();
+const mockDbGetQuotedQuantities = vi.fn();
+const mockDbGetIncomingQuantities = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts:  (...args: unknown[]) => mockDbListProducts(...args),
-    dbCreateProduct: vi.fn(),
+    dbListProducts:          (...args: unknown[]) => mockDbListProducts(...args),
+    dbCreateProduct:         vi.fn(),
+    dbGetQuotedQuantities:   (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
+}));
+
+vi.mock("@/lib/supabase/purchase-commitments", () => ({
+    dbGetIncomingQuantities: (...args: unknown[]) => mockDbGetIncomingQuantities(...args),
+    dbListCommitments:       vi.fn(),
+    dbCreateCommitment:      vi.fn(),
+    dbGetCommitment:         vi.fn(),
+    dbReceiveCommitment:     vi.fn(),
+    dbCancelCommitment:      vi.fn(),
 }));
 
 import { GET } from "@/app/api/products/route";
@@ -35,6 +47,8 @@ function makeGetRequest(query = ""): NextRequest {
 beforeEach(() => {
     vi.clearAllMocks();
     mockDbListProducts.mockResolvedValue([]);
+    mockDbGetQuotedQuantities.mockResolvedValue(new Map());
+    mockDbGetIncomingQuantities.mockResolvedValue(new Map());
 });
 
 // ─── Query param forwarding ───────────────────────────────────────────────────

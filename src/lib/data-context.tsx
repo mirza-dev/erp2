@@ -107,7 +107,7 @@ interface DataContextValue {
   updateCustomer: (id: string, updates: Partial<Customer>) => Promise<void>;
   deleteCustomer: (id: string) => Promise<void>;
   addProduct: (
-    p: Omit<Product, "id" | "reserved" | "available_now" | "isActive">
+    p: Omit<Product, "id" | "reserved" | "available_now" | "isActive" | "quoted" | "promisable" | "incoming" | "forecasted">
   ) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
   addUretimKaydi: (k: Omit<UretimKaydi, "id">) => Promise<{ refetchFailed?: boolean }>;
@@ -273,7 +273,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // ── Products ─────────────────────────────────────────────
 
   const addProduct = async (
-    fields: Omit<Product, "id" | "reserved" | "available_now" | "isActive">
+    fields: Omit<Product, "id" | "reserved" | "available_now" | "isActive" | "quoted" | "promisable" | "incoming" | "forecasted">
   ) => {
     if (demoGuard()) return;
     try {

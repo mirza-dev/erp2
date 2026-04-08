@@ -1,18 +1,23 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-07_
+_Son güncelleme: 2026-04-08_
 
-**Son tamamlanan iş:** AI risk/güven UI temizliği
-- Sipariş listesi: renkli risk dot kaldırıldı
-- Sipariş detay: AI Risk Değerlendirmesi paneli, drawer, "Yeniden Skorla" butonu, header badge kaldırıldı
-- Alert/Dashboard/Ürünler/Satın Alma sayfaları: "%X güven" badge'leri kaldırıldı
-- Import parse güveni korundu (aksiyona dönüşüyor)
-- Backend scoring (aiScoreOrder, DB kolonları, alert engine) değişmedi
+**Son tamamlanan iş:** Faz 2 — Giriş Takibi (incoming/forecasted + purchase_commitments)
+- DB migration: `purchase_commitments` tablosu + `receive_purchase_commitment` atomik RPC (`020_purchase_commitments.sql`)
+- Yeni stok alanları: `incoming` (bekleyen commitments), `forecasted` (on_hand + incoming - reserved - quoted)
+- `dbGetIncomingQuantities()` → purchase_commitments pending filtreli ürün bazlı toplam
+- CRUD: `dbListCommitments`, `dbCreateCommitment`, `dbReceiveCommitment`, `dbCancelCommitment`
+- `/api/purchase-commitments` GET+POST + `/api/purchase-commitments/[id]` GET+PATCH (receive/cancel)
+- `/api/products` GET → 3-way parallel fetch, incoming + forecasted ile enrich
+- `Product` interface → incoming ve forecasted required alanlar
+- Ürünler sayfası: stok kolonu "+X bekleniyor" yeşil, sinyal "ÖNGÖRÜLEN KRİTİK" badge, drawer 8 hücreli grid
+- Drawer: Bekleyen Teslimatlar bölümü — liste + inline ekle formu + Alındı/İptal butonları
+- DB migration kullanıcı elle uygulamalı: `supabase db push` veya Studio SQL editörü
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** —
-**Test sayısı:** 46 dosya · 1097 test
+**Test sayısı:** 50 dosya · 1164 test
 
 ---
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbListProducts, dbCreateProduct, type CreateProductInput } from "@/lib/supabase/products";
+import { dbListProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
+import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { handleApiError } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 
@@ -7,13 +8,28 @@ import { ConfigError } from "@/lib/supabase/service";
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
-        const products = await dbListProducts({
-            category: searchParams.get("category") ?? undefined,
-            product_type: (searchParams.get("product_type") as "finished" | "raw_material") ?? undefined,
-            is_active: searchParams.get("is_active") !== "false",
-            page: parseInt(searchParams.get("page") ?? "1"),
+        const [products, quotedMap, incomingMap] = await Promise.all([
+            dbListProducts({
+                category: searchParams.get("category") ?? undefined,
+                product_type: (searchParams.get("product_type") as "finished" | "raw_material") ?? undefined,
+                is_active: searchParams.get("is_active") !== "false",
+                page: parseInt(searchParams.get("page") ?? "1"),
+            }),
+            dbGetQuotedQuantities(),
+            dbGetIncomingQuantities(),
+        ]);
+        const enriched = products.map(p => {
+            const quoted   = quotedMap.get(p.id)   ?? 0;
+            const incoming = incomingMap.get(p.id) ?? 0;
+            return {
+                ...p,
+                quoted,
+                promisable: p.available_now - quoted,
+                incoming,
+                forecasted: p.available_now + incoming - quoted,
+            };
         });
-        return NextResponse.json(products);
+        return NextResponse.json(enriched);
     } catch (err) {
         return handleApiError(err, "GET /api/products");
     }

@@ -8,6 +8,9 @@
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [current_focus.md](current_focus.md) — Aktif sprint ve sonraki adımlar
 
+## Roadmap
+- [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği planı (local: erp2/yuksek-etki.md)
+
 ## Feedback
 - [feedback_no_silent_deletes.md](feedback_no_silent_deletes.md) — Kod silmeden önce onay veya net gerekçe gerekiyor; işe yarar kodu sessizce silme
 - [feedback_memory_updates.md](feedback_memory_updates.md) — MEMORY.md ve memory dosyaları düzenli güncel tutulmalı; önemli değişikliklerde güncelle
