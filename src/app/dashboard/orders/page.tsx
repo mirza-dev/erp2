@@ -271,7 +271,7 @@ function OrdersList() {
                                         <td style={{ ...tdStyle, textAlign: "center" }}>
                                             <span className={`badge ${commercial.cls}`}>{commercial.label}</span>
                                             {order.quoteValidUntil &&
-                                             new Date(order.quoteValidUntil) < new Date() &&
+                                             order.quoteValidUntil < new Date().toISOString().slice(0, 10) &&
                                              (order.commercial_status === "draft" || order.commercial_status === "pending_approval") && (
                                                 <span style={{
                                                     display: "inline-block",

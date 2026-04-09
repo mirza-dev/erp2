@@ -403,7 +403,7 @@ export default function OrderDetailPage() {
 
                 {/* Teklif süresi doldu uyarısı */}
                 {order.quoteValidUntil &&
-                 new Date(order.quoteValidUntil) < new Date() &&
+                 order.quoteValidUntil < new Date().toISOString().slice(0, 10) &&
                  (commercialStatus === "draft" || commercialStatus === "pending_approval") && (
                     <div style={{
                         background: "var(--danger-bg)",

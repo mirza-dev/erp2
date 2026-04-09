@@ -3,7 +3,7 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-10_
 
-**Son tamamlanan iş:** Faz 6.1 — Teklif Uzatma (Drawer) + Faz 5 Bug Fix
+**Son tamamlanan iş:** Geciken Sevkiyat Alertı (overdue_shipment)
 - `supabase/migrations/023_quote_valid_until.sql` — `quote_valid_until date` kolonu, `quote_expired` alert tipi, `create_order_with_lines` RPC güncelleme
 - `dbListExpiredQuotes()` + `serviceExpireQuotes()` — expired draft'ları auto-cancel, pending_approval'ları alert'e çevirir (dedup)
 - `POST /api/orders/expire-quotes` — CRON_PATHS'e eklendi (middleware.ts)
@@ -14,6 +14,7 @@ _Son güncelleme: 2026-04-10_
 - 2 yeni test dosyası: `expire-quotes-service.test.ts`, `expire-quotes-route.test.ts`
 - **Faz 6.1:** `dbUpdateOrderQuoteDeadline()` + PATCH `/api/orders/[id]` `quote_valid_until` branşı + drawer "Uzat" UI (+7/+14/+30/Özel, expired + ≤3 gün) + `expire-extend-route.test.ts`
 - **Faz 5 bug fix:** currency mismatch (q.currency), promisable negatif gizleme kaldırıldı (product.promisable canonical), email fallback "—"
+- **Geciken Sevkiyat:** `024_overdue_shipment_alert.sql` + `dbListOverdueShipments()` + `serviceCheckOverdueShipments()` + `POST /api/orders/check-shipments` + 2 test dosyası
 
 **Faz 5 (tamamlandı — Teklif Kırılımı):**
 - `dbGetQuotedBreakdownByProduct()` query + `dbLookupUserEmails()` helper
@@ -22,7 +23,7 @@ _Son güncelleme: 2026-04-10_
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** Migration 023 local Supabase'e henüz uygulanmadı (deploy sırasında yapılacak)
-**Test sayısı:** 61 dosya · 1264 test
+**Test sayısı:** 63 dosya · 1271 test
 
 ---
 

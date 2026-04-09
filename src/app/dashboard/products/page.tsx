@@ -1304,7 +1304,8 @@ export default function ProductsPage() {
                                     ) : (
                                         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                                             {quotes.map((q, idx) => {
-                                                const isExpired = !!q.quoteValidUntil && new Date(q.quoteValidUntil) < new Date();
+                                                const todayStr = new Date().toISOString().slice(0, 10);
+                                                const isExpired = !!q.quoteValidUntil && q.quoteValidUntil < todayStr;
                                                 const isOld = !isExpired && q.commercialStatus === "draft" &&
                                                     Date.now() - new Date(q.orderCreatedAt).getTime() > 7 * 86_400_000;
                                                 const daysRemaining = q.quoteValidUntil

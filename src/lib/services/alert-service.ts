@@ -4,7 +4,7 @@
  */
 
 import { dbListProducts, dbGetOpenShortagesByProduct, dbGetQuotedQuantities } from "@/lib/supabase/products";
-import { dbListOrders } from "@/lib/supabase/orders";
+import { dbListOrders, dbListOverdueShipments } from "@/lib/supabase/orders";
 import {
     dbListAlerts,
     dbGetAlertById,
@@ -298,4 +298,37 @@ export async function serviceUpdateAlertStatus(
 
     await dbUpdateAlertStatus(id, newStatus, reason);
     return { success: true };
+}
+
+// ── Overdue Shipment Scan ────────────────────────────────────
+
+/** Creates overdue_shipment alerts for approved orders past their planned ship
+ *  date (or 7+ days since creation if no date set). Deduplicates active alerts. */
+export async function serviceCheckOverdueShipments(): Promise<{ alerted: number }> {
+    const orders = await dbListOverdueShipments();
+    if (orders.length === 0) return { alerted: 0 };
+
+    const activeAlerts = await dbListActiveAlerts();
+    const activeSet = new Set(
+        activeAlerts
+            .filter(a => a.type === "overdue_shipment")
+            .map(a => a.entity_id)
+    );
+
+    let alerted = 0;
+    for (const order of orders) {
+        if (activeSet.has(order.id)) continue;
+        await dbCreateAlert({
+            type: "overdue_shipment",
+            severity: "warning",
+            title: `Geciken Sevkiyat: ${order.order_number}`,
+            description: order.planned_shipment_date
+                ? `${order.customer_name} — Planlanan sevk tarihi ${order.planned_shipment_date} geçti.`
+                : `${order.customer_name} — Onaydan 7+ gün geçti, henüz sevk edilmedi.`,
+            entity_type: "sales_order",
+            entity_id: order.id,
+        });
+        alerted++;
+    }
+    return { alerted };
 }

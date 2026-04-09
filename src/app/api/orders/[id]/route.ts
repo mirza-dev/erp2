@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     serviceGetOrder,
     serviceTransitionOrder,
+    serviceUpdateQuoteDeadline,
     type OrderTransition,
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { handleApiError } from "@/lib/api-error";
-import { dbGetOrderById, dbHardDeleteOrder, dbUpdateOrderQuoteDeadline } from "@/lib/supabase/orders";
+import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
 
 // GET /api/orders/[id]
 export async function GET(
@@ -38,7 +39,7 @@ export async function PATCH(
 
         // Quote deadline update — separate from state-machine transitions
         if ("quote_valid_until" in body) {
-            await dbUpdateOrderQuoteDeadline(id, body.quote_valid_until ?? null);
+            await serviceUpdateQuoteDeadline(id, body.quote_valid_until ?? null);
             return NextResponse.json({ ok: true });
         }
 

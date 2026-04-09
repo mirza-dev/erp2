@@ -15,12 +15,13 @@ import {
     dbShipOrderFull,
     dbCancelOrder,
     dbListExpiredQuotes,
+    dbUpdateOrderQuoteDeadline,
     type CreateOrderInput,
     type ListOrdersFilter,
     type ApproveOrderResult,
 } from "@/lib/supabase/orders";
 
-import { dbCreateAlert, dbListActiveAlerts } from "@/lib/supabase/alerts";
+import { dbCreateAlert, dbListActiveAlerts, dbBatchResolveAlerts, type BatchResolveEntry } from "@/lib/supabase/alerts";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 
 // ── Types ────────────────────────────────────────────────────
@@ -59,6 +60,16 @@ function isValidCommercialTransition(from: CommercialStatus, to: CommercialStatu
     return COMMERCIAL_TRANSITIONS[from]?.includes(to) ?? false;
 }
 
+/** Resolves open quote_expired alerts for an order (called on approve/cancel/extend). */
+async function resolveQuoteExpiredAlerts(orderId: string): Promise<void> {
+    const entry: BatchResolveEntry = {
+        type: "quote_expired",
+        entityId: orderId,
+        reason: "order_state_change",
+    };
+    await dbBatchResolveAlerts([entry]);
+}
+
 // ── Validation ───────────────────────────────────────────────
 
 export function validateOrderCreate(input: CreateOrderInput): ValidationResult {
@@ -67,6 +78,13 @@ export function validateOrderCreate(input: CreateOrderInput): ValidationResult {
     if (!input.customer_name?.trim()) errors.push("Müşteri adı zorunludur.");
     if (!input.lines || input.lines.length === 0) errors.push("En az bir satır ürün girilmelidir.");
     if (input.grand_total <= 0) errors.push("Sipariş tutarı 0'dan büyük olmalıdır.");
+
+    if (input.quote_valid_until) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (input.quote_valid_until < today) {
+            errors.push("Teklif geçerlilik tarihi bugün veya sonrası olmalıdır.");
+        }
+    }
 
     for (const [i, line] of (input.lines ?? []).entries()) {
         if (!line.product_id) errors.push(`Satır ${i + 1}: Ürün seçilmedi.`);
@@ -126,6 +144,7 @@ export async function serviceTransitionOrder(
             return { success: false, error: `'${order.commercial_status}' durumundaki sipariş onaylanamaz. Önce onaya gönderin.` };
         }
         const result: ApproveOrderResult = await dbApproveOrder(orderId);
+        if (result.success) await resolveQuoteExpiredAlerts(orderId);
         return {
             success: result.success,
             error: result.error,
@@ -148,10 +167,28 @@ export async function serviceTransitionOrder(
     // ── cancelled: atomic RPC with reservation release + shortage cancel ──
     if (transition === "cancelled") {
         const result = await dbCancelOrder(orderId);
+        if (result.success) await resolveQuoteExpiredAlerts(orderId);
         return { success: result.success, error: result.error };
     }
 
     return { success: false, error: `Bilinmeyen geçiş: ${transition}` };
+}
+
+// ── Quote Deadline Update ────────────────────────────────────
+
+/**
+ * Updates quote_valid_until and resolves open quote_expired alerts
+ * if the new date is today or in the future (i.e. quote is now valid again).
+ */
+export async function serviceUpdateQuoteDeadline(
+    orderId: string,
+    quoteValidUntil: string | null
+): Promise<void> {
+    await dbUpdateOrderQuoteDeadline(orderId, quoteValidUntil);
+    const today = new Date().toISOString().slice(0, 10);
+    if (quoteValidUntil && quoteValidUntil >= today) {
+        await resolveQuoteExpiredAlerts(orderId);
+    }
 }
 
 // ── Quote Expiry ─────────────────────────────────────────────

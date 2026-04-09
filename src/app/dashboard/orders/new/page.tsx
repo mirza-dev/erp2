@@ -677,6 +677,7 @@ function NewOrderForm() {
                                 type="date"
                                 value={quoteValidUntil}
                                 onChange={e => setQuoteValidUntil(e.target.value)}
+                                min={new Date().toISOString().slice(0, 10)}
                                 style={{ ...inputStyle, padding: "7px 10px" }}
                             />
                             {quoteValidUntil && (

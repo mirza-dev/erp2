@@ -366,6 +366,24 @@ export async function dbUpdateOrderQuoteDeadline(
     if (error) throw new Error(error.message);
 }
 
+// ── Overdue Shipments ────────────────────────────────────────
+
+/** Approved, unshipped orders that are past their planned ship date
+ *  or have no ship date but were created 7+ days ago. */
+export async function dbListOverdueShipments(): Promise<SalesOrderRow[]> {
+    const supabase = createServiceClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const threshold = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    const { data, error } = await supabase
+        .from("sales_orders")
+        .select("*")
+        .eq("commercial_status", "approved")
+        .not("fulfillment_status", "eq", "shipped")
+        .or(`planned_shipment_date.lt.${today},and(planned_shipment_date.is.null,created_at.lt.${threshold})`);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}
+
 // ── Hard Delete ──────────────────────────────────────────────
 
 export async function dbHardDeleteOrder(id: string): Promise<void> {

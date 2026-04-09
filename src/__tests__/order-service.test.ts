@@ -26,6 +26,14 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbCancelOrder:       (...args: unknown[]) => mockDbCancelOrder(...args),
     dbUpdateOrderStatus: (...args: unknown[]) => mockDbUpdateOrderStatus(...args),
     dbLogOrderAction:    (...args: unknown[]) => mockDbLogOrderAction(...args),
+    dbListExpiredQuotes:          vi.fn(),
+    dbUpdateOrderQuoteDeadline:   vi.fn(),
+}));
+
+vi.mock("@/lib/supabase/alerts", () => ({
+    dbCreateAlert:        vi.fn(),
+    dbListActiveAlerts:   vi.fn().mockResolvedValue([]),
+    dbBatchResolveAlerts: vi.fn().mockResolvedValue(0),
 }));
 
 import { serviceTransitionOrder, validateOrderCreate } from "@/lib/services/order-service";
@@ -245,5 +253,22 @@ describe("validateOrderCreate", () => {
         });
         expect(result.valid).toBe(false);
         expect(result.errors.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("quote_valid_until geçmiş tarih → hata", () => {
+        const result = validateOrderCreate({ ...validInput, quote_valid_until: "2020-01-01" });
+        expect(result.valid).toBe(false);
+        expect(result.errors.some(e => e.includes("geçerlilik tarihi"))).toBe(true);
+    });
+
+    it("quote_valid_until bugün veya gelecek → geçerli", () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const result = validateOrderCreate({ ...validInput, quote_valid_until: today });
+        expect(result.valid).toBe(true);
+    });
+
+    it("quote_valid_until yok → geçerli (süresiz teklif)", () => {
+        const result = validateOrderCreate({ ...validInput, quote_valid_until: undefined });
+        expect(result.valid).toBe(true);
     });
 });
