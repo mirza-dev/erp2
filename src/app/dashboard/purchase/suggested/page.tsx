@@ -467,6 +467,7 @@ export default function PurchaseSuggestedPage() {
     const { reorderSuggestions } = useData();
     const [filter, setFilter] = useState<FilterType>("all");
     const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>("all");
+    const [search, setSearch] = useState("");
     const isMobile = useIsMobile();
     const { toast } = useToast();
     const isDemo = useIsDemo();
@@ -610,9 +611,13 @@ export default function PurchaseSuggestedPage() {
     const rawItems = reorderSuggestions.filter(p => p.productType === "raw_material");
     const finishedItems = reorderSuggestions.filter(p => p.productType === "finished");
 
-    const filtered = filter === "all"
-        ? reorderSuggestions
-        : reorderSuggestions.filter(p => p.productType === filter);
+    const purchaseSearched = search.trim().toLowerCase();
+    const filtered = (filter === "all" ? reorderSuggestions : reorderSuggestions.filter(p => p.productType === filter))
+        .filter(p =>
+            !purchaseSearched ||
+            p.name.toLowerCase().includes(purchaseSearched) ||
+            p.sku.toLowerCase().includes(purchaseSearched)
+        );
 
     const sorted = [...filtered].sort((a, b) => {
         // Primary: orderDeadline ascending (null = no deadline data → last)
@@ -817,8 +822,25 @@ export default function PurchaseSuggestedPage() {
                 </div>
             )}
 
-            {/* Filter tabs */}
-            <div style={{ display: "flex", gap: "8px", marginTop: "20px" }}>
+            {/* Filter tabs + Arama */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "20px", flexWrap: "wrap" }}>
+                <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Ürün adı veya SKU..."
+                    style={{
+                        fontSize: "12px",
+                        padding: "6px 12px",
+                        border: "0.5px solid var(--border-secondary)",
+                        borderRadius: "6px",
+                        background: "var(--bg-primary)",
+                        color: "var(--text-primary)",
+                        width: "200px",
+                        outline: "none",
+                    }}
+                />
+                <div style={{ display: "flex", gap: "8px" }}>
                 {tabs.map(tab => {
                     const active = filter === tab.key;
                     return (
@@ -853,6 +875,7 @@ export default function PurchaseSuggestedPage() {
                         </button>
                     );
                 })}
+                </div>
             </div>
 
             {/* Segment banner */}

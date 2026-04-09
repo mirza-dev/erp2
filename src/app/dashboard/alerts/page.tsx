@@ -13,7 +13,7 @@ import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-u
 // ── Types ──────────────────────────────────────────────────────
 
 type Severity = "critical" | "warning" | "info";
-type AlertFilter = "all" | "critical" | "warning" | "order_shortage";
+type AlertFilter = "all" | "critical" | "warning" | "order_shortage" | "quote_expired" | "overdue_shipment";
 
 interface ProductAlertGroup {
     entityId: string;
@@ -96,6 +96,7 @@ export default function AlertsPage() {
     const [loading, setLoading]             = useState(true);
     const [activeFilter, setActiveFilter]   = useState<AlertFilter>("all");
     const [showResolved, setShowResolved]   = useState(false);
+    const [search, setSearch]               = useState("");
     const [refreshing, setRefreshing]       = useState(false);
     const [aiGenerating, setAiGenerating]   = useState(false);
     const [drawerGroup, setDrawerGroup]     = useState<ProductAlertGroup | null>(null);
@@ -123,8 +124,10 @@ export default function AlertsPage() {
 
     const productGroups: ProductAlertGroup[] = (() => {
         const sysAlerts = activeAlerts.filter((a) => a.source !== "ai" && a.entity_id);
+        // Sipariş bazlı alertları (quote_expired, overdue_shipment) ürün gruplarından ayır
+        const productSysAlerts = sysAlerts.filter((a) => a.entity_type !== "sales_order");
         const byProduct = new Map<string, AlertRow[]>();
-        for (const alert of sysAlerts) {
+        for (const alert of productSysAlerts) {
             const id = alert.entity_id!;
             if (!byProduct.has(id)) byProduct.set(id, []);
             byProduct.get(id)!.push(alert);
@@ -168,14 +171,27 @@ export default function AlertsPage() {
         });
     })();
 
-    const aiAlerts      = activeAlerts.filter((a) => a.source === "ai");
-    const criticalCount = productGroups.filter((g) => g.topSeverity === "critical").length;
-    const warningCount  = productGroups.filter((g) => g.topSeverity === "warning").length;
-    const shortageCount = productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage")).length;
-    const filtered      = activeFilter === "all"            ? productGroups
-        : activeFilter === "critical"       ? productGroups.filter((g) => g.topSeverity === "critical")
-        : activeFilter === "warning"        ? productGroups.filter((g) => g.topSeverity === "warning")
-        : productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage"));
+    const aiAlerts           = activeAlerts.filter((a) => a.source === "ai");
+    const orderAlerts        = activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "sales_order");
+    const criticalCount      = productGroups.filter((g) => g.topSeverity === "critical").length;
+    const warningCount       = productGroups.filter((g) => g.topSeverity === "warning").length;
+    const shortageCount      = productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage")).length;
+    const quoteExpiredCount  = orderAlerts.filter((a) => a.type === "quote_expired").length;
+    const overdueCount       = orderAlerts.filter((a) => a.type === "overdue_shipment").length;
+    const searched = search.trim().toLowerCase();
+    const searchedGroups = searched
+        ? productGroups.filter(
+            (g) =>
+                g.productName.toLowerCase().includes(searched) ||
+                g.sku.toLowerCase().includes(searched)
+          )
+        : productGroups;
+    const isOrderAlertTab = activeFilter === "quote_expired" || activeFilter === "overdue_shipment";
+    const filtered      = isOrderAlertTab                  ? []  // order alert tabs → ayrı section'da gösterilir
+        : activeFilter === "all"            ? searchedGroups
+        : activeFilter === "critical"       ? searchedGroups.filter((g) => g.topSeverity === "critical")
+        : activeFilter === "warning"        ? searchedGroups.filter((g) => g.topSeverity === "warning")
+        : searchedGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage"));
 
     // ── Actions ──
     const handleRefresh = async () => {
@@ -394,10 +410,12 @@ export default function AlertsPage() {
                     <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
                         {(
                             [
-                                { key: "all"            as AlertFilter, label: "Tümü",         count: productGroups.length, dot: null                },
-                                { key: "critical"       as AlertFilter, label: "Kritik",        count: criticalCount,        dot: "var(--danger)"     },
-                                { key: "warning"        as AlertFilter, label: "Uyarı",         count: warningCount,         dot: "var(--warning)"    },
-                                { key: "order_shortage" as AlertFilter, label: "Sipariş Eksik", count: shortageCount,        dot: "var(--danger)"     },
+                                { key: "all"              as AlertFilter, label: "Tümü",             count: productGroups.length, dot: null                },
+                                { key: "critical"         as AlertFilter, label: "Kritik",            count: criticalCount,        dot: "var(--danger)"     },
+                                { key: "warning"          as AlertFilter, label: "Uyarı",             count: warningCount,         dot: "var(--warning)"    },
+                                { key: "order_shortage"   as AlertFilter, label: "Sipariş Eksik",     count: shortageCount,        dot: "var(--danger)"     },
+                                { key: "quote_expired"    as AlertFilter, label: "Teklif Süresi",     count: quoteExpiredCount,    dot: "var(--warning)"    },
+                                { key: "overdue_shipment" as AlertFilter, label: "Geciken Sevkiyat",  count: overdueCount,         dot: "var(--danger)"     },
                             ]
                         ).map((tab) => (
                             <button
@@ -440,21 +458,39 @@ export default function AlertsPage() {
                         ))}
                     </div>
                     {!isMobile && (
-                        <button
-                            onClick={() => setShowResolved((v) => !v)}
-                            style={{
-                                fontSize: "11px",
-                                padding: "4px 10px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "4px",
-                                background: showResolved ? "var(--bg-tertiary)" : "transparent",
-                                color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
-                                cursor: "pointer",
-                                flexShrink: 0,
-                            }}
-                        >
-                            {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
-                        </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                            <input
+                                type="text"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                placeholder="Ürün adı veya SKU..."
+                                style={{
+                                    fontSize: "12px",
+                                    padding: "5px 10px",
+                                    border: "0.5px solid var(--border-secondary)",
+                                    borderRadius: "6px",
+                                    background: "var(--bg-primary)",
+                                    color: "var(--text-primary)",
+                                    width: "180px",
+                                    outline: "none",
+                                }}
+                            />
+                            <button
+                                onClick={() => setShowResolved((v) => !v)}
+                                style={{
+                                    fontSize: "11px",
+                                    padding: "4px 10px",
+                                    border: "0.5px solid var(--border-secondary)",
+                                    borderRadius: "4px",
+                                    background: showResolved ? "var(--bg-tertiary)" : "transparent",
+                                    color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
+                                    cursor: "pointer",
+                                    flexShrink: 0,
+                                }}
+                            >
+                                {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
+                            </button>
+                        </div>
                     )}
                 </div>
                 {isMobile && (
@@ -483,6 +519,61 @@ export default function AlertsPage() {
             {/* ── Product Alert Table ── */}
             {loading ? (
                 <LoadingState message="Uyarılar yükleniyor..." />
+            ) : isOrderAlertTab ? (
+                /* ── Sipariş Uyarıları Section ── */
+                (() => {
+                    const visibleOrderAlerts = orderAlerts.filter((a) => a.type === activeFilter);
+                    return visibleOrderAlerts.length === 0 ? (
+                        <EmptyState
+                            title={activeFilter === "quote_expired" ? "Süresi dolmuş teklif yok" : "Geciken sevkiyat yok"}
+                            description={activeFilter === "quote_expired" ? "Tüm tekliflerin geçerlilik tarihi uygun." : "Tüm onaylı siparişler zamanında sevk edilmiş."}
+                        />
+                    ) : (
+                        <div>
+                            {visibleOrderAlerts.map((alert) => (
+                                <div
+                                    key={alert.id}
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "flex-start",
+                                        padding: "14px 20px",
+                                        borderBottom: "0.5px solid var(--border-tertiary)",
+                                        gap: "16px",
+                                    }}
+                                >
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
+                                            {alert.title}
+                                        </div>
+                                        {alert.description && (
+                                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                                                {alert.description}
+                                            </div>
+                                        )}
+                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                                            {new Date(alert.created_at).toLocaleDateString("tr-TR")}
+                                        </div>
+                                    </div>
+                                    {alert.entity_id && (
+                                        <Link
+                                            href={`/dashboard/orders/${alert.entity_id}`}
+                                            style={{
+                                                fontSize: "12px",
+                                                color: "var(--accent)",
+                                                whiteSpace: "nowrap",
+                                                flexShrink: 0,
+                                                textDecoration: "none",
+                                            }}
+                                        >
+                                            Siparişe Git →
+                                        </Link>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })()
             ) : productGroups.length === 0 ? (
                 <EmptyState
                     title="Tüm ürünler sağlıklı"

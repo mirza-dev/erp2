@@ -71,6 +71,9 @@ function OrdersList() {
     const [search, setSearch] = useState("");
     const [customerIdFilter, setCustomerIdFilter] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
+    const [currencyFilter, setCurrencyFilter] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const filterAppliedRef = useRef(false);
@@ -102,13 +105,32 @@ function OrdersList() {
     // filterAppliedRef ensures the filter is applied at most once.
     useEffect(() => {
         if (filterAppliedRef.current) return;
+        filterAppliedRef.current = true;
         const customerId = searchParams.get("customerId");
         const customer   = searchParams.get("customer"); // legacy name-based
-        if (!customerId && !customer) return;
-        filterAppliedRef.current = true;
+        const tab        = searchParams.get("tab");
+        const from       = searchParams.get("from");
+        const to         = searchParams.get("to");
+        const currency   = searchParams.get("currency");
         if (customerId) setCustomerIdFilter(customerId);
         else if (customer) setSearch(decodeURIComponent(customer));
+        if (tab && filterTabs.some((t) => t.id === tab)) setActiveTab(tab as FilterTab);
+        if (from) setDateFrom(from);
+        if (to) setDateTo(to);
+        if (currency) setCurrencyFilter(currency);
     }, [searchParams]);
+
+    // URL'e filtre state'ini yaz (link paylaşımı için)
+    useEffect(() => {
+        if (!filterAppliedRef.current) return; // mount okuma tamamlanmadan yazma
+        const params = new URLSearchParams();
+        if (customerIdFilter) params.set("customerId", customerIdFilter);
+        if (activeTab !== "ALL") params.set("tab", activeTab);
+        if (dateFrom) params.set("from", dateFrom);
+        if (dateTo) params.set("to", dateTo);
+        if (currencyFilter) params.set("currency", currencyFilter);
+        router.replace(params.toString() ? `?${params.toString()}` : "?", { scroll: false });
+    }, [activeTab, customerIdFilter, dateFrom, dateTo, currencyFilter, router]);
 
     const filtered = mockOrders.filter((o) => {
         if (customerIdFilter && o.customerId !== customerIdFilter) return false;
@@ -116,7 +138,13 @@ function OrdersList() {
             !search ||
             o.orderNumber.toLowerCase().includes(search.toLowerCase()) ||
             o.customerName.toLowerCase().includes(search.toLowerCase());
-        return matchSearch && matchesTab(o, activeTab);
+        if (!matchSearch) return false;
+        if (!matchesTab(o, activeTab)) return false;
+        const orderDate = (o.createdAt ?? "").slice(0, 10);
+        if (dateFrom && orderDate < dateFrom) return false;
+        if (dateTo   && orderDate > dateTo)   return false;
+        if (currencyFilter && o.currency !== currencyFilter) return false;
+        return true;
     });
 
     const getCount = (tab: FilterTab) =>
@@ -170,23 +198,99 @@ function OrdersList() {
                     ))}
                 </div>
 
-                {/* Search */}
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Sipariş no veya müşteri..."
-                    style={{
-                        fontSize: "12px",
-                        padding: "6px 12px",
-                        border: "0.5px solid var(--border-secondary)",
-                        borderRadius: "6px",
-                        background: "var(--bg-primary)",
-                        color: "var(--text-primary)",
-                        width: "220px",
-                        outline: "none",
-                    }}
-                />
+                {/* Search + Gelişmiş Filtreler */}
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Sipariş no veya müşteri..."
+                        style={{
+                            fontSize: "12px",
+                            padding: "6px 12px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "6px",
+                            background: "var(--bg-primary)",
+                            color: "var(--text-primary)",
+                            width: "200px",
+                            outline: "none",
+                        }}
+                    />
+                    <input
+                        type="date"
+                        value={dateFrom}
+                        onChange={(e) => setDateFrom(e.target.value)}
+                        title="Başlangıç tarihi"
+                        style={{
+                            fontSize: "12px",
+                            padding: "5px 8px",
+                            border: `0.5px solid ${dateFrom ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            borderRadius: "6px",
+                            background: "var(--bg-primary)",
+                            color: dateFrom ? "var(--text-primary)" : "var(--text-tertiary)",
+                            outline: "none",
+                            cursor: "pointer",
+                        }}
+                    />
+                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>—</span>
+                    <input
+                        type="date"
+                        value={dateTo}
+                        onChange={(e) => setDateTo(e.target.value)}
+                        title="Bitiş tarihi"
+                        style={{
+                            fontSize: "12px",
+                            padding: "5px 8px",
+                            border: `0.5px solid ${dateTo ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            borderRadius: "6px",
+                            background: "var(--bg-primary)",
+                            color: dateTo ? "var(--text-primary)" : "var(--text-tertiary)",
+                            outline: "none",
+                            cursor: "pointer",
+                        }}
+                    />
+                    <select
+                        value={currencyFilter}
+                        onChange={(e) => setCurrencyFilter(e.target.value)}
+                        style={{
+                            fontSize: "12px",
+                            padding: "5px 8px",
+                            border: `0.5px solid ${currencyFilter ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            borderRadius: "6px",
+                            background: "var(--bg-primary)",
+                            color: currencyFilter ? "var(--text-primary)" : "var(--text-tertiary)",
+                            outline: "none",
+                            cursor: "pointer",
+                        }}
+                    >
+                        <option value="">Tüm Para Birimleri</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="TRY">TRY</option>
+                    </select>
+                    {(dateFrom || dateTo || currencyFilter || customerIdFilter) && (
+                        <button
+                            onClick={() => {
+                                setDateFrom("");
+                                setDateTo("");
+                                setCurrencyFilter("");
+                                setCustomerIdFilter(null);
+                            }}
+                            style={{
+                                fontSize: "11px",
+                                padding: "5px 10px",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "6px",
+                                background: "transparent",
+                                color: "var(--text-secondary)",
+                                cursor: "pointer",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            × Filtreleri Temizle
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Table */}

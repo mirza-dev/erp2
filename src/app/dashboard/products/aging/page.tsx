@@ -37,6 +37,7 @@ export default function AgingPage() {
     const [rows, setRows] = useState<AgingRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<AgingCategory | "all">("all");
+    const [search, setSearch] = useState("");
 
     useEffect(() => {
         let cancelled = false;
@@ -61,7 +62,13 @@ export default function AgingPage() {
         return () => { cancelled = true; };
     }, []);
 
-    const filtered = filter === "all" ? rows : rows.filter(r => r.agingCategory === filter);
+    const searched = search.trim().toLowerCase();
+    const filtered = (filter === "all" ? rows : rows.filter(r => r.agingCategory === filter))
+        .filter(r =>
+            !searched ||
+            r.productName.toLowerCase().includes(searched) ||
+            r.sku.toLowerCase().includes(searched)
+        );
 
     // Özet kartlar
     const CURRENCY_ORDER = ["EUR", "TRY", "USD"];
@@ -154,8 +161,26 @@ export default function AgingPage() {
                 })}
             </div>
 
+            {/* Filtre Satırı */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginBottom: "8px" }}>
+                <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Ürün adı veya SKU..."
+                    style={{
+                        fontSize: "12px",
+                        padding: "6px 12px",
+                        border: "0.5px solid var(--border-secondary)",
+                        borderRadius: "6px",
+                        background: "var(--bg-primary)",
+                        color: "var(--text-primary)",
+                        width: "200px",
+                        outline: "none",
+                    }}
+                />
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             {/* Filtre Sekmeleri */}
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                 {FILTER_TABS.map(tab => {
                     const active = filter === tab.key;
                     return (
@@ -180,6 +205,7 @@ export default function AgingPage() {
                         </button>
                     );
                 })}
+                </div>
             </div>
 
             {/* Tablo */}
@@ -196,7 +222,7 @@ export default function AgingPage() {
                     </div>
                 ) : filtered.length === 0 ? (
                     <div style={{ padding: "32px", textAlign: "center", fontSize: "13px", color: "var(--text-tertiary)" }}>
-                        {filter === "all" ? "Stokta bekleyen ürün yok." : "Bu kategoride ürün yok."}
+                        {searched ? "Arama sonucu bulunamadı." : filter === "all" ? "Stokta bekleyen ürün yok." : "Bu kategoride ürün yok."}
                     </div>
                 ) : (
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
