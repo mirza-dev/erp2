@@ -615,6 +615,13 @@ export default function PurchaseSuggestedPage() {
         : reorderSuggestions.filter(p => p.productType === filter);
 
     const sorted = [...filtered].sort((a, b) => {
+        // Primary: orderDeadline ascending (null = no deadline data → last)
+        const dlA = a.orderDeadline ?? null;
+        const dlB = b.orderDeadline ?? null;
+        if (dlA !== null && dlB !== null) return dlA < dlB ? -1 : dlA > dlB ? 1 : 0;
+        if (dlA !== null) return -1;
+        if (dlB !== null) return 1;
+        // Fallback: coverage days ascending (null last)
         const daysA = computeCoverageDays(a.available_now, a.dailyUsage);
         const daysB = computeCoverageDays(b.available_now, b.dailyUsage);
         if (daysA !== null && daysB !== null) return daysA - daysB;

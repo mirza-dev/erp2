@@ -49,6 +49,8 @@ export interface Product {
     standards?: string;
     certifications?: string;
     productNotes?: string;
+    stockoutDate?:  string | null;   // ISO date: stok tükenme tahmini
+    orderDeadline?: string | null;   // ISO date: siparişin en geç verileceği tarih
 }
 
 export interface Customer {

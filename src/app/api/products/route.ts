@@ -3,6 +3,7 @@ import { dbListProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProd
 import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { handleApiError } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
+import { computeOrderDeadline } from "@/lib/stock-utils";
 
 // GET /api/products?category=xxx&product_type=finished&is_active=false&page=1
 export async function GET(req: NextRequest) {
@@ -21,12 +22,18 @@ export async function GET(req: NextRequest) {
         const enriched = products.map(p => {
             const quoted   = quotedMap.get(p.id)   ?? 0;
             const incoming = incomingMap.get(p.id) ?? 0;
+            const promisable = p.available_now - quoted;
+            const { stockoutDate, orderDeadline } = computeOrderDeadline(
+                promisable, p.daily_usage, p.lead_time_days
+            );
             return {
                 ...p,
                 quoted,
-                promisable: p.available_now - quoted,
+                promisable,
                 incoming,
                 forecasted: p.available_now + incoming - quoted,
+                stockoutDate,
+                orderDeadline,
             };
         });
         return NextResponse.json(enriched);

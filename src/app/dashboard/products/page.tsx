@@ -578,6 +578,7 @@ export default function ProductsPage() {
                             {!isMobile && <th style={thStyle}>Kategori</th>}
                             <th style={{ ...thStyle, textAlign: "right" }}>Stok</th>
                             {!isMobile && <th style={{ ...thStyle, textAlign: "right" }}>Kapsam</th>}
+                            {!isMobile && <th style={{ ...thStyle, textAlign: "right" }}>Son Tarih</th>}
                             {!isMobile && <th style={{ ...thStyle, textAlign: "center" }}>Sinyal</th>}
                             <th style={{ ...thStyle, width: isMobile ? "36px" : "100px" }}></th>
                         </tr>
@@ -660,6 +661,25 @@ export default function ProductsPage() {
                                             {risk?.coverageDays != null ? `${risk.coverageDays}g` : <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>—</span>}
                                         </td>
                                     )}
+                                    {!isMobile && (() => {
+                                        const dl = product.orderDeadline ?? null;
+                                        if (!dl) return (
+                                            <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)" }}>—</td>
+                                        );
+                                        const daysLeft = Math.floor((new Date(dl).getTime() - Date.now()) / 86_400_000);
+                                        const color = daysLeft < 0 ? "var(--danger-text)"
+                                            : daysLeft < 7  ? "var(--danger-text)"
+                                            : daysLeft < 14 ? "var(--warning-text)"
+                                            : "var(--text-secondary)";
+                                        const label = daysLeft < 0
+                                            ? "Geçti"
+                                            : new Date(dl).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+                                        return (
+                                            <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color, whiteSpace: "nowrap" }}>
+                                                {label}
+                                            </td>
+                                        );
+                                    })()}
                                     {!isMobile && (
                                         <td style={{ ...tdStyle, textAlign: "center" }}>
                                             {product.forecasted < 0 ? (

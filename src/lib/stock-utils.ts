@@ -235,6 +235,43 @@ export function buildPurchaseDescription(
     return parts.join(" ");
 }
 
+// ── Order Deadline ───────────────────────────────────────────
+
+const SAFETY_BUFFER_DAYS = 7;
+
+export interface OrderDeadlineResult {
+    stockoutDate:  string | null;   // ISO date (YYYY-MM-DD)
+    orderDeadline: string | null;   // ISO date (YYYY-MM-DD)
+}
+
+/**
+ * Kaç gün sonra stok tükenir ve en geç ne zaman sipariş verilmeli?
+ *
+ * stockout_date  = today + floor(promisable / daily_usage)
+ * order_deadline = stockout_date - lead_time_days - SAFETY_BUFFER_DAYS (7)
+ *
+ * daily_usage null/0  → her iki alan null
+ * lead_time_days null → stockoutDate hesaplanır, orderDeadline null
+ * promisable ≤ 0      → stockout bugün veya geçmişte → deadline negatif
+ */
+export function computeOrderDeadline(
+    promisable: number,
+    dailyUsage:   number | null | undefined,
+    leadTimeDays: number | null | undefined,
+): OrderDeadlineResult {
+    if (!dailyUsage || dailyUsage <= 0) return { stockoutDate: null, orderDeadline: null };
+
+    const stockoutDays = Math.floor(promisable / dailyUsage);
+    const stockoutDate = new Date(Date.now() + stockoutDays * 86_400_000)
+        .toISOString().slice(0, 10);
+
+    if (!leadTimeDays || leadTimeDays <= 0) return { stockoutDate, orderDeadline: null };
+
+    const deadlineMs    = Date.now() + (stockoutDays - leadTimeDays - SAFETY_BUFFER_DAYS) * 86_400_000;
+    const orderDeadline = new Date(deadlineMs).toISOString().slice(0, 10);
+    return { stockoutDate, orderDeadline };
+}
+
 // ── Status Badge ──────────────────────────────────────────────
 
 export interface StatusBadge {

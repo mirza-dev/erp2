@@ -226,3 +226,31 @@ describe("GET /api/products — forecasted enrichment", () => {
         expect(data[0]).toHaveProperty("promisable", 5);
     });
 });
+
+// ── Deadline enrichment ───────────────────────────────────────
+
+describe("GET /api/products — deadline enrichment", () => {
+    it("daily_usage null → stockoutDate null, orderDeadline null", async () => {
+        // makeProduct sets daily_usage: null by default
+        mockDbListProducts.mockResolvedValue([makeProduct("prod-1", 50, 0)]);
+        const [row] = await (await GET(makeRequest())).json();
+        expect(row.stockoutDate).toBeNull();
+        expect(row.orderDeadline).toBeNull();
+    });
+
+    it("daily_usage set, lead_time_days null → stockoutDate dolu, orderDeadline null", async () => {
+        const p = { ...makeProduct("prod-1", 100, 0), daily_usage: 10, lead_time_days: null };
+        mockDbListProducts.mockResolvedValue([p]);
+        const [row] = await (await GET(makeRequest())).json();
+        expect(row.stockoutDate).not.toBeNull();
+        expect(row.orderDeadline).toBeNull();
+    });
+
+    it("daily_usage ve lead_time_days dolu → deadline hesaplanmış", async () => {
+        const p = { ...makeProduct("prod-1", 100, 0), daily_usage: 10, lead_time_days: 30 };
+        mockDbListProducts.mockResolvedValue([p]);
+        const [row] = await (await GET(makeRequest())).json();
+        expect(row.stockoutDate).not.toBeNull();
+        expect(row.orderDeadline).not.toBeNull();
+    });
+});

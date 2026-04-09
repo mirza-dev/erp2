@@ -1,9 +1,9 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-08_
+_Son güncelleme: 2026-04-09_
 
-**Son tamamlanan iş:** Faz 3 — Stok Eskime Raporu
+**Son tamamlanan iş:** Faz 4 — Sipariş Son Tarihi (Order Deadline)
 - DB migration: `purchase_commitments` tablosu + `receive_purchase_commitment` atomik RPC (`020_purchase_commitments.sql`)
 - Yeni stok alanları: `incoming` (bekleyen commitments), `forecasted` (on_hand + incoming - reserved - quoted)
 - `dbGetIncomingQuantities()` → purchase_commitments pending filtreli ürün bazlı toplam
@@ -15,9 +15,18 @@ _Son güncelleme: 2026-04-08_
 - Drawer: Bekleyen Teslimatlar bölümü — liste + inline ekle formu + Alındı/İptal butonları
 - DB migration kullanıcı elle uygulamalı: `supabase db push` veya Studio SQL editörü
 
+**Faz 4 eklentileri:**
+- `computeOrderDeadline()` pure helper (`src/lib/stock-utils.ts`)
+- `/api/products` → `stockoutDate` + `orderDeadline` alanları (daily_usage + lead_time_days varsa)
+- Ürünler sayfasına "Son Tarih" kolonu (kırmızı/sarı/yeşil renk kodu)
+- Satın alma önerileri → orderDeadline ascending sort
+- `order_deadline` alert tipi: deadline ≤ 7 gün ise alert üretir
+- Migration: `022_add_order_deadline_alert.sql` — alerts.type constraint genişletildi
+- `AlertType` TS tipi güncellendi
+
 **Aktif odak:** —
 **Bilinen açık sorunlar:** —
-**Test sayısı:** 52 dosya · 1207 test
+**Test sayısı:** 53 dosya · 1222 test
 
 ---
 

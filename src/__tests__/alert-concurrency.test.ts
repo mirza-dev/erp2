@@ -185,12 +185,13 @@ describe("Batch resolve — resolve calls collected and sent as one batch", () =
         expect(mockDbBatchResolveAlerts).toHaveBeenCalledOnce();
         const entries = mockDbBatchResolveAlerts.mock.calls[0][0];
 
-        // Each healthy product pushes: stock_critical, stock_risk (stock_recovered) + order_shortage (shortage_resolved)
+        // Each healthy product pushes: stock_critical, stock_risk (stock_recovered)
+        // + order_shortage (shortage_resolved) + order_deadline (not_computable when daily_usage null)
         const p1Entries = entries.filter((e: { entityId: string }) => e.entityId === "p1");
-        expect(p1Entries).toHaveLength(3);
+        expect(p1Entries).toHaveLength(4);
 
         const types = p1Entries.map((e: { type: string }) => e.type).sort();
-        expect(types).toEqual(["order_shortage", "stock_critical", "stock_risk"]);
+        expect(types).toEqual(["order_deadline", "order_shortage", "stock_critical", "stock_risk"]);
     });
 
     it("critical product → batch resolve includes stock_risk escalation", async () => {

@@ -17,7 +17,7 @@ import {
     type BatchResolveEntry,
 } from "@/lib/supabase/alerts";
 import type { AlertStatus } from "@/lib/database.types";
-import { computeCoverageDays, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
+import { computeCoverageDays, computeOrderDeadline, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
 import { isAIAvailable, aiGenerateOpsSummary, type OpsSummaryInput } from "@/lib/services/ai-service";
 
 // ── Lifecycle transitions (domain-rules §12.3) ───────────────
@@ -112,6 +112,37 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
             // Stock is healthy — resolve any open stock alerts
             toResolve.push({ type: "stock_critical", entityId, reason: "stock_recovered" });
             toResolve.push({ type: "stock_risk", entityId, reason: "stock_recovered" });
+        }
+
+        // Order deadline: sipariş son tarihi ≤ 7 gün → alert
+        // available_now kullanılır (promisable yerine) — alert-service'te quoted çekilmiyor
+        const { orderDeadline } = computeOrderDeadline(
+            product.available_now,
+            dailyUsage,
+            leadTimeDays,
+        );
+        if (orderDeadline !== null) {
+            const daysLeft = Math.floor((new Date(orderDeadline).getTime() - Date.now()) / 86_400_000);
+            if (daysLeft <= 7) {
+                if (!activeSet.has(`order_deadline:${entityId}`)) {
+                    const deadlineTitle = daysLeft < 0
+                        ? `${product.name}: Sipariş son tarihi geçti`
+                        : `${product.name}: Sipariş son tarihi ${daysLeft} gün kaldı`;
+                    const alert = await dbCreateAlert({
+                        type: "order_deadline",
+                        severity: daysLeft < 0 ? "critical" : "warning",
+                        title: deadlineTitle,
+                        description: `Stok tükenmeden ${Math.abs(daysLeft)} gün ${daysLeft < 0 ? "önce" : "sonra"} sipariş verilmesi gerekiyordu. Tedarik süresi: ${leadTimeDays ?? "?"} gün.`,
+                        entity_type: "product",
+                        entity_id: entityId,
+                    });
+                    if (alert) created++;
+                }
+            } else {
+                toResolve.push({ type: "order_deadline", entityId, reason: "deadline_not_imminent" });
+            }
+        } else {
+            toResolve.push({ type: "order_deadline", entityId, reason: "deadline_not_computable" });
         }
 
         // Order shortage: source of truth is the shortages table.
