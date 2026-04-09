@@ -65,6 +65,8 @@ export function mapProduct(row: ProductWithStock): Product {
     standards: row.standards ?? undefined,
     certifications: row.certifications ?? undefined,
     productNotes: row.product_notes ?? undefined,
+    stockoutDate: row.stockoutDate ?? null,
+    orderDeadline: row.orderDeadline ?? null,
   };
 }
 
@@ -105,6 +107,7 @@ export function mapOrderSummary(row: SalesOrderRow): Order {
     itemCount: row.item_count,
     aiRiskLevel: row.ai_risk_level ?? undefined,
     aiConfidence: row.ai_confidence ?? undefined,
+    quoteValidUntil: row.quote_valid_until ?? null,
   };
 }
 

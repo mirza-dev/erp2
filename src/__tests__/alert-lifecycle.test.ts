@@ -19,11 +19,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockDbListProducts = vi.fn();
 const mockDbGetOpenShortagesByProduct = vi.fn();
+const mockDbGetQuotedQuantities = vi.fn();
 const mockDbListOrders = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts: (...args: unknown[]) => mockDbListProducts(...args),
+    dbListProducts:              (...args: unknown[]) => mockDbListProducts(...args),
     dbGetOpenShortagesByProduct: () => mockDbGetOpenShortagesByProduct(),
+    dbGetQuotedQuantities:       (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
 }));
 
 vi.mock("@/lib/supabase/orders", () => ({
@@ -111,6 +113,7 @@ beforeEach(() => {
     mockDbBatchResolveAlerts.mockResolvedValue(0);
     mockDbListActiveAlerts.mockResolvedValue([]);
     mockDbGetOpenShortagesByProduct.mockResolvedValue(new Map());
+    mockDbGetQuotedQuantities.mockResolvedValue(new Map());
 });
 
 // ── Block 1: Dedupe — acknowledged alert engel oluşturur ──────────────────────

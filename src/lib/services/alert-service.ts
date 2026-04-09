@@ -3,7 +3,7 @@
  * Follows domain-rules.md §6 (critical/warning rules) + §12 (alert lifecycle).
  */
 
-import { dbListProducts, dbGetOpenShortagesByProduct } from "@/lib/supabase/products";
+import { dbListProducts, dbGetOpenShortagesByProduct, dbGetQuotedQuantities } from "@/lib/supabase/products";
 import { dbListOrders } from "@/lib/supabase/orders";
 import {
     dbListAlerts,
@@ -52,10 +52,11 @@ export interface ScanResult {
  * idx_alerts_active_dedup as a safety net against duplicate creates.
  */
 export async function serviceScanStockAlerts(): Promise<ScanResult> {
-    const [products, shortageMap, activeAlerts] = await Promise.all([
+    const [products, shortageMap, activeAlerts, quotedMap] = await Promise.all([
         dbListProducts({ is_active: true, pageSize: 500 }),
         dbGetOpenShortagesByProduct(),
         dbListActiveAlerts(),
+        dbGetQuotedQuantities(),
     ]);
 
     // Build dedup set: "type:entityId" for O(1) lookups
@@ -115,9 +116,11 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
         }
 
         // Order deadline: sipariş son tarihi ≤ 7 gün → alert
-        // available_now kullanılır (promisable yerine) — alert-service'te quoted çekilmiyor
+        // promisable kullanılır (available_now - quoted) — UI/API ile tutarlı
+        const quoted = quotedMap.get(product.id) ?? 0;
+        const promisable = product.available_now - quoted;
         const { orderDeadline } = computeOrderDeadline(
-            product.available_now,
+            promisable,
             dailyUsage,
             leadTimeDays,
         );
@@ -132,7 +135,9 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                         type: "order_deadline",
                         severity: daysLeft < 0 ? "critical" : "warning",
                         title: deadlineTitle,
-                        description: `Stok tükenmeden ${Math.abs(daysLeft)} gün ${daysLeft < 0 ? "önce" : "sonra"} sipariş verilmesi gerekiyordu. Tedarik süresi: ${leadTimeDays ?? "?"} gün.`,
+                        description: daysLeft < 0
+                            ? `Sipariş son tarihi ${Math.abs(daysLeft)} gün önce geçti. Tedarik süresi: ${leadTimeDays ?? "?"} gün.`
+                            : `Sipariş verilmesi için ${daysLeft} gün kaldı. Tedarik süresi: ${leadTimeDays ?? "?"} gün.`,
                         entity_type: "product",
                         entity_id: entityId,
                     });

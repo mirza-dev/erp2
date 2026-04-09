@@ -14,11 +14,13 @@ import {
     dbApproveOrder,
     dbShipOrderFull,
     dbCancelOrder,
+    dbListExpiredQuotes,
     type CreateOrderInput,
     type ListOrdersFilter,
     type ApproveOrderResult,
 } from "@/lib/supabase/orders";
 
+import { dbCreateAlert, dbListActiveAlerts } from "@/lib/supabase/alerts";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 
 // ── Types ────────────────────────────────────────────────────
@@ -150,4 +152,49 @@ export async function serviceTransitionOrder(
     }
 
     return { success: false, error: `Bilinmeyen geçiş: ${transition}` };
+}
+
+// ── Quote Expiry ─────────────────────────────────────────────
+
+/**
+ * Süresi dolmuş teklifleri tarar:
+ *   - draft → cancel_order RPC ile otomatik iptal (rezervasyon yok, güvenli)
+ *   - pending_approval → quote_expired alert üretir (insan kararı gerekir)
+ *
+ * Endpoint: POST /api/orders/expire-quotes (CRON_SECRET ile çağrılır)
+ */
+export async function serviceExpireQuotes(): Promise<{ expired: number; alerted: number }> {
+    const expiredOrders = await dbListExpiredQuotes();
+    if (expiredOrders.length === 0) return { expired: 0, alerted: 0 };
+
+    // Mevcut açık alert'ler — pending_approval dedup için
+    const activeAlerts = await dbListActiveAlerts();
+    const activeSet = new Set(
+        activeAlerts
+            .filter(a => a.type === "quote_expired")
+            .map(a => a.entity_id)
+    );
+
+    let expired = 0;
+    let alerted = 0;
+
+    for (const order of expiredOrders) {
+        if (order.commercial_status === "draft") {
+            const result = await dbCancelOrder(order.id);
+            if (result.success) expired++;
+        } else if (order.commercial_status === "pending_approval") {
+            if (activeSet.has(order.id)) continue;
+            await dbCreateAlert({
+                type: "quote_expired",
+                severity: "warning",
+                title: `Teklif Süresi Doldu: ${order.order_number}`,
+                description: `${order.customer_name} — ${order.order_number} teklifinin süresi ${order.quote_valid_until} tarihinde doldu. İptal veya uzatma gerekiyor.`,
+                entity_type: "sales_order",
+                entity_id: order.id,
+            });
+            alerted++;
+        }
+    }
+
+    return { expired, alerted };
 }

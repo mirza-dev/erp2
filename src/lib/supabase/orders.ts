@@ -31,6 +31,7 @@ export interface CreateOrderInput {
     planned_shipment_date?: string;
     quote_id?: string;
     original_order_number?: string;
+    quote_valid_until?: string;
     lines: {
         product_id: string;
         product_name: string;
@@ -136,6 +137,7 @@ export async function dbCreateOrder(input: CreateOrderInput): Promise<{ id: stri
             planned_shipment_date: input.planned_shipment_date ?? null,
             quote_id: input.quote_id ?? null,
             original_order_number: input.original_order_number ?? null,
+            quote_valid_until: input.quote_valid_until ?? null,
         },
         p_lines: input.lines.map((l, i) => ({
             product_id: l.product_id,
@@ -212,6 +214,24 @@ export async function dbCancelOrder(orderId: string): Promise<{ success: boolean
     const { data, error } = await supabase.rpc("cancel_order", { p_order_id: orderId });
     if (error) throw new Error(error.message);
     return data as { success: boolean; error?: string };
+}
+
+/**
+ * Süresi dolmuş açık teklifleri döner.
+ * Kapsam: draft + pending_approval, quote_valid_until < bugün.
+ * Sıralama: en eski geçerlilik tarihi üstte.
+ */
+export async function dbListExpiredQuotes(): Promise<SalesOrderRow[]> {
+    const supabase = createServiceClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+        .from("sales_orders")
+        .select("*")
+        .in("commercial_status", ["draft", "pending_approval"])
+        .lt("quote_valid_until", today)
+        .order("quote_valid_until", { ascending: true });
+    if (error) throw new Error(error.message);
+    return data ?? [];
 }
 
 // ── Stock helpers (DEPRECATED) ──────────────────────────────
@@ -330,6 +350,20 @@ export async function dbShipOrder(orderId: string, lines: OrderLineRow[]): Promi
         .update({ status: "shipped", released_at: new Date().toISOString() })
         .eq("order_id", orderId)
         .eq("status", "open");
+}
+
+// ── Quote Deadline Update ────────────────────────────────────
+
+export async function dbUpdateOrderQuoteDeadline(
+    id: string,
+    quoteValidUntil: string | null
+): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("sales_orders")
+        .update({ quote_valid_until: quoteValidUntil })
+        .eq("id", id);
+    if (error) throw new Error(error.message);
 }
 
 // ── Hard Delete ──────────────────────────────────────────────

@@ -46,6 +46,30 @@ interface AlertItem {
     severity: "critical" | "warning" | "info";
 }
 
+interface QuotedItem {
+    orderId: string;
+    orderNumber: string;
+    customerId: string;
+    customerName: string;
+    quantity: number;
+    unitPrice: number;
+    currency: string;
+    commercialStatus: "draft" | "pending_approval";
+    orderCreatedAt: string;
+    createdByEmail: string | null;
+    quoteValidUntil: string | null;
+}
+
+function formatRelativeTime(iso: string): string {
+    const diffMs = Date.now() - new Date(iso).getTime();
+    const diffMin = Math.floor(diffMs / 60_000);
+    if (diffMin < 60) return `${diffMin} dakika önce`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24) return `${diffH} saat önce`;
+    const diffD = Math.floor(diffH / 24);
+    return `${diffD} gün önce`;
+}
+
 function coverageDaysColor(days: number | null): string {
     if (days === null) return "var(--text-tertiary)";
     if (days < 7) return "var(--danger-text)";
@@ -191,6 +215,13 @@ export default function ProductsPage() {
     const [commitmentForm, setCommitmentForm] = useState({ quantity: "", expected_date: "", supplier_name: "" });
     const [commitmentSubmitting, setCommitmentSubmitting] = useState(false);
     const [receivingId, setReceivingId] = useState<string | null>(null);
+    const [quotes, setQuotes] = useState<QuotedItem[]>([]);
+    const [quotesTotal, setQuotesTotal] = useState(0);
+    const [quotesLoading, setQuotesLoading] = useState(false);
+    const [extendingId, setExtendingId] = useState<string | null>(null);
+    const [extendShowCustom, setExtendShowCustom] = useState(false);
+    const [extendCustomDate, setExtendCustomDate] = useState("");
+    const [extendLoading, setExtendLoading] = useState(false);
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
@@ -244,6 +275,50 @@ export default function ProductsPage() {
             .catch(() => { if (!cancelled) setCommitments([]); });
         return () => { cancelled = true; };
     }, [selectedProductId]);
+
+    // Fetch quoted breakdown for the selected product whenever drawer opens
+    useEffect(() => {
+        if (!selectedProductId) { setQuotes([]); setQuotesTotal(0); return; }
+        let cancelled = false;
+        setQuotesLoading(true);
+        fetch(`/api/products/${selectedProductId}/quotes`)
+            .then(r => r.ok ? r.json() : { items: [], totalQuoted: 0 })
+            .then(data => {
+                if (cancelled) return;
+                setQuotes(data.items ?? []);
+                setQuotesTotal(data.totalQuoted ?? 0);
+            })
+            .catch(() => { if (!cancelled) { setQuotes([]); setQuotesTotal(0); } })
+            .finally(() => { if (!cancelled) setQuotesLoading(false); });
+        return () => { cancelled = true; };
+    }, [selectedProductId]);
+
+    async function refetchQuotes() {
+        if (!selectedProductId) return;
+        const data = await fetch(`/api/products/${selectedProductId}/quotes`)
+            .then(r => r.ok ? r.json() : { items: [], totalQuoted: 0 })
+            .catch(() => ({ items: [], totalQuoted: 0 }));
+        setQuotes(data.items ?? []);
+        setQuotesTotal(data.totalQuoted ?? 0);
+    }
+
+    async function extendQuote(orderId: string, newDate: string) {
+        setExtendLoading(true);
+        try {
+            const res = await fetch(`/api/orders/${orderId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ quote_valid_until: newDate }),
+            });
+            if (!res.ok) return;
+            setExtendingId(null);
+            setExtendShowCustom(false);
+            setExtendCustomDate("");
+            await refetchQuotes();
+        } finally {
+            setExtendLoading(false);
+        }
+    }
 
     // Fetch active alerts for the selected product whenever drawer opens
     useEffect(() => {
@@ -670,7 +745,7 @@ export default function ProductsPage() {
                                         const color = daysLeft < 0 ? "var(--danger-text)"
                                             : daysLeft < 7  ? "var(--danger-text)"
                                             : daysLeft < 14 ? "var(--warning-text)"
-                                            : "var(--text-secondary)";
+                                            : "var(--success-text)";
                                         const label = daysLeft < 0
                                             ? "Geçti"
                                             : new Date(dl).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
@@ -1208,6 +1283,255 @@ export default function ProductsPage() {
                                                     </div>
                                                 </div>
                                             ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ── Block 2c: Aktif Teklifler ────────────────── */}
+                                <div>
+                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                        Aktif Teklifler
+                                    </div>
+
+                                    {quotesLoading ? (
+                                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontStyle: "italic", padding: "6px 0" }}>
+                                            Yükleniyor...
+                                        </div>
+                                    ) : quotes.length === 0 ? (
+                                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", fontStyle: "italic", padding: "6px 0" }}>
+                                            Aktif teklif yok
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                            {quotes.map((q, idx) => {
+                                                const isExpired = !!q.quoteValidUntil && new Date(q.quoteValidUntil) < new Date();
+                                                const isOld = !isExpired && q.commercialStatus === "draft" &&
+                                                    Date.now() - new Date(q.orderCreatedAt).getTime() > 7 * 86_400_000;
+                                                const daysRemaining = q.quoteValidUntil
+                                                    ? Math.ceil((new Date(q.quoteValidUntil).getTime() - Date.now()) / 86_400_000)
+                                                    : null;
+                                                return (
+                                                    <a
+                                                        key={`${q.orderId}-${idx}`}
+                                                        href={`/dashboard/orders/${q.orderId}`}
+                                                        style={{ textDecoration: "none" }}
+                                                    >
+                                                        <div style={{
+                                                            padding: "7px 8px",
+                                                            background: "var(--bg-secondary)",
+                                                            borderRadius: "5px",
+                                                            border: isExpired
+                                                                ? "0.5px solid var(--danger-border)"
+                                                                : isOld
+                                                                    ? "0.5px solid var(--warning-border)"
+                                                                    : "0.5px solid var(--border-tertiary)",
+                                                        }}>
+                                                            {/* Top row */}
+                                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "3px" }}>
+                                                                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                                    <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
+                                                                        {q.orderNumber}
+                                                                    </span>
+                                                                    <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                                                                        · {q.customerName}
+                                                                    </span>
+                                                                </div>
+                                                                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                                                    {isExpired && (
+                                                                        <span style={{
+                                                                            fontSize: "9px", fontWeight: 700, padding: "1px 4px",
+                                                                            background: "var(--danger-bg)", color: "var(--danger-text)",
+                                                                            border: "0.5px solid var(--danger-border)", borderRadius: "3px",
+                                                                        }}>
+                                                                            Süresi Doldu
+                                                                        </span>
+                                                                    )}
+                                                                    {isOld && (
+                                                                        <span style={{
+                                                                            fontSize: "9px", fontWeight: 700, padding: "1px 4px",
+                                                                            background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                                            border: "0.5px solid var(--warning-border)", borderRadius: "3px",
+                                                                        }}>
+                                                                            ⚠ Eski
+                                                                        </span>
+                                                                    )}
+                                                                    <span style={{
+                                                                        fontSize: "9px", fontWeight: 700, padding: "1px 4px", borderRadius: "3px",
+                                                                        background: q.commercialStatus === "pending_approval"
+                                                                            ? "var(--warning-bg)" : "var(--bg-tertiary)",
+                                                                        color: q.commercialStatus === "pending_approval"
+                                                                            ? "var(--warning-text)" : "var(--text-tertiary)",
+                                                                        border: q.commercialStatus === "pending_approval"
+                                                                            ? "0.5px solid var(--warning-border)" : "0.5px solid var(--border-tertiary)",
+                                                                    }}>
+                                                                        {q.commercialStatus === "pending_approval" ? "Onay Bekliyor" : "Taslak"}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            {/* Bottom row */}
+                                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                                                                <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
+                                                                    {formatNumber(q.quantity)} {product?.unit}
+                                                                </span>
+                                                                <span>×</span>
+                                                                <span>{formatCurrency(q.unitPrice, q.currency)}</span>
+                                                                <span>·</span>
+                                                                <span>{formatRelativeTime(q.orderCreatedAt)}</span>
+                                                                <span>·</span>
+                                                                <span style={{ color: q.createdByEmail ? "var(--accent-text)" : "var(--text-tertiary)" }}>
+                                                                    {q.createdByEmail ?? "—"}
+                                                                </span>
+                                                                {daysRemaining !== null && (
+                                                                    <>
+                                                                        <span>·</span>
+                                                                        <span style={{
+                                                                            color: isExpired
+                                                                                ? "var(--danger-text)"
+                                                                                : daysRemaining <= 3
+                                                                                    ? "var(--warning-text)"
+                                                                                    : "var(--text-tertiary)",
+                                                                        }}>
+                                                                            {isExpired
+                                                                                ? `${Math.abs(daysRemaining)} gün geçti`
+                                                                                : `${daysRemaining} gün kaldı`}
+                                                                        </span>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                            {/* Extend UI — shown for expired or ≤3 days remaining */}
+                                                            {(isExpired || (daysRemaining !== null && daysRemaining <= 3)) && (
+                                                                <div
+                                                                    style={{ marginTop: "6px" }}
+                                                                    onClick={(e) => e.preventDefault()}
+                                                                >
+                                                                    {extendingId !== q.orderId ? (
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.preventDefault();
+                                                                                setExtendingId(q.orderId);
+                                                                                setExtendShowCustom(false);
+                                                                                setExtendCustomDate("");
+                                                                            }}
+                                                                            style={{
+                                                                                fontSize: "11px", padding: "2px 8px",
+                                                                                background: "transparent",
+                                                                                border: "0.5px solid var(--border-secondary)",
+                                                                                borderRadius: "4px", cursor: "pointer",
+                                                                                color: "var(--text-secondary)",
+                                                                            }}
+                                                                        >
+                                                                            Uzat →
+                                                                        </button>
+                                                                    ) : !extendShowCustom ? (
+                                                                        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
+                                                                            {[7, 14, 30].map(days => (
+                                                                                <button
+                                                                                    key={days}
+                                                                                    disabled={extendLoading}
+                                                                                    onClick={(e) => {
+                                                                                        e.preventDefault();
+                                                                                        const d = new Date(Date.now() + days * 86_400_000);
+                                                                                        extendQuote(q.orderId, d.toISOString().slice(0, 10));
+                                                                                    }}
+                                                                                    style={{
+                                                                                        fontSize: "11px", padding: "2px 8px",
+                                                                                        background: "var(--accent-bg)",
+                                                                                        border: "0.5px solid var(--accent-border)",
+                                                                                        borderRadius: "4px", cursor: "pointer",
+                                                                                        color: "var(--accent-text)",
+                                                                                        opacity: extendLoading ? 0.5 : 1,
+                                                                                    }}
+                                                                                >
+                                                                                    +{days} gün
+                                                                                </button>
+                                                                            ))}
+                                                                            <button
+                                                                                onClick={(e) => { e.preventDefault(); setExtendShowCustom(true); }}
+                                                                                style={{
+                                                                                    fontSize: "11px", padding: "2px 8px",
+                                                                                    background: "transparent",
+                                                                                    border: "0.5px solid var(--border-secondary)",
+                                                                                    borderRadius: "4px", cursor: "pointer",
+                                                                                    color: "var(--text-tertiary)",
+                                                                                }}
+                                                                            >
+                                                                                Özel...
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => { e.preventDefault(); setExtendingId(null); }}
+                                                                                style={{
+                                                                                    fontSize: "11px", padding: "2px 4px",
+                                                                                    background: "transparent", border: "none",
+                                                                                    cursor: "pointer", color: "var(--text-tertiary)",
+                                                                                }}
+                                                                            >
+                                                                                ✕
+                                                                            </button>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
+                                                                            <input
+                                                                                type="date"
+                                                                                value={extendCustomDate}
+                                                                                onChange={e => setExtendCustomDate(e.target.value)}
+                                                                                min={new Date().toISOString().slice(0, 10)}
+                                                                                style={{
+                                                                                    fontSize: "11px", padding: "2px 6px",
+                                                                                    border: "0.5px solid var(--border-secondary)",
+                                                                                    borderRadius: "4px",
+                                                                                    background: "var(--bg-primary)",
+                                                                                    color: "var(--text-primary)",
+                                                                                    outline: "none",
+                                                                                }}
+                                                                            />
+                                                                            <button
+                                                                                disabled={!extendCustomDate || extendLoading}
+                                                                                onClick={(e) => { e.preventDefault(); extendQuote(q.orderId, extendCustomDate); }}
+                                                                                style={{
+                                                                                    fontSize: "11px", padding: "2px 8px",
+                                                                                    background: "var(--accent-bg)",
+                                                                                    border: "0.5px solid var(--accent-border)",
+                                                                                    borderRadius: "4px",
+                                                                                    cursor: extendCustomDate && !extendLoading ? "pointer" : "not-allowed",
+                                                                                    color: "var(--accent-text)",
+                                                                                    opacity: !extendCustomDate || extendLoading ? 0.5 : 1,
+                                                                                }}
+                                                                            >
+                                                                                Kaydet
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={(e) => { e.preventDefault(); setExtendShowCustom(false); }}
+                                                                                style={{
+                                                                                    fontSize: "11px", padding: "2px 4px",
+                                                                                    background: "transparent", border: "none",
+                                                                                    cursor: "pointer", color: "var(--text-tertiary)",
+                                                                                }}
+                                                                            >
+                                                                                ✕
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </a>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {quotes.length > 0 && (
+                                        <div style={{
+                                            marginTop: "6px", fontSize: "11px", color: "var(--text-tertiary)",
+                                            display: "flex", gap: "8px",
+                                        }}>
+                                            <span>Toplam: <strong style={{ color: "var(--text-secondary)" }}>{formatNumber(quotesTotal)} {product?.unit} teklif</strong></span>
+                                            {product && (
+                                                <>
+                                                    <span>·</span>
+                                                    <span>Promisable: <strong style={{ color: product.promisable <= 0 ? "var(--danger-text)" : "var(--success-text)" }}>{formatNumber(product.promisable)} {product.unit}</strong></span>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>

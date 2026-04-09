@@ -401,6 +401,28 @@ export default function OrderDetailPage() {
                     </div>
                 </div>
 
+                {/* Teklif süresi doldu uyarısı */}
+                {order.quoteValidUntil &&
+                 new Date(order.quoteValidUntil) < new Date() &&
+                 (commercialStatus === "draft" || commercialStatus === "pending_approval") && (
+                    <div style={{
+                        background: "var(--danger-bg)",
+                        border: "0.5px solid var(--danger-border)",
+                        borderRadius: "6px",
+                        padding: "10px 16px",
+                        fontSize: "12px",
+                        color: "var(--danger-text)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                    }}>
+                        <strong>Teklif Süresi Doldu</strong>
+                        <span style={{ color: "var(--text-secondary)" }}>
+                            — Geçerlilik tarihi: {new Date(order.quoteValidUntil).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+                        </span>
+                    </div>
+                )}
+
                 {/* Main grid */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 280px", gap: "12px", alignItems: "start" }}>
 
@@ -434,6 +456,12 @@ export default function OrderDetailPage() {
                                     <InfoRow label="Sipariş No" value={order.orderNumber} />
                                     <InfoRow label="Oluşturulma" value={formatDate(order.createdAt)} />
                                     <InfoRow label="Kalem Sayısı" value={`${order.itemCount} ürün`} />
+                                    {order.quoteValidUntil && (
+                                        <InfoRow
+                                            label="Teklif Geçerliliği"
+                                            value={new Date(order.quoteValidUntil).toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+                                        />
+                                    )}
                                     {order.notes && <InfoRow label="Not" value={order.notes} />}
                                 </div>
                             </div>

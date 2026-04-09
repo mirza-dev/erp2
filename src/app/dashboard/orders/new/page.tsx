@@ -56,6 +56,9 @@ function NewOrderForm() {
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [lines, setLines] = useState<OrderLine[]>([newLine()]);
     const [notes, setNotes] = useState("");
+    const [quoteValidUntil, setQuoteValidUntil] = useState<string>(
+        new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10)
+    );
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitAttempted, setSubmitAttempted] = useState(false);
     const [windowWidth, setWindowWidth] = useState<number>(
@@ -177,6 +180,7 @@ function NewOrderForm() {
                 vatTotal: vat,
                 grandTotal,
                 notes,
+                quoteValidUntil: quoteValidUntil || undefined,
                 lines: orderLines,
             });
             toast({ type: "success", message: mode === "draft" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
@@ -438,9 +442,9 @@ function NewOrderForm() {
                                 {lines.map((line, idx) => {
                                     const total = lineTotal(line);
                                     const liveProduct = line.product ? products.find(p => p.id === line.product!.id) : null;
-                                    const stock = liveProduct?.available_now ?? null;
-                                    const stockInsufficient = stock !== null && line.quantity > stock;
-                                    const stockLow = stock !== null && !stockInsufficient && stock <= (liveProduct?.minStockLevel ?? 0);
+                                    const promisable = liveProduct?.promisable ?? null;
+                                    const stockInsufficient = promisable !== null && line.quantity > promisable;
+                                    const stockLow = promisable !== null && !stockInsufficient && promisable <= (liveProduct?.minStockLevel ?? 0);
                                     return (
                                         <tr key={line.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                             <td style={{ padding: "8px 12px", color: "var(--text-tertiary)", fontSize: "12px", textAlign: "center" }}>
@@ -462,7 +466,7 @@ function NewOrderForm() {
                                                         </option>
                                                     ))}
                                                 </select>
-                                                {stock !== null && (
+                                                {promisable !== null && (
                                                     <div style={{
                                                         fontSize: "11px",
                                                         marginTop: "3px",
@@ -470,8 +474,8 @@ function NewOrderForm() {
                                                         fontWeight: stockInsufficient ? 600 : 400,
                                                     }}>
                                                         {stockInsufficient
-                                                            ? `Stok yetersiz — ${stock} ${liveProduct?.unit} mevcut`
-                                                            : `Satılabilir stok: ${stock} ${liveProduct?.unit}${stockLow ? " — Düşük" : ""}`
+                                                            ? `Teklif verilemez — ${promisable} ${liveProduct?.unit} verilebilir (Stokta ${liveProduct?.on_hand}, Tekliflerde ${liveProduct?.quoted})`
+                                                            : `Stokta: ${liveProduct?.on_hand} | Tekliflerde: ${liveProduct?.quoted} | Verilebilir: ${promisable} ${liveProduct?.unit}${stockLow ? " — Düşük" : ""}`
                                                         }
                                                     </div>
                                                 )}
@@ -662,6 +666,29 @@ function NewOrderForm() {
                                     fontFamily: "inherit",
                                 }}
                             />
+                        </div>
+
+                        {/* Teklif Geçerliliği */}
+                        <div style={{ marginTop: "14px" }}>
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                Teklif Geçerliliği
+                            </div>
+                            <input
+                                type="date"
+                                value={quoteValidUntil}
+                                onChange={e => setQuoteValidUntil(e.target.value)}
+                                style={{ ...inputStyle, padding: "7px 10px" }}
+                            />
+                            {quoteValidUntil && (
+                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                                    {(() => {
+                                        const d = Math.ceil((new Date(quoteValidUntil).getTime() - Date.now()) / 86_400_000);
+                                        return d < 0
+                                            ? <span style={{ color: "var(--danger-text)" }}>{Math.abs(d)} gün geçti</span>
+                                            : `${d} gün kaldı`;
+                                    })()}
+                                </div>
+                            )}
                         </div>
 
                         {/* Actions */}

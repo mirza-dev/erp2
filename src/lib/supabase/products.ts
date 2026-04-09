@@ -270,6 +270,117 @@ export async function dbGetQuotedQuantities(): Promise<Map<string, number>> {
     return map;
 }
 
+// ── Quoted Breakdown ─────────────────────────────────────────
+
+export interface QuotedBreakdownRow {
+    orderId: string;
+    orderNumber: string;
+    customerId: string;
+    customerName: string;
+    quantity: number;
+    unitPrice: number;
+    discountPct: number;
+    lineTotal: number;
+    currency: string;
+    commercialStatus: "draft" | "pending_approval";
+    orderCreatedAt: string;
+    createdBy: string | null;
+    quoteValidUntil: string | null;
+}
+
+type SalesOrderJoin = {
+    id: string;
+    order_number: string;
+    commercial_status: "draft" | "pending_approval";
+    created_at: string;
+    created_by: string | null;
+    customer_id: string;
+    customer_name: string;
+    currency: string;
+    quote_valid_until: string | null;
+};
+
+/**
+ * Bir ürünün aktif tekliflerinde yer aldığı order_line satırlarını
+ * sipariş ve müşteri bilgileriyle döner. Sadece draft ve pending_approval.
+ * Sıralama: en yeni teklif üstte (orderCreatedAt DESC).
+ */
+export async function dbGetQuotedBreakdownByProduct(
+    productId: string
+): Promise<QuotedBreakdownRow[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("order_lines")
+        .select(`
+            quantity,
+            unit_price,
+            discount_pct,
+            line_total,
+            sales_orders!inner (
+                id,
+                order_number,
+                commercial_status,
+                created_at,
+                created_by,
+                customer_id,
+                customer_name,
+                currency,
+                quote_valid_until
+            )
+        `)
+        .eq("product_id", productId)
+        .in("sales_orders.commercial_status", ["draft", "pending_approval"]);
+    if (error || !data) return [];
+
+    const rows: QuotedBreakdownRow[] = [];
+    for (const raw of data as unknown as Array<{
+        quantity: number;
+        unit_price: number;
+        discount_pct: number;
+        line_total: number;
+        sales_orders: SalesOrderJoin | SalesOrderJoin[];
+    }>) {
+        const so = Array.isArray(raw.sales_orders) ? raw.sales_orders[0] : raw.sales_orders;
+        if (!so) continue;
+        rows.push({
+            orderId: so.id,
+            orderNumber: so.order_number,
+            customerId: so.customer_id,
+            customerName: so.customer_name,
+            quantity: raw.quantity,
+            unitPrice: raw.unit_price,
+            discountPct: raw.discount_pct,
+            lineTotal: raw.line_total,
+            currency: so.currency,
+            commercialStatus: so.commercial_status,
+            orderCreatedAt: so.created_at,
+            createdBy: so.created_by,
+            quoteValidUntil: so.quote_valid_until ?? null,
+        });
+    }
+    rows.sort((a, b) => b.orderCreatedAt.localeCompare(a.orderCreatedAt));
+    return rows;
+}
+
+/**
+ * auth.users'tan UUID → email map'i döner.
+ * admin.listUsers single-shot, küçük B2B tim için kabul edilebilir.
+ */
+export async function dbLookupUserEmails(
+    userIds: string[]
+): Promise<Map<string, string>> {
+    const unique = Array.from(new Set(userIds.filter(Boolean)));
+    if (unique.length === 0) return new Map();
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.auth.admin.listUsers({ perPage: 200 });
+    if (error || !data) return new Map();
+    const map = new Map<string, string>();
+    for (const u of data.users) {
+        if (u.email && unique.includes(u.id)) map.set(u.id, u.email);
+    }
+    return map;
+}
+
 export async function dbListMovements(productId: string, limit = 50) {
     const supabase = createServiceClient();
     const { data, error } = await supabase

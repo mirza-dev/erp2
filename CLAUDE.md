@@ -1,32 +1,28 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-09_
+_Son güncelleme: 2026-04-10_
 
-**Son tamamlanan iş:** Faz 4 — Sipariş Son Tarihi (Order Deadline)
-- DB migration: `purchase_commitments` tablosu + `receive_purchase_commitment` atomik RPC (`020_purchase_commitments.sql`)
-- Yeni stok alanları: `incoming` (bekleyen commitments), `forecasted` (on_hand + incoming - reserved - quoted)
-- `dbGetIncomingQuantities()` → purchase_commitments pending filtreli ürün bazlı toplam
-- CRUD: `dbListCommitments`, `dbCreateCommitment`, `dbReceiveCommitment`, `dbCancelCommitment`
-- `/api/purchase-commitments` GET+POST + `/api/purchase-commitments/[id]` GET+PATCH (receive/cancel)
-- `/api/products` GET → 3-way parallel fetch, incoming + forecasted ile enrich
-- `Product` interface → incoming ve forecasted required alanlar
-- Ürünler sayfası: stok kolonu "+X bekleniyor" yeşil, sinyal "ÖNGÖRÜLEN KRİTİK" badge, drawer 8 hücreli grid
-- Drawer: Bekleyen Teslimatlar bölümü — liste + inline ekle formu + Alındı/İptal butonları
-- DB migration kullanıcı elle uygulamalı: `supabase db push` veya Studio SQL editörü
+**Son tamamlanan iş:** Faz 6.1 — Teklif Uzatma (Drawer) + Faz 5 Bug Fix
+- `supabase/migrations/023_quote_valid_until.sql` — `quote_valid_until date` kolonu, `quote_expired` alert tipi, `create_order_with_lines` RPC güncelleme
+- `dbListExpiredQuotes()` + `serviceExpireQuotes()` — expired draft'ları auto-cancel, pending_approval'ları alert'e çevirir (dedup)
+- `POST /api/orders/expire-quotes` — CRON_PATHS'e eklendi (middleware.ts)
+- Yeni sipariş formunda default +14 gün `quote_valid_until` date picker
+- Sipariş listesinde "Süresi Doldu" kırmızı badge
+- Sipariş detayında expired uyarı banner + "Teklif Geçerliliği" info row
+- Ürün drawer "Aktif Teklifler": isExpired kırmızı border + badge, kalan/geçen gün gösterimi, ≤3 gün sarı uyarı
+- 2 yeni test dosyası: `expire-quotes-service.test.ts`, `expire-quotes-route.test.ts`
+- **Faz 6.1:** `dbUpdateOrderQuoteDeadline()` + PATCH `/api/orders/[id]` `quote_valid_until` branşı + drawer "Uzat" UI (+7/+14/+30/Özel, expired + ≤3 gün) + `expire-extend-route.test.ts`
+- **Faz 5 bug fix:** currency mismatch (q.currency), promisable negatif gizleme kaldırıldı (product.promisable canonical), email fallback "—"
 
-**Faz 4 eklentileri:**
-- `computeOrderDeadline()` pure helper (`src/lib/stock-utils.ts`)
-- `/api/products` → `stockoutDate` + `orderDeadline` alanları (daily_usage + lead_time_days varsa)
-- Ürünler sayfasına "Son Tarih" kolonu (kırmızı/sarı/yeşil renk kodu)
-- Satın alma önerileri → orderDeadline ascending sort
-- `order_deadline` alert tipi: deadline ≤ 7 gün ise alert üretir
-- Migration: `022_add_order_deadline_alert.sql` — alerts.type constraint genişletildi
-- `AlertType` TS tipi güncellendi
+**Faz 5 (tamamlandı — Teklif Kırılımı):**
+- `dbGetQuotedBreakdownByProduct()` query + `dbLookupUserEmails()` helper
+- `GET /api/products/[id]/quotes` endpoint → sipariş satır satır kırılımı + satışçı email
+- Ürün drawer'ına "Aktif Teklifler" section'ı
 
 **Aktif odak:** —
-**Bilinen açık sorunlar:** —
-**Test sayısı:** 53 dosya · 1222 test
+**Bilinen açık sorunlar:** Migration 023 local Supabase'e henüz uygulanmadı (deploy sırasında yapılacak)
+**Test sayısı:** 61 dosya · 1264 test
 
 ---
 

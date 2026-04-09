@@ -28,6 +28,7 @@ import {
 
 import type { CreateOrderInput } from "./supabase/orders";
 import { isDemoMode as checkDemoMode } from "./demo-utils";
+import { shouldSuggestReorder } from "./stock-utils";
 
 // ── Pure helpers (exported for testing) ────────────────────
 // Mirrors data-context-error.test.ts pattern: extract pure logic, test directly.
@@ -440,6 +441,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         vat_total: detail.vatTotal,
         grand_total: detail.grandTotal,
         notes: detail.notes,
+        quote_valid_until: detail.quoteValidUntil ?? undefined,
         lines: detail.lines.map((l: OrderLineItem) => ({
           product_id: l.productId,
           product_name: l.productName,
@@ -527,7 +529,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   // ── Derived values ───────────────────────────────────────
 
   const reorderSuggestions = useMemo(
-    () => products.filter((p) => p.isActive && p.available_now < p.minStockLevel),
+    () =>
+      products.filter((p) =>
+        shouldSuggestReorder({
+          isActive: p.isActive,
+          available: p.available_now,
+          min: p.minStockLevel,
+          orderDeadline: p.orderDeadline,
+        })
+      ),
     [products]
   );
 

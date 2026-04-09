@@ -14,7 +14,7 @@ export type ProductType = "finished" | "raw_material"
 export type ReservationStatus = "open" | "shipped" | "released"
 export type ShortageStatus = "open" | "resolved" | "cancelled"
 export type MovementType = "production" | "shipment" | "receipt" | "adjustment" | "reservation_create" | "reservation_release"
-export type AlertType = "stock_critical" | "stock_risk" | "purchase_recommended" | "order_shortage" | "sync_issue" | "import_review_required" | "order_deadline"
+export type AlertType = "stock_critical" | "stock_risk" | "purchase_recommended" | "order_shortage" | "sync_issue" | "import_review_required" | "order_deadline" | "quote_expired"
 export type AlertSeverity = "critical" | "warning" | "info"
 export type AlertStatus = "open" | "acknowledged" | "resolved" | "dismissed"
 export type ImportBatchStatus = "pending" | "processing" | "review" | "confirmed" | "failed"
@@ -98,6 +98,10 @@ export interface ProductWithStock extends ProductRow {
     incoming?: number
     /** Full stock outlook = on_hand + incoming - reserved - quoted — computed by API layer */
     forecasted?: number
+    /** ISO date: when promisable stock runs out at daily_usage rate — computed by API layer */
+    stockoutDate?: string | null
+    /** ISO date: latest date to place a purchase order (stockoutDate - lead_time - 7) — computed by API layer */
+    orderDeadline?: string | null
 }
 
 export interface PurchaseCommitmentRow {
@@ -153,6 +157,7 @@ export interface SalesOrderRow {
     planned_shipment_date: string | null
     quote_id: string | null
     original_order_number: string | null
+    quote_valid_until: string | null
 }
 
 export interface OrderLineRow {

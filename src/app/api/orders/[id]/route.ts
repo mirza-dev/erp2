@@ -6,7 +6,7 @@ import {
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { handleApiError } from "@/lib/api-error";
-import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
+import { dbGetOrderById, dbHardDeleteOrder, dbUpdateOrderQuoteDeadline } from "@/lib/supabase/orders";
 
 // GET /api/orders/[id]
 export async function GET(
@@ -27,6 +27,7 @@ export async function GET(
 
 // PATCH /api/orders/[id]
 // Body: { transition: "pending_approval" | "approved" | "shipped" | "cancelled" }
+//    OR { quote_valid_until: "YYYY-MM-DD" | null }
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -34,6 +35,13 @@ export async function PATCH(
     try {
         const { id } = await params;
         const body = await req.json();
+
+        // Quote deadline update — separate from state-machine transitions
+        if ("quote_valid_until" in body) {
+            await dbUpdateOrderQuoteDeadline(id, body.quote_valid_until ?? null);
+            return NextResponse.json({ ok: true });
+        }
+
         const transition: OrderTransition = body.transition;
 
         if (!transition) {

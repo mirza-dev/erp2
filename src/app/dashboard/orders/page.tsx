@@ -270,6 +270,20 @@ function OrdersList() {
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "center" }}>
                                             <span className={`badge ${commercial.cls}`}>{commercial.label}</span>
+                                            {order.quoteValidUntil &&
+                                             new Date(order.quoteValidUntil) < new Date() &&
+                                             (order.commercial_status === "draft" || order.commercial_status === "pending_approval") && (
+                                                <span style={{
+                                                    display: "inline-block",
+                                                    fontSize: "9px", fontWeight: 700,
+                                                    padding: "1px 5px", borderRadius: "3px",
+                                                    background: "var(--danger-bg)", color: "var(--danger-text)",
+                                                    border: "0.5px solid var(--danger-border)",
+                                                    marginLeft: "4px",
+                                                }}>
+                                                    Süresi Doldu
+                                                </span>
+                                            )}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "center" }}>
                                             {order.fulfillment_status !== "unallocated" && (

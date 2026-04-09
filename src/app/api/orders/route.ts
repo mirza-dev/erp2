@@ -8,6 +8,7 @@ import { aiScoreOrder } from "@/lib/services/ai-service";
 import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError } from "@/lib/api-error";
+import { createClient } from "@/lib/supabase/server";
 
 // GET /api/orders?commercial_status=approved&customer_id=xxx&page=1
 export async function GET(req: NextRequest) {
@@ -33,6 +34,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
     try {
         const body: CreateOrderInput = await req.json();
+
+        // Populate created_by from the current session user (session always wins)
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        body.created_by = user?.id ?? undefined;
 
         const validation = validateOrderCreate(body);
         if (!validation.valid) {

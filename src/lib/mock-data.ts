@@ -83,6 +83,7 @@ export interface Order {
     itemCount: number;
     aiRiskLevel?: "low" | "medium" | "high";
     aiConfidence?: number;
+    quoteValidUntil?: string | null;
 }
 
 export interface OrderLineItem {

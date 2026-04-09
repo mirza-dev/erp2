@@ -272,6 +272,34 @@ export function computeOrderDeadline(
     return { stockoutDate, orderDeadline };
 }
 
+// ── Reorder Suggestion Filter ────────────────────────────────
+
+const REORDER_DEADLINE_WINDOW_DAYS = 7;
+
+/**
+ * Bir ürünün satın alma önerileri havuzuna girip girmeyeceğini belirler.
+ *
+ *   - Aktif olmalı
+ *   - Stok minimumun altında veya eşit (backend purchase-service ile aligned: <=)
+ *   - VEYA sipariş son tarihi ≤ 7 gün içinde (stok yeterli olsa bile proaktif sipariş gerek)
+ */
+export function shouldSuggestReorder(args: {
+    isActive: boolean;
+    available: number;
+    min: number;
+    orderDeadline?: string | null;
+}): boolean {
+    if (!args.isActive) return false;
+    if (args.available <= args.min) return true;
+    if (args.orderDeadline) {
+        const daysLeft = Math.floor(
+            (new Date(args.orderDeadline).getTime() - Date.now()) / 86_400_000
+        );
+        if (daysLeft <= REORDER_DEADLINE_WINDOW_DAYS) return true;
+    }
+    return false;
+}
+
 // ── Status Badge ──────────────────────────────────────────────
 
 export interface StatusBadge {
