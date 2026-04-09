@@ -30,7 +30,7 @@ export async function GET() {
                     category:         p.category,
                     unit:             p.unit,
                     onHand:           p.on_hand,
-                    price:            p.price,
+                    price:            p.price ?? 0,
                     currency:         p.currency,
                     lastMovementDate: lastMovement,
                     daysWaiting,
