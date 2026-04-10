@@ -200,7 +200,7 @@ Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is
  * Simple column-name → field-name fallback when AI is unavailable.
  * Maps Turkish Excel column names to ERP field names.
  */
-const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
+export const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
     customer: {
         firma_adi: "name", musteri_adi: "name", ad: "name", isim: "name",
         email: "email", eposta: "email", e_posta: "email",

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch } from "@/lib/supabase/import";
 import { dbLookupColumnMappings } from "@/lib/supabase/column-mappings";
-import { aiDetectColumns, isAIAvailable } from "@/lib/services/ai-service";
+import { aiDetectColumns, isAIAvailable, FALLBACK_FIELD_MAP } from "@/lib/services/ai-service";
 
 /**
  * POST /api/import/[batchId]/detect-columns
@@ -65,27 +65,40 @@ export async function POST(
 
             const unknownHeaders: string[] = [];
 
+            const fallbackMap = FALLBACK_FIELD_MAP[entity_type] ?? {};
+            const trulyUnknownHeaders: string[] = [];
+
             for (const header of headers) {
                 const norm = header.trim().toLowerCase().replace(/[^a-z0-9]/g, "_");
                 const memRow = memoryMap.get(norm);
+
                 if (memRow) {
-                    const confidence = memRow.usage_count > 0
-                        ? Math.min(1, memRow.success_count / memRow.usage_count + 0.6)
-                        : 0.7;
+                    // 1. Memory hit — confidence: confirmed ratio, floor 0.6 for unconfirmed
+                    const confidence = memRow.success_count > 0
+                        ? Math.min(1, memRow.success_count / memRow.usage_count)
+                        : 0.6;
                     resolvedMappings.push({
                         source_column: header,
                         target_field: memRow.target_field,
-                        confidence: Math.min(1, confidence),
+                        confidence,
                         source: "memory",
                     });
+                } else if (fallbackMap[norm]) {
+                    // 2. FALLBACK_FIELD_MAP hit — no AI call needed
+                    resolvedMappings.push({
+                        source_column: header,
+                        target_field: fallbackMap[norm],
+                        confidence: 0.8,
+                        source: "fallback",
+                    });
                 } else {
-                    unknownHeaders.push(header);
+                    // 3. Truly unknown — needs AI
+                    trulyUnknownHeaders.push(header);
                 }
             }
 
-            // 2. Resolve unknown headers via AI (one call per sheet)
-            if (unknownHeaders.length > 0) {
-                // Past successful mappings as few-shot context for AI
+            // 3. AI only for headers not resolved by memory or fallback
+            if (trulyUnknownHeaders.length > 0) {
                 const pastMappings = Array.from(memoryMap.values()).map(r => ({
                     source_column: r.source_column,
                     target_field: r.target_field,
@@ -93,19 +106,18 @@ export async function POST(
                 }));
 
                 const aiResult = await aiDetectColumns({
-                    headers: unknownHeaders,
+                    headers: trulyUnknownHeaders,
                     sampleRows: sample_rows,
                     entityType: entity_type,
                     pastMappings,
                 });
 
                 for (const m of aiResult.mappings) {
-                    const source = isAIAvailable() && m.confidence > 0.6 ? "ai" : "fallback";
                     resolvedMappings.push({
                         source_column: m.source_column,
                         target_field: m.target_field,
                         confidence: m.confidence,
-                        source,
+                        source: isAIAvailable() ? "ai" : "fallback",
                     });
                 }
             }

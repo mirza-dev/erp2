@@ -182,6 +182,9 @@ export default function ImportPage() {
     const [editingCell, setEditingCell] = useState<{ draftId: string; field: string } | null>(null);
     const [editingValue, setEditingValue] = useState("");
     const [draftEdits, setDraftEdits] = useState<Record<string, Record<string, unknown>>>({});
+    // Bulk fill state
+    const [bulkField, setBulkField] = useState("");
+    const [bulkValue, setBulkValue] = useState("");;
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ─── Parse Excel file client-side ─────────────────────────────────
@@ -765,7 +768,7 @@ export default function ImportPage() {
                         {draftEntityTypes.map(type => {
                             const count = drafts.filter(d => d.entity_type === type).length;
                             return (
-                                <button key={type} onClick={() => setActiveTab(type)} style={tabBtnStyle(activeTab === type)}>
+                                <button key={type} onClick={() => { setActiveTab(type); setBulkField(""); setBulkValue(""); }} style={tabBtnStyle(activeTab === type)}>
                                     {entityTypeLabels[type] ?? type}
                                     <span style={{ marginLeft: "5px", fontSize: "10px", opacity: 0.7 }}>{count}</span>
                                 </button>
@@ -773,11 +776,56 @@ export default function ImportPage() {
                         })}
                     </div>
 
-                    {/* Summary bar */}
-                    <div style={{ display: "flex", gap: "12px", padding: "10px 14px", background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", fontSize: "12px", flexWrap: "wrap", alignItems: "center" }}>
-                        <span style={{ color: "var(--text-secondary)" }}>Toplam: <strong>{drafts.length}</strong> satır</span>
-                        <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>Hücreye tıklayarak düzenleyebilirsiniz</span>
-                    </div>
+                    {/* Summary + bulk fill */}
+                    {(() => {
+                        const entityFields = ERP_FIELDS[activeTab] ?? [];
+                        const applyBulkFill = () => {
+                            if (!bulkField || bulkValue === "") return;
+                            const ids = filteredDrafts.map(d => d.id);
+                            setDraftEdits(prev => {
+                                const next = { ...prev };
+                                for (const id of ids) {
+                                    const existing = prev[id] ?? {};
+                                    // Only fill if empty
+                                    const currentVal = existing[bulkField] ?? (filteredDrafts.find(d => d.id === id)?.parsed_data as Record<string, unknown> ?? {})[bulkField];
+                                    if (currentVal === undefined || currentVal === null || currentVal === "") {
+                                        next[id] = { ...existing, [bulkField]: bulkValue };
+                                    }
+                                }
+                                return next;
+                            });
+                            // Best-effort server sync
+                            for (const draft of filteredDrafts) {
+                                const currentVal = (draftEdits[draft.id] ?? {})[bulkField] ?? ((draft.parsed_data as Record<string, unknown> ?? {})[bulkField]);
+                                if (currentVal === undefined || currentVal === null || currentVal === "") {
+                                    const corrections = { ...(draftEdits[draft.id] ?? {}), [bulkField]: bulkValue };
+                                    fetch(`/api/import/drafts/${draft.id}`, {
+                                        method: "PATCH",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ user_corrections: corrections }),
+                                    }).catch(() => {});
+                                }
+                            }
+                            setBulkValue("");
+                        };
+                        return (
+                            <div style={{ display: "flex", gap: "8px", padding: "10px 14px", background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", fontSize: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                                <span style={{ color: "var(--text-secondary)" }}>Toplam: <strong>{filteredDrafts.length}</strong> satır</span>
+                                <span style={{ color: "var(--text-tertiary)", fontSize: "11px", marginRight: "auto" }}>Hücreye tıkla → düzelt</span>
+                                {/* Bulk fill */}
+                                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Toplu doldur:</span>
+                                <select value={bulkField} onChange={e => setBulkField(e.target.value)} style={{ fontSize: "11px", padding: "3px 6px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px" }}>
+                                    <option value="">Alan seç</option>
+                                    {entityFields.map(f => <option key={f.field} value={f.field}>{f.label}</option>)}
+                                </select>
+                                <input value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Değer..." onKeyDown={e => { if (e.key === "Enter") applyBulkFill(); }}
+                                    style={{ fontSize: "11px", padding: "3px 8px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", width: "120px" }} />
+                                <button onClick={applyBulkFill} disabled={!bulkField || bulkValue === ""} style={{ fontSize: "11px", padding: "3px 10px", background: bulkField && bulkValue ? "var(--accent-bg)" : "var(--bg-tertiary)", color: bulkField && bulkValue ? "var(--accent-text)" : "var(--text-tertiary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: bulkField && bulkValue ? "pointer" : "not-allowed" }}>
+                                    Boşlara Uygula
+                                </button>
+                            </div>
+                        );
+                    })()}
 
                     {/* Table preview */}
                     {filteredDrafts.length === 0 ? (
@@ -785,31 +833,38 @@ export default function ImportPage() {
                             Bu kategoride satır bulunmuyor.
                         </div>
                     ) : (() => {
-                        // Collect visible fields from first draft
-                        const firstParsed = (filteredDrafts[0].parsed_data ?? {}) as Record<string, unknown>;
-                        const visibleFields = Object.keys(firstParsed).slice(0, 10);
+                        // Collect ALL fields from ALL drafts (union), required fields first
                         const required = REQUIRED_FIELDS[filteredDrafts[0].entity_type] ?? [];
+                        const fieldSet = new Set<string>();
+                        for (const d of filteredDrafts) {
+                            for (const k of Object.keys((d.parsed_data ?? {}) as Record<string, unknown>)) fieldSet.add(k);
+                        }
+                        // Required fields first, then the rest
+                        const visibleFields = [
+                            ...required.filter(f => fieldSet.has(f)),
+                            ...[...fieldSet].filter(f => !required.includes(f)),
+                        ];
 
                         return (
                             <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "auto" }}>
                                 {/* Table header */}
-                                <div style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(100px, 1fr))`, borderBottom: "0.5px solid var(--border-secondary)", background: "var(--bg-secondary)", minWidth: "600px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(110px, 1fr))`, borderBottom: "0.5px solid var(--border-secondary)", background: "var(--bg-secondary)", minWidth: "600px" }}>
                                     <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)" }}>#</div>
                                     {visibleFields.map(f => (
-                                        <div key={f} style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: required.includes(f) ? "var(--text-primary)" : "var(--text-secondary)", borderLeft: "0.5px solid var(--border-tertiary)" }}>
+                                        <div key={f} style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: required.includes(f) ? "var(--accent-text)" : "var(--text-secondary)", borderLeft: "0.5px solid var(--border-tertiary)" }}>
                                             {f}{required.includes(f) ? " *" : ""}
                                         </div>
                                     ))}
                                 </div>
 
-                                {/* Table rows */}
-                                {filteredDrafts.slice(0, 100).map((draft, rowIdx) => {
+                                {/* Table rows — up to 500 */}
+                                {filteredDrafts.slice(0, 500).map((draft, rowIdx) => {
                                     const rowHasMissing = required.some(f => {
                                         const v = getEffectiveValue(draft, f);
                                         return v === undefined || v === null || v === "";
                                     });
                                     return (
-                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(100px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "0.5px solid var(--border-tertiary)" : "none", background: rowHasMissing ? "var(--danger-bg)" : rowIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "600px" }}>
+                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(110px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "0.5px solid var(--border-tertiary)" : "none", background: rowHasMissing ? "rgba(var(--danger-rgb,248,81,73),0.06)" : rowIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "600px" }}>
                                             <div style={{ padding: "6px 12px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", alignItems: "center" }}>
                                                 {rowHasMissing ? <span style={{ color: "var(--warning-text)", fontSize: "12px" }}>⚠</span> : rowIdx + 1}
                                             </div>
@@ -830,7 +885,7 @@ export default function ImportPage() {
                                                                 style={{ width: "100%", padding: "6px 12px", background: "var(--accent-bg)", border: "none", borderTop: "1.5px solid var(--accent)", fontSize: "12px", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" }}
                                                             />
                                                         ) : (
-                                                            <div style={{ padding: "6px 12px", fontSize: "12px", color: isEmpty ? "var(--danger-text)" : "var(--text-primary)", cursor: "pointer", border: isEmpty ? "1px solid var(--danger-border)" : "none", minHeight: "30px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                            <div style={{ padding: "6px 12px", fontSize: "12px", color: isEmpty ? "var(--danger-text)" : "var(--text-primary)", cursor: "pointer", outline: isEmpty ? "1px solid var(--danger-border)" : "none", minHeight: "30px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                                 {val !== undefined && val !== null && val !== "" ? String(val) : <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>boş</span>}
                                                             </div>
                                                         )}
@@ -840,9 +895,9 @@ export default function ImportPage() {
                                         </div>
                                     );
                                 })}
-                                {filteredDrafts.length > 100 && (
+                                {filteredDrafts.length > 500 && (
                                     <div style={{ padding: "10px 12px", fontSize: "11px", color: "var(--text-tertiary)", background: "var(--bg-secondary)", textAlign: "center" }}>
-                                        +{filteredDrafts.length - 100} daha fazla satır (toplam {filteredDrafts.length})
+                                        +{filteredDrafts.length - 500} daha fazla satır (toplam {filteredDrafts.length})
                                     </div>
                                 )}
                             </div>

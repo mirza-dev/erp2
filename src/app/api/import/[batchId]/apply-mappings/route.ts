@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetBatch, dbUpdateBatchStatus, dbCreateDrafts } from "@/lib/supabase/import";
-import { dbSaveColumnMappings } from "@/lib/supabase/column-mappings";
+import { dbGetBatch, dbUpdateBatchStatus, dbCreateDrafts, dbDeletePendingDrafts } from "@/lib/supabase/import";
+import { dbSaveColumnMappings, dbIncrementMappingSuccess } from "@/lib/supabase/column-mappings";
 
 const NUMERIC_FIELDS = new Set([
     "price", "grand_total", "min_stock_level", "on_hand", "cost_price", "weight_kg",
@@ -58,6 +58,8 @@ export async function POST(
             return NextResponse.json({ error: "En az bir sheet gerekli." }, { status: 400 });
         }
 
+        // Fix: delete existing pending drafts before re-creating — prevents duplication on back navigation
+        await dbDeletePendingDrafts(batchId);
         await dbUpdateBatchStatus(batchId, "processing");
 
         const allDrafts = [];
@@ -65,20 +67,26 @@ export async function POST(
         for (const sheet of body.sheets) {
             const { entity_type, mappings, rows, remember } = sheet;
 
+            // Active (non-skip) mappings
+            const activeMappings = mappings.filter(m => m.target_field && m.target_field !== "skip");
+            const activeNormalized = activeMappings.map(m =>
+                m.source_column.trim().toLowerCase().replace(/[^a-z0-9]/g, "_")
+            );
+
             // Save mappings to memory if user opted in
             if (remember) {
-                const toSave = mappings
-                    .filter(m => m.target_field && m.target_field !== "skip")
-                    .map(m => ({
-                        source_column: m.source_column,
-                        entity_type,
-                        target_field: m.target_field,
-                    }));
+                const toSave = activeMappings.map(m => ({
+                    source_column: m.source_column,
+                    entity_type,
+                    target_field: m.target_field,
+                }));
                 await dbSaveColumnMappings(toSave);
             }
 
-            // Deterministic row transformation
-            const activeMappings = mappings.filter(m => m.target_field && m.target_field !== "skip");
+            // Fix: increment success_count only for actually-mapped columns (not all raw headers)
+            if (activeNormalized.length > 0) {
+                await dbIncrementMappingSuccess(activeNormalized, entity_type);
+            }
 
             const draftInputs = rows.map(row => {
                 const parsed_data: Record<string, unknown> = {};

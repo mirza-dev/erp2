@@ -46,15 +46,25 @@ export async function dbSaveColumnMappings(
         // upsert: on conflict (normalized, entity_type) → increment usage_count
         const { data: existing } = await supabase
             .from("column_mappings")
-            .select("id, usage_count")
+            .select("id, usage_count, target_field")
             .eq("normalized", norm)
             .eq("entity_type", m.entity_type)
             .maybeSingle();
 
         if (existing) {
+            const updates: Record<string, unknown> = {
+                usage_count: existing.usage_count + 1,
+                updated_at: new Date().toISOString(),
+            };
+            // If user corrected the target_field, overwrite it and reset success_count
+            // so stale confidence data doesn't linger
+            if (existing.target_field !== m.target_field) {
+                updates.target_field = m.target_field;
+                updates.success_count = 0;
+            }
             await supabase
                 .from("column_mappings")
-                .update({ usage_count: existing.usage_count + 1, updated_at: new Date().toISOString() })
+                .update(updates)
                 .eq("id", existing.id);
         } else {
             await supabase.from("column_mappings").insert({
