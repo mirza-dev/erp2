@@ -92,6 +92,13 @@ export async function dbCreateDrafts(inputs: CreateDraftInput[]): Promise<Import
     return data;
 }
 
+/** Delete a batch entirely — used when user abandons column-mapping step */
+export async function dbDeleteBatch(id: string): Promise<void> {
+    const supabase = createServiceClient();
+    await supabase.from("import_drafts").delete().eq("batch_id", id);
+    await supabase.from("import_batches").delete().eq("id", id);
+}
+
 /** Delete all pending drafts for a batch — used when user re-applies mappings */
 export async function dbDeletePendingDrafts(batchId: string): Promise<void> {
     const supabase = createServiceClient();

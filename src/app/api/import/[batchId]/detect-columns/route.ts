@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch } from "@/lib/supabase/import";
-import { dbLookupColumnMappings } from "@/lib/supabase/column-mappings";
+import { dbLookupColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { aiDetectColumns, isAIAvailable, FALLBACK_FIELD_MAP } from "@/lib/services/ai-service";
 
 /**
@@ -63,13 +63,11 @@ export async function POST(
                 source: "memory" | "ai" | "fallback";
             }> = [];
 
-            const unknownHeaders: string[] = [];
-
             const fallbackMap = FALLBACK_FIELD_MAP[entity_type] ?? {};
             const trulyUnknownHeaders: string[] = [];
 
             for (const header of headers) {
-                const norm = header.trim().toLowerCase().replace(/[^a-z0-9]/g, "_");
+                const norm = normalizeColumnName(header);
                 const memRow = memoryMap.get(norm);
 
                 if (memRow) {

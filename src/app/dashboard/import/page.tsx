@@ -27,7 +27,7 @@ interface ColumnMapping {
     source_column: string;
     target_field: string | null;   // null or "skip" = skip this column
     confidence: number;
-    source: "memory" | "ai" | "fallback";
+    source: "memory" | "ai" | "fallback" | "user";
 }
 
 interface DraftRow {
@@ -148,15 +148,18 @@ const tabBtnStyle = (active: boolean): React.CSSProperties => ({
     cursor: "pointer", whiteSpace: "nowrap",
 });
 
-const sourceChipStyle = (src: "memory" | "ai" | "fallback"): React.CSSProperties => {
+const sourceChipStyle = (src: "memory" | "ai" | "fallback" | "user"): React.CSSProperties => {
     const map = {
-        memory: { bg: "var(--success-bg)", color: "var(--success-text)", label: "Hafıza" },
-        ai: { bg: "var(--accent-bg)", color: "var(--accent-text)", label: "AI" },
-        fallback: { bg: "var(--bg-tertiary)", color: "var(--text-tertiary)", label: "?" },
+        memory: { bg: "var(--success-bg)", color: "var(--success-text)" },
+        ai: { bg: "var(--accent-bg)", color: "var(--accent-text)" },
+        fallback: { bg: "var(--bg-tertiary)", color: "var(--text-tertiary)" },
+        user: { bg: "var(--warning-bg)", color: "var(--warning-text)" },
     };
     const s = map[src];
     return { fontSize: "10px", padding: "2px 7px", borderRadius: "10px", background: s.bg, color: s.color, whiteSpace: "nowrap" };
 };
+
+const PAGE_SIZE = 100;
 
 export default function ImportPage() {
     const { refetchAll } = useData();
@@ -185,6 +188,7 @@ export default function ImportPage() {
     // Bulk fill state
     const [bulkField, setBulkField] = useState("");
     const [bulkValue, setBulkValue] = useState("");;
+    const [previewPage, setPreviewPage] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ─── Parse Excel file client-side ─────────────────────────────────
@@ -323,7 +327,7 @@ export default function ImportPage() {
         setColumnMappings(prev => ({
             ...prev,
             [sheetName]: prev[sheetName].map((m, i) =>
-                i === colIdx ? { ...m, target_field: targetField, source: "memory" } : m
+                i === colIdx ? { ...m, target_field: targetField, source: "user" } : m
             ),
         }));
     };
@@ -731,7 +735,7 @@ export default function ImportPage() {
                                                     ))}
                                                 </select>
                                                 <span style={sourceChipStyle(m.source)}>
-                                                    {m.source === "memory" ? "Hafıza" : m.source === "ai" ? "AI" : "?"}
+                                                    {m.source === "memory" ? "Hafıza" : m.source === "ai" ? "AI" : m.source === "user" ? "Kullanıcı" : "?"}
                                                 </span>
                                             </div>
                                         ))}
@@ -750,7 +754,10 @@ export default function ImportPage() {
                             </div>
 
                             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                                <button onClick={() => { setState("sheet_select"); setColumnMappings({}); setBatchId(null); }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                                <button onClick={() => {
+                                    if (batchId) { fetch(`/api/import/${batchId}`, { method: "DELETE" }).catch(() => {}); }
+                                    setState("sheet_select"); setColumnMappings({}); setBatchId(null);
+                                }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
                                 <button onClick={handleApplyMappings} style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer", fontWeight: 600 }}>
                                     Eşleştirmeyi Uygula →
                                 </button>
@@ -768,7 +775,7 @@ export default function ImportPage() {
                         {draftEntityTypes.map(type => {
                             const count = drafts.filter(d => d.entity_type === type).length;
                             return (
-                                <button key={type} onClick={() => { setActiveTab(type); setBulkField(""); setBulkValue(""); }} style={tabBtnStyle(activeTab === type)}>
+                                <button key={type} onClick={() => { setActiveTab(type); setBulkField(""); setBulkValue(""); setPreviewPage(0); }} style={tabBtnStyle(activeTab === type)}>
                                     {entityTypeLabels[type] ?? type}
                                     <span style={{ marginLeft: "5px", fontSize: "10px", opacity: 0.7 }}>{count}</span>
                                 </button>
@@ -839,9 +846,9 @@ export default function ImportPage() {
                         for (const d of filteredDrafts) {
                             for (const k of Object.keys((d.parsed_data ?? {}) as Record<string, unknown>)) fieldSet.add(k);
                         }
-                        // Required fields first, then the rest
+                        // Required fields always shown (even if unmapped), then the rest
                         const visibleFields = [
-                            ...required.filter(f => fieldSet.has(f)),
+                            ...required,
                             ...[...fieldSet].filter(f => !required.includes(f)),
                         ];
 
@@ -857,16 +864,16 @@ export default function ImportPage() {
                                     ))}
                                 </div>
 
-                                {/* Table rows — up to 500 */}
-                                {filteredDrafts.slice(0, 500).map((draft, rowIdx) => {
+                                {filteredDrafts.slice(previewPage * PAGE_SIZE, (previewPage + 1) * PAGE_SIZE).map((draft, rowIdx) => {
+                                    const globalIdx = previewPage * PAGE_SIZE + rowIdx;
                                     const rowHasMissing = required.some(f => {
                                         const v = getEffectiveValue(draft, f);
                                         return v === undefined || v === null || v === "";
                                     });
                                     return (
-                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(110px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "0.5px solid var(--border-tertiary)" : "none", background: rowHasMissing ? "rgba(var(--danger-rgb,248,81,73),0.06)" : rowIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "600px" }}>
+                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(110px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "0.5px solid var(--border-tertiary)" : "none", background: rowHasMissing ? "rgba(var(--danger-rgb,248,81,73),0.06)" : globalIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "600px" }}>
                                             <div style={{ padding: "6px 12px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", alignItems: "center" }}>
-                                                {rowHasMissing ? <span style={{ color: "var(--warning-text)", fontSize: "12px" }}>⚠</span> : rowIdx + 1}
+                                                {rowHasMissing ? <span style={{ color: "var(--warning-text)", fontSize: "12px" }}>⚠</span> : globalIdx + 1}
                                             </div>
                                             {visibleFields.map(f => {
                                                 const val = getEffectiveValue(draft, f);
@@ -895,11 +902,22 @@ export default function ImportPage() {
                                         </div>
                                     );
                                 })}
-                                {filteredDrafts.length > 500 && (
-                                    <div style={{ padding: "10px 12px", fontSize: "11px", color: "var(--text-tertiary)", background: "var(--bg-secondary)", textAlign: "center" }}>
-                                        +{filteredDrafts.length - 500} daha fazla satır (toplam {filteredDrafts.length})
-                                    </div>
-                                )}
+                                {filteredDrafts.length > PAGE_SIZE && (() => {
+                                    const totalPages = Math.ceil(filteredDrafts.length / PAGE_SIZE);
+                                    return (
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "10px 12px", background: "var(--bg-secondary)", borderTop: "0.5px solid var(--border-tertiary)", fontSize: "12px", color: "var(--text-secondary)" }}>
+                                            <button onClick={() => setPreviewPage(p => Math.max(0, p - 1))} disabled={previewPage === 0}
+                                                style={{ fontSize: "12px", padding: "4px 12px", background: previewPage === 0 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage === 0 ? "var(--text-tertiary)" : "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage === 0 ? "not-allowed" : "pointer" }}>
+                                                ← Önceki
+                                            </button>
+                                            <span>Sayfa {previewPage + 1} / {totalPages} (toplam {filteredDrafts.length} satır)</span>
+                                            <button onClick={() => setPreviewPage(p => Math.min(totalPages - 1, p + 1))} disabled={previewPage >= totalPages - 1}
+                                                style={{ fontSize: "12px", padding: "4px 12px", background: previewPage >= totalPages - 1 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage >= totalPages - 1 ? "var(--text-tertiary)" : "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage >= totalPages - 1 ? "not-allowed" : "pointer" }}>
+                                                Sonraki →
+                                            </button>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         );
                     })()}

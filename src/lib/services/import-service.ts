@@ -8,6 +8,7 @@ import {
     dbGetBatch, dbUpdateBatchStatus, dbListDrafts, dbUpdateDraft,
     type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
+import { dbIncrementMappingSuccess } from "@/lib/supabase/column-mappings";
 import { dbCreateCustomer, dbFindCustomerByName, dbFindCustomerByCode, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbLookupEntityAlias, dbSaveEntityAlias } from "@/lib/supabase/entity-aliases";
 import { dbCreateProduct, dbFindProductBySku, dbUpdateProduct } from "@/lib/supabase/products";
@@ -569,6 +570,14 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
         }
     }
 
-    await dbUpdateBatchStatus(batchId, "confirmed");
+    const confirmedBatch = await dbUpdateBatchStatus(batchId, "confirmed");
+    // Increment success_count for column mappings now that the import actually succeeded.
+    const meta = (confirmedBatch.parse_result as Record<string, unknown> | null)?.column_mapping_meta as
+        Array<{ entity_type: string; normalized_columns: string[] }> | undefined;
+    if (meta) {
+        for (const m of meta) {
+            await dbIncrementMappingSuccess(m.normalized_columns, m.entity_type);
+        }
+    }
     return { added, updated, skipped, errors };
 }

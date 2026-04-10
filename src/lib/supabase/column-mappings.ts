@@ -1,8 +1,12 @@
 import { createServiceClient } from "./service";
 import type { ColumnMappingRow } from "@/lib/database.types";
 
-function normalize(col: string): string {
-    return col.trim().toLowerCase().replace(/[^a-z0-9]/g, "_");
+export function normalizeColumnName(col: string): string {
+    return col.trim()
+        .toLowerCase()
+        .replace(/[ğ]/g, "g").replace(/[ü]/g, "u").replace(/[ş]/g, "s")
+        .replace(/[ı]/g, "i").replace(/[ö]/g, "o").replace(/[ç]/g, "c")
+        .replace(/[^a-z0-9]/g, "_");
 }
 
 /**
@@ -14,7 +18,7 @@ export async function dbLookupColumnMappings(
     entityType: string,
 ): Promise<Map<string, ColumnMappingRow>> {
     const supabase = createServiceClient();
-    const normalizedHeaders = headers.map(normalize);
+    const normalizedHeaders = headers.map(normalizeColumnName);
     if (normalizedHeaders.length === 0) return new Map();
 
     const { data, error } = await supabase
@@ -42,7 +46,7 @@ export async function dbSaveColumnMappings(
     const supabase = createServiceClient();
 
     for (const m of mappings) {
-        const norm = normalize(m.source_column);
+        const norm = normalizeColumnName(m.source_column);
         // upsert: on conflict (normalized, entity_type) → increment usage_count
         const { data: existing } = await supabase
             .from("column_mappings")

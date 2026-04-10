@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch, dbUpdateBatchStatus, dbCreateDrafts, dbDeletePendingDrafts } from "@/lib/supabase/import";
-import { dbSaveColumnMappings, dbIncrementMappingSuccess } from "@/lib/supabase/column-mappings";
+import { dbSaveColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
 
 const NUMERIC_FIELDS = new Set([
     "price", "grand_total", "min_stock_level", "on_hand", "cost_price", "weight_kg",
@@ -63,15 +63,16 @@ export async function POST(
         await dbUpdateBatchStatus(batchId, "processing");
 
         const allDrafts = [];
+        // Accumulate mapping metadata across sheets — used by serviceConfirmBatch to
+        // increment success_count only after a successful import, not here.
+        const columnMappingMeta: Array<{ entity_type: string; normalized_columns: string[] }> = [];
 
         for (const sheet of body.sheets) {
             const { entity_type, mappings, rows, remember } = sheet;
 
             // Active (non-skip) mappings
             const activeMappings = mappings.filter(m => m.target_field && m.target_field !== "skip");
-            const activeNormalized = activeMappings.map(m =>
-                m.source_column.trim().toLowerCase().replace(/[^a-z0-9]/g, "_")
-            );
+            const activeNormalized = activeMappings.map(m => normalizeColumnName(m.source_column));
 
             // Save mappings to memory if user opted in
             if (remember) {
@@ -83,9 +84,8 @@ export async function POST(
                 await dbSaveColumnMappings(toSave);
             }
 
-            // Fix: increment success_count only for actually-mapped columns (not all raw headers)
             if (activeNormalized.length > 0) {
-                await dbIncrementMappingSuccess(activeNormalized, entity_type);
+                columnMappingMeta.push({ entity_type, normalized_columns: activeNormalized });
             }
 
             const draftInputs = rows.map(row => {
@@ -117,7 +117,9 @@ export async function POST(
         const avgConfidence = allDrafts.length > 0
             ? allDrafts.reduce((sum, d) => sum + (d.confidence ?? 0), 0) / allDrafts.length
             : 1.0;
-        await dbUpdateBatchStatus(batchId, "review", null, avgConfidence);
+        // Store mapping metadata so serviceConfirmBatch can increment success_count
+        // only after a successful import, not at draft-creation time.
+        await dbUpdateBatchStatus(batchId, "review", { column_mapping_meta: columnMappingMeta }, avgConfidence);
 
         return NextResponse.json({ drafts: allDrafts }, { status: 201 });
     } catch (err) {
