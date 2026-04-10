@@ -6,41 +6,27 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-10):**
-1. **Faz 6 — Teklif Süresi & Auto-expire:**
-   - `023_quote_valid_until.sql` migration — `quote_valid_until date`, `quote_expired` alert tipi, RPC güncelleme
-   - `dbListExpiredQuotes()` + `serviceExpireQuotes()` — draft auto-cancel, pending_approval → alert (dedup)
-   - `POST /api/orders/expire-quotes` cron endpoint + middleware CRON_PATHS
-   - Yeni sipariş formu date picker (default +14 gün)
-   - Sipariş listesi + detay UI (badge, banner, info row)
-   - Ürün drawer: isExpired kırmızı border/badge + kalan/geçen gün gösterimi
-   - **60 dosya · 1261 test**
+**Son tamamlanan (2026-04-11):**
 
-2. **Faz 5 — Teklif Kırılımı (Quoted Breakdown):**
-   - `dbGetQuotedBreakdownByProduct()` + `dbLookupUserEmails()` (`src/lib/supabase/products.ts`)
-   - `GET /api/products/[id]/quotes` endpoint
-   - Ürün drawer'ında "Aktif Teklifler" section
-   - **58 dosya · 1253 test**
+1. **Import Sistemi Yenileme (Faz 8) + 7 Bug Fix:**
+   - Yeni akış: `idle → analyzing → sheet_select → column_mapping → preview → importing → done`
+   - `026_column_mappings.sql` — kolon hafıza tablosu (normalized, usage_count, success_count)
+   - `POST /api/import/[batchId]/detect-columns` — memory → FALLBACK → AI sırasıyla kolon algılama
+   - `POST /api/import/[batchId]/apply-mappings` — kullanıcı onaylı deterministik dönüşüm
+   - `src/lib/supabase/column-mappings.ts` — dbLookupColumnMappings, dbSaveColumnMappings, dbIncrementMappingSuccess
+   - Preview: tüm alanlar (union), required alanlar önce, 500 satır, inline cell edit, toplu doldur UI
+   - 7 bug fix: draft duplication (back nav), memory düzeltilemiyor, success_count yanlış kaynak, detection sırası, confidence formülü, preview sınırları, bulk fill eksikliği
+   - **63 dosya · 1274 test**
 
-2. **Faz 4.6 — Deadline Tutarlılık Geçişi:**
-   - `alert-service.ts`: deadline hesabı `available_now` → `promisable` (quoted dahil edildi), API/UI ile tutarlı
-   - `shouldSuggestReorder()` pure helper (`src/lib/stock-utils.ts`)
-   - `data-context.tsx` reorderSuggestions: `<` → `<=` (off-by-one fix) + deadline ≤ 7 gün olan ürünler de dahil
-   - 2 yeni test: `alert-deadline-promisable.test.ts`, `reorder-suggestions.test.ts`
-   - **55 dosya · 1239 test**
+2. **Ürün Kullanım Bayrakları:**
+   - `025_product_usage_flags.sql` — `is_for_sales` / `is_for_purchase` kolonları
+   - Ürün oluşturma formu, drawer toggle, stok sayfası filtre butonları
 
-2. **Faz 4 — Sipariş Son Tarihi (Order Deadline):** (2026-04-09)
-   - `computeOrderDeadline()` pure helper (`src/lib/stock-utils.ts`)
-   - `/api/products` → `stockoutDate` + `orderDeadline` alanları
-   - `stockoutDate`/`orderDeadline` → `ProductWithStock` + `mapProduct()` üzerinden frontend'e taşınıyor
-   - Ürünler sayfasına "Son Tarih" kolonu (kırmızı/sarı/yeşil)
-   - Satın alma önerileri → deadline ascending sort
-   - `order_deadline` alert tipi + migration `022_add_order_deadline_alert.sql`
+3. **Önceki: Geciken Sevkiyat Alertı (overdue_shipment):**
+   - `024_overdue_shipment_alert.sql`, `dbListOverdueShipments()`, CRON endpoint
 
-3. **Faz 3 — Stok Eskime Raporu** (2026-04-08)
-4. **Faz 2 Bug Fix** (2026-04-08)
-5. **Faz 2 — Giriş Takibi** (2026-04-08)
-6. **Faz 1 — Teklif Görünürlüğü** (2026-04-08)
+**Bilinen açık sorunlar:**
+- Migration 025 ve 026 production Supabase'e henüz uygulanmadı (Supabase SQL editöründe çalıştırılacak)
 
 **Sonraki adım:** yuksek-etki.md'deki sıradaki özellik
 

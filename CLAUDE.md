@@ -1,29 +1,25 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-10_
+_Son güncelleme: 2026-04-11_
 
-**Son tamamlanan iş:** Geciken Sevkiyat Alertı (overdue_shipment)
-- `supabase/migrations/023_quote_valid_until.sql` — `quote_valid_until date` kolonu, `quote_expired` alert tipi, `create_order_with_lines` RPC güncelleme
-- `dbListExpiredQuotes()` + `serviceExpireQuotes()` — expired draft'ları auto-cancel, pending_approval'ları alert'e çevirir (dedup)
-- `POST /api/orders/expire-quotes` — CRON_PATHS'e eklendi (middleware.ts)
-- Yeni sipariş formunda default +14 gün `quote_valid_until` date picker
-- Sipariş listesinde "Süresi Doldu" kırmızı badge
-- Sipariş detayında expired uyarı banner + "Teklif Geçerliliği" info row
-- Ürün drawer "Aktif Teklifler": isExpired kırmızı border + badge, kalan/geçen gün gösterimi, ≤3 gün sarı uyarı
-- 2 yeni test dosyası: `expire-quotes-service.test.ts`, `expire-quotes-route.test.ts`
-- **Faz 6.1:** `dbUpdateOrderQuoteDeadline()` + PATCH `/api/orders/[id]` `quote_valid_until` branşı + drawer "Uzat" UI (+7/+14/+30/Özel, expired + ≤3 gün) + `expire-extend-route.test.ts`
-- **Faz 5 bug fix:** currency mismatch (q.currency), promisable negatif gizleme kaldırıldı (product.promisable canonical), email fallback "—"
-- **Geciken Sevkiyat:** `024_overdue_shipment_alert.sql` + `dbListOverdueShipments()` + `serviceCheckOverdueShipments()` + `POST /api/orders/check-shipments` + 2 test dosyası
+**Son tamamlanan iş:** Import Sistemi Yenileme + 7 Bug Fix
+- `supabase/migrations/026_column_mappings.sql` — kolon hafıza tablosu (normalized, usage_count, success_count)
+- Yeni akış: `idle → analyzing → sheet_select → column_mapping → preview → importing → done`
+- `POST /api/import/[batchId]/detect-columns` — memory → FALLBACK → AI sırasıyla kolon eşleştirme
+- `POST /api/import/[batchId]/apply-mappings` — kullanıcı onaylı deterministik dönüşüm + draft oluşturma
+- `src/lib/supabase/column-mappings.ts` — `dbLookupColumnMappings`, `dbSaveColumnMappings`, `dbIncrementMappingSuccess`
+- Preview: tüm alanlar (union), required alanlar önce, 500 satır, inline cell edit, toplu doldur UI
+- **7 bug fix:** draft duplication (back nav), memory düzeltilemiyor, success_count yanlış kaynak, detection sırası, confidence formülü, preview sınırları, bulk fill eksikliği
+- **Ürün kullanım bayrakları:** `is_for_sales` / `is_for_purchase` — ürün oluşturma formu, drawer toggle, stok sayfası filtre butonları (`025_product_usage_flags.sql`)
 
-**Faz 5 (tamamlandı — Teklif Kırılımı):**
-- `dbGetQuotedBreakdownByProduct()` query + `dbLookupUserEmails()` helper
-- `GET /api/products/[id]/quotes` endpoint → sipariş satır satır kırılımı + satışçı email
-- Ürün drawer'ına "Aktif Teklifler" section'ı
+**Önceki önemli işler:**
+- Geciken Sevkiyat Alertı (`024_overdue_shipment_alert.sql`), Teklif Uzatma (Faz 6.1), Teklif Kırılımı (Faz 5)
+- Quote valid until domain kuralı (string karşılaştırma), overdue_shipment alert, demo mode mimarisi
 
 **Aktif odak:** —
-**Bilinen açık sorunlar:** Migration 023 local Supabase'e henüz uygulanmadı (deploy sırasında yapılacak)
-**Test sayısı:** 63 dosya · 1271 test
+**Bilinen açık sorunlar:** Migration 025 ve 026 production Supabase'e uygulanmadı (Supabase SQL editöründe çalıştırılacak)
+**Test sayısı:** 63 dosya · 1274 test
 
 ---
 
@@ -212,20 +208,157 @@ available_now = on_hand - reserved
 
 ---
 
-## Tamamlanan Fazlar (Faz 0–10)
+## Stok Modeli (Detay)
 
-| Faz | Konu | Durum |
-|-----|------|-------|
-| 0 | Domain Alignment | ✅ Tamamlandı |
-| 1 | Frontend Stabilization | ✅ Tamamlandı |
-| 2 | Core Domain Model (DB schema) | ✅ Tamamlandı (5 migration, 14 tablo) |
-| 3 | Orders Engine | ✅ Tamamlandı |
-| 4 | Inventory & Reservation Engine | ✅ Tamamlandı |
-| 5 | Critical Stock & Alerts Engine | ✅ Tamamlandı |
-| 6 | Purchase Suggestion Engine | ✅ Tamamlandı |
-| 7 | Production Engine | ✅ Tamamlandı |
-| 8 | Import Flow | ✅ Tamamlandı |
-| 9 | Paraşüt Integration | ✅ Tamamlandı |
-| 10 | AI Layer (Claude Haiku) | ✅ Tamamlandı |
+```
+on_hand        — fiziksel stok
+reserved       — onaylı siparişler için ayrılmış
+available_now  = on_hand - reserved              (computed column)
+quoted         = draft + pending_approval siparişlerdeki toplam miktar
+promisable     = available_now - quoted          (canonical; negatif olabilir — Math.max ile gizleme)
+incoming       = açık purchase commitment toplamı
+forecasted     = on_hand + incoming - reserved - quoted
+```
+
+---
+
+## Domain Kuralları
+
+### Teklif Süresi (quote_valid_until)
+- `sales_orders.quote_valid_until date` — nullable, NULL = süresiz
+- **Tarih karşılaştırma kuralı — ZORUNLU:**
+  ```ts
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const isExpired = !!date && date < todayStr;  // string karşılaştırma
+  ```
+  `new Date(date) < new Date()` KULLANMA — saat farkı nedeniyle ~24 saat kayar.
+- Expire akışı: `serviceExpireQuotes()` (CRON) → expired draft → auto-cancel, pending → `quote_expired` alert
+
+### Alert Tipleri
+
+| Tip | Tetikleyici |
+|-----|-------------|
+| `stock_critical` | available_now ≤ 0 |
+| `stock_risk` | available_now ≤ min_stock_level |
+| `purchase_recommended` | reorder önerisi |
+| `order_shortage` | onaylı sipariş için stok yetersiz |
+| `order_deadline` | stok tükenme tarihi yakın |
+| `quote_expired` | pending_approval + quote_valid_until geçmiş |
+| `overdue_shipment` | approved + sevk edilmemiş, planlanan tarih geçmiş veya created_at+7 gün |
+| `sync_issue` | Paraşüt sync hatası |
+| `import_review_required` | import batch review gerekiyor |
+
+**Dedup:** `dbListActiveAlerts()` → type+entity_id filtresi ile aktif alert varsa yeni yaratılmaz.
+**Kapanma:** `dbBatchResolveAlerts([{ type, entityId, reason }])` — ID değil type+entity ile.
+
+### CRON Endpoint'leri (`middleware.ts CRON_PATHS`)
+
+| Endpoint | İşlev |
+|----------|-------|
+| `POST /api/alerts/scan` | Stok alert taraması |
+| `POST /api/alerts/ai-suggest` | AI alert önerileri |
+| `POST /api/parasut/sync-all` | Paraşüt sync |
+| `POST /api/orders/expire-quotes` | Süresi dolan teklifleri işle |
+| `POST /api/orders/check-shipments` | Geciken sevkiyat alertları |
+
+### Import Servisi Kontratı
+`serviceConfirmBatch` → `{ added, updated, skipped, errors }`
+- Yeni SKU → `added` (on_hand dahil)
+- Mevcut SKU → `updated` (on_hand dahil değil — master-data only)
+- Eksik zorunlu alan (sku/name/unit) → `skipped`
+
+---
+
+## Güvenlik ve Demo Mode
+
+### Auth Middleware (`middleware.ts` — proje kökünde)
+- `/` ve `/login` → herkese açık; auth'd kullanıcı `/`'e gelirse `/dashboard`'a yönlendir
+- `/dashboard/**` ve `/api/**` → oturum gerektirir
+- Cron bypass: `CRON_SECRET` Bearer token → CRON_PATHS
+- `/api/health` ve `/api/auth/demo` → her zaman public
+
+### Demo Mode
+**Entry:** Landing "Demo Gez" → `demo_mode=1` cookie → `/dashboard`
+
+**`src/lib/demo-utils.ts`:** `useIsDemo()`, `DEMO_DISABLED_TOOLTIP`, `DEMO_BLOCK_TOAST`
+
+**Middleware gate (demo_mode=1 + unauthenticated):**
+- `GET /api/**` → izin ver
+- `POST/PATCH/DELETE /api/**` → 403
+
+**Client-side guard pattern:**
+```tsx
+const isDemo = useIsDemo();
+if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+<Button disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+```
+
+### Credential Güvenliği
+- Auth'd kullanıcı: masked (ilk 4 kar + ••••••••) + boolean flag
+- Demo/anon: null veya false
+- Regression: `src/__tests__/credentials-no-leak.test.ts`, `demo-mode-middleware.test.ts`
+
+---
+
+## Entegrasyonlar
+
+### Paraşüt
+- `src/lib/parasut.ts` — şu an **MOCK** (%90 başarı, 1-1.8s rastgele gecikme)
+- `PARASUT_ENABLED=true` → sync aktif; boş/false → erken döner
+- Sipariş detay → sevk → `serviceSyncOrderToParasut(id)` (fire-and-forget değil)
+
+### AI Katmanı (Claude Haiku — `claude-haiku-4-5-20251001`)
+- Import: `aiDetectColumns()` — sheet başına TEK çağrı, kolon eşleştirme
+- Order Review Risk, Ops Summary, Stock Risk Forecast, Purchase Copilot
+- AI memory: `column_mappings` tablosu (kolon hafızası), `ai_entity_aliases` (isim öğrenme)
+- Guardrails: G1-G4, run logging (`ai_runs` tablosu)
+- `GET /api/ai/observability` → son 7 gün istatistik
+
+### Test Altyapısı
+- **Framework:** Vitest · `src/__tests__/` · node environment
+- **63 dosya · 1274 test**
+- Mock pattern:
+  ```ts
+  vi.mock("@/lib/supabase/orders", () => ({ dbGetOrderById: vi.fn() }));
+  vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: () => undefined }) }));
+  ```
+
+---
+
+## Auth ve Kullanıcı Yönetimi
+
+- `src/app/login/page.tsx` — Supabase `signInWithPassword`
+- `src/app/api/admin/users/route.ts` — GET/POST (service role key)
+- İlk admin: `npm run create-admin email şifre`
+- Demo modda POST/DELETE → middleware 403
+
+---
+
+## Tamamlanan Fazlar
+
+| Faz | Konu |
+|-----|------|
+| 0 | Domain Alignment |
+| 1 | Frontend Stabilization |
+| 2 | Core Domain Model (DB schema — 14+ tablo, 26 migration) |
+| 3 | Orders Engine |
+| 4 | Inventory & Reservation Engine |
+| 5 | Critical Stock & Alerts Engine + Teklif Kırılımı |
+| 6 | Purchase Suggestion Engine + Teklif Süresi + Geciken Sevkiyat |
+| 7 | Production Engine |
+| 8 | Import Flow → Kolon Eşleştirme + Hafıza + Inline Düzenleme |
+| 9 | Paraşüt Integration |
+| 10 | AI Layer (Claude Haiku) |
+| + | Demo Mode, Güvenlik, Ürün Kullanım Bayrakları |
 
 Detay için: `implementation-roadmap.md`
+
+---
+
+## Claude İçin Kurallar (Feedback)
+
+1. **Sessiz silme yasak:** Kodu silmeden önce yerine ne geldiğini açıkla veya kullanıcıya sor. "Taşıdım" demek yeterli değil — eski işlevsellik tam karşılanmalı.
+
+2. **Memory güncellemesi:** Proje durumu değiştiğinde (`current_focus.md`, bu dosyanın "Mevcut Durum" bölümü) otomatik güncelle — kullanıcı söylemeden.
+
+3. **Context güncelleme:** İş commit'lendikten hemen sonra "Mevcut Durum"u ve `memory/current_focus.md`'yi güncelle.
