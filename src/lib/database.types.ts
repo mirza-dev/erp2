@@ -85,6 +85,8 @@ export interface ProductRow {
     standards: string | null
     certifications: string | null
     product_notes: string | null
+    is_for_sales: boolean
+    is_for_purchase: boolean
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */

@@ -305,6 +305,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
         standards: fields.standards || undefined,
         certifications: fields.certifications || undefined,
         product_notes: fields.productNotes || undefined,
+        is_for_sales: fields.isForSales,
+        is_for_purchase: fields.isForPurchase,
       };
       const res = await fetch("/api/products", {
         method: "POST",

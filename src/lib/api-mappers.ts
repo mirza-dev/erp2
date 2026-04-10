@@ -65,6 +65,8 @@ export function mapProduct(row: ProductWithStock): Product {
     standards: row.standards ?? undefined,
     certifications: row.certifications ?? undefined,
     productNotes: row.product_notes ?? undefined,
+    isForSales: row.is_for_sales,
+    isForPurchase: row.is_for_purchase,
     stockoutDate: row.stockoutDate ?? null,
     orderDeadline: row.orderDeadline ?? null,
   };
