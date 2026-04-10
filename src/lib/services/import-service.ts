@@ -63,12 +63,20 @@ const ENTITY_PRIORITY: Record<string, number> = {
 
 /**
  * Numeric field parser that preserves 0 as a valid value.
+ * Handles TR format (1.234,56) with thousands dot + decimal comma.
  * Treats null/undefined/"" as absent (returns undefined), but keeps 0 and "0".
- * Truthy checks like `data.price ? Number(data.price) : undefined` silently drop 0.
  */
 function parseNumeric(value: unknown): number | undefined {
     if (value === null || value === undefined || value === "") return undefined;
-    const n = Number(value);
+    if (typeof value === "number") return value;
+    const s = String(value).trim();
+    // TR format: 1.234,56 → strip thousands dots, replace decimal comma
+    if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(s)) {
+        const n = Number(s.replace(/\./g, "").replace(",", "."));
+        return Number.isNaN(n) ? undefined : n;
+    }
+    // EN format or simple comma-decimal: 1234.56 or 1234,56
+    const n = Number(s.replace(",", "."));
     return Number.isNaN(n) ? undefined : n;
 }
 
@@ -571,12 +579,21 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
     }
 
     const confirmedBatch = await dbUpdateBatchStatus(batchId, "confirmed");
-    // Increment success_count for column mappings now that the import actually succeeded.
+
+    // Increment success_count only for entity types that had at least one merged draft.
+    // If all drafts of a type were rejected, the mapping likely didn't work —
+    // don't inflate its confidence.
     const meta = (confirmedBatch.parse_result as Record<string, unknown> | null)?.column_mapping_meta as
         Array<{ entity_type: string; normalized_columns: string[] }> | undefined;
-    if (meta) {
+    if (meta && (added + updated) > 0) {
+        const finalDrafts = await dbListDrafts(batchId);
         for (const m of meta) {
-            await dbIncrementMappingSuccess(m.normalized_columns, m.entity_type);
+            const hasMerged = finalDrafts.some(
+                d => d.entity_type === m.entity_type && d.status === "merged"
+            );
+            if (hasMerged) {
+                await dbIncrementMappingSuccess(m.normalized_columns, m.entity_type);
+            }
         }
     }
     return { added, updated, skipped, errors };

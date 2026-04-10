@@ -8,11 +8,23 @@ const NUMERIC_FIELDS = new Set([
     "validity_days", "quantity", "unit_price", "line_total", "lead_time_days", "reorder_qty",
 ]);
 
+function parseTRNumber(raw: string): number | null {
+    const s = raw.toString().trim();
+    // TR format: 1.234,56 → strip thousands dots, replace decimal comma
+    if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(s)) {
+        const n = Number(s.replace(/\./g, "").replace(",", "."));
+        return isNaN(n) ? null : n;
+    }
+    // EN format or simple comma-decimal: 1234.56 or 1234,56
+    const n = Number(s.replace(",", "."));
+    return isNaN(n) ? null : n;
+}
+
 function coerceValue(field: string, raw: string): unknown {
     if (raw === undefined || raw === null || raw === "") return undefined;
     if (NUMERIC_FIELDS.has(field)) {
-        const num = Number(raw.toString().replace(",", "."));
-        if (!isNaN(num)) return num;
+        const num = parseTRNumber(raw);
+        if (num !== null) return num;
     }
     return raw;
 }
