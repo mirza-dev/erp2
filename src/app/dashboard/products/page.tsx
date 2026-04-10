@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
@@ -178,7 +178,9 @@ export default function ProductsPage() {
     const [search, setSearch] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-    const [activeCategory, setActiveCategory] = useState("Tümü");
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+    const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+    const categoryDropdownRef = useRef<HTMLDivElement>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [createForm, setCreateForm] = useState<{
         name: string; sku: string; category: string; unit: string;
@@ -227,6 +229,16 @@ export default function ProductsPage() {
         function handleResize() { setWindowWidth(window.innerWidth); }
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    useEffect(() => {
+        function handleClick(e: MouseEvent) {
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(e.target as Node)) {
+                setCategoryDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
     }, []);
 
     useEffect(() => {
@@ -358,7 +370,7 @@ export default function ProductsPage() {
         const matchSearch =
             p.name.toLowerCase().includes(search.toLowerCase()) ||
             p.sku.toLowerCase().includes(search.toLowerCase());
-        const matchCategory = activeCategory === "Tümü" || p.category === activeCategory;
+        const matchCategory = selectedCategories.length === 0 || selectedCategories.includes(p.category);
         const pRisk = riskData.get(p.id);
         const pRec = recMap.get(p.id);
         const matchSignal =
@@ -375,6 +387,14 @@ export default function ProductsPage() {
     categories.slice(1).forEach(cat => {
         categoryCounts[cat] = mockProducts.filter(p => p.category === cat).length;
     });
+
+    const categoryButtonLabel: string =
+        selectedCategories.length === 0
+            ? "Kategori"
+            : selectedCategories.length === 1
+            ? selectedCategories[0]
+            : `Kategori (${selectedCategories.length})`;
+    const categoryIsActive = selectedCategories.length > 0;
 
     const riskliCount = mockProducts.filter(p => riskData.has(p.id)).length;
     const uyariliCount = productsWithAlerts.size;
@@ -533,54 +553,140 @@ export default function ProductsPage() {
                 </div>
             </div>
 
-            {/* Category filter */}
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                {categories.map((cat) => (
-                    <button
-                        key={cat}
-                        aria-pressed={activeCategory === cat}
-                        onClick={() => setActiveCategory(cat)}
-                        style={{
-                            fontSize: "12px",
-                            padding: "5px 12px",
-                            border: `0.5px solid ${activeCategory === cat ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                            borderRadius: "6px",
-                            background: activeCategory === cat ? "var(--accent-bg)" : "transparent",
-                            color: activeCategory === cat ? "var(--accent-text)" : "var(--text-secondary)",
-                            cursor: "pointer",
-                            fontWeight: activeCategory === cat ? 600 : 400,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "5px",
-                        }}
-                        onMouseEnter={e => {
-                            if (activeCategory !== cat) {
-                                e.currentTarget.style.background = "var(--bg-tertiary)";
-                                e.currentTarget.style.color = "var(--text-primary)";
-                            }
-                        }}
-                        onMouseLeave={e => {
-                            if (activeCategory !== cat) {
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.color = "var(--text-secondary)";
-                            }
-                        }}
-                    >
-                        {cat}
-                        <span style={{
-                            fontSize: "10px",
-                            padding: "1px 5px",
-                            borderRadius: "10px",
-                            background: activeCategory === cat ? "var(--accent)" : "var(--bg-tertiary)",
-                            color: activeCategory === cat ? "#fff" : "var(--text-tertiary)",
-                            fontWeight: 600,
-                            minWidth: "16px",
-                            textAlign: "center",
-                        }}>
-                            {categoryCounts[cat] ?? 0}
-                        </span>
-                    </button>
-                ))}
+            {/* Category filter dropdown */}
+            <div ref={categoryDropdownRef} style={{ position: "relative", display: "inline-block" }}>
+                {categoryDropdownOpen && (
+                    <div
+                        onClick={() => setCategoryDropdownOpen(false)}
+                        style={{ position: "fixed", inset: 0, zIndex: 49, background: "transparent" }}
+                    />
+                )}
+                <button
+                    onClick={() => setCategoryDropdownOpen(prev => !prev)}
+                    style={{
+                        fontSize: "12px",
+                        padding: "5px 12px",
+                        border: `0.5px solid ${categoryIsActive ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                        borderRadius: "6px",
+                        background: categoryIsActive ? "var(--accent-bg)" : "transparent",
+                        color: categoryIsActive ? "var(--accent-text)" : "var(--text-secondary)",
+                        cursor: "pointer",
+                        fontWeight: categoryIsActive ? 600 : 400,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                    }}
+                    onMouseEnter={e => {
+                        if (!categoryIsActive) {
+                            e.currentTarget.style.background = "var(--bg-tertiary)";
+                            e.currentTarget.style.color = "var(--text-primary)";
+                        }
+                    }}
+                    onMouseLeave={e => {
+                        if (!categoryIsActive) {
+                            e.currentTarget.style.background = "transparent";
+                            e.currentTarget.style.color = "var(--text-secondary)";
+                        }
+                    }}
+                >
+                    {categoryButtonLabel}
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M2 3.5L5 6.5l3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                    </svg>
+                </button>
+
+                {categoryDropdownOpen && (
+                    <div style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        left: 0,
+                        minWidth: "220px",
+                        background: "var(--bg-primary)",
+                        border: "0.5px solid var(--border-primary)",
+                        borderRadius: "6px",
+                        boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                        zIndex: 50,
+                        overflow: "hidden",
+                    }}>
+                        <div
+                            onClick={() => {
+                                setSelectedCategories([]);
+                                setCategoryDropdownOpen(false);
+                            }}
+                            style={{
+                                padding: "8px 12px",
+                                fontSize: "12px",
+                                cursor: "pointer",
+                                color: selectedCategories.length === 0 ? "var(--accent-text)" : "var(--text-secondary)",
+                                fontWeight: selectedCategories.length === 0 ? 600 : 400,
+                                borderBottom: "0.5px solid var(--border-tertiary)",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-secondary)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                        >
+                            <span>Tümü</span>
+                            <span style={{
+                                fontSize: "10px", padding: "1px 5px", borderRadius: "10px",
+                                background: selectedCategories.length === 0 ? "var(--accent)" : "var(--bg-tertiary)",
+                                color: selectedCategories.length === 0 ? "#fff" : "var(--text-tertiary)",
+                                fontWeight: 600, minWidth: "16px", textAlign: "center",
+                            }}>
+                                {categoryCounts["Tümü"] ?? 0}
+                            </span>
+                        </div>
+                        {categories.slice(1).map(cat => {
+                            const checked = selectedCategories.includes(cat);
+                            return (
+                                <div
+                                    key={cat}
+                                    onClick={() => setSelectedCategories(prev =>
+                                        checked ? prev.filter(c => c !== cat) : [...prev, cat]
+                                    )}
+                                    style={{
+                                        padding: "8px 12px",
+                                        fontSize: "12px",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        gap: "8px",
+                                        color: checked ? "var(--accent-text)" : "var(--text-primary)",
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-secondary)"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                                >
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                        <div style={{
+                                            width: "14px", height: "14px", borderRadius: "3px",
+                                            border: `0.5px solid ${checked ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                            background: checked ? "var(--accent-bg)" : "transparent",
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            flexShrink: 0,
+                                        }}>
+                                            {checked && (
+                                                <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                                                    <path d="M1.5 4.5l2 2 4-4" stroke="var(--accent-text)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+                                                </svg>
+                                            )}
+                                        </div>
+                                        {cat}
+                                    </div>
+                                    <span style={{
+                                        fontSize: "10px", padding: "1px 5px", borderRadius: "10px",
+                                        background: checked ? "var(--accent)" : "var(--bg-tertiary)",
+                                        color: checked ? "#fff" : "var(--text-tertiary)",
+                                        fontWeight: 600, minWidth: "16px", textAlign: "center",
+                                    }}>
+                                        {categoryCounts[cat] ?? 0}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             {/* Signal filter */}
@@ -893,7 +999,7 @@ export default function ProductsPage() {
                                 : alertFilter === "riskli" ? "Şu an riskli ürün yok"
                                 : alertFilter === "uyarili" ? "Aktif uyarısı olan ürün yok"
                                 : alertFilter === "oneri" ? "Bekleyen önerisi olan ürün yok"
-                                : `"${activeCategory}" kategorisinde ürün yok`}
+                                : selectedCategories.length > 0 ? `Seçili kategorilerde ürün yok` : "Ürün bulunamadı"}
                         </div>
                         {(search || alertFilter !== "tumu") && (
                             <button
