@@ -1,0 +1,96 @@
+import { createServiceClient } from "./service";
+import type { ColumnMappingRow } from "@/lib/database.types";
+
+function normalize(col: string): string {
+    return col.trim().toLowerCase().replace(/[^a-z0-9]/g, "_");
+}
+
+/**
+ * Look up past-successful column mappings for a set of headers.
+ * Returns a map: normalized_column → ColumnMappingRow
+ */
+export async function dbLookupColumnMappings(
+    headers: string[],
+    entityType: string,
+): Promise<Map<string, ColumnMappingRow>> {
+    const supabase = createServiceClient();
+    const normalizedHeaders = headers.map(normalize);
+    if (normalizedHeaders.length === 0) return new Map();
+
+    const { data, error } = await supabase
+        .from("column_mappings")
+        .select("*")
+        .eq("entity_type", entityType)
+        .in("normalized", normalizedHeaders);
+
+    if (error || !data) return new Map();
+
+    const map = new Map<string, ColumnMappingRow>();
+    for (const row of data) {
+        map.set(row.normalized, row as ColumnMappingRow);
+    }
+    return map;
+}
+
+/**
+ * Save or update column mappings. On conflict: increment usage_count.
+ */
+export async function dbSaveColumnMappings(
+    mappings: { source_column: string; entity_type: string; target_field: string }[],
+): Promise<void> {
+    if (mappings.length === 0) return;
+    const supabase = createServiceClient();
+
+    for (const m of mappings) {
+        const norm = normalize(m.source_column);
+        // upsert: on conflict (normalized, entity_type) → increment usage_count
+        const { data: existing } = await supabase
+            .from("column_mappings")
+            .select("id, usage_count")
+            .eq("normalized", norm)
+            .eq("entity_type", m.entity_type)
+            .maybeSingle();
+
+        if (existing) {
+            await supabase
+                .from("column_mappings")
+                .update({ usage_count: existing.usage_count + 1, updated_at: new Date().toISOString() })
+                .eq("id", existing.id);
+        } else {
+            await supabase.from("column_mappings").insert({
+                source_column: m.source_column,
+                normalized: norm,
+                entity_type: m.entity_type,
+                target_field: m.target_field,
+                usage_count: 1,
+                success_count: 0,
+            });
+        }
+    }
+}
+
+/**
+ * Increment success_count for each mapping used in a successful import.
+ */
+export async function dbIncrementMappingSuccess(
+    normalizedColumns: string[],
+    entityType: string,
+): Promise<void> {
+    if (normalizedColumns.length === 0) return;
+    const supabase = createServiceClient();
+
+    const { data } = await supabase
+        .from("column_mappings")
+        .select("id, success_count")
+        .eq("entity_type", entityType)
+        .in("normalized", normalizedColumns);
+
+    if (!data) return;
+
+    for (const row of data) {
+        await supabase
+            .from("column_mappings")
+            .update({ success_count: row.success_count + 1, updated_at: new Date().toISOString() })
+            .eq("id", row.id);
+    }
+}

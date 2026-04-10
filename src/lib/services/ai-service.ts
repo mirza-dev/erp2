@@ -436,6 +436,135 @@ export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseRe
     return { items: allItems };
 }
 
+// ── Column Detection ─────────────────────────────────────────
+
+export interface ColumnDetectionInput {
+    headers: string[];
+    sampleRows: Array<Record<string, string>>;  // first 3-5 rows
+    entityType: string;
+    pastMappings?: Array<{ source_column: string; target_field: string; success_count: number }>;
+}
+
+export interface ColumnDetectionResult {
+    mappings: Array<{
+        source_column: string;
+        target_field: string | null;   // null = could not map
+        confidence: number;
+    }>;
+}
+
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Detects which ERP field each Excel column maps to.
+ * One AI call per sheet (not per row). Much cheaper than aiBatchParse.
+ */
+export async function aiDetectColumns(input: ColumnDetectionInput): Promise<ColumnDetectionResult> {
+    const { headers, sampleRows, entityType, pastMappings = [] } = input;
+
+    if (!isAIAvailable()) {
+        // Fallback: use FALLBACK_FIELD_MAP
+        const fieldMap = FALLBACK_FIELD_MAP[entityType] ?? {};
+        return {
+            mappings: headers.map(h => {
+                const norm = h.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+                return { source_column: h, target_field: fieldMap[norm] ?? null, confidence: fieldMap[norm] ? 0.8 : 0 };
+            }),
+        };
+    }
+
+    // Build few-shot context from past successful mappings
+    const pastContext = pastMappings.length > 0
+        ? "\nGeçmiş başarılı eşleştirmeler:\n" +
+          pastMappings.map(m => `- "${m.source_column}" → ${m.target_field} (${m.success_count} başarılı kullanım)`).join("\n")
+        : "";
+
+    // Available ERP fields per entity type
+    const ERP_FIELDS: Record<string, string[]> = {
+        product: ["name", "sku", "category", "unit", "price", "currency", "on_hand", "min_stock_level",
+            "product_family", "sub_category", "cost_price", "weight_kg", "material_quality",
+            "origin_country", "production_site", "use_cases", "industries", "standards",
+            "certifications", "product_notes", "lead_time_days", "reorder_qty", "preferred_vendor"],
+        customer: ["name", "email", "phone", "country", "currency", "tax_number", "tax_office",
+            "address", "notes", "payment_terms_days", "default_incoterm", "customer_code"],
+        order: ["customer_name", "customer_code", "currency", "grand_total", "notes",
+            "incoterm", "planned_shipment_date", "quote_number", "original_order_number", "order_date"],
+        order_line: ["order_number", "product_sku", "quantity", "unit", "unit_price", "line_total"],
+        quote: ["quote_number", "quote_date", "customer_code", "currency", "incoterm", "validity_days", "total_amount"],
+        shipment: ["shipment_number", "order_number", "shipment_date", "transport_type", "net_weight_kg", "gross_weight_kg"],
+        invoice: ["invoice_number", "invoice_date", "order_number", "customer_code", "currency", "amount", "due_date"],
+        payment: ["payment_number", "invoice_number", "payment_date", "amount", "payment_method"],
+        stock: ["sku", "on_hand"],
+    };
+
+    const availableFields = (ERP_FIELDS[entityType] ?? []).join(", ");
+
+    // Sample data as compact string
+    const sampleStr = JSON.stringify(
+        sampleRows.slice(0, 3).map(row =>
+            Object.fromEntries(
+                headers.slice(0, 20).map(h => [h, sanitizeAiInput(row[h] ?? "", 100)])
+            )
+        )
+    );
+
+    const prompt = `Bir B2B ERP sistemi için Excel kolon adlarını ERP alanlarına eşleştir.
+${pastContext}
+
+Entity türü: ${entityType}
+Mevcut ERP alanları: ${availableFields}
+
+Kolon adları: ${JSON.stringify(headers.slice(0, 30))}
+
+İlk 3 satır örneği:
+${sampleStr}
+
+Sadece JSON döndür — başka metin yok:
+[{"source_column": "...", "target_field": "...", "confidence": 0.0-1.0}, ...]
+
+Kurallar:
+- target_field mutlaka yukarıdaki ERP alanlarından biri olmalı
+- Eşleşme yoksa target_field: null
+- confidence: 0-1 arası float`;
+
+    try {
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 1024,
+            messages: [{ role: "user", content: prompt }],
+        });
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const arrMatch = text.match(/\[[\s\S]*\]/);
+        if (arrMatch) {
+            const parsed = JSON.parse(arrMatch[0]) as Array<{ source_column: string; target_field: string | null; confidence: number }>;
+            if (Array.isArray(parsed)) {
+                return {
+                    mappings: parsed.map(item => ({
+                        source_column: typeof item.source_column === "string" ? item.source_column : "",
+                        target_field: typeof item.target_field === "string" && item.target_field.length > 0 ? item.target_field : null,
+                        confidence: clampConfidence(typeof item.confidence === "number" ? item.confidence : 0.5),
+                    })),
+                };
+            }
+        }
+    } catch {
+        // fall through to fallback
+    }
+
+    // Fallback if AI fails
+    const fieldMap = FALLBACK_FIELD_MAP[entityType] ?? {};
+    return {
+        mappings: headers.map(h => {
+            const norm = h.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+            return { source_column: h, target_field: fieldMap[norm] ?? null, confidence: fieldMap[norm] ? 0.7 : 0 };
+        }),
+    };
+}
+
 // ── Ops Summary ──────────────────────────────────────────────
 
 export interface OpsSummaryInput {

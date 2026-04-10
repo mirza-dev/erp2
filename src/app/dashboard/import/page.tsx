@@ -7,7 +7,7 @@ import * as XLSX from "xlsx";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useToast } from "@/components/ui/Toast";
 
-type ImportState = "idle" | "analyzing" | "sheet_select" | "parsing" | "preview" | "importing" | "done";
+type ImportState = "idle" | "analyzing" | "sheet_select" | "column_mapping" | "preview" | "importing" | "done";
 
 // ─── Sheet info derived from actual file ─────────────────────────────────────
 interface SheetInfo {
@@ -23,6 +23,102 @@ interface SheetInfo {
     allRows: Array<Record<string, string>>;
 }
 
+interface ColumnMapping {
+    source_column: string;
+    target_field: string | null;   // null or "skip" = skip this column
+    confidence: number;
+    source: "memory" | "ai" | "fallback";
+}
+
+interface DraftRow {
+    id: string;
+    batch_id: string;
+    entity_type: string;
+    raw_data: Record<string, unknown> | null;
+    parsed_data: Record<string, unknown> | null;
+    confidence: number | null;
+    ai_reason: string | null;
+    unmatched_fields: string[] | null;
+    status: string;
+    user_corrections?: Record<string, unknown> | null;
+}
+
+// ERP fields per entity type (for dropdown options)
+const ERP_FIELDS: Record<string, Array<{ field: string; label: string }>> = {
+    product: [
+        { field: "name", label: "Ürün Adı" }, { field: "sku", label: "SKU" },
+        { field: "category", label: "Kategori" }, { field: "unit", label: "Birim" },
+        { field: "price", label: "Fiyat" }, { field: "currency", label: "Para Birimi" },
+        { field: "on_hand", label: "Stok Miktarı" }, { field: "min_stock_level", label: "Min. Stok" },
+        { field: "product_family", label: "Ürün Ailesi" }, { field: "sub_category", label: "Alt Kategori" },
+        { field: "cost_price", label: "Maliyet" }, { field: "weight_kg", label: "Ağırlık (kg)" },
+        { field: "material_quality", label: "Malzeme Kalitesi" }, { field: "origin_country", label: "Menşei" },
+        { field: "production_site", label: "Üretim Tesisi" }, { field: "use_cases", label: "Kullanım Alanları" },
+        { field: "industries", label: "Sektörler" }, { field: "standards", label: "Standartlar" },
+        { field: "certifications", label: "Sertifikalar" }, { field: "product_notes", label: "Notlar" },
+        { field: "lead_time_days", label: "Tedarik Süresi (gün)" }, { field: "reorder_qty", label: "Yeniden Sipariş Miktarı" },
+        { field: "preferred_vendor", label: "Tercihli Tedarikçi" },
+    ],
+    customer: [
+        { field: "name", label: "Firma Adı" }, { field: "email", label: "E-posta" },
+        { field: "phone", label: "Telefon" }, { field: "country", label: "Ülke" },
+        { field: "currency", label: "Para Birimi" }, { field: "tax_number", label: "Vergi No" },
+        { field: "tax_office", label: "Vergi Dairesi" }, { field: "address", label: "Adres" },
+        { field: "notes", label: "Notlar" }, { field: "payment_terms_days", label: "Ödeme Vadesi (gün)" },
+        { field: "customer_code", label: "Müşteri Kodu" },
+    ],
+    order: [
+        { field: "customer_name", label: "Müşteri Adı" }, { field: "customer_code", label: "Müşteri Kodu" },
+        { field: "currency", label: "Para Birimi" }, { field: "grand_total", label: "Toplam Tutar" },
+        { field: "notes", label: "Notlar" }, { field: "incoterm", label: "Incoterm" },
+        { field: "planned_shipment_date", label: "Planlanan Sevk Tarihi" },
+        { field: "quote_number", label: "Teklif No" }, { field: "original_order_number", label: "Sipariş No" },
+        { field: "order_date", label: "Sipariş Tarihi" },
+    ],
+    order_line: [
+        { field: "order_number", label: "Sipariş No" }, { field: "product_sku", label: "Ürün SKU" },
+        { field: "quantity", label: "Miktar" }, { field: "unit", label: "Birim" },
+        { field: "unit_price", label: "Birim Fiyat" }, { field: "line_total", label: "Toplam" },
+    ],
+    quote: [
+        { field: "quote_number", label: "Teklif No" }, { field: "quote_date", label: "Teklif Tarihi" },
+        { field: "customer_code", label: "Müşteri Kodu" }, { field: "currency", label: "Para Birimi" },
+        { field: "incoterm", label: "Incoterm" }, { field: "validity_days", label: "Geçerlilik (gün)" },
+        { field: "total_amount", label: "Toplam Tutar" },
+    ],
+    shipment: [
+        { field: "shipment_number", label: "Sevkiyat No" }, { field: "order_number", label: "Sipariş No" },
+        { field: "shipment_date", label: "Sevkiyat Tarihi" }, { field: "transport_type", label: "Taşıma Türü" },
+        { field: "net_weight_kg", label: "Net Ağırlık (kg)" }, { field: "gross_weight_kg", label: "Brüt Ağırlık (kg)" },
+    ],
+    invoice: [
+        { field: "invoice_number", label: "Fatura No" }, { field: "invoice_date", label: "Fatura Tarihi" },
+        { field: "order_number", label: "Sipariş No" }, { field: "customer_code", label: "Müşteri Kodu" },
+        { field: "currency", label: "Para Birimi" }, { field: "amount", label: "Tutar" },
+        { field: "due_date", label: "Vade Tarihi" },
+    ],
+    payment: [
+        { field: "payment_number", label: "Tahsilat No" }, { field: "invoice_number", label: "Fatura No" },
+        { field: "payment_date", label: "Tahsilat Tarihi" }, { field: "amount", label: "Tutar" },
+        { field: "payment_method", label: "Ödeme Yöntemi" },
+    ],
+    stock: [
+        { field: "sku", label: "SKU" }, { field: "on_hand", label: "Stok Miktarı" },
+    ],
+};
+
+const REQUIRED_FIELDS: Record<string, string[]> = {
+    product: ["sku", "name", "unit"],
+    customer: ["name"],
+    quote: ["quote_number"],
+    order: [],
+    order_line: ["order_number", "product_sku"],
+    stock: ["sku", "on_hand"],
+    shipment: ["shipment_number"],
+    invoice: ["invoice_number"],
+    payment: ["payment_number"],
+};
+
 // Known sheet → entity type mapping
 const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"; displayName: string; entity: string; status: "importable" }> = {
     Urunler: { entityType: "product", displayName: "Ürünler", entity: "Ürünler", status: "importable" },
@@ -36,52 +132,31 @@ const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "o
     Stok: { entityType: "stock", displayName: "Stok", entity: "Stok Güncellemesi", status: "importable" },
 };
 
-// Entity types that support AI parse (customer/product/order only)
-const AI_PARSEABLE: Set<string> = new Set(["customer", "product", "order"]);
-
-// ─── Draft type from API ─────────────────────────────────────────────────────
-interface DraftRow {
-    id: string;
-    batch_id: string;
-    entity_type: string;
-    raw_data: Record<string, unknown> | null;
-    parsed_data: Record<string, unknown> | null;
-    confidence: number | null;
-    ai_reason: string | null;
-    unmatched_fields: string[] | null;
-    status: string;
-}
+const entityTypeLabels: Record<string, string> = {
+    customer: "Müşteriler", product: "Ürünler", quote: "Teklifler",
+    order: "Siparişler", order_line: "Sipariş Kalemleri", shipment: "Sevkiyatlar",
+    invoice: "Faturalar", payment: "Tahsilatlar", stock: "Stok",
+};
 
 // ─── Styles ────────────────────────────────────────────────────────────────
 const tabBtnStyle = (active: boolean): React.CSSProperties => ({
-    fontSize: "12px",
-    padding: "5px 12px",
+    fontSize: "12px", padding: "5px 12px",
     border: "0.5px solid " + (active ? "var(--accent-border)" : "var(--border-secondary)"),
     borderRadius: "5px",
     background: active ? "var(--accent-bg)" : "transparent",
     color: active ? "var(--accent-text)" : "var(--text-secondary)",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
+    cursor: "pointer", whiteSpace: "nowrap",
 });
 
-// ─── Confidence helpers ─────────────────────────────────────────────────────
-function confidenceColor(c: number): string {
-    if (c >= 0.8) return "var(--success-text)";
-    if (c >= 0.5) return "var(--warning-text)";
-    return "var(--danger-text)";
-}
-
-function confidenceBg(c: number): string {
-    if (c >= 0.8) return "var(--success-bg)";
-    if (c >= 0.5) return "var(--warning-bg)";
-    return "var(--danger-bg)";
-}
-
-function confidenceLabel(c: number): string {
-    if (c >= 0.8) return "Yüksek";
-    if (c >= 0.5) return "Orta";
-    return "Düşük";
-}
+const sourceChipStyle = (src: "memory" | "ai" | "fallback"): React.CSSProperties => {
+    const map = {
+        memory: { bg: "var(--success-bg)", color: "var(--success-text)", label: "Hafıza" },
+        ai: { bg: "var(--accent-bg)", color: "var(--accent-text)", label: "AI" },
+        fallback: { bg: "var(--bg-tertiary)", color: "var(--text-tertiary)", label: "?" },
+    };
+    const s = map[src];
+    return { fontSize: "10px", padding: "2px 7px", borderRadius: "10px", background: s.bg, color: s.color, whiteSpace: "nowrap" };
+};
 
 export default function ImportPage() {
     const { refetchAll } = useData();
@@ -97,9 +172,16 @@ export default function ImportPage() {
     const [importProgress, setImportProgress] = useState<Record<string, number>>({});
     const [confirmResult, setConfirmResult] = useState<{ added: number; updated: number; skipped: number; errors: string[] } | null>(null);
     const [drafts, setDrafts] = useState<DraftRow[]>([]);
-    const [aiAvailable, setAiAvailable] = useState(true);
     const [parseError, setParseError] = useState<string | null>(null);
     const [batchId, setBatchId] = useState<string | null>(null);
+    // Column mapping state — keyed by sheet name
+    const [columnMappings, setColumnMappings] = useState<Record<string, ColumnMapping[]>>({});
+    const [detectingColumns, setDetectingColumns] = useState(false);
+    const [rememberMappings, setRememberMappings] = useState(true);
+    // Inline editing in preview
+    const [editingCell, setEditingCell] = useState<{ draftId: string; field: string } | null>(null);
+    const [editingValue, setEditingValue] = useState("");
+    const [draftEdits, setDraftEdits] = useState<Record<string, Record<string, unknown>>>({});
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // ─── Parse Excel file client-side ─────────────────────────────────
@@ -114,10 +196,8 @@ export default function ImportPage() {
             try {
                 setProgress(30);
                 setProgressLabel("Excel ayrıştırılıyor...");
-
                 const data = new Uint8Array(e.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: "array" });
-
                 setProgress(60);
                 setProgressLabel("Sheetler analiz ediliyor...");
 
@@ -125,31 +205,23 @@ export default function ImportPage() {
                     const worksheet = workbook.Sheets[name];
                     const jsonRows = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet, { defval: "" });
                     const headers = jsonRows.length > 0 ? Object.keys(jsonRows[0]) : [];
-
-                    // Determine entity type and status
                     const known = SHEET_ENTITY_MAP[name];
 
                     return {
-                        name,
-                        displayName: known?.displayName ?? name,
-                        rows: jsonRows.length,
-                        entity: known?.entity ?? name,
+                        name, displayName: known?.displayName ?? name,
+                        rows: jsonRows.length, entity: known?.entity ?? name,
                         entityType: known?.entityType ?? null,
                         status: known ? "importable" : "unsupported",
-                        selected: !!known,
-                        headers,
+                        selected: !!known, headers,
                         previewRows: jsonRows.slice(0, 5).map(row =>
-                            Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v)]))
-                        ),
+                            Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v)]))),
                         allRows: jsonRows.map(row =>
-                            Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v)]))
-                        ),
+                            Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v)]))),
                     } satisfies SheetInfo;
                 });
 
                 setProgress(100);
                 setProgressLabel("Hazır");
-
                 setTimeout(() => {
                     setSheets(detectedSheets);
                     const firstImportable = detectedSheets.find(s => s.status === "importable");
@@ -162,10 +234,7 @@ export default function ImportPage() {
                 setState("idle");
             }
         };
-        reader.onerror = () => {
-            setParseError("Dosya okuma hatası.");
-            setState("idle");
-        };
+        reader.onerror = () => { setParseError("Dosya okuma hatası."); setState("idle"); };
         reader.readAsArrayBuffer(file);
     }, []);
 
@@ -193,12 +262,11 @@ export default function ImportPage() {
         setSheets(prev => prev.map((s, i) => i === idx ? { ...s, selected: !s.selected } : s));
     };
 
-    // ─── AI Parse step ────────────────────────────────────────────────
-    const handleParse = async () => {
+    // ─── Step 1: Create batch + detect column mappings ────────────────
+    const handleDetectColumns = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
-        setState("parsing");
-        setProgress(0);
-        setProgressLabel("AI analiz başlatılıyor...");
+        setState("column_mapping");
+        setDetectingColumns(true);
         setParseError(null);
 
         try {
@@ -212,82 +280,118 @@ export default function ImportPage() {
             const batch = await batchRes.json();
             setBatchId(batch.id);
 
-            setProgress(20);
-            setProgressLabel("AI analiz ediyor...");
-
-            // 2. Prepare sheets for parse — only AI-parseable entity types
+            // 2. Detect columns for selected sheets
             const selectedSheets = sheets.filter(s => s.status === "importable" && s.selected);
-            const parseableSheets = selectedSheets
-                .filter(s => s.entityType && AI_PARSEABLE.has(s.entityType))
-                .map(s => ({
-                    sheet_name: s.name,
-                    entity_type: s.entityType as "customer" | "product" | "order",
-                    rows: s.allRows,
-                }));
+            const detectRes = await fetch(`/api/import/${batch.id}/detect-columns`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sheets: selectedSheets.map(s => ({
+                        sheet_name: s.name,
+                        entity_type: s.entityType,
+                        headers: s.headers,
+                        sample_rows: s.previewRows,
+                    })),
+                }),
+            });
+            if (!detectRes.ok) throw new Error("Kolon algılama başarısız.");
+            const detectResult = await detectRes.json() as {
+                sheets: Array<{ sheet_name: string; mappings: ColumnMapping[] }>;
+            };
 
-            let parsedDrafts: DraftRow[] = [];
-            let isAiAvailable = true;
-
-            if (parseableSheets.length > 0) {
-                // 3. Call AI parse endpoint
-                const parseRes = await fetch(`/api/import/${batch.id}/parse`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ sheets: parseableSheets }),
-                });
-
-                setProgress(70);
-                setProgressLabel("Sonuçlar işleniyor...");
-
-                if (!parseRes.ok) {
-                    const err = await parseRes.json().catch(() => ({}));
-                    throw new Error(err.error ?? "AI parse başarısız.");
-                }
-
-                const parseResult = await parseRes.json();
-                parsedDrafts = parseResult.drafts ?? [];
-                isAiAvailable = parseResult.ai_available ?? true;
+            const mappingMap: Record<string, ColumnMapping[]> = {};
+            for (const sheet of detectResult.sheets) {
+                mappingMap[sheet.sheet_name] = sheet.mappings;
             }
-
-            // 4. For non-AI-parseable sheets (order_line, stock), create simple drafts
-            const nonParseableSheets = selectedSheets.filter(s => s.entityType && !AI_PARSEABLE.has(s.entityType));
-            if (nonParseableSheets.length > 0) {
-                for (const sheet of nonParseableSheets) {
-                    const simpleDrafts = sheet.allRows.map(row => ({
-                        entity_type: sheet.entityType!,
-                        parsed_data: row as Record<string, unknown>,
-                        raw_data: row as Record<string, unknown>,
-                        confidence: 0.5,
-                        ai_reason: "Doğrudan kolon eşleştirmesi (AI parse desteklenmiyor)",
-                    }));
-
-                    const draftRes = await fetch(`/api/import/${batch.id}/drafts`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(simpleDrafts),
-                    });
-                    if (draftRes.ok) {
-                        const created = await draftRes.json();
-                        parsedDrafts.push(...created);
-                    }
-                }
-            }
-
-            setProgress(100);
-            setProgressLabel("Analiz tamamlandı");
-            setDrafts(parsedDrafts);
-            setAiAvailable(isAiAvailable);
-
-            // Set active tab to first entity type with drafts
-            const firstType = parsedDrafts[0]?.entity_type;
-            if (firstType) setActiveTab(firstType);
-
-            setTimeout(() => setState("preview"), 300);
+            setColumnMappings(mappingMap);
+            const firstSheet = selectedSheets[0];
+            if (firstSheet) setActiveTab(firstSheet.name);
         } catch (err) {
-            console.error("Parse failed:", err);
-            setParseError(err instanceof Error ? err.message : "Parse hatası.");
+            console.error("Detect columns failed:", err);
+            setParseError(err instanceof Error ? err.message : "Kolon algılama hatası.");
             setState("sheet_select");
+        } finally {
+            setDetectingColumns(false);
         }
+    };
+
+    // Update a single mapping field value
+    const updateMapping = (sheetName: string, colIdx: number, targetField: string | null) => {
+        setColumnMappings(prev => ({
+            ...prev,
+            [sheetName]: prev[sheetName].map((m, i) =>
+                i === colIdx ? { ...m, target_field: targetField, source: "memory" } : m
+            ),
+        }));
+    };
+
+    // ─── Step 2: Apply mappings → create drafts → preview ────────────
+    const handleApplyMappings = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!batchId) return;
+        setParseError(null);
+
+        try {
+            const selectedSheets = sheets.filter(s => s.status === "importable" && s.selected);
+            const applyRes = await fetch(`/api/import/${batchId}/apply-mappings`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    sheets: selectedSheets.map(s => ({
+                        sheet_name: s.name,
+                        entity_type: s.entityType,
+                        mappings: (columnMappings[s.name] ?? []).map(m => ({
+                            source_column: m.source_column,
+                            target_field: m.target_field ?? "skip",
+                        })),
+                        rows: s.allRows,
+                        remember: rememberMappings,
+                    })),
+                }),
+            });
+            if (!applyRes.ok) {
+                const err = await applyRes.json().catch(() => ({}));
+                throw new Error(err.error ?? "Eşleştirme uygulaması başarısız.");
+            }
+            const applyResult = await applyRes.json();
+            const createdDrafts: DraftRow[] = applyResult.drafts ?? [];
+            setDrafts(createdDrafts);
+            const firstType = createdDrafts[0]?.entity_type;
+            if (firstType) setActiveTab(firstType);
+            setState("preview");
+        } catch (err) {
+            console.error("Apply mappings failed:", err);
+            setParseError(err instanceof Error ? err.message : "Eşleştirme hatası.");
+        }
+    };
+
+    // ─── Inline edit helpers ──────────────────────────────────────────
+    const startEdit = (draftId: string, field: string, currentValue: unknown) => {
+        setEditingCell({ draftId, field });
+        setEditingValue(currentValue !== undefined && currentValue !== null ? String(currentValue) : "");
+    };
+
+    const commitEdit = async (draftId: string, field: string) => {
+        setEditingCell(null);
+        const prev = draftEdits[draftId] ?? {};
+        const newEdits = { ...prev, [field]: editingValue };
+        setDraftEdits(d => ({ ...d, [draftId]: newEdits }));
+
+        // Persist to server (best-effort)
+        try {
+            await fetch(`/api/import/drafts/${draftId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_corrections: newEdits }),
+            });
+        } catch { /* ignore */ }
+    };
+
+    const getEffectiveValue = (draft: DraftRow, field: string): unknown => {
+        const corrections = draftEdits[draft.id];
+        if (corrections && field in corrections) return corrections[field];
+        const parsed = (draft.parsed_data ?? {}) as Record<string, unknown>;
+        return parsed[field];
     };
 
     // ─── Import (confirm) step ────────────────────────────────────────
@@ -302,9 +406,7 @@ export default function ImportPage() {
         setImportProgress(init);
 
         const steps: Record<string, number> = {};
-        selectedSheets.forEach(s => {
-            steps[s.name] = Math.max(1, s.rows / 40);
-        });
+        selectedSheets.forEach(s => { steps[s.name] = Math.max(1, s.rows / 40); });
 
         let ticker: ReturnType<typeof setInterval> | null = setInterval(() => {
             setImportProgress(prev => {
@@ -318,10 +420,8 @@ export default function ImportPage() {
         }, 100);
 
         try {
-            // Confirm batch → merge drafts to real entities
             const confirmRes = await fetch(`/api/import/${batchId}/confirm`, { method: "POST" });
-            clearInterval(ticker);
-            ticker = null;
+            clearInterval(ticker); ticker = null;
 
             const done: Record<string, number> = {};
             selectedSheets.forEach(s => (done[s.name] = s.rows));
@@ -331,7 +431,6 @@ export default function ImportPage() {
                 const result = await confirmRes.json();
                 setConfirmResult(result);
             }
-
             await refetchAll();
             setState("done");
         } catch (err) {
@@ -343,38 +442,26 @@ export default function ImportPage() {
     };
 
     const reset = () => {
-        setState("idle");
-        setFileName(null);
-        setProgress(0);
-        setProgressLabel("");
-        setImportProgress({});
-        setConfirmResult(null);
-        setDrafts([]);
-        setSheets([]);
-        setActiveTab("");
-        setBatchId(null);
-        setParseError(null);
-        setAiAvailable(true);
+        setState("idle"); setFileName(null); setProgress(0); setProgressLabel("");
+        setImportProgress({}); setConfirmResult(null); setDrafts([]); setSheets([]);
+        setActiveTab(""); setBatchId(null); setParseError(null);
+        setColumnMappings({}); setDetectingColumns(false); setDraftEdits({});
     };
 
     const importableSelected = sheets.filter(s => s.status === "importable" && s.selected);
-
-    // Group drafts by entity_type for the preview/review step
     const draftEntityTypes = [...new Set(drafts.map(d => d.entity_type))];
     const filteredDrafts = drafts.filter(d => d.entity_type === activeTab);
 
-    // Entity type labels
-    const entityTypeLabels: Record<string, string> = {
-        customer: "Müşteriler",
-        product: "Ürünler",
-        quote: "Teklifler",
-        order: "Siparişler",
-        order_line: "Sipariş Kalemleri",
-        shipment: "Sevkiyatlar",
-        invoice: "Faturalar",
-        payment: "Tahsilatlar",
-        stock: "Stok",
-    };
+    // Step indicator
+    const STEPS = [
+        { key: "analyzing", label: "Dosya Okuma" },
+        { key: "sheet_select", label: "Sheet Seçimi" },
+        { key: "column_mapping", label: "Kolon Eşleştirme" },
+        { key: "preview", label: "İnceleme" },
+        { key: "importing", label: "İçe Aktarım" },
+        { key: "done", label: "Tamamlandı" },
+    ];
+    const stepOrder = STEPS.map(s => s.key);
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -385,41 +472,24 @@ export default function ImportPage() {
                         Veri İçe Aktarım
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        Excel dosyasını yükle — AI ile otomatik ayrıştırma, güven skoru ve inceleme
+                        Excel dosyasını yükle — kolon eşleştirme, önizleme ve içe aktarım
                     </div>
                 </div>
                 {(state !== "idle" && state !== "analyzing") && (
-                    <button
-                        onClick={reset}
-                        style={{
-                            fontSize: "12px",
-                            padding: "5px 12px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "6px",
-                            background: "transparent",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                        }}
-                    >
-                        Yeni Dosya
-                    </button>
+                    <button onClick={reset} style={{
+                        fontSize: "12px", padding: "5px 12px",
+                        border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
+                        background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
+                    }}>Yeni Dosya</button>
                 )}
             </div>
 
             {/* Step indicator */}
             {state !== "idle" && (
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
-                    {[
-                        { key: "analyzing", label: "Dosya Okuma" },
-                        { key: "sheet_select", label: "Sheet Seçimi" },
-                        { key: "parsing", label: "AI Analiz" },
-                        { key: "preview", label: "İnceleme" },
-                        { key: "importing", label: "İçe Aktarım" },
-                        { key: "done", label: "Tamamlandı" },
-                    ].map((step, i) => {
-                        const order = ["analyzing", "sheet_select", "parsing", "preview", "importing", "done"];
-                        const currentIdx = order.indexOf(state);
-                        const stepIdx = order.indexOf(step.key);
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", flexWrap: "wrap" }}>
+                    {STEPS.map((step, i) => {
+                        const currentIdx = stepOrder.indexOf(state);
+                        const stepIdx = stepOrder.indexOf(step.key);
                         const isDone = stepIdx < currentIdx;
                         const isActive = stepIdx === currentIdx;
                         return (
@@ -437,56 +507,34 @@ export default function ImportPage() {
                 </div>
             )}
 
-            {/* Parse error banner */}
+            {/* Error banner */}
             {parseError && (
                 <div style={{
-                    padding: "10px 14px",
-                    background: "var(--danger-bg)",
-                    border: "0.5px solid var(--danger-border)",
-                    borderRadius: "6px",
-                    fontSize: "12px",
-                    color: "var(--danger-text)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
+                    padding: "10px 14px", background: "var(--danger-bg)",
+                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
+                    fontSize: "12px", color: "var(--danger-text)", display: "flex", alignItems: "center", gap: "8px",
                 }}>
                     <span style={{ fontWeight: 600 }}>Hata:</span> {parseError}
-                    <button
-                        onClick={() => setParseError(null)}
-                        style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--danger-text)", cursor: "pointer", fontSize: "14px" }}
-                    >&times;</button>
+                    <button onClick={() => setParseError(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--danger-text)", cursor: "pointer", fontSize: "14px" }}>&times;</button>
                 </div>
             )}
 
             {/* ───── IDLE ───── */}
             {state === "idle" && (
                 <>
-                    {/* Drop zone */}
                     <div
                         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                         onDragLeave={() => setDragOver(false)}
                         onDrop={handleDrop}
                         style={{
                             border: `2px dashed ${dragOver ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                            borderRadius: "8px",
-                            padding: "48px 24px",
-                            textAlign: "center",
+                            borderRadius: "8px", padding: "48px 24px", textAlign: "center",
                             background: dragOver ? "rgba(56,139,253,0.07)" : "var(--bg-primary)",
-                            transition: "border-color 0.15s, background 0.15s",
                         }}
                     >
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".xlsx,.xls,.csv"
-                            style={{ display: "none" }}
-                            onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }}
-                        />
-                        <div style={{
-                            width: "56px", height: "56px", margin: "0 auto 16px",
-                            background: "var(--accent-bg)", borderRadius: "10px",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
+                        <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
+                            onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }} />
+                        <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", background: "var(--accent-bg)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <svg width="24" height="24" viewBox="0 0 22 22" fill="none">
                                 <path d="M11 14V4M11 4L7 8M11 4L15 8" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                 <path d="M3 17h16" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
@@ -498,59 +546,25 @@ export default function ImportPage() {
                         <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>
                             Excel ve CSV dosyalarını destekliyoruz
                         </div>
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            style={{
-                                padding: "8px 20px",
-                                background: "var(--accent)",
-                                color: "#fff",
-                                border: "none",
-                                borderRadius: "6px",
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                            }}
-                        >
-                            Dosya Seç
-                        </button>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "8px" }}>
-                            veya dosyayı buraya sürükle
-                        </div>
-                        {/* File type chips */}
+                        <button onClick={() => fileInputRef.current?.click()} style={{
+                            padding: "8px 20px", background: "var(--accent)", color: "#fff",
+                            border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, cursor: "pointer",
+                        }}>Dosya Seç</button>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "8px" }}>veya dosyayı buraya sürükle</div>
                         <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap", alignItems: "center" }}>
                             {["XLSX", "XLS", "CSV"].map(ext => (
-                                <span key={ext} style={{
-                                    fontSize: "11px", padding: "3px 10px",
-                                    background: "var(--bg-secondary)",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "4px",
-                                    color: "var(--text-secondary)",
-                                    fontFamily: "monospace",
-                                    fontWeight: 600,
-                                }}>{ext}</span>
+                                <span key={ext} style={{ fontSize: "11px", padding: "3px 10px", background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", color: "var(--text-secondary)", fontFamily: "monospace", fontWeight: 600 }}>{ext}</span>
                             ))}
                             <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>· çok-sheet desteklenir</span>
                         </div>
                     </div>
 
-                    {/* Flow indicator */}
-                    <div style={{
-                        display: "flex", alignItems: "center", gap: "0",
-                        background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                        borderRadius: "6px", overflow: "hidden",
-                    }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0", background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", overflow: "hidden" }}>
                         {[
-                            { icon: "🔍", label: "Dosya Oku" },
-                            { icon: "🗂", label: "Sheet Seç" },
-                            { icon: "🧠", label: "AI Analiz" },
-                            { icon: "👁", label: "İncele" },
-                            { icon: "✅", label: "İçe Aktar" },
+                            { icon: "🔍", label: "Dosya Oku" }, { icon: "🗂", label: "Sheet Seç" },
+                            { icon: "🔗", label: "Kolon Eşleştir" }, { icon: "👁", label: "İncele" }, { icon: "✅", label: "İçe Aktar" },
                         ].map((step, i) => (
-                            <div key={step.label} style={{
-                                flex: 1, textAlign: "center", padding: "10px 8px",
-                                borderRight: i < 4 ? "0.5px solid var(--border-tertiary)" : "none",
-                                display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
-                            }}>
+                            <div key={step.label} style={{ flex: 1, textAlign: "center", padding: "10px 8px", borderRight: i < 4 ? "0.5px solid var(--border-tertiary)" : "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
                                 <span style={{ fontSize: "14px" }}>{step.icon}</span>
                                 <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{step.label}</span>
                             </div>
@@ -560,13 +574,10 @@ export default function ImportPage() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
                         {[
                             { title: "Çok-Sheet Desteği", desc: "Excel dosyanızdaki tüm sheetler otomatik tespit edilir." },
-                            { title: "AI Ayrıştırma", desc: "Her satır AI ile analiz edilir, güven skoru ve eşleştirme önerisi verilir." },
-                            { title: "Seçici İçe Aktarım", desc: "Düşük güvenli satırları inceleyip onaylayın veya reddedin." },
+                            { title: "Akıllı Kolon Eşleştirme", desc: "AI kolonları ERP alanlarına eşleştirir, hafızaya kaydedilir." },
+                            { title: "Seçici İçe Aktarım", desc: "Her alanı önizleyin, düzeltin, sonra onaylayın." },
                         ].map(card => (
-                            <div key={card.title} style={{
-                                background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                                borderRadius: "6px", padding: "14px 16px",
-                            }}>
+                            <div key={card.title} style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "14px 16px" }}>
                                 <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>{card.title}</div>
                                 <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.5 }}>{card.desc}</div>
                             </div>
@@ -577,25 +588,14 @@ export default function ImportPage() {
 
             {/* ───── ANALYZING ───── */}
             {state === "analyzing" && (
-                <div style={{
-                    background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                    borderRadius: "8px", padding: "48px 24px", textAlign: "center",
-                }}>
+                <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "48px 24px", textAlign: "center" }}>
                     <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "24px" }}>
                         {[0, 1, 2].map(i => (
-                            <div key={i} style={{
-                                width: "8px", height: "8px", borderRadius: "50%",
-                                background: "var(--accent)",
-                                animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite`,
-                            }} />
+                            <div key={i} style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)", animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
                         ))}
                     </div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
-                        Dosya okunuyor...
-                    </div>
-                    {fileName && (
-                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>{fileName}</div>
-                    )}
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>Dosya okunuyor...</div>
+                    {fileName && <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>{fileName}</div>}
                     <div style={{ maxWidth: "320px", margin: "0 auto", height: "4px", background: "var(--border-tertiary)", borderRadius: "2px", overflow: "hidden" }}>
                         <div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: "2px", transition: "width 0.35s ease" }} />
                     </div>
@@ -606,160 +606,161 @@ export default function ImportPage() {
             {/* ───── SHEET SELECT ───── */}
             {state === "sheet_select" && (
                 <>
-                    <div style={{
-                        background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                        borderRadius: "8px", overflow: "hidden",
-                    }}>
-                        {/* Header */}
-                        <div style={{
-                            padding: "12px 16px", borderBottom: "0.5px solid var(--border-tertiary)",
-                            background: "var(--bg-secondary)", display: "flex", alignItems: "center", justifyContent: "space-between",
-                        }}>
+                    <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>
+                        <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--border-tertiary)", background: "var(--bg-secondary)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div>
-                                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
-                                    Dosyada {sheets.length} sheet bulundu
-                                </span>
+                                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>Dosyada {sheets.length} sheet bulundu</span>
                                 <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "10px" }}>
                                     {importableSelected.length} içe aktarılabilir · {importableSelected.filter(s => s.selected).length} seçili
                                 </span>
                             </div>
                             {fileName && <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{fileName}</span>}
                         </div>
-
-                        {/* Sheet rows */}
                         <div style={{ display: "flex", flexDirection: "column" }}>
-                            {sheets.map((sheet, idx) => {
-                                const statusColor = sheet.status === "importable"
-                                    ? "var(--success-text)"
-                                    : "var(--text-tertiary)";
-                                const statusBg = sheet.status === "importable"
-                                    ? "var(--success-bg)"
-                                    : "var(--bg-tertiary)";
-                                const statusLabel = sheet.status === "importable"
-                                    ? "İçe Aktarılabilir"
-                                    : "Desteklenmiyor";
-
-                                return (
-                                    <div
-                                        key={sheet.name}
-                                        onClick={() => toggleSheet(idx)}
-                                        style={{
-                                            display: "flex", alignItems: "center", gap: "12px",
-                                            padding: "10px 16px",
-                                            borderBottom: idx < sheets.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
-                                            cursor: sheet.status === "importable" ? "pointer" : "default",
-                                            opacity: sheet.status === "unsupported" ? 0.5 : 1,
-                                        }}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={sheet.selected}
-                                            disabled={sheet.status !== "importable"}
-                                            onChange={() => toggleSheet(idx)}
-                                            onClick={e => e.stopPropagation()}
-                                            style={{ cursor: sheet.status === "importable" ? "pointer" : "default", accentColor: "var(--accent)" }}
-                                        />
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                                <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
-                                                    {sheet.displayName}
-                                                </span>
-                                                <span style={{ fontSize: "10px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
-                                                    {sheet.name}
-                                                </span>
-                                            </div>
-                                            {sheet.headers.length > 0 && (
-                                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                                                    Kolonlar: {sheet.headers.slice(0, 5).join(", ")}{sheet.headers.length > 5 ? ` +${sheet.headers.length - 5}` : ""}
-                                                </div>
-                                            )}
+                            {sheets.map((sheet, idx) => (
+                                <div key={sheet.name} onClick={() => toggleSheet(idx)} style={{
+                                    display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px",
+                                    borderBottom: idx < sheets.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+                                    cursor: sheet.status === "importable" ? "pointer" : "default",
+                                    opacity: sheet.status === "unsupported" ? 0.5 : 1,
+                                }}>
+                                    <input type="checkbox" checked={sheet.selected} disabled={sheet.status !== "importable"}
+                                        onChange={() => toggleSheet(idx)} onClick={e => e.stopPropagation()}
+                                        style={{ cursor: sheet.status === "importable" ? "pointer" : "default", accentColor: "var(--accent)" }} />
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                            <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>{sheet.displayName}</span>
+                                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>{sheet.name}</span>
                                         </div>
-                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
-                                            {sheet.rows.toLocaleString("tr-TR")} satır
-                                        </span>
-                                        <span style={{
-                                            fontSize: "10px", padding: "2px 8px",
-                                            background: statusBg, color: statusColor,
-                                            borderRadius: "10px", whiteSpace: "nowrap",
-                                        }}>
-                                            {statusLabel}
-                                        </span>
+                                        {sheet.headers.length > 0 && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                                Kolonlar: {sheet.headers.slice(0, 5).join(", ")}{sheet.headers.length > 5 ? ` +${sheet.headers.length - 5}` : ""}
+                                            </div>
+                                        )}
                                     </div>
-                                );
-                            })}
+                                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{sheet.rows.toLocaleString("tr-TR")} satır</span>
+                                    <span style={{ fontSize: "10px", padding: "2px 8px", background: sheet.status === "importable" ? "var(--success-bg)" : "var(--bg-tertiary)", color: sheet.status === "importable" ? "var(--success-text)" : "var(--text-tertiary)", borderRadius: "10px", whiteSpace: "nowrap" }}>
+                                        {sheet.status === "importable" ? "İçe Aktarılabilir" : "Desteklenmiyor"}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
                     </div>
-
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button onClick={reset} style={{
-                            fontSize: "12px", padding: "7px 14px",
-                            border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                            background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                        }}>← Geri</button>
-                        <button
-                            onClick={handleParse}
-                            disabled={isDemo || importableSelected.length === 0}
+                        <button onClick={reset} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                        <button onClick={handleDetectColumns} disabled={isDemo || importableSelected.length === 0}
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                            style={{
-                                fontSize: "12px", padding: "7px 18px",
-                                border: "0.5px solid var(--accent-border)", borderRadius: "6px",
-                                background: (!isDemo && importableSelected.length > 0) ? "var(--accent-bg)" : "var(--bg-tertiary)",
-                                color: (!isDemo && importableSelected.length > 0) ? "var(--accent-text)" : "var(--text-tertiary)",
-                                cursor: (!isDemo && importableSelected.length > 0) ? "pointer" : "not-allowed", fontWeight: 600,
-                            }}
-                        >
-                            AI Analiz Başlat →
+                            style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: (!isDemo && importableSelected.length > 0) ? "var(--accent-bg)" : "var(--bg-tertiary)", color: (!isDemo && importableSelected.length > 0) ? "var(--accent-text)" : "var(--text-tertiary)", cursor: (!isDemo && importableSelected.length > 0) ? "pointer" : "not-allowed", fontWeight: 600 }}>
+                            Kolon Eşleştirmeye Geç →
                         </button>
                     </div>
                 </>
             )}
 
-            {/* ───── PARSING (AI Analysis) ───── */}
-            {state === "parsing" && (
-                <div style={{
-                    background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                    borderRadius: "8px", padding: "48px 24px", textAlign: "center",
-                }}>
-                    <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "24px" }}>
-                        {[0, 1, 2].map(i => (
-                            <div key={i} style={{
-                                width: "8px", height: "8px", borderRadius: "50%",
-                                background: "var(--accent)",
-                                animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite`,
-                            }} />
-                        ))}
-                    </div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
-                        AI analiz ediyor...
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>
-                        {importableSelected.reduce((sum, s) => sum + s.rows, 0).toLocaleString("tr-TR")} satır işleniyor
-                    </div>
-                    <div style={{ maxWidth: "320px", margin: "0 auto", height: "4px", background: "var(--border-tertiary)", borderRadius: "2px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: "2px", transition: "width 0.35s ease" }} />
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "8px" }}>{progressLabel}</div>
-                </div>
+            {/* ───── COLUMN MAPPING ───── */}
+            {state === "column_mapping" && (
+                <>
+                    {detectingColumns ? (
+                        <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "48px 24px", textAlign: "center" }}>
+                            <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "24px" }}>
+                                {[0, 1, 2].map(i => (
+                                    <div key={i} style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)", animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                                ))}
+                            </div>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>Kolonlar algılanıyor...</div>
+                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>AI kolon adlarını ERP alanlarına eşleştiriyor</div>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Sheet tabs */}
+                            {importableSelected.length > 1 && (
+                                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                                    {importableSelected.map(s => (
+                                        <button key={s.name} onClick={() => setActiveTab(s.name)} style={tabBtnStyle(activeTab === s.name)}>
+                                            {s.displayName}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+
+                            {importableSelected.filter(s => !activeTab || s.name === activeTab).map(sheet => {
+                                const mappings = columnMappings[sheet.name] ?? [];
+                                const fields = ERP_FIELDS[sheet.entityType ?? ""] ?? [];
+
+                                return (
+                                    <div key={sheet.name} style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>
+                                        <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--border-tertiary)", background: "var(--bg-secondary)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                            <div>
+                                                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{sheet.displayName}</span>
+                                                <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "10px" }}>{sheet.rows} satır · {sheet.headers.length} kolon</span>
+                                            </div>
+                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{entityTypeLabels[sheet.entityType ?? ""] ?? ""}</span>
+                                        </div>
+
+                                        {/* Table header */}
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: "0", borderBottom: "0.5px solid var(--border-tertiary)", padding: "8px 16px", background: "var(--bg-secondary)" }}>
+                                            <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>Excel Kolonu</span>
+                                            <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>ERP Alanı</span>
+                                            <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>Kaynak</span>
+                                        </div>
+
+                                        {mappings.map((m, colIdx) => (
+                                            <div key={m.source_column} style={{
+                                                display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: "0",
+                                                alignItems: "center", padding: "8px 16px",
+                                                borderBottom: colIdx < mappings.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+                                                background: colIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)",
+                                            }}>
+                                                <span style={{ fontSize: "12px", color: "var(--text-primary)", fontFamily: "monospace" }}>{m.source_column}</span>
+                                                <select
+                                                    value={m.target_field ?? "skip"}
+                                                    onChange={e => updateMapping(sheet.name, colIdx, e.target.value === "skip" ? null : e.target.value)}
+                                                    style={{
+                                                        fontSize: "12px", padding: "4px 8px", marginRight: "16px",
+                                                        background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                        border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
+                                                        cursor: "pointer",
+                                                    }}
+                                                >
+                                                    <option value="skip">— Atla —</option>
+                                                    {fields.map(f => (
+                                                        <option key={f.field} value={f.field}>{f.label} ({f.field})</option>
+                                                    ))}
+                                                </select>
+                                                <span style={sourceChipStyle(m.source)}>
+                                                    {m.source === "memory" ? "Hafıza" : m.source === "ai" ? "AI" : "?"}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+
+                            {/* Remember toggle */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <input type="checkbox" id="remember-mappings" checked={rememberMappings}
+                                    onChange={e => setRememberMappings(e.target.checked)}
+                                    style={{ accentColor: "var(--accent)", cursor: "pointer" }} />
+                                <label htmlFor="remember-mappings" style={{ fontSize: "12px", color: "var(--text-secondary)", cursor: "pointer" }}>
+                                    Bu eşleştirmeyi hatırla (aynı format tekrar gelince AI kullanılmaz)
+                                </label>
+                            </div>
+
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                                <button onClick={() => { setState("sheet_select"); setColumnMappings({}); setBatchId(null); }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                                <button onClick={handleApplyMappings} style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer", fontWeight: 600 }}>
+                                    Eşleştirmeyi Uygula →
+                                </button>
+                            </div>
+                        </>
+                    )}
+                </>
             )}
 
             {/* ───── PREVIEW / REVIEW ───── */}
             {state === "preview" && (
                 <>
-                    {/* AI availability banner */}
-                    {!aiAvailable && (
-                        <div style={{
-                            padding: "10px 14px",
-                            background: "var(--warning-bg)",
-                            border: "0.5px solid var(--warning-border)",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            color: "var(--warning-text)",
-                        }}>
-                            AI devre dışı — basit kolon eşleştirmesi kullanıldı. Güven skorları düşük olabilir.
-                        </div>
-                    )}
-
-                    {/* Tab bar — entity types */}
+                    {/* Tab bar */}
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                         {draftEntityTypes.map(type => {
                             const count = drafts.filter(d => d.entity_type === type).length;
@@ -773,160 +774,98 @@ export default function ImportPage() {
                     </div>
 
                     {/* Summary bar */}
-                    <div style={{
-                        display: "flex", gap: "12px", padding: "10px 14px",
-                        background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)",
-                        borderRadius: "6px", fontSize: "12px", flexWrap: "wrap", alignItems: "center",
-                    }}>
-                        <span style={{ color: "var(--text-secondary)" }}>Toplam: <strong>{drafts.length}</strong> draft</span>
-                        <span style={{ color: "var(--success-text)" }}>
-                            Yüksek: {drafts.filter(d => (d.confidence ?? 0) >= 0.8).length}
-                        </span>
-                        <span style={{ color: "var(--warning-text)" }}>
-                            Orta: {drafts.filter(d => (d.confidence ?? 0) >= 0.5 && (d.confidence ?? 0) < 0.8).length}
-                        </span>
-                        <span style={{ color: "var(--danger-text)" }}>
-                            Düşük: {drafts.filter(d => (d.confidence ?? 0) < 0.5).length}
-                        </span>
-                        <span style={{ marginLeft: "auto", fontSize: "11px", color: "var(--text-tertiary)" }}>
-                            {aiAvailable ? "AI Önerisi" : "Basit Eşleştirme"}
-                        </span>
+                    <div style={{ display: "flex", gap: "12px", padding: "10px 14px", background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", fontSize: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                        <span style={{ color: "var(--text-secondary)" }}>Toplam: <strong>{drafts.length}</strong> satır</span>
+                        <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>Hücreye tıklayarak düzenleyebilirsiniz</span>
                     </div>
 
-                    {/* Draft cards */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        {filteredDrafts.length === 0 && (
-                            <div style={{
-                                padding: "24px", textAlign: "center",
-                                background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                                borderRadius: "8px", color: "var(--text-tertiary)", fontSize: "12px",
-                            }}>
-                                Bu kategoride draft bulunmuyor.
-                            </div>
-                        )}
-                        {filteredDrafts.slice(0, 50).map((draft, idx) => {
-                            const conf = draft.confidence ?? 0;
-                            const parsedData = (draft.parsed_data ?? {}) as Record<string, unknown>;
-                            const unmatchedFields = draft.unmatched_fields ?? [];
-                            const needsReview = conf < 0.5;
+                    {/* Table preview */}
+                    {filteredDrafts.length === 0 ? (
+                        <div style={{ padding: "24px", textAlign: "center", background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", color: "var(--text-tertiary)", fontSize: "12px" }}>
+                            Bu kategoride satır bulunmuyor.
+                        </div>
+                    ) : (() => {
+                        // Collect visible fields from first draft
+                        const firstParsed = (filteredDrafts[0].parsed_data ?? {}) as Record<string, unknown>;
+                        const visibleFields = Object.keys(firstParsed).slice(0, 10);
+                        const required = REQUIRED_FIELDS[filteredDrafts[0].entity_type] ?? [];
 
-                            return (
-                                <div key={draft.id} style={{
-                                    background: "var(--bg-primary)",
-                                    border: `0.5px solid ${needsReview ? "var(--danger-border)" : "var(--border-tertiary)"}`,
-                                    borderRadius: "8px",
-                                    padding: "12px 16px",
-                                }}>
-                                    {/* Card header */}
-                                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
-                                            #{idx + 1}
-                                        </span>
-                                        {/* Confidence badge */}
-                                        <span style={{
-                                            fontSize: "10px",
-                                            padding: "2px 8px",
-                                            borderRadius: "10px",
-                                            background: confidenceBg(conf),
-                                            color: confidenceColor(conf),
-                                            fontWeight: 600,
-                                        }}>
-                                            %{Math.round(conf * 100)} {confidenceLabel(conf)}
-                                        </span>
-                                        {needsReview && (
-                                            <span style={{
-                                                fontSize: "10px",
-                                                padding: "2px 8px",
-                                                borderRadius: "10px",
-                                                background: "var(--danger-bg)",
-                                                color: "var(--danger-text)",
-                                                fontWeight: 600,
-                                            }}>
-                                                İnceleme Gerekli
-                                            </span>
-                                        )}
-                                        {!aiAvailable && (
-                                            <span style={{
-                                                fontSize: "10px",
-                                                padding: "2px 8px",
-                                                borderRadius: "10px",
-                                                background: "var(--bg-tertiary)",
-                                                color: "var(--text-tertiary)",
-                                            }}>
-                                                Basit Eşleştirme
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Parsed data fields */}
-                                    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", marginBottom: "6px" }}>
-                                        {Object.entries(parsedData).slice(0, 8).map(([key, value]) => (
-                                            <div key={key} style={{ fontSize: "11px" }}>
-                                                <span style={{ color: "var(--text-tertiary)" }}>{key}: </span>
-                                                <span style={{ color: "var(--text-primary)" }}>{String(value)}</span>
-                                            </div>
-                                        ))}
-                                        {Object.keys(parsedData).length > 8 && (
-                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                                +{Object.keys(parsedData).length - 8} alan
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* AI reason */}
-                                    {draft.ai_reason && (
-                                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "4px" }}>
-                                            {draft.ai_reason}
+                        return (
+                            <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "auto" }}>
+                                {/* Table header */}
+                                <div style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(100px, 1fr))`, borderBottom: "0.5px solid var(--border-secondary)", background: "var(--bg-secondary)", minWidth: "600px" }}>
+                                    <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)" }}>#</div>
+                                    {visibleFields.map(f => (
+                                        <div key={f} style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: required.includes(f) ? "var(--text-primary)" : "var(--text-secondary)", borderLeft: "0.5px solid var(--border-tertiary)" }}>
+                                            {f}{required.includes(f) ? " *" : ""}
                                         </div>
-                                    )}
-
-                                    {/* Unmatched fields warning */}
-                                    {unmatchedFields.length > 0 && unmatchedFields[0] !== "all" && (
-                                        <div style={{
-                                            fontSize: "11px", color: "var(--warning-text)",
-                                            padding: "4px 8px",
-                                            background: "var(--warning-bg)",
-                                            borderRadius: "4px",
-                                            marginTop: "4px",
-                                        }}>
-                                            Eşleştirilemeyen alanlar: {unmatchedFields.join(", ")}
-                                        </div>
-                                    )}
+                                    ))}
                                 </div>
-                            );
-                        })}
-                        {filteredDrafts.length > 50 && (
-                            <div style={{
-                                padding: "12px", textAlign: "center",
-                                fontSize: "12px", color: "var(--text-tertiary)",
-                                background: "var(--bg-secondary)",
-                                borderRadius: "6px",
-                            }}>
-                                +{filteredDrafts.length - 50} daha fazla draft (toplam {filteredDrafts.length})
-                            </div>
-                        )}
-                    </div>
 
-                    {/* Action buttons */}
+                                {/* Table rows */}
+                                {filteredDrafts.slice(0, 100).map((draft, rowIdx) => {
+                                    const rowHasMissing = required.some(f => {
+                                        const v = getEffectiveValue(draft, f);
+                                        return v === undefined || v === null || v === "";
+                                    });
+                                    return (
+                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(100px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "0.5px solid var(--border-tertiary)" : "none", background: rowHasMissing ? "var(--danger-bg)" : rowIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "600px" }}>
+                                            <div style={{ padding: "6px 12px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", alignItems: "center" }}>
+                                                {rowHasMissing ? <span style={{ color: "var(--warning-text)", fontSize: "12px" }}>⚠</span> : rowIdx + 1}
+                                            </div>
+                                            {visibleFields.map(f => {
+                                                const val = getEffectiveValue(draft, f);
+                                                const isEditing = editingCell?.draftId === draft.id && editingCell?.field === f;
+                                                const isEmpty = required.includes(f) && (val === undefined || val === null || val === "");
+                                                return (
+                                                    <div key={f} style={{ borderLeft: "0.5px solid var(--border-tertiary)", position: "relative" }}
+                                                        onClick={() => { if (!isEditing) startEdit(draft.id, f, val); }}>
+                                                        {isEditing ? (
+                                                            <input
+                                                                autoFocus
+                                                                value={editingValue}
+                                                                onChange={e => setEditingValue(e.target.value)}
+                                                                onBlur={() => commitEdit(draft.id, f)}
+                                                                onKeyDown={e => { if (e.key === "Enter") commitEdit(draft.id, f); if (e.key === "Escape") setEditingCell(null); }}
+                                                                style={{ width: "100%", padding: "6px 12px", background: "var(--accent-bg)", border: "none", borderTop: "1.5px solid var(--accent)", fontSize: "12px", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" }}
+                                                            />
+                                                        ) : (
+                                                            <div style={{ padding: "6px 12px", fontSize: "12px", color: isEmpty ? "var(--danger-text)" : "var(--text-primary)", cursor: "pointer", border: isEmpty ? "1px solid var(--danger-border)" : "none", minHeight: "30px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                                {val !== undefined && val !== null && val !== "" ? String(val) : <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>boş</span>}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })}
+                                {filteredDrafts.length > 100 && (
+                                    <div style={{ padding: "10px 12px", fontSize: "11px", color: "var(--text-tertiary)", background: "var(--bg-secondary)", textAlign: "center" }}>
+                                        +{filteredDrafts.length - 100} daha fazla satır (toplam {filteredDrafts.length})
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {/* Missing fields warning */}
+                    {(() => {
+                        const required = REQUIRED_FIELDS[activeTab] ?? [];
+                        const missingCount = filteredDrafts.filter(d =>
+                            required.some(f => { const v = getEffectiveValue(d, f); return v === undefined || v === null || v === ""; })
+                        ).length;
+                        return missingCount > 0 ? (
+                            <div style={{ padding: "8px 14px", background: "var(--warning-bg)", border: "0.5px solid var(--warning-border)", borderRadius: "6px", fontSize: "12px", color: "var(--warning-text)" }}>
+                                ⚠ {missingCount} satırda zorunlu alan eksik (*). İçe aktarımda bu satırlar atlanabilir.
+                            </div>
+                        ) : null;
+                    })()}
+
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button onClick={() => { setState("sheet_select"); setDrafts([]); setBatchId(null); }} style={{
-                            fontSize: "12px", padding: "7px 14px",
-                            border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                            background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                        }}>← Geri</button>
-                        <button
-                            onClick={handleImport}
-                            disabled={isDemo}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                            style={{
-                                fontSize: "12px", padding: "7px 18px",
-                                border: "0.5px solid var(--accent-border)", borderRadius: "6px",
-                                background: isDemo ? "var(--bg-tertiary)" : "var(--accent-bg)",
-                                color: isDemo ? "var(--text-tertiary)" : "var(--accent-text)",
-                                cursor: isDemo ? "not-allowed" : "pointer", fontWeight: 600,
-                                opacity: isDemo ? 0.5 : 1,
-                            }}
-                        >
+                        <button onClick={() => { setState("column_mapping"); setDrafts([]); }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                        <button onClick={handleImport} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                            style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: isDemo ? "var(--bg-tertiary)" : "var(--accent-bg)", color: isDemo ? "var(--text-tertiary)" : "var(--accent-text)", cursor: isDemo ? "not-allowed" : "pointer", fontWeight: 600, opacity: isDemo ? 0.5 : 1 }}>
                             Onayla ve İçe Aktar →
                         </button>
                     </div>
@@ -935,13 +874,8 @@ export default function ImportPage() {
 
             {/* ───── IMPORTING ───── */}
             {state === "importing" && (
-                <div style={{
-                    background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                    borderRadius: "8px", padding: "24px",
-                }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "20px" }}>
-                        İçe aktarılıyor...
-                    </div>
+                <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "24px" }}>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "20px" }}>İçe aktarılıyor...</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                         {sheets.filter(s => s.status === "importable" && s.selected).map(sheet => {
                             const count = importProgress[sheet.name] ?? 0;
@@ -957,11 +891,7 @@ export default function ImportPage() {
                                         </span>
                                     </div>
                                     <div style={{ height: "5px", background: "var(--border-tertiary)", borderRadius: "3px", overflow: "hidden" }}>
-                                        <div style={{
-                                            height: "100%", width: `${pct}%`,
-                                            background: done ? "var(--success)" : "var(--accent)",
-                                            borderRadius: "3px", transition: "width 0.2s ease",
-                                        }} />
+                                        <div style={{ height: "100%", width: `${pct}%`, background: done ? "var(--success)" : "var(--accent)", borderRadius: "3px", transition: "width 0.2s ease" }} />
                                     </div>
                                 </div>
                             );
@@ -972,15 +902,9 @@ export default function ImportPage() {
 
             {/* ───── DONE ───── */}
             {state === "done" && (
-                <div style={{
-                    background: "var(--bg-primary)", border: "0.5px solid var(--success-border)",
-                    borderRadius: "8px", padding: "32px 24px",
-                }}>
+                <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--success-border)", borderRadius: "8px", padding: "32px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
-                        <div style={{
-                            width: "36px", height: "36px", background: "var(--success-bg)", borderRadius: "8px",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
+                        <div style={{ width: "36px", height: "36px", background: "var(--success-bg)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
                                 <path d="M3.5 9l3.5 3.5 7-7" stroke="var(--success)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
@@ -990,7 +914,6 @@ export default function ImportPage() {
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>{fileName}</div>
                         </div>
                     </div>
-
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px", marginBottom: "16px" }}>
                         {confirmResult ? (
                             <>
@@ -1025,18 +948,9 @@ export default function ImportPage() {
                             </div>
                         )}
                     </div>
-
                     {confirmResult && confirmResult.errors.length > 0 && (
-                        <div style={{
-                            marginBottom: "16px",
-                            background: "var(--danger-bg)",
-                            border: "0.5px solid var(--danger-border)",
-                            borderRadius: "6px",
-                            padding: "12px 14px",
-                        }}>
-                            <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "8px" }}>
-                                {confirmResult.errors.length} satırda sorun oluştu
-                            </div>
+                        <div style={{ marginBottom: "16px", background: "var(--danger-bg)", border: "0.5px solid var(--danger-border)", borderRadius: "6px", padding: "12px 14px" }}>
+                            <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "8px" }}>{confirmResult.errors.length} satırda sorun oluştu</div>
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                                 {confirmResult.errors.map((err, i) => (
                                     <div key={i} style={{ fontSize: "11px", color: "var(--text-secondary)" }}>· {err}</div>
@@ -1044,39 +958,11 @@ export default function ImportPage() {
                             </div>
                         </div>
                     )}
-
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <Link href="/dashboard/customers" style={{
-                            fontSize: "12px", padding: "6px 14px",
-                            border: "0.5px solid var(--accent-border)", borderRadius: "6px",
-                            background: "var(--accent-bg)", color: "var(--accent-text)",
-                            textDecoration: "none", fontWeight: 500,
-                        }}>
-                            Cariler sayfasına git →
-                        </Link>
-                        <Link href="/dashboard/orders" style={{
-                            fontSize: "12px", padding: "6px 14px",
-                            border: "0.5px solid var(--accent-border)", borderRadius: "6px",
-                            background: "var(--accent-bg)", color: "var(--accent-text)",
-                            textDecoration: "none", fontWeight: 500,
-                        }}>
-                            Siparişler sayfasına git →
-                        </Link>
-                        <Link href="/dashboard/products" style={{
-                            fontSize: "12px", padding: "6px 14px",
-                            border: "0.5px solid var(--accent-border)", borderRadius: "6px",
-                            background: "var(--accent-bg)", color: "var(--accent-text)",
-                            textDecoration: "none", fontWeight: 500,
-                        }}>
-                            Stok & Ürünler →
-                        </Link>
-                        <button onClick={reset} style={{
-                            fontSize: "12px", padding: "6px 16px",
-                            border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                            background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                        }}>
-                            Yeni Dosya Yükle
-                        </button>
+                        <Link href="/dashboard/customers" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Cariler sayfasına git →</Link>
+                        <Link href="/dashboard/orders" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Siparişler sayfasına git →</Link>
+                        <Link href="/dashboard/products" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Stok & Ürünler →</Link>
+                        <button onClick={reset} style={{ fontSize: "12px", padding: "6px 16px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>Yeni Dosya Yükle</button>
                     </div>
                 </div>
             )}

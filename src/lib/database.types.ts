@@ -413,6 +413,18 @@ export interface AiRunRow {
     created_at: string
 }
 
+export interface ColumnMappingRow {
+    id: string
+    source_column: string
+    normalized: string
+    entity_type: string
+    target_field: string
+    usage_count: number
+    success_count: number
+    created_at: string
+    updated_at: string
+}
+
 // ── Composite / joined types ──────────────────────────────────
 
 export interface SalesOrderWithLines extends SalesOrderRow {

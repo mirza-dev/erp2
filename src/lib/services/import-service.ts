@@ -8,6 +8,7 @@ import {
     dbGetBatch, dbUpdateBatchStatus, dbListDrafts, dbUpdateDraft,
     type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
+import { dbIncrementMappingSuccess } from "@/lib/supabase/column-mappings";
 import { dbCreateCustomer, dbFindCustomerByName, dbFindCustomerByCode, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbLookupEntityAlias, dbSaveEntityAlias } from "@/lib/supabase/entity-aliases";
 import { dbCreateProduct, dbFindProductBySku, dbUpdateProduct } from "@/lib/supabase/products";
@@ -570,5 +571,27 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
     }
 
     await dbUpdateBatchStatus(batchId, "confirmed");
+
+    // Increment success_count for all column mappings used in this batch
+    // (best-effort: collect unique entity_type → normalized column sets from drafts)
+    try {
+        const entityColumnMap = new Map<string, Set<string>>();
+        for (const draft of drafts) {
+            const entityType = draft.entity_type;
+            const rawData = (draft.raw_data ?? {}) as Record<string, unknown>;
+            const headers = Object.keys(rawData);
+            if (!entityColumnMap.has(entityType)) entityColumnMap.set(entityType, new Set());
+            for (const h of headers) {
+                const norm = h.trim().toLowerCase().replace(/[^a-z0-9]/g, "_");
+                entityColumnMap.get(entityType)!.add(norm);
+            }
+        }
+        for (const [entityType, cols] of entityColumnMap.entries()) {
+            await dbIncrementMappingSuccess(Array.from(cols), entityType);
+        }
+    } catch {
+        // best-effort — don't fail the import for this
+    }
+
     return { added, updated, skipped, errors };
 }
