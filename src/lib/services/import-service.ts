@@ -143,6 +143,9 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     country: data.country ? String(data.country) : undefined,
                     currency: data.currency ? String(data.currency) : undefined,
                     notes: data.notes ? String(data.notes) : undefined,
+                    payment_terms_days: data.payment_terms_days ? Number(data.payment_terms_days) : undefined,
+                    customer_code: data.customer_code ? String(data.customer_code) : undefined,
+                    default_incoterm: data.default_incoterm ? String(data.default_incoterm) : undefined,
                 };
 
                 if (aliasMatch) {
@@ -222,6 +225,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         standards: data.standards ? String(data.standards) : undefined,
                         certifications: data.certifications ? String(data.certifications) : undefined,
                         product_notes: data.product_notes ? String(data.product_notes) : undefined,
+                        origin_country: data.origin_country ? String(data.origin_country) : undefined,
+                        lead_time_days: parseNumeric(data.lead_time_days),
                     });
                     productId = updatedProduct.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: updatedProduct.id });
@@ -255,6 +260,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         standards: data.standards ? String(data.standards) : undefined,
                         certifications: data.certifications ? String(data.certifications) : undefined,
                         product_notes: data.product_notes ? String(data.product_notes) : undefined,
+                        origin_country: data.origin_country ? String(data.origin_country) : undefined,
+                        lead_time_days: parseNumeric(data.lead_time_days),
                     });
                     productId = product.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: product.id });

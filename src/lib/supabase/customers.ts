@@ -75,6 +75,9 @@ export interface UpdateCustomerInput {
     country?: string;
     currency?: string;
     notes?: string;
+    payment_terms_days?: number;
+    customer_code?: string;
+    default_incoterm?: string;
 }
 
 export async function dbUpdateCustomer(id: string, input: UpdateCustomerInput): Promise<CustomerRow> {
@@ -88,7 +91,10 @@ export async function dbUpdateCustomer(id: string, input: UpdateCustomerInput): 
     if (input.tax_office !== undefined) patch.tax_office = input.tax_office || null;
     if (input.country !== undefined)    patch.country = input.country || null;
     if (input.currency !== undefined)   patch.currency = input.currency;
-    if (input.notes !== undefined)      patch.notes = input.notes || null;
+    if (input.notes !== undefined)            patch.notes = input.notes || null;
+    if (input.payment_terms_days !== undefined) patch.payment_terms_days = input.payment_terms_days ?? null;
+    if (input.customer_code !== undefined)    patch.customer_code = input.customer_code || null;
+    if (input.default_incoterm !== undefined) patch.default_incoterm = input.default_incoterm || null;
     const { data, error } = await supabase
         .from("customers")
         .update(patch)

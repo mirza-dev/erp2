@@ -16,6 +16,7 @@ import {
     capAiStringArray,
 } from "@/lib/ai-guards";
 import { normalizeColumnName } from "@/lib/supabase/column-mappings";
+import { IMPORT_FIELD_NAMES } from "@/lib/import-fields";
 
 export function isAIAvailable(): boolean {
     return !!process.env.ANTHROPIC_API_KEY;
@@ -246,7 +247,6 @@ export const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
         planlanan_sevk_tarihi: "planned_shipment_date",
         teklif_no: "quote_number",
         siparis_no: "original_order_number",
-        siparis_tarihi: "order_date",
     },
     order_line: {
         siparis_no: "order_number",
@@ -479,25 +479,7 @@ export async function aiDetectColumns(input: ColumnDetectionInput): Promise<Colu
           pastMappings.map(m => `- "${m.source_column}" → ${m.target_field} (${m.success_count} başarılı kullanım)`).join("\n")
         : "";
 
-    // Available ERP fields per entity type
-    const ERP_FIELDS: Record<string, string[]> = {
-        product: ["name", "sku", "category", "unit", "price", "currency", "on_hand", "min_stock_level",
-            "product_family", "sub_category", "cost_price", "weight_kg", "material_quality",
-            "origin_country", "production_site", "use_cases", "industries", "standards",
-            "certifications", "product_notes", "lead_time_days", "reorder_qty", "preferred_vendor"],
-        customer: ["name", "email", "phone", "country", "currency", "tax_number", "tax_office",
-            "address", "notes", "payment_terms_days", "default_incoterm", "customer_code"],
-        order: ["customer_name", "customer_code", "currency", "grand_total", "notes",
-            "incoterm", "planned_shipment_date", "quote_number", "original_order_number", "order_date"],
-        order_line: ["order_number", "product_sku", "quantity", "unit", "unit_price", "line_total"],
-        quote: ["quote_number", "quote_date", "customer_code", "currency", "incoterm", "validity_days", "total_amount"],
-        shipment: ["shipment_number", "order_number", "shipment_date", "transport_type", "net_weight_kg", "gross_weight_kg"],
-        invoice: ["invoice_number", "invoice_date", "order_number", "customer_code", "currency", "amount", "due_date"],
-        payment: ["payment_number", "invoice_number", "payment_date", "amount", "payment_method"],
-        stock: ["sku", "on_hand"],
-    };
-
-    const availableFields = (ERP_FIELDS[entityType] ?? []).join(", ");
+    const availableFields = (IMPORT_FIELD_NAMES[entityType] ?? []).join(", ");
 
     // Sample data as compact string
     const sampleStr = JSON.stringify(

@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch, dbUpdateBatchStatus, dbCreateDrafts, dbDeletePendingDrafts } from "@/lib/supabase/import";
 import { dbSaveColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
-
-const NUMERIC_FIELDS = new Set([
-    "price", "grand_total", "min_stock_level", "on_hand", "cost_price", "weight_kg",
-    "payment_terms_days", "total_amount", "net_weight_kg", "gross_weight_kg", "amount",
-    "validity_days", "quantity", "unit_price", "line_total", "lead_time_days", "reorder_qty",
-]);
+import { NUMERIC_FIELDS, IMPORT_FIELD_SET } from "@/lib/import-fields";
 
 function parseTRNumber(raw: string): number | null {
     const s = raw.toString().trim();
@@ -82,8 +77,13 @@ export async function POST(
         for (const sheet of body.sheets) {
             const { entity_type, mappings, rows, remember } = sheet;
 
-            // Active (non-skip) mappings
-            const activeMappings = mappings.filter(m => m.target_field && m.target_field !== "skip");
+            // Active (non-skip) mappings — filtered against known fields for this entity type
+            const activeMappings = mappings
+                .filter(m => m.target_field && m.target_field !== "skip")
+                .filter(m => {
+                    const allowed = IMPORT_FIELD_SET[entity_type];
+                    return allowed && allowed.has(m.target_field);
+                });
             const activeNormalized = activeMappings.map(m => normalizeColumnName(m.source_column));
 
             // Save mappings to memory if user opted in

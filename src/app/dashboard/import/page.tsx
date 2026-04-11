@@ -6,6 +6,7 @@ import { useData } from "@/lib/data-context";
 import * as XLSX from "xlsx";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useToast } from "@/components/ui/Toast";
+import { IMPORT_FIELDS, REQUIRED_FIELDS } from "@/lib/import-fields";
 
 type ImportState = "idle" | "analyzing" | "sheet_select" | "column_mapping" | "preview" | "importing" | "done";
 
@@ -43,81 +44,8 @@ interface DraftRow {
     user_corrections?: Record<string, unknown> | null;
 }
 
-// ERP fields per entity type (for dropdown options)
-const ERP_FIELDS: Record<string, Array<{ field: string; label: string }>> = {
-    product: [
-        { field: "name", label: "Ürün Adı" }, { field: "sku", label: "SKU" },
-        { field: "category", label: "Kategori" }, { field: "unit", label: "Birim" },
-        { field: "price", label: "Fiyat" }, { field: "currency", label: "Para Birimi" },
-        { field: "on_hand", label: "Stok Miktarı" }, { field: "min_stock_level", label: "Min. Stok" },
-        { field: "product_family", label: "Ürün Ailesi" }, { field: "sub_category", label: "Alt Kategori" },
-        { field: "cost_price", label: "Maliyet" }, { field: "weight_kg", label: "Ağırlık (kg)" },
-        { field: "material_quality", label: "Malzeme Kalitesi" }, { field: "origin_country", label: "Menşei" },
-        { field: "production_site", label: "Üretim Tesisi" }, { field: "use_cases", label: "Kullanım Alanları" },
-        { field: "industries", label: "Sektörler" }, { field: "standards", label: "Standartlar" },
-        { field: "certifications", label: "Sertifikalar" }, { field: "product_notes", label: "Notlar" },
-        { field: "lead_time_days", label: "Tedarik Süresi (gün)" }, { field: "reorder_qty", label: "Yeniden Sipariş Miktarı" },
-        { field: "preferred_vendor", label: "Tercihli Tedarikçi" },
-    ],
-    customer: [
-        { field: "name", label: "Firma Adı" }, { field: "email", label: "E-posta" },
-        { field: "phone", label: "Telefon" }, { field: "country", label: "Ülke" },
-        { field: "currency", label: "Para Birimi" }, { field: "tax_number", label: "Vergi No" },
-        { field: "tax_office", label: "Vergi Dairesi" }, { field: "address", label: "Adres" },
-        { field: "notes", label: "Notlar" }, { field: "payment_terms_days", label: "Ödeme Vadesi (gün)" },
-        { field: "customer_code", label: "Müşteri Kodu" },
-    ],
-    order: [
-        { field: "customer_name", label: "Müşteri Adı" }, { field: "customer_code", label: "Müşteri Kodu" },
-        { field: "currency", label: "Para Birimi" }, { field: "grand_total", label: "Toplam Tutar" },
-        { field: "notes", label: "Notlar" }, { field: "incoterm", label: "Incoterm" },
-        { field: "planned_shipment_date", label: "Planlanan Sevk Tarihi" },
-        { field: "quote_number", label: "Teklif No" }, { field: "original_order_number", label: "Sipariş No" },
-        { field: "order_date", label: "Sipariş Tarihi" },
-    ],
-    order_line: [
-        { field: "order_number", label: "Sipariş No" }, { field: "product_sku", label: "Ürün SKU" },
-        { field: "quantity", label: "Miktar" }, { field: "unit", label: "Birim" },
-        { field: "unit_price", label: "Birim Fiyat" }, { field: "line_total", label: "Toplam" },
-    ],
-    quote: [
-        { field: "quote_number", label: "Teklif No" }, { field: "quote_date", label: "Teklif Tarihi" },
-        { field: "customer_code", label: "Müşteri Kodu" }, { field: "currency", label: "Para Birimi" },
-        { field: "incoterm", label: "Incoterm" }, { field: "validity_days", label: "Geçerlilik (gün)" },
-        { field: "total_amount", label: "Toplam Tutar" },
-    ],
-    shipment: [
-        { field: "shipment_number", label: "Sevkiyat No" }, { field: "order_number", label: "Sipariş No" },
-        { field: "shipment_date", label: "Sevkiyat Tarihi" }, { field: "transport_type", label: "Taşıma Türü" },
-        { field: "net_weight_kg", label: "Net Ağırlık (kg)" }, { field: "gross_weight_kg", label: "Brüt Ağırlık (kg)" },
-    ],
-    invoice: [
-        { field: "invoice_number", label: "Fatura No" }, { field: "invoice_date", label: "Fatura Tarihi" },
-        { field: "order_number", label: "Sipariş No" }, { field: "customer_code", label: "Müşteri Kodu" },
-        { field: "currency", label: "Para Birimi" }, { field: "amount", label: "Tutar" },
-        { field: "due_date", label: "Vade Tarihi" },
-    ],
-    payment: [
-        { field: "payment_number", label: "Tahsilat No" }, { field: "invoice_number", label: "Fatura No" },
-        { field: "payment_date", label: "Tahsilat Tarihi" }, { field: "amount", label: "Tutar" },
-        { field: "payment_method", label: "Ödeme Yöntemi" },
-    ],
-    stock: [
-        { field: "sku", label: "SKU" }, { field: "on_hand", label: "Stok Miktarı" },
-    ],
-};
-
-const REQUIRED_FIELDS: Record<string, string[]> = {
-    product: ["sku", "name", "unit"],
-    customer: ["name"],
-    quote: ["quote_number"],
-    order: [],
-    order_line: ["order_number", "product_sku"],
-    stock: ["sku", "on_hand"],
-    shipment: ["shipment_number"],
-    invoice: ["invoice_number"],
-    payment: ["payment_number"],
-};
+// ERP_FIELDS alias for backward compat with references in this file
+const ERP_FIELDS = IMPORT_FIELDS;
 
 // Known sheet → entity type mapping
 const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"; displayName: string; entity: string; status: "importable" }> = {

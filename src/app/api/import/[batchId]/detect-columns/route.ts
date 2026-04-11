@@ -74,7 +74,7 @@ export async function POST(
                     // 1. Memory hit — confidence: confirmed ratio, floor 0.6 for unconfirmed
                     const confidence = memRow.success_count > 0
                         ? Math.min(1, memRow.success_count / memRow.usage_count)
-                        : 0.6;
+                        : 0.4;
                     resolvedMappings.push({
                         source_column: header,
                         target_field: memRow.target_field,
