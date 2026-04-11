@@ -8,14 +8,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Supabase mock ─────────────────────────────────────────────
 
-const mockEq  = vi.fn();
-const mockIn  = vi.fn();
+const mockEq    = vi.fn();
+const mockIn    = vi.fn();
+const mockOrder = vi.fn();
 
 function makeThenableBuilder(result: { data: unknown; error: unknown }) {
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.eq     = (...args: unknown[]) => { mockEq(...args); return b; };
     b.in     = (...args: unknown[]) => { mockIn(...args); return b; };
+    b.order  = (...args: unknown[]) => { mockOrder(...args); return b; };
     b.then   = (resolve: (v: unknown) => void, reject?: (e: unknown) => void) =>
         Promise.resolve(result).then(resolve, reject);
     return b;
@@ -36,7 +38,10 @@ vi.mock("@/lib/supabase/service", () => ({
 import {
     dbGetLastSaleDates,
     dbGetLastIncomingDates,
+    dbGetLastProductionDates,
     computeAgingCategory,
+    computeAgingCategoryRaw,
+    computeAgingCategoryFinished,
     pickMax,
 } from "@/lib/supabase/aging";
 
@@ -46,20 +51,46 @@ beforeEach(() => {
     mockFrom.mockReset();
     mockEq.mockReset();
     mockIn.mockReset();
+    mockOrder.mockReset();
 });
 
-// ── computeAgingCategory (pure) ───────────────────────────────
+// ── computeAgingCategoryRaw (pure) ────────────────────────────
 
-describe("computeAgingCategory", () => {
+describe("computeAgingCategoryRaw", () => {
+    it("null → no_movement", () => expect(computeAgingCategoryRaw(null)).toBe("no_movement"));
+    it("0 gün → active",     () => expect(computeAgingCategoryRaw(0)).toBe("active"));
+    it("59 gün → active",    () => expect(computeAgingCategoryRaw(59)).toBe("active"));
+    it("60 gün → slow",      () => expect(computeAgingCategoryRaw(60)).toBe("slow"));
+    it("119 gün → slow",     () => expect(computeAgingCategoryRaw(119)).toBe("slow"));
+    it("120 gün → stagnant", () => expect(computeAgingCategoryRaw(120)).toBe("stagnant"));
+    it("239 gün → stagnant", () => expect(computeAgingCategoryRaw(239)).toBe("stagnant"));
+    it("240 gün → dead",     () => expect(computeAgingCategoryRaw(240)).toBe("dead"));
+    it("365 gün → dead",     () => expect(computeAgingCategoryRaw(365)).toBe("dead"));
+});
+
+// ── computeAgingCategoryFinished (pure) ───────────────────────
+
+describe("computeAgingCategoryFinished", () => {
+    it("null → no_movement", () => expect(computeAgingCategoryFinished(null)).toBe("no_movement"));
+    it("0 gün → active",     () => expect(computeAgingCategoryFinished(0)).toBe("active"));
+    it("44 gün → active",    () => expect(computeAgingCategoryFinished(44)).toBe("active"));
+    it("45 gün → slow",      () => expect(computeAgingCategoryFinished(45)).toBe("slow"));
+    it("89 gün → slow",      () => expect(computeAgingCategoryFinished(89)).toBe("slow"));
+    it("90 gün → stagnant",  () => expect(computeAgingCategoryFinished(90)).toBe("stagnant"));
+    it("179 gün → stagnant", () => expect(computeAgingCategoryFinished(179)).toBe("stagnant"));
+    it("180 gün → dead",     () => expect(computeAgingCategoryFinished(180)).toBe("dead"));
+    it("365 gün → dead",     () => expect(computeAgingCategoryFinished(365)).toBe("dead"));
+});
+
+// ── computeAgingCategory (backward compat) ────────────────────
+
+describe("computeAgingCategory (eski API — finished eşiklerini kullanır)", () => {
     it("null → no_movement", () => expect(computeAgingCategory(null)).toBe("no_movement"));
-    it("0 gün → active",     () => expect(computeAgingCategory(0)).toBe("active"));
-    it("29 gün → active",    () => expect(computeAgingCategory(29)).toBe("active"));
-    it("30 gün → slow",      () => expect(computeAgingCategory(30)).toBe("slow"));
-    it("89 gün → slow",      () => expect(computeAgingCategory(89)).toBe("slow"));
-    it("90 gün → stagnant",  () => expect(computeAgingCategory(90)).toBe("stagnant"));
-    it("179 gün → stagnant", () => expect(computeAgingCategory(179)).toBe("stagnant"));
-    it("180 gün → dead",     () => expect(computeAgingCategory(180)).toBe("dead"));
-    it("365 gün → dead",     () => expect(computeAgingCategory(365)).toBe("dead"));
+    it("0 → active",         () => expect(computeAgingCategory(0)).toBe("active"));
+    it("44 → active",        () => expect(computeAgingCategory(44)).toBe("active"));
+    it("45 → slow",          () => expect(computeAgingCategory(45)).toBe("slow"));
+    it("179 → stagnant",     () => expect(computeAgingCategory(179)).toBe("stagnant"));
+    it("180 → dead",         () => expect(computeAgingCategory(180)).toBe("dead"));
 });
 
 // ── pickMax (pure) ────────────────────────────────────────────
@@ -200,5 +231,67 @@ describe("dbGetLastIncomingDates", () => {
         setup([]);
         await dbGetLastIncomingDates();
         expect(mockEq).toHaveBeenCalledWith("status", "received");
+    });
+});
+
+// ── dbGetLastProductionDates ──────────────────────────────────
+
+describe("dbGetLastProductionDates", () => {
+    function setup(rows: { product_id: string; production_date: string }[], error?: unknown) {
+        mockFrom.mockImplementation(() =>
+            makeThenableBuilder({ data: error ? null : rows, error: error ?? null })
+        );
+    }
+
+    it("boş veri → boş Map", async () => {
+        setup([]);
+        expect((await dbGetLastProductionDates()).size).toBe(0);
+    });
+
+    it("hata → boş Map", async () => {
+        setup([], { message: "DB error" });
+        expect((await dbGetLastProductionDates()).size).toBe(0);
+    });
+
+    it("tek satır → doğru product_id ve production_date", async () => {
+        setup([{ product_id: "p1", production_date: "2024-09-15" }]);
+        const result = await dbGetLastProductionDates();
+        expect(result.get("p1")).toBe("2024-09-15");
+        expect(result.size).toBe(1);
+    });
+
+    it("DESC sıralı geldiğinde ilk = MAX alınır", async () => {
+        // DESC sıralamayla geldiğinde ilk satır en yeni — sadece ilk set edilir
+        setup([
+            { product_id: "p1", production_date: "2024-12-01" },  // en yeni (DESC)
+            { product_id: "p1", production_date: "2024-06-01" },
+            { product_id: "p1", production_date: "2024-01-01" },
+        ]);
+        const result = await dbGetLastProductionDates();
+        expect(result.get("p1")).toBe("2024-12-01");
+        expect(result.size).toBe(1);
+    });
+
+    it("birden fazla ürün bağımsız takip edilir", async () => {
+        setup([
+            { product_id: "p1", production_date: "2024-11-01" },
+            { product_id: "p2", production_date: "2024-08-01" },
+        ]);
+        const result = await dbGetLastProductionDates();
+        expect(result.get("p1")).toBe("2024-11-01");
+        expect(result.get("p2")).toBe("2024-08-01");
+        expect(result.size).toBe(2);
+    });
+
+    it("production_entries tablosunu sorgular", async () => {
+        setup([]);
+        await dbGetLastProductionDates();
+        expect(mockFrom).toHaveBeenCalledWith("production_entries");
+    });
+
+    it("DESC sıralı sorgular (production_date)", async () => {
+        setup([]);
+        await dbGetLastProductionDates();
+        expect(mockOrder).toHaveBeenCalledWith("production_date", { ascending: false });
     });
 });

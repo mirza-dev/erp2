@@ -6,9 +6,10 @@ import { NextRequest } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
-const mockDbListProducts       = vi.fn();
-const mockDbGetLastSaleDates   = vi.fn();
+const mockDbListProducts         = vi.fn();
+const mockDbGetLastSaleDates     = vi.fn();
 const mockDbGetLastIncomingDates = vi.fn();
+const mockDbGetLastProductionDates = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
     dbListProducts: (...args: unknown[]) => mockDbListProducts(...args),
@@ -19,9 +20,10 @@ vi.mock("@/lib/supabase/products", () => ({
 vi.mock("@/lib/supabase/aging", async (importOriginal) => {
     const actual = await importOriginal<typeof import("@/lib/supabase/aging")>();
     return {
-        ...actual,  // pickMax, computeAgingCategory — real implementations
-        dbGetLastSaleDates:    (...args: unknown[]) => mockDbGetLastSaleDates(...args),
-        dbGetLastIncomingDates: (...args: unknown[]) => mockDbGetLastIncomingDates(...args),
+        ...actual,  // pickMax, computeAgingCategoryRaw, computeAgingCategoryFinished — real implementations
+        dbGetLastSaleDates:        (...args: unknown[]) => mockDbGetLastSaleDates(...args),
+        dbGetLastIncomingDates:    (...args: unknown[]) => mockDbGetLastIncomingDates(...args),
+        dbGetLastProductionDates:  (...args: unknown[]) => mockDbGetLastProductionDates(...args),
     };
 });
 
@@ -29,12 +31,17 @@ import { GET } from "@/app/api/products/aging/route";
 
 // ── Helpers ───────────────────────────────────────────────────
 
-function makeRequest(): NextRequest {
-    return new NextRequest("http://localhost/api/products/aging", { method: "GET" });
+function makeRequest(type?: string): NextRequest {
+    const url = type
+        ? `http://localhost/api/products/aging?type=${type}`
+        : "http://localhost/api/products/aging";
+    return new NextRequest(url, { method: "GET" });
 }
 
 function makeProduct(id: string, overrides: Partial<{
     on_hand: number; price: number; currency: string; category: string | null;
+    product_type: "finished" | "raw_material";
+    is_for_sales: boolean; is_for_purchase: boolean;
 }> = {}) {
     return {
         id,
@@ -50,6 +57,8 @@ function makeProduct(id: string, overrides: Partial<{
         min_stock_level: 5,
         is_active: true,
         product_type: "finished" as const,
+        is_for_sales: true,
+        is_for_purchase: true,
         warehouse: null,
         reorder_qty: null,
         preferred_vendor: null,
@@ -81,9 +90,10 @@ beforeEach(() => {
     mockDbListProducts.mockResolvedValue([]);
     mockDbGetLastSaleDates.mockResolvedValue(new Map());
     mockDbGetLastIncomingDates.mockResolvedValue(new Map());
+    mockDbGetLastProductionDates.mockResolvedValue(new Map());
 });
 
-// ── Tests ─────────────────────────────────────────────────────
+// ── Temel testler ─────────────────────────────────────────────
 
 describe("GET /api/products/aging", () => {
     it("returns 200 with empty array when no products", async () => {
@@ -116,44 +126,12 @@ describe("GET /api/products/aging", () => {
         expect(row.agingCategory).toBe("no_movement");
     });
 
-    it("saleDate only → lastMovement = saleDate", async () => {
-        mockDbListProducts.mockResolvedValue([makeProduct("p1")]);
-        mockDbGetLastSaleDates.mockResolvedValue(new Map([["p1", "2020-01-01T00:00:00Z"]]));
-        const [row] = await (await GET(makeRequest())).json();
-        expect(row.lastMovementDate).toBe("2020-01-01T00:00:00Z");
-        expect(row.agingCategory).toBe("dead"); // > 180 gün önce
-    });
-
-    it("incomingDate only → lastMovement = incomingDate", async () => {
-        mockDbListProducts.mockResolvedValue([makeProduct("p1")]);
-        mockDbGetLastIncomingDates.mockResolvedValue(new Map([["p1", "2020-06-01T00:00:00Z"]]));
-        const [row] = await (await GET(makeRequest())).json();
-        expect(row.lastMovementDate).toBe("2020-06-01T00:00:00Z");
-        expect(row.agingCategory).toBe("dead");
-    });
-
-    it("lastMovement = max(saleDate, incomingDate)", async () => {
-        mockDbListProducts.mockResolvedValue([makeProduct("p1")]);
-        mockDbGetLastSaleDates.mockResolvedValue(new Map([["p1", "2020-01-01T00:00:00Z"]]));
-        mockDbGetLastIncomingDates.mockResolvedValue(new Map([["p1", "2020-06-01T00:00:00Z"]]));
-        const [row] = await (await GET(makeRequest())).json();
-        expect(row.lastMovementDate).toBe("2020-06-01T00:00:00Z");
-    });
-
-    it("recent movement → active category", async () => {
-        const recent = new Date(Date.now() - 5 * 86_400_000).toISOString(); // 5 gün önce
-        mockDbListProducts.mockResolvedValue([makeProduct("p1")]);
-        mockDbGetLastSaleDates.mockResolvedValue(new Map([["p1", recent]]));
-        const [row] = await (await GET(makeRequest())).json();
-        expect(row.agingCategory).toBe("active");
-        expect(row.daysWaiting).toBeLessThan(30);
-    });
-
-    it("3 fonksiyon paralel çağrılır (her biri 1 kez)", async () => {
+    it("4 fonksiyon paralel çağrılır (her biri 1 kez)", async () => {
         await GET(makeRequest());
         expect(mockDbListProducts).toHaveBeenCalledTimes(1);
         expect(mockDbGetLastSaleDates).toHaveBeenCalledTimes(1);
         expect(mockDbGetLastIncomingDates).toHaveBeenCalledTimes(1);
+        expect(mockDbGetLastProductionDates).toHaveBeenCalledTimes(1);
     });
 
     it("dbListProducts pageSize: 10_000 ile çağrılır (pagination bypass)", async () => {
@@ -172,9 +150,135 @@ describe("GET /api/products/aging", () => {
         expect(row).toHaveProperty("onHand");
         expect(row).toHaveProperty("price");
         expect(row).toHaveProperty("currency");
+        expect(row).toHaveProperty("productType");
+        expect(row).toHaveProperty("isForSales");
+        expect(row).toHaveProperty("isForPurchase");
         expect(row).toHaveProperty("lastMovementDate");
+        expect(row).toHaveProperty("lastSaleDate");
+        expect(row).toHaveProperty("lastIncomingDate");
+        expect(row).toHaveProperty("lastProductionDate");
         expect(row).toHaveProperty("daysWaiting");
         expect(row).toHaveProperty("agingCategory");
         expect(row).toHaveProperty("boundCapital");
+    });
+});
+
+// ── type=raw_material ─────────────────────────────────────────
+
+describe("GET /api/products/aging?type=raw_material", () => {
+    it("sadece raw_material ürünleri döner", async () => {
+        mockDbListProducts.mockResolvedValue([
+            makeProduct("p1", { product_type: "finished",     is_for_sales: true }),
+            makeProduct("p2", { product_type: "raw_material", is_for_sales: false }),
+            makeProduct("p3", { product_type: "raw_material", is_for_sales: true }),
+        ]);
+        const data = await (await GET(makeRequest("raw_material"))).json();
+        expect(data.every((r: { productType: string }) => r.productType === "raw_material")).toBe(true);
+        expect(data).toHaveLength(2);
+    });
+
+    it("lastMovement = MAX(incoming, production) — satış tarihi dahil değil", async () => {
+        mockDbListProducts.mockResolvedValue([makeProduct("p1", { product_type: "raw_material" })]);
+        mockDbGetLastSaleDates.mockResolvedValue(new Map([["p1", "2025-01-01T00:00:00Z"]]));       // çok yeni ama kullanılmaz
+        mockDbGetLastIncomingDates.mockResolvedValue(new Map([["p1", "2020-03-01T00:00:00Z"]]));
+        mockDbGetLastProductionDates.mockResolvedValue(new Map([["p1", "2020-06-01"]]));
+        const [row] = await (await GET(makeRequest("raw_material"))).json();
+        // lastMovement = MAX(incoming "2020-03-01", production "2020-06-01") = "2020-06-01"
+        // NOT "2025-01-01" (saleDate)
+        expect(row.lastMovementDate).toBe("2020-06-01");
+    });
+
+    it("computeAgingCategoryRaw eşiklerini kullanır (60 gün → slow)", async () => {
+        mockDbListProducts.mockResolvedValue([makeProduct("p1", { product_type: "raw_material" })]);
+        const sixtyDaysAgo = new Date(Date.now() - 60 * 86_400_000).toISOString();
+        mockDbGetLastIncomingDates.mockResolvedValue(new Map([["p1", sixtyDaysAgo]]));
+        const [row] = await (await GET(makeRequest("raw_material"))).json();
+        expect(row.agingCategory).toBe("slow");
+    });
+
+    it("computeAgingCategoryRaw: 45 gün → active (finished eşiğinde slow olurdu)", async () => {
+        mockDbListProducts.mockResolvedValue([makeProduct("p1", { product_type: "raw_material" })]);
+        const fortyFiveDaysAgo = new Date(Date.now() - 45 * 86_400_000).toISOString();
+        mockDbGetLastProductionDates.mockResolvedValue(new Map([["p1", fortyFiveDaysAgo]]));
+        const [row] = await (await GET(makeRequest("raw_material"))).json();
+        expect(row.agingCategory).toBe("active"); // raw: < 60 = active
+    });
+});
+
+// ── type=finished ─────────────────────────────────────────────
+
+describe("GET /api/products/aging?type=finished", () => {
+    it("sadece is_for_sales=true ürünleri döner", async () => {
+        mockDbListProducts.mockResolvedValue([
+            makeProduct("p1", { is_for_sales: true }),
+            makeProduct("p2", { is_for_sales: false }),
+            makeProduct("p3", { is_for_sales: true, product_type: "raw_material" }),
+        ]);
+        const data = await (await GET(makeRequest("finished"))).json();
+        expect(data.every((r: { isForSales: boolean }) => r.isForSales === true)).toBe(true);
+        expect(data).toHaveLength(2);
+    });
+
+    it("lastMovement = MAX(production, sale) — incoming tarihi dahil değil", async () => {
+        mockDbListProducts.mockResolvedValue([makeProduct("p1", { is_for_sales: true })]);
+        mockDbGetLastIncomingDates.mockResolvedValue(new Map([["p1", "2025-01-01T00:00:00Z"]])); // çok yeni ama kullanılmaz
+        mockDbGetLastSaleDates.mockResolvedValue(new Map([["p1", "2020-03-01T00:00:00Z"]]));
+        mockDbGetLastProductionDates.mockResolvedValue(new Map([["p1", "2020-06-01"]]));
+        const [row] = await (await GET(makeRequest("finished"))).json();
+        // lastMovement = MAX(production "2020-06-01", sale "2020-03-01") = "2020-06-01"
+        // NOT "2025-01-01" (incomingDate)
+        expect(row.lastMovementDate).toBe("2020-06-01");
+    });
+
+    it("computeAgingCategoryFinished eşiklerini kullanır (45 gün → slow)", async () => {
+        mockDbListProducts.mockResolvedValue([makeProduct("p1", { is_for_sales: true })]);
+        const fortyFiveDaysAgo = new Date(Date.now() - 45 * 86_400_000).toISOString();
+        mockDbGetLastSaleDates.mockResolvedValue(new Map([["p1", fortyFiveDaysAgo]]));
+        const [row] = await (await GET(makeRequest("finished"))).json();
+        expect(row.agingCategory).toBe("slow");
+    });
+
+    it("recent sale → active (< 45 gün)", async () => {
+        const recent = new Date(Date.now() - 5 * 86_400_000).toISOString();
+        mockDbListProducts.mockResolvedValue([makeProduct("p1")]);
+        mockDbGetLastSaleDates.mockResolvedValue(new Map([["p1", recent]]));
+        const [row] = await (await GET(makeRequest("finished"))).json();
+        expect(row.agingCategory).toBe("active");
+    });
+});
+
+// ── type=all (default) ────────────────────────────────────────
+
+describe("GET /api/products/aging (type=all — default)", () => {
+    it("tüm ürünleri döner (raw_material + finished)", async () => {
+        mockDbListProducts.mockResolvedValue([
+            makeProduct("p1", { product_type: "finished" }),
+            makeProduct("p2", { product_type: "raw_material" }),
+        ]);
+        const data = await (await GET(makeRequest())).json();
+        expect(data).toHaveLength(2);
+    });
+});
+
+// ── Sıralama ──────────────────────────────────────────────────
+
+describe("Sıralama — daysWaiting DESC", () => {
+    it("en uzun bekleyen üstte, null en sonda", async () => {
+        const recent = new Date(Date.now() - 5 * 86_400_000).toISOString();
+        const old    = new Date(Date.now() - 200 * 86_400_000).toISOString();
+        mockDbListProducts.mockResolvedValue([
+            makeProduct("p1"),  // no movement → null
+            makeProduct("p2"),
+            makeProduct("p3"),
+        ]);
+        mockDbGetLastSaleDates.mockResolvedValue(new Map([
+            ["p2", recent],
+            ["p3", old],
+        ]));
+        const data = await (await GET(makeRequest())).json();
+        // p3 (200 gün) > p2 (5 gün) > p1 (null)
+        expect(data[0].productId).toBe("p3");
+        expect(data[1].productId).toBe("p2");
+        expect(data[2].productId).toBe("p1");
     });
 });

@@ -1,43 +1,91 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { dbListProducts } from "@/lib/supabase/products";
-import { dbGetLastSaleDates, dbGetLastIncomingDates, pickMax, computeAgingCategory } from "@/lib/supabase/aging";
+import {
+    dbGetLastSaleDates,
+    dbGetLastIncomingDates,
+    dbGetLastProductionDates,
+    pickMax,
+    computeAgingCategoryRaw,
+    computeAgingCategoryFinished,
+} from "@/lib/supabase/aging";
 import { handleApiError } from "@/lib/api-error";
 
-// GET /api/products/aging
+// GET /api/products/aging?type=raw_material|finished|all
 // Aktif ürünler arasında on_hand > 0 olanlar için eskime raporu döner.
-export async function GET() {
+// type=raw_material → sadece hammaddeler (product_type = 'raw_material')
+// type=finished     → sadece mamul + ticari mallar (is_for_sales = true)
+// type=all (default) → tümü
+export async function GET(req: NextRequest) {
     try {
-        const [products, lastSaleDates, lastIncomingDates] = await Promise.all([
+        const type = req.nextUrl.searchParams.get("type") ?? "all";
+
+        const [products, lastSaleDates, lastIncomingDates, lastProductionDates] = await Promise.all([
             dbListProducts({ is_active: true, pageSize: 10_000 }),
             dbGetLastSaleDates(),
             dbGetLastIncomingDates(),
+            dbGetLastProductionDates(),
         ]);
 
         const now = Date.now();
         const result = products
             .filter(p => p.on_hand > 0)
+            .filter(p => {
+                if (type === "raw_material") return p.product_type === "raw_material";
+                if (type === "finished")     return p.is_for_sales === true;
+                return true; // "all"
+            })
             .map(p => {
-                const saleDate     = lastSaleDates.get(p.id)     ?? null;
-                const incomingDate = lastIncomingDates.get(p.id) ?? null;
-                const lastMovement = pickMax(saleDate, incomingDate);
-                const daysWaiting  = lastMovement
+                const saleDate       = lastSaleDates.get(p.id)       ?? null;
+                const incomingDate   = lastIncomingDates.get(p.id)   ?? null;
+                const productionDate = lastProductionDates.get(p.id) ?? null;
+
+                // Tip-bazlı "son hareket" semantiği:
+                // Hammadde → son tedarik alımı VEYA son üretim kullanımı
+                // Mamul/ticari → son üretim VEYA son satış
+                let lastMovement: string | null;
+                if (p.product_type === "raw_material") {
+                    lastMovement = pickMax(incomingDate, productionDate);
+                } else {
+                    lastMovement = pickMax(productionDate, saleDate);
+                }
+
+                const daysWaiting = lastMovement
                     ? Math.floor((now - new Date(lastMovement).getTime()) / 86_400_000)
                     : null;
+
+                const agingCategory = p.product_type === "raw_material"
+                    ? computeAgingCategoryRaw(daysWaiting)
+                    : computeAgingCategoryFinished(daysWaiting);
+
                 return {
-                    productId:        p.id,
-                    productName:      p.name,
-                    sku:              p.sku,
-                    category:         p.category,
-                    unit:             p.unit,
-                    onHand:           p.on_hand,
-                    price:            p.price ?? 0,
-                    currency:         p.currency,
-                    lastMovementDate: lastMovement,
+                    productId:          p.id,
+                    productName:        p.name,
+                    sku:                p.sku,
+                    category:           p.category,
+                    unit:               p.unit,
+                    onHand:             p.on_hand,
+                    price:              p.price ?? 0,
+                    currency:           p.currency,
+                    productType:        p.product_type as "finished" | "raw_material",
+                    isForSales:         p.is_for_sales ?? true,
+                    isForPurchase:      p.is_for_purchase ?? true,
+                    lastMovementDate:   lastMovement,
+                    lastSaleDate:       saleDate,
+                    lastIncomingDate:   incomingDate,
+                    lastProductionDate: productionDate,
                     daysWaiting,
-                    agingCategory:    computeAgingCategory(daysWaiting),
-                    boundCapital:     p.on_hand * (p.price ?? 0),
+                    agingCategory,
+                    boundCapital:       p.on_hand * (p.price ?? 0),
                 };
             });
+
+        // Varsayılan sort: daysWaiting DESC (en uzun bekleyen üstte, null en sona)
+        result.sort((a, b) => {
+            if (a.daysWaiting === null && b.daysWaiting === null) return 0;
+            if (a.daysWaiting === null) return 1;
+            if (b.daysWaiting === null) return -1;
+            return b.daysWaiting - a.daysWaiting;
+        });
 
         return NextResponse.json(result);
     } catch (err) {

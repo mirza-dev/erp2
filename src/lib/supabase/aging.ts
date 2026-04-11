@@ -13,10 +13,16 @@ export interface AgingRow {
     onHand: number;
     price: number;
     currency: string;
-    lastMovementDate: string | null;  // ISO timestamptz, null = hiç hareket yok
-    daysWaiting: number | null;       // null = no movement
+    productType: "finished" | "raw_material";
+    isForSales: boolean;
+    isForPurchase: boolean;
+    lastMovementDate: string | null;     // ISO timestamptz, null = hiç hareket yok
+    lastSaleDate: string | null;
+    lastIncomingDate: string | null;
+    lastProductionDate: string | null;
+    daysWaiting: number | null;          // null = no movement
     agingCategory: AgingCategory;
-    boundCapital: number;             // on_hand * price
+    boundCapital: number;                // on_hand * price
 }
 
 // ── Pure helpers ─────────────────────────────────────────────
@@ -28,13 +34,36 @@ export function pickMax(a: string | null, b: string | null): string | null {
     return a > b ? a : b;
 }
 
-/** Sınır değerleri: < 30 → active, 30–89 → slow, 90–179 → stagnant, ≥ 180 → dead */
-export function computeAgingCategory(days: number | null): AgingCategory {
+/**
+ * Hammadde eşikleri — toplu alım doğası gereği daha uzun tutulur.
+ * < 60 → active · 60–119 → slow · 120–239 → stagnant · ≥ 240 → dead
+ */
+export function computeAgingCategoryRaw(days: number | null): AgingCategory {
     if (days === null) return "no_movement";
-    if (days < 30)    return "active";
+    if (days < 60)    return "active";
+    if (days < 120)   return "slow";
+    if (days < 240)   return "stagnant";
+    return "dead";
+}
+
+/**
+ * Mamul / ticari mal eşikleri — daha hızlı dönmeli.
+ * < 45 → active · 45–89 → slow · 90–179 → stagnant · ≥ 180 → dead
+ */
+export function computeAgingCategoryFinished(days: number | null): AgingCategory {
+    if (days === null) return "no_movement";
+    if (days < 45)    return "active";
     if (days < 90)    return "slow";
     if (days < 180)   return "stagnant";
     return "dead";
+}
+
+/**
+ * Geriye dönük uyumluluk için korunuyor.
+ * @deprecated computeAgingCategoryRaw veya computeAgingCategoryFinished kullan.
+ */
+export function computeAgingCategory(days: number | null): AgingCategory {
+    return computeAgingCategoryFinished(days);
 }
 
 // ── Queries ──────────────────────────────────────────────────
@@ -42,7 +71,6 @@ export function computeAgingCategory(days: number | null): AgingCategory {
 /**
  * Her ürün için en son onaylı satış siparişinin tarihini döner.
  * order_lines JOIN sales_orders (commercial_status = 'approved')
- * JS'te MAX aggregation.
  */
 export async function dbGetLastSaleDates(): Promise<Map<string, string>> {
     const supabase = createServiceClient();
@@ -67,7 +95,6 @@ export async function dbGetLastSaleDates(): Promise<Map<string, string>> {
 /**
  * Her ürün için en son gerçek stok girişinin tarihini döner.
  * Sadece status='received' satırlar — received_at = fiziksel teslim zamanı.
- * Pending commitments henüz teslim alınmadı, stok hareketi sayılmaz.
  */
 export async function dbGetLastIncomingDates(): Promise<Map<string, string>> {
     const supabase = createServiceClient();
@@ -78,10 +105,33 @@ export async function dbGetLastIncomingDates(): Promise<Map<string, string>> {
     if (error || !data) return new Map();
     const map = new Map<string, string>();
     for (const row of data) {
-        if (!row.received_at) continue;   // null guard (teorik, ama defensif)
+        if (!row.received_at) continue;
         const existing = map.get(row.product_id);
         if (!existing || row.received_at > existing) {
             map.set(row.product_id, row.received_at);
+        }
+    }
+    return map;
+}
+
+/**
+ * Her ürün için en son üretim kaydının tarihini döner.
+ * Hammadde için: bu ürünün üretimde kullanıldığı son tarihi verir.
+ * Mamul için: bu ürünün üretildiği son tarihi verir.
+ * Kaynak: production_entries.production_date (DATE)
+ */
+export async function dbGetLastProductionDates(): Promise<Map<string, string>> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("production_entries")
+        .select("product_id, production_date")
+        .order("production_date", { ascending: false });
+    if (error || !data) return new Map();
+    const map = new Map<string, string>();
+    for (const row of data) {
+        // İlk karşılaşılan = en yeni (DESC sıralı)
+        if (!map.has(row.product_id)) {
+            map.set(row.product_id, row.production_date);
         }
     }
     return map;
