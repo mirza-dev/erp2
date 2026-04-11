@@ -15,6 +15,7 @@ import {
     sanitizeAiOutput,
     capAiStringArray,
 } from "@/lib/ai-guards";
+import { normalizeColumnName } from "@/lib/supabase/column-mappings";
 
 export function isAIAvailable(): boolean {
     return !!process.env.ANTHROPIC_API_KEY;
@@ -466,7 +467,7 @@ export async function aiDetectColumns(input: ColumnDetectionInput): Promise<Colu
         const fieldMap = FALLBACK_FIELD_MAP[entityType] ?? {};
         return {
             mappings: headers.map(h => {
-                const norm = h.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+                const norm = normalizeColumnName(h);
                 return { source_column: h, target_field: fieldMap[norm] ?? null, confidence: fieldMap[norm] ? 0.8 : 0 };
             }),
         };
@@ -559,7 +560,7 @@ Kurallar:
     const fieldMap = FALLBACK_FIELD_MAP[entityType] ?? {};
     return {
         mappings: headers.map(h => {
-            const norm = h.toLowerCase().replace(/[^a-z0-9_]/g, "_");
+            const norm = normalizeColumnName(h);
             return { source_column: h, target_field: fieldMap[norm] ?? null, confidence: fieldMap[norm] ? 0.7 : 0 };
         }),
     };

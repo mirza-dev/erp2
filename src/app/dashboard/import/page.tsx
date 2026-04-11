@@ -845,6 +845,8 @@ export default function ImportPage() {
                         const fieldSet = new Set<string>();
                         for (const d of filteredDrafts) {
                             for (const k of Object.keys((d.parsed_data ?? {}) as Record<string, unknown>)) fieldSet.add(k);
+                            const edits = draftEdits[d.id];
+                            if (edits) { for (const k of Object.keys(edits)) fieldSet.add(k); }
                         }
                         // Required fields always shown (even if unmapped), then the rest
                         const visibleFields = [
