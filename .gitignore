@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local planning docs (not for repo)
+yuksek-etki.md
+
+# Playwright
+tests/.auth/
+test-results/
+playwright-report/
+tests/fixtures/invalid.txt

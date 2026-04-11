@@ -561,7 +561,7 @@ export default function ProductsPage() {
                             textDecoration: "none", whiteSpace: "nowrap",
                         }}
                     >Eskime Raporu →</a>
-                    <Button variant="primary" onClick={() => setCreateOpen(true)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
+                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "Küresel Vanalar", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "finished", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", isForSales: true, isForPurchase: true }); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
                 </div>
             </div>
 
