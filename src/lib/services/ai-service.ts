@@ -452,6 +452,7 @@ export interface ColumnDetectionResult {
         target_field: string | null;   // null = could not map
         confidence: number;
     }>;
+    usedAI: boolean;  // true = AI responded; false = fallback (AI unavailable or threw)
 }
 
 /**
@@ -466,6 +467,7 @@ export async function aiDetectColumns(input: ColumnDetectionInput): Promise<Colu
         // Fallback: use FALLBACK_FIELD_MAP
         const fieldMap = FALLBACK_FIELD_MAP[entityType] ?? {};
         return {
+            usedAI: false,
             mappings: headers.map(h => {
                 const norm = normalizeColumnName(h);
                 return { source_column: h, target_field: fieldMap[norm] ?? null, confidence: fieldMap[norm] ? 0.8 : 0 };
@@ -526,6 +528,7 @@ Kurallar:
             const parsed = JSON.parse(arrMatch[0]) as Array<{ source_column: string; target_field: string | null; confidence: number }>;
             if (Array.isArray(parsed)) {
                 return {
+                    usedAI: true,
                     mappings: parsed.map(item => ({
                         source_column: typeof item.source_column === "string" ? item.source_column : "",
                         target_field: typeof item.target_field === "string" && item.target_field.length > 0 ? item.target_field : null,
@@ -541,6 +544,7 @@ Kurallar:
     // Fallback if AI fails
     const fieldMap = FALLBACK_FIELD_MAP[entityType] ?? {};
     return {
+        usedAI: false,
         mappings: headers.map(h => {
             const norm = normalizeColumnName(h);
             return { source_column: h, target_field: fieldMap[norm] ?? null, confidence: fieldMap[norm] ? 0.7 : 0 };

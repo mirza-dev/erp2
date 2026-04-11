@@ -143,7 +143,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     country: data.country ? String(data.country) : undefined,
                     currency: data.currency ? String(data.currency) : undefined,
                     notes: data.notes ? String(data.notes) : undefined,
-                    payment_terms_days: data.payment_terms_days ? Number(data.payment_terms_days) : undefined,
+                    payment_terms_days: parseNumeric(data.payment_terms_days),
                     customer_code: data.customer_code ? String(data.customer_code) : undefined,
                     default_incoterm: data.default_incoterm ? String(data.default_incoterm) : undefined,
                 };
@@ -172,7 +172,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         country: data.country ? String(data.country) : undefined,
                         currency: data.currency ? String(data.currency) : "USD",
                         notes: data.notes ? String(data.notes) : undefined,
-                        payment_terms_days: data.payment_terms_days ? Number(data.payment_terms_days) : undefined,
+                        payment_terms_days: parseNumeric(data.payment_terms_days),
                         default_incoterm: data.default_incoterm ? String(data.default_incoterm) : undefined,
                         customer_code: customerCode,
                     });
@@ -291,8 +291,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         customer_code: customerCode,
                         currency: data.currency ? String(data.currency) : undefined,
                         incoterm: data.incoterm ? String(data.incoterm) : undefined,
-                        validity_days: data.validity_days ? Number(data.validity_days) : undefined,
-                        total_amount: data.total_amount ? Number(data.total_amount) : undefined,
+                        validity_days: parseNumeric(data.validity_days),
+                        total_amount: parseNumeric(data.total_amount),
                     });
                     refMap.quoteNumbers.set(quoteNumber, existing.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
@@ -305,8 +305,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                         customer_code: customerCode,
                         currency: data.currency ? String(data.currency) : "USD",
                         incoterm: data.incoterm ? String(data.incoterm) : undefined,
-                        validity_days: data.validity_days ? Number(data.validity_days) : undefined,
-                        total_amount: data.total_amount ? Number(data.total_amount) : undefined,
+                        validity_days: parseNumeric(data.validity_days),
+                        total_amount: parseNumeric(data.total_amount),
                     });
                     refMap.quoteNumbers.set(quoteNumber, quote.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: quote.id });
@@ -391,7 +391,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 const quantity = Number(data.quantity ?? 1);
                 const unitPrice = Number(data.unit_price ?? 0);
                 const discountPct = Number(data.discount_pct ?? 0);
-                const lineTotal = data.line_total ? Number(data.line_total) : quantity * unitPrice * (1 - discountPct / 100);
+                const lineTotal = parseNumeric(data.line_total) ?? quantity * unitPrice * (1 - discountPct / 100);
 
                 // Get current max sort_order for this order
                 const { data: existingLines } = await supabase
@@ -478,8 +478,8 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     order_number: orderNumber,
                     shipment_date: data.shipment_date ? String(data.shipment_date).split("T")[0] : new Date().toISOString().split("T")[0],
                     transport_type: data.transport_type ? String(data.transport_type) : undefined,
-                    net_weight_kg: data.net_weight_kg ? Number(data.net_weight_kg) : undefined,
-                    gross_weight_kg: data.gross_weight_kg ? Number(data.gross_weight_kg) : undefined,
+                    net_weight_kg: parseNumeric(data.net_weight_kg),
+                    gross_weight_kg: parseNumeric(data.gross_weight_kg),
                 });
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: shipment.id });
                 added++;

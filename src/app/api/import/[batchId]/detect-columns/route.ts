@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch } from "@/lib/supabase/import";
 import { dbLookupColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
-import { aiDetectColumns, isAIAvailable, FALLBACK_FIELD_MAP } from "@/lib/services/ai-service";
+import { aiDetectColumns, FALLBACK_FIELD_MAP } from "@/lib/services/ai-service";
 
 /**
  * POST /api/import/[batchId]/detect-columns
@@ -115,7 +115,7 @@ export async function POST(
                         source_column: m.source_column,
                         target_field: m.target_field,
                         confidence: m.confidence,
-                        source: isAIAvailable() ? "ai" : "fallback",
+                        source: aiResult.usedAI ? "ai" : "fallback",
                     });
                 }
             }
