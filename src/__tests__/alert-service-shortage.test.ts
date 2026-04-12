@@ -10,13 +10,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mocks (hoisted) ───────────────────────────────────────────────────────────
 
-const mockDbListProducts = vi.fn();
+const mockDbListAllActiveProducts = vi.fn();
 const mockDbGetOpenShortagesByProduct = vi.fn();
 const mockDbGetQuotedQuantities = vi.fn();
 const mockDbListOrders = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts:              (...args: unknown[]) => mockDbListProducts(...args),
+    dbListAllActiveProducts:     (...args: unknown[]) => mockDbListAllActiveProducts(...args),
     dbGetOpenShortagesByProduct: () => mockDbGetOpenShortagesByProduct(),
     dbGetQuotedQuantities:       (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
 }));
@@ -134,7 +134,7 @@ function setupDefaultMocks() {
 }
 
 beforeEach(() => {
-    mockDbListProducts.mockReset();
+    mockDbListAllActiveProducts.mockReset();
     mockDbGetOpenShortagesByProduct.mockReset();
     mockDbListActiveAlerts.mockReset();
     mockDbCreateAlert.mockReset();
@@ -147,7 +147,7 @@ beforeEach(() => {
 
 describe("order_shortage — false positive prevention", () => {
     it("available < reserved ama shortages tablosunda kayıt yok → alert açılmaz", async () => {
-        mockDbListProducts.mockResolvedValue([HEAVILY_RESERVED_NO_SHORTAGE]);
+        mockDbListAllActiveProducts.mockResolvedValue([HEAVILY_RESERVED_NO_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
 
         await serviceScanStockAlerts();
@@ -159,7 +159,7 @@ describe("order_shortage — false positive prevention", () => {
     });
 
     it("on_hand=100, reserved=60 (available=40) → available < reserved ama shortages yok → created=0", async () => {
-        mockDbListProducts.mockResolvedValue([HEAVILY_RESERVED_NO_SHORTAGE]);
+        mockDbListAllActiveProducts.mockResolvedValue([HEAVILY_RESERVED_NO_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
 
         const result = await serviceScanStockAlerts();
@@ -169,7 +169,7 @@ describe("order_shortage — false positive prevention", () => {
     });
 
     it("available < reserved ama shortages yok → activeSet'te order_shortage kontrolü yapılmaz", async () => {
-        mockDbListProducts.mockResolvedValue([HEAVILY_RESERVED_NO_SHORTAGE]);
+        mockDbListAllActiveProducts.mockResolvedValue([HEAVILY_RESERVED_NO_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
 
         await serviceScanStockAlerts();
@@ -186,7 +186,7 @@ describe("order_shortage — false positive prevention", () => {
 
 describe("order_shortage — gerçek shortage durumu alert açar", () => {
     it("shortages tablosunda 20 adet eksik → order_shortage alert açılır", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(
             shortageMapFor(PRODUCT_WITH_REAL_SHORTAGE.id, 20)
         );
@@ -203,7 +203,7 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
     });
 
     it("shortage alert açılırken description shortage_qty içeriyor", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(
             shortageMapFor(PRODUCT_WITH_REAL_SHORTAGE.id, 20)
         );
@@ -216,7 +216,7 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
     });
 
     it("alert zaten açıksa (activeSet'te var) duplicate açılmaz", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(
             shortageMapFor(PRODUCT_WITH_REAL_SHORTAGE.id, 20)
         );
@@ -234,7 +234,7 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
     });
 
     it("result.created shortage alert'ı sayıyor", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(
             shortageMapFor(PRODUCT_WITH_REAL_SHORTAGE.id, 15)
         );
@@ -250,7 +250,7 @@ describe("order_shortage — gerçek shortage durumu alert açar", () => {
 
 describe("order_shortage — shortage çözülünce alert resolve edilir", () => {
     it("openShortageQty=0 → batch resolve order_shortage içerir", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_WITH_REAL_SHORTAGE]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap()); // shortage resolved
         mockDbBatchResolveAlerts.mockResolvedValue(1);
 
@@ -265,7 +265,7 @@ describe("order_shortage — shortage çözülünce alert resolve edilir", () =>
     });
 
     it("shortage yok → resolve reason 'shortage_resolved'", async () => {
-        mockDbListProducts.mockResolvedValue([HEALTHY_PRODUCT]);
+        mockDbListAllActiveProducts.mockResolvedValue([HEALTHY_PRODUCT]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
         mockDbBatchResolveAlerts.mockResolvedValue(0);
 
@@ -280,7 +280,7 @@ describe("order_shortage — shortage çözülünce alert resolve edilir", () =>
 
     it("rezervasyon sıfırlandıktan sonra bile (reserved=0) shortage yok → batch resolve'da order_shortage var", async () => {
         const cancelledProduct = { ...HEALTHY_PRODUCT, id: "prod-cancelled", reserved: 0, available_now: 200 };
-        mockDbListProducts.mockResolvedValue([cancelledProduct]);
+        mockDbListAllActiveProducts.mockResolvedValue([cancelledProduct]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
         mockDbBatchResolveAlerts.mockResolvedValue(1);
 
@@ -298,7 +298,7 @@ describe("order_shortage — shortage çözülünce alert resolve edilir", () =>
 
 describe("order_shortage — doğru veri kaynağı: shortages tablosu", () => {
     it("scan başlamadan önce dbGetOpenShortagesByProduct çağrılır", async () => {
-        mockDbListProducts.mockResolvedValue([]);
+        mockDbListAllActiveProducts.mockResolvedValue([]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(emptyShortageMap());
 
         await serviceScanStockAlerts();
@@ -307,7 +307,7 @@ describe("order_shortage — doğru veri kaynağı: shortages tablosu", () => {
     });
 
     it("birden fazla ürün için shortage doğru product_id üzerinden eşleştirilir", async () => {
-        mockDbListProducts.mockResolvedValue([
+        mockDbListAllActiveProducts.mockResolvedValue([
             HEAVILY_RESERVED_NO_SHORTAGE,  // available < reserved, NO shortage
             PRODUCT_WITH_REAL_SHORTAGE,     // has real shortage
         ]);

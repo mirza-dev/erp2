@@ -17,12 +17,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
+const mockDbListAllActiveProducts = vi.fn();
 const mockDbListProducts = vi.fn();
 const mockDbGetOpenShortagesByProduct = vi.fn();
 const mockDbGetQuotedQuantities = vi.fn();
 const mockDbListOrders = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
+    dbListAllActiveProducts:     (...args: unknown[]) => mockDbListAllActiveProducts(...args),
     dbListProducts:              (...args: unknown[]) => mockDbListProducts(...args),
     dbGetOpenShortagesByProduct: () => mockDbGetOpenShortagesByProduct(),
     dbGetQuotedQuantities:       (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
@@ -120,7 +122,7 @@ beforeEach(() => {
 
 describe("Dedupe — acknowledged alert yeni alert yaratımını engeller", () => {
     it("acknowledged stock_critical var → activeSet'te bulunur → yeni alert açılmaz", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_CRITICAL]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_CRITICAL]);
         mockDbListActiveAlerts.mockResolvedValue([
             { type: "stock_critical", entity_id: "prod-crit", status: "acknowledged" },
         ]);
@@ -142,7 +144,7 @@ describe("Dedupe — acknowledged alert yeni alert yaratımını engeller", () =
             available_now: 13,
             min_stock_level: 10, // available(13) ≤ ceil(10*1.5)=15 → warning
         };
-        mockDbListProducts.mockResolvedValue([warningProduct]);
+        mockDbListAllActiveProducts.mockResolvedValue([warningProduct]);
         mockDbListActiveAlerts.mockResolvedValue([
             { type: "stock_risk", entity_id: "prod-warn", status: "acknowledged" },
         ]);
@@ -156,7 +158,7 @@ describe("Dedupe — acknowledged alert yeni alert yaratımını engeller", () =
     });
 
     it("acknowledged order_shortage var → dedupe engel, shortage alert açılmaz", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_CRITICAL]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_CRITICAL]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(new Map([["prod-crit", 5]]));
         // Both critical and shortage already active (acknowledged)
         mockDbListActiveAlerts.mockResolvedValue([
@@ -177,7 +179,7 @@ describe("Dedupe — acknowledged alert yeni alert yaratımını engeller", () =
 
 describe("Auto-resolve — koşul düzelince acknowledged alert kapanır", () => {
     it("stok iyileşince batch resolve stock_critical içerir", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_HEALTHY]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_HEALTHY]);
         mockDbBatchResolveAlerts.mockResolvedValue(1);
 
         await serviceScanStockAlerts();
@@ -189,7 +191,7 @@ describe("Auto-resolve — koşul düzelince acknowledged alert kapanır", () =>
     });
 
     it("stok iyileşince result.resolved batch resolve dönüş değerini yansıtır", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_HEALTHY]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_HEALTHY]);
         mockDbBatchResolveAlerts.mockResolvedValue(3);
 
         const result = await serviceScanStockAlerts();
@@ -197,7 +199,7 @@ describe("Auto-resolve — koşul düzelince acknowledged alert kapanır", () =>
     });
 
     it("shortage çözülünce batch resolve order_shortage içerir (acknowledged dahil)", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_HEALTHY]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_HEALTHY]);
         mockDbGetOpenShortagesByProduct.mockResolvedValue(new Map()); // no open shortages
         mockDbBatchResolveAlerts.mockResolvedValue(1);
 
@@ -215,6 +217,7 @@ describe("Auto-resolve — koşul düzelince acknowledged alert kapanır", () =>
 describe("AI dismiss — AI regenerasyon acknowledged alert'leri de temizler", () => {
     beforeEach(() => {
         mockIsAIAvailable.mockReturnValue(true);
+        mockDbListAllActiveProducts.mockResolvedValue([]);
         mockDbListProducts.mockResolvedValue([]);
         mockDbListOrders.mockResolvedValue([]);
         mockDbListAlerts.mockResolvedValue([]);
@@ -328,7 +331,7 @@ describe("Lifecycle transitions — ALERT_TRANSITIONS matrisi", () => {
 
 describe("Lifecycle contract — acknowledged aktif sayılır", () => {
     it("acknowledged alert open gibi davranır: escalate sırasında warning resolve edilir", async () => {
-        mockDbListProducts.mockResolvedValue([PRODUCT_CRITICAL]);
+        mockDbListAllActiveProducts.mockResolvedValue([PRODUCT_CRITICAL]);
         mockDbListActiveAlerts.mockResolvedValue([]);
         mockDbBatchResolveAlerts.mockResolvedValue(1);
 

@@ -3,7 +3,7 @@
  * Follows domain-rules.md §6 (critical/warning rules) + §12 (alert lifecycle).
  */
 
-import { dbListProducts, dbGetOpenShortagesByProduct, dbGetQuotedQuantities } from "@/lib/supabase/products";
+import { dbListAllActiveProducts, dbListProducts, dbGetOpenShortagesByProduct, dbGetQuotedQuantities } from "@/lib/supabase/products";
 import { dbListOrders, dbListOverdueShipments } from "@/lib/supabase/orders";
 import {
     dbListAlerts,
@@ -17,7 +17,7 @@ import {
     type BatchResolveEntry,
 } from "@/lib/supabase/alerts";
 import type { AlertStatus } from "@/lib/database.types";
-import { computeCoverageDays, computeOrderDeadline, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
+import { computeCoverageDays, computeOrderDeadline, dateDaysFromToday, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
 import { isAIAvailable, aiGenerateOpsSummary, type OpsSummaryInput } from "@/lib/services/ai-service";
 
 // ── Lifecycle transitions (domain-rules §12.3) ───────────────
@@ -53,20 +53,22 @@ export interface ScanResult {
  */
 export async function serviceScanStockAlerts(): Promise<ScanResult> {
     const [products, shortageMap, activeAlerts, quotedMap] = await Promise.all([
-        dbListProducts({ is_active: true, pageSize: 500 }),
+        dbListAllActiveProducts(),
         dbGetOpenShortagesByProduct(),
         dbListActiveAlerts(),
         dbGetQuotedQuantities(),
     ]);
 
-    // Build dedup set: "type:entityId" for O(1) lookups
-    const activeSet = new Set<string>();
+    // Build dedup map: "type:entityId" → severity, for O(1) lookups + severity diff detection
+    const activeMap = new Map<string, string>();
     for (const a of activeAlerts) {
-        if (a.entity_id) activeSet.add(`${a.type}:${a.entity_id}`);
+        if (a.entity_id) activeMap.set(`${a.type}:${a.entity_id}`, a.severity);
     }
 
     let created = 0;
     const toResolve: BatchResolveEntry[] = [];
+    // Deferred creates for severity-change cases (resolved first, then created)
+    const toCreate: Parameters<typeof dbCreateAlert>[0][] = [];
 
     for (const product of products) {
         const available = product.available_now;
@@ -84,7 +86,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
             // Resolve any existing warning for this product (escalate)
             toResolve.push({ type: "stock_risk", entityId, reason: "escalated_to_critical" });
 
-            if (!activeSet.has(`stock_critical:${entityId}`)) {
+            if (!activeMap.has(`stock_critical:${entityId}`)) {
                 const alert = await dbCreateAlert({
                     type: "stock_critical",
                     severity: "critical",
@@ -97,7 +99,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                 if (alert) created++;
             }
         } else if (isWarning) {
-            if (!activeSet.has(`stock_risk:${entityId}`)) {
+            if (!activeMap.has(`stock_risk:${entityId}`)) {
                 const alert = await dbCreateAlert({
                     type: "stock_risk",
                     severity: "warning",
@@ -125,24 +127,34 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
             leadTimeDays,
         );
         if (orderDeadline !== null) {
-            const daysLeft = Math.floor((new Date(orderDeadline).getTime() - Date.now()) / 86_400_000);
+            const daysLeft = dateDaysFromToday(orderDeadline);
             if (daysLeft <= 7) {
-                if (!activeSet.has(`order_deadline:${entityId}`)) {
-                    const deadlineTitle = daysLeft < 0
-                        ? `${product.name}: Sipariş son tarihi geçti`
-                        : `${product.name}: Sipariş son tarihi ${daysLeft} gün kaldı`;
-                    const alert = await dbCreateAlert({
-                        type: "order_deadline",
-                        severity: daysLeft < 0 ? "critical" : "warning",
-                        title: deadlineTitle,
-                        description: daysLeft < 0
-                            ? `Sipariş son tarihi ${Math.abs(daysLeft)} gün önce geçti. Tedarik süresi: ${leadTimeDays ?? "?"} gün.`
-                            : `Sipariş verilmesi için ${daysLeft} gün kaldı. Tedarik süresi: ${leadTimeDays ?? "?"} gün.`,
-                        entity_type: "product",
-                        entity_id: entityId,
-                    });
+                const newSeverity = daysLeft < 0 ? "critical" as const : "warning" as const;
+                const deadlineTitle = daysLeft < 0
+                    ? `${product.name}: Sipariş son tarihi geçti`
+                    : `${product.name}: Sipariş son tarihi ${daysLeft} gün kaldı`;
+                const deadlineDesc = daysLeft < 0
+                    ? `Sipariş son tarihi ${Math.abs(daysLeft)} gün önce geçti. Tedarik süresi: ${leadTimeDays ?? "?"} gün.`
+                    : `Sipariş verilmesi için ${daysLeft} gün kaldı. Tedarik süresi: ${leadTimeDays ?? "?"} gün.`;
+                const alertInput = {
+                    type: "order_deadline" as const,
+                    severity: newSeverity,
+                    title: deadlineTitle,
+                    description: deadlineDesc,
+                    entity_type: "product" as const,
+                    entity_id: entityId,
+                };
+                const existingSeverity = activeMap.get(`order_deadline:${entityId}`);
+                if (existingSeverity === undefined) {
+                    // Alert yok — inline oluştur
+                    const alert = await dbCreateAlert(alertInput);
                     if (alert) created++;
+                } else if (existingSeverity !== newSeverity) {
+                    // Severity değişti (warning → critical veya tersi) — eski resolve et, yeni oluştur
+                    toResolve.push({ type: "order_deadline", entityId, reason: "deadline_severity_changed" });
+                    toCreate.push(alertInput);
                 }
+                // else: aynı severity → aksiyon gerekmez
             } else {
                 toResolve.push({ type: "order_deadline", entityId, reason: "deadline_not_imminent" });
             }
@@ -153,7 +165,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
         // Order shortage: source of truth is the shortages table.
         const openShortageQty = shortageMap.get(product.id) ?? 0;
         if (openShortageQty > 0) {
-            if (!activeSet.has(`order_shortage:${entityId}`)) {
+            if (!activeMap.has(`order_shortage:${entityId}`)) {
                 const alert = await dbCreateAlert({
                     type: "order_shortage",
                     severity: "critical",
@@ -172,6 +184,12 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
 
     // Batch resolve — groups by type+reason, ~3-5 DB calls instead of ~1000
     const resolved = await dbBatchResolveAlerts(toResolve);
+
+    // Deferred creates: severity-changed alerts (resolved above, now safe to create)
+    for (const input of toCreate) {
+        const alert = await dbCreateAlert(input);
+        if (alert) created++;
+    }
 
     return { scanned: products.length, created, resolved };
 }
