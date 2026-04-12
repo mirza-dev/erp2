@@ -33,6 +33,11 @@ export default function StatsCards() {
             const ratio = p.minStockLevel > 0 ? p.available_now / p.minStockLevel : 999;
             return p.available_now === 0 || ratio <= 1;
         }).length,
+        deadlineCount: products.filter(p => {
+            if (!p.orderDeadline) return false;
+            const daysLeft = Math.floor((new Date(p.orderDeadline).getTime() - Date.now()) / 86_400_000);
+            return daysLeft <= 7;
+        }).length,
     }), [products]);
 
     if (loading) {
@@ -80,7 +85,7 @@ export default function StatsCards() {
     }
 
     const { total: todayTotal, productTypes: todayProductTypes } = todayStats;
-    const { total: totalStock, allocated: allocatedStock, available: availableStock, criticalCount } = stockStats;
+    const { total: totalStock, allocated: allocatedStock, available: availableStock, criticalCount, deadlineCount } = stockStats;
 
     const metrics = [
         {
@@ -107,8 +112,14 @@ export default function StatsCards() {
         {
             label: "Kritik Seviye",
             value: `${criticalCount} Ürün`,
-            subtitle: criticalCount > 0 ? "Üretim uyarısı aktif" : "Stok durumu iyi",
-            subtitleColor: criticalCount > 0 ? ("warn" as const) : ("ok" as const),
+            subtitle: criticalCount > 0 && deadlineCount > 0
+                ? `${criticalCount} kritik + ${deadlineCount} son tarih yakın`
+                : criticalCount > 0
+                ? "Üretim uyarısı aktif"
+                : deadlineCount > 0
+                ? `${deadlineCount} ürün için sipariş son tarihi yakın`
+                : "Stok durumu iyi",
+            subtitleColor: criticalCount > 0 ? ("danger" as const) : deadlineCount > 0 ? ("warn" as const) : ("ok" as const),
             valueDanger: criticalCount > 0,
             href: "/dashboard/alerts",
         },

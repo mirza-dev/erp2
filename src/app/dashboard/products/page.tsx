@@ -126,6 +126,13 @@ function getAlertContext(type: string): {
                 ctaHref: "/dashboard/orders",
                 ctaLabel: "Siparişleri görüntüle →",
             };
+        case "order_deadline":
+            return {
+                neden: "Sipariş son tarihi yaklaşıyor veya geçmiş.",
+                etki: "Tedarik süresi göz önüne alındığında stok tükenecek.",
+                ctaHref: "/dashboard/purchase/suggested",
+                ctaLabel: "Satın alma önerilerini incele →",
+            };
         default:
             return { neden: null, etki: null, ctaHref: null, ctaLabel: null };
     }
@@ -1308,6 +1315,53 @@ export default function ProductsPage() {
                                             Günlük kullanım verisi yok — risk analizi hesaplanamıyor.
                                         </div>
                                     )}
+
+                                    {/* Sipariş Son Tarihi */}
+                                    {(product.stockoutDate || product.orderDeadline) && (() => {
+                                        const dl = product.orderDeadline ?? null;
+                                        const daysLeft = dl ? Math.floor((new Date(dl).getTime() - Date.now()) / 86_400_000) : null;
+                                        const borderColor = daysLeft === null ? "var(--border-tertiary)"
+                                            : daysLeft < 0  ? "var(--danger-border)"
+                                            : daysLeft <= 7  ? "var(--danger-border)"
+                                            : daysLeft <= 14 ? "var(--warning-border)"
+                                            : "var(--success-border)";
+                                        const bgColor = daysLeft === null ? "var(--bg-secondary)"
+                                            : daysLeft < 0  ? "var(--danger-bg)"
+                                            : daysLeft <= 7  ? "var(--danger-bg)"
+                                            : daysLeft <= 14 ? "var(--warning-bg)"
+                                            : "var(--success-bg)";
+                                        const textColor = daysLeft === null ? "var(--text-secondary)"
+                                            : daysLeft < 0  ? "var(--danger-text)"
+                                            : daysLeft <= 7  ? "var(--danger-text)"
+                                            : daysLeft <= 14 ? "var(--warning-text)"
+                                            : "var(--success-text)";
+                                        return (
+                                            <div style={{ marginTop: "8px", padding: "8px 10px", borderRadius: "5px", border: `0.5px solid ${borderColor}`, background: bgColor }}>
+                                                <div style={{ fontSize: "10px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>
+                                                    Sipariş Son Tarihi
+                                                </div>
+                                                {product.stockoutDate && (
+                                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "3px" }}>
+                                                        <span style={{ color: "var(--text-tertiary)" }}>Stok tükeniyor: </span>
+                                                        <span style={{ fontWeight: 500 }}>
+                                                            {new Date(product.stockoutDate).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {dl ? (
+                                                    <div style={{ fontSize: "13px", fontWeight: 700, color: textColor }}>
+                                                        {daysLeft! < 0
+                                                            ? `Son tarih ${Math.abs(daysLeft!)} gün önce geçti`
+                                                            : `En geç ${new Date(dl).toLocaleDateString("tr-TR", { day: "numeric", month: "short", year: "numeric" })} — ${daysLeft} gün kaldı`}
+                                                    </div>
+                                                ) : (
+                                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+                                                        Tedarik süresi tanımlı değil — sipariş tarihi hesaplanamıyor.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* ── Block 2b: Bekleyen Teslimatlar ───────────── */}

@@ -1195,6 +1195,19 @@ export default function PurchaseSuggestedPage() {
                                                     Kullanım verisi yok
                                                 </span>
                                             )}
+                                            {p.stockoutDate && (
+                                                <div style={{ marginTop: "3px", fontSize: "10px", color: "var(--text-tertiary)" }}>
+                                                    Tükeniyor: {new Date(p.stockoutDate).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}
+                                                </div>
+                                            )}
+                                            {p.orderDeadline && (() => {
+                                                const dlDays = Math.floor((new Date(p.orderDeadline).getTime() - Date.now()) / 86_400_000);
+                                                return (
+                                                    <div style={{ marginTop: "2px", fontSize: "10px", fontWeight: 600, color: daysColor(dlDays) }}>
+                                                        Sipariş: {new Date(p.orderDeadline).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}&apos;e kadar
+                                                    </div>
+                                                );
+                                            })()}
                                         </td>
                                         {/* Karar — status only; actions in AI drawer */}
                                         <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>

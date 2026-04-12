@@ -39,6 +39,7 @@ function actionFor(alerts: AlertRow[]): { label: string; href: string } {
     const types = alerts.map((a) => a.type);
     if (types.includes("order_shortage")) return { label: "Siparişleri incele", href: "/dashboard/orders" };
     if (types.includes("stock_critical")) return { label: "Satın alma planla",  href: "/dashboard/purchase/suggested" };
+    if (types.includes("order_deadline")) return { label: "Satın alma planla",  href: "/dashboard/purchase/suggested" };
     return { label: "Stoku izle", href: "/dashboard/products" };
 }
 
