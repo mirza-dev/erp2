@@ -60,10 +60,9 @@ describe("dbGetQuotedQuantities", () => {
         expect(result.size).toBe(0);
     });
 
-    it("returns empty Map on Supabase error", async () => {
+    it("throws on Supabase error", async () => {
         mockIn.mockResolvedValue({ data: null, error: { message: "DB error" } });
-        const result = await dbGetQuotedQuantities();
-        expect(result.size).toBe(0);
+        await expect(dbGetQuotedQuantities()).rejects.toThrow("DB error");
     });
 
     it("returns empty Map when data is null without error", async () => {

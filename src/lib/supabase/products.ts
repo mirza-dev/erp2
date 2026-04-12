@@ -266,7 +266,8 @@ export async function dbGetQuotedQuantities(): Promise<Map<string, number>> {
         .from("order_lines")
         .select("product_id, quantity, sales_orders!inner(commercial_status)")
         .in("sales_orders.commercial_status", ["draft", "pending_approval"]);
-    if (error || !data) return new Map();
+    if (error) throw new Error(`dbGetQuotedQuantities: ${error.message}`);
+    if (!data) return new Map();
     const map = new Map<string, number>();
     for (const row of data) {
         map.set(row.product_id, (map.get(row.product_id) ?? 0) + row.quantity);
