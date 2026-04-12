@@ -125,7 +125,7 @@ grandTotal = subtotal + vatTotal
 | 5 | Critical Stock & Alerts Engine |
 | 6 | Purchase Suggestion Engine |
 | 7 | Production Engine |
-| 8 | Import Flow |
+| 8 | Import Flow → Kolon Eşleştirme + Hafıza + Inline Düzenleme + 12 bug fix |
 | 9 | Paraşüt Integration |
 | 10 | AI Layer (Claude Haiku) |
 | 4.6 | Deadline Tutarlılık (promisable, off-by-one fix) |

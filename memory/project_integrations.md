@@ -1,6 +1,6 @@
 ---
 name: KokpitERP — Entegrasyonlar, AI ve Test Altyapısı
-description: Paraşüt mock, AI Stage 2A/2B, health check, test altyapısı ve mock pattern'ler
+description: Paraşüt mock, AI kolon eşleştirme, health check, test altyapısı ve mock pattern'ler
 type: project
 ---
 
@@ -18,14 +18,18 @@ type: project
 
 ## AI Katmanı (Claude Haiku)
 
-**5 yetenek:** Import Intelligence · Order Review Risk · AI Ops Summary · Stock Risk Forecast · Purchase Copilot v1
+**5 yetenek:** Import Column Detection · Order Review Risk · AI Ops Summary · Stock Risk Forecast · Purchase Copilot v1
+
+**Import AI (Faz 8 yenileme — 2026-04-11):**
+- `aiDetectColumns()` — sheet başına TEK AI çağrısı, kolon adı + 5 örnek satır + entity_type ile
+- Algılama sırası: `column_mappings` hafıza → `FALLBACK_FIELD_MAP` → AI (sadece gerçekten bilinmeyen kolonlar için)
+- `normalizeColumnName()` — Türkçe transliterasyon (İ→i, ğ→g, ü→u vb.), tüm route'lar ve fallback paylaşıyor
+- Hafıza: `column_mappings` tablosu (usage_count, success_count) — success_count sadece confirm sonrası artırılıyor
 
 **Stage 2A:** AI memory layer, audit trail, guardrails (G1-G4), run logging (`ai_runs` tablosu)
 
 **Stage 2B:** `ai_recommendations` lifecycle (suggested→accepted/edited/rejected/expired), kullanıcı feedback, observability metrics
 - `GET /api/ai/observability` → son 7 gün istatistik; her zaman 200 (DB hatası non-fatal)
-
-**Import AI:** Batch parse 20'lik chunk'larla (100 satır → 5 batch)
 
 **Settings AiTab:** 8s AbortController timeout, retry butonu
 
@@ -43,7 +47,8 @@ type: project
 ## Test Altyapısı
 
 - **Framework:** Vitest · `src/__tests__/` · node environment
-- **45 dosya · 1059 test:** service, route handler, middleware, AI, import, credentials
+- **63 dosya · 1274 test** (2026-04-11 itibarıyla)
+- **E2E:** `@playwright/test` kurulu (Chromium, Firefox, WebKit), config henüz yok
 - **Eval suite:** `src/__tests__/eval/` — AI kalite değerlendirmesi
 
 **Mock pattern:**

@@ -7,7 +7,7 @@ type: project
 **Çalışma dizini:** `/Users/mirzasaribiyik/Projects/erp2`
 **GitHub:** `mirza-dev/erp2` (public repo)
 
-**Stack:** Next.js 15 · TypeScript · Supabase (14 tablo, 18+ migration) · Tailwind kurulu ama kullanılmıyor
+**Stack:** Next.js 15 · TypeScript · Supabase (15+ tablo, 26 migration) · Tailwind kurulu ama kullanılmıyor
 **Font:** `geist` npm paketi (`geist/font/sans`, `geist/font/mono`) — `next/font/google` değil; build sırasında ağ bağımlılığı yok
 
 ---

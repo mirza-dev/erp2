@@ -6,29 +6,23 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-11):**
+**Son tamamlanan (2026-04-12):**
 
-1. **Import Sistemi Yenileme (Faz 8) + 7 Bug Fix:**
-   - Yeni akış: `idle → analyzing → sheet_select → column_mapping → preview → importing → done`
-   - `026_column_mappings.sql` — kolon hafıza tablosu (normalized, usage_count, success_count)
-   - `POST /api/import/[batchId]/detect-columns` — memory → FALLBACK → AI sırasıyla kolon algılama
-   - `POST /api/import/[batchId]/apply-mappings` — kullanıcı onaylı deterministik dönüşüm
-   - `src/lib/supabase/column-mappings.ts` — dbLookupColumnMappings, dbSaveColumnMappings, dbIncrementMappingSuccess
-   - Preview: tüm alanlar (union), required alanlar önce, 500 satır, inline cell edit, toplu doldur UI
-   - 7 bug fix: draft duplication (back nav), memory düzeltilemiyor, success_count yanlış kaynak, detection sırası, confidence formülü, preview sınırları, bulk fill eksikliği
-   - **63 dosya · 1274 test**
+1. **Faz 3 — Stok Eskime Raporu (5 bug fix):**
+   - Hammadde eskime semantiği düzeltildi: `dbGetLastComponentUsageDates()` yeni fonksiyon eklendi — `inventory_movements WHERE movement_type='production' AND quantity < 0` (BOM tüketimi) — `production_entries` değil
+   - `boundCapital` cost_price kullanıyor: `on_hand * (cost_price ?? price)`, response'a `costPrice` alanı eklendi
+   - `finishedItems` build-breaker düzeltildi: `purchase/suggested/page.tsx` satır 720/887 → `manufacturedItems.length + commercialItems.length`
+   - Aging page gereksiz setState kaldırıldı: `useState(true)` varken `setLoadingX(true)` çağrısı silindi
+   - E2E selector düzeltildi: `getByText(/bağlanan sermaye/i).first()` — çoklu eleman sorunu çözüldü
+   - **Test:** 67 dosya, 1339 test — hepsi geçiyor | Build: temiz
 
-2. **Ürün Kullanım Bayrakları:**
-   - `025_product_usage_flags.sql` — `is_for_sales` / `is_for_purchase` kolonları
-   - Ürün oluşturma formu, drawer toggle, stok sayfası filtre butonları
+2. **product_type 3-yollu enum genişletme (2026-04-12 öncesi):**
+   - `finished` → `manufactured` / `commercial`
+   - Eskime raporu 3 tab, form akıllı default'lar, badge 3 renk
 
-3. **Önceki: Geciken Sevkiyat Alertı (overdue_shipment):**
-   - `024_overdue_shipment_alert.sql`, `dbListOverdueShipments()`, CRON endpoint
+**Bilinen açık sorunlar:** —
 
-**Bilinen açık sorunlar:**
-- Migration 025 ve 026 production Supabase'e henüz uygulanmadı (Supabase SQL editöründe çalıştırılacak)
-
-**Sonraki adım:** yuksek-etki.md'deki sıradaki özellik
+**Sonraki adım:** yuksek-etki.md → Faz 4 (Sipariş Son Tarihi / Order Deadline)
 
 **Why:** Yeni session'da Claude aktif konuyu bilsin, context kaybı yaşanmasın.
 **How to apply:** Her büyük özellik başlarken "Aktif" alanını güncelle; bitince "Son tamamlanan"a taşı.
