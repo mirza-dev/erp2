@@ -185,7 +185,7 @@ export default function ProductsPage() {
     const [createForm, setCreateForm] = useState<{
         name: string; sku: string; category: string; unit: string;
         price: number; currency: string; on_hand: number; minStockLevel: number;
-        productType: "finished" | "raw_material"; warehouse: string;
+        productType: "raw_material" | "manufactured" | "commercial"; warehouse: string;
         materialQuality: string; originCountry: string; productionSite: string;
         useCases: string; industries: string; standards: string;
         certifications: string; productNotes: string;
@@ -193,10 +193,10 @@ export default function ProductsPage() {
     }>({
         name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
         price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
-        productType: "finished", warehouse: "Sevkiyat Deposu",
+        productType: "manufactured", warehouse: "Sevkiyat Deposu",
         materialQuality: "", originCountry: "", productionSite: "",
         useCases: "", industries: "", standards: "", certifications: "", productNotes: "",
-        isForSales: true, isForPurchase: true,
+        isForSales: true, isForPurchase: false,
     });
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [windowWidth, setWindowWidth] = useState<number>(
@@ -436,10 +436,10 @@ export default function ProductsPage() {
             setCreateForm({
                 name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
                 price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
-                productType: "finished" as const, warehouse: "Sevkiyat Deposu",
+                productType: "manufactured" as const, warehouse: "Sevkiyat Deposu",
                 materialQuality: "", originCountry: "", productionSite: "",
                 useCases: "", industries: "", standards: "", certifications: "", productNotes: "",
-                isForSales: true, isForPurchase: true,
+                isForSales: true, isForPurchase: false,
             });
             toast({ type: "success", message: `${createForm.name} ürün olarak eklendi` });
         } catch (err) {
@@ -561,7 +561,7 @@ export default function ProductsPage() {
                             textDecoration: "none", whiteSpace: "nowrap",
                         }}
                     >Eskime Raporu →</a>
-                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "Küresel Vanalar", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "finished", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", isForSales: true, isForPurchase: true }); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
+                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "Küresel Vanalar", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", isForSales: true, isForPurchase: false }); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
                 </div>
             </div>
 
@@ -1126,11 +1126,11 @@ export default function ProductsPage() {
                                         <span style={{
                                             fontSize: "10px", fontWeight: 600, padding: "2px 7px",
                                             borderRadius: "4px", flexShrink: 0, marginTop: "2px",
-                                            background: product.productType === "finished" ? "var(--accent-bg)" : "var(--bg-tertiary)",
-                                            color: product.productType === "finished" ? "var(--accent-text)" : "var(--text-secondary)",
-                                            border: `0.5px solid ${product.productType === "finished" ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                            background: product.productType === "manufactured" ? "var(--accent-bg)" : product.productType === "commercial" ? "var(--success-bg)" : "var(--bg-tertiary)",
+                                            color: product.productType === "manufactured" ? "var(--accent-text)" : product.productType === "commercial" ? "var(--success-text)" : "var(--text-secondary)",
+                                            border: `0.5px solid ${product.productType === "manufactured" ? "var(--accent-border)" : product.productType === "commercial" ? "var(--success-border)" : "var(--border-secondary)"}`,
                                         }}>
-                                            {product.productType === "finished" ? "Mamul" : "Hammadde"}
+                                            {product.productType === "manufactured" ? "Mamul" : product.productType === "commercial" ? "Ticari Mal" : "Hammadde"}
                                         </span>
                                     </div>
 
@@ -1399,8 +1399,11 @@ export default function ProductsPage() {
                                                         });
                                                         if (res.ok) {
                                                             window.location.reload();
+                                                        } else {
+                                                            const err = await res.json().catch(() => ({}));
+                                                            toast({ type: "error", message: (err as { error?: string }).error ?? "Teslimat kaydedilemedi." });
                                                         }
-                                                    } catch { /* graceful */ }
+                                                    } catch { toast({ type: "error", message: "Bağlantı hatası." }); }
                                                     finally { setCommitmentSubmitting(false); }
                                                 }}
                                                 style={{
@@ -1450,6 +1453,9 @@ export default function ProductsPage() {
                                                                     });
                                                                     if (res.ok) {
                                                                         window.location.reload();
+                                                                    } else {
+                                                                        const err = await res.json().catch(() => ({}));
+                                                                        toast({ type: "error", message: (err as { error?: string }).error ?? "Teslimat alınamadı." });
                                                                     }
                                                                 } finally { setReceivingId(null); }
                                                             }}
@@ -1465,14 +1471,19 @@ export default function ProductsPage() {
                                                             disabled={isDemo}
                                                             onClick={async () => {
                                                                 if (isDemo) return;
-                                                                const res = await fetch(`/api/purchase-commitments/${c.id}`, {
-                                                                    method: "PATCH",
-                                                                    headers: { "Content-Type": "application/json" },
-                                                                    body: JSON.stringify({ action: "cancel" }),
-                                                                });
-                                                                if (res.ok) {
-                                                                    window.location.reload();
-                                                                }
+                                                                try {
+                                                                    const res = await fetch(`/api/purchase-commitments/${c.id}`, {
+                                                                        method: "PATCH",
+                                                                        headers: { "Content-Type": "application/json" },
+                                                                        body: JSON.stringify({ action: "cancel" }),
+                                                                    });
+                                                                    if (res.ok) {
+                                                                        window.location.reload();
+                                                                    } else {
+                                                                        const err = await res.json().catch(() => ({}));
+                                                                        toast({ type: "error", message: (err as { error?: string }).error ?? "İptal edilemedi." });
+                                                                    }
+                                                                } catch { toast({ type: "error", message: "Bağlantı hatası." }); }
                                                             }}
                                                             style={{
                                                                 fontSize: "10px", fontWeight: 600, padding: "2px 6px",
@@ -2080,9 +2091,18 @@ export default function ProductsPage() {
                                     <select
                                         style={modalInputStyle}
                                         value={createForm.productType}
-                                        onChange={e => setCreateForm(f => ({ ...f, productType: e.target.value as "finished" | "raw_material" }))}
+                                        onChange={e => {
+                                            const pt = e.target.value as "raw_material" | "manufactured" | "commercial";
+                                            const defaults = pt === "raw_material"
+                                                ? { isForSales: false, isForPurchase: true }
+                                                : pt === "manufactured"
+                                                ? { isForSales: true, isForPurchase: false }
+                                                : { isForSales: true, isForPurchase: true };
+                                            setCreateForm(f => ({ ...f, productType: pt, ...defaults }));
+                                        }}
                                     >
-                                        <option value="finished">Mamul</option>
+                                        <option value="manufactured">Mamul</option>
+                                        <option value="commercial">Ticari Mal</option>
                                         <option value="raw_material">Hammadde</option>
                                     </select>
                                 </FormField>

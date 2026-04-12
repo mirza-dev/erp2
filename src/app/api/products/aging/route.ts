@@ -4,49 +4,57 @@ import {
     dbGetLastSaleDates,
     dbGetLastIncomingDates,
     dbGetLastProductionDates,
+    dbGetLastComponentUsageDates,
     pickMax,
     computeAgingCategoryRaw,
     computeAgingCategoryFinished,
 } from "@/lib/supabase/aging";
 import { handleApiError } from "@/lib/api-error";
 
-// GET /api/products/aging?type=raw_material|finished|all
+// GET /api/products/aging?type=raw_material|manufactured|commercial|all
 // Aktif ürünler arasında on_hand > 0 olanlar için eskime raporu döner.
-// type=raw_material → sadece hammaddeler (product_type = 'raw_material')
-// type=finished     → sadece mamul + ticari mallar (is_for_sales = true)
+// type=raw_material  → sadece hammaddeler
+// type=manufactured  → sadece mamul (firma üretimi)
+// type=commercial    → sadece ticari mal (alınıp satılan)
 // type=all (default) → tümü
 export async function GET(req: NextRequest) {
     try {
         const type = req.nextUrl.searchParams.get("type") ?? "all";
 
-        const [products, lastSaleDates, lastIncomingDates, lastProductionDates] = await Promise.all([
+        const [products, lastSaleDates, lastIncomingDates, lastProductionDates, lastComponentUsageDates] = await Promise.all([
             dbListProducts({ is_active: true, pageSize: 10_000 }),
             dbGetLastSaleDates(),
             dbGetLastIncomingDates(),
             dbGetLastProductionDates(),
+            dbGetLastComponentUsageDates(),
         ]);
 
         const now = Date.now();
         const result = products
             .filter(p => p.on_hand > 0)
             .filter(p => {
-                if (type === "raw_material") return p.product_type === "raw_material";
-                if (type === "finished")     return p.is_for_sales === true;
+                if (type === "raw_material")  return p.product_type === "raw_material";
+                if (type === "manufactured")  return p.product_type === "manufactured";
+                if (type === "commercial")    return p.product_type === "commercial";
                 return true; // "all"
             })
             .map(p => {
-                const saleDate       = lastSaleDates.get(p.id)       ?? null;
-                const incomingDate   = lastIncomingDates.get(p.id)   ?? null;
-                const productionDate = lastProductionDates.get(p.id) ?? null;
+                const saleDate            = lastSaleDates.get(p.id)            ?? null;
+                const incomingDate        = lastIncomingDates.get(p.id)        ?? null;
+                const productionDate      = lastProductionDates.get(p.id)      ?? null;
+                const componentUsageDate  = lastComponentUsageDates.get(p.id)  ?? null;
 
                 // Tip-bazlı "son hareket" semantiği:
-                // Hammadde → son tedarik alımı VEYA son üretim kullanımı
-                // Mamul/ticari → son üretim VEYA son satış
+                // Hammadde   → son tedarik alımı VEYA üretimde son tüketim (inventory_movements, quantity<0)
+                // Mamul      → son üretim tarihi (production_entries) VEYA son satış
+                // Ticari mal → son tedarik VEYA son satış (üretim yok)
                 let lastMovement: string | null;
                 if (p.product_type === "raw_material") {
-                    lastMovement = pickMax(incomingDate, productionDate);
-                } else {
+                    lastMovement = pickMax(incomingDate, componentUsageDate);
+                } else if (p.product_type === "manufactured") {
                     lastMovement = pickMax(productionDate, saleDate);
+                } else {
+                    lastMovement = pickMax(incomingDate, saleDate);
                 }
 
                 const daysWaiting = lastMovement
@@ -66,16 +74,18 @@ export async function GET(req: NextRequest) {
                     onHand:             p.on_hand,
                     price:              p.price ?? 0,
                     currency:           p.currency,
-                    productType:        p.product_type as "finished" | "raw_material",
+                    productType:        p.product_type as "raw_material" | "manufactured" | "commercial",
                     isForSales:         p.is_for_sales ?? true,
                     isForPurchase:      p.is_for_purchase ?? true,
-                    lastMovementDate:   lastMovement,
-                    lastSaleDate:       saleDate,
-                    lastIncomingDate:   incomingDate,
-                    lastProductionDate: productionDate,
+                    lastMovementDate:        lastMovement,
+                    lastSaleDate:            saleDate,
+                    lastIncomingDate:        incomingDate,
+                    lastProductionDate:      productionDate,
+                    lastComponentUsageDate:  componentUsageDate,
                     daysWaiting,
                     agingCategory,
-                    boundCapital:       p.on_hand * (p.price ?? 0),
+                    costPrice:          p.cost_price ?? null,
+                    boundCapital:       p.on_hand * (p.cost_price ?? p.price ?? 0),
                 };
             });
 

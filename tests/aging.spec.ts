@@ -13,18 +13,19 @@ test("eskime raporu sayfası yükleniyor", async ({ page }) => {
     await expect(page.getByText(/stok eskime raporu/i)).toBeVisible({ timeout: 5_000 });
 });
 
-test("iki rapor tab'ı görünür — Hammadde ve Mamul", async ({ page }) => {
+test("üç rapor tab'ı görünür — Hammadde, Mamul, Ticari Mal", async ({ page }) => {
     await expect(page.getByText(/hammadde eskimesi/i)).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(/mamul.*ticari/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/mamul eskimesi/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/ticari mal eskimesi/i)).toBeVisible({ timeout: 5_000 });
 });
 
 test("Hammadde tab'ı açıkken özet kartlar görünür", async ({ page }) => {
-    await expect(page.getByText(/bağlanan sermaye/i)).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByText(/durgun.*ölü/i).or(page.getByText(/ort\. bekleme/i))).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/bağlanan sermaye/i).first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByText(/durgun \+ ölü/i).or(page.getByText(/ort\. bekleme/i))).toBeVisible({ timeout: 5_000 });
 });
 
 test("Mamul tab'ına geçiş çalışıyor", async ({ page }) => {
-    const mamulTab = page.getByText(/mamul.*ticari/i);
+    const mamulTab = page.getByText(/mamul eskimesi/i);
     await mamulTab.click();
     await page.waitForTimeout(300);
     // Eşik referansı mamul eşiklerini göstermeli

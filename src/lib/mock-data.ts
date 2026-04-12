@@ -30,7 +30,7 @@ export interface Product {
     forecasted: number;      // on_hand + incoming - reserved - quoted
     minStockLevel: number;
     isActive: boolean;
-    productType: "raw_material" | "finished";
+    productType: "raw_material" | "manufactured" | "commercial";
     warehouse: string;
     reorderQty?: number;
     preferredVendor?: string;
@@ -155,7 +155,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 400,
     },
@@ -178,7 +178,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 200,
     },
@@ -201,7 +201,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 100,
     },
@@ -224,7 +224,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 100,
         dailyUsage: 3,
@@ -248,7 +248,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 2000,
     },
@@ -271,7 +271,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 1000,
     },
@@ -294,7 +294,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 40,
     },
@@ -317,7 +317,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 160,
     },
@@ -340,7 +340,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 30,
         dailyUsage: 2,
@@ -364,7 +364,7 @@ export const mockProducts: Product[] = [
         isActive: true,
         isForSales: true,
         isForPurchase: true,
-        productType:"finished",
+        productType:"manufactured",
         warehouse: "Sevkiyat Deposu",
         reorderQty: 600,
     },

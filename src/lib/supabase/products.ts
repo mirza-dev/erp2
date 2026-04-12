@@ -12,7 +12,7 @@ export interface CreateProductInput {
     currency?: string;
     on_hand?: number;
     min_stock_level?: number;
-    product_type?: "finished" | "raw_material";
+    product_type?: "raw_material" | "manufactured" | "commercial";
     warehouse?: string;
     reorder_qty?: number;
     preferred_vendor?: string;
@@ -37,7 +37,7 @@ export interface CreateProductInput {
 
 export interface ListProductsFilter {
     category?: string;
-    product_type?: "finished" | "raw_material";
+    product_type?: "raw_material" | "manufactured" | "commercial";
     is_active?: boolean;
     page?: number;
     pageSize?: number;
@@ -102,7 +102,7 @@ export async function dbCreateProduct(input: CreateProductInput): Promise<Produc
             reserved: 0,
             min_stock_level: input.min_stock_level ?? 0,
             is_active: true,
-            product_type: input.product_type ?? "finished",
+            product_type: input.product_type ?? "manufactured",
             warehouse: input.warehouse ?? null,
             reorder_qty: input.reorder_qty ?? null,
             preferred_vendor: input.preferred_vendor ?? null,

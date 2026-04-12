@@ -3,7 +3,7 @@
  *
  * Documents the actual supported filter contract:
  *   ?category=xxx          → forwarded to dbListProducts
- *   ?product_type=finished → forwarded
+ *   ?product_type=manufactured → forwarded
  *   ?is_active=false       → forwarded (default: true)
  *   ?page=2                → forwarded
  *

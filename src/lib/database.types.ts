@@ -10,7 +10,7 @@ export type Json = string | number | boolean | null | { [key: string]: any } | a
 
 export type CommercialStatus = "draft" | "pending_approval" | "approved" | "cancelled"
 export type FulfillmentStatus = "unallocated" | "partially_allocated" | "allocated" | "partially_shipped" | "shipped"
-export type ProductType = "finished" | "raw_material"
+export type ProductType = "raw_material" | "manufactured" | "commercial"
 export type ReservationStatus = "open" | "shipped" | "released"
 export type ShortageStatus = "open" | "resolved" | "cancelled"
 export type MovementType = "production" | "shipment" | "receipt" | "adjustment" | "reservation_create" | "reservation_release"

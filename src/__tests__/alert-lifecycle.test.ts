@@ -80,7 +80,7 @@ const PRODUCT_CRITICAL: ProductWithStock = {
     available_now: 5,
     min_stock_level: 10,   // available(5) <= min(10) → critical
     is_active: true,
-    product_type: "finished",
+    product_type: "manufactured",
     warehouse: null, reorder_qty: null, preferred_vendor: null,
     daily_usage: null, lead_time_days: null, product_family: null,
     sub_category: null, sector_compatibility: null, cost_price: null,
@@ -100,7 +100,7 @@ const PRODUCT_HEALTHY: ProductWithStock = {
     available_now: 200,
     min_stock_level: 10,
     is_active: true,
-    product_type: "finished",
+    product_type: "manufactured",
     warehouse: null, reorder_qty: null, preferred_vendor: null,
     daily_usage: null, lead_time_days: null, product_family: null,
     sub_category: null, sector_compatibility: null, cost_price: null,

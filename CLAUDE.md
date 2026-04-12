@@ -1,25 +1,26 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-11_
+_Son güncelleme: 2026-04-12_
 
-**Son tamamlanan iş:** Import Sistemi Yenileme + 7 Bug Fix
-- `supabase/migrations/026_column_mappings.sql` — kolon hafıza tablosu (normalized, usage_count, success_count)
-- Yeni akış: `idle → analyzing → sheet_select → column_mapping → preview → importing → done`
-- `POST /api/import/[batchId]/detect-columns` — memory → FALLBACK → AI sırasıyla kolon eşleştirme
-- `POST /api/import/[batchId]/apply-mappings` — kullanıcı onaylı deterministik dönüşüm + draft oluşturma
-- `src/lib/supabase/column-mappings.ts` — `dbLookupColumnMappings`, `dbSaveColumnMappings`, `dbIncrementMappingSuccess`
-- Preview: tüm alanlar (union), required alanlar önce, 500 satır, inline cell edit, toplu doldur UI
-- **7 bug fix:** draft duplication (back nav), memory düzeltilemiyor, success_count yanlış kaynak, detection sırası, confidence formülü, preview sınırları, bulk fill eksikliği
-- **Ürün kullanım bayrakları:** `is_for_sales` / `is_for_purchase` — ürün oluşturma formu, drawer toggle, stok sayfası filtre butonları (`025_product_usage_flags.sql`)
+**Son tamamlanan iş:** Faz 3 bug fix — hammadde eskime semantiği, boundCapital cost_price, finishedItems build-breaker, setState temizleme, E2E selector
+- `supabase/migrations/027_product_type_3way.sql` — `finished` → `manufactured` / `commercial` (is_for_purchase bazlı migrasyon)
+- `product_type` artık: `raw_material | manufactured | commercial`
+- Eskime raporu 3 tab: Hammadde, Mamul, Ticari Mal — her biri kendi hareket semantiği ve kolon başlıkları
+- Ticari mal son hareket: MAX(tedarik, satış) — üretim dahil değil
+- Ürün formu: 3 seçenekli dropdown + akıllı is_for_sales/is_for_purchase default'ları
+- Badge: 3 renk (manufactured=accent, commercial=success, raw_material=tertiary)
+- Satınalma önerileri: 4 filtre tab'ı
+- E2E: aging.spec.ts 3 tab testleri
 
 **Önceki önemli işler:**
-- Geciken Sevkiyat Alertı (`024_overdue_shipment_alert.sql`), Teklif Uzatma (Faz 6.1), Teklif Kırılımı (Faz 5)
-- Quote valid until domain kuralı (string karşılaştırma), overdue_shipment alert, demo mode mimarisi
+- Stok Eskime Raporu v1 (aging.ts, üretim tarihleri, tip-bazlı eşikler)
+- Import Sistemi Yenileme + 7 Bug Fix, Ürün kullanım bayrakları (025, 026)
+- Geciken Sevkiyat Alertı, Teklif Uzatma, Teklif Kırılımı, demo mode
 
 **Aktif odak:** —
-**Bilinen açık sorunlar:** Migration 025 ve 026 production Supabase'e uygulanmadı (Supabase SQL editöründe çalıştırılacak)
-**Test sayısı:** 63 dosya · 1274 test
+**Bilinen açık sorunlar:** —
+**Test sayısı:** 67 dosya · 1338 test
 
 ---
 
@@ -144,9 +145,11 @@ supabase/
 
 ```ts
 // Product — DB-aligned field isimler
+// productType: "raw_material" | "manufactured" | "commercial"
 Product: id, name, sku, category, unit, price, currency,
          on_hand, reserved, available_now,
          minStockLevel, isActive, productType, warehouse,
+         isForSales, isForPurchase,
          reorderQty?, preferredVendor?, dailyUsage?
 
 // Customer

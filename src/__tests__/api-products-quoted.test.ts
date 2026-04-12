@@ -50,7 +50,7 @@ function makeProduct(id: string, on_hand: number, reserved: number) {
         available_now: on_hand - reserved,
         min_stock_level: 5,
         is_active: true,
-        product_type: "finished" as const,
+        product_type: "manufactured" as const,
         warehouse: null,
         reorder_qty: null,
         preferred_vendor: null,

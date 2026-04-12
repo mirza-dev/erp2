@@ -18,7 +18,7 @@ describe("mapProduct", () => {
     available_now: 80,
     min_stock_level: 10,
     is_active: true,
-    product_type: "finished",
+    product_type: "manufactured",
     warehouse: "Depo A",
     reorder_qty: null,
     preferred_vendor: null,

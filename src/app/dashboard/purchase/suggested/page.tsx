@@ -68,7 +68,7 @@ function AiSignalButton({ enrichment, loading, onClick }: {
     );
 }
 
-type FilterType = "all" | "raw_material" | "finished";
+type FilterType = "all" | "raw_material" | "manufactured" | "commercial";
 
 function WhyBadge({ daysLeft, urgency, leadTimeDays }: {
     daysLeft: number | null;
@@ -609,7 +609,8 @@ export default function PurchaseSuggestedPage() {
     };
 
     const rawItems = reorderSuggestions.filter(p => p.productType === "raw_material");
-    const finishedItems = reorderSuggestions.filter(p => p.productType === "finished");
+    const manufacturedItems = reorderSuggestions.filter(p => p.productType === "manufactured");
+    const commercialItems = reorderSuggestions.filter(p => p.productType === "commercial");
 
     const purchaseSearched = search.trim().toLowerCase();
     const filtered = (filter === "all" ? reorderSuggestions : reorderSuggestions.filter(p => p.productType === filter))
@@ -670,7 +671,8 @@ export default function PurchaseSuggestedPage() {
     const tabs: { key: FilterType; label: string; count: number }[] = [
         { key: "all", label: "Tümü", count: reorderSuggestions.length },
         { key: "raw_material", label: "Hammadde", count: rawItems.length },
-        { key: "finished", label: "Bitmiş Ürün", count: finishedItems.length },
+        { key: "manufactured", label: "Mamul", count: manufacturedItems.length },
+        { key: "commercial", label: "Ticari Mal", count: commercialItems.length },
     ];
 
     // Summary stats for decisions
@@ -715,7 +717,7 @@ export default function PurchaseSuggestedPage() {
                             {reorderSuggestions.length}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                            {rawItems.length} hammadde · {finishedItems.length} bitmiş ürün
+                            {rawItems.length} hammadde · {manufacturedItems.length + commercialItems.length} mamul + ticari
                         </div>
                     </div>
 
@@ -882,7 +884,7 @@ export default function PurchaseSuggestedPage() {
             <SegmentBanner
                 filter={filter}
                 rawCount={rawItems.length}
-                finishedCount={finishedItems.length}
+                finishedCount={manufacturedItems.length + commercialItems.length}
                 rawItems={rawItems}
             />
 

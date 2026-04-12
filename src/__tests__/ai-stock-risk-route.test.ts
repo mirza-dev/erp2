@@ -51,7 +51,7 @@ function makeProduct(overrides: Partial<ProductWithStock> = {}): ProductWithStoc
         available_now: 100,
         min_stock_level: 10,
         is_active: true,
-        product_type: "finished",
+        product_type: "manufactured",
         warehouse: null,
         reorder_qty: null,
         preferred_vendor: null,

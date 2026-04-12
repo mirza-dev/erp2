@@ -13,16 +13,18 @@ export interface AgingRow {
     onHand: number;
     price: number;
     currency: string;
-    productType: "finished" | "raw_material";
+    productType: "raw_material" | "manufactured" | "commercial";
     isForSales: boolean;
     isForPurchase: boolean;
-    lastMovementDate: string | null;     // ISO timestamptz, null = hiç hareket yok
+    lastMovementDate: string | null;         // ISO timestamptz, null = hiç hareket yok
     lastSaleDate: string | null;
     lastIncomingDate: string | null;
-    lastProductionDate: string | null;
+    lastProductionDate: string | null;       // mamul: üretildiği tarih (production_entries)
+    lastComponentUsageDate: string | null;   // hammadde: üretimde tüketildiği tarih (inventory_movements)
     daysWaiting: number | null;          // null = no movement
     agingCategory: AgingCategory;
-    boundCapital: number;                // on_hand * price
+    costPrice: number | null;            // maliyet fiyatı (null = girilmemiş)
+    boundCapital: number;                // on_hand * (cost_price ?? price)
 }
 
 // ── Pure helpers ─────────────────────────────────────────────
@@ -115,10 +117,9 @@ export async function dbGetLastIncomingDates(): Promise<Map<string, string>> {
 }
 
 /**
- * Her ürün için en son üretim kaydının tarihini döner.
- * Hammadde için: bu ürünün üretimde kullanıldığı son tarihi verir.
- * Mamul için: bu ürünün üretildiği son tarihi verir.
- * Kaynak: production_entries.production_date (DATE)
+ * Her mamul ürün için en son üretildiği tarihi döner.
+ * Kaynak: production_entries.product_id = üretilen mamulün ID'si.
+ * Hammadde tüketimi için dbGetLastComponentUsageDates() kullan.
  */
 export async function dbGetLastProductionDates(): Promise<Map<string, string>> {
     const supabase = createServiceClient();
@@ -132,6 +133,30 @@ export async function dbGetLastProductionDates(): Promise<Map<string, string>> {
         // İlk karşılaşılan = en yeni (DESC sıralı)
         if (!map.has(row.product_id)) {
             map.set(row.product_id, row.production_date);
+        }
+    }
+    return map;
+}
+
+/**
+ * Her hammadde için üretimde son kullanıldığı tarihi döner.
+ * Kaynak: inventory_movements WHERE movement_type='production' AND quantity < 0
+ * (complete_production() RPC'si BOM tüketimini bu şekilde kaydeder.)
+ */
+export async function dbGetLastComponentUsageDates(): Promise<Map<string, string>> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("inventory_movements")
+        .select("product_id, occurred_at")
+        .eq("movement_type", "production")
+        .lt("quantity", 0)
+        .order("occurred_at", { ascending: false });
+    if (error || !data) return new Map();
+    const map = new Map<string, string>();
+    for (const row of data) {
+        // İlk karşılaşılan = en yeni (DESC sıralı)
+        if (!map.has(row.product_id)) {
+            map.set(row.product_id, row.occurred_at);
         }
     }
     return map;

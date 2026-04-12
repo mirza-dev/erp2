@@ -26,7 +26,8 @@ export async function POST() {
     const needsPurchase = products.filter(p => p.available_now <= p.min_stock_level);
 
     const rawMaterialCount = needsPurchase.filter(p => p.product_type === "raw_material").length;
-    const finishedCount = needsPurchase.filter(p => p.product_type === "finished").length;
+    const manufacturedCount = needsPurchase.filter(p => p.product_type === "manufactured").length;
+    const commercialCount = needsPurchase.filter(p => p.product_type === "commercial").length;
 
     const items: PurchaseSuggestionItem[] = needsPurchase.map(p => {
         const dailyUsage = p.daily_usage ?? null;
@@ -41,7 +42,7 @@ export async function POST() {
             productId: p.id,
             productName: p.name,
             sku: p.sku,
-            productType: p.product_type as "raw_material" | "finished",
+            productType: p.product_type as "raw_material" | "manufactured" | "commercial",
             unit: p.unit,
             available: p.available_now,
             min: p.min_stock_level,
@@ -225,7 +226,8 @@ export async function POST() {
             total_products: products.length,
             needs_purchase: needsPurchase.length,
             raw_material: rawMaterialCount,
-            finished: finishedCount,
+            manufactured: manufacturedCount,
+            commercial: commercialCount,
         },
         items: responseItems,
         recommendations,

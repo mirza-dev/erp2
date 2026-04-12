@@ -113,7 +113,7 @@ describe("POST /api/ai/purchase-copilot — counts computation", () => {
     it("raw_material count is correct", async () => {
         mockDbListProducts.mockResolvedValue([
             makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20, product_type: "raw_material" }),
-            makeProduct({ id: "p-2", available_now: 5, min_stock_level: 20, product_type: "finished" }),
+            makeProduct({ id: "p-2", available_now: 5, min_stock_level: 20, product_type: "manufactured" }),
             makeProduct({ id: "p-3", available_now: 5, min_stock_level: 20, product_type: "raw_material" }),
         ]);
         const res = await POST();
@@ -121,14 +121,14 @@ describe("POST /api/ai/purchase-copilot — counts computation", () => {
         expect(body.counts.raw_material).toBe(2);
     });
 
-    it("finished count is correct", async () => {
+    it("manufactured count is correct", async () => {
         mockDbListProducts.mockResolvedValue([
             makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20, product_type: "raw_material" }),
-            makeProduct({ id: "p-2", available_now: 5, min_stock_level: 20, product_type: "finished" }),
+            makeProduct({ id: "p-2", available_now: 5, min_stock_level: 20, product_type: "manufactured" }),
         ]);
         const res = await POST();
         const body = await res.json();
-        expect(body.counts.finished).toBe(1);
+        expect(body.counts.manufactured).toBe(1);
     });
 });
 

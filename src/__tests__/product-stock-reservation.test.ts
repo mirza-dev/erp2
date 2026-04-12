@@ -30,7 +30,7 @@ function makeProductRow(overrides: Partial<ProductWithStock> = {}): ProductWithS
         available_now: 200,
         min_stock_level: 50,
         is_active: true,
-        product_type: "finished",
+        product_type: "manufactured",
         warehouse: "Sevkiyat Deposu",
         reorder_qty: null,
         preferred_vendor: null,

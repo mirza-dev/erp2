@@ -5,14 +5,14 @@ import { handleApiError } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 import { computeOrderDeadline } from "@/lib/stock-utils";
 
-// GET /api/products?category=xxx&product_type=finished&is_active=false&page=1
+// GET /api/products?category=xxx&product_type=manufactured&is_active=false&page=1
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
         const [products, quotedMap, incomingMap] = await Promise.all([
             dbListProducts({
                 category: searchParams.get("category") ?? undefined,
-                product_type: (searchParams.get("product_type") as "finished" | "raw_material") ?? undefined,
+                product_type: (searchParams.get("product_type") as "raw_material" | "manufactured" | "commercial") ?? undefined,
                 is_active: searchParams.get("is_active") !== "false",
                 page: parseInt(searchParams.get("page") ?? "1"),
             }),
