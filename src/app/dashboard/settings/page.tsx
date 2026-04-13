@@ -575,7 +575,7 @@ function DemoTab() {
             if (!seed.ok) throw new Error("Seed başarısız: " + seed.status);
 
             setStep("scanning");
-            const scan = await fetch("/api/alerts/scan", { method: "POST" });
+            const scan = await fetch("/api/alerts/scan?force=true", { method: "POST" });
             if (!scan.ok) throw new Error("Alert taraması başarısız: " + scan.status);
 
             setStep("done");

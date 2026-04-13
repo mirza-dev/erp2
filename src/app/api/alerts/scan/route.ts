@@ -3,8 +3,16 @@ import { serviceScanStockAlerts } from "@/lib/services/alert-service";
 import { createServiceClient } from "@/lib/supabase/service";
 
 // POST /api/alerts/scan — scans all products and creates/resolves stock alerts
-export async function POST() {
+// ?force=true → takılı lock'u temizler (demo / manuel tetikleme için)
+export async function POST(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const force = searchParams.get("force") === "true";
     const supabase = createServiceClient();
+
+    if (force) {
+        // Takılı lock'u zorla bırak
+        try { await supabase.rpc("release_scan_lock"); } catch { /* ignore */ }
+    }
 
     // Advisory lock: only one scan at a time
     const { data: locked } = await supabase.rpc("try_acquire_scan_lock");
