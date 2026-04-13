@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { dateDaysFromToday } from "@/lib/stock-utils";
 
 const categories = [
     "Tümü",
@@ -906,7 +907,7 @@ export default function ProductsPage() {
                                         if (!dl) return (
                                             <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)" }}>—</td>
                                         );
-                                        const daysLeft = Math.floor((new Date(dl).getTime() - Date.now()) / 86_400_000);
+                                        const daysLeft = dateDaysFromToday(dl);
                                         const color = daysLeft < 0 ? "var(--danger-text)"
                                             : daysLeft < 7  ? "var(--danger-text)"
                                             : daysLeft < 14 ? "var(--warning-text)"
@@ -1319,7 +1320,7 @@ export default function ProductsPage() {
                                     {/* Sipariş Son Tarihi */}
                                     {(product.stockoutDate || product.orderDeadline) && (() => {
                                         const dl = product.orderDeadline ?? null;
-                                        const daysLeft = dl ? Math.floor((new Date(dl).getTime() - Date.now()) / 86_400_000) : null;
+                                        const daysLeft = dl ? dateDaysFromToday(dl) : null;
                                         const borderColor = daysLeft === null ? "var(--border-tertiary)"
                                             : daysLeft < 0  ? "var(--danger-border)"
                                             : daysLeft <= 7  ? "var(--danger-border)"

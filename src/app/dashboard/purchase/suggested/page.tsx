@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useData } from "@/lib/data-context";
-import { computeCoverageDays, computeTargetStock, daysColor, daysBg } from "@/lib/stock-utils";
+import { computeCoverageDays, computeTargetStock, daysColor, daysBg, dateDaysFromToday } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { useToast } from "@/components/ui/Toast";
@@ -1201,7 +1201,7 @@ export default function PurchaseSuggestedPage() {
                                                 </div>
                                             )}
                                             {p.orderDeadline && (() => {
-                                                const dlDays = Math.floor((new Date(p.orderDeadline).getTime() - Date.now()) / 86_400_000);
+                                                const dlDays = dateDaysFromToday(p.orderDeadline);
                                                 return (
                                                     <div style={{ marginTop: "2px", fontSize: "10px", fontWeight: 600, color: daysColor(dlDays) }}>
                                                         Sipariş: {new Date(p.orderDeadline).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}&apos;e kadar

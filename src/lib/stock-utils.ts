@@ -235,6 +235,30 @@ export function buildPurchaseDescription(
     return parts.join(" ");
 }
 
+// ── Date Utilities ───────────────────────────────────────────
+
+/**
+ * Format a UTC timestamp as YYYY-MM-DD using local timezone.
+ * Avoids the UTC-midnight drift that toISOString() causes for UTC+ zones
+ * (e.g., at 00:30 Istanbul, toISOString() returns yesterday's UTC date).
+ */
+function localISODate(ts: number): string {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * How many calendar days from today (local timezone) to the given ISO date.
+ *
+ * Uses local date components — toISOString() gives UTC, which at local midnight
+ * (00:00–02:59 in UTC+3 zones) reports the previous day → 1-day off.
+ */
+export function dateDaysFromToday(isoDate: string): number {
+    const todayStr = localISODate(Date.now());
+    const todayMs = new Date(todayStr).getTime();
+    return Math.round((new Date(isoDate).getTime() - todayMs) / 86_400_000);
+}
+
 // ── Order Deadline ───────────────────────────────────────────
 
 const SAFETY_BUFFER_DAYS = 7;
@@ -262,13 +286,11 @@ export function computeOrderDeadline(
     if (!dailyUsage || dailyUsage <= 0) return { stockoutDate: null, orderDeadline: null };
 
     const stockoutDays = Math.floor(promisable / dailyUsage);
-    const stockoutDate = new Date(Date.now() + stockoutDays * 86_400_000)
-        .toISOString().slice(0, 10);
+    const stockoutDate = localISODate(Date.now() + stockoutDays * 86_400_000);
 
     if (!leadTimeDays || leadTimeDays <= 0) return { stockoutDate, orderDeadline: null };
 
-    const deadlineMs    = Date.now() + (stockoutDays - leadTimeDays - SAFETY_BUFFER_DAYS) * 86_400_000;
-    const orderDeadline = new Date(deadlineMs).toISOString().slice(0, 10);
+    const orderDeadline = localISODate(Date.now() + (stockoutDays - leadTimeDays - SAFETY_BUFFER_DAYS) * 86_400_000);
     return { stockoutDate, orderDeadline };
 }
 
@@ -292,10 +314,7 @@ export function shouldSuggestReorder(args: {
     if (!args.isActive) return false;
     if (args.available <= args.min) return true;
     if (args.orderDeadline) {
-        const daysLeft = Math.floor(
-            (new Date(args.orderDeadline).getTime() - Date.now()) / 86_400_000
-        );
-        if (daysLeft <= REORDER_DEADLINE_WINDOW_DAYS) return true;
+        if (dateDaysFromToday(args.orderDeadline) <= REORDER_DEADLINE_WINDOW_DAYS) return true;
     }
     return false;
 }

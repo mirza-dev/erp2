@@ -91,3 +91,33 @@ describe("shouldSuggestReorder — stok + deadline kombinasyonları", () => {
         expect(shouldSuggestReorder({ isActive: true, available: 20, min: 10, orderDeadline: null })).toBe(false);
     });
 });
+
+// ── Timezone Drift Regression ─────────────────────────────────
+// UTC+ saat diliminde (TRT +3) öğlen deadline bugünse true döner.
+
+describe("shouldSuggestReorder — timezone drift (TRT noon)", () => {
+    it("bugün olan deadline saat 12:00 TRT'de (09:00 UTC) → true", () => {
+        const noon = new Date("2024-06-01T09:00:00Z").getTime(); // 12:00 TRT
+        vi.spyOn(Date, "now").mockReturnValue(noon);
+        // deadline = "2024-06-01" → dateDaysFromToday = 0 → ≤ 7 → true
+        expect(shouldSuggestReorder({ isActive: true, available: 20, min: 10, orderDeadline: "2024-06-01" })).toBe(true);
+    });
+
+    // 00:00–02:59 penceresi: yerel bugünden 7 gün sonrası deadline → true döner.
+    // Eski kod (UTC gün): deadline = yerel_bugün+7, ama UTC bugün = yerel_dün → daysLeft=8 → false (yanlış!)
+    it("00:30 yerel saat — yerel bugünden 7 gün sonrası deadline → true", () => {
+        // 1 Haziran 2024 00:30 Istanbul = 31 Mayıs 2024 21:30 UTC
+        const istanbul0030 = new Date("2024-05-31T21:30:00Z").getTime();
+        vi.spyOn(Date, "now").mockReturnValue(istanbul0030);
+
+        // "yerel bugün" + 7 gün
+        const d = new Date(istanbul0030);
+        const localToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const sevenDaysLater = new Date(new Date(localToday).getTime() + 7 * 86_400_000).toISOString().slice(0, 10);
+
+        expect(shouldSuggestReorder({ isActive: true, available: 20, min: 10, orderDeadline: sevenDaysLater })).toBe(true);
+        // TZ=Europe/Istanbul: localToday="2024-06-01", sevenDaysLater="2024-06-08" → daysLeft=7 → true ✓
+        //   Eski kod: UTC bugün="2024-05-31", daysLeft("2024-06-08")=8 → false (yanlış!)
+        // TZ=UTC: localToday="2024-05-31", sevenDaysLater="2024-06-07" → daysLeft=7 → true ✓
+    });
+});

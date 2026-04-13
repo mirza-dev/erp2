@@ -6,7 +6,7 @@
  *   order_deadline = stockout_date - lead_time_days - 7 (SAFETY_BUFFER_DAYS)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { computeOrderDeadline } from "@/lib/stock-utils";
+import { computeOrderDeadline, dateDaysFromToday } from "@/lib/stock-utils";
 
 // Sabit "bugün" → 2024-01-15 (zorla deterministik)
 const FIXED_NOW = new Date("2024-01-15T12:00:00Z").getTime();
@@ -104,5 +104,78 @@ describe("computeOrderDeadline — orderDeadline", () => {
         // deadline_days = 50 - 30 - 7 = 13 → 2024-01-28
         const { orderDeadline } = computeOrderDeadline(500, 10, 30);
         expect(orderDeadline).toBe("2024-01-28");
+    });
+});
+
+// ── computeOrderDeadline — 00:00–02:59 UTC drift regresyonu ──
+// toISOString().slice(0,10) UTC gününü verir; yerel gece başında bir gün kayar.
+
+describe("computeOrderDeadline — 00:00–02:59 yerel saat UTC drift regresyonu", () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it("00:30 yerel saat — stockoutDate yerel tarihe eşit (toISOString değil)", () => {
+        // 15 Ocak 2024 00:30 Istanbul = 14 Ocak 2024 21:30 UTC
+        const istanbul0030 = new Date("2024-01-14T21:30:00Z").getTime();
+        vi.spyOn(Date, "now").mockReturnValue(istanbul0030);
+
+        const { stockoutDate } = computeOrderDeadline(0, 10, null);
+
+        // stockoutDate yerel getDate() ile tutarlı olmalı (toISOString UTC değil)
+        const d = new Date(istanbul0030);
+        const expectedLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        expect(stockoutDate).toBe(expectedLocal);
+        // TZ=Europe/Istanbul: expectedLocal="2024-01-15" (iş günü doğru; eski kod "2024-01-14" verirdi)
+        // TZ=UTC:             expectedLocal="2024-01-14" (referans UTC ortamda her iki kod aynı)
+    });
+});
+
+// ── dateDaysFromToday — timezone drift regression ─────────────
+// UTC+3 (TRT) saat 12:00'de deadline bugün ise 0 döner, -1 değil.
+
+describe("dateDaysFromToday — UTC normalizasyonu", () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it("bugün tarihi → 0 (saat farkından bağımsız)", () => {
+        // TRT saat 12:00 = UTC 09:00 — eski kod Date.now() farkı ile -1 verirdi
+        const noon = new Date("2024-01-15T09:00:00Z").getTime(); // 12:00 TRT
+        vi.spyOn(Date, "now").mockReturnValue(noon);
+        expect(dateDaysFromToday("2024-01-15")).toBe(0);
+    });
+
+    it("yarın tarihi → 1", () => {
+        const noon = new Date("2024-01-15T09:00:00Z").getTime();
+        vi.spyOn(Date, "now").mockReturnValue(noon);
+        expect(dateDaysFromToday("2024-01-16")).toBe(1);
+    });
+
+    it("dün tarihi → -1", () => {
+        const noon = new Date("2024-01-15T09:00:00Z").getTime();
+        vi.spyOn(Date, "now").mockReturnValue(noon);
+        expect(dateDaysFromToday("2024-01-14")).toBe(-1);
+    });
+
+    it("gece yarısı UTC'de de doğru çalışır", () => {
+        const midnight = new Date("2024-01-15T00:00:00Z").getTime();
+        vi.spyOn(Date, "now").mockReturnValue(midnight);
+        expect(dateDaysFromToday("2024-01-15")).toBe(0);
+        expect(dateDaysFromToday("2024-01-22")).toBe(7);
+    });
+
+    // 00:00–02:59 yerel saat penceresi (UTC+3 drift regresyonu)
+    // Timestamp olarak 21:30 UTC kullanılır; bu an:
+    //   • TZ=Europe/Istanbul makinede getDate()=15 (Ocak 15) → doğru
+    //   • TZ=UTC makinede getDate()=14 (Ocak 14) — aynı sınırda tutarlı davranış
+    // Test her iki ortamda yerel tarihe göre 0 döndüğünü doğrular.
+
+    it("00:30 yerel saat — yerel bugünün tarihi → 0 (UTC drift regresyonu)", () => {
+        // 15 Ocak 2024 00:30 Istanbul = 14 Ocak 2024 21:30 UTC
+        const istanbul0030 = new Date("2024-01-14T21:30:00Z").getTime();
+        vi.spyOn(Date, "now").mockReturnValue(istanbul0030);
+
+        const d = new Date(istanbul0030);
+        const localToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+        // Yerel bugüne ait tarih → 0 döner (TZ=Istanbul: "2024-01-15"; TZ=UTC: "2024-01-14")
+        expect(dateDaysFromToday(localToday)).toBe(0);
     });
 });

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { formatNumber } from "@/lib/utils";
+import { dateDaysFromToday } from "@/lib/stock-utils";
 
 const subtitleColors = {
     ok: "var(--success-text)",
@@ -35,8 +36,7 @@ export default function StatsCards() {
         }).length,
         deadlineCount: products.filter(p => {
             if (!p.orderDeadline) return false;
-            const daysLeft = Math.floor((new Date(p.orderDeadline).getTime() - Date.now()) / 86_400_000);
-            return daysLeft <= 7;
+            return dateDaysFromToday(p.orderDeadline) <= 7;
         }).length,
     }), [products]);
 
