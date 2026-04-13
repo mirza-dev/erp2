@@ -908,9 +908,9 @@ export default function ProductsPage() {
                                             <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)" }}>—</td>
                                         );
                                         const daysLeft = dateDaysFromToday(dl);
-                                        const color = daysLeft < 0 ? "var(--danger-text)"
-                                            : daysLeft < 7  ? "var(--danger-text)"
-                                            : daysLeft < 14 ? "var(--warning-text)"
+                                        const color = daysLeft <= 0 ? "var(--danger-text)"
+                                            : daysLeft <= 7  ? "var(--danger-text)"
+                                            : daysLeft <= 14 ? "var(--warning-text)"
                                             : "var(--success-text)";
                                         const label = daysLeft < 0
                                             ? "Geçti"

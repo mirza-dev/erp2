@@ -153,8 +153,11 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     // Severity değişti (warning → critical veya tersi) — eski resolve et, yeni oluştur
                     toResolve.push({ type: "order_deadline", entityId, reason: "deadline_severity_changed" });
                     toCreate.push(alertInput);
+                } else {
+                    // Aynı severity, fakat metin dinamik (gün sayısı değişir) → her scan'de tazele
+                    toResolve.push({ type: "order_deadline", entityId, reason: "deadline_text_refresh" });
+                    toCreate.push(alertInput);
                 }
-                // else: aynı severity → aksiyon gerekmez
             } else {
                 toResolve.push({ type: "order_deadline", entityId, reason: "deadline_not_imminent" });
             }

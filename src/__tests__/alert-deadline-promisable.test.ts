@@ -164,6 +164,55 @@ describe("alert-service — order_deadline uses promisable (not available_now)",
         expect(deadlineAlerts[0][0].severity).toBe("critical");
     });
 
+    it("mevcut warning alert varken re-scan → resolve + yeni alert (metin tazeleme)", async () => {
+        // Senaryo: önceki scan'de 5 gün kaldı (warning) → alert açıldı.
+        // Bugün re-scan: 4 gün kaldı — hâlâ warning, fakat metin bayat.
+        // Beklenti: eski alert resolve edilir, yeni metin (4 gün) ile alert açılır.
+        //
+        // Ürün: promisable=120, daily_usage=10, lead_time_days=1
+        //   stockout_days = floor(120/10) = 12
+        //   deadline_days = 12 - 1 - 7 = 4 → daysLeft=4 → warning severity ✓
+        const product = makeProduct({
+            available_now: 120,
+            min_stock_level: 5,
+            daily_usage: 10,
+            lead_time_days: 1,
+        });
+        mockDbListAllActiveProducts.mockResolvedValue([product]);
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map());
+
+        // Aktif order_deadline alert (warning) — önceki scan'den kalma, eski metin
+        mockDbListActiveAlerts.mockResolvedValue([{
+            id: "alert-existing",
+            type: "order_deadline",
+            entity_id: "prod-1",
+            severity: "warning",
+            status: "open",
+            title: "Test Ürün: Sipariş son tarihi 5 gün kaldı",
+        }]);
+
+        await serviceScanStockAlerts();
+
+        // dbBatchResolveAlerts deadline_text_refresh reason ile çağrılmış olmalı
+        expect(mockDbBatchResolveAlerts).toHaveBeenCalledWith(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    type: "order_deadline",
+                    entityId: "prod-1",
+                    reason: "deadline_text_refresh",
+                }),
+            ])
+        );
+
+        // Taze alert oluşturulmuş olmalı
+        const deadlineAlerts = mockDbCreateAlert.mock.calls.filter(
+            ([input]) => input.type === "order_deadline"
+        );
+        expect(deadlineAlerts).toHaveLength(1);
+        expect(deadlineAlerts[0][0].severity).toBe("warning");
+        expect(deadlineAlerts[0][0].title).toContain("4 gün kaldı");
+    });
+
     it("small quoted with comfortable deadline → no deadline alert", async () => {
         // available_now=500, quoted=10 → promisable=490
         // daily_usage=10 → stockout_days=49 → deadline = 49 - 5 - 7 = +37 days (> 7, no alert)
