@@ -1,8 +1,19 @@
 # KokpitERP
 
-PMT Endüstriyel için yapay zeka destekli ERP sistemi. Endüstriyel vana satışı (B2B).
+> AI-powered ERP system for industrial B2B sales, integrating LLM-based document parsing, automated purchase recommendations, and multi-agent workflow orchestration. Built with Next.js, TypeScript, Supabase, and Anthropic Claude API.
 
-**Stack:** Next.js 16 · TypeScript · Supabase · Tailwind CSS (inline styles ile)
+PMT Endüstriyel için geliştirilmiş yapay zeka destekli ERP sistemi. Endüstriyel vana ticareti (B2B) süreçlerini uçtan uca kapsar.
+
+## Özellikler
+
+- **AI Document Parsing** — Excel/CSV dosyalarını Claude Haiku ile otomatik parse eder; kolon eşleştirmeyi öğrenir ve sonraki import'larda hafızasını kullanır
+- **Automated Purchase Recommendations** — Stok seviyesi, günlük kullanım, tedarik süresi ve aktif teklifleri (promisable stock) birlikte değerlendirerek yeniden sipariş önerileri üretir
+- **Smart Alert Engine** — Kritik stok, sipariş son tarihi, geciken sevkiyat ve sipariş eksikliği alertlerini otomatik tarar; severity değişimlerini ve batch resolve'u yönetir
+- **Order Deadline Tracking** — Stok tükenme tarihi ve en geç sipariş tarihi hesaplar; teklif aşamasındaki miktarları (quoted) göz önünde bulundurur
+- **AI Risk Scoring** — Siparişleri Claude ile değerlendirir; yüksek riskli onayları operasyon özetine dahil eder
+- **Paraşüt Integration** — Onaylanan siparişleri muhasebe yazılımıyla senkronize eder
+
+**Stack:** Next.js 15 · TypeScript · Supabase (PostgreSQL + RLS) · Anthropic Claude API · Vitest
 
 ---
 
