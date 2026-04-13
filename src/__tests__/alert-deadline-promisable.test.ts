@@ -9,12 +9,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
-const mockDbListProducts          = vi.fn();
+const mockDbListAllActiveProducts = vi.fn();
 const mockDbGetOpenShortagesByProduct = vi.fn();
 const mockDbGetQuotedQuantities   = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts:              (...args: unknown[]) => mockDbListProducts(...args),
+    dbListAllActiveProducts:     (...args: unknown[]) => mockDbListAllActiveProducts(...args),
     dbGetOpenShortagesByProduct: () => mockDbGetOpenShortagesByProduct(),
     dbGetQuotedQuantities:       (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
 }));
@@ -107,7 +107,7 @@ describe("alert-service — order_deadline uses promisable (not available_now)",
             daily_usage: 10,
             lead_time_days: 5,
         });
-        mockDbListProducts.mockResolvedValue([product]);
+        mockDbListAllActiveProducts.mockResolvedValue([product]);
         mockDbGetQuotedQuantities.mockResolvedValue(new Map([["prod-1", 25]]));
 
         await serviceScanStockAlerts();
@@ -129,7 +129,7 @@ describe("alert-service — order_deadline uses promisable (not available_now)",
             daily_usage: 10,
             lead_time_days: 5,
         });
-        mockDbListProducts.mockResolvedValue([product]);
+        mockDbListAllActiveProducts.mockResolvedValue([product]);
         mockDbGetQuotedQuantities.mockResolvedValue(new Map()); // no quotes
 
         await serviceScanStockAlerts();
@@ -151,7 +151,7 @@ describe("alert-service — order_deadline uses promisable (not available_now)",
             daily_usage: 10,
             lead_time_days: 5,
         });
-        mockDbListProducts.mockResolvedValue([product]);
+        mockDbListAllActiveProducts.mockResolvedValue([product]);
         mockDbGetQuotedQuantities.mockResolvedValue(new Map([["prod-1", 185]]));
 
         await serviceScanStockAlerts();
@@ -173,7 +173,7 @@ describe("alert-service — order_deadline uses promisable (not available_now)",
             daily_usage: 10,
             lead_time_days: 5,
         });
-        mockDbListProducts.mockResolvedValue([product]);
+        mockDbListAllActiveProducts.mockResolvedValue([product]);
         mockDbGetQuotedQuantities.mockResolvedValue(new Map([["prod-1", 10]]));
 
         await serviceScanStockAlerts();

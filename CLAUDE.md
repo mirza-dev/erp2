@@ -1,26 +1,23 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-12_
+_Son güncelleme: 2026-04-13_
 
-**Son tamamlanan iş:** Faz 3 bug fix — hammadde eskime semantiği, boundCapital cost_price, finishedItems build-breaker, setState temizleme, E2E selector
-- `supabase/migrations/027_product_type_3way.sql` — `finished` → `manufactured` / `commercial` (is_for_purchase bazlı migrasyon)
-- `product_type` artık: `raw_material | manufactured | commercial`
-- Eskime raporu 3 tab: Hammadde, Mamul, Ticari Mal — her biri kendi hareket semantiği ve kolon başlıkları
-- Ticari mal son hareket: MAX(tedarik, satış) — üretim dahil değil
-- Ürün formu: 3 seçenekli dropdown + akıllı is_for_sales/is_for_purchase default'ları
-- Badge: 3 renk (manufactured=accent, commercial=success, raw_material=tertiary)
-- Satınalma önerileri: 4 filtre tab'ı
-- E2E: aging.spec.ts 3 tab testleri
+**Son tamamlanan iş:** Faz 4 timezone fix (2026-04-13)
+- `localISODate()` yardımcısı: `toISOString()` yerine `getDate()` (yerel TZ) — 00:00–02:59 UTC+3 drift düzeltildi
+- `computeOrderDeadline` + `dateDaysFromToday` + 4 call site `dateDaysFromToday()` ile tekleştirildi
+- Regresyon testleri: 00:30 yerel saat senaryosu eklendi
+- **Test:** 67 dosya · 1347 test geçiyor | Build: temiz
 
 **Önceki önemli işler:**
-- Stok Eskime Raporu v1 (aging.ts, üretim tarihleri, tip-bazlı eşikler)
+- Faz 3 Stok Eskime Raporu: hammadde semantiği, cost_price, 3-tab, E2E
+- product_type 3-yollu enum: `finished` → `manufactured` / `commercial`
 - Import Sistemi Yenileme + 7 Bug Fix, Ürün kullanım bayrakları (025, 026)
 - Geciken Sevkiyat Alertı, Teklif Uzatma, Teklif Kırılımı, demo mode
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** —
-**Test sayısı:** 67 dosya · 1338 test
+**Test sayısı:** 67 dosya · 1347 test
 
 ---
 

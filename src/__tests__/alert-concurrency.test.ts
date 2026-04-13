@@ -10,12 +10,12 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mocks ─────────────���───────────────────────────────────────────────────────
 
-const mockDbListProducts = vi.fn();
+const mockDbListAllActiveProducts = vi.fn();
 const mockDbGetOpenShortagesByProduct = vi.fn();
 const mockDbGetQuotedQuantities = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts:            (...args: unknown[]) => mockDbListProducts(...args),
+    dbListAllActiveProducts:   (...args: unknown[]) => mockDbListAllActiveProducts(...args),
     dbGetOpenShortagesByProduct: () => mockDbGetOpenShortagesByProduct(),
     dbGetQuotedQuantities:     (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
 }));
@@ -94,7 +94,7 @@ describe("dbCreateAlert null return — scan handles gracefully", () => {
             available_now: 3,
             min_stock_level: 10,
         });
-        mockDbListProducts.mockResolvedValue([criticalProduct]);
+        mockDbListAllActiveProducts.mockResolvedValue([criticalProduct]);
         mockDbCreateAlert.mockResolvedValue(null); // unique violation
 
         const result = await serviceScanStockAlerts();
@@ -110,7 +110,7 @@ describe("dbCreateAlert null return — scan handles gracefully", () => {
             available_now: 3,
             min_stock_level: 10,
         });
-        mockDbListProducts.mockResolvedValue([criticalProduct]);
+        mockDbListAllActiveProducts.mockResolvedValue([criticalProduct]);
         mockDbCreateAlert.mockResolvedValue({ id: "new-alert-id" });
 
         const result = await serviceScanStockAlerts();
@@ -123,7 +123,7 @@ describe("dbCreateAlert null return — scan handles gracefully", () => {
 
 describe("N+1 optimization — activeSet replaces per-product dbOpenAlertExists", () => {
     it("dbListActiveAlerts scan başında bir kere çağrılır", async () => {
-        mockDbListProducts.mockResolvedValue([
+        mockDbListAllActiveProducts.mockResolvedValue([
             makeProduct({ id: "p1" }),
             makeProduct({ id: "p2" }),
             makeProduct({ id: "p3" }),
@@ -141,7 +141,7 @@ describe("N+1 optimization — activeSet replaces per-product dbOpenAlertExists"
             available_now: 3,
             min_stock_level: 10,
         });
-        mockDbListProducts.mockResolvedValue([criticalProduct]);
+        mockDbListAllActiveProducts.mockResolvedValue([criticalProduct]);
         mockDbListActiveAlerts.mockResolvedValue([
             { type: "stock_critical", entity_id: "prod-existing", status: "open" },
         ]);
@@ -161,7 +161,7 @@ describe("N+1 optimization — activeSet replaces per-product dbOpenAlertExists"
             available_now: 3,
             min_stock_level: 10,
         });
-        mockDbListProducts.mockResolvedValue([criticalProduct]);
+        mockDbListAllActiveProducts.mockResolvedValue([criticalProduct]);
         mockDbListActiveAlerts.mockResolvedValue([]); // no existing alerts
 
         await serviceScanStockAlerts();
@@ -177,7 +177,7 @@ describe("N+1 optimization — activeSet replaces per-product dbOpenAlertExists"
 
 describe("Batch resolve — resolve calls collected and sent as one batch", () => {
     it("healthy products → batch resolve stock_critical + stock_risk + order_shortage entries", async () => {
-        mockDbListProducts.mockResolvedValue([
+        mockDbListAllActiveProducts.mockResolvedValue([
             makeProduct({ id: "p1" }),
             makeProduct({ id: "p2" }),
         ]);
@@ -204,7 +204,7 @@ describe("Batch resolve — resolve calls collected and sent as one batch", () =
             available_now: 3,
             min_stock_level: 10,
         });
-        mockDbListProducts.mockResolvedValue([criticalProduct]);
+        mockDbListAllActiveProducts.mockResolvedValue([criticalProduct]);
 
         await serviceScanStockAlerts();
 
@@ -218,7 +218,7 @@ describe("Batch resolve — resolve calls collected and sent as one batch", () =
     });
 
     it("batch resolve return value → result.resolved", async () => {
-        mockDbListProducts.mockResolvedValue([makeProduct()]);
+        mockDbListAllActiveProducts.mockResolvedValue([makeProduct()]);
         mockDbBatchResolveAlerts.mockResolvedValue(5);
 
         const result = await serviceScanStockAlerts();

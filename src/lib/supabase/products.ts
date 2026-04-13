@@ -67,6 +67,21 @@ export async function dbFindProductBySku(sku: string): Promise<ProductWithStock 
     return { ...data, available_now: data.on_hand - data.reserved };
 }
 
+/**
+ * Tüm aktif ürünleri pagination olmadan döner.
+ * Alert taraması gibi iç servis işlemlerinde kullanılır — UI pagination'ına uygun değil.
+ */
+export async function dbListAllActiveProducts(): Promise<ProductWithStock[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("is_active", true)
+        .order("name");
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(p => ({ ...p, available_now: p.on_hand - p.reserved }));
+}
+
 export async function dbListProducts(filter: ListProductsFilter = {}): Promise<ProductWithStock[]> {
     const supabase = createServiceClient();
     const { page = 1, pageSize = 100, category, product_type, is_active } = filter;
