@@ -73,8 +73,8 @@ function formatRelativeTime(iso: string): string {
 
 function coverageDaysColor(days: number | null): string {
     if (days === null) return "var(--text-tertiary)";
-    if (days < 7) return "var(--danger-text)";
-    if (days < 14) return "var(--warning-text)";
+    if (days <= 7) return "var(--danger-text)";
+    if (days <= 14) return "var(--warning-text)";
     return "var(--success-text)";
 }
 
@@ -1577,7 +1577,7 @@ export default function ProductsPage() {
                                                 const isOld = !isExpired && q.commercialStatus === "draft" &&
                                                     Date.now() - new Date(q.orderCreatedAt).getTime() > 7 * 86_400_000;
                                                 const daysRemaining = q.quoteValidUntil
-                                                    ? Math.ceil((new Date(q.quoteValidUntil).getTime() - Date.now()) / 86_400_000)
+                                                    ? dateDaysFromToday(q.quoteValidUntil)
                                                     : null;
                                                 return (
                                                     <a

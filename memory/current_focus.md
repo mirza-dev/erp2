@@ -6,7 +6,20 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-13):**
+**Son tamamlanan (2026-04-13 — Bulgular Fix):**
+
+1. **Alert metin tazeliği (Orta):**
+   - `alert-service.ts`: aynı severity'de `order_deadline` alert → `deadline_text_refresh` reason ile resolve+recreate
+   - "5 gün kaldı" → "4 gün kaldı" artık her scan'de güncelleniyor
+   - Yeni test: mevcut warning alert varken re-scan senaryosu
+
+2. **Renk sınırı tutarsızlığı (Düşük):**
+   - `products/page.tsx` tablo: `< 7` / `< 14` → `<= 7` / `<= 14` (drawer + `daysColor` ile hizalandı)
+   - 7 günlük deadline artık tabloda da kırmızı (eski: sarı); 14 gün sarı (eski: yeşil)
+
+**Test:** 67 dosya · 1348 test (1 yeni) — hepsi geçiyor | Build: temiz | Push: daf3edf
+
+**Önceki son tamamlanan (2026-04-13):**
 
 1. **Faz 4 bulgular — Tur 2 (timezone fix):**
    - `localISODate(ts)` yardımcısı: `toISOString()` yerine `getDate()` (yerel TZ) kullanır

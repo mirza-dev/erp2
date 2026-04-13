@@ -191,7 +191,6 @@ supabase/
 ### Okuma Sırası
 1. `README.md` (bu dosya) — kurulum ve ortam
 2. `domain-rules.md` — sistemin ne yapması/yapmaması gerektiğini anla
-3. `implementation-roadmap.md` — hangi fazlar tamamlandı, ne kaldı
 4. `src/lib/database.types.ts` — DB şemasını anlamak için
 5. `src/lib/api-mappers.ts` — DB ↔ frontend veri akışını anlamak için
 6. `CLAUDE.md` — kodlama kuralları ve mimari özet

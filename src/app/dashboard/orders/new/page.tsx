@@ -9,6 +9,7 @@ import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { dateDaysFromToday } from "@/lib/stock-utils";
 
 interface OrderLine {
     id: string;
@@ -683,7 +684,7 @@ function NewOrderForm() {
                             {quoteValidUntil && (
                                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
                                     {(() => {
-                                        const d = Math.ceil((new Date(quoteValidUntil).getTime() - Date.now()) / 86_400_000);
+                                        const d = dateDaysFromToday(quoteValidUntil);
                                         return d < 0
                                             ? <span style={{ color: "var(--danger-text)" }}>{Math.abs(d)} gün geçti</span>
                                             : `${d} gün kaldı`;

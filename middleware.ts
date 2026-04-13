@@ -11,6 +11,7 @@ const CRON_PATHS = [
     "/api/parasut/sync-all",
     "/api/orders/expire-quotes",
     "/api/orders/check-shipments",
+    "/api/seed",
 ];
 
 export async function middleware(request: NextRequest) {

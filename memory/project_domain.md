@@ -47,7 +47,7 @@ grandTotal = subtotal + vatTotal
 
 - `sales_orders.quote_valid_until date` — nullable, DB default yok
 - NULL = süresiz (expire olmaz)
-- Yeni sipariş formu default: bugün + 14 gün, `min=today` (geçmiş tarih girilemez)
+- Yeni sipariş formu default: bugün + 15 gün, `min=today` (geçmiş tarih girilemez)
 - `validateOrderCreate()` sunucu tarafında da geçmiş tarih reddeder
 - **Tarih karşılaştırma kuralı:** Her zaman string karşılaştırma kullan:
   ```ts
@@ -132,4 +132,4 @@ grandTotal = subtotal + vatTotal
 | 5+ | Teklif Kırılımı + bug fix (currency, promisable, email) |
 | 6+ | Teklif Süresi, Uzatma, Geciken Sevkiyat + bug fix'ler |
 
-Detay: `implementation-roadmap.md`
+Detay: `domain-rules.md`
