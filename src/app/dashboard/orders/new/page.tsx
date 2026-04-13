@@ -57,7 +57,7 @@ function NewOrderForm() {
     const [lines, setLines] = useState<OrderLine[]>([newLine()]);
     const [notes, setNotes] = useState("");
     const [quoteValidUntil, setQuoteValidUntil] = useState<string>(
-        new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10)
+        new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10)
     );
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitAttempted, setSubmitAttempted] = useState(false);

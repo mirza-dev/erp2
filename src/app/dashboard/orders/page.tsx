@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { dateDaysFromToday } from "@/lib/stock-utils";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral" },
@@ -375,19 +376,24 @@ function OrdersList() {
                                         <td style={{ ...tdStyle, textAlign: "center" }}>
                                             <span className={`badge ${commercial.cls}`}>{commercial.label}</span>
                                             {order.quoteValidUntil &&
-                                             order.quoteValidUntil < new Date().toISOString().slice(0, 10) &&
-                                             (order.commercial_status === "draft" || order.commercial_status === "pending_approval") && (
-                                                <span style={{
-                                                    display: "inline-block",
-                                                    fontSize: "9px", fontWeight: 700,
-                                                    padding: "1px 5px", borderRadius: "3px",
-                                                    background: "var(--danger-bg)", color: "var(--danger-text)",
-                                                    border: "0.5px solid var(--danger-border)",
-                                                    marginLeft: "4px",
-                                                }}>
-                                                    Süresi Doldu
-                                                </span>
-                                            )}
+                                             (order.commercial_status === "draft" || order.commercial_status === "pending_approval") && (() => {
+                                                const daysLeft = dateDaysFromToday(order.quoteValidUntil!);
+                                                const expired = daysLeft < 0;
+                                                const urgent = !expired && daysLeft <= 3;
+                                                return (
+                                                    <span style={{
+                                                        display: "inline-block",
+                                                        fontSize: "9px", fontWeight: 700,
+                                                        padding: "1px 5px", borderRadius: "3px",
+                                                        background: expired ? "var(--danger-bg)" : urgent ? "var(--warning-bg)" : "var(--bg-tertiary)",
+                                                        color: expired ? "var(--danger-text)" : urgent ? "var(--warning-text)" : "var(--text-secondary)",
+                                                        border: `0.5px solid ${expired ? "var(--danger-border)" : urgent ? "var(--warning-border)" : "var(--border-secondary)"}`,
+                                                        marginLeft: "4px",
+                                                    }}>
+                                                        {expired ? "Süresi Doldu" : `${daysLeft} gün kaldı`}
+                                                    </span>
+                                                );
+                                            })()}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "center" }}>
                                             {order.fulfillment_status !== "unallocated" && (
