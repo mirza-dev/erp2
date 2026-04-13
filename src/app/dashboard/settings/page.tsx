@@ -6,7 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import { isDemoMode } from "@/lib/demo-utils";
 
-type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
+type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka" | "demo";
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
@@ -559,6 +559,91 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
     );
 }
 
+// ─── Demo Hazırlık Tab ─────────────────────────────────────────────────────────
+function DemoTab() {
+    const { toast } = useToast();
+    const [step, setStep] = useState<"idle" | "deleting" | "seeding" | "scanning" | "done">("idle");
+
+    async function runFullSetup() {
+        setStep("deleting");
+        try {
+            const del = await fetch("/api/seed", { method: "DELETE" });
+            if (!del.ok) throw new Error("Silme başarısız: " + del.status);
+
+            setStep("seeding");
+            const seed = await fetch("/api/seed", { method: "POST" });
+            if (!seed.ok) throw new Error("Seed başarısız: " + seed.status);
+
+            setStep("scanning");
+            const scan = await fetch("/api/alerts/scan", { method: "POST" });
+            if (!scan.ok) throw new Error("Alert taraması başarısız: " + scan.status);
+
+            setStep("done");
+            toast({ type: "success", message: "PMT demo verisi yüklendi, alertlar oluşturuldu!" });
+        } catch (err) {
+            setStep("idle");
+            toast({ type: "error", message: err instanceof Error ? err.message : "Hata oluştu." });
+        }
+    }
+
+    const stepLabel = {
+        idle: null,
+        deleting: "Eski veriler temizleniyor…",
+        seeding: "PMT ürünleri ve müşterileri yükleniyor…",
+        scanning: "Alert taraması çalıştırılıyor…",
+        done: null,
+    }[step];
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div>
+                <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
+                    Demo Hazırlık
+                </div>
+                <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                    Mevcut tüm verileri siler ve PMT Endüstriyel demo verisini yükler.
+                    25 ürün, 7 müşteri ve demo alert senaryoları hazır gelir.
+                </div>
+            </div>
+
+            <div style={{
+                border: "0.5px solid var(--warning-border)",
+                borderRadius: "8px",
+                background: "var(--warning-bg)",
+                padding: "12px 16px",
+                fontSize: "12px",
+                color: "var(--warning-text)",
+            }}>
+                Dikkat: Mevcut tüm sipariş, ürün ve müşteri verileri silinir. Geri alınamaz.
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <Button
+                    variant="primary"
+                    size="md"
+                    onClick={runFullSetup}
+                    loading={step !== "idle" && step !== "done"}
+                    disabled={step !== "idle" && step !== "done"}
+                >
+                    {step === "done" ? "Tamamlandı — Tekrar Çalıştır" : "PMT Demo Verisini Yükle"}
+                </Button>
+
+                {stepLabel && (
+                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", paddingLeft: "2px" }}>
+                        {stepLabel}
+                    </div>
+                )}
+
+                {step === "done" && (
+                    <div style={{ fontSize: "12px", color: "var(--success-text)", paddingLeft: "2px" }}>
+                        Hazır. Dashboard'a git ve alertları gör.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 const AI_FETCH_TIMEOUT_MS = 8000;
 
 function AiTab() {
@@ -665,6 +750,7 @@ export default function SettingsPage() {
         { key: "bildirimler", label: "Bildirimler" },
         { key: "api", label: "API Anahtarları" },
         { key: "yapay-zeka", label: "Yapay Zeka" },
+        { key: "demo", label: "Demo Hazırlık" },
     ];
 
     const handleDirtyChange = (tab: Tab, isDirty: boolean) => {
@@ -752,6 +838,7 @@ export default function SettingsPage() {
                     {activeTab === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
                     {activeTab === "api" && <ApiTab />}
                     {activeTab === "yapay-zeka" && <AiTab />}
+                    {activeTab === "demo" && <DemoTab />}
                 </div>
             </div>
         </div>
