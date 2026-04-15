@@ -10,8 +10,17 @@
  *   IMMINENT deadline: Albrecht DN50 (3 gün kaldı — Almanya tedariki 45 gün!)
  *                      Kontrol Valfı DN65 (1 gün kaldı)
  */
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
+
+async function checkAuth(request: NextRequest): Promise<boolean> {
+    const secret = process.env.CRON_SECRET;
+    if (secret && request.headers.get("authorization") === `Bearer ${secret}`) return true;
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return !!user;
+}
 
 // ── Ürünler ──────────────────────────────────────────────────────────────────
 //
@@ -727,7 +736,10 @@ const SEED_CUSTOMERS = [
  * DELETE /api/seed — Tüm verileri siler (demo sıfırlama).
  * Silme sırası FK bağımlılıklarına göre ayarlandı.
  */
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+    if (!await checkAuth(request)) {
+        return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
+    }
     try {
         const supabase = createServiceClient();
 
@@ -975,7 +987,10 @@ const SEED_ORDERS: SeedOrder[] = [
 
 // ── Route Handler ──────────────────────────────────────────────────────────────
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+    if (!await checkAuth(request)) {
+        return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
+    }
     try {
         const supabase = createServiceClient();
 
