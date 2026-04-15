@@ -3,11 +3,10 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-13_
 
-**Son tamamlanan iş:** Bulgular Fix — alert metin tazeliği + renk tutarsızlığı (2026-04-13)
-- `alert-service.ts`: `order_deadline` aynı severity'de → `deadline_text_refresh` ile resolve+recreate (günlük metin tazeleме)
-- `products/page.tsx` tablo: `< 7` / `< 14` → `<= 7` / `<= 14` (drawer + `daysColor` ile hizalandı)
-- Yeni test: mevcut warning alert varken re-scan senaryosu
-- **Test:** 67 dosya · 1348 test geçiyor | Build: temiz
+**Son tamamlanan iş:** Kapsamlı Seed Data + "Nerede Kullanılıyor" bölümü (2026-04-14)
+- `seed/route.ts`: POST handler genişletildi — 15 sipariş, ~50 kalem, rezervasyonlar, shortages, 8 satınalma taahhüdü, 7 BOM, 10 üretim kaydı, sevkiyat/fatura/ödeme, sync logları, audit log
+- `products/page.tsx`: Drawer Block 1'e "Nerede Kullanılıyor?" bölümü eklendi (teklifler, rezerve, satınalma, alertler)
+- **Build:** temiz
 
 **Önceki önemli işler:**
 - Faz 3 Stok Eskime Raporu: hammadde semantiği, cost_price, 3-tab, E2E

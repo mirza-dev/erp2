@@ -1240,6 +1240,90 @@ export default function ProductsPage() {
                                             {product.productNotes}
                                         </div>
                                     )}
+
+                                    {/* Nerede Kullanılıyor? */}
+                                    {(() => {
+                                        const usageItems: Array<{ label: string; color: string }> = [];
+
+                                        // Teklifler (quotes = draft + pending_approval siparişlerdeki kalemler)
+                                        const pendingQuotes = quotes.filter(q => q.commercialStatus === "pending_approval");
+                                        const draftQuotes = quotes.filter(q => q.commercialStatus === "draft");
+
+                                        if (pendingQuotes.length > 0) {
+                                            const totalQty = pendingQuotes.reduce((s, q) => s + (q.quantity ?? 0), 0);
+                                            usageItems.push({
+                                                label: `${pendingQuotes.length} onay bekleyen siparişte · ${formatNumber(totalQty)} ${product.unit}`,
+                                                color: "var(--accent-text)",
+                                            });
+                                        }
+                                        if (draftQuotes.length > 0) {
+                                            const totalQty = draftQuotes.reduce((s, q) => s + (q.quantity ?? 0), 0);
+                                            usageItems.push({
+                                                label: `${draftQuotes.length} taslak teklifte · ${formatNumber(totalQty)} ${product.unit}`,
+                                                color: "var(--warning-text)",
+                                            });
+                                        }
+
+                                        // Rezerve (onaylı siparişler için ayrılmış)
+                                        if (product.reserved > 0) {
+                                            usageItems.push({
+                                                label: `${formatNumber(product.reserved)} ${product.unit} onaylı siparişlere rezerve`,
+                                                color: "var(--accent-text)",
+                                            });
+                                        }
+
+                                        // Satınalma bekliyor
+                                        if (commitments.length > 0) {
+                                            const totalQty = commitments.reduce((s, c) => s + (c.quantity ?? 0), 0);
+                                            usageItems.push({
+                                                label: `${commitments.length} satınalma bekliyor · ${formatNumber(totalQty)} ${product.unit}`,
+                                                color: "var(--success-text)",
+                                            });
+                                        }
+
+                                        // Aktif alertler
+                                        if (drawerAlerts.length > 0) {
+                                            const critCount = drawerAlerts.filter(a => a.severity === "critical").length;
+                                            const warnCount = drawerAlerts.filter(a => a.severity === "warning").length;
+                                            const parts = [];
+                                            if (critCount > 0) parts.push(`${critCount} kritik`);
+                                            if (warnCount > 0) parts.push(`${warnCount} uyarı`);
+                                            if (parts.length > 0) {
+                                                usageItems.push({
+                                                    label: `${parts.join(", ")} alert aktif`,
+                                                    color: critCount > 0 ? "var(--danger-text)" : "var(--warning-text)",
+                                                });
+                                            }
+                                        }
+
+                                        if (usageItems.length === 0) return null;
+
+                                        return (
+                                            <div style={{ marginTop: "12px" }}>
+                                                <div style={{
+                                                    fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
+                                                    textTransform: "uppercase", letterSpacing: "0.04em",
+                                                    marginBottom: "6px",
+                                                }}>
+                                                    Nerede Kullanılıyor?
+                                                </div>
+                                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                                    {usageItems.map((item, i) => (
+                                                        <div key={i} style={{
+                                                            display: "flex", alignItems: "center", gap: "6px",
+                                                            fontSize: "12px", color: "var(--text-secondary)",
+                                                        }}>
+                                                            <span style={{
+                                                                width: "5px", height: "5px", borderRadius: "50%",
+                                                                background: item.color, flexShrink: 0,
+                                                            }} />
+                                                            {item.label}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* ── Block 2: Operasyonel Durum ───────────────── */}

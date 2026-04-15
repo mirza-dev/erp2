@@ -770,11 +770,215 @@ export async function DELETE() {
     }
 }
 
+// ── Date Helpers ─────────────────────────────────────────────────────────────
+
+const _today = new Date();
+const daysAgo = (n: number) => new Date(_today.getTime() - n * 86_400_000).toISOString().slice(0, 10);
+const daysLater = (n: number) => new Date(_today.getTime() + n * 86_400_000).toISOString().slice(0, 10);
+const daysAgoISO = (n: number) => new Date(_today.getTime() - n * 86_400_000).toISOString();
+const todayStr = _today.toISOString().slice(0, 10);
+
+// ── Sipariş Tanımları ────────────────────────────────────────────────────────
+// Her sipariş: müşteri adı, durumlar, tarihler, kalemler (SKU + miktar + fiyat + iskonto)
+// Hesaplama: lineTotal = qty * unitPrice * (1 - disc/100), subtotal = sum, vat = 0.20, grand = sub + vat
+
+interface SeedOrderLine {
+    sku: string;
+    qty: number;
+    price: number;
+    disc: number; // iskonto %
+}
+
+interface SeedOrder {
+    orderNumber: string;
+    customerName: string;
+    commercial: "draft" | "pending_approval" | "approved" | "cancelled";
+    fulfillment: "unallocated" | "partially_allocated" | "allocated" | "partially_shipped" | "shipped";
+    currency: string;
+    createdDaysAgo: number;
+    quoteValidUntil?: string | null;
+    plannedShipmentDate?: string | null;
+    aiRisk?: "low" | "medium" | "high" | null;
+    aiConfidence?: number | null;
+    aiReason?: string | null;
+    parasutInvoiceId?: string | null;
+    parasutSentAt?: string | null;
+    parasutError?: string | null;
+    notes?: string | null;
+    lines: SeedOrderLine[];
+}
+
+const SEED_ORDERS: SeedOrder[] = [
+    // 1. Draft — Tüpraş — geçerli teklif
+    {
+        orderNumber: "ORD-2026-0001", customerName: "Tüpraş İzmit Rafinerisi",
+        commercial: "draft", fulfillment: "unallocated", currency: "USD", createdDaysAgo: 2,
+        quoteValidUntil: daysLater(15), notes: "Rafineri bakım dönemi siparişi",
+        lines: [
+            { sku: "KV-3P-DN50-PN40-CF8M", qty: 20, price: 780, disc: 5 },
+            { sku: "SV-F5-DN150-300LB-WCB", qty: 8, price: 2400, disc: 0 },
+            { sku: "CT-SS-DN50-PN40-GRF", qty: 200, price: 42, disc: 10 },
+        ],
+    },
+    // 2. Draft — BOTAŞ — süresi DOLMUŞ teklif
+    {
+        orderNumber: "ORD-2026-0002", customerName: "BOTAŞ Boru Hatları ve Petrol Taşıma A.Ş.",
+        commercial: "draft", fulfillment: "unallocated", currency: "USD", createdDaysAgo: 18,
+        quoteValidUntil: daysAgo(1),
+        lines: [
+            { sku: "KB-WT-DN150-PN16-CF8", qty: 30, price: 580, disc: 0 },
+            { sku: "CV-SW-DN80-PN16-WCB", qty: 15, price: 680, disc: 5 },
+        ],
+    },
+    // 3. Draft — Petkim — süresiz
+    {
+        orderNumber: "ORD-2026-0003", customerName: "Petkim Petrokimya A.Ş.",
+        commercial: "draft", fulfillment: "unallocated", currency: "USD", createdDaysAgo: 5,
+        lines: [
+            { sku: "KV-2P-DN25-PN16-CF8", qty: 50, price: 320, disc: 8 },
+            { sku: "BE-SC-M24x100-B7", qty: 500, price: 18, disc: 0 },
+        ],
+    },
+    // 4. Pending Approval — Enerjisa — 2 gün kaldı
+    {
+        orderNumber: "ORD-2026-0004", customerName: "Enerjisa Üretim Santralleri",
+        commercial: "pending_approval", fulfillment: "unallocated", currency: "USD", createdDaysAgo: 8,
+        quoteValidUntil: daysLater(2), aiRisk: "low", aiConfidence: 0.91, aiReason: "Düşük risk — düzenli müşteri, standart kalemler",
+        lines: [
+            { sku: "SV-F4-DN200-PN40-WCB", qty: 5, price: 3800, disc: 0 },
+            { sku: "FT-YF-DN80-PN40-WCB", qty: 10, price: 750, disc: 5 },
+            { sku: "CT-SS-DN50-PN40-GRF", qty: 100, price: 42, disc: 0 },
+        ],
+    },
+    // 5. Pending Approval — AKSA — süresi 3 gün önce DOLMUŞ → alert
+    {
+        orderNumber: "ORD-2026-0005", customerName: "AKSA Akrilik Kimya San. A.Ş.",
+        commercial: "pending_approval", fulfillment: "unallocated", currency: "USD", createdDaysAgo: 20,
+        quoteValidUntil: daysAgo(3), aiRisk: "medium", aiConfidence: 0.74, aiReason: "Orta risk — teklif süresi dolmuş, fiyat güncellemesi gerekebilir",
+        lines: [
+            { sku: "KV-DB-DN100-600LB-CF8M", qty: 3, price: 4800, disc: 0 },
+            { sku: "IK-E-DN80-PN16", qty: 12, price: 380, disc: 10 },
+        ],
+    },
+    // 6. Approved + Allocated — Tüpraş — sevke hazır
+    {
+        orderNumber: "ORD-2026-0006", customerName: "Tüpraş İzmit Rafinerisi",
+        commercial: "approved", fulfillment: "allocated", currency: "USD", createdDaysAgo: 7,
+        plannedShipmentDate: daysLater(3), aiRisk: "low", aiConfidence: 0.95,
+        lines: [
+            { sku: "KV-2P-DN25-PN16-CF8", qty: 30, price: 320, disc: 5 },
+            { sku: "CT-PTFE-DN80-PN16", qty: 100, price: 28, disc: 0 },
+            { sku: "BE-BK-DN80", qty: 20, price: 35, disc: 0 },
+        ],
+    },
+    // 7. Approved + Partially Allocated — BOTAŞ — bazı kalemler eksik → shortage
+    {
+        orderNumber: "ORD-2026-0007", customerName: "BOTAŞ Boru Hatları ve Petrol Taşıma A.Ş.",
+        commercial: "approved", fulfillment: "partially_allocated", currency: "USD", createdDaysAgo: 5,
+        plannedShipmentDate: daysLater(10),
+        lines: [
+            { sku: "KV-DB-DN100-600LB-CF8M", qty: 8, price: 4800, disc: 0 },  // Kritik stok — shortage!
+            { sku: "FT-BT-DN100-PN40-CF8M", qty: 10, price: 1450, disc: 0 },  // Kritik stok — shortage!
+            { sku: "SV-F5-DN150-300LB-WCB", qty: 5, price: 2400, disc: 5 },   // Yeterli stok
+        ],
+    },
+    // 8. Approved + Unallocated — Petkim — 12 gün önce → overdue_shipment
+    {
+        orderNumber: "ORD-2026-0008", customerName: "Petkim Petrokimya A.Ş.",
+        commercial: "approved", fulfillment: "unallocated", currency: "USD", createdDaysAgo: 12,
+        notes: "Acil sipariş — stok bekleniyor",
+        lines: [
+            { sku: "AA-SOV-DN80-PN40", qty: 4, price: 4200, disc: 0 },  // Kritik stok
+            { sku: "AA-SOV-DN50-PN40", qty: 6, price: 2850, disc: 5 },
+        ],
+    },
+    // 9. Approved + Partially Shipped — Ülker
+    {
+        orderNumber: "ORD-2026-0009", customerName: "Ülker Gıda San. ve Tic. A.Ş.",
+        commercial: "approved", fulfillment: "partially_shipped", currency: "TRY", createdDaysAgo: 15,
+        plannedShipmentDate: daysAgo(3),
+        lines: [
+            { sku: "KV-2P-DN25-PN16-CF8", qty: 40, price: 10500, disc: 0 },   // TRY fiyat
+            { sku: "CT-PTFE-DN80-PN16", qty: 200, price: 920, disc: 5 },
+            { sku: "CV-LT-DN50-PN40-CF8M", qty: 10, price: 17000, disc: 0 },
+        ],
+    },
+    // 10. Approved + Shipped — Abdi İbrahim — Paraşüt sync OK
+    {
+        orderNumber: "ORD-2026-0010", customerName: "Abdi İbrahim İlaç San. ve Tic. A.Ş.",
+        commercial: "approved", fulfillment: "shipped", currency: "EUR", createdDaysAgo: 25,
+        parasutInvoiceId: "INV-2026-0087", parasutSentAt: daysAgoISO(20),
+        aiRisk: "low", aiConfidence: 0.88,
+        lines: [
+            { sku: "KV-3P-DN50-PN40-CF8M", qty: 10, price: 720, disc: 0 },
+            { sku: "CT-PTFE-DN80-PN16", qty: 150, price: 26, disc: 0 },
+            { sku: "CV-LT-DN50-PN40-CF8M", qty: 5, price: 480, disc: 5 },
+        ],
+    },
+    // 11. Approved + Shipped — Enerjisa — Paraşüt sync HATALI
+    {
+        orderNumber: "ORD-2026-0011", customerName: "Enerjisa Üretim Santralleri",
+        commercial: "approved", fulfillment: "shipped", currency: "USD", createdDaysAgo: 22,
+        parasutError: "Müşteri Paraşüt'te bulunamadı — eşleşme hatası",
+        lines: [
+            { sku: "SV-F5-DN150-300LB-WCB", qty: 12, price: 2400, disc: 3 },
+            { sku: "GV-KN-DN65-PN40-WCB", qty: 8, price: 960, disc: 0 },
+        ],
+    },
+    // 12. Approved + Allocated — AKSA — overdue (planned_shipment geçmiş)
+    {
+        orderNumber: "ORD-2026-0012", customerName: "AKSA Akrilik Kimya San. A.Ş.",
+        commercial: "approved", fulfillment: "allocated", currency: "USD", createdDaysAgo: 14,
+        plannedShipmentDate: daysAgo(5),
+        lines: [
+            { sku: "KV-3P-DN80-300LB-WCB", qty: 6, price: 1250, disc: 0 },
+            { sku: "CT-AF-DN100-PN40", qty: 80, price: 55, disc: 5 },
+            { sku: "IK-D-DN100-PN16-OR", qty: 8, price: 490, disc: 0 },
+        ],
+    },
+    // 13. Cancelled — Tüpraş
+    {
+        orderNumber: "ORD-2026-0013", customerName: "Tüpraş İzmit Rafinerisi",
+        commercial: "cancelled", fulfillment: "unallocated", currency: "USD", createdDaysAgo: 30,
+        notes: "Müşteri tarafından iptal edildi — bütçe kesintisi",
+        lines: [
+            { sku: "KB-LG-DN200-PN16-WCB", qty: 10, price: 920, disc: 0 },
+            { sku: "CV-CK-DN200-PN16-WCB", qty: 5, price: 2200, disc: 0 },
+        ],
+    },
+    // 14. Cancelled — Ülker
+    {
+        orderNumber: "ORD-2026-0014", customerName: "Ülker Gıda San. ve Tic. A.Ş.",
+        commercial: "cancelled", fulfillment: "unallocated", currency: "TRY", createdDaysAgo: 35,
+        lines: [
+            { sku: "KV-2P-DN25-PN16-CF8", qty: 20, price: 10500, disc: 10 },
+        ],
+    },
+    // 15. Approved + Allocated — Petkim — AI risk=high, büyük sipariş
+    {
+        orderNumber: "ORD-2026-0015", customerName: "Petkim Petrokimya A.Ş.",
+        commercial: "approved", fulfillment: "allocated", currency: "USD", createdDaysAgo: 3,
+        plannedShipmentDate: daysLater(7),
+        aiRisk: "high", aiConfidence: 0.82, aiReason: "Yüksek tutar — toplam $120K+ sipariş, son 6 ayın en büyüğü. Stok yeterliliği doğrulanmalı.",
+        lines: [
+            { sku: "KV-DB-DN100-600LB-CF8M", qty: 5, price: 4800, disc: 3 },
+            { sku: "SV-F4-DN200-PN40-WCB", qty: 8, price: 3800, disc: 0 },
+            { sku: "CV-KV-DN65-PN40-CF8M", qty: 6, price: 3200, disc: 0 },
+            { sku: "FT-BT-DN100-PN40-CF8M", qty: 4, price: 1450, disc: 5 },
+            { sku: "AA-SOV-DN50-PN40", qty: 10, price: 2850, disc: 0 },
+        ],
+    },
+];
+
+// ── Route Handler ──────────────────────────────────────────────────────────────
+
 export async function POST() {
     try {
         const supabase = createServiceClient();
 
-        // Products: upsert on SKU (safe to re-run)
+        // ════════════════════════════════════════════════════════════
+        // 1. Products: upsert on SKU
+        // ════════════════════════════════════════════════════════════
         const { error: pErr } = await supabase
             .from("products")
             .upsert(
@@ -783,7 +987,14 @@ export async function POST() {
             );
         if (pErr) throw new Error("Products: " + pErr.message);
 
-        // Customers: insert only if table is empty (preserves real data)
+        // Build SKU→ID map
+        const { data: allProducts } = await supabase.from("products").select("id, sku, name");
+        const skuMap = new Map<string, { id: string; name: string }>();
+        for (const p of allProducts ?? []) skuMap.set(p.sku, { id: p.id, name: p.name });
+
+        // ════════════════════════════════════════════════════════════
+        // 2. Customers: insert only if empty
+        // ════════════════════════════════════════════════════════════
         const { count: cCount } = await supabase
             .from("customers")
             .select("*", { count: "exact", head: true });
@@ -796,20 +1007,612 @@ export async function POST() {
             customersSeeded = SEED_CUSTOMERS.length;
         }
 
+        // Build customer name→row map
+        const { data: allCustomers } = await supabase.from("customers").select("id, name, email, country, tax_office, tax_number");
+        const custMap = new Map<string, { id: string; email: string | null; country: string | null; tax_office: string | null; tax_number: string | null }>();
+        for (const c of allCustomers ?? []) custMap.set(c.name, { id: c.id, email: c.email, country: c.country, tax_office: c.tax_office, tax_number: c.tax_number });
+
+        // ════════════════════════════════════════════════════════════
+        // 3. Sales Orders
+        // ════════════════════════════════════════════════════════════
+        const orderRows = SEED_ORDERS.map(o => {
+            const cust = custMap.get(o.customerName);
+            // Calculate totals from lines
+            const lineTotals = o.lines.map(l => l.qty * l.price * (1 - l.disc / 100));
+            const subtotal = lineTotals.reduce((a, b) => a + b, 0);
+            const vatTotal = Math.round(subtotal * 0.20 * 100) / 100;
+            const grandTotal = Math.round((subtotal + vatTotal) * 100) / 100;
+
+            return {
+                order_number: o.orderNumber,
+                customer_id: cust?.id ?? null,
+                customer_name: o.customerName,
+                customer_email: cust?.email ?? null,
+                customer_country: cust?.country ?? null,
+                customer_tax_office: cust?.tax_office ?? null,
+                customer_tax_number: cust?.tax_number ?? null,
+                commercial_status: o.commercial,
+                fulfillment_status: o.fulfillment,
+                currency: o.currency,
+                subtotal: Math.round(subtotal * 100) / 100,
+                vat_total: vatTotal,
+                grand_total: grandTotal,
+                item_count: o.lines.length,
+                notes: o.notes ?? null,
+                quote_valid_until: o.quoteValidUntil ?? null,
+                planned_shipment_date: o.plannedShipmentDate ?? null,
+                ai_risk_level: o.aiRisk ?? null,
+                ai_confidence: o.aiConfidence ?? null,
+                ai_reason: o.aiReason ?? null,
+                parasut_invoice_id: o.parasutInvoiceId ?? null,
+                parasut_sent_at: o.parasutSentAt ?? null,
+                parasut_error: o.parasutError ?? null,
+                created_at: daysAgoISO(o.createdDaysAgo),
+            };
+        });
+
+        const { data: insertedOrders, error: oErr } = await supabase
+            .from("sales_orders")
+            .insert(orderRows)
+            .select("id, order_number");
+        if (oErr) throw new Error("Orders: " + oErr.message);
+
+        // order_number → id map
+        const orderIdMap = new Map<string, string>();
+        for (const o of insertedOrders ?? []) orderIdMap.set(o.order_number, o.id);
+
+        // Update order_counters so future generated numbers don't collide
+        await supabase.from("order_counters").upsert(
+            { year: 2026, last_seq: SEED_ORDERS.length },
+            { onConflict: "year" }
+        );
+
+        // ════════════════════════════════════════════════════════════
+        // 4. Order Lines
+        // ════════════════════════════════════════════════════════════
+        const lineRows: Array<Record<string, unknown>> = [];
+        for (const o of SEED_ORDERS) {
+            const orderId = orderIdMap.get(o.orderNumber);
+            if (!orderId) continue;
+            o.lines.forEach((l, idx) => {
+                const prod = skuMap.get(l.sku);
+                if (!prod) return;
+                lineRows.push({
+                    order_id: orderId,
+                    product_id: prod.id,
+                    product_name: prod.name,
+                    product_sku: l.sku,
+                    unit: "adet",
+                    quantity: l.qty,
+                    unit_price: l.price,
+                    discount_pct: l.disc,
+                    line_total: Math.round(l.qty * l.price * (1 - l.disc / 100) * 100) / 100,
+                    sort_order: idx + 1,
+                });
+            });
+        }
+
+        const { data: insertedLines, error: lErr } = await supabase
+            .from("order_lines")
+            .insert(lineRows)
+            .select("id, order_id, product_id, quantity");
+        if (lErr) throw new Error("Order Lines: " + lErr.message);
+
+        // ════════════════════════════════════════════════════════════
+        // 5. Stock Reservations (approved + allocated/shipped siparişler)
+        // ════════════════════════════════════════════════════════════
+        const reservationRows: Array<Record<string, unknown>> = [];
+        // Track per-product reserved totals for later sync
+        const productReservedQty = new Map<string, number>();
+
+        const approvedOrders = SEED_ORDERS.filter(o => o.commercial === "approved");
+        for (const o of approvedOrders) {
+            const orderId = orderIdMap.get(o.orderNumber);
+            if (!orderId) continue;
+            const orderLines = (insertedLines ?? []).filter(l => l.order_id === orderId);
+
+            for (const ol of orderLines) {
+                // Determine reservation status based on fulfillment
+                let resStatus: "open" | "shipped" = "open";
+                if (o.fulfillment === "shipped") resStatus = "shipped";
+
+                // For partially_allocated: only reserve part of critical-stock items
+                let reserveQty = ol.quantity;
+                if (o.fulfillment === "partially_allocated") {
+                    // Check if this is a critical-stock product
+                    const seedProd = SEED_PRODUCTS.find(p => {
+                        const prod = skuMap.get(p.sku);
+                        return prod?.id === ol.product_id;
+                    });
+                    if (seedProd) {
+                        const avail = seedProd.on_hand - seedProd.reserved;
+                        if (avail < ol.quantity) {
+                            reserveQty = Math.max(0, avail); // Reserve what's available
+                        }
+                    }
+                }
+                // For unallocated orders (overdue), no reservations
+                if (o.fulfillment === "unallocated") continue;
+
+                // For partially_shipped: first half shipped, rest open
+                if (o.fulfillment === "partially_shipped") {
+                    const shippedQty = Math.ceil(ol.quantity / 2);
+                    const openQty = ol.quantity - shippedQty;
+                    if (shippedQty > 0) {
+                        reservationRows.push({
+                            product_id: ol.product_id,
+                            order_id: orderId,
+                            order_line_id: ol.id,
+                            reserved_qty: shippedQty,
+                            status: "shipped",
+                        });
+                    }
+                    if (openQty > 0) {
+                        reservationRows.push({
+                            product_id: ol.product_id,
+                            order_id: orderId,
+                            order_line_id: ol.id,
+                            reserved_qty: openQty,
+                            status: "open",
+                        });
+                        productReservedQty.set(ol.product_id, (productReservedQty.get(ol.product_id) ?? 0) + openQty);
+                    }
+                    continue;
+                }
+
+                if (reserveQty > 0) {
+                    reservationRows.push({
+                        product_id: ol.product_id,
+                        order_id: orderId,
+                        order_line_id: ol.id,
+                        reserved_qty: reserveQty,
+                        status: resStatus,
+                    });
+                    if (resStatus === "open") {
+                        productReservedQty.set(ol.product_id, (productReservedQty.get(ol.product_id) ?? 0) + reserveQty);
+                    }
+                }
+            }
+        }
+
+        if (reservationRows.length > 0) {
+            const { error: rErr } = await supabase.from("stock_reservations").insert(reservationRows);
+            if (rErr) throw new Error("Reservations: " + rErr.message);
+        }
+
+        // Sync products.reserved with actual open reservation totals
+        for (const [productId, totalReserved] of productReservedQty) {
+            await supabase.from("products").update({ reserved: totalReserved }).eq("id", productId);
+        }
+        // Products with no open reservations → reset to 0 (seed had hardcoded values)
+        const productsWithReservations = new Set(productReservedQty.keys());
+        for (const p of allProducts ?? []) {
+            if (!productsWithReservations.has(p.id)) {
+                await supabase.from("products").update({ reserved: 0 }).eq("id", p.id);
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 6. Shortages (partially_allocated sipariş — eksik kalemler)
+        // ════════════════════════════════════════════════════════════
+        const shortageRows: Array<Record<string, unknown>> = [];
+        // Order 7 is partially_allocated
+        const order7Id = orderIdMap.get("ORD-2026-0007");
+        if (order7Id) {
+            const o7lines = (insertedLines ?? []).filter(l => l.order_id === order7Id);
+            for (const ol of o7lines) {
+                const seedProd = SEED_PRODUCTS.find(p => skuMap.get(p.sku)?.id === ol.product_id);
+                if (!seedProd) continue;
+                const avail = seedProd.on_hand - seedProd.reserved;
+                if (avail < ol.quantity) {
+                    shortageRows.push({
+                        order_id: order7Id,
+                        order_line_id: ol.id,
+                        product_id: ol.product_id,
+                        requested_qty: ol.quantity,
+                        available_qty: Math.max(0, avail),
+                        shortage_qty: ol.quantity - Math.max(0, avail),
+                        status: "open",
+                    });
+                }
+            }
+        }
+        if (shortageRows.length > 0) {
+            const { error: sErr } = await supabase.from("shortages").insert(shortageRows);
+            if (sErr) throw new Error("Shortages: " + sErr.message);
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 7. Purchase Commitments
+        // ════════════════════════════════════════════════════════════
+        const commitmentData = [
+            { sku: "KV-DB-DN100-600LB-CF8M", qty: 15, date: daysLater(18), supplier: "PMT Amasya Fabrikası", status: "pending", notes: "Acil tedarik — Çift Blok sipariş yoğunluğu" },
+            { sku: "FT-BT-DN100-PN40-CF8M", qty: 20, date: daysLater(14), supplier: "PMT Amasya Fabrikası", status: "pending", notes: "Basket filtre kritik stok takviyesi" },
+            { sku: "AA-SOV-DN80-PN40", qty: 15, date: daysLater(50), supplier: "Albrecht-Automatik GmbH", status: "pending", notes: "Almanya tedarik — 45 gün transit" },
+            { sku: "CT-SS-DN50-PN40-GRF", qty: 1000, date: daysLater(5), supplier: "Garlock Türkiye", status: "pending", notes: null },
+            { sku: "BE-SC-M24x100-B7", qty: 2000, date: daysLater(3), supplier: "Bulonsan", status: "pending", notes: null },
+            { sku: "KV-3P-DN80-300LB-WCB", qty: 50, date: daysAgo(10), supplier: "PMT Amasya Fabrikası", status: "received", notes: "Teslim alındı — stok güncellendi" },
+            { sku: "KB-WT-DN150-PN16-CF8", qty: 80, date: daysAgo(5), supplier: "PMT Amasya Fabrikası", status: "received", notes: "Teslim alındı" },
+            { sku: "CV-KV-DN65-PN40-CF8M", qty: 20, date: daysAgo(20), supplier: "PMT Amasya Fabrikası", status: "cancelled", notes: "İptal — tedarikçi fiyat artırdı" },
+        ] as const;
+
+        const commitRows = commitmentData.map(c => ({
+            product_id: skuMap.get(c.sku)?.id,
+            quantity: c.qty,
+            expected_date: c.date,
+            supplier_name: c.supplier,
+            status: c.status,
+            notes: c.notes,
+            received_at: c.status === "received" ? c.date : null,
+        })).filter(c => c.product_id);
+
+        if (commitRows.length > 0) {
+            const { error: pcErr } = await supabase.from("purchase_commitments").insert(commitRows);
+            if (pcErr) throw new Error("Purchase Commitments: " + pcErr.message);
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 8. Bills of Materials
+        // ════════════════════════════════════════════════════════════
+        const bomData = [
+            // 3P Küresel DN50 → conta + saplama
+            { finished: "KV-3P-DN50-PN40-CF8M", component: "CT-SS-DN50-PN40-GRF", qty: 1, unit: "adet", notes: "Ana gövde contası" },
+            { finished: "KV-3P-DN50-PN40-CF8M", component: "BE-SC-M24x100-B7", qty: 4, unit: "adet", notes: "Flanş bağlantı saplamalar" },
+            // Wafer Kelebek DN150 → conta + saplama + kelepçe
+            { finished: "KB-WT-DN150-PN16-CF8", component: "CT-PTFE-DN80-PN16", qty: 1, unit: "adet", notes: "Disk contası" },
+            { finished: "KB-WT-DN150-PN16-CF8", component: "BE-SC-M24x100-B7", qty: 6, unit: "adet", notes: "Gövde saplamalar" },
+            { finished: "KB-WT-DN150-PN16-CF8", component: "BE-BK-DN80", qty: 1, unit: "adet", notes: "Ara boru kelepçesi" },
+            // Kontrol Valfı DN65 → conta + saplama
+            { finished: "CV-KV-DN65-PN40-CF8M", component: "CT-SS-DN50-PN40-GRF", qty: 1, unit: "adet", notes: "Gövde contası" },
+            { finished: "CV-KV-DN65-PN40-CF8M", component: "BE-SC-M24x100-B7", qty: 2, unit: "adet", notes: "Bonnet saplamalar" },
+        ];
+
+        const bomRows = bomData.map(b => ({
+            finished_product_id: skuMap.get(b.finished)?.id,
+            component_product_id: skuMap.get(b.component)?.id,
+            quantity: b.qty,
+            unit: b.unit,
+            notes: b.notes,
+        })).filter(b => b.finished_product_id && b.component_product_id);
+
+        if (bomRows.length > 0) {
+            const { error: bErr } = await supabase.from("bills_of_materials").insert(bomRows);
+            if (bErr) throw new Error("BOM: " + bErr.message);
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 9. Production Entries
+        // ════════════════════════════════════════════════════════════
+        const prodEntries = [
+            { sku: "KV-3P-DN50-PN40-CF8M", qty: 30, scrap: 0, date: todayStr, notes: "Sabah vardiyası — tam verimlilik" },
+            { sku: "CV-SW-DN80-PN16-WCB", qty: 15, scrap: 1, date: todayStr, notes: "1 adet döküm hatası — fire" },
+            { sku: "KB-WT-DN150-PN16-CF8", qty: 20, scrap: 0, date: todayStr, notes: "Acil sipariş üretimi" },
+            { sku: "SV-F5-DN150-300LB-WCB", qty: 10, scrap: 0, date: daysAgo(1), notes: null },
+            { sku: "KV-2P-DN25-PN16-CF8", qty: 40, scrap: 2, date: daysAgo(2), notes: "2 adet yüzey işleme hatası" },
+            { sku: "KB-LG-DN200-PN16-WCB", qty: 8, scrap: 0, date: daysAgo(3), notes: null },
+            { sku: "GV-KN-DN65-PN40-WCB", qty: 12, scrap: 0, date: daysAgo(5), notes: null },
+            { sku: "CV-CK-DN200-PN16-WCB", qty: 5, scrap: 0, date: daysAgo(7), notes: null },
+            { sku: "CV-KV-DN65-PN40-CF8M", qty: 8, scrap: 1, date: daysAgo(10), notes: "1 adet kalibrasyon dışı — fire" },
+            { sku: "KV-3P-DN80-300LB-WCB", qty: 25, scrap: 0, date: daysAgo(14), notes: null },
+        ];
+
+        const prodRows = prodEntries.map(e => {
+            const prod = skuMap.get(e.sku);
+            return prod ? {
+                product_id: prod.id,
+                product_name: prod.name,
+                product_sku: e.sku,
+                produced_qty: e.qty,
+                scrap_qty: e.scrap,
+                waste_reason: e.scrap > 0 ? e.notes : null,
+                production_date: e.date,
+                notes: e.notes,
+            } : null;
+        }).filter(Boolean);
+
+        let productionSeeded = 0;
+        if (prodRows.length > 0) {
+            const { error: peErr } = await supabase.from("production_entries").insert(prodRows);
+            if (peErr) throw new Error("Production: " + peErr.message);
+            productionSeeded = prodRows.length;
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 10. Inventory Movements
+        // ════════════════════════════════════════════════════════════
+        const movementRows: Array<Record<string, unknown>> = [];
+
+        // Production movements (positive)
+        for (const e of prodEntries) {
+            const prod = skuMap.get(e.sku);
+            if (!prod) continue;
+            movementRows.push({
+                product_id: prod.id,
+                movement_type: "production",
+                quantity: e.qty,
+                reference_type: "production_entry",
+                notes: `Üretim: ${e.qty} adet ${prod.name}`,
+                occurred_at: e.date + "T08:00:00Z",
+                source: "system",
+            });
+        }
+
+        // Receipt movements (received purchase commitments)
+        for (const c of commitmentData) {
+            if (c.status !== "received") continue;
+            const prod = skuMap.get(c.sku);
+            if (!prod) continue;
+            movementRows.push({
+                product_id: prod.id,
+                movement_type: "receipt",
+                quantity: c.qty,
+                reference_type: "purchase_commitment",
+                notes: `Tedarik teslimi: ${c.supplier} — ${c.qty} adet`,
+                occurred_at: c.date + "T10:00:00Z",
+                source: "system",
+            });
+        }
+
+        // Shipment movements for shipped orders (negative)
+        const shippedOrders = SEED_ORDERS.filter(o => o.fulfillment === "shipped" || o.fulfillment === "partially_shipped");
+        for (const o of shippedOrders) {
+            for (const l of o.lines) {
+                const prod = skuMap.get(l.sku);
+                if (!prod) continue;
+                const qty = o.fulfillment === "partially_shipped" ? Math.ceil(l.qty / 2) : l.qty;
+                movementRows.push({
+                    product_id: prod.id,
+                    movement_type: "shipment",
+                    quantity: -qty,
+                    reference_type: "sales_order",
+                    reference_id: orderIdMap.get(o.orderNumber),
+                    notes: `Sevkiyat: ${o.orderNumber} — ${qty} adet ${prod.name}`,
+                    occurred_at: daysAgoISO(o.createdDaysAgo - 5),
+                    source: "system",
+                });
+            }
+        }
+
+        // Manual adjustments
+        const adjSku1 = skuMap.get("CT-SS-DN50-PN40-GRF");
+        const adjSku2 = skuMap.get("BE-SC-M24x100-B7");
+        if (adjSku1) {
+            movementRows.push({
+                product_id: adjSku1.id,
+                movement_type: "adjustment",
+                quantity: -50,
+                notes: "Sayım düzeltmesi — depoda 50 adet eksik tespit edildi",
+                occurred_at: daysAgoISO(8),
+                source: "ui",
+            });
+        }
+        if (adjSku2) {
+            movementRows.push({
+                product_id: adjSku2.id,
+                movement_type: "adjustment",
+                quantity: 200,
+                notes: "Sayım düzeltmesi — 200 adet fazla tespit edildi",
+                occurred_at: daysAgoISO(6),
+                source: "ui",
+            });
+        }
+
+        if (movementRows.length > 0) {
+            const { error: mErr } = await supabase.from("inventory_movements").insert(movementRows);
+            if (mErr) throw new Error("Movements: " + mErr.message);
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 11. Shipments
+        // ════════════════════════════════════════════════════════════
+        const shipmentRows = [
+            {
+                shipment_number: "SVK-2026-0001",
+                order_id: orderIdMap.get("ORD-2026-0010"),
+                order_number: "ORD-2026-0010",
+                shipment_date: daysAgo(20),
+                transport_type: "Karayolu — TIR",
+                net_weight_kg: 2400,
+                gross_weight_kg: 2650,
+                notes: "Abdi İbrahim İlaç — İstanbul Esenyurt teslimat",
+            },
+            {
+                shipment_number: "SVK-2026-0002",
+                order_id: orderIdMap.get("ORD-2026-0011"),
+                order_number: "ORD-2026-0011",
+                shipment_date: daysAgo(17),
+                transport_type: "Karayolu — TIR",
+                net_weight_kg: 3800,
+                gross_weight_kg: 4100,
+                notes: "Enerjisa — İstanbul Nişantepe teslimat",
+            },
+            {
+                shipment_number: "SVK-2026-0003",
+                order_id: orderIdMap.get("ORD-2026-0009"),
+                order_number: "ORD-2026-0009",
+                shipment_date: daysAgo(5),
+                transport_type: "Karayolu — Kamyonet",
+                net_weight_kg: 850,
+                gross_weight_kg: 980,
+                notes: "Ülker — kısmi sevkiyat (1. parti)",
+            },
+        ].filter(s => s.order_id);
+
+        if (shipmentRows.length > 0) {
+            const { error: shErr } = await supabase.from("shipments").insert(shipmentRows);
+            if (shErr) throw new Error("Shipments: " + shErr.message);
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 12. Invoices
+        // ════════════════════════════════════════════════════════════
+        const ord10 = SEED_ORDERS.find(o => o.orderNumber === "ORD-2026-0010");
+        const ord11 = SEED_ORDERS.find(o => o.orderNumber === "ORD-2026-0011");
+        const ord9 = SEED_ORDERS.find(o => o.orderNumber === "ORD-2026-0009");
+        const calcGrand = (o: SeedOrder) => {
+            const sub = o.lines.reduce((s, l) => s + l.qty * l.price * (1 - l.disc / 100), 0);
+            return Math.round((sub * 1.20) * 100) / 100;
+        };
+
+        const invoiceRows = [
+            {
+                invoice_number: "FTR-2026-0001",
+                invoice_date: daysAgo(20),
+                order_id: orderIdMap.get("ORD-2026-0010"),
+                order_number: "ORD-2026-0010",
+                currency: "EUR",
+                amount: ord10 ? calcGrand(ord10) : 0,
+                due_date: daysAgo(20 - 30), // 30 gün vade
+                status: "paid" as const,
+                notes: "Abdi İbrahim faturası — ödendi",
+            },
+            {
+                invoice_number: "FTR-2026-0002",
+                invoice_date: daysAgo(17),
+                order_id: orderIdMap.get("ORD-2026-0011"),
+                order_number: "ORD-2026-0011",
+                currency: "USD",
+                amount: ord11 ? calcGrand(ord11) : 0,
+                due_date: daysLater(28),
+                status: "open" as const,
+                notes: "Enerjisa faturası — ödeme bekleniyor",
+            },
+            {
+                invoice_number: "FTR-2026-0003",
+                invoice_date: daysAgo(5),
+                order_id: orderIdMap.get("ORD-2026-0009"),
+                order_number: "ORD-2026-0009",
+                currency: "TRY",
+                amount: ord9 ? Math.round(calcGrand(ord9) / 2) : 0, // Kısmi
+                due_date: daysLater(25),
+                status: "partially_paid" as const,
+                notes: "Ülker — kısmi sevkiyat faturası",
+            },
+        ].filter(i => i.order_id);
+
+        const { data: insertedInvoices, error: iErr } = await supabase
+            .from("invoices")
+            .insert(invoiceRows)
+            .select("id, invoice_number");
+        if (iErr) throw new Error("Invoices: " + iErr.message);
+
+        // ════════════════════════════════════════════════════════════
+        // 13. Payments
+        // ════════════════════════════════════════════════════════════
+        const inv1 = insertedInvoices?.find(i => i.invoice_number === "FTR-2026-0001");
+        const inv3 = insertedInvoices?.find(i => i.invoice_number === "FTR-2026-0003");
+
+        const paymentRows = [
+            inv1 ? {
+                payment_number: "ODM-2026-0001",
+                invoice_id: inv1.id,
+                invoice_number: inv1.invoice_number,
+                payment_date: daysAgo(10),
+                amount: invoiceRows[0]?.amount ?? 0,
+                currency: "EUR",
+                payment_method: "Havale/EFT",
+                notes: "Abdi İbrahim — tam ödeme",
+            } : null,
+            inv3 ? {
+                payment_number: "ODM-2026-0002",
+                invoice_id: inv3.id,
+                invoice_number: inv3.invoice_number,
+                payment_date: daysAgo(2),
+                amount: Math.round((invoiceRows[2]?.amount ?? 0) * 0.6),
+                currency: "TRY",
+                payment_method: "Havale/EFT",
+                notes: "Ülker — kısmi ödeme (%60)",
+            } : null,
+        ].filter(Boolean);
+
+        if (paymentRows.length > 0) {
+            const { error: payErr } = await supabase.from("payments").insert(paymentRows);
+            if (payErr) throw new Error("Payments: " + payErr.message);
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 14. Integration Sync Logs (Paraşüt)
+        // ════════════════════════════════════════════════════════════
+        const syncLogRows = [
+            {
+                entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0010"),
+                direction: "push", status: "success", external_id: "INV-2026-0087",
+                retry_count: 0, requested_at: daysAgoISO(20), completed_at: daysAgoISO(20), source: "system",
+            },
+            {
+                entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0011"),
+                direction: "push", status: "error", error_message: "Müşteri Paraşüt'te bulunamadı — eşleşme hatası",
+                retry_count: 2, requested_at: daysAgoISO(17), source: "system",
+            },
+            {
+                entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0006"),
+                direction: "push", status: "success", external_id: "INV-2026-0092",
+                retry_count: 0, requested_at: daysAgoISO(5), completed_at: daysAgoISO(5), source: "system",
+            },
+            {
+                entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0012"),
+                direction: "push", status: "retrying", error_message: "Timeout — tekrar denenecek",
+                retry_count: 1, requested_at: daysAgoISO(2), source: "system",
+            },
+            {
+                entity_type: "customer", entity_id: custMap.get("Tüpraş İzmit Rafinerisi")?.id,
+                direction: "push", status: "success", external_id: "CST-4821",
+                retry_count: 0, requested_at: daysAgoISO(30), completed_at: daysAgoISO(30), source: "system",
+            },
+            {
+                entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0008"),
+                direction: "push", status: "error", error_message: "API timeout — 30s aşıldı",
+                retry_count: 3, requested_at: daysAgoISO(10), source: "scheduled",
+            },
+        ].filter(s => s.entity_id);
+
+        if (syncLogRows.length > 0) {
+            const { error: slErr } = await supabase.from("integration_sync_logs").insert(syncLogRows);
+            if (slErr) throw new Error("Sync Logs: " + slErr.message);
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // 15. Audit Log
+        // ════════════════════════════════════════════════════════════
+        const auditRows = [
+            { action: "order_created", entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0006"), occurred_at: daysAgoISO(7), source: "ui" },
+            { action: "order_approved", entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0006"), occurred_at: daysAgoISO(6), source: "ui" },
+            { action: "order_created", entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0010"), occurred_at: daysAgoISO(25), source: "ui" },
+            { action: "order_approved", entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0010"), occurred_at: daysAgoISO(24), source: "ui" },
+            { action: "order_shipped", entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0010"), occurred_at: daysAgoISO(20), source: "system" },
+            { action: "order_created", entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0013"), occurred_at: daysAgoISO(30), source: "ui" },
+            { action: "order_cancelled", entity_type: "sales_order", entity_id: orderIdMap.get("ORD-2026-0013"), occurred_at: daysAgoISO(28), source: "ui" },
+            { action: "stock_adjusted", entity_type: "product", entity_id: skuMap.get("CT-SS-DN50-PN40-GRF")?.id, occurred_at: daysAgoISO(8), source: "ui" },
+            { action: "production_logged", entity_type: "product", entity_id: skuMap.get("KV-3P-DN50-PN40-CF8M")?.id, occurred_at: todayStr + "T08:30:00Z", source: "ui" },
+            { action: "commitment_created", entity_type: "product", entity_id: skuMap.get("KV-DB-DN100-600LB-CF8M")?.id, occurred_at: daysAgoISO(3), source: "ui" },
+        ].filter(a => a.entity_id);
+
+        if (auditRows.length > 0) {
+            const { error: aErr } = await supabase.from("audit_log").insert(auditRows);
+            if (aErr) throw new Error("Audit Log: " + aErr.message);
+        }
+
+        // ════════════════════════════════════════════════════════════
+        // Response
+        // ════════════════════════════════════════════════════════════
         return NextResponse.json({
             ok: true,
             seeded: {
                 products: SEED_PRODUCTS.length,
                 customers: customersSeeded,
-                customers_note: customersSeeded === 0
-                    ? "Müşteri tablosu boş değil — atlandı."
-                    : `${customersSeeded} müşteri eklendi.`,
-            },
-            alert_scenarios: {
-                critical_stock: ["KB-CK-DN100-600LB-CF8M", "FT-BT-DN100-PN40-CF8M", "AA-SOV-DN80-PN40"],
-                warning_stock: ["KV-3P-DN80-300LB-WCB", "SV-AF-DN50-600LB-BW", "CV-LT-DN50-PN40-CF8M", "CT-AF-DN100-PN40"],
-                past_deadline: ["KB-WT-DN150-PN16-CF8"],
-                imminent_deadline: ["AA-SOV-DN50-PN40", "CV-KV-DN65-PN40-CF8M"],
+                orders: SEED_ORDERS.length,
+                order_lines: lineRows.length,
+                reservations: reservationRows.length,
+                shortages: shortageRows.length,
+                purchase_commitments: commitRows.length,
+                bom: bomRows.length,
+                production: productionSeeded,
+                movements: movementRows.length,
+                shipments: shipmentRows.length,
+                invoices: invoiceRows.length,
+                payments: paymentRows.length,
+                sync_logs: syncLogRows.length,
+                audit_log: auditRows.length,
             },
         });
     } catch (err) {
