@@ -86,6 +86,9 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
     if (order.commercial_status !== "approved") {
         return { success: false, error: "Yalnızca onaylı siparişler Paraşüt'e gönderilebilir." };
     }
+    if (order.fulfillment_status !== "shipped") {
+        return { success: false, error: "Yalnızca sevk edilmiş siparişler Paraşüt'e gönderilebilir." };
+    }
 
     const payload = mapOrderToParasut(order);
     const result = await sendInvoiceToParasut(payload);
@@ -170,6 +173,7 @@ export async function serviceSyncAllPending(): Promise<{
         .from("sales_orders")
         .select("id, order_number")
         .eq("commercial_status", "approved")
+        .eq("fulfillment_status", "shipped")
         .is("parasut_invoice_id", null)
         .is("parasut_error", null)
         .limit(50);

@@ -105,6 +105,7 @@ describe("serviceSyncOrderToParasut — PARASUT_ENABLED guard", () => {
         mockDbGetOrderById.mockResolvedValue({
             id: "order-1",
             commercial_status: "approved",
+            fulfillment_status: "shipped",
             order_number: "ORD-2026-0001",
             created_at: new Date().toISOString(),
             currency: "USD",
