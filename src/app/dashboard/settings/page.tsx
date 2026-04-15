@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import { isDemoMode } from "@/lib/demo-utils";
+import { useData } from "@/lib/data-context";
 
 type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka" | "demo";
 
@@ -562,6 +563,7 @@ function SectionHeader({ children }: { children: React.ReactNode }) {
 // ─── Demo Hazırlık Tab ─────────────────────────────────────────────────────────
 function DemoTab() {
     const { toast } = useToast();
+    const { refetchAll } = useData();
     const [step, setStep] = useState<"idle" | "deleting" | "seeding" | "scanning" | "done">("idle");
 
     async function runFullSetup() {
@@ -582,6 +584,7 @@ function DemoTab() {
 
             setStep("scanning");
             await fetch("/api/alerts/scan?force=true", { method: "POST" });
+            await refetchAll();
 
             setStep("done");
             toast({ type: "success", message: "PMT demo verisi yüklendi, alertlar oluşturuldu!" });
