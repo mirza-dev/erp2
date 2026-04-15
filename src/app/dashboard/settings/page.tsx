@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import { isDemoMode } from "@/lib/demo-utils";
+import { seedDelete, seedPost, alertScan } from "./actions";
 
 type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka" | "demo";
 
@@ -567,22 +568,13 @@ function DemoTab() {
     async function runFullSetup() {
         setStep("deleting");
         try {
-            const del = await fetch("/api/seed", { method: "DELETE" });
-            if (!del.ok) {
-                const body = await del.json().catch(() => ({}));
-                throw new Error("Silme başarısız: " + (body?.error ?? del.status));
-            }
+            await seedDelete();
 
             setStep("seeding");
-            const seed = await fetch("/api/seed", { method: "POST" });
-            if (!seed.ok) {
-                const body = await seed.json().catch(() => ({}));
-                throw new Error("Seed başarısız: " + (body?.error ?? seed.status));
-            }
+            await seedPost();
 
             setStep("scanning");
-            const scan = await fetch("/api/alerts/scan?force=true", { method: "POST" });
-            if (!scan.ok) throw new Error("Alert taraması başarısız: " + scan.status);
+            await alertScan();
 
             setStep("done");
             toast({ type: "success", message: "PMT demo verisi yüklendi, alertlar oluşturuldu!" });
