@@ -55,6 +55,13 @@ src/
     ├── data-context.tsx     — global React context (gerçek API'ye bağlı)
     ├── api-error.ts         — merkezi hata yönetimi (handleApiError)
     └── stock-utils.ts       — coverage_days, daysColor
+
+## Demo Hazırlık
+
+- `POST /api/seed` — tüm tabloları dolduruyor (products, customers, orders, order_lines, reservations, shortages, commitments, BOM, production, movements, shipments, invoices, payments, sync_logs, audit_log)
+- `DELETE /api/seed` — tüm verileri siliyor (FK sırasına göre)
+- `settings/page.tsx` → "Demo Hazırlık" tab → "PMT Demo Verisini Yükle" butonu (DELETE + POST + alerts/scan?force=true)
+- `CRON_SECRET=kokpit-pmt-2026` Bearer token ile `/api/seed` erişimi (middleware CRON_PATHS'e dahil)
 ```
 
 ---

@@ -3,19 +3,21 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-13_
 
-**Son tamamlanan iş:** Kapsamlı Seed Data + "Nerede Kullanılıyor" bölümü (2026-04-14)
-- `seed/route.ts`: POST handler genişletildi — 15 sipariş, ~50 kalem, rezervasyonlar, shortages, 8 satınalma taahhüdü, 7 BOM, 10 üretim kaydı, sevkiyat/fatura/ödeme, sync logları, audit log
-- `products/page.tsx`: Drawer Block 1'e "Nerede Kullanılıyor?" bölümü eklendi (teklifler, rezerve, satınalma, alertler)
+**Son tamamlanan iş:** Per-page fetch refactor + Seed/Auth fix (2026-04-15)
+- Dashboard/Orders/Products: DataContext bağımlılığı azaltıldı, her sayfa mount'ta kendi verisini çekiyor, Yenile butonları eklendi
+- Seed fix: FK sırası, reference_type constraint, ALWAYS_PUBLIC + kendi auth kontrolü
+- Alerts "Silinmiş Ürün" fix: sayfa kendi products fetch'ini yapıyor, "Tara" `?force=true`
 - **Build:** temiz
 
 **Önceki önemli işler:**
+- Kapsamlı Seed Data + "Nerede Kullanılıyor" bölümü (2026-04-14)
 - Faz 3 Stok Eskime Raporu: hammadde semantiği, cost_price, 3-tab, E2E
 - product_type 3-yollu enum: `finished` → `manufactured` / `commercial`
 - Import Sistemi Yenileme + 7 Bug Fix, Ürün kullanım bayrakları (025, 026)
 - Geciken Sevkiyat Alertı, Teklif Uzatma, Teklif Kırılımı, demo mode
 
 **Aktif odak:** —
-**Bilinen açık sorunlar:** —
+**Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik
 **Test sayısı:** 67 dosya · 1347 test
 
 ---

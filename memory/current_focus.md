@@ -6,33 +6,32 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-14 — Kapsamlı Seed Data + "Nerede Kullanılıyor"):**
+**Son tamamlanan (2026-04-15 — Per-page fetch refactor + Seed fix):**
 
-1. **Seed data genişletmesi:**
-   - `POST /api/seed` artık tüm tabloları dolduruyor (sadece products+customers değil)
-   - 15 sipariş (draft/pending/approved/shipped/cancelled — tüm durumlar)
-   - ~50 sipariş kalemi, stok rezervasyonları, eksiklikler (shortages)
-   - 8 satınalma taahhüdü (pending/received/cancelled)
-   - 7 BOM kaydı (3 mamul × 2-3 bileşen)
-   - 10 üretim kaydı (3 tanesi bugün), stok hareketleri
-   - 3 sevkiyat, 3 fatura, 2 ödeme
-   - 6 entegrasyon sync logu, 10 audit log kaydı
-   - Ürün reserved değerleri reservation toplamlarıyla otomatik senkronize
+1. **Her sayfa kendi verisini çeker:**
+   - Dashboard: `refetchAll` + Yenile butonu (DataContext child'larını günceller)
+   - Orders: DataContext bağımlılığı kaldırıldı, kendi `/api/orders` fetch'i, Yenile butonu
+   - Products: DataContext bağımlılığı kaldırıldı, direkt `POST/DELETE /api/products`, Yenile butonu
+   - Alerts: önceki oturumda zaten yapılmıştı
 
-2. **Ürün detay drawer — "Nerede Kullanılıyor?" bölümü:**
-   - products/page.tsx: Block 1 Ürün Kimliği altına dinamik kullanım özeti
-   - Onay bekleyen siparişler, taslak teklifler, rezerve miktar, satınalma bekliyor, aktif alertler
-   - Mevcut drawer verilerinden (quotes, commitments, alerts) hesaplanıyor — ek API gerekmez
+2. **Seed fix + auth:**
+   - `/api/seed` → ALWAYS_PUBLIC, kendi içinde CRON_SECRET veya session kontrolü
+   - `inventory_movements.reference_type` düzeltmesi: `'sales_order'` → `'order'`, `'purchase_commitment'` → `'manual'`
+   - DELETE handler FK sırası: `payments, invoices, shipments` → `sales_orders`
 
-**Test:** Build temiz | TypeScript temiz
+3. **Alerts "Silinmiş Ürün" fix:**
+   - Alerts sayfası artık kendi `/api/products` fetch'ini yapıyor → DataContext stale etkisi yok
+   - "Tara" butonu `?force=true` parametresiyle scan lock'u zorla açıyor
 
-**Önceki son tamamlanan (2026-04-13 — Bulgular Fix):**
-- Alert metin tazeliği + renk tutarsızlığı düzeltmesi
-- 67 dosya · 1348 test
+4. **Settings DemoTab:**
+   - Server actions kaldırıldı (Next.js prod build hatası)
+   - Basit `fetch()` pattern'ine döndürüldü
+   - `/api/seed` ALWAYS_PUBLIC olduğu için middleware bypass gerekmedi
 
-**Bilinen açık sorunlar:** —
+**Test:** TypeScript temiz | Build temiz
 
-**Sonraki adım:** Cumartesi PMT sunum hazırlığı — DemoTab ile test
+**Bilinen açık sorunlar:**
+- `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik (migration 020/026, sonra 017'de RLS aktifleştirildi)
 
 **Why:** Yeni session'da Claude aktif konuyu bilsin, context kaybı yaşanmasın.
 **How to apply:** Her büyük özellik başlarken "Aktif" alanını güncelle; bitince "Son tamamlanan"a taşı.
