@@ -159,6 +159,16 @@ const modalInputStyle: React.CSSProperties = {
     width: "100%",
 };
 
+const drawerInputStyle: React.CSSProperties = {
+    fontSize: "12px",
+    padding: "4px 8px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "5px",
+    background: "var(--bg-tertiary)",
+    color: "var(--text-primary)",
+    width: "100%",
+};
+
 function FormField({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
     return (
         <div>
@@ -208,6 +218,19 @@ export default function ProductsPage() {
     const [riskCounts, setRiskCounts] = useState<{ at_risk: number; excluded_no_usage?: number } | null>(null);
     const [aiAvailable, setAiAvailable] = useState<boolean | null>(null);
     const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
+    const [drawerEditMode, setDrawerEditMode] = useState(false);
+    const [drawerSaving, setDrawerSaving] = useState(false);
+    const [drawerEditForm, setDrawerEditForm] = useState<{
+        name: string; category: string; subCategory: string;
+        productFamily: string; productType: "raw_material" | "manufactured" | "commercial";
+        sectorCompatibility: string; industries: string; useCases: string;
+        materialQuality: string; originCountry: string; productionSite: string;
+        standards: string; certifications: string;
+        unit: string; warehouse: string; preferredVendor: string;
+        leadTimeDays: string; weightKg: string;
+        price: string; currency: string; costPrice: string;
+        productNotes: string;
+    } | null>(null);
     const [recMap, setRecMap] = useState<Map<string, RiskRecEntry>>(new Map());
     const [rejectMode, setRejectMode] = useState(false);
     const [rejectNote, setRejectNote] = useState("");
@@ -295,6 +318,12 @@ export default function ProductsPage() {
         fetchRisk();
         return () => { cancelled = true; };
     }, []);
+
+    // Reset edit mode when drawer product changes
+    useEffect(() => {
+        setDrawerEditMode(false);
+        setDrawerEditForm(null);
+    }, [selectedProductId]);
 
     // Fetch pending commitments for the selected product whenever drawer opens
     useEffect(() => {
@@ -1172,6 +1201,80 @@ export default function ProductsPage() {
                     </div>
                 );
 
+                const handleDrawerEdit = () => {
+                    if (!product) return;
+                    setDrawerEditForm({
+                        name: product.name,
+                        category: product.category ?? "",
+                        subCategory: product.subCategory ?? "",
+                        productFamily: product.productFamily ?? "",
+                        productType: product.productType,
+                        sectorCompatibility: product.sectorCompatibility ?? "",
+                        industries: product.industries ?? "",
+                        useCases: product.useCases ?? "",
+                        materialQuality: product.materialQuality ?? "",
+                        originCountry: product.originCountry ?? "",
+                        productionSite: product.productionSite ?? "",
+                        standards: product.standards ?? "",
+                        certifications: product.certifications ?? "",
+                        unit: product.unit,
+                        warehouse: product.warehouse ?? "",
+                        preferredVendor: product.preferredVendor ?? "",
+                        leadTimeDays: product.leadTimeDays?.toString() ?? "",
+                        weightKg: product.weightKg?.toString() ?? "",
+                        price: product.price?.toString() ?? "",
+                        currency: product.currency ?? "USD",
+                        costPrice: product.costPrice?.toString() ?? "",
+                        productNotes: product.productNotes ?? "",
+                    });
+                    setDrawerEditMode(true);
+                };
+
+                const handleDrawerSave = async () => {
+                    if (!drawerEditForm || !product) return;
+                    setDrawerSaving(true);
+                    try {
+                        const res = await fetch(`/api/products/${product.id}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                name: drawerEditForm.name || undefined,
+                                category: drawerEditForm.category || undefined,
+                                sub_category: drawerEditForm.subCategory || undefined,
+                                product_family: drawerEditForm.productFamily || undefined,
+                                product_type: drawerEditForm.productType,
+                                sector_compatibility: drawerEditForm.sectorCompatibility || undefined,
+                                industries: drawerEditForm.industries || undefined,
+                                use_cases: drawerEditForm.useCases || undefined,
+                                material_quality: drawerEditForm.materialQuality || undefined,
+                                origin_country: drawerEditForm.originCountry || undefined,
+                                production_site: drawerEditForm.productionSite || undefined,
+                                standards: drawerEditForm.standards || undefined,
+                                certifications: drawerEditForm.certifications || undefined,
+                                unit: drawerEditForm.unit || undefined,
+                                warehouse: drawerEditForm.warehouse || undefined,
+                                preferred_vendor: drawerEditForm.preferredVendor || undefined,
+                                lead_time_days: drawerEditForm.leadTimeDays ? Number(drawerEditForm.leadTimeDays) : undefined,
+                                weight_kg: drawerEditForm.weightKg ? Number(drawerEditForm.weightKg) : undefined,
+                                price: drawerEditForm.price ? Number(drawerEditForm.price) : undefined,
+                                currency: drawerEditForm.currency || undefined,
+                                cost_price: drawerEditForm.costPrice ? Number(drawerEditForm.costPrice) : undefined,
+                                product_notes: drawerEditForm.productNotes || undefined,
+                            }),
+                        });
+                        if (!res.ok) throw new Error("PATCH başarısız");
+                        await refetch();
+                        setDrawerEditMode(false);
+                        setDrawerEditForm(null);
+                        toast({ type: "success", message: "Ürün bilgileri güncellendi." });
+                    } catch {
+                        toast({ type: "error", message: "Güncelleme başarısız." });
+                    } finally {
+                        setDrawerSaving(false);
+                    }
+                };
+
+
                 return (
                     <AIDetailDrawer
                         open={selectedProductId !== null}
@@ -1188,23 +1291,52 @@ export default function ProductsPage() {
 
                                 {/* ── Block 1: Ürün Kimliği ─────────────────────── */}
                                 <div>
-                                    {sectionLabel("Ürün Kimliği")}
+                                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", paddingBottom: "6px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                                        <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                                            Ürün Kimliği
+                                        </div>
+                                        {!drawerEditMode && !isDemo && (
+                                            <button onClick={handleDrawerEdit} style={{ fontSize: "11px", padding: "3px 8px", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>
+                                                Düzenle
+                                            </button>
+                                        )}
+                                    </div>
 
                                     {/* Name + type badge */}
-                                    <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "4px" }}>
-                                        <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
-                                            {product.name}
+                                    {drawerEditMode && drawerEditForm ? (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "4px" }}>
+                                            <input
+                                                value={drawerEditForm.name}
+                                                onChange={e => setDrawerEditForm(f => f && ({ ...f, name: e.target.value }))}
+                                                style={{ ...drawerInputStyle, fontSize: "14px", fontWeight: 600 }}
+                                                placeholder="Ürün adı"
+                                            />
+                                            <select
+                                                value={drawerEditForm.productType}
+                                                onChange={e => setDrawerEditForm(f => f && ({ ...f, productType: e.target.value as "raw_material" | "manufactured" | "commercial" }))}
+                                                style={drawerInputStyle}
+                                            >
+                                                <option value="manufactured">Mamul</option>
+                                                <option value="commercial">Ticari Mal</option>
+                                                <option value="raw_material">Hammadde</option>
+                                            </select>
                                         </div>
-                                        <span style={{
-                                            fontSize: "10px", fontWeight: 600, padding: "2px 7px",
-                                            borderRadius: "4px", flexShrink: 0, marginTop: "2px",
-                                            background: product.productType === "manufactured" ? "var(--accent-bg)" : product.productType === "commercial" ? "var(--success-bg)" : "var(--bg-tertiary)",
-                                            color: product.productType === "manufactured" ? "var(--accent-text)" : product.productType === "commercial" ? "var(--success-text)" : "var(--text-secondary)",
-                                            border: `0.5px solid ${product.productType === "manufactured" ? "var(--accent-border)" : product.productType === "commercial" ? "var(--success-border)" : "var(--border-secondary)"}`,
-                                        }}>
-                                            {product.productType === "manufactured" ? "Mamul" : product.productType === "commercial" ? "Ticari Mal" : "Hammadde"}
-                                        </span>
-                                    </div>
+                                    ) : (
+                                        <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "4px" }}>
+                                            <div style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
+                                                {product.name}
+                                            </div>
+                                            <span style={{
+                                                fontSize: "10px", fontWeight: 600, padding: "2px 7px",
+                                                borderRadius: "4px", flexShrink: 0, marginTop: "2px",
+                                                background: product.productType === "manufactured" ? "var(--accent-bg)" : product.productType === "commercial" ? "var(--success-bg)" : "var(--bg-tertiary)",
+                                                color: product.productType === "manufactured" ? "var(--accent-text)" : product.productType === "commercial" ? "var(--success-text)" : "var(--text-secondary)",
+                                                border: `0.5px solid ${product.productType === "manufactured" ? "var(--accent-border)" : product.productType === "commercial" ? "var(--success-border)" : "var(--border-secondary)"}`,
+                                            }}>
+                                                {product.productType === "manufactured" ? "Mamul" : product.productType === "commercial" ? "Ticari Mal" : "Hammadde"}
+                                            </span>
+                                        </div>
+                                    )}
 
                                     {/* Kullanım toggleları */}
                                     <div style={{ display: "flex", gap: "6px", marginTop: "6px", marginBottom: "4px" }}>
@@ -1256,53 +1388,186 @@ export default function ProductsPage() {
                                     </div>
 
                                     {/* Identity fields */}
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                                        <IdField label="Kategori" value={[product.category, product.subCategory].filter(Boolean).join(" / ")} />
-                                        <IdField label="Ürün Ailesi" value={product.productFamily} />
-                                        <IdField label="Sektör Uygunluğu" value={product.sectorCompatibility} />
-                                        <IdField label="Sektörler" value={product.industries} />
-                                        <IdField label="Kullanım" value={product.useCases} />
-                                        <IdField label="Malzeme" value={product.materialQuality} />
-                                        <IdField label="Menşei" value={product.originCountry} />
-                                        <IdField label="Üretim Tesisi" value={product.productionSite} />
-                                        <IdField label="Standartlar" value={product.standards} />
-                                        <IdField label="Sertifikalar" value={product.certifications} />
-                                        <IdField label="Birim / Depo" value={[product.unit, product.warehouse].filter(Boolean).join(" · ")} />
-                                        <IdField
-                                            label="Tedarikçi"
-                                            value={[product.preferredVendor, product.leadTimeDays ? `${product.leadTimeDays} gün tedarik` : null].filter(Boolean).join(" · ")}
-                                        />
-                                        {product.weightKg && <IdField label="Ağırlık" value={`${product.weightKg} kg`} />}
-                                    </div>
+                                    {drawerEditMode && drawerEditForm ? (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                            {/* Kategori */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Kategori</span>
+                                                <div style={{ flex: 1 }}>
+                                                    <input type="text" list="edit-categories-list" value={drawerEditForm.category} onChange={e => setDrawerEditForm(f => f && ({ ...f, category: e.target.value }))} style={drawerInputStyle} placeholder="Kategori..." />
+                                                    <datalist id="edit-categories-list">{categories.slice(1).map(c => <option key={c} value={c} />)}</datalist>
+                                                </div>
+                                            </div>
+                                            {/* Alt Kategori */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Alt Kategori</span>
+                                                <input value={drawerEditForm.subCategory} onChange={e => setDrawerEditForm(f => f && ({ ...f, subCategory: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Alt kategori..." />
+                                            </div>
+                                            {/* Ürün Ailesi */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Ürün Ailesi</span>
+                                                <input value={drawerEditForm.productFamily} onChange={e => setDrawerEditForm(f => f && ({ ...f, productFamily: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Ürün ailesi..." />
+                                            </div>
+                                            {/* Sektör Uygunluğu */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Sektör Uygunluğu</span>
+                                                <input value={drawerEditForm.sectorCompatibility} onChange={e => setDrawerEditForm(f => f && ({ ...f, sectorCompatibility: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Oil & Gas, Petrokimya..." />
+                                            </div>
+                                            {/* Sektörler */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Sektörler</span>
+                                                <input value={drawerEditForm.industries} onChange={e => setDrawerEditForm(f => f && ({ ...f, industries: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Sektörler..." />
+                                            </div>
+                                            {/* Kullanım */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Kullanım</span>
+                                                <input value={drawerEditForm.useCases} onChange={e => setDrawerEditForm(f => f && ({ ...f, useCases: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Kullanım alanları..." />
+                                            </div>
+                                            {/* Malzeme */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Malzeme</span>
+                                                <input value={drawerEditForm.materialQuality} onChange={e => setDrawerEditForm(f => f && ({ ...f, materialQuality: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="316L Paslanmaz Çelik..." />
+                                            </div>
+                                            {/* Menşei */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Menşei</span>
+                                                <input value={drawerEditForm.originCountry} onChange={e => setDrawerEditForm(f => f && ({ ...f, originCountry: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Türkiye..." />
+                                            </div>
+                                            {/* Üretim Tesisi */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Üretim Tesisi</span>
+                                                <input value={drawerEditForm.productionSite} onChange={e => setDrawerEditForm(f => f && ({ ...f, productionSite: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Tesis adı..." />
+                                            </div>
+                                            {/* Standartlar */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Standartlar</span>
+                                                <input value={drawerEditForm.standards} onChange={e => setDrawerEditForm(f => f && ({ ...f, standards: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="EN, ISO..." />
+                                            </div>
+                                            {/* Sertifikalar */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Sertifikalar</span>
+                                                <input value={drawerEditForm.certifications} onChange={e => setDrawerEditForm(f => f && ({ ...f, certifications: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="CE, API..." />
+                                            </div>
+                                            {/* Birim */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Birim</span>
+                                                <select value={drawerEditForm.unit} onChange={e => setDrawerEditForm(f => f && ({ ...f, unit: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }}>
+                                                    {["adet", "kg", "m", "litre", "takım"].map(u => <option key={u}>{u}</option>)}
+                                                </select>
+                                            </div>
+                                            {/* Depo */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Depo</span>
+                                                <input value={drawerEditForm.warehouse} onChange={e => setDrawerEditForm(f => f && ({ ...f, warehouse: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Depo adı..." />
+                                            </div>
+                                            {/* Tedarikçi */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Tedarikçi</span>
+                                                <input value={drawerEditForm.preferredVendor} onChange={e => setDrawerEditForm(f => f && ({ ...f, preferredVendor: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="Tedarikçi adı..." />
+                                            </div>
+                                            {/* Tedarik Süresi */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Tedarik (gün)</span>
+                                                <input type="number" value={drawerEditForm.leadTimeDays} onChange={e => setDrawerEditForm(f => f && ({ ...f, leadTimeDays: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="0" />
+                                            </div>
+                                            {/* Ağırlık */}
+                                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Ağırlık (kg)</span>
+                                                <input type="number" value={drawerEditForm.weightKg} onChange={e => setDrawerEditForm(f => f && ({ ...f, weightKg: e.target.value }))} style={{ ...drawerInputStyle, flex: 1 }} placeholder="0" />
+                                            </div>
+                                            {/* Fiyatlar */}
+                                            <div style={{ display: "flex", gap: "6px", marginTop: "4px" }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "3px" }}>Satış Fiyatı</div>
+                                                    <input type="number" value={drawerEditForm.price} onChange={e => setDrawerEditForm(f => f && ({ ...f, price: e.target.value }))} style={drawerInputStyle} placeholder="0" />
+                                                </div>
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "3px" }}>Maliyet</div>
+                                                    <input type="number" value={drawerEditForm.costPrice} onChange={e => setDrawerEditForm(f => f && ({ ...f, costPrice: e.target.value }))} style={drawerInputStyle} placeholder="0" />
+                                                </div>
+                                                <div style={{ width: "70px" }}>
+                                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "3px" }}>Para Birimi</div>
+                                                    <select value={drawerEditForm.currency} onChange={e => setDrawerEditForm(f => f && ({ ...f, currency: e.target.value }))} style={drawerInputStyle}>
+                                                        <option>USD</option><option>TRY</option><option>EUR</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            {/* Notlar */}
+                                            <div>
+                                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "3px" }}>Notlar</div>
+                                                <textarea
+                                                    value={drawerEditForm.productNotes}
+                                                    onChange={e => setDrawerEditForm(f => f && ({ ...f, productNotes: e.target.value }))}
+                                                    style={{ ...drawerInputStyle, minHeight: "60px", resize: "vertical" }}
+                                                    placeholder="Ürün notları..."
+                                                />
+                                            </div>
+                                            {/* İptal / Kaydet */}
+                                            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                                                <button
+                                                    onClick={() => { setDrawerEditMode(false); setDrawerEditForm(null); }}
+                                                    style={{ flex: 1, fontSize: "12px", padding: "6px", border: "0.5px solid var(--border-secondary)", borderRadius: "5px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}
+                                                >
+                                                    İptal
+                                                </button>
+                                                <button
+                                                    onClick={handleDrawerSave}
+                                                    disabled={drawerSaving}
+                                                    style={{ flex: 2, fontSize: "12px", padding: "6px", border: "0.5px solid var(--accent-border)", borderRadius: "5px", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: drawerSaving ? "not-allowed" : "pointer", opacity: drawerSaving ? 0.6 : 1 }}
+                                                >
+                                                    {drawerSaving ? "Kaydediliyor…" : "Kaydet"}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                                                <IdField label="Kategori" value={[product.category, product.subCategory].filter(Boolean).join(" / ")} />
+                                                <IdField label="Ürün Ailesi" value={product.productFamily} />
+                                                <IdField label="Sektör Uygunluğu" value={product.sectorCompatibility} />
+                                                <IdField label="Sektörler" value={product.industries} />
+                                                <IdField label="Kullanım" value={product.useCases} />
+                                                <IdField label="Malzeme" value={product.materialQuality} />
+                                                <IdField label="Menşei" value={product.originCountry} />
+                                                <IdField label="Üretim Tesisi" value={product.productionSite} />
+                                                <IdField label="Standartlar" value={product.standards} />
+                                                <IdField label="Sertifikalar" value={product.certifications} />
+                                                <IdField label="Birim / Depo" value={[product.unit, product.warehouse].filter(Boolean).join(" · ")} />
+                                                <IdField
+                                                    label="Tedarikçi"
+                                                    value={[product.preferredVendor, product.leadTimeDays ? `${product.leadTimeDays} gün tedarik` : null].filter(Boolean).join(" · ")}
+                                                />
+                                                {product.weightKg && <IdField label="Ağırlık" value={`${product.weightKg} kg`} />}
+                                            </div>
 
-                                    {/* Prices */}
-                                    {(product.price > 0 || product.costPrice) && (
-                                        <div style={{ display: "flex", gap: "16px", marginTop: "10px" }}>
-                                            {product.price > 0 && (
-                                                <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                                                    <span style={{ color: "var(--text-tertiary)", marginRight: "4px" }}>Satış</span>
-                                                    <span style={{ fontWeight: 600 }}>{formatCurrency(product.price, product.currency)}</span>
+                                            {(product.price > 0 || product.costPrice) && (
+                                                <div style={{ display: "flex", gap: "16px", marginTop: "10px" }}>
+                                                    {product.price > 0 && (
+                                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                                            <span style={{ color: "var(--text-tertiary)", marginRight: "4px" }}>Satış</span>
+                                                            <span style={{ fontWeight: 600 }}>{formatCurrency(product.price, product.currency)}</span>
+                                                        </div>
+                                                    )}
+                                                    {product.costPrice && (
+                                                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                                            <span style={{ color: "var(--text-tertiary)", marginRight: "4px" }}>Maliyet</span>
+                                                            <span style={{ fontWeight: 600 }}>{formatCurrency(product.costPrice, product.currency)}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
-                                            {product.costPrice && (
-                                                <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                                                    <span style={{ color: "var(--text-tertiary)", marginRight: "4px" }}>Maliyet</span>
-                                                    <span style={{ fontWeight: 600 }}>{formatCurrency(product.costPrice, product.currency)}</span>
+
+                                            {product.productNotes && (
+                                                <div style={{
+                                                    marginTop: "10px", padding: "8px 10px",
+                                                    background: "var(--bg-secondary)", borderRadius: "5px",
+                                                    border: "0.5px solid var(--border-tertiary)",
+                                                    fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5,
+                                                }}>
+                                                    {product.productNotes}
                                                 </div>
                                             )}
-                                        </div>
-                                    )}
-
-                                    {/* Notes */}
-                                    {product.productNotes && (
-                                        <div style={{
-                                            marginTop: "10px", padding: "8px 10px",
-                                            background: "var(--bg-secondary)", borderRadius: "5px",
-                                            border: "0.5px solid var(--border-tertiary)",
-                                            fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5,
-                                        }}>
-                                            {product.productNotes}
-                                        </div>
+                                        </>
                                     )}
 
                                 </div>
