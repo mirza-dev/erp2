@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useData } from "@/lib/data-context";
+import { mapProduct } from "@/lib/api-mappers";
+import type { Product } from "@/lib/mock-data";
 import { useToast } from "@/components/ui/Toast";
 import { computeCoverageDays, daysColor } from "@/lib/stock-utils";
 import { EmptyState, LoadingState } from "@/components/ui/StateViews";
@@ -90,10 +91,10 @@ function useIsMobile(breakpoint = 768): boolean {
 export default function AlertsPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
-    const { products } = useData();
     const isMobile = useIsMobile();
 
     const [rawAlerts, setRawAlerts]         = useState<AlertRow[]>([]);
+    const [products, setProducts]           = useState<Product[]>([]);
     const [loading, setLoading]             = useState(true);
     const [activeFilter, setActiveFilter]   = useState<AlertFilter>("all");
     const [showResolved, setShowResolved]   = useState(false);
@@ -105,10 +106,17 @@ export default function AlertsPage() {
 
     // ── Fetch ──
     const refetch = useCallback(async () => {
-        const res = await fetch("/api/alerts");
-        if (res.ok) {
-            const data = await res.json();
+        const [alertsRes, productsRes] = await Promise.all([
+            fetch("/api/alerts"),
+            fetch("/api/products"),
+        ]);
+        if (alertsRes.ok) {
+            const data = await alertsRes.json();
             if (Array.isArray(data)) setRawAlerts(data as AlertRow[]);
+        }
+        if (productsRes.ok) {
+            const data = await productsRes.json();
+            if (Array.isArray(data)) setProducts(data.map(mapProduct));
         }
     }, []);
 
@@ -200,7 +208,7 @@ export default function AlertsPage() {
         if (refreshing) return;
         setRefreshing(true);
         try {
-            const res = await fetch("/api/alerts/scan", { method: "POST" });
+            const res = await fetch("/api/alerts/scan?force=true", { method: "POST" });
             if (!res.ok) throw new Error(String(res.status));
             await refetch();
             setLastRefreshed(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
