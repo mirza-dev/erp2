@@ -7,7 +7,7 @@ export const IMPORT_FIELDS: Record<string, Array<{ field: string; label: string 
         { field: "category", label: "Kategori" }, { field: "unit", label: "Birim" },
         { field: "price", label: "Fiyat" }, { field: "currency", label: "Para Birimi" },
         { field: "on_hand", label: "Stok Miktarı" }, { field: "min_stock_level", label: "Min. Stok" },
-        { field: "product_family", label: "Ürün Ailesi" }, { field: "sub_category", label: "Alt Kategori" },
+        { field: "product_family", label: "Ürün Ailesi" }, { field: "sub_category", label: "Alt Kategori" }, { field: "sector_compatibility", label: "Sektör Uygunluğu" },
         { field: "cost_price", label: "Maliyet" }, { field: "weight_kg", label: "Ağırlık (kg)" },
         { field: "material_quality", label: "Malzeme Kalitesi" }, { field: "origin_country", label: "Menşei" },
         { field: "production_site", label: "Üretim Tesisi" }, { field: "use_cases", label: "Kullanım Alanları" },

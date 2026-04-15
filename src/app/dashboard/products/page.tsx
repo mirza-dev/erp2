@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { mapProduct } from "@/lib/api-mappers";
 import type { Product } from "@/lib/mock-data";
@@ -10,16 +10,6 @@ import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { dateDaysFromToday } from "@/lib/stock-utils";
 
-const categories = [
-    "Tümü",
-    "Küresel Vanalar",
-    "Sürgülü Vanalar",
-    "Kelebek Vanalar",
-    "Çek Valfler",
-    "Contalar",
-    "Filtreler",
-    "Flanş Aksesuarları",
-];
 
 interface RiskItem {
     productId: string;
@@ -202,7 +192,7 @@ export default function ProductsPage() {
         certifications: string; productNotes: string;
         isForSales: boolean; isForPurchase: boolean;
     }>({
-        name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
+        name: "", sku: "", category: "", unit: "adet",
         price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
         productType: "manufactured", warehouse: "Sevkiyat Deposu",
         materialQuality: "", originCountry: "", productionSite: "",
@@ -423,6 +413,11 @@ export default function ProductsPage() {
 
     const criticalCount = mockProducts.filter(p => p.promisable <= p.minStockLevel).length;
 
+    const categories = useMemo(
+        () => ["Tümü", ...Array.from(new Set(mockProducts.map(p => p.category).filter(Boolean))).sort()],
+        [mockProducts]
+    );
+
     const categoryCounts: Record<string, number> = { "Tümü": mockProducts.length };
     categories.slice(1).forEach(cat => {
         categoryCounts[cat] = mockProducts.filter(p => p.category === cat).length;
@@ -489,7 +484,7 @@ export default function ProductsPage() {
             await refetch();
             setCreateOpen(false);
             setCreateForm({
-                name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
+                name: "", sku: "", category: "", unit: "adet",
                 price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
                 productType: "manufactured" as const, warehouse: "Sevkiyat Deposu",
                 materialQuality: "", originCountry: "", productionSite: "",
@@ -638,7 +633,7 @@ export default function ProductsPage() {
                             textDecoration: "none", whiteSpace: "nowrap",
                         }}
                     >Eskime Raporu →</a>
-                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "Küresel Vanalar", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", isForSales: true, isForPurchase: false }); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
+                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", isForSales: true, isForPurchase: false }); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
                 </div>
             </div>
 
@@ -1264,7 +1259,7 @@ export default function ProductsPage() {
                                     <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                                         <IdField label="Kategori" value={[product.category, product.subCategory].filter(Boolean).join(" / ")} />
                                         <IdField label="Ürün Ailesi" value={product.productFamily} />
-                                        <IdField label="Sektör" value={product.sectorCompatibility} />
+                                        <IdField label="Sektör Uygunluğu" value={product.sectorCompatibility} />
                                         <IdField label="Sektörler" value={product.industries} />
                                         <IdField label="Kullanım" value={product.useCases} />
                                         <IdField label="Malzeme" value={product.materialQuality} />
@@ -1310,89 +1305,6 @@ export default function ProductsPage() {
                                         </div>
                                     )}
 
-                                    {/* Nerede Kullanılıyor? */}
-                                    {(() => {
-                                        const usageItems: Array<{ label: string; color: string }> = [];
-
-                                        // Teklifler (quotes = draft + pending_approval siparişlerdeki kalemler)
-                                        const pendingQuotes = quotes.filter(q => q.commercialStatus === "pending_approval");
-                                        const draftQuotes = quotes.filter(q => q.commercialStatus === "draft");
-
-                                        if (pendingQuotes.length > 0) {
-                                            const totalQty = pendingQuotes.reduce((s, q) => s + (q.quantity ?? 0), 0);
-                                            usageItems.push({
-                                                label: `${pendingQuotes.length} onay bekleyen siparişte · ${formatNumber(totalQty)} ${product.unit}`,
-                                                color: "var(--accent-text)",
-                                            });
-                                        }
-                                        if (draftQuotes.length > 0) {
-                                            const totalQty = draftQuotes.reduce((s, q) => s + (q.quantity ?? 0), 0);
-                                            usageItems.push({
-                                                label: `${draftQuotes.length} taslak teklifte · ${formatNumber(totalQty)} ${product.unit}`,
-                                                color: "var(--warning-text)",
-                                            });
-                                        }
-
-                                        // Rezerve (onaylı siparişler için ayrılmış)
-                                        if (product.reserved > 0) {
-                                            usageItems.push({
-                                                label: `${formatNumber(product.reserved)} ${product.unit} onaylı siparişlere rezerve`,
-                                                color: "var(--accent-text)",
-                                            });
-                                        }
-
-                                        // Satınalma bekliyor
-                                        if (commitments.length > 0) {
-                                            const totalQty = commitments.reduce((s, c) => s + (c.quantity ?? 0), 0);
-                                            usageItems.push({
-                                                label: `${commitments.length} satınalma bekliyor · ${formatNumber(totalQty)} ${product.unit}`,
-                                                color: "var(--success-text)",
-                                            });
-                                        }
-
-                                        // Aktif alertler
-                                        if (drawerAlerts.length > 0) {
-                                            const critCount = drawerAlerts.filter(a => a.severity === "critical").length;
-                                            const warnCount = drawerAlerts.filter(a => a.severity === "warning").length;
-                                            const parts = [];
-                                            if (critCount > 0) parts.push(`${critCount} kritik`);
-                                            if (warnCount > 0) parts.push(`${warnCount} uyarı`);
-                                            if (parts.length > 0) {
-                                                usageItems.push({
-                                                    label: `${parts.join(", ")} alert aktif`,
-                                                    color: critCount > 0 ? "var(--danger-text)" : "var(--warning-text)",
-                                                });
-                                            }
-                                        }
-
-                                        if (usageItems.length === 0) return null;
-
-                                        return (
-                                            <div style={{ marginTop: "12px" }}>
-                                                <div style={{
-                                                    fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
-                                                    textTransform: "uppercase", letterSpacing: "0.04em",
-                                                    marginBottom: "6px",
-                                                }}>
-                                                    Nerede Kullanılıyor?
-                                                </div>
-                                                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                                    {usageItems.map((item, i) => (
-                                                        <div key={i} style={{
-                                                            display: "flex", alignItems: "center", gap: "6px",
-                                                            fontSize: "12px", color: "var(--text-secondary)",
-                                                        }}>
-                                                            <span style={{
-                                                                width: "5px", height: "5px", borderRadius: "50%",
-                                                                background: item.color, flexShrink: 0,
-                                                            }} />
-                                                            {item.label}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
                                 </div>
 
                                 {/* ── Block 2: Operasyonel Durum ───────────────── */}
@@ -2229,13 +2141,17 @@ export default function ProductsPage() {
                                     />
                                 </FormField>
                                 <FormField label="Kategori">
-                                    <select
+                                    <input
+                                        type="text"
+                                        list="product-categories-list"
                                         style={modalInputStyle}
                                         value={createForm.category}
                                         onChange={e => setCreateForm(f => ({ ...f, category: e.target.value }))}
-                                    >
-                                        {categories.slice(1).map(c => <option key={c}>{c}</option>)}
-                                    </select>
+                                        placeholder="Kategori seç veya yaz..."
+                                    />
+                                    <datalist id="product-categories-list">
+                                        {categories.slice(1).map(c => <option key={c} value={c} />)}
+                                    </datalist>
                                 </FormField>
                             </div>
 
