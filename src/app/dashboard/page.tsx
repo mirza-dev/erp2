@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import StatsCards from "@/components/dashboard/StatsCards";
 import StockDataGrid from "@/components/dashboard/StockDataGrid";
@@ -18,8 +18,15 @@ const STATUS_OPTIONS = [
 ];
 
 export default function DashboardPage() {
-    const { products } = useData();
+    const { products, refetchAll } = useData();
     const [filterOpen, setFilterOpen] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const handleRefresh = useCallback(async () => {
+        if (refreshing) return;
+        setRefreshing(true);
+        try { await refetchAll(); } finally { setRefreshing(false); }
+    }, [refetchAll, refreshing]);
     const [filterCategory, setFilterCategory] = useState("");
     const [filterStatus, setFilterStatus] = useState("");
     const filterRef = useRef<HTMLDivElement>(null);
@@ -57,6 +64,29 @@ export default function DashboardPage() {
                     Stok Envanteri
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    {/* Yenile */}
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        style={{
+                            fontSize: "12px",
+                            padding: "6px 12px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "6px",
+                            background: "transparent",
+                            color: "var(--text-secondary)",
+                            cursor: refreshing ? "not-allowed" : "pointer",
+                            opacity: refreshing ? 0.5 : 1,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: refreshing ? "rotate(180deg)" : "none", transition: "transform 0.4s" }}>
+                            <path d="M10 6A4 4 0 1 1 6 2a4 4 0 0 1 3.5 2M10 2v2.5H7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        {refreshing ? "Yenileniyor…" : "Yenile"}
+                    </button>
                     {/* Filter button + dropdown */}
                     <div ref={filterRef} style={{ position: "relative" }}>
                         <button

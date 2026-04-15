@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import { useData } from "@/lib/data-context";
+import { mapProduct } from "@/lib/api-mappers";
+import type { Product } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
@@ -180,9 +181,11 @@ function FormField({ label, required, children }: { label: string; required?: bo
 }
 
 export default function ProductsPage() {
-    const { products: mockProducts, addProduct, deleteProduct, loadError } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const [mockProducts, setMockProducts] = useState<Product[]>([]);
+    const [loadError, setLoadError] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -237,6 +240,24 @@ export default function ProductsPage() {
     const [filterSales, setFilterSales] = useState(false);
     const [filterPurchase, setFilterPurchase] = useState(false);
     const [usageOverrides, setUsageOverrides] = useState<Map<string, { isForSales: boolean; isForPurchase: boolean }>>(new Map());
+
+    const refetch = useCallback(async () => {
+        const res = await fetch("/api/products");
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) setMockProducts(data.map(mapProduct));
+        } else {
+            setLoadError("Ürünler yüklenemedi.");
+        }
+    }, []);
+
+    useEffect(() => { refetch(); }, [refetch]);
+
+    const handleRefresh = async () => {
+        if (refreshing) return;
+        setRefreshing(true);
+        try { await refetch(); } finally { setRefreshing(false); }
+    };
 
     useEffect(() => {
         function handleResize() { setWindowWidth(window.innerWidth); }
@@ -423,7 +444,12 @@ export default function ProductsPage() {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setDeletingId(id);
         try {
-            await deleteProduct(id);
+            const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => null);
+                throw new Error(errBody?.error ?? "Ürün silinemedi.");
+            }
+            await refetch();
             toast({ type: "success", message: "Ürün silindi" });
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Ürün silinemedi.";
@@ -439,7 +465,28 @@ export default function ProductsPage() {
         if (!createForm.name.trim() || !createForm.sku.trim()) return;
         setCreateSubmitting(true);
         try {
-            await addProduct(createForm);
+            const body = {
+                name: createForm.name, sku: createForm.sku, category: createForm.category,
+                unit: createForm.unit, price: createForm.price, currency: createForm.currency,
+                on_hand: createForm.on_hand, min_stock_level: createForm.minStockLevel,
+                product_type: createForm.productType, warehouse: createForm.warehouse,
+                material_quality: createForm.materialQuality || undefined,
+                origin_country: createForm.originCountry || undefined,
+                production_site: createForm.productionSite || undefined,
+                use_cases: createForm.useCases || undefined,
+                industries: createForm.industries || undefined,
+                standards: createForm.standards || undefined,
+                certifications: createForm.certifications || undefined,
+                product_notes: createForm.productNotes || undefined,
+                is_for_sales: createForm.isForSales, is_for_purchase: createForm.isForPurchase,
+            };
+            const res = await fetch("/api/products", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            await refetch();
             setCreateOpen(false);
             setCreateForm({
                 name: "", sku: "", category: "Küresel Vanalar", unit: "adet",
@@ -545,6 +592,28 @@ export default function ProductsPage() {
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        style={{
+                            fontSize: "12px",
+                            padding: "6px 12px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "6px",
+                            background: "transparent",
+                            color: "var(--text-secondary)",
+                            cursor: refreshing ? "not-allowed" : "pointer",
+                            opacity: refreshing ? 0.5 : 1,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: refreshing ? "rotate(180deg)" : "none", transition: "transform 0.4s" }}>
+                            <path d="M10 6A4 4 0 1 1 6 2a4 4 0 0 1 3.5 2M10 2v2.5H7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        {refreshing ? "Yenileniyor…" : "Yenile"}
+                    </button>
                     <input
                         type="text"
                         value={search}

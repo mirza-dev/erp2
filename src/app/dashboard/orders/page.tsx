@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { useData } from "@/lib/data-context";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/data-context";
+import { mapOrderSummary } from "@/lib/api-mappers";
+import type { Order } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
@@ -64,11 +65,12 @@ function matchesTab(order: { commercial_status: CommercialStatus; fulfillment_st
 }
 
 function OrdersList() {
-    const { orders: mockOrders, refetchAll } = useData();
     const router = useRouter();
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const [mockOrders, setMockOrders] = useState<Order[]>([]);
+    const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState("");
     const [customerIdFilter, setCustomerIdFilter] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
@@ -78,6 +80,22 @@ function OrdersList() {
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const filterAppliedRef = useRef(false);
+
+    const refetch = useCallback(async () => {
+        const res = await fetch("/api/orders");
+        if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) setMockOrders(data.map(mapOrderSummary));
+        }
+    }, []);
+
+    useEffect(() => { refetch(); }, [refetch]);
+
+    const handleRefresh = async () => {
+        if (refreshing) return;
+        setRefreshing(true);
+        try { await refetch(); } finally { setRefreshing(false); }
+    };
 
     const handleDelete = async (e: React.MouseEvent, orderId: string) => {
         e.stopPropagation();
@@ -95,7 +113,7 @@ function OrdersList() {
                 toast({ type: "error", message: errBody.error || `İşlem başarısız (${res.status})` });
                 return;
             }
-            await refetchAll();
+            await refetch();
         } finally {
             setDeletingId(null);
         }
@@ -165,9 +183,33 @@ function OrdersList() {
                         {mockOrders.length} sipariş · {pendingCount} onay bekliyor
                     </div>
                 </div>
-                <Link href="/dashboard/orders/new">
-                    <Button variant="primary">+ Yeni Sipariş</Button>
-                </Link>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        style={{
+                            fontSize: "12px",
+                            padding: "6px 12px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "6px",
+                            background: "transparent",
+                            color: "var(--text-secondary)",
+                            cursor: refreshing ? "not-allowed" : "pointer",
+                            opacity: refreshing ? 0.5 : 1,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "5px",
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M10 6A4 4 0 1 1 6 2a4 4 0 0 1 3.5 2M10 2v2.5H7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        {refreshing ? "Yenileniyor…" : "Yenile"}
+                    </button>
+                    <Link href="/dashboard/orders/new">
+                        <Button variant="primary">+ Yeni Sipariş</Button>
+                    </Link>
+                </div>
             </div>
 
             {/* Toolbar */}
