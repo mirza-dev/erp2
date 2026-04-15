@@ -568,13 +568,16 @@ function DemoTab() {
     async function runFullSetup() {
         setStep("deleting");
         try {
-            await seedDelete();
+            const del = await seedDelete();
+            if (!del.ok) throw new Error("Silme başarısız: " + del.error);
 
             setStep("seeding");
-            await seedPost();
+            const seed = await seedPost();
+            if (!seed.ok) throw new Error("Seed başarısız: " + seed.error);
 
             setStep("scanning");
-            await alertScan();
+            const scan = await alertScan();
+            if (!scan.ok) throw new Error("Alert taraması başarısız: " + scan.error);
 
             setStep("done");
             toast({ type: "success", message: "PMT demo verisi yüklendi, alertlar oluşturuldu!" });
