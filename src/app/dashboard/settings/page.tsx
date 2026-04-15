@@ -568,11 +568,17 @@ function DemoTab() {
         setStep("deleting");
         try {
             const del = await fetch("/api/seed", { method: "DELETE" });
-            if (!del.ok) throw new Error("Silme başarısız: " + del.status);
+            if (!del.ok) {
+                const body = await del.json().catch(() => ({}));
+                throw new Error("Silme başarısız: " + (body?.error ?? del.status));
+            }
 
             setStep("seeding");
             const seed = await fetch("/api/seed", { method: "POST" });
-            if (!seed.ok) throw new Error("Seed başarısız: " + seed.status);
+            if (!seed.ok) {
+                const body = await seed.json().catch(() => ({}));
+                throw new Error("Seed başarısız: " + (body?.error ?? seed.status));
+            }
 
             setStep("scanning");
             const scan = await fetch("/api/alerts/scan?force=true", { method: "POST" });
