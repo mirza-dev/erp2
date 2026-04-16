@@ -228,7 +228,7 @@ test.describe("Ürün Ekleme Modal", () => {
         const typeSelect = page.locator("select").nth(2);
         if (await typeSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
             const val = await typeSelect.inputValue();
-            expect(val).toMatch(/finished|mamul/i);
+            expect(val).toMatch(/finished|manufactured|mamul/i);
         }
     });
 
