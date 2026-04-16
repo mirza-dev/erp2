@@ -15,6 +15,7 @@ export const test = base.extend<{ demoPage: Page }>({
             document.cookie = "demo_mode=1; path=/; max-age=86400; SameSite=Lax";
         });
 
+        // eslint-disable-next-line react-hooks/rules-of-hooks
         await use(page);
         await context.close();
     },

@@ -21,7 +21,8 @@ test("üç rapor tab'ı görünür — Hammadde, Mamul, Ticari Mal", async ({ pa
 
 test("Hammadde tab'ı açıkken özet kartlar görünür", async ({ page }) => {
     await expect(page.getByText(/bağlanan sermaye/i).first()).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByText(/durgun \+ ölü/i).or(page.getByText(/ort\. bekleme/i)).first()).toBeVisible({ timeout: 5_000 });
+    // Exact matching: "Durgun + Ölü SKU" label'ı parent container'lardan ayırt eder
+    await expect(page.getByText("Durgun + Ölü SKU", { exact: true })).toBeVisible({ timeout: 5_000 });
 });
 
 test("Mamul tab'ına geçiş çalışıyor", async ({ page }) => {

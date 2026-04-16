@@ -56,12 +56,11 @@ test.describe("Ürün Listesi & Filtreler", () => {
     });
 
     test("ürün stok durumu renk kodlaması görünür", async ({ page }) => {
-        // Stok durumu badge'leri var mı
-        const badges = page.locator("[class*='badge'], [class*='chip'], [style*='danger'], [style*='warning']");
-        await page.waitForTimeout(500);
-        // At least the table renders
+        // Seed data ürünleri içerdiğinden tablo en az 1 satır göstermeli
+        await page.waitForSelector("table tbody tr", { timeout: 8_000 });
+        const rowCount = await page.locator("table tbody tr").count();
+        expect(rowCount).toBeGreaterThan(0);
         await expect(page.locator("main")).toBeVisible();
-        void badges;
     });
 });
 

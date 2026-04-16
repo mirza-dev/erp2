@@ -14,9 +14,6 @@ test("dashboard sayfası başarıyla yükleniyor", async ({ page }) => {
 });
 
 test("stats kartları render ediliyor", async ({ page }) => {
-    // StatsCards bileşeni — en az 1 rakam kartı
-    const cards = page.locator("[data-testid='stats-card']")
-        .or(page.getByRole("region").filter({ hasText: /toplam|sipariş|stok|müşteri/i }));
     // Veri yoksa bile kart iskeletleri yükleniyor
     await expect(page.locator("main")).toBeVisible();
 });

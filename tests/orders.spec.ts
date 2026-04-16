@@ -57,11 +57,10 @@ test("sipariş arama çalışıyor", async ({ page }) => {
     if (await searchInput.isVisible()) {
         await searchInput.fill("TEST-NONEXISTENT-XYZ");
         await page.waitForTimeout(400);
-        // Sonuçlar azalmış olmalı (0 veya filtrelenmiş)
-        const rows = page.locator("table tbody tr");
-        const count = await rows.count();
-        // Either filtered or "no results" message
-        expect(count).toBeGreaterThanOrEqual(0);
+        // Var olmayan bir string arandığında 0 satır veya "bulunamadı" mesajı dönmeli
+        const rowCount = await page.locator("table tbody tr").count();
+        const noResultsMsg = await page.getByText(/bulunamadı|no results/i).isVisible().catch(() => false);
+        expect(rowCount === 0 || noResultsMsg).toBeTruthy();
     }
 });
 
@@ -71,38 +70,27 @@ test("yeni sipariş oluşturulabiliyor ve DRAFT olarak kaydediliyor", async ({ p
     await page.goto("/dashboard/orders/new");
     await page.waitForLoadState("networkidle");
 
-    // Customer dropdown — custom button that opens a search input
-    const customerDropdown = page.getByText(/müşteri ara veya seç/i)
-        .or(page.locator("button").filter({ hasText: /müşteri|seç/i }).first());
-    if (await customerDropdown.first().isVisible({ timeout: 5_000 }).catch(() => false)) {
-        await customerDropdown.first().click();
-    }
+    // 1. Open customer dropdown (button text before selection: "Müşteri ara veya seç...")
+    await page.getByRole("button", { name: /müşteri ara veya seç/i }).click();
+
+    // 2. Search for the test customer by name
     const customerSearch = page.getByPlaceholder(/firma adı veya ülke/i);
-    if (await customerSearch.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await customerSearch.fill("Test");
-        await page.waitForTimeout(300);
-    }
-    // Pick first matching option
-    const option = page.getByRole("option").first()
-        .or(page.locator("li").filter({ hasText: /test/i }).first());
-    if (await option.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await option.click();
-    }
+    await expect(customerSearch).toBeVisible({ timeout: 5_000 });
+    await customerSearch.fill(customerName);
+    await page.waitForTimeout(300);
 
-    // Add product line
-    const addLineBtn = page.getByRole("button", { name: /satır ekle|ürün ekle|\+ ekle/i });
-    if (await addLineBtn.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await addLineBtn.click();
-    }
+    // 3. Click the matching customer row (dropdown items are <div><span>name</span>...)
+    await page.locator("span", { hasText: customerName }).first().click();
 
-    // Submit
-    const submitBtn = page.getByRole("button", { name: /sipariş oluştur|kaydet|oluştur/i });
-    if (await submitBtn.isEnabled({ timeout: 3_000 }).catch(() => false)) {
-        await submitBtn.click();
-        // On success → redirect to order list or order detail
-        await page.waitForURL("**/orders**", { timeout: 10_000 }).catch(() => {});
-    }
-    expect(page.url()).toContain("/orders");
+    // 4. Select the test product in the first order line's <select>
+    await page.locator("tbody select").first().selectOption(productId);
+
+    // 5. Submit as draft — button labeled "Taslak Kaydet"
+    await page.getByRole("button", { name: /taslak kaydet/i }).click();
+
+    // 6. On success → router.push("/dashboard/orders") → URL must NOT stay at /orders/new
+    await page.waitForURL("**/dashboard/orders", { timeout: 10_000 });
+    expect(page.url()).toMatch(/\/dashboard\/orders$/);
 });
 
 // ── Sipariş Detay & Durum Geçişleri ──────────────────────────────────────────

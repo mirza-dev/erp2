@@ -1,9 +1,9 @@
-import { chromium, FullConfig } from "@playwright/test";
+import { chromium } from "@playwright/test";
 import { STORAGE_STATE } from "../playwright.config";
 import fs from "fs";
 import path from "path";
 
-export default async function globalSetup(_config: FullConfig) {
+export default async function globalSetup() {
     const email    = process.env.E2E_USER_EMAIL    ?? "";
     const password = process.env.E2E_USER_PASSWORD ?? "";
 
