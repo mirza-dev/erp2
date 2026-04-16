@@ -91,7 +91,7 @@ describe("POST /api/alerts/scan — HTTP status contract", () => {
     it("200 + scan result on success", async () => {
         mockServiceScanStockAlerts.mockResolvedValue({ scanned: 10, created: 2, resolved: 1 });
 
-        const res = await scanPost();
+        const res = await scanPost(new NextRequest("http://localhost/api/alerts/scan", { method: "POST" }));
         const body = await res.json();
 
         expect(res.status).toBe(200);
@@ -102,7 +102,7 @@ describe("POST /api/alerts/scan — HTTP status contract", () => {
     it("500 when service throws — UI res.ok check catches this", async () => {
         mockServiceScanStockAlerts.mockRejectedValue(new Error("DB hatası"));
 
-        const res = await scanPost();
+        const res = await scanPost(new NextRequest("http://localhost/api/alerts/scan", { method: "POST" }));
 
         expect(res.status).toBe(500);
     });
@@ -110,7 +110,7 @@ describe("POST /api/alerts/scan — HTTP status contract", () => {
     it("500 body has error field", async () => {
         mockServiceScanStockAlerts.mockRejectedValue(new Error("DB hatası"));
 
-        const res = await scanPost();
+        const res = await scanPost(new NextRequest("http://localhost/api/alerts/scan", { method: "POST" }));
         const body = await res.json();
 
         expect(body.error).toBeDefined();
@@ -122,7 +122,7 @@ describe("POST /api/alerts/scan — HTTP status contract", () => {
             return Promise.resolve({ data: null });
         });
 
-        const res = await scanPost();
+        const res = await scanPost(new NextRequest("http://localhost/api/alerts/scan", { method: "POST" }));
 
         expect(res.status).toBe(409);
         expect(mockServiceScanStockAlerts).not.toHaveBeenCalled();

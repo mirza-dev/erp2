@@ -26,6 +26,7 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbCancelOrder:       (...args: unknown[]) => mockDbCancelOrder(...args),
     dbUpdateOrderStatus: (...args: unknown[]) => mockDbUpdateOrderStatus(...args),
     dbLogOrderAction:    (...args: unknown[]) => mockDbLogOrderAction(...args),
+    dbListOrders:                 vi.fn().mockResolvedValue([]),
     dbListExpiredQuotes:          vi.fn(),
     dbUpdateOrderQuoteDeadline:   vi.fn(),
 }));
@@ -36,7 +37,7 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbBatchResolveAlerts: vi.fn().mockResolvedValue(0),
 }));
 
-import { serviceTransitionOrder, validateOrderCreate } from "@/lib/services/order-service";
+import { serviceTransitionOrder, validateOrderCreate, serviceListOrders, serviceGetOrder } from "@/lib/services/order-service";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 
 // ── Fixtures ──────────────────────────────────────────────────
@@ -270,5 +271,26 @@ describe("validateOrderCreate", () => {
     it("quote_valid_until yok → geçerli (süresiz teklif)", () => {
         const result = validateOrderCreate({ ...validInput, quote_valid_until: undefined });
         expect(result.valid).toBe(true);
+    });
+});
+
+// ── CRUD passthroughs ─────────────────────────────────────────
+
+describe("serviceListOrders — passthrough to dbListOrders", () => {
+    it("filtre ile çağrıldığında dizi döner", async () => {
+        const result = await serviceListOrders({ commercial_status: "approved" });
+        expect(Array.isArray(result)).toBe(true);
+    });
+});
+
+describe("serviceGetOrder — passthrough to dbGetOrderById", () => {
+    it("id ile çağrıldığında dbGetOrderById sonucunu döner", async () => {
+        const order = { id: "o1", commercial_status: "draft" };
+        mockDbGetOrderById.mockResolvedValue(order);
+
+        const result = await serviceGetOrder("o1");
+
+        expect(mockDbGetOrderById).toHaveBeenCalledWith("o1");
+        expect(result).toEqual(order);
     });
 });

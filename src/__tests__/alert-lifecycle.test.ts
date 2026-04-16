@@ -64,6 +64,8 @@ import {
     serviceScanStockAlerts,
     serviceUpdateAlertStatus,
     serviceGenerateAiAlerts,
+    serviceListAlerts,
+    serviceGetAlert,
 } from "@/lib/services/alert-service";
 import type { ProductWithStock } from "@/lib/database.types";
 
@@ -344,5 +346,31 @@ describe("Lifecycle contract — acknowledged aktif sayılır", () => {
         );
         expect(escalateCalls).toHaveLength(1);
         expect(escalateCalls[0].entityId).toBe(PRODUCT_CRITICAL.id);
+    });
+});
+
+// ── CRUD passthroughs ─────────────────────────────────────────────────────────
+
+describe("serviceListAlerts — passthrough to dbListAlerts", () => {
+    it("çağrıldığında dbListAlerts sonucunu döner", async () => {
+        const fakeAlert = { id: "a1", type: "stock_critical", status: "open" };
+        mockDbListAlerts.mockResolvedValue([fakeAlert]);
+
+        const result = await serviceListAlerts({ status: "open" });
+
+        expect(mockDbListAlerts).toHaveBeenCalledWith({ status: "open" });
+        expect(result).toEqual([fakeAlert]);
+    });
+});
+
+describe("serviceGetAlert — passthrough to dbGetAlertById", () => {
+    it("id ile çağrıldığında dbGetAlertById sonucunu döner", async () => {
+        const fakeAlert = { id: "a1", type: "stock_risk", status: "acknowledged" };
+        mockDbGetAlertById.mockResolvedValue(fakeAlert);
+
+        const result = await serviceGetAlert("a1");
+
+        expect(mockDbGetAlertById).toHaveBeenCalledWith("a1");
+        expect(result).toEqual(fakeAlert);
     });
 });

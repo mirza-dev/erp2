@@ -111,7 +111,7 @@ describe("serviceSyncOrderToParasut — PARASUT_ENABLED guard", () => {
             currency: "USD",
             customer_id: "cust-1",
             customer_name: "Test",
-            lines: [],
+            lines: [{ quantity: 1, unit_price: 100, product_name: "Test Ürün", product_sku: "SKU-001", product_id: "prod-1", discount_pct: 0 }],
         });
         mockSendInvoice.mockResolvedValue({ success: true, invoiceId: "F-2026-9999", sentAt: new Date().toISOString() });
 

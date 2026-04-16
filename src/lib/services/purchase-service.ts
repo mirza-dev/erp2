@@ -8,10 +8,10 @@
  * - MOQ rounding: max(moq, ceil(needed / moq) * moq)
  */
 
-import { dbListProducts } from "@/lib/supabase/products";
+import { dbListProducts, dbGetQuotedQuantities } from "@/lib/supabase/products";
 import {
     dbListAlerts,
-    dbOpenAlertExists,
+    dbListActiveAlerts,
     dbCreateAlert,
     dbResolveAlertsForEntity,
 } from "@/lib/supabase/alerts";
@@ -57,19 +57,31 @@ export interface PurchaseScanResult {
  * - Stock recovered → open purchase_recommended alertleri kapat
  */
 export async function serviceScanPurchaseSuggestions(): Promise<PurchaseScanResult> {
-    const products = await dbListProducts({ is_active: true, pageSize: 500 });
+    const [products, activeAlerts, quotedMap] = await Promise.all([
+        dbListProducts({ is_active: true, pageSize: 500 }),
+        dbListActiveAlerts(),
+        dbGetQuotedQuantities(),
+    ]);
+
+    // Dedup: open + acknowledged purchase_recommended alertleri önceden topla
+    const activePurchaseSet = new Set<string>();
+    for (const a of activeAlerts) {
+        if (a.type === "purchase_recommended" && a.entity_id) {
+            activePurchaseSet.add(a.entity_id);
+        }
+    }
 
     let created = 0;
     let resolved = 0;
 
     for (const product of products) {
-        const available = product.available_now;
+        const available = product.available_now - (quotedMap.get(product.id) ?? 0); // promisable
         const min = product.min_stock_level;
         const moq = product.reorder_qty ?? min;
         const entityId = product.id;
 
         if (available <= min) {
-            const exists = await dbOpenAlertExists("purchase_recommended", entityId);
+            const exists = activePurchaseSet.has(entityId);
             if (!exists) {
                 const dailyUsage = product.daily_usage ?? null;
                 const leadTimeDays = product.lead_time_days ?? null;
