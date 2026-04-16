@@ -19,6 +19,9 @@ const mockDbCancelOrder     = vi.fn();
 const mockDbUpdateOrderStatus = vi.fn();
 const mockDbLogOrderAction  = vi.fn();
 
+const mockDbCreateOrder = vi.fn();
+const mockDbUpdateOrderQuoteDeadline = vi.fn().mockResolvedValue(undefined);
+
 vi.mock("@/lib/supabase/orders", () => ({
     dbGetOrderById:      (...args: unknown[]) => mockDbGetOrderById(...args),
     dbApproveOrder:      (...args: unknown[]) => mockDbApproveOrder(...args),
@@ -26,18 +29,21 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbCancelOrder:       (...args: unknown[]) => mockDbCancelOrder(...args),
     dbUpdateOrderStatus: (...args: unknown[]) => mockDbUpdateOrderStatus(...args),
     dbLogOrderAction:    (...args: unknown[]) => mockDbLogOrderAction(...args),
+    dbCreateOrder:       (...args: unknown[]) => mockDbCreateOrder(...args),
     dbListOrders:                 vi.fn().mockResolvedValue([]),
     dbListExpiredQuotes:          vi.fn(),
-    dbUpdateOrderQuoteDeadline:   vi.fn(),
+    dbUpdateOrderQuoteDeadline:   (...args: unknown[]) => mockDbUpdateOrderQuoteDeadline(...args),
 }));
+
+const mockDbBatchResolveAlerts = vi.fn().mockResolvedValue(0);
 
 vi.mock("@/lib/supabase/alerts", () => ({
     dbCreateAlert:        vi.fn(),
     dbListActiveAlerts:   vi.fn().mockResolvedValue([]),
-    dbBatchResolveAlerts: vi.fn().mockResolvedValue(0),
+    dbBatchResolveAlerts: (...args: unknown[]) => mockDbBatchResolveAlerts(...args),
 }));
 
-import { serviceTransitionOrder, validateOrderCreate, serviceListOrders, serviceGetOrder } from "@/lib/services/order-service";
+import { serviceTransitionOrder, validateOrderCreate, serviceListOrders, serviceGetOrder, serviceCreateOrder, serviceUpdateQuoteDeadline } from "@/lib/services/order-service";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 
 // ── Fixtures ──────────────────────────────────────────────────
@@ -292,5 +298,56 @@ describe("serviceGetOrder — passthrough to dbGetOrderById", () => {
 
         expect(mockDbGetOrderById).toHaveBeenCalledWith("o1");
         expect(result).toEqual(order);
+    });
+});
+
+// ── serviceCreateOrder — invalid status guard ─────────────────
+
+const validLine = { product_id: "prod-1", product_name: "Vana", quantity: 1, unit_price: 100, unit: "adet", line_total: 100 };
+const validOrderInput = { customer_name: "Acme", lines: [validLine], grand_total: 120, commercial_status: "draft" as const };
+
+describe("serviceCreateOrder — invalid commercial_status throws", () => {
+    it("'approved' başlangıç statüsü → hata fırlatır (domain-rules §4.1)", async () => {
+        await expect(
+            serviceCreateOrder({ ...validOrderInput, commercial_status: "approved" as "draft" })
+        ).rejects.toThrow(/Geçersiz başlangıç/i);
+    });
+
+    it("'draft' → dbCreateOrder çağrılır ve fulfillment_status eklenir", async () => {
+        mockDbCreateOrder.mockResolvedValue({ id: "o-new", order_number: "ORD-001" });
+        const result = await serviceCreateOrder(validOrderInput);
+        expect(mockDbCreateOrder).toHaveBeenCalledWith(
+            expect.objectContaining({ commercial_status: "draft", fulfillment_status: "unallocated" })
+        );
+        expect(result).toEqual({ id: "o-new", order_number: "ORD-001" });
+    });
+});
+
+// ── serviceUpdateQuoteDeadline — alert resolve branch ────────
+
+describe("serviceUpdateQuoteDeadline — quote_valid_until dalları", () => {
+    beforeEach(() => {
+        mockDbUpdateOrderQuoteDeadline.mockResolvedValue(undefined);
+        mockDbBatchResolveAlerts.mockClear();
+        mockDbBatchResolveAlerts.mockResolvedValue(0);
+    });
+
+    it("geçerli tarih (bugün veya ileri) → resolveQuoteExpiredAlerts çağrılır", async () => {
+        const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+        await serviceUpdateQuoteDeadline("order-1", tomorrow);
+        expect(mockDbBatchResolveAlerts).toHaveBeenCalledWith(
+            expect.arrayContaining([expect.objectContaining({ type: "quote_expired" })])
+        );
+    });
+
+    it("geçmiş tarih → resolveQuoteExpiredAlerts çağrılmaz", async () => {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        await serviceUpdateQuoteDeadline("order-1", yesterday);
+        expect(mockDbBatchResolveAlerts).not.toHaveBeenCalled();
+    });
+
+    it("null tarih → resolveQuoteExpiredAlerts çağrılmaz", async () => {
+        await serviceUpdateQuoteDeadline("order-1", null);
+        expect(mockDbBatchResolveAlerts).not.toHaveBeenCalled();
     });
 });

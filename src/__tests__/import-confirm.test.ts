@@ -40,6 +40,12 @@ const mockDbUpdateInvoiceStatus = vi.fn();
 const mockDbSumPaymentsForInvoice = vi.fn();
 const mockDbCreatePayment = vi.fn();
 const mockDbFindOrderByOriginalNumber = vi.fn();
+const mockDbIncrementMappingSuccess = vi.fn();
+
+vi.mock("@/lib/supabase/column-mappings", () => ({
+    dbIncrementMappingSuccess: (...args: unknown[]) => mockDbIncrementMappingSuccess(...args),
+    normalizeColumnName: (s: string) => s.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+}));
 
 vi.mock("@/lib/supabase/import", () => ({
     dbGetBatch: (...args: unknown[]) => mockDbGetBatch(...args),
@@ -90,6 +96,7 @@ vi.mock("@/lib/supabase/service", () => ({
 }));
 
 import { serviceConfirmBatch } from "@/lib/services/import-service";
+import { createServiceClient } from "@/lib/supabase/service";
 
 // ─── Fixture factory ─────────────────────────────────────────────────────────
 
@@ -1632,5 +1639,358 @@ describe("serviceConfirmBatch — mixed-entity batch", () => {
         expect(result.added).toBe(1);   // product new
         expect(result.updated).toBe(1); // quote existing
         expect(result.skipped).toBe(1); // quote missing number
+    });
+});
+
+// ─── order_line entity ────────────────────────────────────────────────────────
+
+describe("serviceConfirmBatch — order_line entity", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    function makeSupabaseMock(opts: {
+        existingSortOrders?: Array<{ sort_order: number }>;
+        allLines?: Array<{ line_total: number }>;
+    } = {}) {
+        const { existingSortOrders = [], allLines = [{ line_total: 500 }] } = opts;
+        const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null });
+        const mockUpdateEq = vi.fn().mockResolvedValue({ data: null, error: null });
+        const mockSalesOrdersUpdate = vi.fn().mockReturnValue({ eq: mockUpdateEq });
+
+        const mockFrom = vi.fn((table: string) => {
+            if (table === "order_lines") {
+                return {
+                    select: vi.fn((col: string) => {
+                        if (col === "sort_order") {
+                            return {
+                                eq: vi.fn().mockReturnThis(),
+                                order: vi.fn().mockReturnThis(),
+                                limit: vi.fn().mockResolvedValue({ data: existingSortOrders }),
+                            };
+                        }
+                        // "line_total" select
+                        return {
+                            eq: vi.fn().mockResolvedValue({ data: allLines }),
+                        };
+                    }),
+                    insert: mockInsert,
+                };
+            }
+            if (table === "sales_orders") {
+                return { update: mockSalesOrdersUpdate };
+            }
+            return {};
+        });
+
+        return { mockFrom, mockInsert, mockSalesOrdersUpdate, mockUpdateEq };
+    }
+
+    it("order_number eksikse → skipped, draft rejected", async () => {
+        const draft = makeDraft({
+            entity_type: "order_line",
+            parsed_data: { product_sku: "GV-050", quantity: 2, unit_price: 100 }, // no order_number
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(result.added).toBe(0);
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "rejected" });
+    });
+
+    it("product_sku eksikse → skipped, draft rejected", async () => {
+        const draft = makeDraft({
+            entity_type: "order_line",
+            parsed_data: { order_number: "ORD-001", quantity: 2, unit_price: 100 }, // no product_sku
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "rejected" });
+    });
+
+    it("sipariş bulunamazsa → skipped, draft rejected", async () => {
+        const draft = makeDraft({
+            entity_type: "order_line",
+            parsed_data: { order_number: "ORD-NONEXISTENT", product_sku: "GV-050" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindOrderByOriginalNumber.mockResolvedValue(null);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "rejected" });
+    });
+
+    it("başarılı → order_lines insert + sales_orders totals update çağrılır", async () => {
+        const draft = makeDraft({
+            entity_type: "order_line",
+            parsed_data: { order_number: "ORD-2026-0001", product_sku: "GV-050", quantity: 2, unit_price: 250, discount_pct: 0 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindOrderByOriginalNumber.mockResolvedValue({ id: "order-1" });
+        mockDbFindProductBySku.mockResolvedValue({ id: "prod-1" });
+
+        const { mockFrom, mockInsert, mockSalesOrdersUpdate } = makeSupabaseMock({
+            existingSortOrders: [],
+            allLines: [{ line_total: 500 }],
+        });
+        vi.mocked(createServiceClient).mockReturnValue({ from: mockFrom } as ReturnType<typeof createServiceClient>);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(mockInsert).toHaveBeenCalledWith(
+            expect.objectContaining({ order_id: "order-1", product_sku: "GV-050", quantity: 2 })
+        );
+        expect(mockSalesOrdersUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ subtotal: 500, vat_total: 100, grand_total: 600 })
+        );
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "merged" });
+    });
+
+    it("mevcut satır varsa sort_order bir artırılır", async () => {
+        const draft = makeDraft({
+            entity_type: "order_line",
+            parsed_data: { order_number: "ORD-2026-0001", product_sku: "GV-050", quantity: 1, unit_price: 100 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindOrderByOriginalNumber.mockResolvedValue({ id: "order-1" });
+        mockDbFindProductBySku.mockResolvedValue({ id: "prod-1" });
+
+        const { mockFrom, mockInsert } = makeSupabaseMock({
+            existingSortOrders: [{ sort_order: 5 }],
+            allLines: [{ line_total: 100 }],
+        });
+        vi.mocked(createServiceClient).mockReturnValue({ from: mockFrom } as ReturnType<typeof createServiceClient>);
+
+        await serviceConfirmBatch("batch-1");
+
+        expect(mockInsert).toHaveBeenCalledWith(
+            expect.objectContaining({ sort_order: 6 })
+        );
+    });
+});
+
+// ─── parseNumeric — TR format ─────────────────────────────────────────────────
+
+describe("parseNumeric — TR format (dolaylı, product price üzerinden)", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("'1.234,56' (TR thousands dot + decimal comma) → 1234.56", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Flanş DN100", sku: "FL-100", unit: "adet", price: "1.234,56" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "p-new" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [payload] = mockDbCreateProduct.mock.calls[0];
+        expect(payload.price).toBe(1234.56);
+    });
+
+    it("'1.000' (TR integer with thousands dot) → 1000", async () => {
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Vana", sku: "VN-001", unit: "adet", price: "1.000" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "p-new" });
+
+        await serviceConfirmBatch("batch-1");
+
+        const [payload] = mockDbCreateProduct.mock.calls[0];
+        expect(payload.price).toBe(1000);
+    });
+});
+
+// ─── Shipment / Invoice / Payment — orderId + customerId + invoiceId branches ─
+
+describe("serviceConfirmBatch — shipment with order_number → orderId resolved", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("shipment order_number provided → dbFindOrderByOriginalNumber called, orderId set", async () => {
+        const draft = makeDraft({
+            entity_type: "shipment",
+            parsed_data: { shipment_number: "SEV-001", order_number: "ORD-2026-0001" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindOrderByOriginalNumber.mockResolvedValue({ id: "order-1" });
+        mockDbCreateShipment.mockResolvedValue({ id: "ship-new" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(mockDbFindOrderByOriginalNumber).toHaveBeenCalledWith("ORD-2026-0001");
+        expect(mockDbCreateShipment).toHaveBeenCalledWith(
+            expect.objectContaining({ order_id: "order-1", order_number: "ORD-2026-0001" })
+        );
+    });
+});
+
+describe("serviceConfirmBatch — invoice with order_number + customer_code", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("invoice order_number + customer_code → orderId + customerId resolved", async () => {
+        const draft = makeDraft({
+            entity_type: "invoice",
+            parsed_data: {
+                invoice_number: "FAT-001",
+                order_number: "ORD-2026-0001",
+                customer_code: "ACME",
+                amount: 1200,
+            },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindInvoiceByNumber.mockResolvedValue(null); // new invoice
+        mockDbFindOrderByOriginalNumber.mockResolvedValue({ id: "order-1" });
+        mockDbFindCustomerByCode.mockResolvedValue({ id: "cust-1" });
+        mockDbCreateInvoice.mockResolvedValue({ id: "inv-new" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(mockDbFindOrderByOriginalNumber).toHaveBeenCalledWith("ORD-2026-0001");
+        expect(mockDbFindCustomerByCode).toHaveBeenCalledWith("ACME");
+        expect(mockDbCreateInvoice).toHaveBeenCalledWith(
+            expect.objectContaining({ order_id: "order-1", customer_id: "cust-1" })
+        );
+    });
+});
+
+describe("serviceConfirmBatch — payment with invoice_number → invoice status update", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("payment fully covers invoice → dbUpdateInvoiceStatus 'paid' çağrılır", async () => {
+        const draft = makeDraft({
+            entity_type: "payment",
+            parsed_data: { payment_number: "ODE-001", invoice_number: "FAT-001", amount: 1000 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbCreatePayment.mockResolvedValue({ id: "pay-new" });
+        // dbFindInvoiceByNumber called TWICE: once to get invoiceId, once inside if(invoiceId) block
+        mockDbFindInvoiceByNumber
+            .mockResolvedValueOnce({ id: "inv-1" })         // first call → invoiceId lookup
+            .mockResolvedValueOnce({ id: "inv-1", amount: 1000 }); // second call → invoice detail
+        mockDbSumPaymentsForInvoice.mockResolvedValue(1000); // fully paid
+
+        await serviceConfirmBatch("batch-1");
+
+        expect(mockDbSumPaymentsForInvoice).toHaveBeenCalledWith("inv-1");
+        expect(mockDbUpdateInvoiceStatus).toHaveBeenCalledWith("inv-1", "paid");
+    });
+
+    it("payment partially covers invoice → dbUpdateInvoiceStatus 'partially_paid' çağrılır", async () => {
+        const draft = makeDraft({
+            entity_type: "payment",
+            parsed_data: { payment_number: "ODE-002", invoice_number: "FAT-001", amount: 400 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbCreatePayment.mockResolvedValue({ id: "pay-new" });
+        mockDbFindInvoiceByNumber
+            .mockResolvedValueOnce({ id: "inv-1" })
+            .mockResolvedValueOnce({ id: "inv-1", amount: 1000 });
+        mockDbSumPaymentsForInvoice.mockResolvedValue(400); // partial
+
+        await serviceConfirmBatch("batch-1");
+
+        expect(mockDbUpdateInvoiceStatus).toHaveBeenCalledWith("inv-1", "partially_paid");
+    });
+});
+
+// ─── Meta processing — column_mapping_meta branch ────────────────────────────
+
+describe("serviceConfirmBatch — meta processing (column_mapping_meta)", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbIncrementMappingSuccess.mockResolvedValue(undefined);
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("batch with parse_result.column_mapping_meta + merge → dbIncrementMappingSuccess çağrılır", async () => {
+        const metaBatch = makeBatch({
+            status: "confirmed",
+            parse_result: {
+                column_mapping_meta: [
+                    { entity_type: "product", normalized_columns: ["urun_adi", "sku"] },
+                ],
+            } as unknown as null,
+        });
+        // dbGetBatch returns review batch (status: "review"), dbUpdateBatchStatus returns confirmed batch WITH meta
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(metaBatch);
+
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Vana", sku: "VN-001", unit: "adet" },
+        });
+        mockDbListDrafts
+            .mockResolvedValueOnce([draft])             // first call: drafts to process
+            .mockResolvedValueOnce([{ entity_type: "product", status: "merged" }]); // second call: finalDrafts
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "p-new" });
+
+        await serviceConfirmBatch("batch-1");
+
+        expect(mockDbIncrementMappingSuccess).toHaveBeenCalledWith(
+            ["urun_adi", "sku"],
+            "product"
+        );
+    });
+
+    it("batch with meta but no merged drafts → dbIncrementMappingSuccess çağrılmaz", async () => {
+        const batchWithMeta = makeBatch({
+            parse_result: {
+                column_mapping_meta: [
+                    { entity_type: "product", normalized_columns: ["sku"] },
+                ],
+            } as unknown as null,
+        });
+        mockDbGetBatch.mockResolvedValue(batchWithMeta);
+
+        // All drafts skipped (missing required field)
+        const draft = makeDraft({
+            entity_type: "product",
+            parsed_data: { sku: "VN-001" }, // missing name + unit → skip
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+
+        await serviceConfirmBatch("batch-1");
+
+        // added + updated = 0 → no call
+        expect(mockDbIncrementMappingSuccess).not.toHaveBeenCalled();
     });
 });
