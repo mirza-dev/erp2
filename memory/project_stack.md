@@ -59,9 +59,10 @@ src/
 ## Demo Hazırlık
 
 - `POST /api/seed` — tüm tabloları dolduruyor (products, customers, orders, order_lines, reservations, shortages, commitments, BOM, production, movements, shipments, invoices, payments, sync_logs, audit_log)
-- `DELETE /api/seed` — tüm verileri siliyor (FK sırasına göre)
-- `settings/page.tsx` → "Demo Hazırlık" tab → "PMT Demo Verisini Yükle" butonu (DELETE + POST + alerts/scan?force=true)
-- `CRON_SECRET=kokpit-pmt-2026` Bearer token ile `/api/seed` erişimi (middleware CRON_PATHS'e dahil)
+- `DELETE /api/seed` — tüm verileri siliyor (FK sırasına göre: payments, invoices, shipments önce, sonra sales_orders)
+- `settings/page.tsx` → "Demo Hazırlık" tab → "PMT Demo Verisini Yükle" butonu (DELETE + POST + `alerts/scan?force=true`)
+- `/api/seed` → `ALWAYS_PUBLIC` (middleware'de — CRON_PATHS'te değil); kendi içinde CRON_SECRET Bearer VEYA aktif Supabase session ile auth yapıyor
+- Server action YASAK — `settings/` altında `actions.ts` dosyası yok, sadece client `fetch()` kullanılıyor
 ```
 
 ---

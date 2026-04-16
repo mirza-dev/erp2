@@ -25,6 +25,8 @@ type: project
 - Algılama sırası: `column_mappings` hafıza → `FALLBACK_FIELD_MAP` → AI (sadece gerçekten bilinmeyen kolonlar için)
 - `normalizeColumnName()` — Türkçe transliterasyon (İ→i, ğ→g, ü→u vb.), tüm route'lar ve fallback paylaşıyor
 - Hafıza: `column_mappings` tablosu (usage_count, success_count) — success_count sadece confirm sonrası artırılıyor
+- `FALLBACK_FIELD_MAP.product.sektor_uygunlugu = "sector_compatibility"` mevcut; `import-fields.ts`'e 2026-04-15'te eklendi (öncesi import UI "Atla" gösteriyordu)
+- Import sonrası yeni kategoriler products/page.tsx'te otomatik filtre seçeneklerine yansır (dinamik useMemo)
 
 **Stage 2A:** AI memory layer, audit trail, guardrails (G1-G4), run logging (`ai_runs` tablosu)
 

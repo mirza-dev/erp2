@@ -14,8 +14,9 @@ Tüm 23 tablo için Row Level Security aktif.
 
 - `/` ve `/login` → herkese açık; auth'd kullanıcı `/`'e gelirse `/dashboard`'a yönlendir
 - `/dashboard/**` ve `/api/**` → oturum gerektirir
-- Cron bypass: `CRON_SECRET` Bearer token → `/api/alerts/scan`, `/api/alerts/ai-suggest`, `/api/parasut/sync-all`
-- `/api/health` ve `/api/auth/demo` → her zaman public
+- **ALWAYS_PUBLIC:** `/api/health`, `/api/auth/demo`, `/api/seed` — middleware kontrolü yok
+- **CRON_PATHS** (CRON_SECRET Bearer token bypass): `/api/alerts/scan`, `/api/alerts/ai-suggest`, `/api/parasut/sync-all`, `/api/orders/expire-quotes`, `/api/orders/check-shipments`
+- `/api/seed` özel: ALWAYS_PUBLIC ama kendi route handler'ında CRON_SECRET Bearer VEYA aktif session doğrulaması yapıyor
 
 ---
 
