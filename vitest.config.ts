@@ -8,7 +8,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
-      include: ["src/lib/services/**", "src/lib/stock-utils.ts", "src/lib/api-mappers.ts"],
+      include: [
+        "src/lib/services/**",
+        "src/lib/stock-utils.ts",
+        "src/lib/api-mappers.ts",
+        "src/lib/ai-guards.ts",
+        "src/lib/alert-ui-helpers.ts",
+      ],
       exclude: ["src/__tests__/**"],
       thresholds: { lines: 80, functions: 80, branches: 80 },
     },
