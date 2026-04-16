@@ -284,6 +284,104 @@ async function runImportCheck() {
   }
 }
 
+// ── Yeni Test Fonksiyonları ──────────────────────────────────
+
+async function runCustomersCheck() {
+  console.log("\n[12] Customers");
+  const { status, body } = await get("/api/customers");
+  if (status !== 200 || !Array.isArray(body))
+    fail(`GET /api/customers → ${status}`, JSON.stringify(body));
+  else ok(`GET /api/customers → 200 (${(body as unknown[]).length} cari)`);
+}
+
+async function runPurchaseCommitmentsCheck() {
+  console.log("\n[13] Purchase Commitments");
+  const { status, body } = await get("/api/purchase-commitments");
+  if (status !== 200 || !Array.isArray(body))
+    fail(`GET /api/purchase-commitments → ${status}`, JSON.stringify(body));
+  else ok(`GET /api/purchase-commitments → 200 (${(body as unknown[]).length} commitment)`);
+}
+
+async function runInventoryMovementsCheck(productId: string) {
+  console.log("\n[14] Inventory Movements");
+  // product_id olmadan 400 beklenir
+  const { status: s1 } = await get("/api/inventory/movements");
+  if (s1 === 400) ok("GET /api/inventory/movements (no product_id) → 400 ✓");
+  else fail(`GET /api/inventory/movements (no product_id) → beklenen 400, alınan ${s1}`);
+
+  // product_id ile 200 + Array beklenir
+  const { status: s2, body } = await get(`/api/inventory/movements?product_id=${productId}`);
+  if (s2 !== 200 || !Array.isArray(body))
+    fail(`GET /api/inventory/movements?product_id → ${s2}`, JSON.stringify(body));
+  else ok(`GET /api/inventory/movements?product_id → 200 (${(body as unknown[]).length} hareket)`);
+}
+
+async function runProductAgingCheck() {
+  console.log("\n[15] Product Aging");
+  const { status, body } = await get("/api/products/aging?type=all");
+  if (status !== 200 || !Array.isArray(body)) {
+    fail(`GET /api/products/aging → ${status}`, JSON.stringify(body));
+    return;
+  }
+  const items = body as Array<Record<string, unknown>>;
+  const badDays = items.find(p => p.daysWaiting !== null && typeof p.daysWaiting !== "number");
+  if (badDays) { fail(`GET /api/products/aging — daysWaiting tipi yanlış (sku: ${badDays.sku})`); return; }
+  const badCapital = items.find(p => typeof p.boundCapital === "number" && isNaN(p.boundCapital as number));
+  if (badCapital) { fail(`GET /api/products/aging — boundCapital NaN (sku: ${badCapital.sku})`); return; }
+  ok(`GET /api/products/aging → 200 (${items.length} ürün, tip kontrolleri geçti)`);
+}
+
+async function runProductQuotesCheck(productId: string) {
+  console.log("\n[16] Product Quotes");
+  const { status, body } = await get(`/api/products/${productId}/quotes`);
+  const b = body as { items?: Array<{ quantity: number }>; totalQuoted?: unknown };
+  if (status !== 200 || !Array.isArray(b?.items) || typeof b?.totalQuoted !== "number") {
+    fail(`GET /api/products/{id}/quotes → ${status}`, JSON.stringify(body));
+    return;
+  }
+  const calcSum = b.items.reduce((s, r) => s + r.quantity, 0);
+  if (calcSum !== b.totalQuoted)
+    fail(`GET /api/products/{id}/quotes — totalQuoted uyuşmazlığı (hesap: ${calcSum}, dönen: ${b.totalQuoted})`);
+  else ok(`GET /api/products/{id}/quotes → 200 (totalQuoted: ${b.totalQuoted})`);
+}
+
+async function runPurchaseSuggestionsCheck() {
+  console.log("\n[17] Purchase Suggestions");
+  const { status, body } = await get("/api/purchase/suggestions");
+  if (status !== 200 || !Array.isArray(body))
+    fail(`GET /api/purchase/suggestions → ${status}`, JSON.stringify(body));
+  else ok(`GET /api/purchase/suggestions → 200 (${(body as unknown[]).length} öneri)`);
+}
+
+async function runPurchaseScanCheck() {
+  console.log("\n[18] Purchase Scan");
+  const { status, body } = await post("/api/purchase/scan");
+  const b = body as { scanned?: unknown; created?: unknown; resolved?: unknown };
+  if (status !== 200 || typeof b.scanned !== "number" || typeof b.created !== "number" || typeof b.resolved !== "number")
+    fail(`POST /api/purchase/scan → ${status}`, JSON.stringify(body));
+  else ok(`POST /api/purchase/scan → 200 (scanned: ${b.scanned}, created: ${b.created}, resolved: ${b.resolved})`);
+}
+
+async function runExpireQuotesCheck() {
+  console.log("\n[19] Expire Quotes");
+  const { status, body } = await post("/api/orders/expire-quotes");
+  const b = body as { expired?: unknown; alerted?: unknown };
+  if (status !== 200 || typeof b.expired !== "number" || typeof b.alerted !== "number")
+    fail(`POST /api/orders/expire-quotes → ${status}`, JSON.stringify(body));
+  else ok(`POST /api/orders/expire-quotes → 200 (expired: ${b.expired}, alerted: ${b.alerted})`);
+}
+
+async function runAiObservabilityCheck() {
+  console.log("\n[20] AI Observability");
+  const { status, body } = await get("/api/ai/observability");
+  const b = body as { runs?: { last7d?: unknown }; recommendations?: unknown; feedback?: unknown };
+  if (status !== 200 || !b.runs || !b.recommendations || !b.feedback)
+    fail(`GET /api/ai/observability → ${status} (eksik field'lar)`, JSON.stringify(body));
+  else if (typeof b.runs.last7d !== "number")
+    fail(`GET /api/ai/observability — runs.last7d sayı değil`);
+  else ok(`GET /api/ai/observability → 200`);
+}
+
 // ── Main ─────────────────────────────────────────────────────
 
 async function main() {
@@ -305,6 +403,17 @@ async function main() {
     await runProductionCheck();
     await runImportCheck();
     await runShipOrderSmoke();
+    await runCustomersCheck();
+    await runPurchaseCommitmentsCheck();
+    if (productId) {
+      await runInventoryMovementsCheck(productId);
+      await runProductQuotesCheck(productId);
+    }
+    await runProductAgingCheck();
+    await runPurchaseSuggestionsCheck();
+    await runPurchaseScanCheck();
+    await runExpireQuotesCheck();
+    await runAiObservabilityCheck();
   } catch (err) {
     fail("Beklenmedik hata", err instanceof Error ? err.message : String(err));
   }
