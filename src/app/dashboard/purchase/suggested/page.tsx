@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useData } from "@/lib/data-context";
 import { computeCoverageDays, computeTargetStock, daysColor, daysBg, dateDaysFromToday } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
@@ -465,7 +465,7 @@ function RecActionCell({
 }
 
 export default function PurchaseSuggestedPage() {
-    const { reorderSuggestions } = useData();
+    const { reorderSuggestions, refetchAll } = useData();
     const [filter, setFilter] = useState<FilterType>("all");
     const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>("all");
     const [search, setSearch] = useState("");
@@ -480,51 +480,62 @@ export default function PurchaseSuggestedPage() {
     } | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
     const [aiDrawerProductId, setAiDrawerProductId] = useState<string | null>(null);
 
     // recMap: productId → { id, status, editedQty? }
     const [recMap, setRecMap] = useState<Map<string, RecEntry & { editedQty?: number }>>(new Map());
 
+    const loadAiData = useCallback(async (signal?: AbortSignal) => {
+        setAiLoading(true);
+        setAiError(false);
+        try {
+            const res = await fetch("/api/ai/purchase-copilot", {
+                method: "POST",
+                signal,
+            });
+            const data = res.ok ? await res.json() : null;
+            if (data) {
+                setAiData(data);
+                if (data.recommendations) {
+                    const newMap = new Map<string, RecEntry & { editedQty?: number }>();
+                    for (const r of data.recommendations) {
+                        if (r.recommendationId) {
+                            const editedQty = r.status === "edited"
+                                ? (r.editedMetadata?.suggestQty as number | undefined)
+                                : undefined;
+                            newMap.set(r.productId, { id: r.recommendationId, status: r.status, decidedAt: r.decidedAt ?? null, ...(editedQty != null && { editedQty }) });
+                        }
+                    }
+                    setRecMap(newMap);
+                }
+            }
+        } catch (e) {
+            if (!(e instanceof Error && e.name === "AbortError")) {
+                setAiError(true);
+            }
+        } finally {
+            setAiLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         if (reorderSuggestions.length === 0) return;
-
         const controller = new AbortController();
-
-        async function load() {
-            setAiLoading(true);
-            try {
-                const res = await fetch("/api/ai/purchase-copilot", {
-                    method: "POST",
-                    signal: controller.signal,
-                });
-                const data = res.ok ? await res.json() : null;
-                if (data) {
-                    setAiData(data);
-                    if (data.recommendations) {
-                        const newMap = new Map<string, RecEntry & { editedQty?: number }>();
-                        for (const r of data.recommendations) {
-                            if (r.recommendationId) {
-                                const editedQty = r.status === "edited"
-                                    ? (r.editedMetadata?.suggestQty as number | undefined)
-                                    : undefined;
-                                newMap.set(r.productId, { id: r.recommendationId, status: r.status, decidedAt: r.decidedAt ?? null, ...(editedQty != null && { editedQty }) });
-                            }
-                        }
-                        setRecMap(newMap);
-                    }
-                }
-            } catch (e) {
-                if (!(e instanceof Error && e.name === "AbortError")) {
-                    setAiError(true);
-                }
-            } finally {
-                setAiLoading(false);
-            }
-        }
-
-        load();
+        loadAiData(controller.signal);
         return () => controller.abort();
-    }, [reorderSuggestions.length]);
+    }, [reorderSuggestions.length, loadAiData]);
+
+    const handleRefresh = async () => {
+        if (refreshing || aiLoading) return;
+        setRefreshing(true);
+        try {
+            await refetchAll();
+            await loadAiData();
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     const aiMap = useMemo(() => {
         if (!aiData?.items) return new Map<string, AiEnrichmentItem>();
@@ -703,9 +714,37 @@ export default function PurchaseSuggestedPage() {
     return (
         <div style={{ padding: "24px 32px" }}>
             {/* Header */}
-            <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                Satın Alma Önerileri
-            </h1>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
+                <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                    Satın Alma Önerileri
+                </h1>
+                <button
+                    onClick={handleRefresh}
+                    disabled={refreshing || aiLoading}
+                    title="Verileri yenile"
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "6px 12px",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        color: (refreshing || aiLoading) ? "var(--text-tertiary)" : "var(--text-secondary)",
+                        background: "var(--bg-secondary)",
+                        border: "1px solid var(--border-secondary)",
+                        borderRadius: "6px",
+                        cursor: (refreshing || aiLoading) ? "not-allowed" : "pointer",
+                        flexShrink: 0,
+                    }}
+                >
+                    <span style={{
+                        display: "inline-block",
+                        transition: "transform 0.6s linear",
+                        transform: refreshing ? "rotate(360deg)" : "none",
+                    }}>↻</span>
+                    {refreshing ? "Yenileniyor..." : "Yenile"}
+                </button>
+            </div>
             <p style={{ fontSize: "13px", color: "var(--text-tertiary)", marginTop: "4px" }}>
                 Minimum stok seviyesinin altına düşen ürünler · Öncelik sırasına göre
             </p>
