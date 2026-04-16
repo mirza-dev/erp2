@@ -262,7 +262,7 @@ function RecActionCell({
     isDemo,
 }: {
     productId: string;
-    recEntry: RecEntry | undefined;
+    recEntry: (RecEntry & { editedQty?: number }) | undefined;
     suggestQty: number;
     unit: string;
     onAccept: (productId: string) => void;
@@ -294,7 +294,7 @@ function RecActionCell({
     }
 
     if (status === "edited") {
-        const editedQty = recEntry ? (recEntry as RecEntry & { editedQty?: number }).editedQty : null;
+        const editedQty = recEntry?.editedQty ?? null;
         return (
             <span style={{
                 fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
@@ -739,8 +739,7 @@ export default function PurchaseSuggestedPage() {
                 >
                     <span style={{
                         display: "inline-block",
-                        transition: "transform 0.6s linear",
-                        transform: refreshing ? "rotate(360deg)" : "none",
+                        animation: (refreshing || aiLoading) ? "spin 0.8s linear infinite" : "none",
                     }}>↻</span>
                     {refreshing ? "Yenileniyor..." : "Yenile"}
                 </button>
@@ -1064,7 +1063,7 @@ export default function PurchaseSuggestedPage() {
                                         const st = rec?.status ?? "no_rec";
                                         if (st === "accepted") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--success-bg)", color: "var(--success-text)", border: "0.5px solid var(--success-border)" }}>✓ Kabul Edildi</span>;
                                         if (st === "rejected") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", color: "var(--danger-text)" }}>✕ Reddedildi</span>;
-                                        if (st === "edited") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--accent-border)" }}>✎ Düzenlendi{(rec as { editedQty?: number })?.editedQty != null ? `: ${(rec as { editedQty?: number }).editedQty} ${p.unit}` : ""}</span>;
+                                        if (st === "edited") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--accent-border)" }}>✎ Düzenlendi{rec?.editedQty != null ? `: ${rec.editedQty} ${p.unit}` : ""}</span>;
                                         if (!rec) return null;
                                         return (
                                             <button
