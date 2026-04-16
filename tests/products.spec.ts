@@ -130,10 +130,10 @@ test.describe("Ürün Ekleme Modal", () => {
         await page.getByPlaceholder(/küresel vana/i).fill(name);
         await page.getByPlaceholder(/KV-3P/i).fill(sku);
 
-        // Kategori (first <select> in the modal)
-        const categorySelect = page.locator("select").first();
-        if (await categorySelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
-            await categorySelect.selectOption({ index: 1 });
+        // Kategori artık <input list="datalist"> — text input, select değil
+        const categoryInput = page.getByPlaceholder(/kategori seç/i);
+        if (await categoryInput.isVisible({ timeout: 2_000 }).catch(() => false)) {
+            await categoryInput.fill("Vana");
         }
 
         // Birim Fiyat (first number input)
@@ -142,8 +142,8 @@ test.describe("Ürün Ekleme Modal", () => {
             await priceInput.fill("250");
         }
 
-        // Birim (third <select>: Kategori, Para Birimi, Birim)
-        const unitSelect = page.locator("select").nth(2);
+        // Modal selects: 0=Para Birimi, 1=Birim, 2=Ürün Tipi (Kategori artık text input)
+        const unitSelect = page.locator("select").nth(1);
         if (await unitSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
             await unitSelect.selectOption("adet");
         }
@@ -217,15 +217,15 @@ test.describe("Ürün Ekleme Modal", () => {
         await page.getByRole("button", { name: /yeni ürün/i }).click();
         await page.waitForTimeout(300);
 
-        // Para Birimi: second <select> (Kategori=0, Para Birimi=1, Birim=2)
-        const currencySelect = page.locator("select").nth(1);
+        // Modal selects: 0=Para Birimi, 1=Birim, 2=Ürün Tipi (Kategori artık text input)
+        const currencySelect = page.locator("select").nth(0);
         if (await currencySelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
             const val = await currencySelect.inputValue();
             expect(val).toBe("USD");
         }
 
-        // Ürün Tipi: fourth <select> (Kategori=0, Para Birimi=1, Birim=2, Ürün Tipi=3)
-        const typeSelect = page.locator("select").nth(3);
+        // Ürün Tipi: third <select>
+        const typeSelect = page.locator("select").nth(2);
         if (await typeSelect.isVisible({ timeout: 2_000 }).catch(() => false)) {
             const val = await typeSelect.inputValue();
             expect(val).toMatch(/finished|mamul/i);
