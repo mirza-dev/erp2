@@ -365,7 +365,7 @@ export default function OrderDetailPage() {
                                 </Button>
                             </>
                         )}
-                        {commercialStatus === "approved" && fulfillmentStatus === "allocated" && (
+                        {commercialStatus === "approved" && fulfillmentStatus !== "shipped" && (
                             <>
                                 <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et

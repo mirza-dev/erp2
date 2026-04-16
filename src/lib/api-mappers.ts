@@ -41,7 +41,7 @@ export function mapProduct(row: ProductWithStock): Product {
     reserved: row.reserved,
     available_now: row.available_now ?? (row.on_hand ?? 0) - (row.reserved ?? 0),
     quoted: row.quoted ?? 0,
-    promisable: row.promisable ?? row.available_now,
+    promisable: row.promisable ?? ((row.available_now ?? 0) - (row.quoted ?? 0)),
     incoming: row.incoming ?? 0,
     forecasted: row.forecasted ?? row.available_now,
     minStockLevel: row.min_stock_level,
