@@ -4,11 +4,11 @@ description: 4 Odoo'dan ilham alınan stok özelliğinin uygulama planı — erp
 type: project
 ---
 
-Planlanan 4 özellik (öncelik sırasıyla):
-1. **Sanal Stok** — on_hand + incoming - reserved (1 gün)
-2. **Stok Eskime Raporu** — son hareketten bu yana kaç gün (2-3 gün)
-3. **Sipariş Son Tarihi** — stok tükenmeden kaç gün önce sipariş verilmeli (2-3 gün)
-4. **Tedarikçi Performansı** — söz verilen vs. gerçekleşen teslimat (5-6 gün, suppliers tablosu gerektirir)
+4 özellik (öncelik sırasıyla):
+1. ✅ **Sanal Stok** — quoted/promisable/incoming/forecasted (tamamlandı)
+2. ✅ **Stok Eskime Raporu** — aging sayfası + API (tamamlandı)
+3. ✅ **Sipariş Son Tarihi** — orderDeadline hesabı + alert + purchase sıralama (tamamlandı)
+4. ⬜ **Tedarikçi Performansı** — söz verilen vs. gerçekleşen teslimat (suppliers tablosu gerektirir)
 
 **Detay:** `/Users/mirzasaribiyik/Projects/erp2/yuksek-etki.md` (gitignore'da, push edilmez)
 

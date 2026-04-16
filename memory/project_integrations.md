@@ -49,9 +49,18 @@ type: project
 ## Test Altyapısı
 
 - **Framework:** Vitest · `src/__tests__/` · node environment
-- **63 dosya · 1274 test** (2026-04-11 itibarıyla)
-- **E2E:** `@playwright/test` kurulu (Chromium, Firefox, WebKit), config henüz yok
+- **75 dosya · 1465 test** (2026-04-16 itibarıyla) · Branch coverage ≥ 80%
+- **E2E:** `@playwright/test` · Chromium · `tests/` — 23 test, tümü yeşil
+  - `tests/helpers/test-data.ts` — API üzerinden test müşteri/ürün/sipariş oluşturma/silme
+  - `tests/fixtures.ts` — `demoPage` fixture (demo_mode=1 cookie)
+  - `tests/global-setup.ts` — Supabase signIn → storageState persist
+- **Smoke testler:** `scripts/smoke.ts` — 24 endpoint, response shape validation
+  - `npm run smoke` (dev server çalışırken)
+- **k6 load testleri:** `tests/load/alert-scan.k6.js` + `tests/load/import-wizard.k6.js`
+  - `.github/workflows/load-test.yml` — manuel tetiklemeli CI
 - **Eval suite:** `src/__tests__/eval/` — AI kalite değerlendirmesi
+- **Sentry:** `@sentry/nextjs` — client/server/edge config, `withSentryConfig` wrap
+  - DSN kurulumu manuel: `.env.local` → `NEXT_PUBLIC_SENTRY_DSN` + `SENTRY_DSN`
 
 **Mock pattern:**
 ```ts

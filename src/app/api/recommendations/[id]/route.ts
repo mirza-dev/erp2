@@ -43,6 +43,13 @@ export async function PATCH(
         );
     }
 
+    if (status === "edited") {
+        const qty = body.editedMetadata?.suggestQty;
+        if (typeof qty !== "number" || !Number.isFinite(qty) || qty <= 0) {
+            return NextResponse.json({ error: "editedMetadata.suggestQty must be a positive number" }, { status: 400 });
+        }
+    }
+
     try {
         const updated = await dbUpdateRecommendationStatus(id, status, {
             editedMetadata: body.editedMetadata,

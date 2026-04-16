@@ -7,6 +7,7 @@ import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { formatCurrency } from "@/lib/utils";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -213,7 +214,7 @@ function computeSuggestion(p: Product) {
     const { target, formula, leadTimeDemand } = computeTargetStock(
         p.minStockLevel, p.dailyUsage ?? null, p.leadTimeDays ?? null
     );
-    const moq = p.reorderQty ?? p.minStockLevel;
+    const moq = Math.max(1, p.reorderQty ?? p.minStockLevel);
     const needed = Math.max(0, target - p.available_now);
     const suggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
     return { suggestQty, target, formula, leadTimeDemand, moq };
@@ -503,7 +504,10 @@ export default function PurchaseSuggestedPage() {
                         const newMap = new Map<string, RecEntry & { editedQty?: number }>();
                         for (const r of data.recommendations) {
                             if (r.recommendationId) {
-                                newMap.set(r.productId, { id: r.recommendationId, status: r.status, decidedAt: r.decidedAt ?? null });
+                                const editedQty = r.status === "edited"
+                                    ? (r.editedMetadata?.suggestQty as number | undefined)
+                                    : undefined;
+                                newMap.set(r.productId, { id: r.recommendationId, status: r.status, decidedAt: r.decidedAt ?? null, ...(editedQty != null && { editedQty }) });
                             }
                         }
                         setRecMap(newMap);
@@ -584,6 +588,10 @@ export default function PurchaseSuggestedPage() {
 
     const handleEdit = async (productId: string, qty: number, unit: string) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!qty || qty <= 0 || !Number.isFinite(qty)) {
+            toast({ type: "error", message: "Miktar 0'dan büyük olmalıdır." });
+            return;
+        }
         const rec = recMap.get(productId);
         if (!rec) return;
         const prev = { ...rec };
@@ -633,8 +641,8 @@ export default function PurchaseSuggestedPage() {
         if (daysA !== null && daysB !== null) return daysA - daysB;
         if (daysA !== null) return -1;
         if (daysB !== null) return 1;
-        const urgA = 1 - a.available_now / a.minStockLevel;
-        const urgB = 1 - b.available_now / b.minStockLevel;
+        const urgA = a.minStockLevel > 0 ? 1 - a.available_now / a.minStockLevel : 1;
+        const urgB = b.minStockLevel > 0 ? 1 - b.available_now / b.minStockLevel : 1;
         return urgB - urgA;
     }).filter(p => {
         if (decisionFilter === "all") return true;
@@ -645,9 +653,21 @@ export default function PurchaseSuggestedPage() {
         return !st || (st !== "accepted" && st !== "rejected");
     });
 
-    const avgRisk = reorderSuggestions.length > 0
-        ? Math.round(reorderSuggestions.reduce((sum, p) => sum + (1 - p.available_now / p.minStockLevel) * 100, 0) / reorderSuggestions.length)
-        : 0;
+    const { totalOrderCost, acceptedOrderCost } = reorderSuggestions.reduce(
+        (acc, p) => {
+            const rec = recMap.get(p.id);
+            const isEdited = rec?.status === "edited";
+            const qty = isEdited && rec?.editedQty != null ? rec.editedQty : computeSuggestion(p).suggestQty;
+            const lineCost = qty * (p.costPrice ?? p.price ?? 0);
+            return {
+                totalOrderCost: acc.totalOrderCost + lineCost,
+                acceptedOrderCost: rec?.status === "accepted"
+                    ? acc.acceptedOrderCost + lineCost
+                    : acc.acceptedOrderCost,
+            };
+        },
+        { totalOrderCost: 0, acceptedOrderCost: 0 }
+    );
 
     const mostUrgent = [...reorderSuggestions]
         .filter(p => p.dailyUsage)
@@ -760,24 +780,13 @@ export default function PurchaseSuggestedPage() {
                         padding: "14px 16px",
                     }}>
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            Ortalama Risk Skoru
+                            Toplam Sipariş Tutarı
                         </div>
-                        <div style={{ fontSize: "28px", fontWeight: 700, color: avgRisk >= 70 ? "var(--danger-text)" : "var(--warning-text)", marginTop: "4px", lineHeight: 1 }}>
-                            {avgRisk}%
+                        <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--accent-text)", marginTop: "4px", lineHeight: 1 }}>
+                            {formatCurrency(totalOrderCost, "TRY")}
                         </div>
-                        <div style={{
-                            marginTop: "6px",
-                            height: "4px",
-                            background: "var(--bg-tertiary)",
-                            borderRadius: "2px",
-                            overflow: "hidden",
-                        }}>
-                            <div style={{
-                                width: `${avgRisk}%`,
-                                height: "100%",
-                                background: avgRisk >= 70 ? "var(--danger)" : "var(--warning)",
-                                borderRadius: "2px",
-                            }} />
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                            {reorderSuggestions.length} ürün · {formatCurrency(acceptedOrderCost, "TRY")} kabul edildi
                         </div>
                     </div>
                 </div>
@@ -903,7 +912,7 @@ export default function PurchaseSuggestedPage() {
                 /* Mobile card layout */
                 <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     {sorted.map(p => {
-                        const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
+                        const urgency = p.minStockLevel > 0 ? Math.round((1 - p.available_now / p.minStockLevel) * 100) : 100;
                         const deficit = p.minStockLevel - p.available_now;
                         const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                         const isRaw = p.productType === "raw_material";
@@ -1066,7 +1075,7 @@ export default function PurchaseSuggestedPage() {
                         </thead>
                         <tbody>
                             {sorted.map((p, idx) => {
-                                const urgency = Math.round((1 - p.available_now / p.minStockLevel) * 100);
+                                const urgency = p.minStockLevel > 0 ? Math.round((1 - p.available_now / p.minStockLevel) * 100) : 100;
                                 const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
                                 const deficit = p.minStockLevel - p.available_now;
                                 const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
@@ -1276,7 +1285,7 @@ export default function PurchaseSuggestedPage() {
                             </div>
                             <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px", overflow: "hidden", marginBottom: "6px" }}>
                                 <div style={{
-                                    width: `${Math.min(100, Math.round((aiDrawerProduct.available_now / aiDrawerProduct.minStockLevel) * 100))}%`,
+                                    width: `${aiDrawerProduct.minStockLevel > 0 ? Math.min(100, Math.round((aiDrawerProduct.available_now / aiDrawerProduct.minStockLevel) * 100)) : 0}%`,
                                     height: "100%",
                                     background: "var(--danger)",
                                     borderRadius: "2px",

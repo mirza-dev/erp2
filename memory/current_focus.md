@@ -6,19 +6,24 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-16 — Test altyapısı + Bulgular Raporu fix'leri):**
+**Son tamamlanan (2026-04-16 — E2E test kalitesi):**
 
-1. **Y1: 4 failing test fix** — `alert-action-routes.test.ts`: `scanPost()` çağrılarına `NextRequest` geçildi
-2. **Y3: Purchase alert dedup fix** — `purchase-service.ts`: `dbOpenAlertExists` → `dbListActiveAlerts` pre-fetch (acknowledged alertlar da dedup kapsamında)
-3. **O4: Promisable fix** — `purchase-service.ts`: `available_now` → `available_now - quoted` (promisable hesabı)
-4. **Coverage threshold** — `production-service.test.ts` (yeni, 6 test), passthrough function testleri → lines 82% / functions 80.7% (threshold 80% geçti)
-5. **5 DR test dosyası** — `src/__tests__/domain-rules/` (DR-4, DR-5.1, DR-6, DR-7, DR-11)
-6. **REVIEW.md** — repo kökünde code review talimatları
-7. **K1+K3 (önceki oturum)** — RLS migration 029, Paraşüt shipped guard
+Bulgular raporuna göre sahte-yeşil E2E testler güçlendirildi:
 
-**Test:** 1418 pass, 0 fail | Lines 82% | Functions 80.7%
+1. **aging.spec.ts** — `.or().first()` strict-mode fail → exact text match (`"Durgun + Ölü SKU"`)
+2. **orders.spec.ts** — Tüm adımlar `if (isVisible)` korumasından çıkarıldı; sipariş oluşturma testi gerçek API akışını test ediyor; URL `/orders$` regex ile doğrulanıyor; arama testi `count>=0` → `rowCount===0 || noResultsMsg`
+3. **alerts.spec.ts** — Tab butonları mandatory `toBeVisible` + click; arama kutusu mandatory visible
+4. **products.spec.ts** — `void badges` no-op → `rowCount > 0` assertion
+5. **Lint temizlendi** — dashboard unused locator, global-setup unused import/param, fixtures eslint-disable
 
-**Bilinen açık sorunlar:** Yok (tüm bilinen hatalar giderildi)
+**Sonuç:** 23/23 E2E geçiyor · 0 lint error
 
-**Why:** Yeni session'da Claude aktif konuyu bilsin, context kaybı yaşanmasın.
+**Bekleyen manuel adımlar:**
+- Sentry: sentry.io → NEXT_PUBLIC_SENTRY_DSN + SENTRY_DSN → .env.local ve GitHub Secrets
+- Supabase local: `brew install supabase/tap/supabase` → `supabase init`
+- k6 local: `brew install k6`
+
+**Test:** 1465 vitest (0 fail) + 23 Playwright (0 fail) · Lint: 0 error
+
+**Why:** Yeni session'da Claude aktif konuyu bilsin.
 **How to apply:** Her büyük özellik başlarken "Aktif" alanını güncelle; bitince "Son tamamlanan"a taşı.
