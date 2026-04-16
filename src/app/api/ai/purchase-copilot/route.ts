@@ -23,7 +23,7 @@ export async function POST() {
         return handleApiError(err, "Satın alma önerileri toplanamadı.");
     }
 
-    const needsPurchase = products.filter(p => p.available_now <= p.min_stock_level);
+    const needsPurchase = products.filter(p => p.is_for_purchase && p.available_now <= p.min_stock_level);
 
     const rawMaterialCount = needsPurchase.filter(p => p.product_type === "raw_material").length;
     const manufacturedCount = needsPurchase.filter(p => p.product_type === "manufactured").length;

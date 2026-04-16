@@ -6,17 +6,13 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-16 — E2E test kalitesi):**
+**Son tamamlanan (2026-04-17 — Satın Alma Önerileri kart iyileştirmesi):**
 
-Bulgular raporuna göre sahte-yeşil E2E testler güçlendirildi:
-
-1. **aging.spec.ts** — `.or().first()` strict-mode fail → exact text match (`"Durgun + Ölü SKU"`)
-2. **orders.spec.ts** — Tüm adımlar `if (isVisible)` korumasından çıkarıldı; sipariş oluşturma testi gerçek API akışını test ediyor; URL `/orders$` regex ile doğrulanıyor; arama testi `count>=0` → `rowCount===0 || noResultsMsg`
-3. **alerts.spec.ts** — Tab butonları mandatory `toBeVisible` + click; arama kutusu mandatory visible
-4. **products.spec.ts** — `void badges` no-op → `rowCount > 0` assertion
-5. **Lint temizlendi** — dashboard unused locator, global-setup unused import/param, fixtures eslint-disable
-
-**Sonuç:** 23/23 E2E geçiyor · 0 lint error
+1. **"Ortalama Risk Skoru" (NaN%) → "Toplam Sipariş Tutarı"** — `costPrice ?? price` bazında, kabul edilen tutar alt satırda
+2. **editedQty kalıcılığı** — `purchase-copilot` route `editedMetadata` döndürüyor; refresh sonrası düzenlenen miktar korunuyor
+3. **NaN fix** — `computeSuggestion` `moq = Math.max(1, ...)`, tüm `urgency/stockPct` hesaplarına `minStockLevel > 0` guard
+4. **Validasyon** — UI `qty <= 0` guard + route server-side `suggestQty > 0` doğrulama
+5. **Semantik fix** — `acceptedOrderCost` sadece `accepted` sayıyor (`edited ≠ accepted`)
 
 **Bekleyen manuel adımlar:**
 - Sentry: sentry.io → NEXT_PUBLIC_SENTRY_DSN + SENTRY_DSN → .env.local ve GitHub Secrets

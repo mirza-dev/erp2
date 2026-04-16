@@ -535,6 +535,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       products.filter((p) =>
         shouldSuggestReorder({
           isActive: p.isActive,
+          isForPurchase: p.isForPurchase,
           available: p.available_now,
           min: p.minStockLevel,
           orderDeadline: p.orderDeadline,
