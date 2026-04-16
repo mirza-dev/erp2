@@ -1,0 +1,44 @@
+name: Load Test (k6)
+
+# Sadece elle tetiklenir — her push'ta değil
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Test hedefi (alert-scan | import-wizard | all)"
+        required: true
+        default: "alert-scan"
+        type: choice
+        options:
+          - alert-scan
+          - import-wizard
+          - all
+      base_url:
+        description: "Hedef URL (varsayılan: staging)"
+        required: false
+        default: "https://erp2.vercel.app"
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run alert-scan load test
+        if: inputs.target == 'alert-scan' || inputs.target == 'all'
+        run: |
+          k6 run tests/load/alert-scan.k6.js \
+            -e BASE_URL=${{ inputs.base_url }} \
+            -e CRON_SECRET=${{ secrets.CRON_SECRET }}
+
+      - name: Run import-wizard load test
+        if: inputs.target == 'import-wizard' || inputs.target == 'all'
+        run: |
+          k6 run tests/load/import-wizard.k6.js \
+            -e BASE_URL=${{ inputs.base_url }} \
+            -e SESSION_COOKIE=${{ secrets.E2E_SESSION_COOKIE }}

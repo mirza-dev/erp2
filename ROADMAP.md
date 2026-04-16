@@ -13,13 +13,32 @@ Tüm maddeler tamamlandığında bu dosya silinecek.
 ## Dış Araçlar Yol Haritası
 
 ### Kısa vadeli
-- [ ] Codecov — PR'da branch/line diff + badge
-- [ ] GitHub branch protection — test geçmeden merge engeli
+- [x] Codecov — PR'da branch/line diff + badge (lcov reporter + codecov.yml + upload adımı)
+- [x] GitHub branch protection — test geçmeden merge engeli
 
 ### Orta vadeli
+- [x] Sentry — production hata takibi (@sentry/nextjs kuruldu, error.tsx entegre)
+  - ⚠️ Manuel: sentry.io'da proje oluştur → NEXT_PUBLIC_SENTRY_DSN + SENTRY_DSN değerlerini .env.local'a ekle
 - [ ] Supabase local + integration tests — DB/RLS/migration gerçek DB'de
-- [ ] Sentry — production hata takibi
+  - ⚠️ Manuel: `brew install supabase/tap/supabase` → `supabase init` → `supabase start`
 
 ### Uzun vadeli
-- [ ] Playwright CI — GitHub Secrets ile tam E2E (altyapı var, secrets eksik)
-- [ ] k6 load test — import wizard ve alert scan yük testi
+- [x] k6 load test — tests/load/alert-scan.k6.js + import-wizard.k6.js + load-test.yml CI workflow
+  - ⚠️ Manuel: `brew install k6` (local çalıştırma için)
+- [ ] Playwright CI — GitHub Secrets ile tam E2E (altyapı var, testler yazılı)
+  - ⚠️ Manuel: 6 GitHub Secret ekle (aşağıya bak)
+
+---
+
+## Playwright CI — Eksik Secrets
+
+GitHub → Repo → Settings → Secrets and variables → Actions:
+
+| Secret | Değer |
+|--------|-------|
+| `NEXT_PUBLIC_SUPABASE_URL` | .env.local'dan kopyala |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | .env.local'dan kopyala |
+| `SUPABASE_SERVICE_ROLE_KEY` | .env.local'dan kopyala |
+| `ANTHROPIC_API_KEY` | Zaten ekli (test.yml'den) |
+| `E2E_USER_EMAIL` | Test kullanıcısı e-postası |
+| `E2E_USER_PASSWORD` | Test kullanıcısı şifresi |
