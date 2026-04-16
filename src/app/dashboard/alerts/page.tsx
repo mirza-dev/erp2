@@ -366,7 +366,7 @@ export default function AlertsPage() {
             }}>
                 <div>
                     <h1 style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Üretim Uyarıları
+                        Üretim & Stok Uyarıları
                     </h1>
                     <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
                         Son tarama: {lastRefreshed}

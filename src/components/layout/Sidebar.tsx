@@ -55,7 +55,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
             label: "Otomasyon",
             items: [
                 { label: "AI İçeri Aktar", href: "/dashboard/import" },
-                { label: "Üretim Uyarıları", href: "/dashboard/alerts", count: activeAlertCount || undefined },
+                { label: "Üretim & Stok Uyarıları", href: "/dashboard/alerts", count: activeAlertCount || undefined },
             ],
         },
         {
