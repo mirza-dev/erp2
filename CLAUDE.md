@@ -1,24 +1,25 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-13_
+_Son güncelleme: 2026-04-16_
 
-**Son tamamlanan iş:** Per-page fetch refactor + Seed/Auth fix (2026-04-15)
-- Dashboard/Orders/Products: DataContext bağımlılığı azaltıldı, her sayfa mount'ta kendi verisini çekiyor, Yenile butonları eklendi
-- Seed fix: FK sırası, reference_type constraint, ALWAYS_PUBLIC + kendi auth kontrolü
-- Alerts "Silinmiş Ürün" fix: sayfa kendi products fetch'ini yapıyor, "Tara" `?force=true`
-- **Build:** temiz
+**Son tamamlanan iş:** E2E test kalitesi + demo öncesi kritik bug'lar (2026-04-16)
+- **2 kritik semantik bug** düzeltildi: Sevket butonu `approved` tüm siparişlerde görünür; `promisable` fallback `available_now - quoted`
+- **Smoke testler** 14 → 24'e genişletildi (customers, aging, quotes, purchase/scan, expire-quotes, AI observability vb.)
+- **Sentry** kuruldu: client/server/edge config, `withSentryConfig` wrap, `error.tsx` entegrasyonu
+- **k6 load testleri**: `tests/load/` — alert-scan + import-wizard, manual-trigger CI workflow
+- **E2E sahte-yeşil testler** güçlendirildi: aging exact match, orders/new mandatory akış, alerts mandatory tab assert, lint temizlendi
+- **Build:** temiz · **Lint:** 0 error
 
 **Önceki önemli işler:**
+- Per-page fetch refactor + Seed/Auth fix (2026-04-15)
 - Kapsamlı Seed Data + "Nerede Kullanılıyor" bölümü (2026-04-14)
 - Faz 3 Stok Eskime Raporu: hammadde semantiği, cost_price, 3-tab, E2E
 - product_type 3-yollu enum: `finished` → `manufactured` / `commercial`
-- Import Sistemi Yenileme + 7 Bug Fix, Ürün kullanım bayrakları (025, 026)
-- Geciken Sevkiyat Alertı, Teklif Uzatma, Teklif Kırılımı, demo mode
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik
-**Test sayısı:** 67 dosya · 1347 test
+**Test sayısı:** 75 dosya · 1465 vitest · 23 Playwright (hepsi yeşil)
 
 ---
 
