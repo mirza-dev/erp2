@@ -12,7 +12,7 @@ import { useData } from "@/lib/data-context";
 const STATUS_OPTIONS = [
     { key: "", label: "Tümü" },
     { key: "kritik", label: "Kritik" },
-    { key: "rezerve", label: "Rezerve" },
+    { key: "dusuk", label: "Düşük" },
     { key: "hazir", label: "Hazır" },
     { key: "tukendi", label: "Tükendi" },
 ];

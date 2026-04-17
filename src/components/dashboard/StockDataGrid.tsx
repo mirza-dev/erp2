@@ -10,10 +10,11 @@ interface StockDataGridProps {
 }
 
 function getStatusInfo(available: number, min: number): { label: string; cls: string; key: string } {
-    const ratio = min > 0 ? available / min : 999;
+    if (min === 0) return { label: "Hazır", cls: "badge-success", key: "hazir" };
+    const ratio = available / min;
     if (available === 0) return { label: "Tükendi", cls: "badge-danger", key: "tukendi" };
     if (ratio <= 1) return { label: "Kritik", cls: "badge-warning", key: "kritik" };
-    if (ratio <= 2) return { label: "Rezerve", cls: "badge-warning", key: "rezerve" };
+    if (ratio <= 2) return { label: "Düşük", cls: "badge-warning", key: "dusuk" };
     return { label: "Hazır", cls: "badge-success", key: "hazir" };
 }
 
