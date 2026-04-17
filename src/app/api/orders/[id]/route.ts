@@ -90,6 +90,7 @@ export async function DELETE(
             if (!result.success) {
                 return NextResponse.json({ error: result.error }, { status: 400 });
             }
+            revalidateTag("products", "max");
             return NextResponse.json({ ok: true });
         } catch (err) {
             return handleApiError(err, "DELETE /api/orders/[id]");
