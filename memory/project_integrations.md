@@ -49,7 +49,7 @@ type: project
 ## Test Altyapısı
 
 - **Framework:** Vitest · `src/__tests__/` · node environment
-- **1467 test** (2026-04-17 itibarıyla, 0 fail) · Branch coverage ≥ 80%
+- **1491 test** (2026-04-17 itibarıyla, 0 fail) · Branch coverage ≥ 80%
 - **E2E:** `@playwright/test` · Chromium · `tests/` — 23 test, tümü yeşil
   - `tests/helpers/test-data.ts` — API üzerinden test müşteri/ürün/sipariş oluşturma/silme
   - `tests/fixtures.ts` — `demoPage` fixture (demo_mode=1 cookie)

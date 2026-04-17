@@ -3,23 +3,22 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-17_
 
-**Son tamamlanan iş:** Seed dataya 5 hammadde (raw_material) ürünü eklendi (2026-04-17)
-- **5 hammadde ürünü** eklendi: kritik (Döküm gövde, Dövme flanş), geçmiş-deadline (SS316 bar, Grafit levha), filtre testi (PTFE rod)
-- `is_for_sales: false, is_for_purchase: true` — Hammadde tabı artık demo'da dolu
-- **isForPurchase/isForSales** filtreleme 6 dosyada: shouldSuggestReorder, data-context, purchase-copilot, alerts sayfası, purchase-service, DR-7 fixture
-- **4 semantik bug** düzeltildi + yenile butonu + Üretim & Stok Uyarıları yeniden adlandırma
+**Son tamamlanan iş:** Faz 2 DB + client refresh performans optimizasyonu (2026-04-17)
+- **Faz 2A:** `dbGetOrderById` 2 sıralı sorgu → 1 Supabase embedded JOIN (`select("*, order_lines(*)")`)
+- **Faz 2B:** `dbCreateOrder` tam `SalesOrderRow` döndürüyor; `addOrder` artık `GET /api/orders` refetch yapmıyor — POST response ile state prepend
+- **Bulgu fix:** `orders/page.tsx` mount fetch kaldırıldı — `useData().orders` (DataContext) ile init, sipariş oluşturma sonrası redundant GET yok
+- **Faz 1:** 4 DB index, 30s server cache, email cache 5dk, 9 route revalidateTag, 24 test, 031 migration
 - **Build:** temiz · **Lint:** 0 error
 
 **Önceki önemli işler:**
+- Navigasyon hızlandırma & donma önleme (2026-04-17)
+- Seed dataya 5 hammadde ürünü + semantik bug'lar (2026-04-17)
 - E2E test kalitesi + demo öncesi kritik bug'lar (2026-04-16)
 - Per-page fetch refactor + Seed/Auth fix (2026-04-15)
-- Kapsamlı Seed Data + "Nerede Kullanılıyor" bölümü (2026-04-14)
-- Faz 3 Stok Eskime Raporu: hammadde semantiği, cost_price, 3-tab, E2E
-- product_type 3-yollu enum: `finished` → `manufactured` / `commercial`
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik
-**Test sayısı:** 75 dosya · 1465 vitest · 23 Playwright (hepsi yeşil)
+**Test sayısı:** 76 dosya · 1491 vitest · 23 Playwright (hepsi yeşil)
 
 ---
 

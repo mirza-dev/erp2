@@ -6,11 +6,12 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-17 — Faz 2 DB sorgu + client refresh optimizasyonu):**
+**Son tamamlanan (2026-04-17 — Faz 2 DB sorgu + client refresh optimizasyonu + bulgu fix):**
 
 1. **Faz 2A** — `dbGetOrderById` 2 sıralı sorgu → 1 Supabase embedded JOIN (`select("*, order_lines(*)")`)
 2. **Faz 2B** — `dbCreateOrder` RPC sonrası `SELECT *` ile tam `SalesOrderRow` döndürüyor; `data-context.addOrder` artık `GET /api/orders` refetch yapmıyor, POST response ile state prepend yapıyor
-3. **Faz 1** (önceki oturum) — 4 DB index, 30s server cache (`unstable_cache`), email cache 5dk, 9 route'a `revalidateTag`, 24 test, 031 duplicate index cleanup migration
+3. **Faz 2B bulgu fix** — `orders/page.tsx` mount fetch kaldırıldı; `useData().orders` (DataContext) ile init olur, `contextInitRef` ile tek seferlik geç yükleme sync'i; sipariş oluşturma sonrası `GET /api/orders` artık görünmüyor
+4. **Faz 1** (önceki oturum) — 4 DB index, 30s server cache (`unstable_cache`), email cache 5dk, 9 route'a `revalidateTag`, 24 test, 031 duplicate index cleanup migration
 
 **Önceki (2026-04-17 — navigasyon hızlandırma & donma önleme):**
 
@@ -39,7 +40,7 @@ Commit: `e293a9b perf: navigasyon hızlandırma ve donma önleme`
 - Supabase local: `brew install supabase/tap/supabase` → `supabase init`
 - k6 local: `brew install k6`
 
-**Test:** 1467 vitest (0 fail) + 23 Playwright (0 fail) · Lint: 0 error
+**Test:** 1491 vitest (0 fail) + 23 Playwright (0 fail) · Lint: 0 error
 
 **Yaklaşan:** PMT demo — 2026-04-19 (Cumartesi). Tedarikçi Performansı ve Paraşüt entegrasyonu öncelik değil; odak her şeyin semantik olarak doğru olması.
 
