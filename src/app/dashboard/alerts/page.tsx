@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { mapProduct } from "@/lib/api-mappers";
 import type { Product } from "@/lib/mock-data";
@@ -125,13 +125,14 @@ export default function AlertsPage() {
     }, [refetch]);
 
     // ── Group by product ──
-    const productMap = new Map(products.map((p) => [p.id, p]));
+    const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
-    const activeAlerts = showResolved
+    const activeAlerts = useMemo(() => showResolved
         ? rawAlerts
-        : rawAlerts.filter((a) => a.status === "open" || a.status === "acknowledged");
+        : rawAlerts.filter((a) => a.status === "open" || a.status === "acknowledged"),
+    [rawAlerts, showResolved]);
 
-    const productGroups: ProductAlertGroup[] = (() => {
+    const productGroups: ProductAlertGroup[] = useMemo(() => {
         const sysAlerts = activeAlerts.filter((a) => a.source !== "ai" && a.entity_id);
         // Sipariş bazlı alertları (quote_expired, overdue_shipment) ürün gruplarından ayır
         const productSysAlerts = sysAlerts.filter((a) => a.entity_type !== "sales_order");
@@ -180,29 +181,34 @@ export default function AlertsPage() {
             if (a.topSeverity !== b.topSeverity) return a.topSeverity === "critical" ? -1 : 1;
             return (a.coverageDays ?? 999) - (b.coverageDays ?? 999);
         });
-    })();
+    }, [activeAlerts, productMap]);
 
-    const aiAlerts           = activeAlerts.filter((a) => a.source === "ai");
-    const orderAlerts        = activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "sales_order");
-    const criticalCount      = productGroups.filter((g) => g.topSeverity === "critical").length;
-    const warningCount       = productGroups.filter((g) => g.topSeverity === "warning").length;
-    const shortageCount      = productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage")).length;
-    const quoteExpiredCount  = orderAlerts.filter((a) => a.type === "quote_expired").length;
-    const overdueCount       = orderAlerts.filter((a) => a.type === "overdue_shipment").length;
-    const searched = search.trim().toLowerCase();
-    const searchedGroups = searched
-        ? productGroups.filter(
-            (g) =>
-                g.productName.toLowerCase().includes(searched) ||
-                g.sku.toLowerCase().includes(searched)
-          )
-        : productGroups;
+    const aiAlerts           = useMemo(() => activeAlerts.filter((a) => a.source === "ai"), [activeAlerts]);
+    const orderAlerts        = useMemo(() => activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "sales_order"), [activeAlerts]);
+    const criticalCount      = useMemo(() => productGroups.filter((g) => g.topSeverity === "critical").length, [productGroups]);
+    const warningCount       = useMemo(() => productGroups.filter((g) => g.topSeverity === "warning").length, [productGroups]);
+    const shortageCount      = useMemo(() => productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage")).length, [productGroups]);
+    const quoteExpiredCount  = useMemo(() => orderAlerts.filter((a) => a.type === "quote_expired").length, [orderAlerts]);
+    const overdueCount       = useMemo(() => orderAlerts.filter((a) => a.type === "overdue_shipment").length, [orderAlerts]);
+
+    const filtered = useMemo(() => {
+        const searched = search.trim().toLowerCase();
+        const searchedGroups = searched
+            ? productGroups.filter(
+                (g) =>
+                    g.productName.toLowerCase().includes(searched) ||
+                    g.sku.toLowerCase().includes(searched)
+              )
+            : productGroups;
+        const isOrderAlertTab = activeFilter === "quote_expired" || activeFilter === "overdue_shipment";
+        if (isOrderAlertTab) return [];
+        if (activeFilter === "all")      return searchedGroups;
+        if (activeFilter === "critical") return searchedGroups.filter((g) => g.topSeverity === "critical");
+        if (activeFilter === "warning")  return searchedGroups.filter((g) => g.topSeverity === "warning");
+        return searchedGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage"));
+    }, [productGroups, search, activeFilter]);
+
     const isOrderAlertTab = activeFilter === "quote_expired" || activeFilter === "overdue_shipment";
-    const filtered      = isOrderAlertTab                  ? []  // order alert tabs → ayrı section'da gösterilir
-        : activeFilter === "all"            ? searchedGroups
-        : activeFilter === "critical"       ? searchedGroups.filter((g) => g.topSeverity === "critical")
-        : activeFilter === "warning"        ? searchedGroups.filter((g) => g.topSeverity === "warning")
-        : searchedGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage"));
 
     // ── Actions ──
     const handleRefresh = async () => {

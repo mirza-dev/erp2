@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useData } from "@/lib/data-context";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/data-context";
 import { formatCurrency } from "@/lib/utils";
@@ -19,7 +20,7 @@ const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: s
     shipped:             { label: "Sevk Edildi",   cls: "badge-success"  },
 };
 
-export default function RecentOrders() {
+const RecentOrders = memo(function RecentOrders() {
     const { orders, loading } = useData();
 
     if (loading) {
@@ -129,4 +130,6 @@ export default function RecentOrders() {
             })}
         </div>
     );
-}
+});
+
+export default RecentOrders;

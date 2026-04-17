@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -151,7 +151,7 @@ function OrdersList() {
         router.replace(params.toString() ? `?${params.toString()}` : "?", { scroll: false });
     }, [activeTab, customerIdFilter, dateFrom, dateTo, currencyFilter, router]);
 
-    const filtered = mockOrders.filter((o) => {
+    const filtered = useMemo(() => mockOrders.filter((o) => {
         if (customerIdFilter && o.customerId !== customerIdFilter) return false;
         const matchSearch =
             !search ||
@@ -164,7 +164,7 @@ function OrdersList() {
         if (dateTo   && orderDate > dateTo)   return false;
         if (currencyFilter && o.currency !== currencyFilter) return false;
         return true;
-    });
+    }), [mockOrders, search, customerIdFilter, activeTab, dateFrom, dateTo, currencyFilter]);
 
     const getCount = (tab: FilterTab) =>
         tab === "ALL" ? mockOrders.length : mockOrders.filter(o => matchesTab(o, tab)).length;

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
 
@@ -7,7 +8,7 @@ interface TopbarProps {
     onToggleSidebar?: () => void;
 }
 
-export default function Topbar({ onToggleSidebar }: TopbarProps) {
+const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
     const { activeAlertCount } = useData();
     const alertCount = activeAlertCount;
     return (
@@ -128,4 +129,6 @@ export default function Topbar({ onToggleSidebar }: TopbarProps) {
             </div>
         </header>
     );
-}
+});
+
+export default Topbar;

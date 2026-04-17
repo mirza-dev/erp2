@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
 
@@ -40,7 +40,7 @@ const tdStyle: React.CSSProperties = {
     lineHeight: 1.4,
 };
 
-export default function StockDataGrid({ filterCategory = "", filterStatus = "" }: StockDataGridProps) {
+const StockDataGrid = memo(function StockDataGrid({ filterCategory = "", filterStatus = "" }: StockDataGridProps) {
     const { products, loading } = useData();
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -192,4 +192,6 @@ export default function StockDataGrid({ filterCategory = "", filterStatus = "" }
             </table>
         </div>
     );
-}
+});
+
+export default StockDataGrid;

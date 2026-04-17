@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
 
@@ -27,7 +28,7 @@ function severityDotColor(severity: "critical" | "warning" | "info"): string {
   return "var(--accent)";
 }
 
-export default function AIAlerts() {
+const AIAlerts = memo(function AIAlerts() {
   const { openAlerts, loading } = useData();
 
   if (loading) {
@@ -204,4 +205,6 @@ export default function AIAlerts() {
       )}
     </div>
   );
-}
+});
+
+export default AIAlerts;

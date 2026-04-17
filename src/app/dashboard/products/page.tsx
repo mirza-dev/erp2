@@ -269,7 +269,18 @@ export default function ProductsPage() {
     const handleRefresh = async () => {
         if (refreshing) return;
         setRefreshing(true);
-        try { await refetch(); } finally { setRefreshing(false); }
+        try {
+            await refetch();
+            // Run alert scan on manual refresh (not on mount — too expensive)
+            try { await fetch("/api/alerts/scan", { method: "POST" }); } catch { /* non-fatal */ }
+            try {
+                const res = await fetch("/api/alerts?entity_type=product&status=open");
+                const data: Array<{ entity_id?: string | null }> = res.ok ? await res.json() : [];
+                const ids = new Set<string>();
+                for (const a of data) { if (a.entity_id) ids.add(a.entity_id); }
+                setProductsWithAlerts(ids);
+            } catch { /* graceful */ }
+        } finally { setRefreshing(false); }
     };
 
     useEffect(() => {
@@ -398,12 +409,10 @@ export default function ProductsPage() {
         return () => { cancelled = true; };
     }, [selectedProductId]);
 
-    // Scan stock alerts on mount, then fetch all open product alerts for signal filtering
+    // Fetch open product alerts for signal filtering (no scan on mount — scan runs on "Yenile")
     useEffect(() => {
         let cancelled = false;
-        async function scanThenFetch() {
-            try { await fetch("/api/alerts/scan", { method: "POST" }); } catch { /* non-fatal */ }
-            if (cancelled) return;
+        async function fetchAlerts() {
             try {
                 const res = await fetch("/api/alerts?entity_type=product&status=open");
                 const data: Array<{ entity_id?: string | null }> = res.ok ? await res.json() : [];
@@ -413,13 +422,13 @@ export default function ProductsPage() {
                 setProductsWithAlerts(ids);
             } catch { /* graceful */ }
         }
-        scanThenFetch();
+        fetchAlerts();
         return () => { cancelled = true; };
     }, []);
 
     const isMobile = windowWidth < 768;
 
-    const filtered = mockProducts.filter((p) => {
+    const filtered = useMemo(() => mockProducts.filter((p) => {
         const matchSearch =
             p.name.toLowerCase().includes(search.toLowerCase()) ||
             p.sku.toLowerCase().includes(search.toLowerCase());
@@ -438,7 +447,7 @@ export default function ProductsPage() {
             (!filterSales && filterPurchase && eff.isForPurchase) ||
             (filterSales && filterPurchase && eff.isForSales && eff.isForPurchase);
         return matchSearch && matchCategory && matchSignal && matchUsage;
-    });
+    }), [mockProducts, search, selectedCategories, riskData, recMap, alertFilter, productsWithAlerts, filterSales, filterPurchase, usageOverrides]);
 
     const criticalCount = mockProducts.filter(p => p.promisable <= p.minStockLevel).length;
 

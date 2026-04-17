@@ -627,42 +627,43 @@ export default function PurchaseSuggestedPage() {
         }
     };
 
-    const rawItems = reorderSuggestions.filter(p => p.productType === "raw_material");
-    const manufacturedItems = reorderSuggestions.filter(p => p.productType === "manufactured");
-    const commercialItems = reorderSuggestions.filter(p => p.productType === "commercial");
+    const rawItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "raw_material"), [reorderSuggestions]);
+    const manufacturedItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "manufactured"), [reorderSuggestions]);
+    const commercialItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "commercial"), [reorderSuggestions]);
 
-    const purchaseSearched = search.trim().toLowerCase();
-    const filtered = (filter === "all" ? reorderSuggestions : reorderSuggestions.filter(p => p.productType === filter))
-        .filter(p =>
-            !purchaseSearched ||
-            p.name.toLowerCase().includes(purchaseSearched) ||
-            p.sku.toLowerCase().includes(purchaseSearched)
-        );
+    const sorted = useMemo(() => {
+        const purchaseSearched = search.trim().toLowerCase();
+        const base = (filter === "all" ? reorderSuggestions : reorderSuggestions.filter(p => p.productType === filter))
+            .filter(p =>
+                !purchaseSearched ||
+                p.name.toLowerCase().includes(purchaseSearched) ||
+                p.sku.toLowerCase().includes(purchaseSearched)
+            );
 
-    const sorted = [...filtered].sort((a, b) => {
-        // Primary: orderDeadline ascending (null = no deadline data → last)
-        const dlA = a.orderDeadline ?? null;
-        const dlB = b.orderDeadline ?? null;
-        if (dlA !== null && dlB !== null) return dlA < dlB ? -1 : dlA > dlB ? 1 : 0;
-        if (dlA !== null) return -1;
-        if (dlB !== null) return 1;
-        // Fallback: coverage days ascending (null last)
-        const daysA = computeCoverageDays(a.available_now, a.dailyUsage);
-        const daysB = computeCoverageDays(b.available_now, b.dailyUsage);
-        if (daysA !== null && daysB !== null) return daysA - daysB;
-        if (daysA !== null) return -1;
-        if (daysB !== null) return 1;
-        const urgA = a.minStockLevel > 0 ? 1 - a.available_now / a.minStockLevel : 1;
-        const urgB = b.minStockLevel > 0 ? 1 - b.available_now / b.minStockLevel : 1;
-        return urgB - urgA;
-    }).filter(p => {
-        if (decisionFilter === "all") return true;
-        const st = recMap.get(p.id)?.status;
-        if (decisionFilter === "accepted") return st === "accepted";
-        if (decisionFilter === "rejected") return st === "rejected";
-        // pending: no decision yet, or edited (quantity changed but not finalized)
-        return !st || (st !== "accepted" && st !== "rejected");
-    });
+        return [...base].sort((a, b) => {
+            // Primary: orderDeadline ascending (null = no deadline data → last)
+            const dlA = a.orderDeadline ?? null;
+            const dlB = b.orderDeadline ?? null;
+            if (dlA !== null && dlB !== null) return dlA < dlB ? -1 : dlA > dlB ? 1 : 0;
+            if (dlA !== null) return -1;
+            if (dlB !== null) return 1;
+            // Fallback: coverage days ascending (null last)
+            const daysA = computeCoverageDays(a.available_now, a.dailyUsage);
+            const daysB = computeCoverageDays(b.available_now, b.dailyUsage);
+            if (daysA !== null && daysB !== null) return daysA - daysB;
+            if (daysA !== null) return -1;
+            if (daysB !== null) return 1;
+            const urgA = a.minStockLevel > 0 ? 1 - a.available_now / a.minStockLevel : 1;
+            const urgB = b.minStockLevel > 0 ? 1 - b.available_now / b.minStockLevel : 1;
+            return urgB - urgA;
+        }).filter(p => {
+            if (decisionFilter === "all") return true;
+            const st = recMap.get(p.id)?.status;
+            if (decisionFilter === "accepted") return st === "accepted";
+            if (decisionFilter === "rejected") return st === "rejected";
+            return !st || (st !== "accepted" && st !== "rejected");
+        });
+    }, [reorderSuggestions, search, filter, decisionFilter, recMap]);
 
     const { totalOrderCost, acceptedOrderCost } = reorderSuggestions.reduce(
         (acc, p) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
@@ -21,7 +21,7 @@ interface SidebarProps {
     onNavigate?: () => void;
 }
 
-export default function Sidebar({ onNavigate }: SidebarProps) {
+const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
     const { reorderSuggestions, orders, activeAlertCount } = useData();
@@ -32,10 +32,14 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
         await fetch("/api/auth/logout", { method: "POST" });
         router.push("/login");
     };
-    const reorderCount = reorderSuggestions.length;
-    const pendingOrderCount = orders.filter(o => o.commercial_status === "pending_approval").length;
 
-    const navGroups: NavGroup[] = [
+    const reorderCount = useMemo(() => reorderSuggestions.length, [reorderSuggestions]);
+    const pendingOrderCount = useMemo(
+        () => orders.filter(o => o.commercial_status === "pending_approval").length,
+        [orders]
+    );
+
+    const navGroups: NavGroup[] = useMemo(() => [
         {
             label: "Operasyon",
             items: [
@@ -72,7 +76,7 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
                 { label: "Kullanıcılar", href: "/dashboard/settings/users" },
             ],
         },
-    ];
+    ], [reorderCount, pendingOrderCount, activeAlertCount]);
 
     const isActive = (href: string) =>
         href === "/dashboard"
@@ -222,4 +226,6 @@ export default function Sidebar({ onNavigate }: SidebarProps) {
             </div>
         </aside>
     );
-}
+});
+
+export default Sidebar;

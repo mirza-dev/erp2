@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { formatNumber } from "@/lib/utils";
@@ -12,7 +12,7 @@ const subtitleColors = {
     danger: "var(--danger-text)",
 };
 
-export default function StatsCards() {
+const StatsCards = memo(function StatsCards() {
     const router = useRouter();
     const { products, uretimKayitlari, loading } = useData();
 
@@ -188,4 +188,6 @@ export default function StatsCards() {
             ))}
         </div>
     );
-}
+});
+
+export default StatsCards;
