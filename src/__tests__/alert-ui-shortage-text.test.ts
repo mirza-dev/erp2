@@ -115,6 +115,29 @@ describe("shortReason — order_shortage semantik hizalama", () => {
         const alerts = [makeAlert({ type: "stock_critical" }), makeShortageAlert(10)];
         expect(shortReason(alerts)).toBe("Onaylı sipariş stokla karşılanamıyor");
     });
+
+    it("order_deadline critical → 'Sipariş son tarihi geçti'", () => {
+        const alerts = [makeAlert({ type: "order_deadline", severity: "critical" })];
+        expect(shortReason(alerts)).toBe("Sipariş son tarihi geçti");
+    });
+
+    it("order_deadline warning → 'Sipariş son tarihi yaklaşıyor'", () => {
+        const alerts = [makeAlert({ type: "order_deadline", severity: "warning" })];
+        expect(shortReason(alerts)).toBe("Sipariş son tarihi yaklaşıyor");
+    });
+
+    it("order_deadline critical + stock_risk → order_deadline öncelikli", () => {
+        const alerts = [
+            makeAlert({ type: "stock_risk", severity: "warning" }),
+            makeAlert({ type: "order_deadline", severity: "critical" }),
+        ];
+        expect(shortReason(alerts)).toBe("Sipariş son tarihi geçti");
+    });
+
+    it("overdue_shipment → 'Planlanan sevk tarihi geçti'", () => {
+        const alerts = [makeAlert({ type: "overdue_shipment", severity: "warning" })];
+        expect(shortReason(alerts)).toBe("Planlanan sevk tarihi geçti");
+    });
 });
 
 // ── shortImpact — order_shortage kolu ────────────────────────────────────────

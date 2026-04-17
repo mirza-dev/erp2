@@ -21,9 +21,17 @@ export function extractShortageQty(alerts: AlertRow[]): number | null {
 
 export function shortReason(alerts: AlertRow[]): string {
     const types = alerts.map((a) => a.type);
-    if (types.includes("order_shortage")) return "Onaylı sipariş stokla karşılanamıyor";
-    if (types.includes("stock_critical")) return "Stok kritik seviyenin altında";
-    if (types.includes("stock_risk"))     return "Stok uyarı eşiğine yaklaşıyor";
+    if (types.includes("order_shortage"))  return "Onaylı sipariş stokla karşılanamıyor";
+    if (types.includes("stock_critical"))  return "Stok kritik seviyenin altında";
+    // order_deadline: geçmişse kritik, yaklaşıyorsa uyarı — mevcut severity'den oku
+    const deadlineAlert = alerts.find((a) => a.type === "order_deadline");
+    if (deadlineAlert) {
+        return deadlineAlert.severity === "critical"
+            ? "Sipariş son tarihi geçti"
+            : "Sipariş son tarihi yaklaşıyor";
+    }
+    if (types.includes("stock_risk"))      return "Stok uyarı eşiğine yaklaşıyor";
+    if (types.includes("overdue_shipment")) return "Planlanan sevk tarihi geçti";
     return "Stok riski tespit edildi";
 }
 
