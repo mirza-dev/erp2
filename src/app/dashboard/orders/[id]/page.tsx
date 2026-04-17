@@ -21,7 +21,7 @@ const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: s
     unallocated:         { label: "Rezervesiz",    cls: "badge-neutral",  description: "Stok henüz ayrılmadı" },
     partially_allocated: { label: "Kısmi Rezerve", cls: "badge-warning",  description: "Stok kısmen ayrıldı" },
     allocated:           { label: "Rezerveli",     cls: "badge-warning",  description: "Stok ayrıldı, sevkiyata hazır" },
-    partially_shipped:   { label: "Kısmi Sevk",    cls: "badge-accent",   description: "Kısmen gönderildi" },
+    partially_shipped:   { label: "Sevk Edildi",   cls: "badge-success",  description: "Müşteriye gönderildi" },
     shipped:             { label: "Sevk Edildi",   cls: "badge-success",  description: "Müşteriye gönderildi" },
 };
 

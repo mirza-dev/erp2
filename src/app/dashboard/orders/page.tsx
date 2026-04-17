@@ -24,7 +24,7 @@ const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: s
     unallocated:         { label: "Rezervesiz",   cls: "badge-neutral"  },
     partially_allocated: { label: "Kısmi Rezerve", cls: "badge-warning"  },
     allocated:           { label: "Rezerveli",    cls: "badge-warning"  },
-    partially_shipped:   { label: "Kısmi Sevk",   cls: "badge-accent"   },
+    partially_shipped:   { label: "Sevk Edildi",  cls: "badge-success"  },
     shipped:             { label: "Sevk Edildi",  cls: "badge-success"  },
 };
 

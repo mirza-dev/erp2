@@ -1029,10 +1029,10 @@ const SEED_ORDERS: SeedOrder[] = [
             { sku: "AA-SOV-DN50-PN40", qty: 6, price: 2850, disc: 5 },
         ],
     },
-    // 9. Approved + Partially Shipped — Ülker
+    // 9. Approved + Shipped — Ülker
     {
         orderNumber: "ORD-2026-0009", customerName: "Ülker Gıda San. ve Tic. A.Ş.",
-        commercial: "approved", fulfillment: "partially_shipped", currency: "TRY", createdDaysAgo: 15,
+        commercial: "approved", fulfillment: "shipped", currency: "TRY", createdDaysAgo: 15,
         plannedShipmentDate: daysAgo(3),
         lines: [
             { sku: "KV-2P-DN25-PN16-CF8", qty: 40, price: 10500, disc: 0 },   // TRY fiyat
