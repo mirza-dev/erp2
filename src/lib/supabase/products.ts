@@ -384,11 +384,22 @@ export async function dbGetQuotedBreakdownByProduct(
 }
 
 // auth.users listesi 5 dakika cache'lenir — kullanıcı emailları sık değişmez.
+// Pagination ile tüm kullanıcılar çekilir (200+ kullanıcıda eksik eşleşme olmaz).
 const getCachedAuthUsers = unstable_cache(
     async () => {
         const supabase = createServiceClient();
-        const { data } = await supabase.auth.admin.listUsers({ perPage: 200 });
-        return (data?.users ?? []).map(u => ({ id: u.id, email: u.email ?? "" }));
+        const allUsers: { id: string; email: string }[] = [];
+        let page = 1;
+        while (true) {
+            const { data } = await supabase.auth.admin.listUsers({ perPage: 1000, page });
+            const batch = data?.users ?? [];
+            for (const u of batch) {
+                if (u.id) allUsers.push({ id: u.id, email: u.email ?? "" });
+            }
+            if (batch.length < 1000) break;
+            page++;
+        }
+        return allUsers;
     },
     ["auth-users-list"],
     { tags: ["auth-users"], revalidate: 300 }
