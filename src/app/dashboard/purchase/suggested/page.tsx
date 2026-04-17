@@ -1005,25 +1005,6 @@ export default function PurchaseSuggestedPage() {
                                             onClick={() => setAiDrawerProductId(p.id)}
                                         />
                                     </div>
-                                    <div style={{ fontSize: "18px", fontWeight: 700, color: urgency >= 80 ? "var(--danger-text)" : "var(--warning-text)", whiteSpace: "nowrap" }}>
-                                        {urgency}%
-                                    </div>
-                                </div>
-
-                                {/* Risk bar */}
-                                <div style={{
-                                    marginTop: "10px",
-                                    height: "4px",
-                                    background: "var(--bg-tertiary)",
-                                    borderRadius: "2px",
-                                    overflow: "hidden",
-                                }}>
-                                    <div style={{
-                                        width: `${urgency}%`,
-                                        height: "100%",
-                                        background: urgency >= 80 ? "var(--danger)" : urgency >= 50 ? "var(--warning)" : "var(--accent)",
-                                        borderRadius: "2px",
-                                    }} />
                                 </div>
 
                                 {/* Stock details */}
@@ -1095,7 +1076,7 @@ export default function PurchaseSuggestedPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
-                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Risk Skoru", "Önerilen · Tükenme", "Karar"].map(h => (
+                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Önerilen · Tükenme", "Karar"].map(h => (
                                     <th key={h} style={{
                                         padding: "10px 12px",
                                         textAlign: "left",
@@ -1187,31 +1168,6 @@ export default function PurchaseSuggestedPage() {
                                         {/* Açık */}
                                         <td style={{ padding: "10px 12px", color: "var(--danger-text)", fontWeight: 700, fontSize: "14px" }}>
                                             -{deficit.toLocaleString("tr-TR")}
-                                        </td>
-                                        {/* Risk Skoru */}
-                                        <td style={{ padding: "10px 12px" }}>
-                                            <div style={{
-                                                fontSize: "13px",
-                                                fontWeight: 700,
-                                                color: urgency >= 80 ? "var(--danger-text)" : urgency >= 50 ? "var(--warning-text)" : "var(--text-primary)",
-                                            }}>
-                                                {urgency}%
-                                            </div>
-                                            <div style={{
-                                                width: "72px",
-                                                height: "4px",
-                                                background: "var(--bg-tertiary)",
-                                                borderRadius: "2px",
-                                                marginTop: "4px",
-                                                overflow: "hidden",
-                                            }}>
-                                                <div style={{
-                                                    width: `${urgency}%`,
-                                                    height: "100%",
-                                                    background: urgency >= 80 ? "var(--danger)" : urgency >= 50 ? "var(--warning)" : "var(--accent)",
-                                                    borderRadius: "2px",
-                                                }} />
-                                            </div>
                                         </td>
                                         {/* Önerilen + Tükenme */}
                                         <td style={{ padding: "10px 12px" }}>
