@@ -14,6 +14,8 @@ fulfillment_status:  UNALLOCATED → PARTIALLY_ALLOCATED → ALLOCATED → PARTI
 **Kural:** `fulfillment_status` sadece `commercial_status = APPROVED` siparişlerde aktif.
 Rezervasyon sadece APPROVED olunca tetiklenir.
 
+**`partially_shipped`:** DB enum'da tanımlı ama hiçbir RPC bu değeri set etmiyor (`ship_order_full()` sadece `allocated → shipped` geçişi yapıyor). Ulaşılamaz durum. Frontend'de `shipped` ile aynı badge ("Sevk Edildi", badge-success) gösterir.
+
 ---
 
 ## Stok Modeli
@@ -131,5 +133,8 @@ grandTotal = subtotal + vatTotal
 | 4.6 | Deadline Tutarlılık (promisable, off-by-one fix) |
 | 5+ | Teklif Kırılımı + bug fix (currency, promisable, email) |
 | 6+ | Teklif Süresi, Uzatma, Geciken Sevkiyat + bug fix'ler |
+| 11 | isForPurchase/isForSales alan ayrımı (stock-utils, alerts, purchase-copilot) |
+| 12 | Sentry + k6 + Playwright CI + smoke 24 + 2 kritik semantik bug fix |
+| 13 | Performans: React.memo (6 component) + useMemo (4 sayfa) + mount scan kaldırma |
 
 Detay: `domain-rules.md`

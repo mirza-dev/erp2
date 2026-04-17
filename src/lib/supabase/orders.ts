@@ -77,22 +77,15 @@ export async function dbFindOrderByOriginalNumber(originalNumber: string): Promi
 
 export async function dbGetOrderById(id: string): Promise<OrderWithLines | null> {
     const supabase = createServiceClient();
-
-    const { data: order, error } = await supabase
+    const { data, error } = await supabase
         .from("sales_orders")
-        .select("*")
+        .select("*, order_lines(*)")
         .eq("id", id)
+        .order("sort_order", { foreignTable: "order_lines" })
         .single();
-
-    if (error || !order) return null;
-
-    const { data: lines } = await supabase
-        .from("order_lines")
-        .select("*")
-        .eq("order_id", id)
-        .order("sort_order");
-
-    return { ...order, lines: lines ?? [] };
+    if (error || !data) return null;
+    const { order_lines, ...orderFields } = data as typeof data & { order_lines: OrderLineRow[] };
+    return { ...orderFields, lines: order_lines ?? [] };
 }
 
 export async function dbListOrders(filter: ListOrdersFilter = {}): Promise<SalesOrderRow[]> {
@@ -113,7 +106,7 @@ export async function dbListOrders(filter: ListOrdersFilter = {}): Promise<Sales
     return data ?? [];
 }
 
-export async function dbCreateOrder(input: CreateOrderInput): Promise<{ id: string; order_number: string }> {
+export async function dbCreateOrder(input: CreateOrderInput): Promise<SalesOrderRow> {
     const supabase = createServiceClient();
 
     // Atomic: header + lines in one PL/pgSQL function — Postgres rolls back
@@ -153,8 +146,16 @@ export async function dbCreateOrder(input: CreateOrderInput): Promise<{ id: stri
     });
 
     if (error) throw new Error(error.message);
-    const result = data as { order_id: string; order_number: string };
-    return { id: result.order_id, order_number: result.order_number };
+    const rpcResult = data as { order_id: string; order_number: string };
+
+    // Fetch full row so caller gets item_count and all DB-set fields
+    const { data: row, error: rowErr } = await supabase
+        .from("sales_orders")
+        .select("*")
+        .eq("id", rpcResult.order_id)
+        .single();
+    if (rowErr || !row) throw new Error("Order created but could not be fetched");
+    return row;
 }
 
 export async function dbUpdateOrderStatus(

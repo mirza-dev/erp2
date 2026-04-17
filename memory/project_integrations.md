@@ -49,18 +49,23 @@ type: project
 ## Test Altyapısı
 
 - **Framework:** Vitest · `src/__tests__/` · node environment
-- **75 dosya · 1465 test** (2026-04-16 itibarıyla) · Branch coverage ≥ 80%
+- **1467 test** (2026-04-17 itibarıyla, 0 fail) · Branch coverage ≥ 80%
 - **E2E:** `@playwright/test` · Chromium · `tests/` — 23 test, tümü yeşil
   - `tests/helpers/test-data.ts` — API üzerinden test müşteri/ürün/sipariş oluşturma/silme
   - `tests/fixtures.ts` — `demoPage` fixture (demo_mode=1 cookie)
   - `tests/global-setup.ts` — Supabase signIn → storageState persist
-- **Smoke testler:** `scripts/smoke.ts` — 24 endpoint, response shape validation
+- **Smoke testler:** `scripts/smoke.ts` — **24 endpoint**, response shape validation (14→24 genişletildi 2026-04-16)
+  - Her test gerçek bug senaryosunu hedefliyor (status 200 yeterli değil, body field'ları validate ediliyor)
   - `npm run smoke` (dev server çalışırken)
 - **k6 load testleri:** `tests/load/alert-scan.k6.js` + `tests/load/import-wizard.k6.js`
-  - `.github/workflows/load-test.yml` — manuel tetiklemeli CI
+  - `.github/workflows/load-test.yml` — manuel tetiklemeli CI (`workflow_dispatch`)
+  - 3 VU / 10 VU max · p95<3000ms · error rate<2%
 - **Eval suite:** `src/__tests__/eval/` — AI kalite değerlendirmesi
-- **Sentry:** `@sentry/nextjs` — client/server/edge config, `withSentryConfig` wrap
-  - DSN kurulumu manuel: `.env.local` → `NEXT_PUBLIC_SENTRY_DSN` + `SENTRY_DSN`
+- **Sentry:** `@sentry/nextjs` — **kod tarafı tamamlandı** (2026-04-16):
+  - `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
+  - `next.config.ts` → `withSentryConfig` wrap
+  - `src/app/error.tsx` → `Sentry.captureException(error)`
+  - **DSN kurulumu manuel bekliyor:** `.env.local` → `NEXT_PUBLIC_SENTRY_DSN` + `SENTRY_DSN`, GitHub Secrets'a da eklenmeli
 
 **Mock pattern:**
 ```ts

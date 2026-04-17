@@ -27,6 +27,7 @@ import {
 } from "./api-mappers";
 
 import type { CreateOrderInput } from "./supabase/orders";
+import type { SalesOrderRow } from "./database.types";
 import { isDemoMode as checkDemoMode } from "./demo-utils";
 import { shouldSuggestReorder } from "./stock-utils";
 
@@ -461,15 +462,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        const data = await res.json();
-        const newId: string = (data.order ?? data).id;
-        // Refetch full list so all fields are populated correctly
-        const ordersRes = await fetch("/api/orders");
-        if (ordersRes.ok) {
-          const ordersData = await ordersRes.json();
-          setOrders(Array.isArray(ordersData) ? ordersData.map(mapOrderSummary) : []);
-        }
-        return newId;
+        const data: SalesOrderRow = await res.json();
+        setOrders((prev) => [mapOrderSummary(data), ...prev]);
+        return data.id;
       }
       const errJson = await res.json().catch(() => null);
       const errMsg =

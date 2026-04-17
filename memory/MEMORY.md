@@ -5,15 +5,15 @@
 
 ## Project
 - [project_stack.md](project_stack.md) — Stack, inline style kuralları, klasör yapısı, veri modelleri, seed/demo hazırlık
-- [project_domain.md](project_domain.md) — Sipariş çift ekseni, stok modeli, KDV hesaplama, import kontratı, tamamlanan fazlar
+- [project_domain.md](project_domain.md) — Sipariş çift ekseni, stok modeli, KDV, import kontratı, alert tipleri, tamamlanan fazlar (0–13)
 - [project_security.md](project_security.md) — RLS, middleware (ALWAYS_PUBLIC vs CRON_PATHS), demo mode mimarisi, credential güvenliği
-- [project_integrations.md](project_integrations.md) — Paraşüt mock, AI kolon eşleştirme, import-fields, test altyapısı
+- [project_integrations.md](project_integrations.md) — Paraşüt mock, AI kolon eşleştirme, Sentry (kod hazır/DSN eksik), k6, smoke 24, test altyapısı
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
-- [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock pattern
-- [current_focus.md](current_focus.md) — Aktif sprint ve sonraki adımlar
+- [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
+- [current_focus.md](current_focus.md) — Aktif sprint; PMT demo 2026-04-19; son yapılan perf optimizasyonu
 
 ## Roadmap
-- [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği planı (local: erp2/yuksek-etki.md)
+- [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
 
 ## Feedback
 - [feedback_no_silent_deletes.md](feedback_no_silent_deletes.md) — Kod silmeden önce onay veya net gerekçe gerekiyor

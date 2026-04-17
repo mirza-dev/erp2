@@ -9,7 +9,7 @@ type: project
 **Production URL:** `https://erp2-hj5u0tlp1-mirza-dev-6592s-projects.vercel.app`
 **Deploy:** Vercel — push → otomatik deploy
 
-**Stack:** Next.js 15 · TypeScript · Supabase (15+ tablo, 26 migration) · Tailwind kurulu ama kullanılmıyor
+**Stack:** Next.js 15 · TypeScript · Supabase (15+ tablo, 26 migration) · Tailwind kurulu ama kullanılmıyor · Sentry (`@sentry/nextjs`) kurulu ve yapılandırıldı (DSN eksik)
 **Font:** `geist` npm paketi (`geist/font/sans`, `geist/font/mono`) — `next/font/google` değil; build sırasında ağ bağımlılığı yok
 
 ---
@@ -17,7 +17,7 @@ type: project
 ## Kritik kodlama kuralları
 
 - **Sadece inline styles + CSS variables** — Tailwind class YASAK
-- **Framer Motion import YASAK** (kurulu ama yasak)
+- **Framer Motion KALDIRILDI** (`npm uninstall framer-motion` — 2026-04-17; zustand da kaldırıldı)
 - Her interaktif component için `"use client";`
 - Renk: `var(--text-primary/secondary/tertiary)`, `var(--bg-primary/secondary/tertiary)`, `var(--border-primary/secondary/tertiary)`, `var(--accent/success/warning/danger)` + `-bg/-text/-border` varyantları
 - CSS `animation` ve `transition` sadece gerekli yerde (hover, progress bar)

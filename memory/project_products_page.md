@@ -46,5 +46,17 @@ type: project
 
 Alerts sayfasındaki "Tara" butonu ve DemoTab seed sonrası scan: `?force=true` parametresi kullanıyor — takılı kalan advisory lock'u zorla açar.
 
+## Mount Tarama Davranışı (2026-04-17 değişti)
+
+- **Products page:** Artık mount'ta `POST /api/alerts/scan` YAPMAZ. Sadece `GET /api/alerts` çeker. Scan → sadece `handleRefresh()` butonuyla tetiklenir.
+  - **Why:** Her sayfa açılışında tam alert scan RPC çalışıyordu → freeze ve gecikme.
+- **Diğer sayfalar:** Benzer şekilde useMemo ile filter/sort hesapları optimize edildi.
+
+## Performance Optimizasyonları (2026-04-17)
+
+`React.memo` ile sarılan componentler: Sidebar, Topbar, StatsCards, RecentOrders, AIAlerts, StockDataGrid.
+
+`useMemo` ile sarılan hesaplamalar: Sidebar'daki navGroups + count'lar; products, orders, alerts, purchase/suggested sayfalarındaki `filtered`/`sorted` array'leri.
+
 **Why:** Bu pattern'ler yeni bir session'da hızlıca hatırlanması gereken mimari kararlar.
-**How to apply:** products/page.tsx'e dokunurken DataContext bağımlılığı arama; drawer edit modu state'leri component içinde.
+**How to apply:** products/page.tsx'e dokunurken DataContext bağımlılığı arama; drawer edit modu state'leri component içinde. Mount'ta scan yok — handleRefresh'e bak.
