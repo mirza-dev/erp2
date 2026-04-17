@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "rea
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import type { CommercialStatus, FulfillmentStatus } from "@/lib/data-context";
+import { useData, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { mapOrderSummary } from "@/lib/api-mappers";
 import type { Order } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
@@ -69,7 +69,9 @@ function OrdersList() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const isDemo = useIsDemo();
-    const [mockOrders, setMockOrders] = useState<Order[]>([]);
+    const { orders: contextOrders } = useData();
+    const [mockOrders, setMockOrders] = useState<Order[]>(contextOrders);
+    const contextInitRef = useRef(contextOrders.length > 0);
     const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState("");
     const [customerIdFilter, setCustomerIdFilter] = useState<string | null>(null);
@@ -81,6 +83,14 @@ function OrdersList() {
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const filterAppliedRef = useRef(false);
 
+    // Initialize from DataContext on first non-empty load (avoids redundant fetch after navigation)
+    useEffect(() => {
+        if (!contextInitRef.current && contextOrders.length > 0) {
+            setMockOrders(contextOrders);
+            contextInitRef.current = true;
+        }
+    }, [contextOrders]);
+
     const refetch = useCallback(async () => {
         const res = await fetch("/api/orders");
         if (res.ok) {
@@ -88,8 +98,6 @@ function OrdersList() {
             if (Array.isArray(data)) setMockOrders(data.map(mapOrderSummary));
         }
     }, []);
-
-    useEffect(() => { refetch(); }, [refetch]);
 
     const handleRefresh = async () => {
         if (refreshing) return;
