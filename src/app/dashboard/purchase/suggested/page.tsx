@@ -1019,7 +1019,10 @@ export default function PurchaseSuggestedPage() {
                                     </div>
                                     <div style={{ fontSize: "12px" }}>
                                         <span style={{ color: "var(--text-tertiary)" }}>Açık:</span>{" "}
-                                        <span style={{ fontWeight: 700, color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
+                                        {deficit > 0
+                                            ? <span style={{ fontWeight: 700, color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
+                                            : <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                                        }
                                     </div>
                                     {p.leadTimeDays != null && (
                                         <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
@@ -1166,8 +1169,11 @@ export default function PurchaseSuggestedPage() {
                                             </div>
                                         </td>
                                         {/* Açık */}
-                                        <td style={{ padding: "10px 12px", color: "var(--danger-text)", fontWeight: 700, fontSize: "14px" }}>
-                                            -{deficit.toLocaleString("tr-TR")}
+                                        <td style={{ padding: "10px 12px", fontWeight: 700, fontSize: "14px" }}>
+                                            {deficit > 0
+                                                ? <span style={{ color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
+                                                : <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                                            }
                                         </td>
                                         {/* Önerilen + Tükenme */}
                                         <td style={{ padding: "10px 12px" }}>
@@ -1206,9 +1212,13 @@ export default function PurchaseSuggestedPage() {
                                             )}
                                             {p.orderDeadline && (() => {
                                                 const dlDays = dateDaysFromToday(p.orderDeadline);
+                                                const dlLabel = new Date(p.orderDeadline).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
                                                 return (
                                                     <div style={{ marginTop: "2px", fontSize: "10px", fontWeight: 600, color: daysColor(dlDays) }}>
-                                                        Sipariş: {new Date(p.orderDeadline).toLocaleDateString("tr-TR", { day: "numeric", month: "short" })}&apos;e kadar
+                                                        {dlDays < 0
+                                                            ? `Sipariş: Geçti (${dlLabel})`
+                                                            : `Sipariş: ${dlLabel}'e kadar`
+                                                        }
                                                     </div>
                                                 );
                                             })()}
