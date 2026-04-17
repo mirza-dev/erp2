@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceConfirmBatch } from "@/lib/services/import-service";
+import { revalidateTag } from "next/cache";
 
 // POST /api/import/[batchId]/confirm
 // Tüm confirmed/pending draftları gerçek entity'lere merge eder (domain-rules §9.2)
@@ -10,6 +11,7 @@ export async function POST(
     try {
         const { batchId } = await params;
         const result = await serviceConfirmBatch(batchId);
+        revalidateTag("products", "max");
         return NextResponse.json(result);
     } catch (err) {
         console.error("[POST /api/import/[batchId]/confirm]", err);

@@ -6,6 +6,7 @@ import {
     CommitmentConflictError,
 } from "@/lib/supabase/purchase-commitments";
 import { handleApiError } from "@/lib/api-error";
+import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-commitments/[id]
 export async function GET(
@@ -41,11 +42,13 @@ export async function PATCH(
 
         if (action === "receive") {
             await dbReceiveCommitment(id);
+            revalidateTag("products", "max");
             return NextResponse.json({ success: true });
         }
 
         if (action === "cancel") {
             await dbCancelCommitment(id);
+            revalidateTag("products", "max");
             return NextResponse.json({ success: true });
         }
 

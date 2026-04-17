@@ -8,6 +8,7 @@ import {
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { handleApiError } from "@/lib/api-error";
 import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
+import { revalidateTag } from "next/cache";
 
 // GET /api/orders/[id]
 export async function GET(
@@ -64,6 +65,7 @@ export async function PATCH(
 
         // Return updated order with shortage info if partial allocation occurred
         const updated = await serviceGetOrder(id);
+        revalidateTag("products", "max");
         const response: Record<string, unknown> = { ...updated };
         if (result.shortages && result.shortages.length > 0) {
             response.shortages = result.shortages;
@@ -107,6 +109,7 @@ export async function DELETE(
             );
         }
         await dbHardDeleteOrder(id);
+        revalidateTag("products", "max");
         return NextResponse.json({ success: true });
     } catch (err) {
         return handleApiError(err, "DELETE /api/orders/[id]?permanent=1");

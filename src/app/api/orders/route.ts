@@ -9,6 +9,7 @@ import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
+import { revalidateTag } from "next/cache";
 
 // GET /api/orders?commercial_status=approved&customer_id=xxx&page=1
 export async function GET(req: NextRequest) {
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
             console.error("[AI Score] fire-and-forget:", err)
         );
 
+        revalidateTag("products", "max");
         return NextResponse.json(result, { status: 201 });
     } catch (err) {
         return handleApiError(err, "POST /api/orders");

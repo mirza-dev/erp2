@@ -4,22 +4,21 @@ import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { handleApiError } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 import { computeOrderDeadline } from "@/lib/stock-utils";
+import { unstable_cache, revalidateTag } from "next/cache";
 
-// GET /api/products?category=xxx&product_type=manufactured&is_active=false&page=1
-export async function GET(req: NextRequest) {
-    try {
-        const { searchParams } = req.nextUrl;
+const getCachedProducts = unstable_cache(
+    async (category: string, productType: string, isActive: boolean, page: number) => {
         const [products, quotedMap, incomingMap] = await Promise.all([
             dbListProducts({
-                category: searchParams.get("category") ?? undefined,
-                product_type: (searchParams.get("product_type") as "raw_material" | "manufactured" | "commercial") ?? undefined,
-                is_active: searchParams.get("is_active") !== "false",
-                page: Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1),
+                category: category || undefined,
+                product_type: (productType || undefined) as "raw_material" | "manufactured" | "commercial" | undefined,
+                is_active: isActive,
+                page,
             }),
             dbGetQuotedQuantities(),
             dbGetIncomingQuantities(),
         ]);
-        const enriched = products.map(p => {
+        return products.map(p => {
             const quoted   = quotedMap.get(p.id)   ?? 0;
             const incoming = incomingMap.get(p.id) ?? 0;
             const promisable = p.available_now - quoted;
@@ -36,6 +35,20 @@ export async function GET(req: NextRequest) {
                 orderDeadline,
             };
         });
+    },
+    ["products-list"],
+    { tags: ["products"], revalidate: 30 }
+);
+
+// GET /api/products?category=xxx&product_type=manufactured&is_active=false&page=1
+export async function GET(req: NextRequest) {
+    try {
+        const { searchParams } = req.nextUrl;
+        const category = searchParams.get("category") ?? "";
+        const productType = searchParams.get("product_type") ?? "";
+        const isActive = searchParams.get("is_active") !== "false";
+        const page = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
+        const enriched = await getCachedProducts(category, productType, isActive, page);
         return NextResponse.json(enriched);
     } catch (err) {
         return handleApiError(err, "GET /api/products");
@@ -58,6 +71,7 @@ export async function POST(req: NextRequest) {
         }
 
         const product = await dbCreateProduct(body);
+        revalidateTag("products", "max");
         return NextResponse.json(product, { status: 201 });
     } catch (err: unknown) {
         // ConfigError (missing env) → 503 before anything else

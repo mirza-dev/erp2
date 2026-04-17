@@ -6,6 +6,7 @@ import {
     type CreateProductInput,
 } from "@/lib/supabase/products";
 import { handleApiError } from "@/lib/api-error";
+import { revalidateTag } from "next/cache";
 
 // GET /api/products/[id]
 export async function GET(
@@ -33,6 +34,7 @@ export async function PATCH(
         const { id } = await params;
         const body: Partial<CreateProductInput> = await req.json();
         const product = await dbUpdateProduct(id, body);
+        revalidateTag("products", "max");
         return NextResponse.json(product);
     } catch (err) {
         return handleApiError(err, "PATCH /api/products/[id]");
@@ -47,6 +49,7 @@ export async function DELETE(
     try {
         const { id } = await params;
         await dbDeleteProduct(id);
+        revalidateTag("products", "max");
         return NextResponse.json({ ok: true });
     } catch (err) {
         return handleApiError(err, "DELETE /api/products/[id]");

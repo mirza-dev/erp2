@@ -1,5 +1,6 @@
 import { createServiceClient } from "./service";
 import type { ProductWithStock } from "@/lib/database.types";
+import { unstable_cache } from "next/cache";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -382,20 +383,29 @@ export async function dbGetQuotedBreakdownByProduct(
     return rows;
 }
 
+// auth.users listesi 5 dakika cache'lenir — kullanıcı emailları sık değişmez.
+const getCachedAuthUsers = unstable_cache(
+    async () => {
+        const supabase = createServiceClient();
+        const { data } = await supabase.auth.admin.listUsers({ perPage: 200 });
+        return (data?.users ?? []).map(u => ({ id: u.id, email: u.email ?? "" }));
+    },
+    ["auth-users-list"],
+    { tags: ["auth-users"], revalidate: 300 }
+);
+
 /**
  * auth.users'tan UUID → email map'i döner.
- * admin.listUsers single-shot, küçük B2B tim için kabul edilebilir.
+ * Sonuçlar 5 dakika server-side cache'de tutulur.
  */
 export async function dbLookupUserEmails(
     userIds: string[]
 ): Promise<Map<string, string>> {
     const unique = Array.from(new Set(userIds.filter(Boolean)));
     if (unique.length === 0) return new Map();
-    const supabase = createServiceClient();
-    const { data, error } = await supabase.auth.admin.listUsers({ perPage: 200 });
-    if (error || !data) return new Map();
+    const users = await getCachedAuthUsers();
     const map = new Map<string, string>();
-    for (const u of data.users) {
+    for (const u of users) {
         if (u.email && unique.includes(u.id)) map.set(u.id, u.email);
     }
     return map;

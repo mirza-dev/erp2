@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { serviceCreateProductionEntry } from "@/lib/services/production-service";
 import { dbListProductionEntries } from "@/lib/supabase/production";
 import { handleApiError } from "@/lib/api-error";
+import { revalidateTag } from "next/cache";
 
 // GET /api/production?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: result.error, shortages: result.shortages }, { status });
         }
 
+        revalidateTag("products", "max");
         return NextResponse.json({ entry_id: result.entry_id }, { status: 201 });
     } catch (err) {
         return handleApiError(err, "POST /api/production");
