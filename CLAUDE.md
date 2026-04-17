@@ -1,17 +1,17 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-16_
+_Son güncelleme: 2026-04-17_
 
-**Son tamamlanan iş:** E2E test kalitesi + demo öncesi kritik bug'lar (2026-04-16)
-- **2 kritik semantik bug** düzeltildi: Sevket butonu `approved` tüm siparişlerde görünür; `promisable` fallback `available_now - quoted`
-- **Smoke testler** 14 → 24'e genişletildi (customers, aging, quotes, purchase/scan, expire-quotes, AI observability vb.)
-- **Sentry** kuruldu: client/server/edge config, `withSentryConfig` wrap, `error.tsx` entegrasyonu
-- **k6 load testleri**: `tests/load/` — alert-scan + import-wizard, manual-trigger CI workflow
-- **E2E sahte-yeşil testler** güçlendirildi: aging exact match, orders/new mandatory akış, alerts mandatory tab assert, lint temizlendi
+**Son tamamlanan iş:** Seed dataya 5 hammadde (raw_material) ürünü eklendi (2026-04-17)
+- **5 hammadde ürünü** eklendi: kritik (Döküm gövde, Dövme flanş), geçmiş-deadline (SS316 bar, Grafit levha), filtre testi (PTFE rod)
+- `is_for_sales: false, is_for_purchase: true` — Hammadde tabı artık demo'da dolu
+- **isForPurchase/isForSales** filtreleme 6 dosyada: shouldSuggestReorder, data-context, purchase-copilot, alerts sayfası, purchase-service, DR-7 fixture
+- **4 semantik bug** düzeltildi + yenile butonu + Üretim & Stok Uyarıları yeniden adlandırma
 - **Build:** temiz · **Lint:** 0 error
 
 **Önceki önemli işler:**
+- E2E test kalitesi + demo öncesi kritik bug'lar (2026-04-16)
 - Per-page fetch refactor + Seed/Auth fix (2026-04-15)
 - Kapsamlı Seed Data + "Nerede Kullanılıyor" bölümü (2026-04-14)
 - Faz 3 Stok Eskime Raporu: hammadde semantiği, cost_price, 3-tab, E2E
