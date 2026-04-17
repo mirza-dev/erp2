@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = req.nextUrl;
         const status = searchParams.get("commercial_status") as CommercialStatus | null;
         const customer_id = searchParams.get("customer_id") ?? undefined;
-        const page = parseInt(searchParams.get("page") ?? "1");
+        const page = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
 
         const orders = await serviceListOrders({
             commercial_status: status ?? undefined,

@@ -256,7 +256,7 @@ function localISODate(ts: number): string {
 export function dateDaysFromToday(isoDate: string): number {
     const todayStr = localISODate(Date.now());
     const todayMs = new Date(todayStr).getTime();
-    return Math.round((new Date(isoDate).getTime() - todayMs) / 86_400_000);
+    return Math.floor((new Date(isoDate).getTime() - todayMs) / 86_400_000);
 }
 
 // ── Order Deadline ───────────────────────────────────────────

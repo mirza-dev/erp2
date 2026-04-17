@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
                 category: searchParams.get("category") ?? undefined,
                 product_type: (searchParams.get("product_type") as "raw_material" | "manufactured" | "commercial") ?? undefined,
                 is_active: searchParams.get("is_active") !== "false",
-                page: parseInt(searchParams.get("page") ?? "1"),
+                page: Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1),
             }),
             dbGetQuotedQuantities(),
             dbGetIncomingQuantities(),

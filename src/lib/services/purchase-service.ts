@@ -88,7 +88,7 @@ export async function serviceScanPurchaseSuggestions(): Promise<PurchaseScanResu
             if (!exists) {
                 const dailyUsage = product.daily_usage ?? null;
                 const leadTimeDays = product.lead_time_days ?? null;
-                const coverageDays = computeCoverageDays(available, dailyUsage);
+                const coverageDays = computeCoverageDays(Math.max(0, available), dailyUsage);
 
                 const { suggestQty, targetStock, formula, leadTimeDemand } = calcSuggestQty(
                     available, min, moq, dailyUsage, leadTimeDays

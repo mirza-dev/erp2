@@ -42,6 +42,9 @@ export async function serviceCreateProductionEntry(
     if (!input.produced_qty || input.produced_qty <= 0) {
         return { success: false, error: "Üretim miktarı sıfırdan büyük olmalı." };
     }
+    if (input.scrap_qty != null && (input.scrap_qty < 0 || input.scrap_qty > input.produced_qty)) {
+        return { success: false, error: "Fire miktarı 0 ile üretim miktarı arasında olmalı." };
+    }
 
     // 2. Atomic production: BOM check + consume + produce + record — all in one transaction
     const result = await dbCompleteProduction({
