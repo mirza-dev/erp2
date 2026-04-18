@@ -350,7 +350,6 @@ export default function ProductionPage() {
                                 <th style={thStyle}>SKU</th>
                                 <th style={thStyle}>Ürün</th>
                                 <th style={{ ...thStyle, textAlign: "right" as const }}>Üretilen Adet</th>
-                                <th style={thStyle}>Giren</th>
                                 <th style={thStyle}>Not</th>
                                 <th style={{ ...thStyle, width: "34px" }}></th>
                             </tr>
@@ -363,7 +362,6 @@ export default function ProductionPage() {
                                     <td style={{ ...tdStyle, textAlign: "right" as const, fontWeight: 600, color: "var(--success-text)" }}>
                                         +{formatNumber(kaydi.adet)}
                                     </td>
-                                    <td style={{ ...tdStyle, color: "var(--text-secondary)", fontSize: "12px" }}>{kaydi.girenKullanici}</td>
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.notlar || "—"}</td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
@@ -424,7 +422,6 @@ export default function ProductionPage() {
                                 <th style={thStyle}>SKU</th>
                                 <th style={thStyle}>Ürün</th>
                                 <th style={{ ...thStyle, textAlign: "right" as const }}>Adet</th>
-                                <th style={thStyle}>Giren</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -434,7 +431,6 @@ export default function ProductionPage() {
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>
                                     <td style={tdStyle}>{kaydi.productName}</td>
                                     <td style={{ ...tdStyle, textAlign: "right" as const, color: "var(--success-text)", fontWeight: 500 }}>+{formatNumber(kaydi.adet)}</td>
-                                    <td style={{ ...tdStyle, color: "var(--text-secondary)", fontSize: "12px" }}>{kaydi.girenKullanici}</td>
                                 </tr>
                             ))}
                         </tbody>
