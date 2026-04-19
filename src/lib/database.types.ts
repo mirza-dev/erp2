@@ -10,7 +10,7 @@ export type Json = string | number | boolean | null | { [key: string]: any } | a
 
 export type CommercialStatus = "draft" | "pending_approval" | "approved" | "cancelled"
 export type FulfillmentStatus = "unallocated" | "partially_allocated" | "allocated" | "partially_shipped" | "shipped"
-export type ProductType = "raw_material" | "manufactured" | "commercial"
+export type ProductType = "manufactured" | "commercial"
 export type ReservationStatus = "open" | "shipped" | "released"
 export type ShortageStatus = "open" | "resolved" | "cancelled"
 export type MovementType = "production" | "shipment" | "receipt" | "adjustment" | "reservation_create" | "reservation_release"
@@ -85,8 +85,6 @@ export interface ProductRow {
     standards: string | null
     certifications: string | null
     product_notes: string | null
-    is_for_sales: boolean
-    is_for_purchase: boolean
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */

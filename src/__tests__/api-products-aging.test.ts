@@ -42,8 +42,7 @@ function makeRequest(type?: string): NextRequest {
 
 function makeProduct(id: string, overrides: Partial<{
     on_hand: number; price: number; currency: string; category: string | null;
-    product_type: "raw_material" | "manufactured" | "commercial";
-    is_for_sales: boolean; is_for_purchase: boolean;
+    product_type: "manufactured" | "commercial";
     cost_price: number | null;
 }> = {}) {
     return {
@@ -60,8 +59,6 @@ function makeProduct(id: string, overrides: Partial<{
         min_stock_level: 5,
         is_active: true,
         product_type: "manufactured" as const,
-        is_for_sales: true,
-        is_for_purchase: true,
         warehouse: null,
         reorder_qty: null,
         preferred_vendor: null,
@@ -163,8 +160,6 @@ describe("GET /api/products/aging", () => {
         expect(row).toHaveProperty("price");
         expect(row).toHaveProperty("currency");
         expect(row).toHaveProperty("productType");
-        expect(row).toHaveProperty("isForSales");
-        expect(row).toHaveProperty("isForPurchase");
         expect(row).toHaveProperty("lastMovementDate");
         expect(row).toHaveProperty("lastSaleDate");
         expect(row).toHaveProperty("lastIncomingDate");
@@ -177,48 +172,6 @@ describe("GET /api/products/aging", () => {
     });
 });
 
-// ── type=raw_material ─────────────────────────────────────────
-
-describe("GET /api/products/aging?type=raw_material", () => {
-    it("sadece raw_material ürünleri döner", async () => {
-        mockDbListProducts.mockResolvedValue([
-            makeProduct("p1", { product_type: "manufactured",     is_for_sales: true }),
-            makeProduct("p2", { product_type: "raw_material", is_for_sales: false }),
-            makeProduct("p3", { product_type: "raw_material", is_for_sales: true }),
-        ]);
-        const data = await (await GET(makeRequest("raw_material"))).json();
-        expect(data.every((r: { productType: string }) => r.productType === "raw_material")).toBe(true);
-        expect(data).toHaveLength(2);
-    });
-
-    it("lastMovement = MAX(incoming, componentUsage) — satış tarihi dahil değil", async () => {
-        mockDbListProducts.mockResolvedValue([makeProduct("p1", { product_type: "raw_material" })]);
-        mockDbGetLastSaleDates.mockResolvedValue(new Map([["p1", "2025-01-01T00:00:00Z"]]));         // çok yeni ama kullanılmaz
-        mockDbGetLastIncomingDates.mockResolvedValue(new Map([["p1", "2020-03-01T00:00:00Z"]]));
-        mockDbGetLastComponentUsageDates.mockResolvedValue(new Map([["p1", "2020-06-01T00:00:00Z"]]));
-        const [row] = await (await GET(makeRequest("raw_material"))).json();
-        // lastMovement = MAX(incoming "2020-03-01", componentUsage "2020-06-01") = "2020-06-01"
-        // NOT "2025-01-01" (saleDate), NOT production_entries (mamul tarihidir)
-        expect(row.lastMovementDate).toBe("2020-06-01T00:00:00Z");
-    });
-
-    it("computeAgingCategoryRaw eşiklerini kullanır (60 gün → slow)", async () => {
-        mockDbListProducts.mockResolvedValue([makeProduct("p1", { product_type: "raw_material" })]);
-        const sixtyDaysAgo = new Date(Date.now() - 60 * 86_400_000).toISOString();
-        mockDbGetLastIncomingDates.mockResolvedValue(new Map([["p1", sixtyDaysAgo]]));
-        const [row] = await (await GET(makeRequest("raw_material"))).json();
-        expect(row.agingCategory).toBe("slow");
-    });
-
-    it("computeAgingCategoryRaw: 45 gün → active; componentUsage tarihi kullanılır", async () => {
-        mockDbListProducts.mockResolvedValue([makeProduct("p1", { product_type: "raw_material" })]);
-        const fortyFiveDaysAgo = new Date(Date.now() - 45 * 86_400_000).toISOString();
-        mockDbGetLastComponentUsageDates.mockResolvedValue(new Map([["p1", fortyFiveDaysAgo]]));
-        const [row] = await (await GET(makeRequest("raw_material"))).json();
-        expect(row.agingCategory).toBe("active"); // raw: < 60 = active
-    });
-});
-
 // ── type=manufactured ─────────────────────────────────────────
 
 describe("GET /api/products/aging?type=manufactured", () => {
@@ -226,7 +179,6 @@ describe("GET /api/products/aging?type=manufactured", () => {
         mockDbListProducts.mockResolvedValue([
             makeProduct("p1", { product_type: "manufactured" }),
             makeProduct("p2", { product_type: "commercial" }),
-            makeProduct("p3", { product_type: "raw_material" }),
         ]);
         const data = await (await GET(makeRequest("manufactured"))).json();
         expect(data.every((r: { productType: string }) => r.productType === "manufactured")).toBe(true);
@@ -268,7 +220,6 @@ describe("GET /api/products/aging?type=commercial", () => {
         mockDbListProducts.mockResolvedValue([
             makeProduct("p1", { product_type: "commercial" }),
             makeProduct("p2", { product_type: "manufactured" }),
-            makeProduct("p3", { product_type: "raw_material" }),
         ]);
         const data = await (await GET(makeRequest("commercial"))).json();
         expect(data.every((r: { productType: string }) => r.productType === "commercial")).toBe(true);
@@ -298,10 +249,10 @@ describe("GET /api/products/aging?type=commercial", () => {
 // ── type=all (default) ────────────────────────────────────────
 
 describe("GET /api/products/aging (type=all — default)", () => {
-    it("tüm ürünleri döner (raw_material + finished)", async () => {
+    it("tüm ürünleri döner (manufactured + commercial)", async () => {
         mockDbListProducts.mockResolvedValue([
             makeProduct("p1", { product_type: "manufactured" }),
-            makeProduct("p2", { product_type: "raw_material" }),
+            makeProduct("p2", { product_type: "commercial" }),
         ]);
         const data = await (await GET(makeRequest())).json();
         expect(data).toHaveLength(2);

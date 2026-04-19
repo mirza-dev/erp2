@@ -11,7 +11,7 @@ const getCachedProducts = unstable_cache(
         const [products, quotedMap, incomingMap] = await Promise.all([
             dbListProducts({
                 category: category || undefined,
-                product_type: (productType || undefined) as "raw_material" | "manufactured" | "commercial" | undefined,
+                product_type: (productType || undefined) as "manufactured" | "commercial" | undefined,
                 is_active: isActive,
                 page,
             }),

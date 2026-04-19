@@ -13,13 +13,12 @@ test("eskime raporu sayfası yükleniyor", async ({ page }) => {
     await expect(page.getByText(/stok eskime raporu/i)).toBeVisible({ timeout: 5_000 });
 });
 
-test("üç rapor tab'ı görünür — Hammadde, Mamul, Ticari Mal", async ({ page }) => {
-    await expect(page.getByText(/hammadde eskimesi/i)).toBeVisible({ timeout: 5_000 });
+test("iki rapor tab'ı görünür — Mamul, Ticari Mal", async ({ page }) => {
     await expect(page.getByText(/mamul eskimesi/i)).toBeVisible({ timeout: 5_000 });
     await expect(page.getByText(/ticari mal eskimesi/i)).toBeVisible({ timeout: 5_000 });
 });
 
-test("Hammadde tab'ı açıkken özet kartlar görünür", async ({ page }) => {
+test("Mamul tab'ı açıkken özet kartlar görünür", async ({ page }) => {
     await expect(page.getByText(/bağlanan sermaye/i).first()).toBeVisible({ timeout: 8_000 });
     // Exact matching: "Durgun + Ölü SKU" label'ı parent container'lardan ayırt eder
     await expect(page.getByText("Durgun + Ölü SKU", { exact: true })).toBeVisible({ timeout: 5_000 });
@@ -33,9 +32,9 @@ test("Mamul tab'ına geçiş çalışıyor", async ({ page }) => {
     await expect(page.getByText(/45 gün/i)).toBeVisible({ timeout: 5_000 });
 });
 
-test("Hammadde tab'ında eşik referansı doğru", async ({ page }) => {
-    // İlk tab Hammadde — 60 gün eşiği göstermeli
-    await expect(page.getByText(/60 gün/i)).toBeVisible({ timeout: 5_000 });
+test("Mamul tab'ında eşik referansı doğru", async ({ page }) => {
+    // İlk tab Mamul — 45 gün eşiği göstermeli
+    await expect(page.getByText(/45 gün/i)).toBeVisible({ timeout: 5_000 });
 });
 
 test("arama input'u çalışıyor", async ({ page }) => {

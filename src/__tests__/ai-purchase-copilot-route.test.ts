@@ -65,7 +65,7 @@ function makeProduct(overrides: Partial<ProductWithStock> = {}): ProductWithStoc
         available_now: 5,
         min_stock_level: 20,
         is_active: true,
-        product_type: "raw_material",
+        product_type: "commercial",
         warehouse: null,
         reorder_qty: 10,
         preferred_vendor: null,
@@ -76,8 +76,6 @@ function makeProduct(overrides: Partial<ProductWithStock> = {}): ProductWithStoc
         sector_compatibility: null,
         cost_price: null,
         weight_kg: null,
-        is_for_purchase: true,
-        is_for_sales:    true,
         created_at: "2024-01-01T00:00:00Z",
         updated_at: "2024-01-01T00:00:00Z",
         ...overrides,
@@ -112,20 +110,9 @@ describe("POST /api/ai/purchase-copilot — counts computation", () => {
         expect(body.counts.total_products).toBe(3);
     });
 
-    it("raw_material count is correct", async () => {
-        mockDbListProducts.mockResolvedValue([
-            makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20, product_type: "raw_material" }),
-            makeProduct({ id: "p-2", available_now: 5, min_stock_level: 20, product_type: "manufactured" }),
-            makeProduct({ id: "p-3", available_now: 5, min_stock_level: 20, product_type: "raw_material" }),
-        ]);
-        const res = await POST();
-        const body = await res.json();
-        expect(body.counts.raw_material).toBe(2);
-    });
-
     it("manufactured ürünler satın alma havuzuna girmez → count 0", async () => {
         mockDbListProducts.mockResolvedValue([
-            makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20, product_type: "raw_material" }),
+            makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20, product_type: "commercial" }),
             makeProduct({ id: "p-2", available_now: 5, min_stock_level: 20, product_type: "manufactured" }),
         ]);
         const res = await POST();

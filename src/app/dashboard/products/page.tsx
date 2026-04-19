@@ -196,7 +196,7 @@ export default function ProductsPage() {
     const [createForm, setCreateForm] = useState<{
         name: string; sku: string; category: string; unit: string;
         price: number; currency: string; on_hand: number; minStockLevel: number;
-        productType: "raw_material" | "manufactured" | "commercial"; warehouse: string;
+        productType: "manufactured" | "commercial"; warehouse: string;
         materialQuality: string; originCountry: string; productionSite: string;
         useCases: string; industries: string; standards: string;
         certifications: string; productNotes: string;
@@ -220,7 +220,7 @@ export default function ProductsPage() {
     const [drawerSaving, setDrawerSaving] = useState(false);
     const [drawerEditForm, setDrawerEditForm] = useState<{
         name: string; category: string; subCategory: string;
-        productFamily: string; productType: "raw_material" | "manufactured" | "commercial";
+        productFamily: string; productType: "manufactured" | "commercial";
         sectorCompatibility: string; industries: string; useCases: string;
         materialQuality: string; originCountry: string; productionSite: string;
         standards: string; certifications: string;
@@ -1316,12 +1316,11 @@ export default function ProductsPage() {
                                             />
                                             <select
                                                 value={drawerEditForm.productType}
-                                                onChange={e => setDrawerEditForm(f => f && ({ ...f, productType: e.target.value as "raw_material" | "manufactured" | "commercial" }))}
+                                                onChange={e => setDrawerEditForm(f => f && ({ ...f, productType: e.target.value as "manufactured" | "commercial" }))}
                                                 style={drawerInputStyle}
                                             >
                                                 <option value="manufactured">İmalat</option>
                                                 <option value="commercial">Ticari</option>
-                                                <option value="raw_material">Hammadde</option>
                                             </select>
                                         </div>
                                     ) : (
@@ -1334,9 +1333,9 @@ export default function ProductsPage() {
                                                 borderRadius: "4px", flexShrink: 0, marginTop: "2px",
                                                 background: product.productType === "manufactured" ? "var(--accent-bg)" : product.productType === "commercial" ? "var(--success-bg)" : "var(--bg-tertiary)",
                                                 color: product.productType === "manufactured" ? "var(--accent-text)" : product.productType === "commercial" ? "var(--success-text)" : "var(--text-secondary)",
-                                                border: `0.5px solid ${product.productType === "manufactured" ? "var(--accent-border)" : product.productType === "commercial" ? "var(--success-border)" : "var(--border-secondary)"}`,
+                                                border: `0.5px solid ${product.productType === "manufactured" ? "var(--accent-border)" : "var(--success-border)"}`,
                                             }}>
-                                                {product.productType === "manufactured" ? "İmalat" : product.productType === "commercial" ? "Ticari" : "Hammadde"}
+                                                {product.productType === "manufactured" ? "İmalat" : "Ticari"}
                                             </span>
                                         </div>
                                     )}
@@ -2440,13 +2439,12 @@ export default function ProductsPage() {
                                         style={modalInputStyle}
                                         value={createForm.productType}
                                         onChange={e => {
-                                            const pt = e.target.value as "raw_material" | "manufactured" | "commercial";
+                                            const pt = e.target.value as "manufactured" | "commercial";
                                             setCreateForm(f => ({ ...f, productType: pt }));
                                         }}
                                     >
                                         <option value="manufactured">İmalat</option>
                                         <option value="commercial">Ticari</option>
-                                        <option value="raw_material">Hammadde</option>
                                     </select>
                                 </FormField>
                                 <FormField label="Depo">

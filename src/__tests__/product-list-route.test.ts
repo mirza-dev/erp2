@@ -68,12 +68,6 @@ describe("GET /api/products — query param forwarding", () => {
         );
     });
 
-    it("?product_type=raw_material → product_type iletilir", async () => {
-        await GET(makeGetRequest("product_type=raw_material"));
-        expect(mockDbListProducts).toHaveBeenCalledWith(
-            expect.objectContaining({ product_type: "raw_material" })
-        );
-    });
 
     it("?is_active=false → is_active false iletilir", async () => {
         await GET(makeGetRequest("is_active=false"));

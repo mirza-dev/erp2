@@ -304,15 +304,7 @@ Bir finished good üretim kaydı için BOM bulunmalıdır.
 Her komponent için:
 - `consumed_qty = produced_qty * bom_component_qty`
 
-### 8.3 Yetersiz Hammadde
-Varsayılan davranış:
-- yetersiz hammaddede işlem bloklanır
-
-İleride:
-- yetkili kullanıcı override edebilir
-- override ayrıca audit log üretir
-
-### 8.4 Scrap / Waste
+### 8.3 Scrap / Waste
 Sistem ileride fire destekleyebilir.
 İlk sürümde opsiyonel alan olarak tasarlanabilir:
 - `scrap_qty`

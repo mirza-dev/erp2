@@ -42,7 +42,6 @@ function makeProduct(overrides: {
     reorder_qty?: number | null;
     daily_usage?: number | null;
     lead_time_days?: number | null;
-    is_for_purchase?: boolean;
 }) {
     return {
         id: overrides.id ?? "prod-1",
@@ -55,7 +54,6 @@ function makeProduct(overrides: {
         preferred_vendor: null,
         unit: "adet",
         is_active: true,
-        is_for_purchase: overrides.is_for_purchase ?? true,
     };
 }
 

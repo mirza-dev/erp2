@@ -13,9 +13,7 @@ export interface AgingRow {
     onHand: number;
     price: number;
     currency: string;
-    productType: "raw_material" | "manufactured" | "commercial";
-    isForSales: boolean;
-    isForPurchase: boolean;
+    productType: "manufactured" | "commercial";
     lastMovementDate: string | null;         // ISO timestamptz, null = hiç hareket yok
     lastSaleDate: string | null;
     lastIncomingDate: string | null;

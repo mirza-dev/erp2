@@ -27,7 +27,7 @@ function makePurchaseItem(overrides: Partial<PurchaseSuggestionItem> = {}): Purc
         productId: "p-fixture",
         productName: "Test Vana DN50",
         sku: "VLV-DN50",
-        productType: "raw_material",
+        productType: "commercial",
         unit: "adet",
         available: 5,
         min: 20,

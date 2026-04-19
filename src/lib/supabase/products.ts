@@ -13,7 +13,7 @@ export interface CreateProductInput {
     currency?: string;
     on_hand?: number;
     min_stock_level?: number;
-    product_type?: "raw_material" | "manufactured" | "commercial";
+    product_type?: "manufactured" | "commercial";
     warehouse?: string;
     reorder_qty?: number;
     preferred_vendor?: string;
@@ -32,13 +32,11 @@ export interface CreateProductInput {
     standards?: string;
     certifications?: string;
     product_notes?: string;
-    is_for_sales?: boolean;
-    is_for_purchase?: boolean;
 }
 
 export interface ListProductsFilter {
     category?: string;
-    product_type?: "raw_material" | "manufactured" | "commercial";
+    product_type?: "manufactured" | "commercial";
     is_active?: boolean;
     page?: number;
     pageSize?: number;
@@ -137,8 +135,6 @@ export async function dbCreateProduct(input: CreateProductInput): Promise<Produc
             standards: input.standards ?? null,
             certifications: input.certifications ?? null,
             product_notes: input.product_notes ?? null,
-            is_for_sales: input.is_for_sales ?? true,
-            is_for_purchase: input.is_for_purchase ?? true,
         })
         .select("*")
         .single();

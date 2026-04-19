@@ -6,7 +6,18 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-17 — Faz 2 DB sorgu + client refresh optimizasyonu + bulgu fix):**
+**Son tamamlanan (2026-04-20 — İmalat/Ticari sınıflandırması + UI temizlik):**
+
+1. `isForSales`/`isForPurchase` toggle konsepti UI ve servislerden kaldırıldı; `productType` tek otorite
+2. Etiketler: "Mamul" → "İmalat", "Ticari Mal" → "Ticari" (products page, purchase/suggested)
+3. Filtre butonları: `filterSales`/`filterPurchase` → `filterManufactured`/`filterCommercial` (productType'a göre)
+4. Drawer'dan Satış/Satınalma toggle'ları kaldırıldı; create modal'dan checkbox'lar kaldırıldı
+5. purchase-service, purchase-copilot, alerts page, stock-utils → productType kullanıyor
+6. production/page.tsx: "Giren" kolonu kaldırıldı (hardcoded "Usta")
+7. settings/page.tsx: "Demo Hazırlık" sekmesi kaldırıldı
+8. **Faz 2 (hammadde kaldırma)** henüz yapılmadı — DB migrasyon gerekiyor
+
+**Önceki (2026-04-17 — Faz 2 DB sorgu + client refresh optimizasyonu + bulgu fix):**
 
 1. **Faz 2A** — `dbGetOrderById` 2 sıralı sorgu → 1 Supabase embedded JOIN (`select("*, order_lines(*)")`)
 2. **Faz 2B** — `dbCreateOrder` RPC sonrası `SELECT *` ile tam `SalesOrderRow` döndürüyor; `data-context.addOrder` artık `GET /api/orders` refetch yapmıyor, POST response ile state prepend yapıyor

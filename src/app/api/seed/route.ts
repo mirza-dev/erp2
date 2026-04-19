@@ -56,7 +56,6 @@ const SEED_PRODUCTS = [
         industries: "Petrokimya, Kimya, İlaç, Gıda",
         standards: "API 6D, EN 12516",
         certifications: "ISO 9001",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         // WARNING: available=35, min=25, ceil(25*1.5)=38 → 25<35≤38
@@ -78,7 +77,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Petrokimya, Gaz, Enerji",
         standards: "API 6D, ASME B16.10",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         name: "2 Parçalı Küresel Vana DN25 PN16 Paslanmaz 304",
@@ -99,7 +97,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Gıda, İlaç, Kimya",
         standards: "EN 12516",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         // CRITICAL: available=5, min=10 → 5≤10
@@ -121,7 +118,6 @@ const SEED_PRODUCTS = [
         industries: "Petrokimya, Rafineri, Gaz",
         standards: "API 6D, API 600",
         certifications: "ISO 9001, PED 2014/68/EU",
-        is_for_sales: true, is_for_purchase: false,
     },
 
     // ── SÜRGÜLÜ VANALAR ─────────────────────────────────────────────────────
@@ -146,7 +142,6 @@ const SEED_PRODUCTS = [
         industries: "Petrokimya, Enerji, Gaz",
         standards: "EN 558 Serie 15, API 600",
         certifications: "ISO 9001",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         name: "Yükselen Milli F4 Sürgülü Vana DN200 PN40 Karbon Çelik",
@@ -166,7 +161,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Enerji Santralleri, Gaz",
         standards: "EN 558 Serie 14, DIN 3352",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         // WARNING: available=22, min=15, ceil(15*1.5)=23 → 15<22≤23
@@ -189,7 +183,6 @@ const SEED_PRODUCTS = [
         industries: "Petrokimya, Rafineri, Gaz",
         standards: "API 602, ASME B16.34",
         certifications: "ISO 9001",
-        is_for_sales: true, is_for_purchase: false,
     },
 
     // ── KELEBEK VANALAR ─────────────────────────────────────────────────────
@@ -216,7 +209,6 @@ const SEED_PRODUCTS = [
         industries: "Gıda, İlaç, Kimya, Petrokimya",
         standards: "EN 593, ISO 5752",
         certifications: "ISO 9001, FDA uyumlu",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         name: "Lug Tip Kelebek Vana DN200 PN16 Karbon Çelik",
@@ -237,7 +229,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Enerji, Gaz, Petrokimya",
         standards: "EN 593, API 609",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         name: "Çift Klapeli Flanşlı Kelebek Vana DN100 PN16 Karbon Çelik",
@@ -258,7 +249,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Enerji, Petrokimya, Kimya",
         standards: "EN 593",
-        is_for_sales: true, is_for_purchase: false,
     },
 
     // ── ÇEK VALFLER ────────────────────────────────────────────────────────
@@ -282,7 +272,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Petrokimya, Gaz, Enerji",
         standards: "EN 12334, API 6D",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         // WARNING: available=28, min=20, ceil(20*1.5)=30 → 20<28≤30
@@ -305,7 +294,6 @@ const SEED_PRODUCTS = [
         industries: "Kimya, İlaç, Gıda",
         standards: "EN 12334",
         certifications: "ISO 9001",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         name: "Çift Klapeli Çek Valf DN200 PN16 Karbon Çelik",
@@ -325,7 +313,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Enerji Santralleri, Rafineri",
         standards: "EN 12334, API 6D",
-        is_for_sales: true, is_for_purchase: false,
     },
 
     // ── FİLTRELER ──────────────────────────────────────────────────────────
@@ -349,7 +336,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Petrokimya, Enerji, Kimya",
         standards: "EN 13709",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         // CRITICAL: available=6, min=10 → 6≤10
@@ -371,7 +357,6 @@ const SEED_PRODUCTS = [
         industries: "Kimya, İlaç, Gıda, Petrokimya",
         standards: "EN 13709",
         certifications: "ISO 9001",
-        is_for_sales: true, is_for_purchase: false,
     },
 
     // ── GLOB / KONTROL VALFLERİ ─────────────────────────────────────────────
@@ -395,7 +380,6 @@ const SEED_PRODUCTS = [
         production_site: "PMT Amasya Fabrikası",
         industries: "Petrokimya, Enerji, Kimya",
         standards: "EN 13709, API 623",
-        is_for_sales: true, is_for_purchase: false,
     },
     {
         // IMMINENT DEADLINE: available=45, daily=2, lead=14
@@ -419,7 +403,6 @@ const SEED_PRODUCTS = [
         industries: "Petrokimya, Kimya, İlaç",
         standards: "IEC 60534, ISA S75",
         certifications: "ISO 9001, ATEX",
-        is_for_sales: true, is_for_purchase: false,
     },
 
     // ── CONTALAR ───────────────────────────────────────────────────────────
@@ -442,7 +425,6 @@ const SEED_PRODUCTS = [
         origin_country: "TR",
         industries: "Petrokimya, Gaz, Enerji, Kimya",
         standards: "ASME B16.20, EN 1514-2",
-        is_for_sales: true, is_for_purchase: true,
     },
     {
         name: "PTFE Conta DN80 PN16",
@@ -463,7 +445,6 @@ const SEED_PRODUCTS = [
         industries: "Kimya, İlaç, Gıda",
         standards: "EN 1514-1",
         certifications: "FDA 21 CFR 177.1550",
-        is_for_sales: true, is_for_purchase: true,
     },
     {
         // WARNING: available=150, min=100, ceil(100*1.5)=150 → 100<150≤150 (sınırda!)
@@ -484,7 +465,6 @@ const SEED_PRODUCTS = [
         origin_country: "TR",
         industries: "Petrokimya, Kimya, Enerji",
         standards: "EN 1514-1, DIN 28090",
-        is_for_sales: true, is_for_purchase: true,
     },
 
     // ── FLANŞ İZOLASYON KİTLERİ ────────────────────────────────────────────
@@ -507,7 +487,6 @@ const SEED_PRODUCTS = [
         origin_country: "TR",
         industries: "Gaz, Petrokimya, Enerji",
         standards: "EN 14772, ASME PCC-1",
-        is_for_sales: true, is_for_purchase: true,
     },
     {
         name: "Flanş İzolasyon Kiti D Tipi DN100 PN16 O-Ring",
@@ -526,7 +505,6 @@ const SEED_PRODUCTS = [
         origin_country: "TR",
         industries: "Gaz, Petrokimya",
         standards: "EN 14772",
-        is_for_sales: true, is_for_purchase: true,
     },
 
     // ── BAĞLANTI ELEMANLARI ─────────────────────────────────────────────────
@@ -549,7 +527,6 @@ const SEED_PRODUCTS = [
         origin_country: "TR",
         industries: "Petrokimya, Enerji, Gaz, Kimya",
         standards: "ASTM A193, ASME B18.2.1",
-        is_for_sales: true, is_for_purchase: true,
     },
     {
         name: "Boru Kelepçesi DN80",
@@ -569,7 +546,6 @@ const SEED_PRODUCTS = [
         origin_country: "TR",
         industries: "Gaz, Enerji, Petrokimya",
         standards: "DIN 3567",
-        is_for_sales: true, is_for_purchase: true,
     },
 
     // ── ALBRECHT-AUTOMATIK (İTHAL — UZUN TEDARİK SÜRESİ) ───────────────────
@@ -598,7 +574,6 @@ const SEED_PRODUCTS = [
         standards: "EN 14382, DIN DVGW G 459-1",
         certifications: "CE, DVGW, ISO 9001",
         product_notes: "Yetkili distribütör: PMT Endüstriyel. Min sipariş miktarı 10 adet.",
-        is_for_sales: true, is_for_purchase: true,
     },
     {
         // CRITICAL: available=3, min=5 → 3≤5
@@ -622,129 +597,6 @@ const SEED_PRODUCTS = [
         standards: "EN 14382, DIN DVGW G 459-1",
         certifications: "CE, DVGW, ISO 9001",
         product_notes: "Yetkili distribütör: PMT Endüstriyel. Min sipariş miktarı 10 adet.",
-        is_for_sales: true, is_for_purchase: true,
-    },
-
-    // ── Hammaddeler (raw_material) ────────────────────────────────────────────
-
-    {
-        name: "Döküm Gövde Blank A216 WCB DN80",
-        sku: "HM-DK-DN80-WCB",
-        category: "Hammadde — Döküm",
-        unit: "adet",
-        price: 0,
-        cost_price: 185,
-        currency: "USD",
-        on_hand: 8, reserved: 0, min_stock_level: 15, reorder_qty: 40,
-        product_type: "raw_material",
-        warehouse: "Hammadde Deposu",
-        preferred_vendor: "Çelik Döküm A.Ş., Bilecik",
-        lead_time_days: 30,
-        daily_usage: 3,
-        material_quality: "ASTM A216 WCB (Karbon Çelik Döküm)",
-        origin_country: "TR",
-        production_site: "Çelik Döküm A.Ş., Bilecik",
-        industries: "Petrokimya, Endüstriyel Borulama",
-        standards: "ASTM A216, ASME B16.34",
-        certifications: "ISO 9001, PED 2014/68/EU",
-        product_notes: "DN80 gövde blank — talaşlı işlem öncesi. Kritik stok: sipariş tetiklenmalı.",
-        is_for_sales: false, is_for_purchase: true,
-    },
-
-    {
-        name: "Paslanmaz Çelik Bar SS316L Ø40mm 6m",
-        sku: "HM-CB-SS316L-40",
-        category: "Hammadde — Çelik",
-        unit: "boy",
-        price: 0,
-        cost_price: 720,
-        currency: "USD",
-        on_hand: 25, reserved: 0, min_stock_level: 12, reorder_qty: 30,
-        product_type: "raw_material",
-        warehouse: "Hammadde Deposu",
-        preferred_vendor: "Viraj Profiles Ltd., Hindistan",
-        lead_time_days: 45,
-        daily_usage: 1,
-        material_quality: "AISI 316L (UNS S31603) — düşük karbonlu",
-        origin_country: "IN",
-        production_site: "Viraj Profiles Ltd., Pune",
-        industries: "Kimya, Gıda, Denizcilik",
-        standards: "ASTM A276, EN 10278",
-        certifications: "ISO 9001, Mill Test Certificate (EN 10204 3.1)",
-        product_notes: "45 günlük tedarik süresi kritik — sipariş penceresi geçmiş olabilir.",
-        is_for_sales: false, is_for_purchase: true,
-    },
-
-    {
-        name: "PTFE Yuvarlak Rod Ø25mm (1m)",
-        sku: "HM-PTFE-ROD-25",
-        category: "Hammadde — Polimer",
-        unit: "boy",
-        price: 0,
-        cost_price: 48,
-        currency: "USD",
-        on_hand: 300, reserved: 0, min_stock_level: 50, reorder_qty: 100,
-        product_type: "raw_material",
-        warehouse: "Hammadde Deposu",
-        preferred_vendor: "Teflon San. A.Ş., Eskişehir",
-        lead_time_days: 10,
-        daily_usage: 4,
-        material_quality: "Virgin PTFE (Politetrafloroetilen)",
-        origin_country: "TR",
-        production_site: "Teflon San. A.Ş., Eskişehir",
-        industries: "Kimya, Gıda, Genel Endüstri",
-        standards: "ASTM D1710",
-        certifications: "FDA 21 CFR 177.1550, RoHS",
-        product_notes: "Stok yeterli — satın alma önerisi tetiklenmez (filtre testi).",
-        is_for_sales: false, is_for_purchase: true,
-    },
-
-    {
-        name: "Grafit Conta Levhası 1500×1500×3mm",
-        sku: "HM-GRF-1500-3",
-        category: "Hammadde — Conta Malzemesi",
-        unit: "levha",
-        price: 0,
-        cost_price: 95,
-        currency: "USD",
-        on_hand: 65, reserved: 0, min_stock_level: 15, reorder_qty: 30,
-        product_type: "raw_material",
-        warehouse: "Hammadde Deposu",
-        preferred_vendor: "SGL Carbon GmbH, Almanya",
-        lead_time_days: 35,
-        daily_usage: 2,
-        material_quality: "Expanded Graphite ≥98% C, yoğunluk 1.0 g/cm³",
-        origin_country: "DE",
-        production_site: "SGL Carbon GmbH, Meitingen",
-        industries: "Petrokimya, Enerji, Kimya",
-        standards: "DIN 28091-2, ASTM F104",
-        certifications: "ISO 9001, TA-Luft / VDI 2440, BAM onaylı",
-        product_notes: "Stok görünürde yeterli ama tedarik 35 gün — sipariş penceresi geçmiş olabilir.",
-        is_for_sales: false, is_for_purchase: true,
-    },
-
-    {
-        name: "Dövme Flanş Blank A105 DN100 PN40",
-        sku: "HM-DF-DN100-PN40-A105",
-        category: "Hammadde — Dövme",
-        unit: "adet",
-        price: 0,
-        cost_price: 135,
-        currency: "USD",
-        on_hand: 0, reserved: 0, min_stock_level: 20, reorder_qty: 50,
-        product_type: "raw_material",
-        warehouse: "Hammadde Deposu",
-        preferred_vendor: "Akbaş Dövme San., Bilecik",
-        lead_time_days: 28,
-        daily_usage: 4,
-        material_quality: "ASTM A105 (Karbon Çelik Dövme)",
-        origin_country: "TR",
-        production_site: "Akbaş Dövme San., Bilecik",
-        industries: "Petrol & Gaz, Boru Hatları",
-        standards: "ASTM A105, ASME B16.5",
-        certifications: "ISO 9001, PED 2014/68/EU, EN 10204 3.1",
-        product_notes: "STOK TÜKENMİŞ. En acil hammadde — satın alma önerisi en üstte görünür.",
-        is_for_sales: false, is_for_purchase: true,
     },
 
 ] as const;

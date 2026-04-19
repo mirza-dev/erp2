@@ -25,7 +25,6 @@ export async function POST() {
 
     const needsPurchase = products.filter(p => p.product_type !== "manufactured" && p.available_now <= p.min_stock_level);
 
-    const rawMaterialCount = needsPurchase.filter(p => p.product_type === "raw_material").length;
     const manufacturedCount = needsPurchase.filter(p => p.product_type === "manufactured").length;
     const commercialCount = needsPurchase.filter(p => p.product_type === "commercial").length;
 
@@ -42,7 +41,7 @@ export async function POST() {
             productId: p.id,
             productName: p.name,
             sku: p.sku,
-            productType: p.product_type as "raw_material" | "manufactured" | "commercial",
+            productType: p.product_type as "manufactured" | "commercial",
             unit: p.unit,
             available: p.available_now,
             min: p.min_stock_level,
@@ -231,7 +230,6 @@ export async function POST() {
         counts: {
             total_products: products.length,
             needs_purchase: needsPurchase.length,
-            raw_material: rawMaterialCount,
             manufactured: manufacturedCount,
             commercial: commercialCount,
         },

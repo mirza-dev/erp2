@@ -29,7 +29,7 @@ function makePurchaseItem(overrides: Partial<PurchaseSuggestionItem> = {}): Purc
         productId: "p-1",
         productName: "Gate Valve DN50",
         sku: "GV-DN50",
-        productType: "raw_material",
+        productType: "commercial",
         unit: "adet",
         available: 5,
         min: 20,

@@ -142,11 +142,10 @@ supabase/
 
 ```ts
 // Product — DB-aligned field isimler
-// productType: "raw_material" | "manufactured" | "commercial"
+// productType: "manufactured" | "commercial"
 Product: id, name, sku, category, unit, price, currency,
          on_hand, reserved, available_now,
          minStockLevel, isActive, productType, warehouse,
-         isForSales, isForPurchase,
          reorderQty?, preferredVendor?, dailyUsage?
 
 // Customer

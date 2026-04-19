@@ -31,14 +31,9 @@ const FILTER_TABS: { key: AgingCategory | "all"; label: string }[] = [
     { key: "no_movement", label: "Hareket Yok" },
 ];
 
-type ReportType = "raw_material" | "manufactured" | "commercial";
+type ReportType = "manufactured" | "commercial";
 
 const REPORT_TABS: { key: ReportType; label: string; subtitle: string }[] = [
-    {
-        key: "raw_material",
-        label: "Hammadde Eskimesi",
-        subtitle: "Depoda kullanılmayan hammaddeler",
-    },
     {
         key: "manufactured",
         label: "Mamul Eskimesi",
@@ -52,7 +47,6 @@ const REPORT_TABS: { key: ReportType; label: string; subtitle: string }[] = [
 ];
 
 const THRESHOLDS: Record<ReportType, string> = {
-    raw_material:  "Aktif: < 60 gün · Yavaş: 60–120 gün · Durgun: 120–240 gün · Ölü: > 240 gün",
     manufactured:  "Aktif: < 45 gün · Yavaş: 45–90 gün · Durgun: 90–180 gün · Ölü: > 180 gün",
     commercial:    "Aktif: < 45 gün · Yavaş: 45–90 gün · Durgun: 90–180 gün · Ölü: > 180 gün",
 };
@@ -65,11 +59,9 @@ function fmtDate(iso: string | null): string {
 // ── Page ──────────────────────────────────────────────────────
 
 export default function AgingPage() {
-    const [reportType, setReportType] = useState<ReportType>("raw_material");
-    const [rowsRaw, setRowsRaw]       = useState<AgingRow[]>([]);
+    const [reportType, setReportType] = useState<ReportType>("manufactured");
     const [rowsMfg, setRowsMfg]       = useState<AgingRow[]>([]);
     const [rowsCom, setRowsCom]       = useState<AgingRow[]>([]);
-    const [loadingRaw, setLoadingRaw] = useState(true);
     const [loadingMfg, setLoadingMfg] = useState(true);
     const [loadingCom, setLoadingCom] = useState(true);
     const [filter, setFilter]         = useState<AgingCategory | "all">("all");
@@ -85,7 +77,6 @@ export default function AgingPage() {
             return (await res.json()) as AgingRow[];
         }
 
-        fetchType("raw_material").then(d => { if (!cancelled) { setRowsRaw(d); setLoadingRaw(false); } }).catch(() => { if (!cancelled) setLoadingRaw(false); });
         fetchType("manufactured").then(d => { if (!cancelled) { setRowsMfg(d); setLoadingMfg(false); } }).catch(() => { if (!cancelled) setLoadingMfg(false); });
         fetchType("commercial").then(d => { if (!cancelled) { setRowsCom(d); setLoadingCom(false); } }).catch(() => { if (!cancelled) setLoadingCom(false); });
 
@@ -99,8 +90,8 @@ export default function AgingPage() {
         setSearch("");
     }
 
-    const rows    = reportType === "raw_material" ? rowsRaw : reportType === "manufactured" ? rowsMfg : rowsCom;
-    const loading = reportType === "raw_material" ? loadingRaw : reportType === "manufactured" ? loadingMfg : loadingCom;
+    const rows    = reportType === "manufactured" ? rowsMfg : rowsCom;
+    const loading = reportType === "manufactured" ? loadingMfg : loadingCom;
 
     const searched = search.trim().toLowerCase();
     const filtered = (filter === "all" ? rows : rows.filter(r => r.agingCategory === filter))
@@ -131,10 +122,8 @@ export default function AgingPage() {
         : null;
 
     // ── Tablo kolonları (tip-bazlı) ───────────────────────────
-    const col5Label = reportType === "raw_material" ? "Son Tedarik"
-        : reportType === "manufactured" ? "Son Üretim" : "Son Tedarik";
-    const col6Label = reportType === "raw_material" ? "Son Kullanım"
-        : "Son Satış";
+    const col5Label = reportType === "manufactured" ? "Son Üretim" : "Son Tedarik";
+    const col6Label = "Son Satış";
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -328,8 +317,7 @@ export default function AgingPage() {
                         {searched
                             ? "Arama sonucu bulunamadı."
                             : filter === "all"
-                                ? (reportType === "raw_material" ? "Stokta bekleyen hammadde yok."
-                                    : reportType === "manufactured" ? "Stokta bekleyen mamul yok."
+                                ? (reportType === "manufactured" ? "Stokta bekleyen mamul yok."
                                     : "Stokta bekleyen ticari mal yok.")
                                 : "Bu kategoride ürün yok."}
                     </div>
@@ -353,11 +341,8 @@ export default function AgingPage() {
                             {filtered.map(row => {
                                 const c = CATEGORY_COLORS[row.agingCategory];
                                 // Tip-bazlı tarih sütunları
-                                const date5 = reportType === "raw_material" ? row.lastIncomingDate
-                                    : reportType === "manufactured" ? row.lastProductionDate
-                                    : row.lastIncomingDate;
-                                const date6 = reportType === "raw_material" ? row.lastComponentUsageDate
-                                    : row.lastSaleDate;
+                                const date5 = reportType === "manufactured" ? row.lastProductionDate : row.lastIncomingDate;
+                                const date6 = row.lastSaleDate;
                                 return (
                                     <tr
                                         key={row.productId}

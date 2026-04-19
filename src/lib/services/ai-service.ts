@@ -837,7 +837,7 @@ export interface PurchaseSuggestionItem {
     productId: string;
     productName: string;
     sku: string;
-    productType: "raw_material" | "manufactured" | "commercial";
+    productType: "manufactured" | "commercial";
     unit: string;
     available: number;
     min: number;

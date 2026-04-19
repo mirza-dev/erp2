@@ -6,14 +6,12 @@ import {
     dbGetLastProductionDates,
     dbGetLastComponentUsageDates,
     pickMax,
-    computeAgingCategoryRaw,
     computeAgingCategoryFinished,
 } from "@/lib/supabase/aging";
 import { handleApiError } from "@/lib/api-error";
 
-// GET /api/products/aging?type=raw_material|manufactured|commercial|all
+// GET /api/products/aging?type=manufactured|commercial|all
 // Aktif ürünler arasında on_hand > 0 olanlar için eskime raporu döner.
-// type=raw_material  → sadece hammaddeler
 // type=manufactured  → sadece mamul (firma üretimi)
 // type=commercial    → sadece ticari mal (alınıp satılan)
 // type=all (default) → tümü
@@ -33,7 +31,6 @@ export async function GET(req: NextRequest) {
         const result = products
             .filter(p => p.on_hand > 0)
             .filter(p => {
-                if (type === "raw_material")  return p.product_type === "raw_material";
                 if (type === "manufactured")  return p.product_type === "manufactured";
                 if (type === "commercial")    return p.product_type === "commercial";
                 return true; // "all"
@@ -45,25 +42,17 @@ export async function GET(req: NextRequest) {
                 const componentUsageDate  = lastComponentUsageDates.get(p.id)  ?? null;
 
                 // Tip-bazlı "son hareket" semantiği:
-                // Hammadde   → son tedarik alımı VEYA üretimde son tüketim (inventory_movements, quantity<0)
                 // Mamul      → son üretim tarihi (production_entries) VEYA son satış
                 // Ticari mal → son tedarik VEYA son satış (üretim yok)
-                let lastMovement: string | null;
-                if (p.product_type === "raw_material") {
-                    lastMovement = pickMax(incomingDate, componentUsageDate);
-                } else if (p.product_type === "manufactured") {
-                    lastMovement = pickMax(productionDate, saleDate);
-                } else {
-                    lastMovement = pickMax(incomingDate, saleDate);
-                }
+                const lastMovement: string | null = p.product_type === "manufactured"
+                    ? pickMax(productionDate, saleDate)
+                    : pickMax(incomingDate, saleDate);
 
                 const daysWaiting = lastMovement
                     ? Math.floor((now - new Date(lastMovement).getTime()) / 86_400_000)
                     : null;
 
-                const agingCategory = p.product_type === "raw_material"
-                    ? computeAgingCategoryRaw(daysWaiting)
-                    : computeAgingCategoryFinished(daysWaiting);
+                const agingCategory = computeAgingCategoryFinished(daysWaiting);
 
                 return {
                     productId:          p.id,
@@ -74,9 +63,7 @@ export async function GET(req: NextRequest) {
                     onHand:             p.on_hand,
                     price:              p.price ?? 0,
                     currency:           p.currency,
-                    productType:        p.product_type as "raw_material" | "manufactured" | "commercial",
-                    isForSales:         p.is_for_sales ?? true,
-                    isForPurchase:      p.is_for_purchase ?? true,
+                    productType:        p.product_type as "manufactured" | "commercial",
                     lastMovementDate:        lastMovement,
                     lastSaleDate:            saleDate,
                     lastIncomingDate:        incomingDate,

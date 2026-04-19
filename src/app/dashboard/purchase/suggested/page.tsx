@@ -69,7 +69,7 @@ function AiSignalButton({ enrichment, loading, onClick }: {
     );
 }
 
-type FilterType = "all" | "raw_material" | "manufactured" | "commercial";
+type FilterType = "all" | "manufactured" | "commercial";
 
 function WhyBadge({ daysLeft, urgency, leadTimeDays }: {
     daysLeft: number | null;
@@ -120,49 +120,11 @@ function WhyBadge({ daysLeft, urgency, leadTimeDays }: {
     );
 }
 
-function SegmentBanner({ filter, rawCount, finishedCount, rawItems }: {
+function SegmentBanner({ filter, finishedCount }: {
     filter: FilterType;
-    rawCount: number;
     finishedCount: number;
-    rawItems: { reorderQty?: number; price?: number }[];
 }) {
     if (filter === "all") return null;
-
-    if (filter === "raw_material") {
-        const totalOrderValue = rawItems.reduce((sum, p) => {
-            const qty = p.reorderQty ?? 0;
-            const price = p.price ?? 0;
-            return sum + qty * price;
-        }, 0);
-        return (
-            <div style={{
-                marginTop: "12px",
-                padding: "12px 16px",
-                background: "var(--warning-bg)",
-                border: "1px solid var(--warning-border)",
-                borderRadius: "8px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "12px",
-                flexWrap: "wrap",
-            }}>
-                <div>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--warning-text)" }}>
-                        Tedarikçi ile sipariş verilmesi gereken {rawCount} hammadde
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                        Minimum stok seviyesinin altında — tedarik süreci başlatılmalı
-                    </div>
-                </div>
-                {totalOrderValue > 0 && (
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--warning-text)", whiteSpace: "nowrap" }}>
-                        Toplam sipariş: {totalOrderValue.toLocaleString("tr-TR", { minimumFractionDigits: 0 })} ₺
-                    </div>
-                )}
-            </div>
-        );
-    }
 
     return (
         <div style={{
@@ -627,7 +589,6 @@ export default function PurchaseSuggestedPage() {
         }
     };
 
-    const rawItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "raw_material"), [reorderSuggestions]);
     const manufacturedItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "manufactured"), [reorderSuggestions]);
     const commercialItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "commercial"), [reorderSuggestions]);
 
@@ -702,7 +663,6 @@ export default function PurchaseSuggestedPage() {
 
     const tabs: { key: FilterType; label: string; count: number }[] = [
         { key: "all", label: "Tümü", count: reorderSuggestions.length },
-        { key: "raw_material", label: "Hammadde", count: rawItems.length },
         { key: "manufactured", label: "İmalat", count: manufacturedItems.length },
         { key: "commercial", label: "Ticari", count: commercialItems.length },
     ];
@@ -776,7 +736,7 @@ export default function PurchaseSuggestedPage() {
                             {reorderSuggestions.length}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                            {rawItems.length} hammadde · {manufacturedItems.length} imalat · {commercialItems.length} ticari
+                            {manufacturedItems.length} imalat · {commercialItems.length} ticari
                         </div>
                     </div>
 
@@ -931,9 +891,7 @@ export default function PurchaseSuggestedPage() {
             {/* Segment banner */}
             <SegmentBanner
                 filter={filter}
-                rawCount={rawItems.length}
                 finishedCount={manufacturedItems.length + commercialItems.length}
-                rawItems={rawItems}
             />
 
             {/* Table or empty state */}
@@ -954,7 +912,6 @@ export default function PurchaseSuggestedPage() {
                         const urgency = p.minStockLevel > 0 ? Math.round((1 - p.available_now / p.minStockLevel) * 100) : 100;
                         const deficit = p.minStockLevel - p.available_now;
                         const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
-                        const isRaw = p.productType === "raw_material";
                         const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
                         const recEntry = recMap.get(p.id);
                         const isRejected = recEntry?.status === "rejected";
@@ -975,11 +932,11 @@ export default function PurchaseSuggestedPage() {
                                             borderRadius: "4px",
                                             fontSize: "10px",
                                             fontWeight: 600,
-                                            background: isRaw ? "var(--danger-bg)" : "var(--accent-bg)",
-                                            color: isRaw ? "var(--danger-text)" : "var(--accent-text)",
+                                            background: "var(--accent-bg)",
+                                            color: "var(--accent-text)",
                                             marginBottom: "4px",
                                         }}>
-                                            {p.productType === "manufactured" ? "İmalat" : p.productType === "commercial" ? "Ticari" : "Hammadde"}
+                                            {p.productType === "manufactured" ? "İmalat" : "Ticari"}
                                         </span>
                                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                             <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
@@ -1102,7 +1059,6 @@ export default function PurchaseSuggestedPage() {
                                 const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
                                 const deficit = p.minStockLevel - p.available_now;
                                 const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
-                                const isRaw = p.productType === "raw_material";
                                 const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
                                 const recEntry = recMap.get(p.id);
                                 const isRejected = recEntry?.status === "rejected";
@@ -1120,10 +1076,10 @@ export default function PurchaseSuggestedPage() {
                                                 borderRadius: "4px",
                                                 fontSize: "11px",
                                                 fontWeight: 600,
-                                                background: isRaw ? "var(--danger-bg)" : "var(--accent-bg)",
-                                                color: isRaw ? "var(--danger-text)" : "var(--accent-text)",
+                                                background: "var(--accent-bg)",
+                                                color: "var(--accent-text)",
                                             }}>
-                                                {p.productType === "manufactured" ? "İmalat" : p.productType === "commercial" ? "Ticari" : "Hammadde"}
+                                                {p.productType === "manufactured" ? "İmalat" : "Ticari"}
                                             </span>
                                         </td>
                                         {/* Ürün Adı + Why */}
@@ -1160,7 +1116,7 @@ export default function PurchaseSuggestedPage() {
                                                 <div style={{
                                                     width: `${stockPct}%`,
                                                     height: "100%",
-                                                    background: isRaw ? "var(--danger)" : "var(--warning)",
+                                                    background: "var(--warning)",
                                                     borderRadius: "2px",
                                                 }} />
                                             </div>

@@ -471,7 +471,7 @@ describe("Eval: Universal Degradation", () => {
                             productId: "p-test",
                             productName: "Test",
                             sku: "T-001",
-                            productType: "raw_material",
+                            productType: "commercial",
                             unit: "adet",
                             available: 5,
                             min: 20,
