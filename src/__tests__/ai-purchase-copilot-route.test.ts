@@ -123,14 +123,14 @@ describe("POST /api/ai/purchase-copilot — counts computation", () => {
         expect(body.counts.raw_material).toBe(2);
     });
 
-    it("manufactured count is correct", async () => {
+    it("manufactured ürünler satın alma havuzuna girmez → count 0", async () => {
         mockDbListProducts.mockResolvedValue([
             makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20, product_type: "raw_material" }),
             makeProduct({ id: "p-2", available_now: 5, min_stock_level: 20, product_type: "manufactured" }),
         ]);
         const res = await POST();
         const body = await res.json();
-        expect(body.counts.manufactured).toBe(1);
+        expect(body.counts.manufactured).toBe(0);
     });
 });
 

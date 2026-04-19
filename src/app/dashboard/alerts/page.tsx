@@ -140,7 +140,7 @@ export default function AlertsPage() {
         for (const alert of productSysAlerts) {
             const id = alert.entity_id!;
             const product = productMap.get(id);
-            if (product && !product.isForSales) continue;
+            if (product && product.productType === "raw_material") continue;
             if (!byProduct.has(id)) byProduct.set(id, []);
             byProduct.get(id)!.push(alert);
         }

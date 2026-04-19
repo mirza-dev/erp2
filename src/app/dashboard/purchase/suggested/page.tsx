@@ -703,8 +703,8 @@ export default function PurchaseSuggestedPage() {
     const tabs: { key: FilterType; label: string; count: number }[] = [
         { key: "all", label: "Tümü", count: reorderSuggestions.length },
         { key: "raw_material", label: "Hammadde", count: rawItems.length },
-        { key: "manufactured", label: "Mamul", count: manufacturedItems.length },
-        { key: "commercial", label: "Ticari Mal", count: commercialItems.length },
+        { key: "manufactured", label: "İmalat", count: manufacturedItems.length },
+        { key: "commercial", label: "Ticari", count: commercialItems.length },
     ];
 
     // Summary stats for decisions

@@ -307,13 +307,13 @@ const REORDER_DEADLINE_WINDOW_DAYS = 7;
  */
 export function shouldSuggestReorder(args: {
     isActive: boolean;
-    isForPurchase: boolean;
+    productType: "raw_material" | "manufactured" | "commercial";
     available: number;
     min: number;
     orderDeadline?: string | null;
 }): boolean {
     if (!args.isActive) return false;
-    if (!args.isForPurchase) return false;
+    if (args.productType === "manufactured") return false;
     if (args.available <= args.min) return true;
     if (args.orderDeadline) {
         if (dateDaysFromToday(args.orderDeadline) <= REORDER_DEADLINE_WINDOW_DAYS) return true;

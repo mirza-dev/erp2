@@ -76,7 +76,7 @@ export async function serviceScanPurchaseSuggestions(): Promise<PurchaseScanResu
     let scanned = 0;
 
     for (const product of products) {
-        if (!product.is_for_purchase) continue;
+        if (product.product_type === "manufactured") continue;
         scanned++;
         const available = product.available_now - (quotedMap.get(product.id) ?? 0); // promisable
         const min = product.min_stock_level;

@@ -200,14 +200,12 @@ export default function ProductsPage() {
         materialQuality: string; originCountry: string; productionSite: string;
         useCases: string; industries: string; standards: string;
         certifications: string; productNotes: string;
-        isForSales: boolean; isForPurchase: boolean;
     }>({
         name: "", sku: "", category: "", unit: "adet",
         price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
         productType: "manufactured", warehouse: "Sevkiyat Deposu",
         materialQuality: "", originCountry: "", productionSite: "",
         useCases: "", industries: "", standards: "", certifications: "", productNotes: "",
-        isForSales: true, isForPurchase: false,
     });
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [windowWidth, setWindowWidth] = useState<number>(
@@ -250,9 +248,8 @@ export default function ProductsPage() {
     const [extendShowCustom, setExtendShowCustom] = useState(false);
     const [extendCustomDate, setExtendCustomDate] = useState("");
     const [extendLoading, setExtendLoading] = useState(false);
-    const [filterSales, setFilterSales] = useState(false);
-    const [filterPurchase, setFilterPurchase] = useState(false);
-    const [usageOverrides, setUsageOverrides] = useState<Map<string, { isForSales: boolean; isForPurchase: boolean }>>(new Map());
+    const [filterManufactured, setFilterManufactured] = useState(false);
+    const [filterCommercial, setFilterCommercial] = useState(false);
 
     const refetch = useCallback(async () => {
         const res = await fetch("/api/products");
@@ -440,14 +437,13 @@ export default function ProductsPage() {
             alertFilter === "uyarili" ? productsWithAlerts.has(p.id) :
             alertFilter === "oneri" ? pRec?.status === "suggested" :
             true;
-        const eff = usageOverrides.get(p.id) ?? { isForSales: p.isForSales, isForPurchase: p.isForPurchase };
         const matchUsage =
-            (!filterSales && !filterPurchase) ||
-            (filterSales && !filterPurchase && eff.isForSales) ||
-            (!filterSales && filterPurchase && eff.isForPurchase) ||
-            (filterSales && filterPurchase && eff.isForSales && eff.isForPurchase);
+            (!filterManufactured && !filterCommercial) ||
+            (filterManufactured && !filterCommercial && p.productType === "manufactured") ||
+            (!filterManufactured && filterCommercial && p.productType === "commercial") ||
+            (filterManufactured && filterCommercial && (p.productType === "manufactured" || p.productType === "commercial"));
         return matchSearch && matchCategory && matchSignal && matchUsage;
-    }), [mockProducts, search, selectedCategories, riskData, recMap, alertFilter, productsWithAlerts, filterSales, filterPurchase, usageOverrides]);
+    }), [mockProducts, search, selectedCategories, riskData, recMap, alertFilter, productsWithAlerts, filterManufactured, filterCommercial]);
 
     const criticalCount = mockProducts.filter(p => p.promisable <= p.minStockLevel).length;
 
@@ -511,7 +507,6 @@ export default function ProductsPage() {
                 standards: createForm.standards || undefined,
                 certifications: createForm.certifications || undefined,
                 product_notes: createForm.productNotes || undefined,
-                is_for_sales: createForm.isForSales, is_for_purchase: createForm.isForPurchase,
             };
             const res = await fetch("/api/products", {
                 method: "POST",
@@ -527,7 +522,6 @@ export default function ProductsPage() {
                 productType: "manufactured" as const, warehouse: "Sevkiyat Deposu",
                 materialQuality: "", originCountry: "", productionSite: "",
                 useCases: "", industries: "", standards: "", certifications: "", productNotes: "",
-                isForSales: true, isForPurchase: false,
             });
             toast({ type: "success", message: `${createForm.name} ürün olarak eklendi` });
         } catch (err) {
@@ -671,7 +665,7 @@ export default function ProductsPage() {
                             textDecoration: "none", whiteSpace: "nowrap",
                         }}
                     >Eskime Raporu →</a>
-                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", isForSales: true, isForPurchase: false }); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
+                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "" }); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
                 </div>
             </div>
 
@@ -813,12 +807,12 @@ export default function ProductsPage() {
 
             {/* Usage filter */}
             <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                {(["sales", "purchase"] as const).map((type) => {
-                    const active = type === "sales" ? filterSales : filterPurchase;
-                    const label  = type === "sales" ? "Satış" : "Satınalma";
-                    const toggle = type === "sales"
-                        ? () => setFilterSales(p => !p)
-                        : () => setFilterPurchase(p => !p);
+                {(["manufactured", "commercial"] as const).map((type) => {
+                    const active = type === "manufactured" ? filterManufactured : filterCommercial;
+                    const label  = type === "manufactured" ? "İmalat" : "Ticari";
+                    const toggle = type === "manufactured"
+                        ? () => setFilterManufactured(p => !p)
+                        : () => setFilterCommercial(p => !p);
                     return (
                         <button
                             key={type}
@@ -1325,8 +1319,8 @@ export default function ProductsPage() {
                                                 onChange={e => setDrawerEditForm(f => f && ({ ...f, productType: e.target.value as "raw_material" | "manufactured" | "commercial" }))}
                                                 style={drawerInputStyle}
                                             >
-                                                <option value="manufactured">Mamul</option>
-                                                <option value="commercial">Ticari Mal</option>
+                                                <option value="manufactured">İmalat</option>
+                                                <option value="commercial">Ticari</option>
                                                 <option value="raw_material">Hammadde</option>
                                             </select>
                                         </div>
@@ -1342,54 +1336,10 @@ export default function ProductsPage() {
                                                 color: product.productType === "manufactured" ? "var(--accent-text)" : product.productType === "commercial" ? "var(--success-text)" : "var(--text-secondary)",
                                                 border: `0.5px solid ${product.productType === "manufactured" ? "var(--accent-border)" : product.productType === "commercial" ? "var(--success-border)" : "var(--border-secondary)"}`,
                                             }}>
-                                                {product.productType === "manufactured" ? "Mamul" : product.productType === "commercial" ? "Ticari Mal" : "Hammadde"}
+                                                {product.productType === "manufactured" ? "İmalat" : product.productType === "commercial" ? "Ticari" : "Hammadde"}
                                             </span>
                                         </div>
                                     )}
-
-                                    {/* Kullanım toggleları */}
-                                    <div style={{ display: "flex", gap: "6px", marginTop: "6px", marginBottom: "4px" }}>
-                                        {(["isForSales", "isForPurchase"] as const).map((field) => {
-                                            const label = field === "isForSales" ? "Satış" : "Satınalma";
-                                            const override = usageOverrides.get(product.id);
-                                            const checked = override ? override[field] : product[field];
-                                            return (
-                                                <button
-                                                    key={field}
-                                                    onClick={async () => {
-                                                        const currentOverride = usageOverrides.get(product.id) ?? { isForSales: product.isForSales, isForPurchase: product.isForPurchase };
-                                                        const newOverride = { ...currentOverride, [field]: !checked };
-                                                        setUsageOverrides(prev => new Map(prev).set(product.id, newOverride));
-                                                        try {
-                                                            await fetch(`/api/products/${product.id}`, {
-                                                                method: "PATCH",
-                                                                headers: { "Content-Type": "application/json" },
-                                                                body: JSON.stringify({ [field === "isForSales" ? "is_for_sales" : "is_for_purchase"]: !checked }),
-                                                            });
-                                                        } catch {
-                                                            setUsageOverrides(prev => new Map(prev).set(product.id, currentOverride));
-                                                        }
-                                                    }}
-                                                    style={{
-                                                        display: "flex", alignItems: "center", gap: "5px",
-                                                        fontSize: "12px", padding: "3px 8px",
-                                                        border: `0.5px solid ${checked ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                                                        borderRadius: "5px",
-                                                        background: checked ? "var(--accent-bg)" : "transparent",
-                                                        color: checked ? "var(--accent-text)" : "var(--text-tertiary)",
-                                                        cursor: "pointer",
-                                                    }}
-                                                >
-                                                    {checked && (
-                                                        <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                                                            <path d="M1.5 4.5l2 2 4-4" stroke="var(--accent-text)" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-                                                        </svg>
-                                                    )}
-                                                    {label}
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
 
                                     {/* SKU */}
                                     <div style={{ fontFamily: "var(--font-mono)", fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "12px" }}>
@@ -2491,16 +2441,11 @@ export default function ProductsPage() {
                                         value={createForm.productType}
                                         onChange={e => {
                                             const pt = e.target.value as "raw_material" | "manufactured" | "commercial";
-                                            const defaults = pt === "raw_material"
-                                                ? { isForSales: false, isForPurchase: true }
-                                                : pt === "manufactured"
-                                                ? { isForSales: true, isForPurchase: false }
-                                                : { isForSales: true, isForPurchase: true };
-                                            setCreateForm(f => ({ ...f, productType: pt, ...defaults }));
+                                            setCreateForm(f => ({ ...f, productType: pt }));
                                         }}
                                     >
-                                        <option value="manufactured">Mamul</option>
-                                        <option value="commercial">Ticari Mal</option>
+                                        <option value="manufactured">İmalat</option>
+                                        <option value="commercial">Ticari</option>
                                         <option value="raw_material">Hammadde</option>
                                     </select>
                                 </FormField>
@@ -2511,36 +2456,6 @@ export default function ProductsPage() {
                                         onChange={e => setCreateForm(f => ({ ...f, warehouse: e.target.value }))}
                                     />
                                 </FormField>
-                            </div>
-
-                            {/* Kullanım alanı */}
-                            <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                                <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Kullanım:</span>
-                                {(["isForSales", "isForPurchase"] as const).map((field) => {
-                                    const label = field === "isForSales" ? "Satış" : "Satınalma";
-                                    const checked = createForm[field];
-                                    return (
-                                        <label key={field} style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "13px", color: "var(--text-primary)" }}>
-                                            <div
-                                                onClick={() => setCreateForm(f => ({ ...f, [field]: !f[field] }))}
-                                                style={{
-                                                    width: "16px", height: "16px", borderRadius: "4px",
-                                                    border: `0.5px solid ${checked ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                                                    background: checked ? "var(--accent-bg)" : "transparent",
-                                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                                    cursor: "pointer", flexShrink: 0,
-                                                }}
-                                            >
-                                                {checked && (
-                                                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                                                        <path d="M1.5 5l2.5 2.5 5-5" stroke="var(--accent-text)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                                                    </svg>
-                                                )}
-                                            </div>
-                                            {label}
-                                        </label>
-                                    );
-                                })}
                             </div>
 
                             {/* Kimlik Bilgileri — opsiyonel */}
