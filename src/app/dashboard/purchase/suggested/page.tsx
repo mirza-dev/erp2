@@ -776,7 +776,7 @@ export default function PurchaseSuggestedPage() {
                             {reorderSuggestions.length}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                            {rawItems.length} hammadde · {manufacturedItems.length + commercialItems.length} mamul + ticari
+                            {rawItems.length} hammadde · {manufacturedItems.length} imalat · {commercialItems.length} ticari
                         </div>
                     </div>
 
@@ -979,7 +979,7 @@ export default function PurchaseSuggestedPage() {
                                             color: isRaw ? "var(--danger-text)" : "var(--accent-text)",
                                             marginBottom: "4px",
                                         }}>
-                                            {isRaw ? "Hammadde" : "Bitmiş Ürün"}
+                                            {p.productType === "manufactured" ? "İmalat" : p.productType === "commercial" ? "Ticari" : "Hammadde"}
                                         </span>
                                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                             <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", lineHeight: 1.3 }}>
@@ -1123,7 +1123,7 @@ export default function PurchaseSuggestedPage() {
                                                 background: isRaw ? "var(--danger-bg)" : "var(--accent-bg)",
                                                 color: isRaw ? "var(--danger-text)" : "var(--accent-text)",
                                             }}>
-                                                {isRaw ? "Hammadde" : "Bitmiş Ürün"}
+                                                {p.productType === "manufactured" ? "İmalat" : p.productType === "commercial" ? "Ticari" : "Hammadde"}
                                             </span>
                                         </td>
                                         {/* Ürün Adı + Why */}
