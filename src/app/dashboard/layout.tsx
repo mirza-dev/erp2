@@ -29,7 +29,7 @@ export default function DashboardLayout({
                     }}
                 >
                     {/* Topbar — spans full width */}
-                    <div style={{ gridColumn: "1 / -1" }}>
+                    <div className="topbar-wrapper" style={{ gridColumn: "1 / -1" }}>
                         <Topbar onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
                     </div>
 

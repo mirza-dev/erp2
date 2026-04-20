@@ -32,6 +32,7 @@ const INJECTED_CSS = `
 .q-del-btn { opacity: 0; transition: opacity .1s; }
 tr:hover .q-del-btn { opacity: 1; }
 .q-del-btn:hover { background: var(--danger-bg) !important; color: var(--danger-text) !important; }
+.q-card table tbody tr:hover td { background: var(--bg-hover, #2a2e37) !important; }
 .q-cell:hover { border-color: var(--border-secondary) !important; background: var(--bg-secondary) !important; }
 .q-cell:focus { border-color: var(--accent-border) !important; background: var(--bg-secondary) !important; outline: none; }
 .q-total-inp:hover { border-color: var(--border-secondary) !important; background: var(--bg-secondary) !important; }
@@ -43,31 +44,6 @@ tr:hover .q-del-btn { opacity: 1; }
 .q-field-inp:focus { border-color: var(--accent-border) !important; outline: none; }
 .q-notes:focus { border-color: var(--accent-border) !important; outline: none; }
 .q-logo-ph:hover { border-color: var(--accent) !important; }
-
-@media print {
-  .q-no-print { display: none !important; }
-  @page { size: A4 portrait; margin: 15mm 15mm 18mm 15mm; }
-  html, body { background: white !important; color: #1a1a1a !important; font-size: 10.5px !important; }
-  .q-card { border: 1px solid #ccc !important; border-radius: 4px !important; max-width: 100% !important; margin: 0 !important; }
-  .q-form-header { background: #f7f7f7 !important; border-bottom: 1px solid #ccc !important; padding: 12px 16px !important; }
-  .q-title-band { background: white !important; border-bottom: 1px solid #ccc !important; }
-  .q-meta-grid { border-bottom: 1px solid #ccc !important; }
-  .q-meta-col { padding: 10px 16px !important; }
-  .q-meta-col + .q-meta-col { border-left: 1px solid #ccc !important; }
-  .q-field-inp { background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; border-radius: 0 !important; padding: 2px 0 !important; color: #1a1a1a !important; font-size: 10.5px !important; }
-  .q-table-toolbar { background: #f0f0f0 !important; border-bottom: 1px solid #ccc !important; padding: 7px 16px !important; }
-  .q-th { background: #efefef !important; color: #444 !important; border-bottom: 1px solid #ccc !important; font-size: 9px !important; padding: 5px 6px !important; }
-  .q-cell { color: #1a1a1a !important; background: transparent !important; border: none !important; padding: 3px 4px !important; font-size: 10px !important; }
-  .q-computed { color: #1a1a1a !important; font-size: 10.5px !important; }
-  .q-total-label { color: #444 !important; }
-  .q-grand-total-inp { color: #13385C !important; font-size: 12px !important; }
-  .q-currency-badge { background: #ddeeff !important; color: #13385C !important; }
-  .q-notes-block { border-top: 1px solid #ccc !important; padding: 12px 16px !important; }
-  .q-sigs-block { border-top: 1px solid #ccc !important; padding: 12px 16px !important; }
-  .q-sig-space { height: 40px !important; }
-  .q-info-inp { color: #1a1a1a !important; }
-  select.q-vat-sel { display: none !important; }
-}
 `;
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -95,7 +71,6 @@ export default function NewQuotePage() {
     const [custContact, setCustContact] = useState("");
     const [custPhone, setCustPhone] = useState("");
     const [custEmail, setCustEmail] = useState("");
-    const [custError, setCustError] = useState(false);
 
     // Quote detail fields
     const [salesRep, setSalesRep] = useState("");
@@ -199,11 +174,6 @@ export default function NewQuotePage() {
     }
 
     function handleSave()  { autoSave(); showToast("Taslak kaydedildi", "success"); }
-    function handleSend()  {
-        if (!custCompany.trim()) { setCustError(true); showToast("Firma adı zorunludur", "error"); return; }
-        setCustError(false);
-        showToast("Teklif gönderildi ✓", "success");
-    }
 
     function lineTotal(r: QuoteRow) { return (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0); }
 
@@ -283,10 +253,6 @@ export default function NewQuotePage() {
                         <button className="q-btn" style={btn} onClick={handleSave}>
                             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M13 3l-2-2H3a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V3z" /><path d="M10 1v4H6V1M5 9h6" /></svg>
                             Kaydet
-                        </button>
-                        <button className="q-btn q-btn-primary" style={{ ...btn, background: "var(--accent-bg)", borderColor: "var(--accent-border)", color: "var(--accent-text)" }} onClick={handleSend}>
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 8l12-6-4 12-3-4-5-2zM14 2L8.5 10" /></svg>
-                            Gönder
                         </button>
                     </div>
                 </div>
@@ -373,21 +339,21 @@ export default function NewQuotePage() {
                                 Müşteri / Customer
                             </div>
                             {([
-                                ["Company",  "Firma Adı",       custCompany, setCustCompany, "Firma adını girin…", "text",  true],
-                                ["Contact",  "İrtibat Kişisi",  custContact, setCustContact, "Ad Soyad",           "text",  false],
-                                ["Phone",    "Telefon",         custPhone,   setCustPhone,   "+90 532 …",          "text",  false],
-                                ["Email",    "E-posta",         custEmail,   setCustEmail,   "ornek@firma.com",    "email", false],
-                            ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string, boolean][])
-                                .map(([en, tr, val, set, ph, type, required]) => (
+                                ["Company",  "Firma Adı",       custCompany, setCustCompany, "Firma adını girin…", "text"],
+                                ["Contact",  "İrtibat Kişisi",  custContact, setCustContact, "Ad Soyad",           "text"],
+                                ["Phone",    "Telefon",         custPhone,   setCustPhone,   "+90 532 …",          "text"],
+                                ["Email",    "E-posta",         custEmail,   setCustEmail,   "ornek@firma.com",    "email"],
+                            ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])
+                                .map(([en, tr, val, set, ph, type]) => (
                                     <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px" }}>
                                         <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                                             {en} <span style={{ fontSize: "9px", opacity: 0.6, display: "block", fontStyle: "normal" }}>{tr}</span>
                                         </div>
                                         <input
                                             className="q-field-inp"
-                                            style={{ ...fieldInput, ...(required && custError && !val.trim() ? { borderColor: "var(--danger)" } : {}) }}
+                                            style={fieldInput}
                                             type={type} placeholder={ph} value={val}
-                                            onChange={e => { set(e.target.value); if (required) setCustError(false); }}
+                                            onChange={e => set(e.target.value)}
                                         />
                                     </div>
                                 ))}
