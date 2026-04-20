@@ -326,7 +326,22 @@ select:focus-visible {
 
 /* ============ PRINT ============ */
 @media print {
-  @page { size: A4 portrait; margin: 8mm 8mm 10mm 8mm; }
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm 16mm 12mm;
+    /* Browser header/footer override — Chrome 107+ */
+    @top-left   { content: none; }
+    @top-center { content: none; }
+    @top-right  { content: none; }
+    @bottom-left   { content: none; }
+    @bottom-center { content: none; }
+    @bottom-right  {
+      content: "Sayfa " counter(page) " / " counter(pages);
+      font-size: 8pt;
+      font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
+      color: #666;
+    }
+  }
 
   /* 2. boş sayfa önleme — tüm height constraint'leri kaldır */
   html, body { height: auto !important; min-height: 0 !important; font-size: 9px !important; }
