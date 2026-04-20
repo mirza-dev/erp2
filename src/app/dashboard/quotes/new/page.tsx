@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import type { QuoteData } from "../components/quote-types";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -100,6 +102,9 @@ export default function NewQuotePage() {
     // Toast
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
+    // Router
+    const router = useRouter();
+
     // Refs
     const logoFileRef = useRef<HTMLInputElement>(null);
     const subInputRef = useRef<HTMLInputElement>(null);
@@ -144,8 +149,40 @@ export default function NewQuotePage() {
 
     // Auto-save to localStorage
     const autoSave = useCallback(() => {
-        try { localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows })); } catch { /* noop */ }
-    }, [currency, rows]);
+        try {
+            localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows }));
+            // Full data for document preview
+            const fullData: QuoteData = {
+                sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
+                custCompany, custContact, custPhone, custEmail,
+                quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
+                currency, vatRate, rows,
+                subtotal: ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0),
+                vatTotal: (() => {
+                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    const vat = ovVat !== null ? ovVat : sub * vatRate / 100;
+                    return vat;
+                })(),
+                grandTotal: (() => {
+                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    const vat = ovVat !== null ? ovVat : sub * vatRate / 100;
+                    return ovGrand !== null ? ovGrand : sub + vat;
+                })(),
+                totalKg: rows.reduce((s, r) => s + (parseFloat(r.kg) || 0), 0),
+                notes,
+                signatures: [
+                    { role: "Prepared by", roleTr: "Hazırlayan", name: sig1, title: sig1Title },
+                    { role: "Approved by", roleTr: "Onay",       name: sig2, title: sig2Title },
+                    { role: "Manager Seal", roleTr: "Mühür Onayı", name: sig3, title: sig3Title },
+                ],
+                status: "draft",
+            };
+            localStorage.setItem("teklif_v3_full", JSON.stringify(fullData));
+        } catch { /* noop */ }
+    }, [currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
+        custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
+        salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand,
+        notes, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
     useEffect(() => { autoSave(); }, [rows, currency, autoSave]);
 
     // ── Row handlers ─────────────────────────────────────────────────────────
@@ -252,9 +289,9 @@ export default function NewQuotePage() {
                     </div>
                     {/* Buttons */}
                     <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                        <button className="q-btn" style={btn} onClick={() => window.print()}>
+                        <button className="q-btn q-btn-primary" style={{ ...btn, background: "var(--accent-bg)", borderColor: "var(--accent-border)", color: "var(--accent-text)" }} onClick={() => { autoSave(); router.push("/dashboard/quotes/preview"); }}>
                             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 6V2h8v4M4 11H3a1 1 0 01-1-1V7a1 1 0 011-1h10a1 1 0 011 1v3a1 1 0 01-1 1h-1M4 11v3h8v-3H4z" /><circle cx="12.5" cy="8.5" r=".5" fill="currentColor" /></svg>
-                            Yazdır / PDF
+                            Önizle &amp; PDF
                         </button>
                         <button className="q-btn" style={btn} onClick={handleSave}>
                             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M13 3l-2-2H3a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V3z" /><path d="M10 1v4H6V1M5 9h6" /></svg>

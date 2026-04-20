@@ -458,4 +458,8 @@ select:focus-visible {
   .q-sig-space { height: 32px !important; border-bottom: 1px solid #888 !important; }
   .q-sig-name  { font-size: 7.5px !important; font-weight: 600 !important; color: #111 !important; border-bottom: 0.5px solid #bbb !important; padding: 2px 0 !important; }
   .q-sig-title { font-size: 7px !important; color: #888 !important; border-bottom: 0.5px solid #ddd !important; padding: 2px 0 !important; }
+
+  /* ── Quote Document preview — component handles its own colors ── */
+  #quote-document { box-shadow: none !important; }
+  .quote-preview-toolbar { display: none !important; }
 }
