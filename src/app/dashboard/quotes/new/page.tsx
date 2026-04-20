@@ -206,16 +206,19 @@ export default function NewQuotePage() {
     const th: React.CSSProperties = {
         padding: "7px 8px", fontSize: "10px", fontWeight: 600,
         color: "white", textTransform: "uppercase", letterSpacing: "0.06em",
-        borderBottom: "none", background: "#0072BC",
+        border: "0.5px solid rgba(255,255,255,0.18)", background: "#0072BC",
         whiteSpace: "nowrap",
     };
     const tdBase: React.CSSProperties = {
-        padding: "2px 4px", borderBottom: "0.5px solid var(--border-tertiary)", verticalAlign: "middle",
+        padding: "2px 4px",
+        border: "0.5px solid var(--border-secondary)",
+        verticalAlign: "middle",
     };
     const totalRowBg: React.CSSProperties = { background: "var(--bg-tertiary)" };
     const totalLabel: React.CSSProperties = {
         padding: "7px 8px", fontSize: "11px", fontWeight: 600,
         color: "var(--text-secondary)", textAlign: "right",
+        border: "0.5px solid var(--border-secondary)",
     };
 
     // ── JSX ──────────────────────────────────────────────────────────────────
@@ -262,15 +265,15 @@ export default function NewQuotePage() {
 
                 {/* ── Form Card ── */}
                 <div className="q-card" style={{
-                    background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
-                    borderRadius: "8px", overflow: "hidden", maxWidth: "1100px", margin: "0 auto",
+                    background: "var(--bg-primary)", border: "1px solid var(--border-secondary)",
+                    borderRadius: "6px", overflow: "hidden", maxWidth: "1100px", margin: "0 auto",
                 }}>
 
                     {/* ── Form Header: Logo + Seller info ── */}
                     <div className="q-form-header" style={{
                         display: "grid", gridTemplateColumns: "auto 1fr", gap: "28px",
-                        padding: "24px 28px 22px", borderBottom: "0.5px solid var(--border-tertiary)",
-                        background: "var(--bg-tertiary)", alignItems: "start",
+                        padding: "24px 28px 22px", borderBottom: "1px solid var(--border-secondary)",
+                        background: "rgba(0,114,188,0.04)", alignItems: "start",
                     }}>
                         {/* Logo */}
                         <div>
@@ -321,7 +324,7 @@ export default function NewQuotePage() {
 
                     {/* ── Title Band ── */}
                     <div className="q-title-band" style={{
-                        padding: "14px 28px", borderBottom: "0.5px solid var(--border-tertiary)",
+                        padding: "14px 28px", borderBottom: "1px solid var(--border-secondary)",
                         background: "var(--bg-primary)", textAlign: "center",
                     }}>
                         <div style={{ fontSize: "22px", fontWeight: 700, letterSpacing: "-0.01em" }}>
@@ -334,10 +337,10 @@ export default function NewQuotePage() {
                     {/* ── Meta Grid ── */}
                     <div className="q-meta-grid" style={{
                         display: "grid", gridTemplateColumns: "1fr 1fr",
-                        borderBottom: "0.5px solid var(--border-tertiary)",
+                        borderBottom: "1px solid var(--border-secondary)",
                     }}>
                         {/* Left: Customer */}
-                        <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "9px" }}>
                             <div style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)" }}>
                                 Müşteri / Customer
                             </div>
@@ -348,7 +351,7 @@ export default function NewQuotePage() {
                                 ["Email",    "E-posta",         custEmail,   setCustEmail,   "ornek@firma.com",    "email"],
                             ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])
                                 .map(([en, tr, val, set, ph, type]) => (
-                                    <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px" }}>
+                                    <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                         <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                                             {en} <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontStyle: "normal", fontWeight: 400 }}>{tr}</span>
                                         </div>
@@ -363,7 +366,7 @@ export default function NewQuotePage() {
                         </div>
 
                         {/* Right: Quote details */}
-                        <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "10px", borderLeft: "0.5px solid var(--border-tertiary)" }}>
+                        <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "9px", borderLeft: "1px solid var(--border-secondary)" }}>
                             <div style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)" }}>
                                 Teklif Detayları / Quote Details
                             </div>
@@ -376,7 +379,7 @@ export default function NewQuotePage() {
                                 ["Valid Until","Geçerlilik",       validUntil, setValidUntil, "",                     "date"],
                             ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])
                                 .map(([en, tr, val, set, ph, type]) => (
-                                    <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px" }}>
+                                    <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                         <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                                             {en} <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontWeight: 400 }}>{tr}</span>
                                         </div>
@@ -384,7 +387,7 @@ export default function NewQuotePage() {
                                     </div>
                                 ))}
                             {/* Currency */}
-                            <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                 <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                                     Currency <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontWeight: 400 }}>Para Birimi</span>
                                 </div>
@@ -402,7 +405,7 @@ export default function NewQuotePage() {
                         {/* Toolbar */}
                         <div className="q-table-toolbar" style={{
                             display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "10px 24px", borderBottom: "0.5px solid var(--border-tertiary)",
+                            padding: "10px 24px", borderBottom: "1px solid var(--border-secondary)",
                             background: "var(--bg-tertiary)",
                         }}>
                             <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -422,7 +425,7 @@ export default function NewQuotePage() {
 
                         {/* Table */}
                         <div style={{ overflowX: "auto" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid var(--border-secondary)" }}>
                                 <thead>
                                     <tr>
                                         <th className="q-th" style={{ ...th, width: "32px", textAlign: "center" }}>#</th>
@@ -488,7 +491,7 @@ export default function NewQuotePage() {
                         </button>
 
                         {/* Totals */}
-                        <table style={{ width: "100%", borderCollapse: "collapse", borderTop: "0.5px solid var(--border-tertiary)" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid var(--border-secondary)", borderTop: "none" }}>
                             <tbody>
                                 {/* Subtotal */}
                                 <tr style={totalRowBg}>
@@ -575,7 +578,7 @@ export default function NewQuotePage() {
                     </div>
 
                     {/* ── Notes ── */}
-                    <div className="q-notes-block" style={{ padding: "16px 24px", borderTop: "0.5px solid var(--border-tertiary)" }}>
+                    <div className="q-notes-block" style={{ padding: "16px 24px", borderTop: "1px solid var(--border-secondary)" }}>
                         <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
                             Notes &amp; Terms <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Notlar</span>
                         </div>
@@ -589,7 +592,7 @@ export default function NewQuotePage() {
                     </div>
 
                     {/* ── Signatures ── */}
-                    <div className="q-sigs-block" style={{ padding: "16px 24px 28px", borderTop: "0.5px solid var(--border-tertiary)" }}>
+                    <div className="q-sigs-block" style={{ padding: "16px 24px 28px", borderTop: "1px solid var(--border-secondary)" }}>
                         <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>
                             Signatures / İmzalar
                         </div>
