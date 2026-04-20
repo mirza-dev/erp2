@@ -120,11 +120,20 @@ function WhyBadge({ daysLeft, urgency, leadTimeDays }: {
     );
 }
 
-function SegmentBanner({ filter, finishedCount }: {
-    filter: FilterType;
-    finishedCount: number;
+function SegmentBanner({ filter, count }: {
+    filter: "manufactured" | "commercial";
+    count: number;
 }) {
-    if (filter === "all") return null;
+    const isManufactured = filter === "manufactured";
+    const title    = isManufactured
+        ? `Üretim emri bekleyen ${count} ürün`
+        : `Satın alma siparişi bekleyen ${count} ürün`;
+    const subtitle = isManufactured
+        ? "Üretim kapasitesine göre önceliklendirin — kritik olanlar önce planlanmalı"
+        : "Tedarikçi kapasitesine göre önceliklendirin — kritik stoklar önce sipariş edilmeli";
+    const badge    = isManufactured
+        ? `${count} üretim planı bekliyor`
+        : `${count} satın alma planı bekliyor`;
 
     return (
         <div style={{
@@ -141,14 +150,14 @@ function SegmentBanner({ filter, finishedCount }: {
         }}>
             <div>
                 <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-text)" }}>
-                    Üretim emri bekleyen {finishedCount} ürün
+                    {title}
                 </div>
                 <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                    Üretim kapasitesine göre önceliklendirin — kritik olanlar önce planlanmalı
+                    {subtitle}
                 </div>
             </div>
             <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-text)", whiteSpace: "nowrap" }}>
-                {finishedCount} üretim planı bekliyor
+                {badge}
             </div>
         </div>
     );
@@ -889,10 +898,12 @@ export default function PurchaseSuggestedPage() {
             </div>
 
             {/* Segment banner */}
-            <SegmentBanner
-                filter={filter}
-                finishedCount={manufacturedItems.length + commercialItems.length}
-            />
+            {filter !== "all" && (
+                <SegmentBanner
+                    filter={filter}
+                    count={filter === "manufactured" ? manufacturedItems.length : commercialItems.length}
+                />
+            )}
 
             {/* Table or empty state */}
             {sorted.length === 0 ? (

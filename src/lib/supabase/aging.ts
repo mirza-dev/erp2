@@ -18,7 +18,6 @@ export interface AgingRow {
     lastSaleDate: string | null;
     lastIncomingDate: string | null;
     lastProductionDate: string | null;       // mamul: üretildiği tarih (production_entries)
-    lastComponentUsageDate: string | null;   // hammadde: üretimde tüketildiği tarih (inventory_movements)
     daysWaiting: number | null;          // null = no movement
     agingCategory: AgingCategory;
     costPrice: number | null;            // maliyet fiyatı (null = girilmemiş)
@@ -35,18 +34,6 @@ export function pickMax(a: string | null, b: string | null): string | null {
 }
 
 /**
- * Hammadde eşikleri — toplu alım doğası gereği daha uzun tutulur.
- * < 60 → active · 60–119 → slow · 120–239 → stagnant · ≥ 240 → dead
- */
-export function computeAgingCategoryRaw(days: number | null): AgingCategory {
-    if (days === null) return "no_movement";
-    if (days < 60)    return "active";
-    if (days < 120)   return "slow";
-    if (days < 240)   return "stagnant";
-    return "dead";
-}
-
-/**
  * Mamul / ticari mal eşikleri — daha hızlı dönmeli.
  * < 45 → active · 45–89 → slow · 90–179 → stagnant · ≥ 180 → dead
  */
@@ -60,7 +47,7 @@ export function computeAgingCategoryFinished(days: number | null): AgingCategory
 
 /**
  * Geriye dönük uyumluluk için korunuyor.
- * @deprecated computeAgingCategoryRaw veya computeAgingCategoryFinished kullan.
+ * @deprecated computeAgingCategoryFinished kullan.
  */
 export function computeAgingCategory(days: number | null): AgingCategory {
     return computeAgingCategoryFinished(days);
@@ -117,7 +104,6 @@ export async function dbGetLastIncomingDates(): Promise<Map<string, string>> {
 /**
  * Her mamul ürün için en son üretildiği tarihi döner.
  * Kaynak: production_entries.product_id = üretilen mamulün ID'si.
- * Hammadde tüketimi için dbGetLastComponentUsageDates() kullan.
  */
 export async function dbGetLastProductionDates(): Promise<Map<string, string>> {
     const supabase = createServiceClient();
@@ -136,26 +122,3 @@ export async function dbGetLastProductionDates(): Promise<Map<string, string>> {
     return map;
 }
 
-/**
- * Her hammadde için üretimde son kullanıldığı tarihi döner.
- * Kaynak: inventory_movements WHERE movement_type='production' AND quantity < 0
- * (complete_production() RPC'si BOM tüketimini bu şekilde kaydeder.)
- */
-export async function dbGetLastComponentUsageDates(): Promise<Map<string, string>> {
-    const supabase = createServiceClient();
-    const { data, error } = await supabase
-        .from("inventory_movements")
-        .select("product_id, occurred_at")
-        .eq("movement_type", "production")
-        .lt("quantity", 0)
-        .order("occurred_at", { ascending: false });
-    if (error || !data) return new Map();
-    const map = new Map<string, string>();
-    for (const row of data) {
-        // İlk karşılaşılan = en yeni (DESC sıralı)
-        if (!map.has(row.product_id)) {
-            map.set(row.product_id, row.occurred_at);
-        }
-    }
-    return map;
-}

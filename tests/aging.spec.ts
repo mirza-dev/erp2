@@ -13,9 +13,9 @@ test("eskime raporu sayfası yükleniyor", async ({ page }) => {
     await expect(page.getByText(/stok eskime raporu/i)).toBeVisible({ timeout: 5_000 });
 });
 
-test("iki rapor tab'ı görünür — Mamul, Ticari Mal", async ({ page }) => {
-    await expect(page.getByText(/mamul eskimesi/i)).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByText(/ticari mal eskimesi/i)).toBeVisible({ timeout: 5_000 });
+test("iki rapor tab'ı görünür — İmalat, Ticari", async ({ page }) => {
+    await expect(page.getByText(/imalat eskimesi/i)).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/ticari eskimesi/i)).toBeVisible({ timeout: 5_000 });
 });
 
 test("Mamul tab'ı açıkken özet kartlar görünür", async ({ page }) => {
@@ -25,7 +25,7 @@ test("Mamul tab'ı açıkken özet kartlar görünür", async ({ page }) => {
 });
 
 test("Mamul tab'ına geçiş çalışıyor", async ({ page }) => {
-    const mamulTab = page.getByText(/mamul eskimesi/i);
+    const mamulTab = page.getByText(/imalat eskimesi/i);
     await mamulTab.click();
     await page.waitForTimeout(300);
     // Eşik referansı mamul eşiklerini göstermeli

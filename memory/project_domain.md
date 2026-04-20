@@ -133,8 +133,10 @@ grandTotal = subtotal + vatTotal
 | 4.6 | Deadline Tutarlılık (promisable, off-by-one fix) |
 | 5+ | Teklif Kırılımı + bug fix (currency, promisable, email) |
 | 6+ | Teklif Süresi, Uzatma, Geciken Sevkiyat + bug fix'ler |
-| 11 | isForPurchase/isForSales alan ayrımı (stock-utils, alerts, purchase-copilot) |
+| 11 | isForPurchase/isForSales alan ayrımı → productType tek otorite |
 | 12 | Sentry + k6 + Playwright CI + smoke 24 + 2 kritik semantik bug fix |
 | 13 | Performans: React.memo (6 component) + useMemo (4 sayfa) + mount scan kaldırma |
+| 14 | Faz 1: İmalat/Ticari etiket + filtre yeniden adlandırması; togglelar kaldırıldı |
+| 15 | Faz 2: raw_material tamamen kaldırıldı (DB migration 032 + kod + testler) |
 
 Detay: `domain-rules.md`

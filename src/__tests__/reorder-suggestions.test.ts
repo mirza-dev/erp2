@@ -3,7 +3,6 @@
  *
  * Kurallar:
  *   - !isActive → false (her durumda)
- *   - !isForPurchase → false (satın almaya uygun değil)
  *   - available <= min → true (backend purchase-service ile aligned: <= kullanır)
  *   - available > min AND orderDeadline ≤ 7 gün → true (Faz 4 proaktif değer)
  *   - available > min AND deadline > 7 gün veya null → false

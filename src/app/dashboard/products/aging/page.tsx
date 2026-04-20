@@ -36,12 +36,12 @@ type ReportType = "manufactured" | "commercial";
 const REPORT_TABS: { key: ReportType; label: string; subtitle: string }[] = [
     {
         key: "manufactured",
-        label: "Mamul Eskimesi",
+        label: "İmalat Eskimesi",
         subtitle: "Üretilen ama satılamayan ürünler",
     },
     {
         key: "commercial",
-        label: "Ticari Mal Eskimesi",
+        label: "Ticari Eskimesi",
         subtitle: "Alınan ama satılamayan ürünler",
     },
 ];

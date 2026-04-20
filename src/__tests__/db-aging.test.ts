@@ -40,7 +40,6 @@ import {
     dbGetLastIncomingDates,
     dbGetLastProductionDates,
     computeAgingCategory,
-    computeAgingCategoryRaw,
     computeAgingCategoryFinished,
     pickMax,
 } from "@/lib/supabase/aging";
@@ -52,20 +51,6 @@ beforeEach(() => {
     mockEq.mockReset();
     mockIn.mockReset();
     mockOrder.mockReset();
-});
-
-// ── computeAgingCategoryRaw (pure) ────────────────────────────
-
-describe("computeAgingCategoryRaw", () => {
-    it("null → no_movement", () => expect(computeAgingCategoryRaw(null)).toBe("no_movement"));
-    it("0 gün → active",     () => expect(computeAgingCategoryRaw(0)).toBe("active"));
-    it("59 gün → active",    () => expect(computeAgingCategoryRaw(59)).toBe("active"));
-    it("60 gün → slow",      () => expect(computeAgingCategoryRaw(60)).toBe("slow"));
-    it("119 gün → slow",     () => expect(computeAgingCategoryRaw(119)).toBe("slow"));
-    it("120 gün → stagnant", () => expect(computeAgingCategoryRaw(120)).toBe("stagnant"));
-    it("239 gün → stagnant", () => expect(computeAgingCategoryRaw(239)).toBe("stagnant"));
-    it("240 gün → dead",     () => expect(computeAgingCategoryRaw(240)).toBe("dead"));
-    it("365 gün → dead",     () => expect(computeAgingCategoryRaw(365)).toBe("dead"));
 });
 
 // ── computeAgingCategoryFinished (pure) ───────────────────────

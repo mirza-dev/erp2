@@ -4,7 +4,6 @@ import {
     dbGetLastSaleDates,
     dbGetLastIncomingDates,
     dbGetLastProductionDates,
-    dbGetLastComponentUsageDates,
     pickMax,
     computeAgingCategoryFinished,
 } from "@/lib/supabase/aging";
@@ -19,12 +18,11 @@ export async function GET(req: NextRequest) {
     try {
         const type = req.nextUrl.searchParams.get("type") ?? "all";
 
-        const [products, lastSaleDates, lastIncomingDates, lastProductionDates, lastComponentUsageDates] = await Promise.all([
+        const [products, lastSaleDates, lastIncomingDates, lastProductionDates] = await Promise.all([
             dbListProducts({ is_active: true, pageSize: 10_000 }),
             dbGetLastSaleDates(),
             dbGetLastIncomingDates(),
             dbGetLastProductionDates(),
-            dbGetLastComponentUsageDates(),
         ]);
 
         const now = Date.now();
@@ -36,10 +34,9 @@ export async function GET(req: NextRequest) {
                 return true; // "all"
             })
             .map(p => {
-                const saleDate            = lastSaleDates.get(p.id)            ?? null;
-                const incomingDate        = lastIncomingDates.get(p.id)        ?? null;
-                const productionDate      = lastProductionDates.get(p.id)      ?? null;
-                const componentUsageDate  = lastComponentUsageDates.get(p.id)  ?? null;
+                const saleDate       = lastSaleDates.get(p.id)       ?? null;
+                const incomingDate   = lastIncomingDates.get(p.id)   ?? null;
+                const productionDate = lastProductionDates.get(p.id) ?? null;
 
                 // Tip-bazlı "son hareket" semantiği:
                 // Mamul      → son üretim tarihi (production_entries) VEYA son satış
@@ -64,11 +61,10 @@ export async function GET(req: NextRequest) {
                     price:              p.price ?? 0,
                     currency:           p.currency,
                     productType:        p.product_type as "manufactured" | "commercial",
-                    lastMovementDate:        lastMovement,
-                    lastSaleDate:            saleDate,
-                    lastIncomingDate:        incomingDate,
-                    lastProductionDate:      productionDate,
-                    lastComponentUsageDate:  componentUsageDate,
+                    lastMovementDate:   lastMovement,
+                    lastSaleDate:       saleDate,
+                    lastIncomingDate:   incomingDate,
+                    lastProductionDate: productionDate,
                     daysWaiting,
                     agingCategory,
                     costPrice:          p.cost_price ?? null,

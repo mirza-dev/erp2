@@ -9,7 +9,7 @@ type: project
 **Production URL:** `https://erp2-hj5u0tlp1-mirza-dev-6592s-projects.vercel.app`
 **Deploy:** Vercel — push → otomatik deploy
 
-**Stack:** Next.js 15 · TypeScript · Supabase (15+ tablo, 26 migration) · Tailwind kurulu ama kullanılmıyor · Sentry (`@sentry/nextjs`) kurulu ve yapılandırıldı (DSN eksik)
+**Stack:** Next.js 15 · TypeScript · Supabase (15+ tablo, 32 migration) · Tailwind kurulu ama kullanılmıyor · Sentry (`@sentry/nextjs`) kurulu ve yapılandırıldı (DSN eksik)
 **Font:** `geist` npm paketi (`geist/font/sans`, `geist/font/mono`) — `next/font/google` değil; build sırasında ağ bağımlılığı yok
 
 ---

@@ -6,11 +6,10 @@ import { NextRequest } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
-const mockDbListProducts              = vi.fn();
-const mockDbGetLastSaleDates          = vi.fn();
-const mockDbGetLastIncomingDates      = vi.fn();
-const mockDbGetLastProductionDates    = vi.fn();
-const mockDbGetLastComponentUsageDates = vi.fn();
+const mockDbListProducts           = vi.fn();
+const mockDbGetLastSaleDates       = vi.fn();
+const mockDbGetLastIncomingDates   = vi.fn();
+const mockDbGetLastProductionDates = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
     dbListProducts: (...args: unknown[]) => mockDbListProducts(...args),
@@ -21,11 +20,10 @@ vi.mock("@/lib/supabase/products", () => ({
 vi.mock("@/lib/supabase/aging", async (importOriginal) => {
     const actual = await importOriginal<typeof import("@/lib/supabase/aging")>();
     return {
-        ...actual,  // pickMax, computeAgingCategoryRaw, computeAgingCategoryFinished — real implementations
-        dbGetLastSaleDates:             (...args: unknown[]) => mockDbGetLastSaleDates(...args),
-        dbGetLastIncomingDates:         (...args: unknown[]) => mockDbGetLastIncomingDates(...args),
-        dbGetLastProductionDates:       (...args: unknown[]) => mockDbGetLastProductionDates(...args),
-        dbGetLastComponentUsageDates:   (...args: unknown[]) => mockDbGetLastComponentUsageDates(...args),
+        ...actual,  // pickMax, computeAgingCategoryFinished — real implementations
+        dbGetLastSaleDates:       (...args: unknown[]) => mockDbGetLastSaleDates(...args),
+        dbGetLastIncomingDates:   (...args: unknown[]) => mockDbGetLastIncomingDates(...args),
+        dbGetLastProductionDates: (...args: unknown[]) => mockDbGetLastProductionDates(...args),
     };
 });
 
@@ -91,7 +89,6 @@ beforeEach(() => {
     mockDbGetLastSaleDates.mockResolvedValue(new Map());
     mockDbGetLastIncomingDates.mockResolvedValue(new Map());
     mockDbGetLastProductionDates.mockResolvedValue(new Map());
-    mockDbGetLastComponentUsageDates.mockResolvedValue(new Map());
 });
 
 // ── Temel testler ─────────────────────────────────────────────
@@ -134,13 +131,12 @@ describe("GET /api/products/aging", () => {
         expect(row.agingCategory).toBe("no_movement");
     });
 
-    it("5 fonksiyon paralel çağrılır (her biri 1 kez)", async () => {
+    it("4 fonksiyon paralel çağrılır (her biri 1 kez)", async () => {
         await GET(makeRequest());
         expect(mockDbListProducts).toHaveBeenCalledTimes(1);
         expect(mockDbGetLastSaleDates).toHaveBeenCalledTimes(1);
         expect(mockDbGetLastIncomingDates).toHaveBeenCalledTimes(1);
         expect(mockDbGetLastProductionDates).toHaveBeenCalledTimes(1);
-        expect(mockDbGetLastComponentUsageDates).toHaveBeenCalledTimes(1);
     });
 
     it("dbListProducts pageSize: 10_000 ile çağrılır (pagination bypass)", async () => {
@@ -164,7 +160,6 @@ describe("GET /api/products/aging", () => {
         expect(row).toHaveProperty("lastSaleDate");
         expect(row).toHaveProperty("lastIncomingDate");
         expect(row).toHaveProperty("lastProductionDate");
-        expect(row).toHaveProperty("lastComponentUsageDate");
         expect(row).toHaveProperty("daysWaiting");
         expect(row).toHaveProperty("agingCategory");
         expect(row).toHaveProperty("costPrice");

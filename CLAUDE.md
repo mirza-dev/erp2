@@ -3,11 +3,12 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-20_
 
-**Son tamamlanan iş:** Faz 2 — raw_material tamamen kaldırıldı (2026-04-20)
-- `ProductType = "manufactured" | "commercial"` (raw_material kalıcı olarak kaldırıldı)
-- DB migration 032: raw_material DELETE + CHECK constraint + is_for_sales/is_for_purchase DROP (Supabase'e uygulandı)
-- UI: Aging 2 tab, Purchase/suggested Hammadde tab yok, products seçenekleri güncellendi
-- **Build:** temiz · **Lint:** 0 error · **Test:** 1489 (0 fail)
+**Son tamamlanan iş:** Faz 2 artık bulgular temizlendi (2026-04-20)
+- Aging tab etiketleri: "İmalat Eskimesi" / "Ticari Eskimesi" (Playwright spec güncellendi)
+- SegmentBanner: seçili sekme count'u + commercial için semantik doğru metin
+- Aging API: `dbGetLastComponentUsageDates` + `computeAgingCategoryRaw` tamamen kaldırıldı
+- Test izleri: `productType: "raw_material"` → `"commercial"`, `isForPurchase` yorum temizliği
+- **Build:** temiz · **Lint:** 0 error · **Test:** 1480 (0 fail)
 
 **Önceki önemli işler:**
 - Navigasyon hızlandırma & donma önleme (2026-04-17)
