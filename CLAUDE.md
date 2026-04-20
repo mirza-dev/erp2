@@ -1,14 +1,13 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-17_
+_Son güncelleme: 2026-04-20_
 
-**Son tamamlanan iş:** Faz 2 DB + client refresh performans optimizasyonu (2026-04-17)
-- **Faz 2A:** `dbGetOrderById` 2 sıralı sorgu → 1 Supabase embedded JOIN (`select("*, order_lines(*)")`)
-- **Faz 2B:** `dbCreateOrder` tam `SalesOrderRow` döndürüyor; `addOrder` artık `GET /api/orders` refetch yapmıyor — POST response ile state prepend
-- **Bulgu fix:** `orders/page.tsx` mount fetch kaldırıldı — `useData().orders` (DataContext) ile init, sipariş oluşturma sonrası redundant GET yok
-- **Faz 1:** 4 DB index, 30s server cache, email cache 5dk, 9 route revalidateTag, 24 test, 031 migration
-- **Build:** temiz · **Lint:** 0 error
+**Son tamamlanan iş:** Faz 2 — raw_material tamamen kaldırıldı (2026-04-20)
+- `ProductType = "manufactured" | "commercial"` (raw_material kalıcı olarak kaldırıldı)
+- DB migration 032: raw_material DELETE + CHECK constraint + is_for_sales/is_for_purchase DROP (Supabase'e uygulandı)
+- UI: Aging 2 tab, Purchase/suggested Hammadde tab yok, products seçenekleri güncellendi
+- **Build:** temiz · **Lint:** 0 error · **Test:** 1489 (0 fail)
 
 **Önceki önemli işler:**
 - Navigasyon hızlandırma & donma önleme (2026-04-17)
@@ -18,7 +17,7 @@ _Son güncelleme: 2026-04-17_
 
 **Aktif odak:** —
 **Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik
-**Test sayısı:** 76 dosya · 1491 vitest · 23 Playwright (hepsi yeşil)
+**Test sayısı:** 76 dosya · 1489 vitest (hepsi yeşil)
 
 ---
 
