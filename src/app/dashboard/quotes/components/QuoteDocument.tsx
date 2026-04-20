@@ -40,6 +40,16 @@ function fmtDate(s: string) {
     }
 }
 
+// ── @page rule (top-level, NOT inside @media print) ──────────────────────────
+// margin: 0 → browser has no space to show its default headers/footers (title, URL, date)
+
+const PAGE_CSS = `
+@page {
+    size: A4 portrait;
+    margin: 0mm;
+}
+`;
+
 // ── Print CSS (scoped to #quote-document) ────────────────────────────────────
 
 const PRINT_CSS = `
@@ -49,11 +59,12 @@ const PRINT_CSS = `
         print-color-adjust: exact !important;
     }
     #quote-document {
-        width: 100% !important;
+        width: 210mm !important;
         min-height: auto !important;
         box-shadow: none !important;
         margin: 0 !important;
         border: none !important;
+        overflow: visible !important;
     }
     #quote-document .doc-brand-bg,
     #quote-document .doc-brand-bg * {
@@ -107,7 +118,7 @@ export default function QuoteDocument({ data }: Props) {
         color: C.text,
         fontSize: "11px",
         lineHeight: 1.5,
-        overflow: "hidden",
+        overflow: "visible",
     };
 
     const headerBandStyle: React.CSSProperties = {
@@ -281,6 +292,7 @@ export default function QuoteDocument({ data }: Props) {
 
     return (
         <>
+            <style dangerouslySetInnerHTML={{ __html: PAGE_CSS }} />
             <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
 
             <div id="quote-document" style={docStyle}>
