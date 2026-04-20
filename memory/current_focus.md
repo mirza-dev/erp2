@@ -6,6 +6,19 @@ type: project
 
 **Aktif:** —
 
+**Son tamamlanan (2026-04-20 — Teklif Faz 2: company_settings DB entegrasyonu):**
+
+1. Migration 033: `company_settings` tablosu + singleton index + RLS + `company-assets` Supabase Storage bucket
+2. `src/lib/database.types.ts` — `CompanySettingsRow` eklendi
+3. `src/lib/supabase/company-settings.ts` — `dbGetCompanySettings`, `dbUpdateCompanySettings`
+4. `src/app/api/settings/company/route.ts` — GET (cached 300s) + PATCH
+5. `src/app/api/settings/company/logo/route.ts` — POST multipart → Storage upload, URL DB'ye yazılır
+6. `settings/page.tsx` FirmaTab — gerçek API save, logo upload (drag-drop), email alanı eklendi
+7. `quotes/new/page.tsx` — mount'ta company_settings'ten satıcı alanları + logo otomatik doldurulur
+8. **0 TS hatası**
+
+**Sonraki:** Faz 3 — Müşteri Autocomplete (context'teki customers listesinden filtrele)
+
 **Son tamamlanan (2026-04-20 — Faz 2 artık bulgular temizlendi):**
 
 1. Aging tab etiketleri güncellendi: "Mamul Eskimesi"→"İmalat Eskimesi", "Ticari Mal Eskimesi"→"Ticari Eskimesi" (page.tsx + aging.spec.ts)

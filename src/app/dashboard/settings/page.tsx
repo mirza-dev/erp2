@@ -5,7 +5,6 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import { isDemoMode } from "@/lib/demo-utils";
-import { useData } from "@/lib/data-context";
 
 type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
 
@@ -60,6 +59,7 @@ const initialFirmaForm = {
     taxNo: "",
     address: "",
     phone: "",
+    email: "",
     website: "",
     currency: "USD",
 };
@@ -70,7 +70,35 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const savedRef = useRef({ ...initialFirmaForm });
     const [isDirty, setIsDirty] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [logoDragging, setLogoDragging] = useState(false);
+    const [logoUploading, setLogoUploading] = useState(false);
+    const logoFileRef = useRef<HTMLInputElement>(null);
+
+    // Yükle: DB'den mevcut ayarları çek
+    useEffect(() => {
+        fetch("/api/settings/company")
+            .then(r => r.ok ? r.json() : null)
+            .then(s => {
+                if (!s) return;
+                const loaded = {
+                    name: s.name ?? "",
+                    taxOffice: s.tax_office ?? "",
+                    taxNo: s.tax_no ?? "",
+                    address: s.address ?? "",
+                    phone: s.phone ?? "",
+                    email: s.email ?? "",
+                    website: s.website ?? "",
+                    currency: s.currency ?? "USD",
+                };
+                setForm(loaded);
+                savedRef.current = loaded;
+                if (s.logo_url) setLogoUrl(s.logo_url);
+            })
+            .catch(() => {/* ağ hatası — varsayılanlarla devam et */})
+            .finally(() => setIsLoading(false));
+    }, []);
 
     const set = (key: keyof typeof initialFirmaForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const next = { ...form, [key]: e.target.value };
@@ -82,12 +110,51 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
 
     const handleSave = async () => {
         setIsSaving(true);
-        await new Promise(r => setTimeout(r, 800));
-        savedRef.current = { ...form };
-        setIsDirty(false);
-        onDirtyChange?.(false);
-        setIsSaving(false);
-        toast({ type: "success", message: "Firma bilgileri kaydedildi" });
+        try {
+            const res = await fetch("/api/settings/company", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    name: form.name,
+                    tax_office: form.taxOffice,
+                    tax_no: form.taxNo,
+                    address: form.address,
+                    phone: form.phone,
+                    email: form.email,
+                    website: form.website,
+                    currency: form.currency,
+                }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            savedRef.current = { ...form };
+            setIsDirty(false);
+            onDirtyChange?.(false);
+            toast({ type: "success", message: "Firma bilgileri kaydedildi" });
+        } catch {
+            toast({ type: "error", message: "Kayıt başarısız. Tekrar deneyin." });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleLogoFile = async (file: File) => {
+        setLogoUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await fetch("/api/settings/company/logo", { method: "POST", body: fd });
+            if (!res.ok) {
+                const { error } = await res.json().catch(() => ({ error: "Yükleme başarısız." }));
+                throw new Error(error ?? "Yükleme başarısız.");
+            }
+            const { logo_url } = await res.json();
+            setLogoUrl(logo_url);
+            toast({ type: "success", message: "Logo yüklendi" });
+        } catch (e: unknown) {
+            toast({ type: "error", message: e instanceof Error ? e.message : "Logo yüklenemedi." });
+        } finally {
+            setLogoUploading(false);
+        }
     };
 
     if (isDemoMode()) {
@@ -98,31 +165,66 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         );
     }
 
+    if (isLoading) {
+        return (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                Yükleniyor…
+            </div>
+        );
+    }
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Logo */}
             <div>
                 <div style={sectionTitle}>Firma Logosu</div>
+                <input
+                    ref={logoFileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    style={{ display: "none" }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = ""; }}
+                />
                 <div
+                    onClick={() => logoFileRef.current?.click()}
                     onDragOver={e => { e.preventDefault(); setLogoDragging(true); }}
                     onDragLeave={() => setLogoDragging(false)}
-                    onDrop={e => { e.preventDefault(); setLogoDragging(false); }}
+                    onDrop={e => {
+                        e.preventDefault();
+                        setLogoDragging(false);
+                        const f = e.dataTransfer.files[0];
+                        if (f) handleLogoFile(f);
+                    }}
                     style={{
                         border: `1px dashed ${logoDragging ? "var(--accent)" : "var(--border-secondary)"}`,
                         borderRadius: "8px",
-                        padding: "24px",
+                        padding: "20px 24px",
                         textAlign: "center",
                         background: logoDragging ? "var(--accent-bg)" : "var(--bg-tertiary)",
                         cursor: "pointer",
-                        transition: "all 0.15s",
+                        transition: "border-color 0.15s, background 0.15s",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "16px",
                     }}
                 >
-                    <div style={{ fontSize: "28px", marginBottom: "6px" }}>🏭</div>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                        Logo yüklemek için sürükleyin veya tıklayın
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                        PNG, SVG · Maks 2MB
+                    {logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                            src={logoUrl}
+                            alt="Firma logosu"
+                            style={{ height: "56px", maxWidth: "120px", objectFit: "contain", borderRadius: "4px" }}
+                        />
+                    ) : (
+                        <div style={{ fontSize: "28px" }}>🏭</div>
+                    )}
+                    <div>
+                        <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                            {logoUploading ? "Yükleniyor…" : logoUrl ? "Logoyu değiştirmek için tıklayın veya sürükleyin" : "Logo yüklemek için tıklayın veya sürükleyin"}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                            PNG, JPEG, SVG, WebP · Maks 2MB
+                        </div>
                     </div>
                 </div>
             </div>
@@ -150,6 +252,10 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     <div>
                         <label style={labelStyle}>Telefon</label>
                         <input style={inputStyle} value={form.phone} onChange={set("phone")} />
+                    </div>
+                    <div>
+                        <label style={labelStyle}>E-posta</label>
+                        <input style={inputStyle} value={form.email} onChange={set("email")} type="email" />
                     </div>
                     <div>
                         <label style={labelStyle}>Web Sitesi</label>

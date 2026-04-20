@@ -3,11 +3,13 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-20_
 
-**Son tamamlanan iş:** Faz 2 artık bulgular temizlendi (2026-04-20)
-- Aging tab etiketleri: "İmalat Eskimesi" / "Ticari Eskimesi" (Playwright spec güncellendi)
-- SegmentBanner: seçili sekme count'u + commercial için semantik doğru metin
-- Aging API: `dbGetLastComponentUsageDates` + `computeAgingCategoryRaw` tamamen kaldırıldı
-- Test izleri: `productType: "raw_material"` → `"commercial"`, `isForPurchase` yorum temizliği
+**Son tamamlanan iş:** Teklif Faz 2 — company_settings DB entegrasyonu (2026-04-20)
+- Migration 033: `company_settings` tablosu + singleton + RLS + `company-assets` Storage bucket
+- `CompanySettingsRow` database.types.ts'e eklendi
+- `GET/PATCH /api/settings/company` + `POST /api/settings/company/logo` route'ları eklendi
+- Settings FirmaTab: gerçek DB save, logo upload (drag-drop + tıklama), email alanı eklendi
+- Teklif formu: mount'ta company_settings fetch → satıcı alanları + logo otomatik doldurulur
+- 0 TS hatası
 - **Build:** temiz · **Lint:** 0 error · **Test:** 1480 (0 fail)
 
 **Önceki önemli işler:**

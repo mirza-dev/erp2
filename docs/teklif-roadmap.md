@@ -4,7 +4,7 @@ _Son güncelleme: 2026-04-20_
 
 ## Mevcut Durum
 
-Teklif formu `/dashboard/quotes/new` olarak implement edildi. Tamamen client-side çalışıyor, veriler localStorage'da tutuluyor. Yazdırma desteği (A4 print CSS) mevcut. Sidebar'da "Teklifler" linki var.
+Teklif formu `/dashboard/quotes/new` olarak implement edildi. Tamamen client-side çalışıyor, veriler localStorage'da tutuluyor. Ayrı bir `QuoteDocument` bileşeni ve `/dashboard/quotes/preview` önizleme sayfası eklendi — premium A4 belge tasarımı tamamlandı. Sidebar'da "Teklifler" linki var.
 
 ---
 
@@ -34,6 +34,51 @@ Teklif formu `/dashboard/quotes/new` olarak implement edildi. Tamamen client-sid
 - [x] `@page` A4 portrait, 15mm margin
 - [x] Satır hover efekti eklendi (ekran modu)
 - [x] Notes ve signatures print boyutları ayarlandı
+
+---
+
+## Faz 1B — Premium Belge Bileşeni + PDF Export ✅
+
+> _Tamamlandı: 2026-04-20_
+
+**Sorun:** Form ekranı (dark tema, input'lar) `window.print()` ile PDF'e dönüştürülüyordu — amatör görünüm, eksik belge hissi.
+
+**Çözüm:** Ayrı bir statik belge bileşeni + önizleme sayfası. Form ≠ Belge ayrımı yapıldı.
+
+- [x] `src/app/dashboard/quotes/components/quote-types.ts` — `QuoteData` interface (form state'ini tam serialize eder)
+- [x] `src/app/dashboard/quotes/components/quote-fonts.ts` — Montserrat (headings) + Inter (body) via `next/font/google`
+- [x] `src/app/dashboard/quotes/components/QuoteDocument.tsx` — Statik A4 belge renderer
+  - Beyaz arka plan, hardcoded renk paleti (dark tema CSS variable'larından bağımsız)
+  - Header band: logo + firma bilgisi + teklif no/tarih (mavi arka plan)
+  - Title band: TEKLİF | QUOTATION
+  - Meta grid: müşteri bilgisi + teklif detayları (2 sütun)
+  - Kalemler tablosu: full-grid borders, mavi header, zebra rows
+  - Toplamlar: sağ hizalı, GRAND TOTAL mavi band
+  - Notlar & Koşullar bölümü
+  - İmzalar: rol → ad → unvan → imza çizgisi (altta)
+  - Footer band: firma adı + gizlilik notu
+  - Siyah belge çerçevesi (1.5px solid #222)
+- [x] `src/app/dashboard/quotes/preview/page.tsx` — Full-screen önizleme sayfası
+  - `position: fixed` overlay (ekranda sidebar/topbar gizlenir)
+  - Toolbar: "Formu Düzenle" ← → "Yazdır / PDF" →
+  - `@media print { position: static }` — print'te fixed kaldırılır, doküman akışa girer
+- [x] `new/page.tsx` güncellendi:
+  - `autoSave()` tüm form alanlarını `localStorage["teklif_v3_full"]` olarak serialize eder
+  - "Yazdır / PDF" butonu → "Önizle & PDF" olarak değişti, preview'a yönlendirir
+- [x] Print CSS iyileştirmeleri:
+  - `@page { margin: 8mm }` — browser header/footer bastırılır, sayfa geçişinde beyaz boşluk
+  - `box-decoration-break: clone` — 2. sayfada belge çerçevesi üst kısmı yeniden çizilir
+  - `tbody tr { break-inside: avoid }` — satır bölünmez, tümü sonraki sayfaya geçer
+  - `overflow: visible` — çok sayfalı belgede içerik kesilmez
+  - `border: 1.5px solid #222` ekranda ve print'te tutarlı siyah çerçeve
+- [x] Logo büyütüldü: 72px → 96px
+- [x] TASLAK filigranı kaldırıldı
+
+**Yeni dosyalar:**
+- `src/app/dashboard/quotes/components/quote-types.ts`
+- `src/app/dashboard/quotes/components/quote-fonts.ts`
+- `src/app/dashboard/quotes/components/QuoteDocument.tsx`
+- `src/app/dashboard/quotes/preview/page.tsx`
 
 ---
 
@@ -313,37 +358,26 @@ Kullanıcı teklifi düzenler
 
 ---
 
-## Faz 2 — Satıcı Bilgisi Ayarlardan Gelsin
+## Faz 2 — Satıcı Bilgisi Ayarlardan Gelsin ✅
 
-> _Durum: Bekliyor_
+> _Tamamlandı: 2026-04-20_
 
-**Sorun:** Her teklif açılışında firma adı, tel, email, adres, VKN sıfırdan yazılıyor.
+**Sorun:** Her teklif açılışında firma adı, tel, email, adres, VKN sıfırdan yazılıyor. Settings FirmaTab sahte save ile çalışıyordu.
 
-**Mevcut altyapı:**
-- `src/app/dashboard/settings/page.tsx` → FirmaTab: `name, taxOffice, taxNo, address, phone, website, currency` alanları var
-- Ama bu veriler DB'ye kaydedilmiyor — sadece component state'te tutuluyor (`initialFirmaForm`, `handleSave` fake delay ile toast gösteriyor)
-
-**Yapılacaklar:**
-- [ ] `company_settings` tablosu oluştur (migration 033) — `id, name, tax_office, tax_no, address, phone, email, website, logo_url, currency, updated_at`
-- [ ] `src/lib/supabase/company-settings.ts` — `dbGetCompanySettings()`, `dbUpdateCompanySettings()`
-- [ ] `GET/PATCH /api/settings/company` route
-- [ ] Settings → FirmaTab'ı gerçek API'ye bağla (fake delay → gerçek save)
-- [ ] Teklif formu: sayfa açılınca `GET /api/settings/company` çağır, satıcı alanlarını doldur
-- [ ] Logo: company_settings'teki `logo_url` varsa otomatik yükle
-
-**Dosyalar:**
-- `supabase/migrations/033_company_settings.sql`
-- `src/lib/supabase/company-settings.ts` (yeni)
-- `src/lib/database.types.ts` (CompanySettingsRow eklenir)
-- `src/app/api/settings/company/route.ts` (yeni)
-- `src/app/dashboard/settings/page.tsx` (FirmaTab API'ye bağlanır)
-- `src/app/dashboard/quotes/new/page.tsx` (useEffect ile fetch)
+**Yapılanlar:**
+- [x] `supabase/migrations/033_company_settings.sql` — tablo + singleton index + RLS + `company-assets` Storage bucket
+- [x] `src/lib/database.types.ts` — `CompanySettingsRow` eklendi
+- [x] `src/lib/supabase/company-settings.ts` — `dbGetCompanySettings()`, `dbUpdateCompanySettings()`
+- [x] `src/app/api/settings/company/route.ts` — GET (cached 300s, tag: "company-settings") + PATCH
+- [x] `src/app/api/settings/company/logo/route.ts` — POST multipart → Supabase Storage (`company-assets` bucket), URL DB'ye yazılır
+- [x] `src/app/dashboard/settings/page.tsx` — FirmaTab: mount'ta DB'den yükle, gerçek PATCH save, logo upload (drag-drop + tıklama), önizleme, `email` alanı eklendi
+- [x] `src/app/dashboard/quotes/new/page.tsx` — ayrı useEffect: `GET /api/settings/company` → satıcı alanları + logo otomatik doldurulur (sadece boşsa override eder)
 
 ---
 
-## Faz 3 — Müşteri Autocomplete
+## Faz 3 — Müşteri Autocomplete ✅
 
-> _Durum: Bekliyor_
+> _Tamamlandı: 2026-04-21_
 
 **Sorun:** Müşteri bilgileri serbest metin olarak yazılıyor, mevcut cariler kullanılmıyor.
 
@@ -352,44 +386,37 @@ Kullanıcı teklifi düzenler
 - `CustomerRow`: `id, name, email, phone, address, tax_number, tax_office, country, currency`
 - `data-context.tsx` → `customers` listesi zaten global context'te
 
-**Yapılacaklar:**
-- [ ] Teklif formuna müşteri arama input'u ekle (Company alanı → autocomplete)
-- [ ] Yazmaya başlayınca mevcut `customers` listesinden filtrele (client-side, context'teki veri)
-- [ ] Müşteri seçilince: Contact, Phone, Email alanlarını otomatik doldur
-- [ ] Seçim sonrası alanlar hâlâ düzenlenebilir olmalı (override)
-- [ ] "Yeni müşteri" olarak serbest metin de yazılabilmeli
+**Yapılanlar:**
+- [x] Company alanı autocomplete: yazmaya başlayınca `customers` listesinden filtrele (name / email / country, max 8, sadece aktif)
+- [x] Müşteri seçilince Phone + Email otomatik dolar; Contact boş bırakılır (DB'de karşılık yok)
+- [x] Seçim sonrası alanlar düzenlenebilir kalır (serbest metin override)
+- [x] Yeni müşteri için serbest metin yazılabilir — autocomplete zorunlu değil
+- [x] `customers` async yükleme race condition fix: liste geç geldiyse mevcut input için yeniden filtrele
+- [x] Dışarı tıklamada dropdown kapanır (mousedown outside-click)
+- [x] `onMouseDown + preventDefault` — blur/click sırası sorunu yok
 
 **Dosyalar:**
-- `src/app/dashboard/quotes/new/page.tsx` (autocomplete dropdown + müşteri state bağlantısı)
+- `src/app/dashboard/quotes/new/page.tsx`
 
 **Not:** Yeni API/tablo gerekmez — context'teki veri yeterli.
 
 ---
 
-## Faz 4 — Ürün Autocomplete + Fiyat Doldurma
+## Faz 4 — Ürün Autocomplete + Fiyat Doldurma ✅
 
-> _Durum: Bekliyor_
+> _Tamamlandı: 2026-04-21_
 
-**Sorun:** Ürün kodu ve açıklaması elle yazılıyor, mevcut envanter kullanılmıyor.
-
-**Mevcut altyapı:**
-- `GET /api/products` → aktif ürünler (sku, name, price, currency, unit, category)
-- `data-context.tsx` → `products` listesi zaten global context'te
-
-**Yapılacaklar:**
-- [ ] "Product Code" hücresine autocomplete ekle (SKU araması)
-- [ ] Ürün seçilince otomatik doldur:
-  - `desc` → product.name
-  - `price` → product.price (para birimi uyuşuyorsa)
-  - `kg` → product.weight (varsa — şu an DB'de yok, opsiyonel)
-- [ ] "Description" hücresinden de arama yapılabilmeli (isim araması)
-- [ ] Katalog dışı ürün: autocomplete'den bir şey seçilmezse serbest metin kalır
-- [ ] Seçilen ürünün stok durumunu küçük bir indicator ile göster (opsiyonel, nice-to-have)
+**Yapılanlar:**
+- [x] "Product Code" hücresine autocomplete: SKU + ürün adı araması (max 8, sadece aktif)
+- [x] Ürün seçilince: `code` = SKU, `desc` = ürün adı, `price` (currency eşleşince), `kg` (weightKg varsa)
+- [x] Currency eşleşmezse price temizlenir (eski fiyat kalmaz)
+- [x] Katalog dışı serbest metin korunur
+- [x] Aynı anda tek satırın dropdown'ı açık kalır
+- [x] products async race condition fix: liste geç yüklenince aktif satır için yeniden filtrele
+- [x] Dışarı tıklamada dropdown kapanır
 
 **Dosyalar:**
-- `src/app/dashboard/quotes/new/page.tsx` (hücre autocomplete + ürün state bağlantısı)
-
-**Not:** Yeni API/tablo gerekmez — context'teki veri yeterli. Autocomplete componenti Faz 3'te yazıldığı için tekrar kullanılabilir.
+- `src/app/dashboard/quotes/new/page.tsx`
 
 ---
 

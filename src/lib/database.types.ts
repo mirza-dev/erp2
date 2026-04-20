@@ -423,6 +423,20 @@ export interface ColumnMappingRow {
     updated_at: string
 }
 
+export interface CompanySettingsRow {
+    id: string
+    name: string
+    tax_office: string
+    tax_no: string
+    address: string
+    phone: string
+    email: string
+    website: string
+    logo_url: string | null
+    currency: string
+    updated_at: string
+}
+
 // ── Composite / joined types ──────────────────────────────────
 
 export interface SalesOrderWithLines extends SalesOrderRow {

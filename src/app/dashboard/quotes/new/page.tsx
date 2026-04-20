@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import type { QuoteData } from "../components/quote-types";
+import { useData } from "@/lib/data-context";
+import type { Customer, Product } from "@/lib/mock-data";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -46,11 +48,15 @@ tr:hover .q-del-btn { opacity: 1; }
 .q-field-inp:focus { border-color: var(--accent-border) !important; outline: none; }
 .q-notes:focus { border-color: var(--accent-border) !important; outline: none; }
 .q-logo-ph:hover { border-color: var(--accent) !important; }
+.q-cust-opt:hover { background: var(--bg-hover, #2a2e37) !important; }
 `;
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function NewQuotePage() {
+    // ── Data context ──────────────────────────────────────────────────────────
+    const { customers, products } = useData();
+
     // ── State ────────────────────────────────────────────────────────────────
     const [rows, setRows] = useState<QuoteRow[]>([]);
     const [nextId, setNextId] = useState(4);
@@ -63,10 +69,13 @@ export default function NewQuotePage() {
     const [ovVat, setOvVat] = useState<number | null>(null);
     const [ovGrand, setOvGrand] = useState<number | null>(null);
 
-    // Display strings for editable total inputs
+    // Edit buffers + focus tracking for total inputs (avoids useEffect-based sync)
     const [subDisp, setSubDisp] = useState("");
     const [vatDisp, setVatDisp] = useState("");
     const [grandDisp, setGrandDisp] = useState("");
+    const [subFocused, setSubFocused] = useState(false);
+    const [vatFocused, setVatFocused] = useState(false);
+    const [grandFocused, setGrandFocused] = useState(false);
 
     // Customer fields
     const [custCompany, setCustCompany] = useState("");
@@ -105,11 +114,17 @@ export default function NewQuotePage() {
     // Router
     const router = useRouter();
 
+    // Autocomplete state — customer
+    const [custSuggestions, setCustSuggestions] = useState<Customer[]>([]);
+    const [custDropdownOpen, setCustDropdownOpen] = useState(false);
+
+    // Autocomplete state — product (per-row, only one open at a time)
+    const [prodOpenRowId, setProdOpenRowId] = useState<number | null>(null);
+    const [prodSuggestions, setProdSuggestions] = useState<Product[]>([]);
+
     // Refs
     const logoFileRef = useRef<HTMLInputElement>(null);
-    const subInputRef = useRef<HTMLInputElement>(null);
-    const vatInputRef = useRef<HTMLInputElement>(null);
-    const grandInputRef = useRef<HTMLInputElement>(null);
+    const custWrapperRef = useRef<HTMLDivElement>(null);
 
     // ── Computed ─────────────────────────────────────────────────────────────
     const sym = SYM[currency];
@@ -120,14 +135,18 @@ export default function NewQuotePage() {
     const effGrand = ovGrand !== null ? ovGrand : effSub + effVat;
 
     // ── Init ─────────────────────────────────────────────────────────────────
+    // Browser-only init: localStorage restore + current date.
+    // useEffect is intentional here — these values cannot be set on the server
+    // without causing SSR/hydration mismatches.
     useEffect(() => {
+        // Browser-only: current date cannot be set without hydration mismatch
         setQuoteDate(new Date().toISOString().slice(0, 10));
         try {
-            const saved = JSON.parse(localStorage.getItem("teklif_v3") || "{}");
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const saved = JSON.parse(localStorage.getItem("teklif_v3") || "{}") as any;
             if (saved.currency) setCurrency(saved.currency as Currency);
             if (saved.rows?.length) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                setRows(saved.rows.map((r: any, i: number) => ({ ...r, id: i + 1 })));
+                setRows(saved.rows.map((r: QuoteRow, i: number) => ({ ...r, id: i + 1 })));
                 setNextId(saved.rows.length + 1);
             } else {
                 setRows([emptyRow(1), emptyRow(2), emptyRow(3)]);
@@ -137,15 +156,144 @@ export default function NewQuotePage() {
         }
     }, []);
 
-    // Sync total display strings (when not focused)
+    // Firma ayarlarını çek — satıcı alanlarını otomatik doldur
     useEffect(() => {
-        if (document.activeElement !== subInputRef.current)
-            setSubDisp(effSub > 0 ? `${sym} ${fmt(effSub)}` : "");
-        if (document.activeElement !== vatInputRef.current)
-            setVatDisp(effVat > 0 ? `${sym} ${fmt(effVat)}` : "");
-        if (document.activeElement !== grandInputRef.current)
-            setGrandDisp(effGrand > 0 ? `${sym} ${fmt(effGrand)}` : "");
-    }, [effSub, effVat, effGrand, sym]);
+        fetch("/api/settings/company")
+            .then(r => r.ok ? r.json() : null)
+            .then(s => {
+                if (!s) return;
+                // Sadece boşsa doldur — kullanıcı zaten bir şey yazdıysa override etme
+                setSellerName(prev => (prev === "" || prev === "PMT Endüstri A.Ş.") && s.name ? s.name : prev);
+                setSellerTel(prev => prev === "" && s.phone ? s.phone : prev);
+                setSellerEmail(prev => prev === "" && s.email ? s.email : prev);
+                setSellerAddr(prev => prev === "" && s.address ? s.address : prev);
+                setSellerTaxId(prev => prev === "" && s.tax_no ? s.tax_no : prev);
+                setSellerWeb(prev => prev === "" && s.website ? s.website : prev);
+                setLogoSrc(prev => prev === null && s.logo_url ? s.logo_url : prev);
+            })
+            .catch(() => {/* ağ hatası — form çalışmaya devam eder */});
+    }, []);
+
+    // (Display strings for totals are derived inline in JSX when not focused — no sync effect needed)
+
+    // ── Customer autocomplete ─────────────────────────────────────────────────
+    const handleCustCompanyChange = (value: string) => {
+        setCustCompany(value);
+        if (value.trim().length < 1) {
+            setCustSuggestions([]);
+            setCustDropdownOpen(false);
+            return;
+        }
+        const q = value.toLowerCase();
+        const matches = customers
+            .filter(c => c.isActive)
+            .filter(c =>
+                c.name.toLowerCase().includes(q) ||
+                c.email.toLowerCase().includes(q) ||
+                c.country.toLowerCase().includes(q)
+            )
+            .slice(0, 8);
+        setCustSuggestions(matches);
+        setCustDropdownOpen(matches.length > 0);
+    };
+
+    const handleSelectCustomer = (c: Customer) => {
+        setCustCompany(c.name);
+        setCustPhone(c.phone || "");
+        setCustEmail(c.email || "");
+        setCustDropdownOpen(false);
+        setCustSuggestions([]);
+    };
+
+    // customers async yüklenince mevcut input değeri için yeniden filtrele (race condition fix)
+    useEffect(() => {
+        if (custCompany.trim().length < 1 || customers.length === 0) return;
+        const q = custCompany.toLowerCase();
+        const matches = customers
+            .filter(c => c.isActive)
+            .filter(c =>
+                c.name.toLowerCase().includes(q) ||
+                c.email.toLowerCase().includes(q) ||
+                c.country.toLowerCase().includes(q)
+            )
+            .slice(0, 8);
+        setCustSuggestions(matches);
+        if (matches.length > 0) setCustDropdownOpen(true);
+        // custCompany intentionally omitted: onChange zaten filtreler, bu effect sadece customers yüklenince çalışmalı
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [customers]);
+
+    // Dışarı tıklayınca müşteri dropdown'ı kapat
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (custWrapperRef.current && !custWrapperRef.current.contains(e.target as Node)) {
+                setCustDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // ── Product autocomplete ──────────────────────────────────────────────────
+    const handleCodeChange = (rowId: number, value: string) => {
+        updateRow(rowId, "code", value);
+        if (value.trim().length < 1) {
+            setProdSuggestions([]);
+            setProdOpenRowId(null);
+            return;
+        }
+        // rowId her zaman set edilir — products henüz boşsa effect yüklenince çalışır
+        setProdOpenRowId(rowId);
+        if (products.length === 0) return;
+        const q = value.toLowerCase();
+        const matches = products
+            .filter(p => p.isActive)
+            .filter(p =>
+                p.sku.toLowerCase().includes(q) ||
+                p.name.toLowerCase().includes(q)
+            )
+            .slice(0, 8);
+        setProdSuggestions(matches);
+    };
+
+    const handleSelectProduct = (rowId: number, p: Product) => {
+        updateRow(rowId, "code", p.sku);
+        updateRow(rowId, "desc", p.name);
+        // Her zaman price güncelle: currency eşleşiyorsa fiyatı yaz, eşleşmiyorsa temizle
+        updateRow(rowId, "price", p.currency === currency ? String(p.price) : "");
+        if (p.weightKg) {
+            updateRow(rowId, "kg", String(p.weightKg));
+        }
+        setProdOpenRowId(null);
+        setProdSuggestions([]);
+    };
+
+    // Dışarı tıklayınca ürün dropdown'ı kapat
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (!(e.target as HTMLElement).closest(".q-prod-cell")) {
+                setProdOpenRowId(null);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // products async yüklenince aktif satır için yeniden filtrele (race condition fix)
+    useEffect(() => {
+        if (!prodOpenRowId || products.length === 0) return;
+        const row = rows.find(r => r.id === prodOpenRowId);
+        if (!row || row.code.trim().length < 1) return;
+        const q = row.code.toLowerCase();
+        const matches = products
+            .filter(p => p.isActive)
+            .filter(p => p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q))
+            .slice(0, 8);
+        setProdSuggestions(matches);
+        if (matches.length === 0) setProdOpenRowId(null);
+        // prodOpenRowId ve rows intentionally omitted: sadece products yüklenince çalışmalı
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [products]);
 
     // Auto-save to localStorage
     const autoSave = useCallback(() => {
@@ -322,6 +470,7 @@ export default function NewQuotePage() {
                                 overflow: "hidden", background: "white", flexShrink: 0,
                             }}>
                                 {logoSrc
+                                    // eslint-disable-next-line @next/next/no-img-element
                                     ? <img src={logoSrc} alt="logo" style={{ width: "100%", height: "100%", objectFit: "contain" }} />
                                     : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9ca3b0" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
                                 }
@@ -381,8 +530,52 @@ export default function NewQuotePage() {
                             <div style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)" }}>
                                 Müşteri / Customer
                             </div>
+                            {/* Company — autocomplete */}
+                            <div ref={custWrapperRef} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                                <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                                    Company <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontStyle: "normal", fontWeight: 400 }}>Firma Adı</span>
+                                </div>
+                                <div style={{ position: "relative" }}>
+                                    <input
+                                        className="q-field-inp"
+                                        style={fieldInput}
+                                        type="text"
+                                        placeholder="Firma adını girin veya seçin…"
+                                        value={custCompany}
+                                        autoComplete="off"
+                                        onChange={e => handleCustCompanyChange(e.target.value)}
+                                        onFocus={() => { if (custSuggestions.length > 0) setCustDropdownOpen(true); }}
+                                    />
+                                    {custDropdownOpen && custSuggestions.length > 0 && (
+                                        <div style={{
+                                            position: "absolute", top: "100%", left: 0, right: 0, zIndex: 200,
+                                            background: "var(--bg-secondary)",
+                                            border: "0.5px solid var(--border-secondary)",
+                                            borderRadius: "6px",
+                                            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                                            maxHeight: "200px", overflowY: "auto",
+                                            marginTop: "3px",
+                                        }}>
+                                            {custSuggestions.map(c => (
+                                                <div
+                                                    key={c.id}
+                                                    className="q-cust-opt"
+                                                    onMouseDown={e => { e.preventDefault(); handleSelectCustomer(c); }}
+                                                    style={{ padding: "8px 12px", cursor: "pointer", borderBottom: "0.5px solid var(--border-tertiary)" }}
+                                                >
+                                                    <div style={{ fontSize: "12.5px", color: "var(--text-primary)", fontWeight: 500 }}>{c.name}</div>
+                                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "1px" }}>
+                                                        {[c.country, c.email].filter(Boolean).join(" · ")}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Contact, Phone, Email */}
                             {([
-                                ["Company",  "Firma Adı",       custCompany, setCustCompany, "Firma adını girin…", "text"],
                                 ["Contact",  "İrtibat Kişisi",  custContact, setCustContact, "Ad Soyad",           "text"],
                                 ["Phone",    "Telefon",         custPhone,   setCustPhone,   "+90 532 …",          "text"],
                                 ["Email",    "E-posta",         custEmail,   setCustEmail,   "ornek@firma.com",    "email"],
@@ -484,8 +677,48 @@ export default function NewQuotePage() {
                                             <tr key={row.id}>
                                                 {/* # */}
                                                 <td style={{ ...tdBase, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", color: "var(--text-tertiary)", width: "32px" }}>{idx + 1}</td>
-                                                {/* Code */}
-                                                <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="KOD-001" value={row.code} onChange={e => updateRow(row.id, "code", e.target.value)} /></td>
+                                                {/* Code — autocomplete */}
+                                                <td style={{ ...tdBase, position: "relative" }} className="q-prod-cell">
+                                                    <input
+                                                        className="q-cell"
+                                                        style={cellInput}
+                                                        placeholder="KOD-001"
+                                                        value={row.code}
+                                                        autoComplete="off"
+                                                        onChange={e => handleCodeChange(row.id, e.target.value)}
+                                                        onFocus={() => {
+                                                            if (prodSuggestions.length > 0 && prodOpenRowId === row.id)
+                                                                setProdOpenRowId(row.id);
+                                                        }}
+                                                    />
+                                                    {prodOpenRowId === row.id && prodSuggestions.length > 0 && (
+                                                        <div className="q-prod-cell" style={{
+                                                            position: "absolute", top: "100%", left: 0, zIndex: 200,
+                                                            minWidth: "280px",
+                                                            background: "var(--bg-secondary)",
+                                                            border: "0.5px solid var(--border-secondary)",
+                                                            borderRadius: "6px",
+                                                            boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                                                            maxHeight: "200px", overflowY: "auto",
+                                                            marginTop: "3px",
+                                                        }}>
+                                                            {prodSuggestions.map(p => (
+                                                                <div
+                                                                    key={p.id}
+                                                                    className="q-cust-opt"
+                                                                    onMouseDown={e => { e.preventDefault(); handleSelectProduct(row.id, p); }}
+                                                                    style={{ padding: "7px 12px", cursor: "pointer", borderBottom: "0.5px solid var(--border-tertiary)" }}
+                                                                >
+                                                                    <div style={{ fontSize: "11px", fontFamily: "'JetBrains Mono', monospace", color: "var(--accent-text)" }}>{p.sku}</div>
+                                                                    <div style={{ fontSize: "12px", color: "var(--text-primary)", marginTop: "1px" }}>{p.name}</div>
+                                                                    <div style={{ fontSize: "10.5px", color: "var(--text-tertiary)", marginTop: "1px" }}>
+                                                                        {p.currency} {fmt(p.price)} · {p.unit} · {p.category}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </td>
                                                 {/* Lead */}
                                                 <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="30 gün" value={row.lead} onChange={e => updateRow(row.id, "lead", e.target.value)} /></td>
                                                 {/* Desc */}
@@ -535,17 +768,17 @@ export default function NewQuotePage() {
                                     <td colSpan={6} className="q-total-label" style={totalLabel}>Subtotal / Ara Toplam</td>
                                     <td style={tdBase}>
                                         <input
-                                            ref={subInputRef}
                                             className="q-total-inp"
                                             style={totalInput}
                                             placeholder="—"
-                                            value={subDisp}
+                                            value={subFocused ? subDisp : (effSub > 0 ? `${sym} ${fmt(effSub)}` : "")}
+                                            onFocus={() => { setSubFocused(true); setSubDisp(effSub > 0 ? `${sym} ${fmt(effSub)}` : ""); }}
                                             onChange={e => {
                                                 setSubDisp(e.target.value);
                                                 const v = parseFloat(e.target.value.replace(/[^0-9.,\-]/g, "").replace(",", "."));
                                                 setOvSub(isNaN(v) ? null : v);
                                             }}
-                                            onBlur={() => setSubDisp(effSub > 0 ? `${sym} ${fmt(effSub)}` : "")}
+                                            onBlur={() => setSubFocused(false)}
                                         />
                                     </td>
                                     <td colSpan={2} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px", color: "var(--text-tertiary)", textAlign: "right", padding: "0 8px" }}>
@@ -569,17 +802,17 @@ export default function NewQuotePage() {
                                     </td>
                                     <td style={tdBase}>
                                         <input
-                                            ref={vatInputRef}
                                             className="q-total-inp"
                                             style={totalInput}
                                             placeholder="—"
-                                            value={vatDisp}
+                                            value={vatFocused ? vatDisp : (effVat > 0 ? `${sym} ${fmt(effVat)}` : "")}
+                                            onFocus={() => { setVatFocused(true); setVatDisp(effVat > 0 ? `${sym} ${fmt(effVat)}` : ""); }}
                                             onChange={e => {
                                                 setVatDisp(e.target.value);
                                                 const v = parseFloat(e.target.value.replace(/[^0-9.,\-]/g, "").replace(",", "."));
                                                 setOvVat(isNaN(v) ? null : v);
                                             }}
-                                            onBlur={() => setVatDisp(effVat > 0 ? `${sym} ${fmt(effVat)}` : "")}
+                                            onBlur={() => setVatFocused(false)}
                                         />
                                     </td>
                                     <td colSpan={2} />
@@ -592,17 +825,17 @@ export default function NewQuotePage() {
                                     <td colSpan={6} style={{ ...totalLabel, fontWeight: 700, color: "var(--text-primary)" }}>GRAND TOTAL / Genel Toplam</td>
                                     <td style={tdBase}>
                                         <input
-                                            ref={grandInputRef}
                                             className="q-total-inp q-grand-total-inp"
                                             style={{ ...totalInput, fontSize: "13px", fontWeight: 600, color: "var(--accent-text)" }}
                                             placeholder="—"
-                                            value={grandDisp}
+                                            value={grandFocused ? grandDisp : (effGrand > 0 ? `${sym} ${fmt(effGrand)}` : "")}
+                                            onFocus={() => { setGrandFocused(true); setGrandDisp(effGrand > 0 ? `${sym} ${fmt(effGrand)}` : ""); }}
                                             onChange={e => {
                                                 setGrandDisp(e.target.value);
                                                 const v = parseFloat(e.target.value.replace(/[^0-9.,\-]/g, "").replace(",", "."));
                                                 setOvGrand(isNaN(v) ? null : v);
                                             }}
-                                            onBlur={() => setGrandDisp(effGrand > 0 ? `${sym} ${fmt(effGrand)}` : "")}
+                                            onBlur={() => setGrandFocused(false)}
                                         />
                                     </td>
                                     <td colSpan={2} />
