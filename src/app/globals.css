@@ -371,6 +371,7 @@ select:focus-visible {
     margin: 0 !important;
     border: 0.5px solid #bbb !important;
     border-radius: 0 !important;
+    overflow: visible !important;
     font-family: -apple-system, "Helvetica Neue", Arial, sans-serif !important;
     font-size: 9px !important;
   }
@@ -387,9 +388,18 @@ select:focus-visible {
 
   /* Meta grid */
   .q-meta-grid { border-bottom: 0.5px solid #ccc !important; }
-  .q-meta-col { padding: 6px 12px !important; }
+  /* Her iki sütun için padding ve satır arası boşluk küçültüldü */
+  .q-meta-col { padding: 5px 10px !important; gap: 3px !important; }
   .q-meta-col + .q-meta-col { border-left: 0.5px solid #ccc !important; }
-  .q-field-inp { background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; border-radius: 0 !important; padding: 1px 0 !important; font-size: 8.5px !important; color: #111 !important; }
+  /* Bölüm başlığı (MÜŞTERİ / CUSTOMER vb.) */
+  .q-meta-col > div:first-child { font-size: 7.5px !important; padding-bottom: 3px !important; letter-spacing: 0.04em !important; }
+  /* Alan satırları — label + input grid gap */
+  .q-meta-col > div:not(:first-child) { gap: 4px !important; }
+  /* Alan etiketi (COMPANY, CONTACT…) */
+  .q-meta-col > div:not(:first-child) > div:first-child { font-size: 7.5px !important; letter-spacing: 0.03em !important; }
+  /* Türkçe alt etiket (Firma Adı, İrtibat Kişisi…) */
+  .q-meta-col > div:not(:first-child) > div:first-child > span { font-size: 6.5px !important; }
+  .q-field-inp { background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; border-radius: 0 !important; padding: 1px 0 !important; font-size: 8px !important; color: #111 !important; }
 
   /* Table toolbar */
   .q-table-toolbar { background: #f2f2f2 !important; border-bottom: 0.5px solid #ccc !important; padding: 4px 12px !important; }
