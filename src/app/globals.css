@@ -326,28 +326,31 @@ select:focus-visible {
 
 /* ============ PRINT ============ */
 @media print {
+  /* A4 portrait */
+  @page { size: A4 portrait; margin: 12mm 12mm 15mm 12mm; }
+
+  /* Boş 2. sayfa önleme */
+  html, body { height: auto !important; overflow: hidden !important; font-size: 10px !important; }
+
   /* Layout elementleri gizle */
   .topbar-wrapper,
   .sidebar-desktop,
   .sidebar-mobile-drawer,
   .sidebar-mobile-backdrop { display: none !important; }
 
-  /* Grid → block (form card tam genişliğe yayılsın) */
-  .dashboard-grid {
-    display: block !important;
-    min-height: auto !important;
-  }
+  /* Grid → block */
+  .dashboard-grid { display: block !important; min-height: auto !important; }
+  .dashboard-grid > main { padding: 0 !important; overflow: visible !important; }
 
-  .dashboard-grid > main {
-    padding: 0 !important;
-    overflow: visible !important;
-  }
-
-  /* No-print util class */
+  /* No-print elementleri gizle */
   .q-no-print { display: none !important; }
 
-  /* A4 portrait */
-  @page { size: A4 portrait; margin: 15mm 15mm 18mm 15mm; }
+  /* Input/form kontrolleri temizle */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none !important; margin: 0 !important; }
+  input[type="number"] { -moz-appearance: textfield !important; }
+  textarea { resize: none !important; }
+  select { -webkit-appearance: none !important; appearance: none !important; }
 
   /* Tüm renkler beyaz kağıt */
   *, *::before, *::after {
@@ -355,32 +358,98 @@ select:focus-visible {
     print-color-adjust: economy !important;
     background: white !important;
     color: #1a1a1a !important;
-    border-color: #ccc !important;
+    border-color: #ddd !important;
     box-shadow: none !important;
   }
 
-  html, body { font-size: 10.5px !important; }
+  /* ── Form card ── */
+  .q-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border: 1px solid #ccc !important;
+    border-radius: 2px !important;
+    font-family: "Inter", -apple-system, "Helvetica Neue", Arial, sans-serif !important;
+  }
 
-  /* ── Teklif formu ── */
-  .q-card { border: 1px solid #ccc !important; border-radius: 4px !important; max-width: 100% !important; margin: 0 !important; }
-  .q-form-header { background: #f7f7f7 !important; border-bottom: 1px solid #ccc !important; padding: 12px 16px !important; }
-  .q-title-band { background: white !important; border-bottom: 1px solid #ccc !important; }
+  /* Header */
+  .q-form-header { background: #f8f8f8 !important; border-bottom: 1px solid #ccc !important; padding: 10px 14px !important; }
+  .q-info-inp {
+    color: #1a1a1a !important;
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 0.5px solid #c0c0c0 !important;
+    font-size: 10px !important;
+    padding: 1px 0 !important;
+  }
+
+  /* Title band */
+  .q-title-band { background: white !important; border-bottom: 1px solid #ccc !important; padding: 8px 14px !important; }
+
+  /* Meta grid */
   .q-meta-grid { border-bottom: 1px solid #ccc !important; }
-  .q-meta-col { padding: 10px 16px !important; }
+  .q-meta-col { padding: 8px 14px !important; }
   .q-meta-col + .q-meta-col { border-left: 1px solid #ccc !important; }
-  .q-field-inp { background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; border-radius: 0 !important; padding: 2px 0 !important; color: #1a1a1a !important; font-size: 10.5px !important; }
-  select.q-field-inp { -webkit-appearance: none !important; appearance: none !important; }
-  .q-table-toolbar { background: #f0f0f0 !important; border-bottom: 1px solid #ccc !important; padding: 7px 16px !important; }
-  .q-th { background: #efefef !important; color: #444 !important; border-bottom: 1px solid #ccc !important; font-size: 9px !important; padding: 5px 6px !important; }
-  .q-cell { color: #1a1a1a !important; background: transparent !important; border: none !important; padding: 3px 4px !important; font-size: 10px !important; }
+  .q-field-inp {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 0.5px solid #c0c0c0 !important;
+    border-radius: 0 !important;
+    padding: 1px 0 !important;
+    font-size: 10px !important;
+    color: #1a1a1a !important;
+  }
+
+  /* Table toolbar */
+  .q-table-toolbar { background: #f4f4f4 !important; border-bottom: 1px solid #ccc !important; padding: 5px 14px !important; }
+
+  /* Items table — fixed layout, hizalı sütunlar */
+  .q-card table { table-layout: fixed !important; width: 100% !important; border-collapse: collapse !important; }
+  .q-th {
+    background: #eeeeee !important;
+    color: #555 !important;
+    border-top: 1px solid #ccc !important;
+    border-bottom: 1px solid #ccc !important;
+    font-size: 8px !important;
+    padding: 4px 5px !important;
+    letter-spacing: 0.04em !important;
+  }
+  .q-card table td { border-bottom: 0.5px solid #e8e8e8 !important; padding: 3px 4px !important; }
   .q-card table tbody tr:hover td { background: white !important; }
-  .q-computed { color: #1a1a1a !important; font-size: 10.5px !important; }
-  .q-total-label { color: #444 !important; }
-  .q-grand-total-inp { color: #13385C !important; font-size: 12px !important; }
-  .q-notes-block { border-top: 1px solid #ccc !important; padding: 12px 16px !important; }
-  .q-notes { background: transparent !important; border: 0.5px solid #ccc !important; color: #1a1a1a !important; font-size: 10px !important; min-height: 60px !important; }
-  .q-sigs-block { border-top: 1px solid #ccc !important; padding: 12px 16px !important; }
-  .q-sig-space { height: 40px !important; }
-  .q-info-inp { color: #1a1a1a !important; background: transparent !important; border: none !important; border-bottom: 0.5px dashed #bbb !important; }
-  select.q-vat-sel { display: none !important; }
+  .q-cell {
+    color: #1a1a1a !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 2px 3px !important;
+    font-size: 9.5px !important;
+    width: 100% !important;
+  }
+  .q-computed { color: #1a1a1a !important; font-size: 10px !important; }
+
+  /* Totals */
+  .q-total-label { color: #444 !important; font-size: 10px !important; padding: 5px 8px !important; }
+  .q-total-inp {
+    color: #1a1a1a !important;
+    font-size: 10px !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 5px 4px !important;
+  }
+  .q-grand-total-inp { color: #0d2d52 !important; font-size: 11px !important; font-weight: 700 !important; }
+
+  /* Notes */
+  .q-notes-block { border-top: 1px solid #ccc !important; padding: 8px 14px !important; }
+  .q-notes {
+    background: transparent !important;
+    border: 0.5px solid #ccc !important;
+    color: #1a1a1a !important;
+    font-size: 9.5px !important;
+    min-height: 50px !important;
+    resize: none !important;
+    padding: 5px 7px !important;
+  }
+
+  /* Signatures */
+  .q-sigs-block { border-top: 1px solid #ccc !important; padding: 8px 14px 16px !important; }
+  .q-sig-space { height: 36px !important; border-bottom: 0.5px solid #aaa !important; }
 }
