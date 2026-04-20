@@ -323,8 +323,8 @@ export default function QuoteDocument({ data }: Props) {
                     {/* Logo */}
                     <div style={{ flexShrink: 0 }}>
                         {data.logoSrc
-                            ? <img src={data.logoSrc} alt="logo" style={{ width: "72px", height: "72px", objectFit: "contain", background: "white", borderRadius: "6px", padding: "4px" }} />
-                            : <div style={{ width: "72px", height: "72px", background: "rgba(255,255,255,0.15)", borderRadius: "6px", display: "grid", placeItems: "center" }}>
+                            ? <img src={data.logoSrc} alt="logo" style={{ width: "96px", height: "96px", objectFit: "contain", background: "white", borderRadius: "6px", padding: "4px" }} />
+                            : <div style={{ width: "96px", height: "96px", background: "rgba(255,255,255,0.15)", borderRadius: "6px", display: "grid", placeItems: "center" }}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg>
                             </div>
                         }
