@@ -334,7 +334,8 @@ select:focus-visible {
   @top-right  { content: none; }
   @bottom-left   { content: none; }
   @bottom-center { content: none; }
-  @bottom-right  {
+  @bottom-right  { content: none; }
+  @bottom-center {
     content: "Sayfa " counter(page) " / " counter(pages);
     font-size: 8pt;
     font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
@@ -399,22 +400,23 @@ select:focus-visible {
   .q-form-header { background: #f6f6f6 !important; border-bottom: 0.5px solid #ccc !important; padding: 8px 12px !important; }
   .q-info-inp { color: #111 !important; background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; font-size: 8.5px !important; padding: 1px 0 !important; }
 
-  /* Title band */
-  .q-title-band { border-bottom: 0.5px solid #ccc !important; padding: 5px 12px !important; }
+  /* Title band — marka mavisi */
+  .q-title-band { border-bottom: 1px solid rgba(0,114,188,0.2) !important; padding: 5px 12px !important; }
+  .q-title-band span { color: #0072BC !important; }
 
   /* Meta grid */
   .q-meta-grid { border-bottom: 0.5px solid #aaa !important; }
   /* Her iki sütun için padding ve satır arası boşluk küçültüldü */
   .q-meta-col { padding: 5px 10px !important; gap: 3px !important; }
   .q-meta-col + .q-meta-col { border-left: 0.5px solid #aaa !important; }
-  /* Bölüm başlığı (MÜŞTERİ / CUSTOMER vb.) */
-  .q-meta-col > div:first-child { font-size: 7.5px !important; padding-bottom: 3px !important; letter-spacing: 0.04em !important; }
+  /* Bölüm başlığı — marka mavisi */
+  .q-meta-col > div:first-child { font-size: 7.5px !important; padding-bottom: 3px !important; letter-spacing: 0.04em !important; color: #0072BC !important; border-bottom-color: rgba(0,114,188,0.2) !important; }
   /* Alan satırları — label + input grid gap */
   .q-meta-col > div:not(:first-child) { gap: 4px !important; }
-  /* Alan etiketi (COMPANY, CONTACT…) */
-  .q-meta-col > div:not(:first-child) > div:first-child { font-size: 7.5px !important; letter-spacing: 0.03em !important; }
-  /* Türkçe alt etiket (Firma Adı, İrtibat Kişisi…) */
-  .q-meta-col > div:not(:first-child) > div:first-child > span { font-size: 6.5px !important; }
+  /* Alan etiketi (COMPANY, CONTACT…) — bold, koyu */
+  .q-meta-col > div:not(:first-child) > div:first-child { font-size: 7.5px !important; letter-spacing: 0.03em !important; font-weight: 700 !important; color: #222 !important; }
+  /* Türkçe alt etiket — gri */
+  .q-meta-col > div:not(:first-child) > div:first-child > span { font-size: 6.5px !important; color: #888 !important; font-weight: 400 !important; }
   .q-field-inp { background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; border-radius: 0 !important; padding: 1px 0 !important; font-size: 8px !important; color: #111 !important; }
 
   /* Table toolbar */
@@ -424,15 +426,17 @@ select:focus-visible {
   .q-card table { table-layout: auto !important; width: 100% !important; border-collapse: collapse !important; }
   .q-card table th, .q-card table td { width: auto !important; min-width: 0 !important; overflow: hidden !important; }
   .q-th {
-    background: #ebebeb !important;
-    color: #444 !important;
-    border-top: 0.5px solid #ccc !important;
-    border-bottom: 0.5px solid #ccc !important;
+    background: #0072BC !important;
+    color: white !important;
+    border-top: none !important;
+    border-bottom: none !important;
     font-size: 7px !important;
     padding: 3px 4px !important;
     white-space: nowrap !important;
     letter-spacing: 0 !important;
   }
+  /* Tablo header Türkçe alt etiket */
+  .q-th span { color: rgba(255,255,255,0.65) !important; }
   .q-card table td { border-bottom: 0.5px solid #e4e4e4 !important; padding: 2px 3px !important; }
   .q-card table tbody tr:hover td { background: white !important; }
   .q-cell { color: #111 !important; background: transparent !important; border: none !important; padding: 1px 2px !important; font-size: 8px !important; min-width: 0 !important; }
@@ -450,4 +454,6 @@ select:focus-visible {
   /* Signatures */
   .q-sigs-block { border-top: 0.5px solid #ccc !important; padding: 6px 12px 12px !important; }
   .q-sig-space { height: 32px !important; border-bottom: 0.5px solid #999 !important; }
+  .q-sig-name  { font-size: 7.5px !important; font-weight: 600 !important; color: #111 !important; border-bottom: 0.5px solid #ccc !important; padding: 2px 0 !important; }
+  .q-sig-title { font-size: 7px !important; color: #888 !important; border-bottom: 0.5px solid #e0e0e0 !important; padding: 2px 0 !important; }
 }

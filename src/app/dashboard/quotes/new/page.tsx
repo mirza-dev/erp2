@@ -93,6 +93,9 @@ export default function NewQuotePage() {
     const [sig1, setSig1] = useState("");
     const [sig2, setSig2] = useState("");
     const [sig3, setSig3] = useState("");
+    const [sig1Title, setSig1Title] = useState("");
+    const [sig2Title, setSig2Title] = useState("");
+    const [sig3Title, setSig3Title] = useState("");
 
     // Toast
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
@@ -202,8 +205,8 @@ export default function NewQuotePage() {
     };
     const th: React.CSSProperties = {
         padding: "7px 8px", fontSize: "10px", fontWeight: 600,
-        color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em",
-        borderBottom: "0.5px solid var(--border-tertiary)", background: "var(--bg-secondary)",
+        color: "white", textTransform: "uppercase", letterSpacing: "0.06em",
+        borderBottom: "none", background: "#0072BC",
         whiteSpace: "nowrap",
     };
     const tdBase: React.CSSProperties = {
@@ -321,10 +324,10 @@ export default function NewQuotePage() {
                         padding: "14px 28px", borderBottom: "0.5px solid var(--border-tertiary)",
                         background: "var(--bg-primary)", textAlign: "center",
                     }}>
-                        <div style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)" }}>
-                            TEKLİF
-                            <span style={{ color: "var(--text-tertiary)", margin: "0 8px", fontWeight: 300 }}>|</span>
-                            <span style={{ color: "var(--text-secondary)", fontStyle: "italic", fontWeight: 500 }}>QUOTATION</span>
+                        <div style={{ fontSize: "22px", fontWeight: 700, letterSpacing: "-0.01em" }}>
+                            <span style={{ color: "#0072BC" }}>TEKLİF</span>
+                            <span style={{ color: "rgba(0,114,188,0.35)", margin: "0 10px", fontWeight: 300 }}>|</span>
+                            <span style={{ color: "#0072BC", fontStyle: "italic", fontWeight: 600 }}>QUOTATION</span>
                         </div>
                     </div>
 
@@ -335,7 +338,7 @@ export default function NewQuotePage() {
                     }}>
                         {/* Left: Customer */}
                         <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                            <div style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)" }}>
                                 Müşteri / Customer
                             </div>
                             {([
@@ -346,8 +349,8 @@ export default function NewQuotePage() {
                             ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])
                                 .map(([en, tr, val, set, ph, type]) => (
                                     <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px" }}>
-                                        <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                                            {en} <span style={{ fontSize: "9px", opacity: 0.6, display: "block", fontStyle: "normal" }}>{tr}</span>
+                                        <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                                            {en} <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontStyle: "normal", fontWeight: 400 }}>{tr}</span>
                                         </div>
                                         <input
                                             className="q-field-inp"
@@ -361,7 +364,7 @@ export default function NewQuotePage() {
 
                         {/* Right: Quote details */}
                         <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "10px", borderLeft: "0.5px solid var(--border-tertiary)" }}>
-                            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                            <div style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)" }}>
                                 Teklif Detayları / Quote Details
                             </div>
                             {([
@@ -374,16 +377,16 @@ export default function NewQuotePage() {
                             ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])
                                 .map(([en, tr, val, set, ph, type]) => (
                                     <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px" }}>
-                                        <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                                            {en} <span style={{ fontSize: "9px", opacity: 0.6, display: "block" }}>{tr}</span>
+                                        <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                                            {en} <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontWeight: 400 }}>{tr}</span>
                                         </div>
                                         <input className="q-field-inp" style={fieldInput} type={type} placeholder={ph} value={val} onChange={e => set(e.target.value)} />
                                     </div>
                                 ))}
                             {/* Currency */}
                             <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px" }}>
-                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                                    Currency <span style={{ fontSize: "9px", opacity: 0.6, display: "block" }}>Para Birimi</span>
+                                <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                                    Currency <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontWeight: 400 }}>Para Birimi</span>
                                 </div>
                                 <select className="q-field-inp" style={fieldInput} value={currency} onChange={e => setCurrency(e.target.value as Currency)}>
                                     <option value="TRY">₺ TRY — Türk Lirası</option>
@@ -592,20 +595,28 @@ export default function NewQuotePage() {
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "32px" }}>
                             {([
-                                ["Prepared by",  "Hazırlayan",  sig1, setSig1],
-                                ["Approved by",  "Onay",        sig2, setSig2],
-                                ["Manager Seal", "Mühür Onayı", sig3, setSig3],
-                            ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>][]).map(([role, roleEn, val, set]) => (
+                                ["Prepared by",  "Hazırlayan",  sig1, setSig1,  sig1Title, setSig1Title],
+                                ["Approved by",  "Onay",        sig2, setSig2,  sig2Title, setSig2Title],
+                                ["Manager Seal", "Mühür Onayı", sig3, setSig3,  sig3Title, setSig3Title],
+                            ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, React.Dispatch<React.SetStateAction<string>>][]).map(([role, roleTr, val, set, titleVal, setTitle]) => (
                                 <div key={role} style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>{role}</div>
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", fontStyle: "italic", marginBottom: "8px" }}>{roleEn}</div>
+                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", letterSpacing: "-0.01em" }}>{role}</div>
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", fontStyle: "italic", marginBottom: "8px" }}>{roleTr}</div>
+                                    <div className="q-sig-space" style={{ height: "56px", borderBottom: "0.5px solid var(--border-secondary)" }} />
                                     <input
-                                        style={{ background: "transparent", border: "none", fontSize: "12px", fontWeight: 500, color: "var(--text-primary)", padding: "2px 0" }}
-                                        placeholder="Ad Soyad"
+                                        className="q-sig-name"
+                                        style={{ background: "transparent", border: "none", borderBottom: "0.5px solid var(--border-tertiary)", fontSize: "11.5px", fontWeight: 500, color: "var(--text-primary)", padding: "4px 0", marginTop: "6px", width: "100%" }}
+                                        placeholder="Ad Soyad / Name"
                                         value={val}
                                         onChange={e => set(e.target.value)}
                                     />
-                                    <div className="q-sig-space" style={{ height: "56px", borderBottom: "0.5px solid var(--border-secondary)" }} />
+                                    <input
+                                        className="q-sig-title"
+                                        style={{ background: "transparent", border: "none", borderBottom: "0.5px solid var(--border-tertiary)", fontSize: "10.5px", color: "var(--text-secondary)", padding: "3px 0", width: "100%" }}
+                                        placeholder="Unvan / Pozisyon"
+                                        value={titleVal}
+                                        onChange={e => setTitle(e.target.value)}
+                                    />
                                 </div>
                             ))}
                         </div>
