@@ -125,7 +125,7 @@ export default function QuoteDocument({ data }: Props) {
         minHeight: "297mm",
         margin: "0 auto",
         background: C.white,
-        border: `1.5px solid ${C.brand}`,
+        border: "1.5px solid #222",
         boxShadow: "0 8px 40px rgba(0,0,0,0.18)",
         fontFamily: FONT.body,
         color: C.text,
