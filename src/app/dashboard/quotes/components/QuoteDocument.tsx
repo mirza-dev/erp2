@@ -46,7 +46,7 @@ function fmtDate(s: string) {
 const PAGE_CSS = `
 @page {
     size: A4 portrait;
-    margin: 0mm;
+    margin: 8mm;
 }
 `;
 
@@ -59,14 +59,18 @@ const PRINT_CSS = `
         print-color-adjust: exact !important;
     }
     #quote-document {
-        width: 210mm !important;
-        padding: 12mm 10mm !important;
+        width: 100% !important;
+        padding: 0 !important;
         box-sizing: border-box !important;
         min-height: auto !important;
         box-shadow: none !important;
         margin: 0 !important;
-        border: none !important;
+        border: 1.5px solid #0072BC !important;
         overflow: visible !important;
+    }
+    #quote-document table tbody tr {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
     }
     #quote-document .doc-brand-bg,
     #quote-document .doc-brand-bg * {
@@ -104,7 +108,6 @@ interface Props {
 
 export default function QuoteDocument({ data }: Props) {
     const sym = SYM[data.currency] ?? "₺";
-    const isDraft = data.status === "draft";
 
     // ── Section styles ────────────────────────────────────────────────────────
 
@@ -298,27 +301,6 @@ export default function QuoteDocument({ data }: Props) {
             <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
 
             <div id="quote-document" style={docStyle}>
-
-                {/* ── Watermark ── */}
-                {isDraft && (
-                    <div className="doc-watermark" style={{
-                        position: "absolute",
-                        top: "50%",
-                        left: "50%",
-                        transform: "translate(-50%, -50%) rotate(-35deg)",
-                        fontSize: "100px",
-                        fontFamily: FONT.heading,
-                        fontWeight: 800,
-                        color: "rgba(0,114,188,0.05)",
-                        pointerEvents: "none",
-                        zIndex: 0,
-                        letterSpacing: "0.15em",
-                        userSelect: "none" as const,
-                        whiteSpace: "nowrap" as const,
-                    }}>
-                        TASLAK
-                    </div>
-                )}
 
                 {/* ── Header Band ── */}
                 <div className="doc-brand-bg doc-no-break" style={headerBandStyle}>
