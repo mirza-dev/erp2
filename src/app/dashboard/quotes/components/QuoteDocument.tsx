@@ -75,10 +75,6 @@ const PRINT_CSS = `
         break-inside: avoid !important;
         page-break-inside: avoid !important;
     }
-    /* Thead her sayfada tekrar render edilsin */
-    #quote-document table thead {
-        display: table-header-group !important;
-    }
     /* Tablo dış çerçevesi */
     #quote-document table {
         border-collapse: collapse !important;
