@@ -65,12 +65,24 @@ const PRINT_CSS = `
         min-height: auto !important;
         box-shadow: none !important;
         margin: 0 !important;
-        border: 1.5px solid #0072BC !important;
+        border: 1.5px solid #222 !important;
         overflow: visible !important;
+        -webkit-box-decoration-break: clone !important;
+        box-decoration-break: clone !important;
     }
+    /* Tbody satırları bölünmesin — sığmazsa tümüyle sonraki sayfaya */
     #quote-document table tbody tr {
         break-inside: avoid !important;
         page-break-inside: avoid !important;
+    }
+    /* Thead her sayfada tekrar render edilsin */
+    #quote-document table thead {
+        display: table-header-group !important;
+    }
+    /* Tablo dış çerçevesi */
+    #quote-document table {
+        border-collapse: collapse !important;
+        border: 1px solid #d0d7de !important;
     }
     #quote-document .doc-brand-bg,
     #quote-document .doc-brand-bg * {
