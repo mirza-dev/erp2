@@ -60,6 +60,8 @@ const PRINT_CSS = `
     }
     #quote-document {
         width: 210mm !important;
+        padding: 12mm 10mm !important;
+        box-sizing: border-box !important;
         min-height: auto !important;
         box-shadow: none !important;
         margin: 0 !important;
