@@ -6,6 +6,28 @@ type: project
 
 **Aktif:** —
 
+**Son tamamlanan (2026-04-21 — Güvenlik + Eksik Testler):**
+
+1. `api/seed/route.ts`: `checkAuth` artık sadece `CRON_SECRET` Bearer kabul ediyor (any-auth bypass kaldırıldı)
+2. `api/admin/users/route.ts` + `[id]/route.ts`: `requireAdmin()` helper — `ADMIN_EMAILS` env var kontrolü (boşsa mevcut davranış korunur)
+3. `next.config.ts`: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` security header'ları eklendi
+4. `quotes-route.test.ts` + `quotes-id-route.test.ts`: 23 yeni test (GET/POST/PATCH/DELETE tüm senaryolar)
+5. **78 test dosyası · 1503 test — 0 hata · 0 TS hatası**
+
+**Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
+
+**Son tamamlanan (2026-04-21 — Teklif Faz 5 Bulgular Fix Round 2+3):**
+
+1. 034_quotes.sql: DROP TABLE → ALTER TABLE (veri + FK korunuyor), validity_days→valid_until dönüşümü, customer_name `customers.name`'den backfill, sequence bootstrap (setval), WHERE clause kaldırıldı
+2. 035_quote_rpcs.sql: `create_quote_with_lines` + `update_quote_with_lines` atomic RPC'ler (yeni migration)
+3. 036_fix_quote_rpc_security.sql: `security definer` kaldırma fix (yeni migration)
+4. `quotes.ts`: `dbCreateQuote`/`dbUpdateQuote` → `.rpc()` ile atomic
+5. `route.ts [id]`: PATCH existence check (geçersiz id → 404), DELETE statü guard (accepted/rejected/expired → 409)
+6. `QuoteForm.tsx`: edit modda seller bilgisi company_settings'ten yükleniyor, Quote No read-only
+7. **76 test dosyası · 1480 test — 0 hata · 0 TS hatası**
+
+**Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
+
 **Son tamamlanan (2026-04-21 — Teklif Faz 5: DB Persistence + Otomatik Numara):**
 
 1. Migration 034: `quotes` + `quote_line_items` + `quotes_number_seq` + `next_quote_number()` PL/pgSQL + RLS

@@ -1,30 +1,24 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-20_
+_Son güncelleme: 2026-04-21_
 
-**Son tamamlanan iş:** Teklif Faz 5 — DB Persistence + Otomatik Numara (2026-04-21)
-- Migration 034: `quotes` + `quote_line_items` + `next_quote_number()` + RLS
-- `QuoteRow`, `QuoteLineItemRow`, `QuoteWithLines`, `QuoteStatus` database.types.ts'e eklendi
-- `QuoteSummary`, `QuoteDetail`, `QuoteLineItem` mock-data.ts'e eklendi
-- `mapQuoteSummary()`, `mapQuoteDetail()` api-mappers.ts'e eklendi
-- `dbCreateQuote`, `dbGetQuote`, `dbListQuotes`, `dbUpdateQuote`, `dbDeleteQuote` supabase/quotes.ts'e eklendi
-- `GET/POST /api/quotes` + `GET/PATCH/DELETE /api/quotes/[id]` route'ları eklendi
-- Teklif formu `_components/QuoteForm.tsx`'e taşındı (initialData prop)
-- Kaydet → POST/PATCH API, URL otomatik güncellenir (TKL-YYYY-NNN)
-- `/dashboard/quotes/[id]` Server Component düzenleme sayfası eklendi
-- 0 TS hatası
-- **Build:** temiz · **Lint:** 0 error · **Test:** 1480 (0 fail)
+**Son tamamlanan iş:** Güvenlik Fix + Eksik Testler (2026-04-21)
+- `api/seed`: CRON_SECRET Bearer zorunlu (any-auth bypass kaldırıldı)
+- `api/admin/users`: `requireAdmin()` — `ADMIN_EMAILS` env guard
+- `next.config.ts`: X-Content-Type-Options, X-Frame-Options, Referrer-Policy
+- `quotes-route.test.ts` + `quotes-id-route.test.ts`: 23 yeni test
+- **78 dosya · 1503 test — 0 hata · 0 TS hatası**
 
 **Önceki önemli işler:**
+- Teklif Faz 5 — DB Persistence + Otomatik Numara (2026-04-21)
 - Navigasyon hızlandırma & donma önleme (2026-04-17)
-- Seed dataya 5 hammadde ürünü + semantik bug'lar (2026-04-17)
 - E2E test kalitesi + demo öncesi kritik bug'lar (2026-04-16)
-- Per-page fetch refactor + Seed/Auth fix (2026-04-15)
 
 **Aktif odak:** —
+**Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
 **Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik
-**Test sayısı:** 76 dosya · 1489 vitest (hepsi yeşil)
+**Test sayısı:** 78 dosya · 1503 vitest (hepsi yeşil)
 
 ---
 

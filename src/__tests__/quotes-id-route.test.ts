@@ -18,6 +18,14 @@ vi.mock("@/lib/supabase/quotes", () => ({
     dbUpdateQuote:       (...args: unknown[]) => mockDbUpdateQuote(...args),
     dbDeleteQuote:       (...args: unknown[]) => mockDbDeleteQuote(...args),
     dbFindQuoteByNumber: vi.fn(),
+    dbUpdateQuoteStatus: vi.fn(),
+    dbListExpiredQuotes: vi.fn(),
+}));
+
+const mockServiceTransitionQuote = vi.fn();
+
+vi.mock("@/lib/services/quote-service", () => ({
+    serviceTransitionQuote: (...args: unknown[]) => mockServiceTransitionQuote(...args),
 }));
 
 import { GET, PATCH, DELETE } from "@/app/api/quotes/[id]/route";
@@ -136,6 +144,70 @@ describe("PATCH /api/quotes/[id]", () => {
         mockDbUpdateQuote.mockRejectedValue(new Error("RPC hatası"));
         const res = await PATCH(makeReq("PATCH", validPatchBody), idCtx());
         expect(res.status).toBe(500);
+        expect(revalidateTag).not.toHaveBeenCalled();
+    });
+});
+
+// ─── PATCH /api/quotes/[id] — status transitions ─────────────────────────────
+
+describe("PATCH /api/quotes/[id] — status transitions", () => {
+    it("draft → sent: 200 + güncel QuoteDetail", async () => {
+        mockServiceTransitionQuote.mockResolvedValue({ success: true });
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "sent" });
+        const res = await PATCH(makeReq("PATCH", { transition: "sent" }), idCtx());
+        expect(res.status).toBe(200);
+        expect(mockServiceTransitionQuote).toHaveBeenCalledWith(QUOTE_ID, "sent");
+        const body = await res.json() as { status: string };
+        expect(body.status).toBe("sent");
+    });
+
+    it("draft → accepted (geçersiz) → 409", async () => {
+        mockServiceTransitionQuote.mockResolvedValue({
+            success: false,
+            error: "'draft' durumundaki teklif 'accepted' durumuna geçirilemez.",
+        });
+        const res = await PATCH(makeReq("PATCH", { transition: "accepted" }), idCtx());
+        expect(res.status).toBe(409);
+        const body = await res.json() as { error: string };
+        expect(body.error).toContain("geçirilemez");
+    });
+
+    it("sent → accepted: 200", async () => {
+        mockServiceTransitionQuote.mockResolvedValue({ success: true });
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "accepted" });
+        const res = await PATCH(makeReq("PATCH", { transition: "accepted" }), idCtx());
+        expect(res.status).toBe(200);
+    });
+
+    it("sent → rejected: 200", async () => {
+        mockServiceTransitionQuote.mockResolvedValue({ success: true });
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "rejected" });
+        const res = await PATCH(makeReq("PATCH", { transition: "rejected" }), idCtx());
+        expect(res.status).toBe(200);
+    });
+
+    it("teklif bulunamadı → 409", async () => {
+        mockServiceTransitionQuote.mockResolvedValue({
+            success: false,
+            error: "Teklif bulunamadı.",
+        });
+        const res = await PATCH(makeReq("PATCH", { transition: "sent" }), idCtx());
+        expect(res.status).toBe(409);
+        const body = await res.json() as { error: string };
+        expect(body.error).toContain("bulunamadı");
+    });
+
+    it("başarılı transition → revalidateTag çağrılır", async () => {
+        mockServiceTransitionQuote.mockResolvedValue({ success: true });
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "sent" });
+        await PATCH(makeReq("PATCH", { transition: "sent" }), idCtx());
+        expect(revalidateTag).toHaveBeenCalledWith("quotes", "max");
+        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QUOTE_ID}`, "max");
+    });
+
+    it("başarısız transition → revalidateTag çağrılmaz", async () => {
+        mockServiceTransitionQuote.mockResolvedValue({ success: false, error: "hata" });
+        await PATCH(makeReq("PATCH", { transition: "accepted" }), idCtx());
         expect(revalidateTag).not.toHaveBeenCalled();
     });
 });

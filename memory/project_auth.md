@@ -18,6 +18,7 @@ type: project
 - `src/app/dashboard/settings/users/page.tsx` — liste, ekle, sil (self-delete engelli)
 - `src/app/api/admin/users/route.ts` — GET (listele) / POST (oluştur) — service role key
 - `src/app/api/admin/users/[id]/route.ts` — DELETE
+- Her handler `requireAdmin()` ile korunuyor: `ADMIN_EMAILS` env var kontrolü (bkz. project_security.md)
 - Demo modda bu endpoint'ler middleware tarafından 403 ile bloklanır (POST/DELETE)
 - `fetchUsers` → `useCallback` ile sarılı, `useEffect`'e dep olarak verilir
 

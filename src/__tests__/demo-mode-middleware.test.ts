@@ -169,6 +169,9 @@ describe("middleware — demo mode blocks sensitive write endpoints", () => {
         ["DELETE", "/api/customers/cust-1"],
         ["POST",   "/api/production"],
         ["DELETE", "/api/production/entry-1"],
+        ["PATCH",  "/api/quotes/quote-1"],
+        ["DELETE", "/api/quotes/quote-1"],
+        ["POST",   "/api/quotes/expire"],
     ];
 
     for (const [method, path] of sensitiveWrites) {

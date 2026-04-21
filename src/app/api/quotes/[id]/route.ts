@@ -4,6 +4,7 @@ import { dbGetQuote, dbUpdateQuote, dbDeleteQuote } from "@/lib/supabase/quotes"
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { mapQuoteDetail } from "@/lib/api-mappers";
 import { handleApiError } from "@/lib/api-error";
+import { serviceTransitionQuote } from "@/lib/services/quote-service";
 
 function getCachedQuote(id: string) {
     return unstable_cache(
@@ -32,16 +33,33 @@ export async function GET(
 }
 
 // PATCH /api/quotes/[id]
+// Two modes:
+//   1. { transition: "sent" | "accepted" | "rejected" } → status transition
+//   2. { ...document fields } → full document update
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const { id } = await params;
+        const body = await req.json();
+
+        // Status transition branch
+        if ("transition" in body) {
+            const result = await serviceTransitionQuote(id, body.transition);
+            if (!result.success) {
+                return NextResponse.json({ error: result.error }, { status: 409 });
+            }
+            const updated = await dbGetQuote(id);
+            revalidateTag("quotes", "max");
+            revalidateTag(`quote-${id}`, "max");
+            return NextResponse.json(updated ? mapQuoteDetail(updated) : null);
+        }
+
+        // Document update branch (existing behavior)
         const existing = await dbGetQuote(id);
         if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-        const body = await req.json() as CreateQuoteInput;
-        const row = await dbUpdateQuote(id, body);
+        const row = await dbUpdateQuote(id, body as CreateQuoteInput);
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");
         return NextResponse.json(mapQuoteDetail(row));

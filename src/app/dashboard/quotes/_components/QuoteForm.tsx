@@ -56,11 +56,12 @@ tr:hover .q-del-btn { opacity: 1; }
 
 interface QuoteFormProps {
     initialData?: QuoteDetail;
+    readOnly?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function QuoteForm({ initialData }: QuoteFormProps) {
+export default function QuoteForm({ initialData, readOnly }: QuoteFormProps) {
     // ── Data context ──────────────────────────────────────────────────────────
     const { customers, products } = useData();
 
@@ -527,7 +528,7 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                         <span>Teklifler</span>
                         <span style={{ color: "var(--text-tertiary)" }}>/</span>
                         <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>
-                            {quoteId ? "Teklif Düzenle" : "Yeni Teklif"}
+                            {readOnly ? "Teklif Detay" : quoteId ? "Teklif Düzenle" : "Yeni Teklif"}
                         </span>
                         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", padding: "2px 8px", background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "3px", color: "var(--text-secondary)" }}>
                             {quoteNo || "(Otomatik)"}
@@ -543,6 +544,7 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 6V2h8v4M4 11H3a1 1 0 01-1-1V7a1 1 0 011-1h10a1 1 0 011 1v3a1 1 0 01-1 1h-1M4 11v3h8v-3H4z" /><circle cx="12.5" cy="8.5" r=".5" fill="currentColor" /></svg>
                             Önizle &amp; PDF
                         </button>
+                        {!readOnly && (
                         <button
                             className="q-btn"
                             style={{ ...btn, opacity: saving ? 0.6 : 1 }}
@@ -552,12 +554,14 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M13 3l-2-2H3a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V3z" /><path d="M10 1v4H6V1M5 9h6" /></svg>
                             {saving ? "Kaydediliyor…" : "Kaydet"}
                         </button>
+                        )}
                     </div>
                 </div>
 
                 {/* ── Form Card ── */}
                 <div className="q-card" style={{
                     background: "var(--bg-primary)", border: "1px solid var(--border-secondary)",
+                    ...(readOnly ? { pointerEvents: "none" as const } : {}),
                     borderRadius: "6px", overflow: "hidden", maxWidth: "1100px", margin: "0 auto",
                 }}>
 
@@ -761,6 +765,7 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                             <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                                 Line Items <span style={{ color: "var(--text-tertiary)", fontWeight: 400, fontStyle: "italic" }}>/ Kalemler</span>
                             </div>
+                            {!readOnly && (
                             <div className="q-no-print" style={{ display: "flex", gap: "6px" }}>
                                 <button className="q-btn" style={btn} onClick={clearAll}>
                                     <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4l8 8M12 4l-8 8" /></svg>
@@ -771,6 +776,7 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                                     Satır Ekle
                                 </button>
                             </div>
+                            )}
                         </div>
 
                         {/* Table */}
@@ -856,11 +862,13 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                                                 {/* Kg */}
                                                 <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.kg} onChange={e => updateRow(row.id, "kg", e.target.value)} /></td>
                                                 {/* Delete */}
+                                                {!readOnly && (
                                                 <td style={{ ...tdBase, width: "28px", textAlign: "center", padding: "0 4px" }} className="q-no-print">
                                                     <button className="q-del-btn" style={{ width: "22px", height: "22px", borderRadius: "3px", display: "grid", placeItems: "center", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer" }} onClick={() => deleteRow(row.id)} title="Sil">
                                                         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h10M6 4V2h4v2M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4" /></svg>
                                                     </button>
                                                 </td>
+                                                )}
                                             </tr>
                                         );
                                     })}
@@ -869,6 +877,7 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                         </div>
 
                         {/* Add row button */}
+                        {!readOnly && (
                         <button className="q-add-btn q-no-print" style={{
                             display: "flex", alignItems: "center", gap: "7px",
                             padding: "8px 24px", fontSize: "12px", color: "var(--text-tertiary)",
@@ -879,6 +888,7 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 3v10M3 8h10" /></svg>
                             Add line item / Yeni satır ekle
                         </button>
+                        )}
 
                         {/* Totals */}
                         <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid var(--border-secondary)", borderTop: "none" }}>

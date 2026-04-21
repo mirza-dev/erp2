@@ -1,5 +1,5 @@
 import { createServiceClient } from "./service";
-import type { QuoteRow, QuoteWithLines } from "@/lib/database.types";
+import type { QuoteRow, QuoteStatus, QuoteWithLines } from "@/lib/database.types";
 
 // ── Input types ───────────────────────────────────────────────────────────────
 
@@ -107,6 +107,29 @@ export async function dbDeleteQuote(id: string): Promise<void> {
     const sb = createServiceClient();
     const { error } = await sb.from("quotes").delete().eq("id", id);
     if (error) throw error;
+}
+
+export async function dbUpdateQuoteStatus(id: string, status: QuoteStatus): Promise<void> {
+    const sb = createServiceClient();
+    const { error } = await sb
+        .from("quotes")
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq("id", id);
+    if (error) throw error;
+}
+
+export async function dbListExpiredQuotes(): Promise<QuoteRow[]> {
+    const sb = createServiceClient();
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const { data, error } = await sb
+        .from("quotes")
+        .select("id, quote_number, status, customer_name, valid_until, created_at, updated_at")
+        .in("status", ["draft", "sent"])
+        .not("valid_until", "is", null)
+        .lt("valid_until", todayStr);
+    if (error) throw error;
+    return (data ?? []) as unknown as QuoteRow[];
 }
 
 export async function dbFindQuoteByNumber(quoteNumber: string): Promise<QuoteRow | null> {

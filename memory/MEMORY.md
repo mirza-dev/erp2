@@ -14,6 +14,7 @@
 
 ## Roadmap
 - [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
+- [project_quotes.md](project_quotes.md) — Teklif modülü: Faz 1-5 tamamlandı; kalan: Faz 6 liste, Faz 7 durum, Faz 8 sipariş dönüşümü
 
 ## Feedback
 - [feedback_no_silent_deletes.md](feedback_no_silent_deletes.md) — Kod silmeden önce onay veya net gerekçe gerekiyor

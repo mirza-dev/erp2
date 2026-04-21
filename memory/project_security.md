@@ -16,7 +16,7 @@ Tüm 23 tablo için Row Level Security aktif.
 - `/dashboard/**` ve `/api/**` → oturum gerektirir
 - **ALWAYS_PUBLIC:** `/api/health`, `/api/auth/demo`, `/api/seed` — middleware kontrolü yok
 - **CRON_PATHS** (CRON_SECRET Bearer token bypass): `/api/alerts/scan`, `/api/alerts/ai-suggest`, `/api/parasut/sync-all`, `/api/orders/expire-quotes`, `/api/orders/check-shipments`
-- `/api/seed` özel: ALWAYS_PUBLIC ama kendi route handler'ında CRON_SECRET Bearer VEYA aktif session doğrulaması yapıyor
+- `/api/seed` özel: ALWAYS_PUBLIC ama kendi route handler'ında **CRON_SECRET Bearer token zorunlu** (herhangi auth'd user erişimi kaldırıldı — 2026-04-21)
 
 ---
 
@@ -64,6 +64,20 @@ const isDemo = (await cookies()).get("demo_mode")?.value === "1";
 Test dosyalarında `vi.mock("next/headers", () => ({ cookies: () => Promise.resolve({ get: () => undefined }) }))` ile mock'lanır.
 
 ---
+
+## Admin Endpoint Koruması (2026-04-21)
+
+`GET/POST /api/admin/users` + `DELETE /api/admin/users/[id]` — `requireAdmin()` helper:
+- Auth kontrolü: oturum yoksa 401
+- `ADMIN_EMAILS` env var: virgülle ayrılmış email listesi; kullanıcı listede değilse 403
+- `ADMIN_EMAILS` tanımsız veya boşsa tüm auth'd kullanıcılara açık (kırılmasız default)
+
+## Security Headers (2026-04-21)
+
+`next.config.ts` → tüm rotalar için (`/:path*`):
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: SAMEORIGIN`
+- `Referrer-Policy: strict-origin-when-cross-origin`
 
 ## Credential Güvenliği
 

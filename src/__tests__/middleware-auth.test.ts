@@ -120,4 +120,14 @@ describe("middleware — CRON_SECRET bypass", () => {
         expect(res.status).toBe(200);
         expect(mockGetUser).not.toHaveBeenCalled();
     });
+
+    it("POST /api/quotes/expire with correct Bearer → pass through without getUser", async () => {
+        const res = await middleware(
+            makeRequest("/api/quotes/expire", {
+                Authorization: "Bearer test-secret-abc",
+            })
+        );
+        expect(res.status).toBe(200);
+        expect(mockGetUser).not.toHaveBeenCalled();
+    });
 });
