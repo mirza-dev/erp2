@@ -109,13 +109,20 @@ export async function dbDeleteQuote(id: string): Promise<void> {
     if (error) throw error;
 }
 
-export async function dbUpdateQuoteStatus(id: string, status: QuoteStatus): Promise<void> {
+export async function dbUpdateQuoteStatus(
+    id: string,
+    status: QuoteStatus,
+    expectedCurrentStatus: QuoteStatus
+): Promise<boolean> {
     const sb = createServiceClient();
-    const { error } = await sb
+    const { data, error } = await sb
         .from("quotes")
         .update({ status, updated_at: new Date().toISOString() })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("status", expectedCurrentStatus)
+        .select("id");
     if (error) throw error;
+    return (data ?? []).length > 0;
 }
 
 export async function dbListExpiredQuotes(): Promise<QuoteRow[]> {

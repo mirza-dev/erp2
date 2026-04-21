@@ -48,7 +48,10 @@ export async function serviceTransitionQuote(
         };
     }
 
-    await dbUpdateQuoteStatus(quoteId, target);
+    const updated = await dbUpdateQuoteStatus(quoteId, target, quote.status as QuoteStatus);
+    if (!updated) {
+        return { success: false, error: "Teklif durumu eşzamanlı olarak değiştirilmiş. Sayfayı yenileyip tekrar deneyin." };
+    }
     return { success: true };
 }
 
@@ -64,8 +67,9 @@ export async function serviceExpireQuotes(): Promise<{ expired: number; expiredI
     const expiredQuotes = await dbListExpiredQuotes();
     const expiredIds: string[] = [];
     for (const q of expiredQuotes) {
-        await dbUpdateQuoteStatus(q.id, "expired");
-        expiredIds.push(q.id);
+        const updated = await dbUpdateQuoteStatus(q.id, "expired", q.status as QuoteStatus);
+        if (updated) expiredIds.push(q.id);
+        // else: status already changed by concurrent action, skip
     }
     return { expired: expiredIds.length, expiredIds };
 }
