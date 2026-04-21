@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import QuoteDocument from "../components/QuoteDocument";
 import { montserrat, inter } from "../components/quote-fonts";
@@ -8,21 +8,16 @@ import type { QuoteData } from "../components/quote-types";
 
 export default function QuotePreviewPage() {
     const router = useRouter();
-    const [data, setData] = useState<QuoteData | null>(null);
-    const [notFound, setNotFound] = useState(false);
-
-    useEffect(() => {
+    const [data] = useState<QuoteData | null>(() => {
+        if (typeof window === "undefined") return null;
         try {
             const raw = localStorage.getItem("teklif_v3_full");
-            if (raw) {
-                setData(JSON.parse(raw) as QuoteData);
-            } else {
-                setNotFound(true);
-            }
+            return raw ? (JSON.parse(raw) as QuoteData) : null;
         } catch {
-            setNotFound(true);
+            return null;
         }
-    }, []);
+    });
+    const notFound = data === null;
 
     const toolbarStyle: React.CSSProperties = {
         position: "fixed" as const,
