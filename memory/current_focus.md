@@ -6,18 +6,20 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-20 — Teklif Faz 2: company_settings DB entegrasyonu):**
+**Son tamamlanan (2026-04-21 — Teklif Faz 5: DB Persistence + Otomatik Numara):**
 
-1. Migration 033: `company_settings` tablosu + singleton index + RLS + `company-assets` Supabase Storage bucket
-2. `src/lib/database.types.ts` — `CompanySettingsRow` eklendi
-3. `src/lib/supabase/company-settings.ts` — `dbGetCompanySettings`, `dbUpdateCompanySettings`
-4. `src/app/api/settings/company/route.ts` — GET (cached 300s) + PATCH
-5. `src/app/api/settings/company/logo/route.ts` — POST multipart → Storage upload, URL DB'ye yazılır
-6. `settings/page.tsx` FirmaTab — gerçek API save, logo upload (drag-drop), email alanı eklendi
-7. `quotes/new/page.tsx` — mount'ta company_settings'ten satıcı alanları + logo otomatik doldurulur
-8. **0 TS hatası**
+1. Migration 034: `quotes` + `quote_line_items` + `quotes_number_seq` + `next_quote_number()` PL/pgSQL + RLS
+2. `database.types.ts` — `QuoteStatus`, `QuoteRow` (tamamen yeniden), `QuoteLineItemRow`, `QuoteWithLines`
+3. `mock-data.ts` — `QuoteLineItem`, `QuoteSummary`, `QuoteDetail`
+4. `api-mappers.ts` — `mapQuoteSummary()`, `mapQuoteDetail()`
+5. `src/lib/supabase/quotes.ts` — tamamen yeniden: `dbCreateQuote`, `dbGetQuote`, `dbListQuotes`, `dbUpdateQuote`, `dbDeleteQuote`, `dbFindQuoteByNumber`
+6. `GET/POST /api/quotes` + `GET/PATCH/DELETE /api/quotes/[id]` route'ları
+7. Form `_components/QuoteForm.tsx`'e taşındı (initialData prop: yeni/düzenleme modu)
+8. Kaydet → POST/PATCH, URL otomatik `window.history.replaceState` ile güncellenir
+9. `/dashboard/quotes/[id]` Server Component düzenleme sayfası
+10. **76 test dosyası · 1480 test — 0 hata · 0 TS hatası**
 
-**Sonraki:** Faz 3 — Müşteri Autocomplete (context'teki customers listesinden filtrele)
+**Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
 
 **Son tamamlanan (2026-04-20 — Faz 2 artık bulgular temizlendi):**
 

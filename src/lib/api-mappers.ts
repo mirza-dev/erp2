@@ -14,6 +14,9 @@ import type {
   ProductionEntryRow,
   OrderLineRow,
   AiRecommendationRow,
+  QuoteRow,
+  QuoteLineItemRow,
+  QuoteWithLines,
 } from "./database.types";
 
 import type {
@@ -24,6 +27,9 @@ import type {
   OrderLineItem,
   UretimKaydi,
   AiRecommendation,
+  QuoteLineItem,
+  QuoteSummary,
+  QuoteDetail,
 } from "./mock-data";
 
 // ── Product ───────────────────────────────────────────────
@@ -168,6 +174,63 @@ export function mapRecommendation(row: AiRecommendationRow): AiRecommendation {
     editedMetadata: row.edited_metadata as Record<string, unknown> | null,
     decidedAt: row.decided_at,
     createdAt: row.created_at,
+  };
+}
+
+// ── Quote Line (private helper) ───────────────────────────
+
+function mapQuoteLineItem(line: QuoteLineItemRow): QuoteLineItem {
+  return {
+    id: line.id,
+    position: line.position,
+    productId: line.product_id ?? null,
+    productCode: line.product_code,
+    leadTime: line.lead_time ?? "",
+    description: line.description,
+    quantity: Number(line.quantity),
+    unitPrice: Number(line.unit_price),
+    lineTotal: Number(line.line_total),
+    hsCode: line.hs_code ?? "",
+    weightKg: line.weight_kg ?? null,
+  };
+}
+
+// ── Quote Summary ─────────────────────────────────────────
+
+export function mapQuoteSummary(row: QuoteRow): QuoteSummary {
+  return {
+    id: row.id,
+    quoteNumber: row.quote_number,
+    status: row.status,
+    customerName: row.customer_name,
+    currency: row.currency,
+    grandTotal: Number(row.grand_total),
+    quoteDate: row.quote_date ?? null,
+    validUntil: row.valid_until ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+// ── Quote Detail ──────────────────────────────────────────
+
+export function mapQuoteDetail(row: QuoteWithLines): QuoteDetail {
+  return {
+    ...mapQuoteSummary(row),
+    customerId: row.customer_id ?? null,
+    customerContact: row.customer_contact ?? "",
+    customerPhone: row.customer_phone ?? "",
+    customerEmail: row.customer_email ?? "",
+    salesRep: row.sales_rep ?? "",
+    salesPhone: row.sales_phone ?? "",
+    salesEmail: row.sales_email ?? "",
+    vatRate: Number(row.vat_rate),
+    subtotal: Number(row.subtotal),
+    vatTotal: Number(row.vat_total),
+    notes: row.notes ?? "",
+    sigPrepared: row.sig_prepared ?? "",
+    sigApproved: row.sig_approved ?? "",
+    sigManager: row.sig_manager ?? "",
+    lines: row.lines.map(mapQuoteLineItem),
   };
 }
 

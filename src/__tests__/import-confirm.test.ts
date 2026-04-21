@@ -1284,7 +1284,7 @@ describe("serviceConfirmBatch — quote merge", () => {
         expect(result.added).toBe(0);
         expect(mockDbUpdateQuote).toHaveBeenCalledWith(
             "q-existing",
-            expect.objectContaining({ total_amount: 7500, currency: "EUR" })
+            expect.objectContaining({ grand_total: 7500, currency: "EUR" })
         );
         expect(mockDbCreateQuote).not.toHaveBeenCalled();
     });

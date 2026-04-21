@@ -3,12 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-20_
 
-**Son tamamlanan iş:** Teklif Faz 2 — company_settings DB entegrasyonu (2026-04-20)
-- Migration 033: `company_settings` tablosu + singleton + RLS + `company-assets` Storage bucket
-- `CompanySettingsRow` database.types.ts'e eklendi
-- `GET/PATCH /api/settings/company` + `POST /api/settings/company/logo` route'ları eklendi
-- Settings FirmaTab: gerçek DB save, logo upload (drag-drop + tıklama), email alanı eklendi
-- Teklif formu: mount'ta company_settings fetch → satıcı alanları + logo otomatik doldurulur
+**Son tamamlanan iş:** Teklif Faz 5 — DB Persistence + Otomatik Numara (2026-04-21)
+- Migration 034: `quotes` + `quote_line_items` + `next_quote_number()` + RLS
+- `QuoteRow`, `QuoteLineItemRow`, `QuoteWithLines`, `QuoteStatus` database.types.ts'e eklendi
+- `QuoteSummary`, `QuoteDetail`, `QuoteLineItem` mock-data.ts'e eklendi
+- `mapQuoteSummary()`, `mapQuoteDetail()` api-mappers.ts'e eklendi
+- `dbCreateQuote`, `dbGetQuote`, `dbListQuotes`, `dbUpdateQuote`, `dbDeleteQuote` supabase/quotes.ts'e eklendi
+- `GET/POST /api/quotes` + `GET/PATCH/DELETE /api/quotes/[id]` route'ları eklendi
+- Teklif formu `_components/QuoteForm.tsx`'e taşındı (initialData prop)
+- Kaydet → POST/PATCH API, URL otomatik güncellenir (TKL-YYYY-NNN)
+- `/dashboard/quotes/[id]` Server Component düzenleme sayfası eklendi
 - 0 TS hatası
 - **Build:** temiz · **Lint:** 0 error · **Test:** 1480 (0 fail)
 

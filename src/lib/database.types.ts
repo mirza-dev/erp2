@@ -259,19 +259,49 @@ export interface ImportBatchRow {
     confirmed_at: string | null
 }
 
+export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired"
+
 export interface QuoteRow {
     id: string
     quote_number: string
-    quote_date: string
+    status: QuoteStatus
     customer_id: string | null
-    customer_code: string | null
+    customer_name: string
+    customer_contact: string | null
+    customer_phone: string | null
+    customer_email: string | null
+    sales_rep: string | null
+    sales_phone: string | null
+    sales_email: string | null
     currency: string
-    incoterm: string | null
-    validity_days: number | null
-    total_amount: number | null
+    vat_rate: number
+    subtotal: number
+    vat_total: number
+    grand_total: number
     notes: string | null
+    sig_prepared: string | null
+    sig_approved: string | null
+    sig_manager: string | null
+    quote_date: string | null
+    valid_until: string | null
     created_at: string
     updated_at: string
+}
+
+export interface QuoteLineItemRow {
+    id: string
+    quote_id: string
+    position: number
+    product_id: string | null
+    product_code: string
+    lead_time: string | null
+    description: string
+    quantity: number
+    unit_price: number
+    line_total: number
+    hs_code: string | null
+    weight_kg: number | null
+    created_at: string
 }
 
 export interface ShipmentRow {
@@ -441,4 +471,8 @@ export interface CompanySettingsRow {
 
 export interface SalesOrderWithLines extends SalesOrderRow {
     lines: OrderLineRow[]
+}
+
+export interface QuoteWithLines extends QuoteRow {
+    lines: QuoteLineItemRow[]
 }

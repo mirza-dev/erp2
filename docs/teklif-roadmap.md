@@ -420,52 +420,39 @@ Kullanıcı teklifi düzenler
 
 ---
 
-## Faz 5 — DB Persistence + Otomatik Numara
+## Faz 5 — DB Persistence + Otomatik Numara ✅
 
-> _Durum: Bekliyor_
+> _Tamamlandı: 2026-04-21_
 
 **Sorun:** Veriler sadece localStorage'da, tek bir teklif tutuluyor, cihazlar arası erişim yok.
 
-**Yapılacaklar:**
-- [ ] Migration 034: `quotes` tablosu
-  ```
-  id uuid PK, quote_number text UNIQUE, status text ('draft','sent'),
-  customer_id uuid FK nullable, customer_name text, customer_contact text,
-  customer_phone text, customer_email text,
-  sales_rep text, sales_phone text, sales_email text,
-  currency text, vat_rate numeric, subtotal numeric, vat_total numeric,
-  grand_total numeric, notes text,
-  sig_prepared text, sig_approved text, sig_manager text,
-  quote_date date, valid_until date,
-  created_at timestamptz, updated_at timestamptz
-  ```
-- [ ] Migration 034: `quote_line_items` tablosu
-  ```
-  id uuid PK, quote_id uuid FK, position int,
-  product_id uuid FK nullable, product_code text, lead_time text,
-  description text, quantity numeric, unit_price numeric,
-  line_total numeric, hs_code text, weight_kg numeric,
-  created_at timestamptz
-  ```
-- [ ] `src/lib/supabase/quotes.ts` — CRUD fonksiyonları
-- [ ] `src/lib/database.types.ts` — QuoteRow, QuoteLineItemRow tipleri
-- [ ] `src/lib/api-mappers.ts` — mapQuote(), mapQuoteDetail()
-- [ ] `GET/POST /api/quotes` route
-- [ ] `GET/PATCH/DELETE /api/quotes/[id]` route
-- [ ] Otomatik numara: `TKL-{YYYY}-{NNN}` (DB sequence veya max+1)
-- [ ] Teklif formu: Kaydet → `POST /api/quotes` (yeni) veya `PATCH /api/quotes/[id]` (mevcut)
-- [ ] localStorage fallback: API başarısız olursa hâlâ localStorage'a kaydet
-- [ ] URL yapısı: `/dashboard/quotes/new` (yeni), `/dashboard/quotes/[id]` (düzenleme)
+**Yapılanlar:**
+- [x] Migration 034: `quotes` tablosu + `quotes_number_seq` sequence + `next_quote_number()` PL/pgSQL fonksiyonu
+- [x] Migration 034: `quote_line_items` tablosu + RLS politikaları
+- [x] `src/lib/database.types.ts` — `QuoteStatus`, `QuoteRow`, `QuoteLineItemRow`, `QuoteWithLines` eklendi (eski QuoteRow şeması değiştirildi)
+- [x] `src/lib/mock-data.ts` — `QuoteLineItem`, `QuoteSummary`, `QuoteDetail` arayüzleri eklendi
+- [x] `src/lib/api-mappers.ts` — `mapQuoteSummary()`, `mapQuoteDetail()` eklendi
+- [x] `src/lib/supabase/quotes.ts` — tamamen yeniden yazıldı: `dbCreateQuote`, `dbGetQuote`, `dbListQuotes`, `dbUpdateQuote`, `dbDeleteQuote`, `dbFindQuoteByNumber`
+- [x] `GET/POST /api/quotes` route (GET cached 30s, tag "quotes")
+- [x] `GET/PATCH/DELETE /api/quotes/[id]` route (GET cached 60s, tag "quote-{id}")
+- [x] Otomatik numara: `TKL-{YYYY}-{NNN}` — DB sequence ile üretilir, race condition yok
+- [x] Form bileşeni `_components/QuoteForm.tsx`'e taşındı (initialData prop ile yeni/düzenleme modu)
+- [x] Teklif formu: Kaydet → `POST /api/quotes` (yeni) → URL `/dashboard/quotes/[id]`'e geçer; sonraki kaydetler `PATCH`
+- [x] localStorage fallback: API başarısız olursa `teklif_v3_full` güncellenir
+- [x] `src/app/dashboard/quotes/[id]/page.tsx` — Server Component, DB'den yükleyip QuoteForm'a geçirir
+- [x] `src/app/dashboard/quotes/new/page.tsx` — ince sarıcı oldu
 
 **Dosyalar:**
 - `supabase/migrations/034_quotes.sql`
-- `src/lib/supabase/quotes.ts` (yeni)
-- `src/lib/database.types.ts` (QuoteRow + QuoteLineItemRow)
-- `src/lib/api-mappers.ts` (mapQuote)
-- `src/app/api/quotes/route.ts` (yeni)
-- `src/app/api/quotes/[id]/route.ts` (yeni)
-- `src/app/dashboard/quotes/new/page.tsx` (API bağlantısı)
-- `src/app/dashboard/quotes/[id]/page.tsx` (yeni — düzenleme sayfası, new ile paylaşılabilir)
+- `src/lib/supabase/quotes.ts`
+- `src/lib/database.types.ts`
+- `src/lib/mock-data.ts`
+- `src/lib/api-mappers.ts`
+- `src/app/api/quotes/route.ts`
+- `src/app/api/quotes/[id]/route.ts`
+- `src/app/dashboard/quotes/_components/QuoteForm.tsx`
+- `src/app/dashboard/quotes/new/page.tsx`
+- `src/app/dashboard/quotes/[id]/page.tsx`
 
 ---
 

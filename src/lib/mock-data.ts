@@ -133,6 +133,52 @@ export interface OrderDetail extends Order {
     aiRiskLevel?: "low" | "medium" | "high";
 }
 
+// ── Quotes ────────────────────────────────────────────────────
+
+export interface QuoteLineItem {
+    id: string;
+    position: number;
+    productId: string | null;
+    productCode: string;
+    leadTime: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+    hsCode: string;
+    weightKg: number | null;
+}
+
+export interface QuoteSummary {
+    id: string;
+    quoteNumber: string;
+    status: "draft" | "sent" | "accepted" | "rejected" | "expired";
+    customerName: string;
+    currency: string;
+    grandTotal: number;
+    quoteDate: string | null;
+    validUntil: string | null;
+    createdAt: string;
+}
+
+export interface QuoteDetail extends QuoteSummary {
+    customerId: string | null;
+    customerContact: string;
+    customerPhone: string;
+    customerEmail: string;
+    salesRep: string;
+    salesPhone: string;
+    salesEmail: string;
+    vatRate: number;
+    subtotal: number;
+    vatTotal: number;
+    notes: string;
+    sigPrepared: string;
+    sigApproved: string;
+    sigManager: string;
+    lines: QuoteLineItem[];
+}
+
 export const mockProducts: Product[] = [
     {
         id: "1",

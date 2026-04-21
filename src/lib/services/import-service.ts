@@ -286,13 +286,13 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 const existing = await dbFindQuoteByNumber(quoteNumber);
                 if (existing) {
                     await dbUpdateQuote(existing.id, {
-                        quote_date: data.quote_date ? String(data.quote_date).split("T")[0] : undefined,
-                        customer_id: customerId,
-                        customer_code: customerCode,
-                        currency: data.currency ? String(data.currency) : undefined,
-                        incoterm: data.incoterm ? String(data.incoterm) : undefined,
-                        validity_days: parseNumeric(data.validity_days),
-                        total_amount: parseNumeric(data.total_amount),
+                        customer_id: customerId ?? null,
+                        customer_name: customerCode ?? existing.customer_name,
+                        currency: data.currency ? String(data.currency) : existing.currency,
+                        quote_date: data.quote_date ? String(data.quote_date).split("T")[0] : existing.quote_date ?? undefined,
+                        grand_total: parseNumeric(data.total_amount) ?? existing.grand_total,
+                        vat_rate: existing.vat_rate, subtotal: existing.subtotal, vat_total: existing.vat_total,
+                        lines: [],
                     });
                     refMap.quoteNumbers.set(quoteNumber, existing.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
@@ -300,13 +300,13 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 } else {
                     const quote = await dbCreateQuote({
                         quote_number: quoteNumber,
-                        quote_date: data.quote_date ? String(data.quote_date).split("T")[0] : new Date().toISOString().split("T")[0],
-                        customer_id: customerId,
-                        customer_code: customerCode,
+                        customer_id: customerId ?? null,
+                        customer_name: customerCode ?? "",
                         currency: data.currency ? String(data.currency) : "USD",
-                        incoterm: data.incoterm ? String(data.incoterm) : undefined,
-                        validity_days: parseNumeric(data.validity_days),
-                        total_amount: parseNumeric(data.total_amount),
+                        quote_date: data.quote_date ? String(data.quote_date).split("T")[0] : new Date().toISOString().split("T")[0],
+                        grand_total: parseNumeric(data.total_amount) ?? 0,
+                        vat_rate: 0, subtotal: 0, vat_total: 0,
+                        lines: [],
                     });
                     refMap.quoteNumbers.set(quoteNumber, quote.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: quote.id });
