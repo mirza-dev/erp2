@@ -12,14 +12,10 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { createClient } from "@/lib/supabase/server";
 
 async function checkAuth(request: NextRequest): Promise<boolean> {
     const secret = process.env.CRON_SECRET;
-    if (secret && request.headers.get("authorization") === `Bearer ${secret}`) return true;
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    return !!user;
+    return !!(secret && request.headers.get("authorization") === `Bearer ${secret}`);
 }
 
 // ── Ürünler ──────────────────────────────────────────────────────────────────

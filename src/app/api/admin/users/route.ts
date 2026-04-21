@@ -1,9 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 import { handleApiError } from "@/lib/api-error";
+
+async function requireAdmin(): Promise<{ error: NextResponse } | null> {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: NextResponse.json({ error: "Yetkisiz." }, { status: 401 }) };
+    const allowed = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+    if (allowed.length > 0 && !allowed.includes(user.email ?? "")) {
+        return { error: NextResponse.json({ error: "Bu işlem için admin yetkisi gereklidir." }, { status: 403 }) };
+    }
+    return null;
+}
 
 // GET /api/admin/users — tüm kullanıcıları listele
 export async function GET() {
+    const adminCheck = await requireAdmin();
+    if (adminCheck) return adminCheck.error;
     try {
         const supabase = createServiceClient();
         const { data, error } = await supabase.auth.admin.listUsers();
@@ -24,6 +38,8 @@ export async function GET() {
 // POST /api/admin/users — yeni kullanıcı oluştur
 // Body: { email: string, password: string }
 export async function POST(req: NextRequest) {
+    const adminCheck = await requireAdmin();
+    if (adminCheck) return adminCheck.error;
     try {
         const body = await req.json();
         const { email, password } = body as { email?: string; password?: string };
