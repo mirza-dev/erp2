@@ -10,6 +10,9 @@ export async function POST() {
         const result = await serviceExpireQuotes();
         if (result.expired > 0) {
             revalidateTag("quotes", "max");
+            for (const id of result.expiredIds) {
+                revalidateTag(`quote-${id}`, "max");
+            }
         }
         return NextResponse.json(result);
     } catch (err) {

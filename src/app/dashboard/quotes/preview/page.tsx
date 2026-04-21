@@ -120,7 +120,7 @@ export default function QuotePreviewPage() {
                             Formu Düzenle
                         </button>
                         <span style={{ fontSize: "11px", color: "#636d7c" }}>
-                            {data.quoteNo} · {data.status === "draft" ? "Taslak" : "Onaylandı"}
+                            {data.quoteNo} · {{ draft: "Taslak", sent: "Gönderildi", accepted: "Kabul Edildi", rejected: "Reddedildi", expired: "Süresi Doldu" }[data.status] ?? data.status}
                         </span>
                     </div>
 

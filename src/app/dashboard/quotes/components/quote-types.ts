@@ -57,5 +57,5 @@ export interface QuoteData {
     signatures: QuoteSignature[];
 
     // Meta
-    status: "draft" | "approved";
+    status: "draft" | "sent" | "accepted" | "rejected" | "expired";
 }

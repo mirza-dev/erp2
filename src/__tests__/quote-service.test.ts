@@ -133,35 +133,35 @@ describe("serviceTransitionQuote", () => {
 // ─── serviceExpireQuotes ─────────────────────────────────────────────────────
 
 describe("serviceExpireQuotes", () => {
-    it("boş liste → { expired: 0 }", async () => {
+    it("boş liste → { expired: 0, expiredIds: [] }", async () => {
         mockDbListExpiredQuotes.mockResolvedValue([]);
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 0 });
+        expect(result).toEqual({ expired: 0, expiredIds: [] });
         expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
     });
 
-    it("1 draft expired → { expired: 1 }", async () => {
+    it("1 draft expired → { expired: 1, expiredIds: ['q1'] }", async () => {
         mockDbListExpiredQuotes.mockResolvedValue([{ id: "q1", status: "draft" }]);
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 1 });
+        expect(result).toEqual({ expired: 1, expiredIds: ["q1"] });
         expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith("q1", "expired");
     });
 
-    it("1 sent expired → { expired: 1 }", async () => {
+    it("1 sent expired → { expired: 1, expiredIds: ['q2'] }", async () => {
         mockDbListExpiredQuotes.mockResolvedValue([{ id: "q2", status: "sent" }]);
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 1 });
+        expect(result).toEqual({ expired: 1, expiredIds: ["q2"] });
         expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith("q2", "expired");
     });
 
-    it("mix: 2 draft + 1 sent → { expired: 3 }", async () => {
+    it("mix: 2 draft + 1 sent → { expired: 3, expiredIds: ['q1','q2','q3'] }", async () => {
         mockDbListExpiredQuotes.mockResolvedValue([
             { id: "q1", status: "draft" },
             { id: "q2", status: "draft" },
             { id: "q3", status: "sent" },
         ]);
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 3 });
+        expect(result).toEqual({ expired: 3, expiredIds: ["q1", "q2", "q3"] });
         expect(mockDbUpdateQuoteStatus).toHaveBeenCalledTimes(3);
     });
 

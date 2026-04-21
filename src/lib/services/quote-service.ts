@@ -60,14 +60,14 @@ export async function serviceTransitionQuote(
  *
  * Endpoint: POST /api/quotes/expire (CRON_SECRET ile çağrılır)
  */
-export async function serviceExpireQuotes(): Promise<{ expired: number }> {
+export async function serviceExpireQuotes(): Promise<{ expired: number; expiredIds: string[] }> {
     const expiredQuotes = await dbListExpiredQuotes();
-    let expired = 0;
+    const expiredIds: string[] = [];
     for (const q of expiredQuotes) {
         await dbUpdateQuoteStatus(q.id, "expired");
-        expired++;
+        expiredIds.push(q.id);
     }
-    return { expired };
+    return { expired: expiredIds.length, expiredIds };
 }
 
 // ── Query ────────────────────────────────────────────────────
