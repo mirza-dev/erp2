@@ -2,6 +2,7 @@
  * Tests for POST /api/quotes/expire — CRON endpoint for auto-expiring quotes.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { revalidateTag } from "next/cache";
 
 // ─── Service mock ────────────────────────────────────────────────────────────
 
@@ -34,6 +35,18 @@ describe("POST /api/quotes/expire", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body).toEqual({ expired: 0 });
+    });
+
+    it("expired > 0 → revalidateTag('quotes') çağrılır", async () => {
+        mockServiceExpireQuotes.mockResolvedValue({ expired: 2 });
+        await POST();
+        expect(revalidateTag).toHaveBeenCalledWith("quotes", "max");
+    });
+
+    it("expired === 0 → revalidateTag çağrılmaz", async () => {
+        mockServiceExpireQuotes.mockResolvedValue({ expired: 0 });
+        await POST();
+        expect(revalidateTag).not.toHaveBeenCalled();
     });
 
     it("service throws → 500", async () => {

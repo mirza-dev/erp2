@@ -6,6 +6,7 @@ import type { QuoteData } from "../components/quote-types";
 import { useData } from "@/lib/data-context";
 import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
+import type { QuoteStatus } from "@/lib/database.types";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -57,11 +58,12 @@ tr:hover .q-del-btn { opacity: 1; }
 interface QuoteFormProps {
     initialData?: QuoteDetail;
     readOnly?: boolean;
+    status?: QuoteStatus;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function QuoteForm({ initialData, readOnly }: QuoteFormProps) {
+export default function QuoteForm({ initialData, readOnly, status }: QuoteFormProps) {
     // ── Data context ──────────────────────────────────────────────────────────
     const { customers, products } = useData();
 
@@ -332,6 +334,7 @@ export default function QuoteForm({ initialData, readOnly }: QuoteFormProps) {
 
     // ── Auto-save to localStorage ─────────────────────────────────────────────
     const autoSave = useCallback(() => {
+        if (readOnly) return;
         try {
             localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows }));
             const fullData: QuoteData = {
@@ -360,7 +363,7 @@ export default function QuoteForm({ initialData, readOnly }: QuoteFormProps) {
             };
             localStorage.setItem("teklif_v3_full", JSON.stringify(fullData));
         } catch { /* noop */ }
-    }, [currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
+    }, [readOnly, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
         custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand,
         notes, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
@@ -540,7 +543,7 @@ export default function QuoteForm({ initialData, readOnly }: QuoteFormProps) {
                     </div>
                     {/* Buttons */}
                     <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                        <button className="q-btn q-btn-primary" style={{ ...btn, background: "var(--accent-bg)", borderColor: "var(--accent-border)", color: "var(--accent-text)" }} onClick={() => { autoSave(); router.push("/dashboard/quotes/preview"); }}>
+                        <button className="q-btn q-btn-primary" style={{ ...btn, background: "var(--accent-bg)", borderColor: "var(--accent-border)", color: "var(--accent-text)" }} onClick={() => { if (!readOnly) autoSave(); router.push("/dashboard/quotes/preview"); }}>
                             <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 6V2h8v4M4 11H3a1 1 0 01-1-1V7a1 1 0 011-1h10a1 1 0 011 1v3a1 1 0 01-1 1h-1M4 11v3h8v-3H4z" /><circle cx="12.5" cy="8.5" r=".5" fill="currentColor" /></svg>
                             Önizle &amp; PDF
                         </button>

@@ -14,6 +14,7 @@ export type QuoteTransition = "sent" | "accepted" | "rejected";
 export interface QuoteTransitionResult {
     success: boolean;
     error?: string;
+    notFound?: boolean;
 }
 
 // ── Transition map ───────────────────────────────────────────
@@ -37,7 +38,7 @@ export async function serviceTransitionQuote(
     transition: QuoteTransition
 ): Promise<QuoteTransitionResult> {
     const quote = await dbGetQuote(quoteId);
-    if (!quote) return { success: false, error: "Teklif bulunamadı." };
+    if (!quote) return { success: false, error: "Teklif bulunamadı.", notFound: true };
 
     const target = transition as QuoteStatus;
     if (!isValidQuoteTransition(quote.status, target)) {

@@ -186,13 +186,14 @@ describe("PATCH /api/quotes/[id] — status transitions", () => {
         expect(res.status).toBe(200);
     });
 
-    it("teklif bulunamadı → 409", async () => {
+    it("teklif bulunamadı → 404", async () => {
         mockServiceTransitionQuote.mockResolvedValue({
             success: false,
             error: "Teklif bulunamadı.",
+            notFound: true,
         });
         const res = await PATCH(makeReq("PATCH", { transition: "sent" }), idCtx());
-        expect(res.status).toBe(409);
+        expect(res.status).toBe(404);
         const body = await res.json() as { error: string };
         expect(body.error).toContain("bulunamadı");
     });
@@ -209,6 +210,45 @@ describe("PATCH /api/quotes/[id] — status transitions", () => {
         mockServiceTransitionQuote.mockResolvedValue({ success: false, error: "hata" });
         await PATCH(makeReq("PATCH", { transition: "accepted" }), idCtx());
         expect(revalidateTag).not.toHaveBeenCalled();
+    });
+});
+
+// ─── PATCH /api/quotes/[id] — document-update durum guard ────────────────────
+
+describe("PATCH /api/quotes/[id] — document-update durum guard", () => {
+    it("draft → güncelleme başarılı (200)", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "draft" });
+        const res = await PATCH(makeReq("PATCH", validPatchBody), idCtx());
+        expect(res.status).toBe(200);
+        expect(mockDbUpdateQuote).toHaveBeenCalled();
+    });
+
+    it("sent → 409, dbUpdateQuote çağrılmaz", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "sent" });
+        const res = await PATCH(makeReq("PATCH", validPatchBody), idCtx());
+        expect(res.status).toBe(409);
+        expect(mockDbUpdateQuote).not.toHaveBeenCalled();
+    });
+
+    it("accepted → 409, dbUpdateQuote çağrılmaz", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "accepted" });
+        const res = await PATCH(makeReq("PATCH", validPatchBody), idCtx());
+        expect(res.status).toBe(409);
+        expect(mockDbUpdateQuote).not.toHaveBeenCalled();
+    });
+
+    it("rejected → 409, dbUpdateQuote çağrılmaz", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "rejected" });
+        const res = await PATCH(makeReq("PATCH", validPatchBody), idCtx());
+        expect(res.status).toBe(409);
+        expect(mockDbUpdateQuote).not.toHaveBeenCalled();
+    });
+
+    it("expired → 409, dbUpdateQuote çağrılmaz", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "expired" });
+        const res = await PATCH(makeReq("PATCH", validPatchBody), idCtx());
+        expect(res.status).toBe(409);
+        expect(mockDbUpdateQuote).not.toHaveBeenCalled();
     });
 });
 

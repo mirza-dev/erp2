@@ -204,7 +204,7 @@ export default function QuoteDetailPage() {
             </div>
 
             {/* ── Quote Form ── */}
-            <QuoteForm initialData={quote} readOnly={!editable} />
+            <QuoteForm initialData={quote} readOnly={!editable} status={status} />
 
             {/* ── Confirm Dialog ── */}
             {confirmDialog && (

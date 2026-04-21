@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { serviceExpireQuotes } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
 
@@ -7,6 +8,9 @@ import { handleApiError } from "@/lib/api-error";
 export async function POST() {
     try {
         const result = await serviceExpireQuotes();
+        if (result.expired > 0) {
+            revalidateTag("quotes", "max");
+        }
         return NextResponse.json(result);
     } catch (err) {
         return handleApiError(err, "POST /api/quotes/expire");

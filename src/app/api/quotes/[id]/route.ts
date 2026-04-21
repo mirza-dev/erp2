@@ -48,7 +48,8 @@ export async function PATCH(
         if ("transition" in body) {
             const result = await serviceTransitionQuote(id, body.transition);
             if (!result.success) {
-                return NextResponse.json({ error: result.error }, { status: 409 });
+                const httpStatus = result.notFound ? 404 : 409;
+                return NextResponse.json({ error: result.error }, { status: httpStatus });
             }
             const updated = await dbGetQuote(id);
             revalidateTag("quotes", "max");
@@ -59,6 +60,9 @@ export async function PATCH(
         // Document update branch (existing behavior)
         const existing = await dbGetQuote(id);
         if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+        if (existing.status !== "draft") {
+            return NextResponse.json({ error: "Sadece taslak teklifler düzenlenebilir." }, { status: 409 });
+        }
         const row = await dbUpdateQuote(id, body as CreateQuoteInput);
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");
