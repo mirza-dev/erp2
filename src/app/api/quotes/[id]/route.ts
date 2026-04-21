@@ -38,6 +38,8 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
+        const existing = await dbGetQuote(id);
+        if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
         const body = await req.json() as CreateQuoteInput;
         const row = await dbUpdateQuote(id, body);
         revalidateTag("quotes", "max");
@@ -55,6 +57,14 @@ export async function DELETE(
 ) {
     try {
         const { id } = await params;
+        const existing = await dbGetQuote(id);
+        if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+        if (!["draft", "sent"].includes(existing.status)) {
+            return NextResponse.json(
+                { error: `Cannot delete a quote with status '${existing.status}'` },
+                { status: 409 }
+            );
+        }
         await dbDeleteQuote(id);
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");

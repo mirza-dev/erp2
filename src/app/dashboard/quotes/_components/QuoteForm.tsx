@@ -201,9 +201,8 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Firma ayarlarını çek — satıcı alanlarını otomatik doldur (yalnızca yeni teklif için)
+    // Firma ayarlarını çek — satıcı alanları DB'de saklanmaz, her modda company_settings'ten gelir
     useEffect(() => {
-        if (initialData) return; // Edit mode: don't override
         fetch("/api/settings/company")
             .then(r => r.ok ? r.json() : null)
             .then(s => {
@@ -217,7 +216,6 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                 setLogoSrc(prev => prev === null && s.logo_url ? s.logo_url : prev);
             })
             .catch(() => {/* ağ hatası — form çalışmaya devam eder */});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // ── Customer autocomplete ─────────────────────────────────────────────────
@@ -709,11 +707,24 @@ export default function QuoteForm({ initialData }: QuoteFormProps) {
                             <div style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)" }}>
                                 Teklif Detayları / Quote Details
                             </div>
+                            {/* Quote No — read-only, DB'de otomatik üretilir */}
+                            <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                                <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                                    Quote No <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontWeight: 400 }}>Teklif No</span>
+                                </div>
+                                <input
+                                    className="q-field-inp"
+                                    style={{ ...fieldInput, color: quoteNo ? "var(--text-primary)" : "var(--text-tertiary)", cursor: "default" }}
+                                    type="text"
+                                    value={quoteNo}
+                                    placeholder="(Otomatik)"
+                                    readOnly
+                                />
+                            </div>
                             {([
                                 ["Sales Rep",  "Satış Temsilcisi", salesRep,   setSalesRep,   "Ad Soyad",             "text"],
                                 ["Phone",      "Telefon",          salesPhone, setSalesPhone, "+90 …",                "text"],
                                 ["Email",      "E-posta",          salesEmail, setSalesEmail, "temsilci@pmt.com.tr",  "email"],
-                                ["Quote No",   "Teklif No",        quoteNo,    setQuoteNo,    "(Otomatik)",           "text"],
                                 ["Date",       "Tarih",            quoteDate,  setQuoteDate,  "",                     "date"],
                                 ["Valid Until","Geçerlilik",       validUntil, setValidUntil, "",                     "date"],
                             ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])

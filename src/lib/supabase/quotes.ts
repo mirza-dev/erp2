@@ -45,22 +45,12 @@ export interface CreateQuoteInput {
 export async function dbCreateQuote(input: CreateQuoteInput): Promise<QuoteWithLines> {
     const sb = createServiceClient();
     const { lines, ...header } = input;
-
-    const { data: quote, error: qErr } = await sb
-        .from("quotes")
-        .insert({ ...header, updated_at: new Date().toISOString() })
-        .select()
-        .single();
-    if (qErr) throw qErr;
-
-    if (lines.length > 0) {
-        const { error: lErr } = await sb
-            .from("quote_line_items")
-            .insert(lines.map(l => ({ ...l, quote_id: quote.id })));
-        if (lErr) throw lErr;
-    }
-
-    return (await dbGetQuote(quote.id))!;
+    const { data: quoteId, error } = await sb.rpc("create_quote_with_lines", {
+        p_header: { ...header, updated_at: new Date().toISOString() },
+        p_lines: lines,
+    });
+    if (error) throw error;
+    return (await dbGetQuote(quoteId as string))!;
 }
 
 export async function dbGetQuote(id: string): Promise<QuoteWithLines | null> {
@@ -104,26 +94,12 @@ export async function dbUpdateQuote(
 ): Promise<QuoteWithLines> {
     const sb = createServiceClient();
     const { lines, ...header } = input;
-
-    const { error: qErr } = await sb
-        .from("quotes")
-        .update({ ...header, updated_at: new Date().toISOString() })
-        .eq("id", id);
-    if (qErr) throw qErr;
-
-    const { error: delErr } = await sb
-        .from("quote_line_items")
-        .delete()
-        .eq("quote_id", id);
-    if (delErr) throw delErr;
-
-    if (lines.length > 0) {
-        const { error: insErr } = await sb
-            .from("quote_line_items")
-            .insert(lines.map(l => ({ ...l, quote_id: id })));
-        if (insErr) throw insErr;
-    }
-
+    const { error } = await sb.rpc("update_quote_with_lines", {
+        p_id: id,
+        p_header: { ...header, updated_at: new Date().toISOString() },
+        p_lines: lines,
+    });
+    if (error) throw error;
     return (await dbGetQuote(id))!;
 }
 

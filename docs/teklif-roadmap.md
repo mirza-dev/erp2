@@ -514,3 +514,5 @@ Kullanıcı teklifi düzenler
 | Autocomplete | Basit dropdown filtre | Üçüncü parti kütüphane gereksiz, ürün/müşteri sayısı makul |
 | Teklif numarası | `TKL-YYYY-NNN` | Mevcut sipariş numarası pattern'ına paralel |
 | localStorage | DB sonrası fallback olarak kalır | Offline/hata durumunda veri kaybı önlenir |
+| İmza unvanları (sig1Title vb.) | DB'ye kaydedilmez, şema dışı | İmza alanı fiziksel imza için boş bırakılan bir alan — unvan yazıp saklama ihtiyacı yok; belge üzerinde roller zaten sabit (Hazırlayan / Onay / Mühür Onayı) |
+| Satıcı bilgileri (firma adı, tel vb.) | DB'ye kaydedilmez | Satıcı her zaman aynı firma (PMT); `company_settings`'ten anlık çekilmesi yeterli, teklife gömmeye gerek yok |
