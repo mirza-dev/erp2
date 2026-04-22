@@ -16,7 +16,7 @@ _Son güncelleme: 2026-04-22_
 - Faz 5+5.5 — DB Persistence + Güvenlik (2026-04-21)
 
 **Aktif odak:** —
-**Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
+**Sonraki:** Belirsiz — teklif roadmap (Faz 1–8) tamamen tamamlandı
 **Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik; migration 037 Supabase'e henüz uygulanmadı
 **Test sayısı:** 83 dosya · 1609 vitest (hepsi yeşil)
 

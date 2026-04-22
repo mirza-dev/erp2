@@ -6,108 +6,56 @@ type: project
 
 **Aktif:** —
 
-**Son tamamlanan (2026-04-21 — Güvenlik + Eksik Testler):**
+**Teklif Roadmap Tamamlandı:** Faz 1–8 + tüm bulgular fix — tüm fazlar ✅
 
-1. `api/seed/route.ts`: `checkAuth` artık sadece `CRON_SECRET` Bearer kabul ediyor (any-auth bypass kaldırıldı)
-2. `api/admin/users/route.ts` + `[id]/route.ts`: `requireAdmin()` helper — `ADMIN_EMAILS` env var kontrolü (boşsa mevcut davranış korunur)
-3. `next.config.ts`: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy` security header'ları eklendi
-4. `quotes-route.test.ts` + `quotes-id-route.test.ts`: 23 yeni test (GET/POST/PATCH/DELETE tüm senaryolar)
-5. **78 test dosyası · 1503 test — 0 hata · 0 TS hatası**
+**Sonraki:** Belirsiz — kullanıcı yönlendirecek
 
-**Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
+---
 
-**Son tamamlanan (2026-04-21 — Teklif Faz 5 Bulgular Fix Round 2+3):**
+**Son tamamlanan (2026-04-22 — Faz 8 Bulgular Fix Round 2):**
 
-1. 034_quotes.sql: DROP TABLE → ALTER TABLE (veri + FK korunuyor), validity_days→valid_until dönüşümü, customer_name `customers.name`'den backfill, sequence bootstrap (setval), WHERE clause kaldırıldı
-2. 035_quote_rpcs.sql: `create_quote_with_lines` + `update_quote_with_lines` atomic RPC'ler (yeni migration)
-3. 036_fix_quote_rpc_security.sql: `security definer` kaldırma fix (yeni migration)
-4. `quotes.ts`: `dbCreateQuote`/`dbUpdateQuote` → `.rpc()` ile atomic
-5. `route.ts [id]`: PATCH existence check (geçersiz id → 404), DELETE statü guard (accepted/rejected/expired → 409)
-6. `QuoteForm.tsx`: edit modda seller bilgisi company_settings'ten yükleniyor, Quote No read-only
-7. **76 test dosyası · 1480 test — 0 hata · 0 TS hatası**
+1. `quote-service.ts`: geçmiş `valid_until` → `serviceCreateOrder`'a varmadan soft 400 (tarih mesajı dahil)
+2. `quote-service.ts`: atlanan satırlar sipariş `notes`'una ekleniyor: `[Dönüştürme: N satır atlandı — Satır X, ...]`
+3. 4 yeni test (T16–T19): expired valid_until, null valid_until, notes append x2
+4. **83 dosya · 1609 test — 0 hata · 0 TS hatası** — commit `3634b1c`
 
-**Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
+**Son tamamlanan (2026-04-22 — Faz 8 Bulgular Fix Round 1):**
 
-**Son tamamlanan (2026-04-21 — Teklif Faz 5: DB Persistence + Otomatik Numara):**
+1. `037_unique_quote_id.sql`: `sales_orders.quote_id` partial UNIQUE index — DB seviyesinde race condition fix
+2. `quote-service.ts`: 23505 unique violation catch → `alreadyConverted`; `createdBy` param eklendi
+3. `convert/route.ts`: session extract → `created_by`; 409'da `existingOrderNumber` dahil
+4. `page.tsx`: 409 handler `setConvertedOrderNumber` — badge artık sipariş numarasını gösteriyor
+5. `QuoteForm.tsx`: `position: i` → `position: i + 1` (1-based satır numaraları)
+6. T15 race condition testi + route testine `@/lib/supabase/server` mock
 
-1. Migration 034: `quotes` + `quote_line_items` + `quotes_number_seq` + `next_quote_number()` PL/pgSQL + RLS
-2. `database.types.ts` — `QuoteStatus`, `QuoteRow` (tamamen yeniden), `QuoteLineItemRow`, `QuoteWithLines`
-3. `mock-data.ts` — `QuoteLineItem`, `QuoteSummary`, `QuoteDetail`
-4. `api-mappers.ts` — `mapQuoteSummary()`, `mapQuoteDetail()`
-5. `src/lib/supabase/quotes.ts` — tamamen yeniden: `dbCreateQuote`, `dbGetQuote`, `dbListQuotes`, `dbUpdateQuote`, `dbDeleteQuote`, `dbFindQuoteByNumber`
-6. `GET/POST /api/quotes` + `GET/PATCH/DELETE /api/quotes/[id]` route'ları
-7. Form `_components/QuoteForm.tsx`'e taşındı (initialData prop: yeni/düzenleme modu)
-8. Kaydet → POST/PATCH, URL otomatik `window.history.replaceState` ile güncellenir
-9. `/dashboard/quotes/[id]` Server Component düzenleme sayfası
-10. **76 test dosyası · 1480 test — 0 hata · 0 TS hatası**
+**Son tamamlanan (2026-04-22 — Faz 8: Siparişe Dönüştür):**
 
-**Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
+1. `serviceConvertQuoteToOrder`: accepted teklif → draft sipariş; ürün/müşteri lookup, finansal yeniden hesaplama, idempotency
+2. `dbFindOrderByQuoteId`: `sales_orders.quote_id` FK üzerinden idempotency kontrolü
+3. `POST /api/quotes/[id]/convert`: 201/400/404/409 + 4 cache tag invalidation
+4. GET /api/quotes/[id]: accepted tekliflere `convertedOrderId`/`convertedOrderNumber` eklendi
+5. Quote detail page: "Siparişe Dönüştür" butonu + confirm dialog + "Sipariş oluşturuldu" badge
+6. Order detail page: "Kaynak Teklif" linki (`quoteId` varsa)
+7. `OrderDetail.quoteId` + `mapOrderDetail` mapper güncellendi
+8. 22 yeni test (14 service + 8 route)
 
-**Son tamamlanan (2026-04-20 — Faz 2 artık bulgular temizlendi):**
+**Son tamamlanan (2026-04-21 — Faz 7: Durum Yönetimi):**
 
-1. Aging tab etiketleri güncellendi: "Mamul Eskimesi"→"İmalat Eskimesi", "Ticari Mal Eskimesi"→"Ticari Eskimesi" (page.tsx + aging.spec.ts)
-2. SegmentBanner semantik düzeltme: seçili sekmeye göre count, commercial için doğru metin ("Satın alma siparişi bekleyen X ürün")
-3. Aging API temizlik: `dbGetLastComponentUsageDates` + `computeAgingCategoryRaw` tamamen kaldırıldı (aging.ts, route.ts, 2 test dosyası)
-4. Test izleri: eval-runner `productType: "raw_material"` → `"commercial"`, reorder-suggestions `isForPurchase` yorumu güncellendi
-5. **76 test dosyası · 1480 test — 0 hata · 0 TS hatası**
+1. Durum geçiş butonları: draft→sent, sent→accepted/rejected
+2. CRON: `POST /api/quotes/expire` → `serviceExpireQuotes()`, middleware CRON_PATHS'e eklendi
+3. Teklif detay sayfası client component → status bar + aksiyon butonları + confirm dialog
+4. QuoteForm readOnly prop: non-draft teklifler kilitli
+5. Bulgular fix: PATCH doc-update draft guard, CRON revalidateTag, autoSave readOnly guard, 404 vs 409 ayrımı
 
-**Önceki (2026-04-20 — Faz 2: raw_material tamamen kaldırıldı + migration uygulandı):**
+**Son tamamlanan (2026-04-21 — Faz 5+5.5: DB Persistence + Güvenlik):**
 
-1. `ProductType` → `"manufactured" | "commercial"` (3-değerli → 2-değerli)
-2. DB migration **032 Supabase'e uygulandı**: raw_material ürünler silindi, CHECK constraint 2-değerli, `is_for_sales`/`is_for_purchase` kolonları DROP edildi
-3. UI: Aging 3 tab → 2 tab; Purchase/suggested Hammadde tab kaldırıldı; products create/edit seçenekleri güncellendi
-4. API: aging route ham mantığı kaldırıldı; purchase-copilot rawMaterialCount kaldırıldı
-5. Types/Interfaces: database.types, mock-data, api-mappers, supabase/products, supabase/aging, stock-utils, ai-service
-6. Seed: 5 hammadde ürünü + is_for_sales/is_for_purchase alanları kaldırıldı
-7. Testler: raw_material test bloğu silindi; fixture'lar "commercial" olarak güncellendi; Playwright aging spec güncellendi
-8. **76 test dosyası · 1489 test — 0 hata · 0 TS hatası**
+- Migration 034–036: quotes tablosu, atomic RPC'ler, RLS
+- Otomatik TKL-YYYY-NNN numaralandırma
+- Security: CRON_SECRET Bearer, requireAdmin(), security headers
 
-**Önceki (2026-04-20 — İmalat/Ticari sınıflandırması + UI temizlik):**
-
-1. `isForSales`/`isForPurchase` toggle konsepti UI ve servislerden kaldırıldı; `productType` tek otorite
-2. Etiketler: "Mamul" → "İmalat", "Ticari Mal" → "Ticari" (products page, purchase/suggested)
-3. Filtre butonları: `filterSales`/`filterPurchase` → `filterManufactured`/`filterCommercial` (productType'a göre)
-4. Drawer'dan Satış/Satınalma toggle'ları kaldırıldı; create modal'dan checkbox'lar kaldırıldı
-5. purchase-service, purchase-copilot, alerts page, stock-utils → productType kullanıyor
-6. production/page.tsx: "Giren" kolonu kaldırıldı (hardcoded "Usta")
-7. settings/page.tsx: "Demo Hazırlık" sekmesi kaldırıldı
-8. **Faz 2 (hammadde kaldırma)** henüz yapılmadı — DB migrasyon gerekiyor
-
-**Önceki (2026-04-17 — Faz 2 DB sorgu + client refresh optimizasyonu + bulgu fix):**
-
-1. **Faz 2A** — `dbGetOrderById` 2 sıralı sorgu → 1 Supabase embedded JOIN (`select("*, order_lines(*)")`)
-2. **Faz 2B** — `dbCreateOrder` RPC sonrası `SELECT *` ile tam `SalesOrderRow` döndürüyor; `data-context.addOrder` artık `GET /api/orders` refetch yapmıyor, POST response ile state prepend yapıyor
-3. **Faz 2B bulgu fix** — `orders/page.tsx` mount fetch kaldırıldı; `useData().orders` (DataContext) ile init olur, `contextInitRef` ile tek seferlik geç yükleme sync'i; sipariş oluşturma sonrası `GET /api/orders` artık görünmüyor
-4. **Faz 1** (önceki oturum) — 4 DB index, 30s server cache (`unstable_cache`), email cache 5dk, 9 route'a `revalidateTag`, 24 test, 031 duplicate index cleanup migration
-
-**Önceki (2026-04-17 — navigasyon hızlandırma & donma önleme):**
-
-Commit: `e293a9b perf: navigasyon hızlandırma ve donma önleme`
-
-1. `npm uninstall framer-motion zustand` (kuruluydu ama import edilmiyordu)
-2. `React.memo` ile 6 component sarıldı; `useMemo` ile filter/sort
-3. Products page mount'ta `POST /api/alerts/scan` kaldırıldı
-
-**Önceki (2026-04-17 — seed data + CI fix + partially_shipped):**
-
-- Seed'e 5 hammadde (raw_material) ürünü eklendi; Hammadde tabı demo'da dolu
-- `partially_shipped` badge kaldırıldı → "Sevk Edildi" gösterilir (durum DB'de var ama hiçbir RPC set etmiyor)
-- 35 CI vitest hatası düzeltildi (`makeProduct` fixture'larına `is_for_purchase/is_for_sales` eklendi)
-
-**Önceki (2026-04-16 — demo hazırlık & Sentry & smoke testler):**
-
-- **2 kritik semantik hata** düzeltildi: Ship butonu (allocated yerine approved+non-shipped), promisable fallback (available_now - quoted)
-- **Sentry** kod tarafı tamamlandı: `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`, `next.config.ts` → `withSentryConfig` wrap, `error.tsx` → `Sentry.captureException`
-- **k6 load testleri** eklendi: `tests/load/alert-scan.k6.js`, `tests/load/import-wizard.k6.js`; `.github/workflows/load-test.yml` (manual-trigger)
-- **Smoke testler** 14 → 24'e genişletildi; her test gerçek bug senaryosunu hedefliyor
-- **isForPurchase/isForSales** alan filtrelemesi (stock-utils, purchase-copilot, alerts, purchase-service)
-
-**Bekleyen manuel adımlar:**
-- Sentry DSN: sentry.io → `NEXT_PUBLIC_SENTRY_DSN` + `SENTRY_DSN` → `.env.local` ve GitHub Secrets
-- Supabase local: `brew install supabase/tap/supabase` → `supabase init`
-- k6 local: `brew install k6`
-
-**Test:** 1489 vitest (0 fail) · Lint: 0 error
+**Bekleyen manuel adımlar:** ✅ Tamamlandı (2026-04-22)
+- Migration 037 uygulandı
+- Sentry DSN `.env.local` ve GitHub Secrets'a eklendi
 
 **Why:** Yeni session'da Claude aktif konuyu bilsin.
 **How to apply:** Her büyük özellik başlarken "Aktif" alanını güncelle; bitince "Son tamamlanan"a taşı.
