@@ -235,6 +235,18 @@ export async function dbListExpiredQuotes(): Promise<SalesOrderRow[]> {
     return data ?? [];
 }
 
+export async function dbFindOrderByQuoteId(quoteId: string): Promise<SalesOrderRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("sales_orders")
+        .select("*")
+        .eq("quote_id", quoteId)
+        .limit(1)
+        .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ?? null;
+}
+
 // ── Stock helpers (DEPRECATED) ──────────────────────────────
 
 /** @deprecated Use ApproveOrderResult.shortages instead */

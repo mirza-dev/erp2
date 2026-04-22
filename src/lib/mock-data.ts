@@ -131,6 +131,7 @@ export interface OrderDetail extends Order {
     aiConfidence?: number;
     aiReason?: string;
     aiRiskLevel?: "low" | "medium" | "high";
+    quoteId?: string;
 }
 
 // ── Quotes ────────────────────────────────────────────────────

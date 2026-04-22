@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import { getQuoteActions, isQuoteEditable, type QuoteAction } from "../_utils/quote-display";
+import { getQuoteActions, isQuoteEditable, getQuoteConvertAction, type QuoteAction } from "../_utils/quote-display";
 import QuoteForm from "../_components/QuoteForm";
 import type { QuoteDetail } from "@/lib/mock-data";
 import type { QuoteStatus } from "@/lib/database.types";
@@ -21,10 +21,17 @@ const quoteStatusConfig: Record<QuoteStatus, { label: string; bg: string; color:
     expired:  { label: "Süresi Doldu", bg: "var(--warning-bg)",     color: "var(--warning-text)",   border: "var(--warning-border)",   description: "Geçerlilik süresi geçti" },
 };
 
+// Faz 8: GET /api/quotes/[id] bu alanları da döndürüyor
+interface QuoteDetailWithConversion extends QuoteDetail {
+    convertedOrderId?: string;
+    convertedOrderNumber?: string;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function QuoteDetailPage() {
     const params = useParams<{ id: string }>();
+    const router = useRouter();
     const { toast } = useToast();
     const isDemo = useIsDemo();
 
@@ -32,6 +39,9 @@ export default function QuoteDetailPage() {
     const [quoteLoading, setQuoteLoading] = useState(true);
     const [status, setStatus] = useState<QuoteStatus>("draft");
     const [loading, setLoading] = useState<string | null>(null);
+    const [converting, setConverting] = useState(false);
+    const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null);
+    const [convertedOrderNumber, setConvertedOrderNumber] = useState<string | null>(null);
     const [confirmDialog, setConfirmDialog] = useState<{
         action: string;
         title: string;
@@ -49,9 +59,11 @@ export default function QuoteDetailPage() {
                 if (!r.ok) throw new Error("Not found");
                 return r.json();
             })
-            .then((data: QuoteDetail) => {
+            .then((data: QuoteDetailWithConversion) => {
                 setQuote(data);
                 setStatus(data.status);
+                setConvertedOrderId(data.convertedOrderId ?? null);
+                setConvertedOrderNumber(data.convertedOrderNumber ?? null);
             })
             .catch(err => {
                 if (err.name !== "AbortError") {
@@ -106,6 +118,36 @@ export default function QuoteDetailPage() {
             toast({ type: "error", message: msg });
         } finally {
             setLoading(null);
+        }
+    };
+
+    // ── Convert handler (Faz 8) ──────────────────────────────────────────────
+
+    const handleConvert = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setConverting(true);
+        try {
+            const res = await fetch(`/api/quotes/${params.id}/convert`, { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) {
+                if (data.existingOrderId) {
+                    setConvertedOrderId(data.existingOrderId);
+                    toast({ type: "info", message: "Bu teklif zaten siparişe dönüştürülmüş." });
+                } else {
+                    toast({ type: "error", message: data.error || "Dönüştürme başarısız." });
+                }
+                return;
+            }
+            if (data.warnings?.length) {
+                toast({ type: "warning", message: `Sipariş oluşturuldu. ${data.warnings.length} satır atlandı.` });
+            } else {
+                toast({ type: "success", message: "Teklif siparişe dönüştürüldü." });
+            }
+            router.push(`/dashboard/orders/${data.orderId}`);
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu." });
+        } finally {
+            setConverting(false);
         }
     };
 
@@ -182,7 +224,7 @@ export default function QuoteDetailPage() {
                 {/* Spacer */}
                 <div style={{ flex: 1 }} />
 
-                {/* Action buttons */}
+                {/* Action buttons (status transitions) */}
                 {actions.length > 0 && (
                     <div style={{ display: "flex", gap: "8px" }}>
                         {actions.map((action) => (
@@ -200,6 +242,50 @@ export default function QuoteDetailPage() {
                             </Button>
                         ))}
                     </div>
+                )}
+
+                {/* Siparişe Dönüştür — sadece accepted + henüz dönüştürülmemiş */}
+                {status === "accepted" && !convertedOrderId && (
+                    <Button
+                        variant="primary"
+                        onClick={() => {
+                            const info = getQuoteConvertAction(quote.quoteNumber);
+                            setConfirmDialog({
+                                action: "convert_to_order",
+                                title: info.confirmTitle,
+                                message: info.confirmMessage,
+                                confirmLabel: info.confirmLabel,
+                                variant: "primary",
+                            });
+                        }}
+                        disabled={isDemo || converting}
+                        loading={converting}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                    >
+                        {converting ? "Dönüştürülüyor..." : "Siparişe Dönüştür"}
+                    </Button>
+                )}
+
+                {/* Zaten dönüştürüldü badge */}
+                {status === "accepted" && convertedOrderId && (
+                    <Link
+                        href={`/dashboard/orders/${convertedOrderId}`}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "4px 12px",
+                            borderRadius: "4px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            background: "var(--success-bg)",
+                            color: "var(--success-text)",
+                            border: "0.5px solid var(--success-border)",
+                            textDecoration: "none",
+                        }}
+                    >
+                        ✓ Sipariş oluşturuldu: {convertedOrderNumber}
+                    </Link>
                 )}
             </div>
 
@@ -277,7 +363,11 @@ export default function QuoteDetailPage() {
                                 onClick={() => {
                                     const action = confirmDialog.action;
                                     setConfirmDialog(null);
-                                    handleTransition(action);
+                                    if (action === "convert_to_order") {
+                                        handleConvert();
+                                    } else {
+                                        handleTransition(action);
+                                    }
                                 }}
                                 style={{ flex: 1 }}
                             >

@@ -153,6 +153,7 @@ export function mapOrderDetail(row: SalesOrderWithLines): OrderDetail {
     aiConfidence: row.ai_confidence ?? undefined,
     aiReason: row.ai_reason ?? undefined,
     aiRiskLevel: row.ai_risk_level ?? undefined,
+    quoteId: row.quote_id ?? undefined,
   };
 }
 

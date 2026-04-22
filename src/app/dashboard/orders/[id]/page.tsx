@@ -463,6 +463,17 @@ export default function OrderDetailPage() {
                                         />
                                     )}
                                     {order.notes && <InfoRow label="Not" value={order.notes} />}
+                                    {order.quoteId && (
+                                        <div style={{ display: "flex", gap: "6px", fontSize: "12px" }}>
+                                            <span style={{ color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Kaynak Teklif</span>
+                                            <Link
+                                                href={`/dashboard/quotes/${order.quoteId}`}
+                                                style={{ color: "var(--accent-text)", textDecoration: "none" }}
+                                            >
+                                                Teklif Detayı →
+                                            </Link>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>

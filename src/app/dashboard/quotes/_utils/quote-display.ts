@@ -62,3 +62,21 @@ export function getQuoteActions(status: QuoteStatus, quoteNumber: string): Quote
 export function isQuoteEditable(status: QuoteStatus): boolean {
     return status === "draft";
 }
+
+// ── Siparişe Dönüştür ────────────────────────────────────────
+
+export interface QuoteConvertInfo {
+    label: string;
+    confirmTitle: string;
+    confirmMessage: string;
+    confirmLabel: string;
+}
+
+export function getQuoteConvertAction(quoteNumber: string): QuoteConvertInfo {
+    return {
+        label: "Siparişe Dönüştür",
+        confirmTitle: "Teklifi Siparişe Dönüştür",
+        confirmMessage: `${quoteNumber} numaralı teklif taslak sipariş olarak oluşturulacak. Devam etmek istiyor musunuz?`,
+        confirmLabel: "Evet, Dönüştür",
+    };
+}

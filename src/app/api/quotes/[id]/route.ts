@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { dbGetQuote, dbUpdateQuote, dbDeleteQuote } from "@/lib/supabase/quotes";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
+import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { mapQuoteDetail } from "@/lib/api-mappers";
 import { handleApiError } from "@/lib/api-error";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
@@ -26,7 +27,19 @@ export async function GET(
         const { id } = await params;
         const data = await getCachedQuote(id);
         if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });
-        return NextResponse.json(data);
+
+        // Accepted tekliflerde dönüştürme durumunu kontrol et
+        let convertedOrderId: string | undefined;
+        let convertedOrderNumber: string | undefined;
+        if (data.status === "accepted") {
+            const existingOrder = await dbFindOrderByQuoteId(id);
+            if (existingOrder) {
+                convertedOrderId = existingOrder.id;
+                convertedOrderNumber = existingOrder.order_number;
+            }
+        }
+
+        return NextResponse.json({ ...data, convertedOrderId, convertedOrderNumber });
     } catch (err) {
         return handleApiError(err, "GET /api/quotes/[id]");
     }
