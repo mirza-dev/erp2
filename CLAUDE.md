@@ -1,24 +1,24 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-21_
+_Son güncelleme: 2026-04-22_
 
-**Son tamamlanan iş:** Faz 8 Bulgular Fix (2026-04-22)
-- `037_unique_quote_id.sql`: `quote_id` partial unique index (race condition fix)
+**Son tamamlanan iş:** Faz 8 Bulgular Fix Round 1+2 (2026-04-22) — commit `3634b1c`
+- `037_unique_quote_id.sql`: `quote_id` partial UNIQUE index (race condition)
+- `quote-service.ts`: 23505 catch, `createdBy` param, geçmiş `valid_until` soft 400, atlanan satırlar → notes
 - `convert/route.ts`: `created_by` session + `existingOrderNumber` 409'da
-- `quote-service.ts`: DB 23505 catch + `createdBy` param
 - `QuoteForm.tsx`: `position: i+1` (1-based satır numaraları)
-- **83 dosya · 1605 test — 0 hata · 0 TS hatası**
+- **83 dosya · 1609 test — 0 hata · 0 TS hatası**
 
 **Önceki önemli işler:**
-- Teklif Faz 5 — DB Persistence + Otomatik Numara (2026-04-21)
-- Navigasyon hızlandırma & donma önleme (2026-04-17)
-- E2E test kalitesi + demo öncesi kritik bug'lar (2026-04-16)
+- Faz 8 — Siparişe Dönüştür (2026-04-22)
+- Faz 7 — Durum Yönetimi (2026-04-21)
+- Faz 5+5.5 — DB Persistence + Güvenlik (2026-04-21)
 
 **Aktif odak:** —
 **Sonraki:** Faz 6 — Teklif Listesi Sayfası (`/dashboard/quotes`)
-**Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik
-**Test sayısı:** 78 dosya · 1503 vitest (hepsi yeşil)
+**Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik; migration 037 Supabase'e henüz uygulanmadı
+**Test sayısı:** 83 dosya · 1609 vitest (hepsi yeşil)
 
 ---
 
