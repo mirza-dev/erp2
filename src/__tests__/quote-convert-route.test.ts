@@ -5,6 +5,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { revalidateTag } from "next/cache";
 
+// ─── Supabase server mock (createClient / auth.getUser) ──────────────────────
+
+vi.mock("@/lib/supabase/server", () => ({
+    createClient: () => Promise.resolve({
+        auth: { getUser: () => Promise.resolve({ data: { user: { id: "test-user-id" } } }) },
+    }),
+}));
+
 // ─── Service mock ─────────────────────────────────────────────────────────────
 
 const mockServiceConvert = vi.fn();
@@ -85,17 +93,19 @@ describe("POST /api/quotes/[id]/convert", () => {
         expect(body.error).toContain("bulunamadı");
     });
 
-    it("T04: zaten dönüştürüldü → 409, existingOrderId dahil", async () => {
+    it("T04: zaten dönüştürüldü → 409, existingOrderId + existingOrderNumber dahil", async () => {
         mockServiceConvert.mockResolvedValue({
             success: false,
             error: "Bu teklif daha önce siparişe dönüştürülmüş.",
             alreadyConverted: true,
             existingOrderId: "existing-order-id",
+            existingOrderNumber: "SIP-2026-000",
         });
         const res = await POST(makeReq(), idCtx());
         expect(res.status).toBe(409);
         const body = await res.json();
         expect(body.existingOrderId).toBe("existing-order-id");
+        expect(body.existingOrderNumber).toBe("SIP-2026-000");
         expect(body.error).toContain("dönüştürülmüş");
     });
 

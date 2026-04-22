@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
 import { serviceConvertQuoteToOrder } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
 
@@ -12,14 +13,20 @@ export async function POST(
 ) {
     try {
         const { id } = await params;
-        const result = await serviceConvertQuoteToOrder(id);
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        const result = await serviceConvertQuoteToOrder(id, user?.id);
 
         if (!result.success) {
             const status = result.notFound ? 404
                 : result.alreadyConverted ? 409
                 : 400;
             return NextResponse.json(
-                { error: result.error, existingOrderId: result.existingOrderId },
+                {
+                    error: result.error,
+                    existingOrderId: result.existingOrderId,
+                    existingOrderNumber: result.existingOrderNumber,
+                },
                 { status }
             );
         }

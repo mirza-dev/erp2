@@ -3,12 +3,12 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-21_
 
-**Son tamamlanan iş:** Güvenlik Fix + Eksik Testler (2026-04-21)
-- `api/seed`: CRON_SECRET Bearer zorunlu (any-auth bypass kaldırıldı)
-- `api/admin/users`: `requireAdmin()` — `ADMIN_EMAILS` env guard
-- `next.config.ts`: X-Content-Type-Options, X-Frame-Options, Referrer-Policy
-- `quotes-route.test.ts` + `quotes-id-route.test.ts`: 23 yeni test
-- **78 dosya · 1503 test — 0 hata · 0 TS hatası**
+**Son tamamlanan iş:** Faz 8 Bulgular Fix (2026-04-22)
+- `037_unique_quote_id.sql`: `quote_id` partial unique index (race condition fix)
+- `convert/route.ts`: `created_by` session + `existingOrderNumber` 409'da
+- `quote-service.ts`: DB 23505 catch + `createdBy` param
+- `QuoteForm.tsx`: `position: i+1` (1-based satır numaraları)
+- **83 dosya · 1605 test — 0 hata · 0 TS hatası**
 
 **Önceki önemli işler:**
 - Teklif Faz 5 — DB Persistence + Otomatik Numara (2026-04-21)

@@ -459,7 +459,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             lines: rows
                 .filter(r => r.code.trim() || r.desc.trim())
                 .map((r, i) => ({
-                    position: i,
+                    position: i + 1,
                     product_code: r.code,
                     lead_time: r.lead || undefined,
                     description: r.desc,

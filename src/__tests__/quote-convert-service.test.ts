@@ -341,6 +341,21 @@ describe("serviceConvertQuoteToOrder", () => {
         await expect(serviceConvertQuoteToOrder(QUOTE_ID)).rejects.toThrow("DB bağlantı hatası");
     });
 
+    it("T15: DB unique constraint violation (race condition) → alreadyConverted döner", async () => {
+        mockDbGetQuote.mockResolvedValue(stubQuote("accepted"));
+        // İlk dbFindOrderByQuoteId null döner (check geçer), ama insert sırasında 23505 hatası fırlar
+        mockDbFindOrderByQuoteId
+            .mockResolvedValueOnce(null)           // initial idempotency check → pas
+            .mockResolvedValueOnce({ id: "race-order-id", order_number: "SIP-2026-RACE" }); // sonraki lookup
+        mockDbCreateOrder.mockRejectedValue(new Error("duplicate key value violates unique constraint \"uq_sales_orders_quote_id\" (23505)"));
+        const result = await serviceConvertQuoteToOrder(QUOTE_ID);
+        expect(result.success).toBe(false);
+        expect(result.alreadyConverted).toBe(true);
+        expect(result.existingOrderId).toBe("race-order-id");
+        expect(result.existingOrderNumber).toBe("SIP-2026-RACE");
+        expect(mockDbCreateOrder).toHaveBeenCalledTimes(1);
+    });
+
     it("T14: finansal yeniden hesaplama — 1 satır atlanınca valid satırlardan hesaplanır", async () => {
         // 3 satır: line_total 200+200+200=600, ama 3. satır null → 2 satır: 200+200=400
         const lines = [stubLine(1), stubLine(2), stubLine(3, null)];
@@ -353,5 +368,47 @@ describe("serviceConvertQuoteToOrder", () => {
         expect(callArg.vat_total).toBe(80);
         // grand_total = 400 + 80 = 480
         expect(callArg.grand_total).toBe(480);
+    });
+
+    it("T16: geçmiş valid_until → 400-uyumlu hata, sipariş oluşturulmaz", async () => {
+        const expiredQuote = { ...stubQuote("accepted"), valid_until: "2020-01-01" };
+        mockDbGetQuote.mockResolvedValue(expiredQuote);
+        const result = await serviceConvertQuoteToOrder(QUOTE_ID);
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("geçerlilik tarihi geçmiş");
+        expect(result.error).toContain("2020-01-01");
+        expect(mockDbCreateOrder).not.toHaveBeenCalled();
+    });
+
+    it("T17: null valid_until → kontrol atlanır, sipariş oluşturulur", async () => {
+        const noDateQuote = { ...stubQuote("accepted"), valid_until: null };
+        mockDbGetQuote.mockResolvedValue(noDateQuote);
+        const result = await serviceConvertQuoteToOrder(QUOTE_ID);
+        expect(result.success).toBe(true);
+        expect(mockDbCreateOrder).toHaveBeenCalledTimes(1);
+        const callArg = mockDbCreateOrder.mock.calls[0][0];
+        expect(callArg.quote_valid_until).toBeUndefined();
+    });
+
+    it("T18: atlanan satırlar sipariş notes'una eklenir", async () => {
+        const lines = [stubLine(1), stubLine(2), stubLine(3, null)];
+        const quoteWithNotes = { ...stubQuote("accepted", lines), notes: "Orijinal not" };
+        mockDbGetQuote.mockResolvedValue(quoteWithNotes);
+        await serviceConvertQuoteToOrder(QUOTE_ID);
+        const callArg = mockDbCreateOrder.mock.calls[0][0];
+        expect(callArg.notes).toContain("Orijinal not");
+        expect(callArg.notes).toContain("Satır 3");
+        expect(callArg.notes).toContain("atlandı");
+    });
+
+    it("T19: notes null + atlanan satırlar → yalnız dönüştürme notu", async () => {
+        const lines = [stubLine(1), stubLine(2, null)];
+        const quoteNoNotes = { ...stubQuote("accepted", lines), notes: null };
+        mockDbGetQuote.mockResolvedValue(quoteNoNotes);
+        await serviceConvertQuoteToOrder(QUOTE_ID);
+        const callArg = mockDbCreateOrder.mock.calls[0][0];
+        expect(callArg.notes).toContain("Satır 2");
+        expect(callArg.notes).not.toMatch(/^undefined/);
+        expect(callArg.notes).not.toMatch(/^null/);
     });
 });

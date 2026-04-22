@@ -101,7 +101,7 @@ export interface ConvertResult {
  *   - Ürün adı/SKU/birimi products tablosundan çekilir.
  *   - Müşteri detayları (country/tax) customers tablosundan zenginleştirilir.
  */
-export async function serviceConvertQuoteToOrder(quoteId: string): Promise<ConvertResult> {
+export async function serviceConvertQuoteToOrder(quoteId: string, createdBy?: string): Promise<ConvertResult> {
     // 1. Teklif var mı?
     const quote = await dbGetQuote(quoteId);
     if (!quote) return { success: false, error: "Teklif bulunamadı.", notFound: true };
@@ -179,23 +179,43 @@ export async function serviceConvertQuoteToOrder(quoteId: string): Promise<Conve
     const vatTotal = Math.round(subtotal * (Number(quote.vat_rate) / 100) * 100) / 100;
     const grandTotal = Math.round((subtotal + vatTotal) * 100) / 100;
 
-    // 8. Sipariş oluştur
-    const order = await serviceCreateOrder({
+    // 8a. Geçerlilik tarihi kontrolü — geçmişse 400 döndür (serviceCreateOrder'a varmadan)
+    const validUntil = quote.valid_until ?? undefined;
+    if (validUntil) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (validUntil < today) {
+            return {
+                success: false,
+                error: `Teklifin geçerlilik tarihi geçmiş (${validUntil}). Dönüştürmeden önce geçerlilik tarihini güncelleyin.`,
+            };
+        }
+    }
+
+    // 8b. Atlanmış satırları sipariş notuna ekle (kalıcı iz)
+    let orderNotes = quote.notes ?? undefined;
+    if (skippedLines.length > 0) {
+        const skippedNote = `[Dönüştürme: ${skippedLines.length} satır ürün eşleşmesi olmadığı için atlandı — ${skippedLines.map(l => `Satır ${l.position}`).join(", ")}]`;
+        orderNotes = orderNotes ? `${orderNotes}\n${skippedNote}` : skippedNote;
+    }
+
+    // 8c. Sipariş oluştur
+    const orderInput = {
         customer_id: quote.customer_id ?? undefined,
         customer_name: quote.customer_name,
         customer_email: customerEmail,
         customer_country: customerCountry,
         customer_tax_office: customerTaxOffice,
         customer_tax_number: customerTaxNumber,
-        commercial_status: "draft",
-        fulfillment_status: "unallocated",
+        commercial_status: "draft" as const,
+        fulfillment_status: "unallocated" as const,
         currency: quote.currency,
         subtotal,
         vat_total: vatTotal,
         grand_total: grandTotal,
-        notes: quote.notes ?? undefined,
+        notes: orderNotes,
         quote_id: quoteId,
-        quote_valid_until: quote.valid_until ?? undefined,
+        quote_valid_until: validUntil,
+        created_by: createdBy,
         lines: validLines.map(line => ({
             product_id: line.product_id!,
             product_name: productMap.get(line.product_id!)!.name,
@@ -206,7 +226,26 @@ export async function serviceConvertQuoteToOrder(quoteId: string): Promise<Conve
             discount_pct: 0,
             line_total: Number(line.line_total),
         })),
-    });
+    };
+
+    let order: Awaited<ReturnType<typeof serviceCreateOrder>>;
+    try {
+        order = await serviceCreateOrder(orderInput);
+    } catch (err: unknown) {
+        // DB unique constraint violation: aynı quote_id zaten sipariş var (race condition)
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg.includes("23505") || msg.includes("uq_sales_orders_quote_id")) {
+            const raceExisting = await dbFindOrderByQuoteId(quoteId);
+            return {
+                success: false,
+                error: "Bu teklif daha önce siparişe dönüştürülmüş.",
+                alreadyConverted: true,
+                existingOrderId: raceExisting?.id,
+                existingOrderNumber: raceExisting?.order_number,
+            };
+        }
+        throw err;
+    }
 
     return {
         success: true,

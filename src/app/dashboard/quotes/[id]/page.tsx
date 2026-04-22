@@ -132,6 +132,7 @@ export default function QuoteDetailPage() {
             if (!res.ok) {
                 if (data.existingOrderId) {
                     setConvertedOrderId(data.existingOrderId);
+                    setConvertedOrderNumber(data.existingOrderNumber ?? null);
                     toast({ type: "info", message: "Bu teklif zaten siparişe dönüştürülmüş." });
                 } else {
                     toast({ type: "error", message: data.error || "Dönüştürme başarısız." });
