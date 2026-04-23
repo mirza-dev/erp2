@@ -87,6 +87,14 @@ export function validateStringLengths(
         if (typeof val === "string" && val.length > maxLength) {
             return `${key} alanı çok uzun (maksimum ${maxLength} karakter).`;
         }
+        if (Array.isArray(val)) {
+            for (let i = 0; i < val.length; i++) {
+                if (val[i] !== null && typeof val[i] === "object") {
+                    const nestedErr = validateStringLengths(val[i] as Record<string, unknown>, maxLength);
+                    if (nestedErr) return `${key}[${i}].${nestedErr}`;
+                }
+            }
+        }
     }
     return null;
 }

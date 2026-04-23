@@ -74,6 +74,15 @@ export async function POST(req: NextRequest) {
         if (!body.unit?.trim()) {
             return NextResponse.json({ error: "Birim zorunludur." }, { status: 400 });
         }
+        const MAX_NUM = 999_999_999;
+        if (body.price !== undefined && body.price > MAX_NUM)
+            return NextResponse.json({ error: "Fiyat çok büyük." }, { status: 400 });
+        if (body.on_hand !== undefined && body.on_hand > MAX_NUM)
+            return NextResponse.json({ error: "Stok miktarı çok büyük." }, { status: 400 });
+        if (body.min_stock_level !== undefined && body.min_stock_level > MAX_NUM)
+            return NextResponse.json({ error: "Minimum stok seviyesi çok büyük." }, { status: 400 });
+        if (body.cost_price !== undefined && body.cost_price > MAX_NUM)
+            return NextResponse.json({ error: "Maliyet fiyatı çok büyük." }, { status: 400 });
 
         const product = await dbCreateProduct(body);
         revalidateTag("products", "max");
