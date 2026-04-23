@@ -1,48 +1,34 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-22_
+_Son güncelleme: 2026-04-23_
 
-**Son tamamlanan iş:** Güvenlik + Kapasite Audit — Faz 1–4 tam (2026-04-23)
-- Faz 1: Auth matrisi, HTTP header audit, CRON güvenlik, bilgi sızıntısı kontrolü
-- Faz 2: Quote convert race (migration 037 ✅), stok rezervasyon 5 VU (invariant ✅), alert scan 5→100 VU (advisory lock ✅)
-- Faz 3: Small/medium profil kapasite testi, edge case testleri
-- Faz 4: Kapasite matrisi raporu → `docs/audit/faz4-capacity-matrix.md`
-- **Önemli bulgular:** Dev/Turbopack middleware bypass, aging endpoint p95 2.6s (medium), category filter p99 7.5s (medium), JSON hataları 500 dönüyor
+**Son tamamlanan iş:** Audit Tam Kapandı — commit `2864c97` (2026-04-23)
 
-**Önceki önemli işler:**
-- Faz 8 Bulgular Fix Round 1+2 — commit `3634b1c`
-- Faz 8 — Siparişe Dönüştür (2026-04-22)
+Tüm audit bulguları giderildi. 3 commit, 43 dosya.
 
-**Aktif odak:** Audit bulguları fix — öncelik sırası aşağıda
+| Bulgu | Commit | Fix |
+|-------|--------|-----|
+| C-1 | `483b3d3` | middleware.ts — Supabase init try-catch (Turbopack bypass) |
+| C-2 | `483b3d3` | safeParseJson helper + 26 route (bozuk JSON → 400) |
+| C-3 | `483b3d3` | numeric overflow catch + validateOrderCreate max value |
+| H-1 | `483b3d3` | CSP header (next.config.ts) |
+| H-2 | `483b3d3` | aging sorgusu: on_hand_gt DB filter + migration 038 indexes |
+| H-3 | `483b3d3` | category filter: idx_products_category_active (migration 038) |
+| H-4 | `f44a47e` | validateStringLengths nested array + products numeric guard |
+| M-1 | `483b3d3` | CRON paths: sadece CRON_SECRET (session bypass kapatıldı) |
+| M-2 | `483b3d3` | HSTS (next.config.ts) |
+| M-4 | `483b3d3` | handleApiError: prod generic mesaj |
+| L-1 | `483b3d3` | Permissions-Policy (next.config.ts) |
+| L-3 | `483b3d3` | limit param üst sınırı 500 |
+| B-04 | `2864c97` | health endpoint: anonim→sade, ?detail=true+CRON_SECRET→tam |
+
+**Kalan / ertelendi:**
+- M-3: Rate limiting (Vercel KV / upstash — altyapı kararı)
+- `purchase_commitments` ve `column_mappings` RLS migration eksik
+- `seed-large.ts --clean` 1000 limit bug (düşük öncelik)
+
 **Test sayısı:** 83 dosya · 1609 vitest (hepsi yeşil)
-
-**Fix Backlog (öncelik sırasıyla):**
-
-_Öncelik 1 — Büyüyen katalog (kullanıcı sayısı ~10, katalog zamanla büyüyecek):_
-- [ ] **H-2** `products/aging` yavaş: small p95=1.2s → medium p95=2.6s → 20K'da timeout. Index + sorgu optimize
-- [ ] **H-3** Category filter yavaş: medium p99=7.5s. `products(category)` veya `(category, is_active)` index ekle (migration)
-
-_Öncelik 2 — Production kalitesi:_
-- [ ] **C-2** Bozuk JSON body → 500 (400 olmalı, iç hata sızıyor). Tüm POST route'lara JSON parse try-catch
-- [ ] **C-3** Numeric overflow → 500 (DB hatası sızıyor). Max value validation + DB hata catch
-- [ ] **C-1** Dev middleware bypass: `middleware.ts`'e try-catch ekle (Turbopack Edge Runtime Supabase init hatası)
-
-_Öncelik 3 — Güvenlik hardening (Vercel'e çıkmadan önce):_
-- [ ] **H-1** CSP header eksik (`next.config.ts`)
-- [ ] **M-2** HSTS (`next.config.ts` veya Vercel)
-- [ ] **H-4** String boyut limiti yok (100KB+ body kabul ediyor)
-- [ ] **B-03** `handleApiError` prod'da iç hata mesajı sızıyor → prod'da generic mesaj dön, Sentry'e logla
-- [ ] **B-06** CRON endpoint'ler session ile tetiklenebilir → sadece CRON_SECRET kabul et
-
-_Öncelik 4 — Düşük risk / backlog:_
-- [ ] **B-02** Rate limiting yok (özellikle `POST /api/ai/*` maliyet saldırısı riski) → Vercel KV veya upstash
-- [ ] **B-04** `/api/health` tablo/migration adları herkese açık → auth gerektir veya sadeleştir
-- [ ] **B-05** `limit` param üst sınırı yok (`?limit=999999`) → `Math.min(limit, 500)`
-
-_Bilinen diğer sorunlar:_
-- `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik
-- `seed-large.ts --clean` 1000 limit bug (birden fazla çalıştırma gerekiyor — düşük öncelik)
 
 ---
 

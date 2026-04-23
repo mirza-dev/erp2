@@ -1,20 +1,21 @@
 # Memory Index
 
 ## User
-- [user_review_workflow.md](user_review_workflow.md) — "Bulgular" raporuyla review yapar; önce doğrula, sonra düzelt
+- [user_review_workflow.md](user_review_workflow.md) — "Bulgular" raporuyla review yapar; önce doğrula, sonra düzelt; REVIEW.md = formal review kuralları
 
 ## Project
 - [project_stack.md](project_stack.md) — Stack, inline style kuralları, klasör yapısı, veri modelleri, seed/demo hazırlık
 - [project_domain.md](project_domain.md) — Sipariş çift ekseni, stok modeli, KDV, import kontratı, alert tipleri, tamamlanan fazlar (0–13)
-- [project_security.md](project_security.md) — RLS, middleware (ALWAYS_PUBLIC vs CRON_PATHS), demo mode mimarisi, credential güvenliği
-- [project_integrations.md](project_integrations.md) — Paraşüt mock, AI kolon eşleştirme, Sentry (kod hazır/DSN eksik), k6, smoke 24, test altyapısı
+- [project_security.md](project_security.md) — RLS, middleware, demo mode, TÜM audit bulguları kapatıldı (C1-C3,H1-H4,M1-M4,L1,L3,B04 ✅)
+- [project_integrations.md](project_integrations.md) — Paraşüt mock, AI kolon eşleştirme, Sentry ✅, k6, smoke 24, 1609 test; health check B-04 fix ✅
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Aktif sprint; PMT demo 2026-04-19; son yapılan perf optimizasyonu
+- [current_focus.md](current_focus.md) — Sprint boş: tüm audit bulguları kapatıldı (2026-04-23), sıradaki iş belirsiz
 
 ## Roadmap
 - [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
-- [project_quotes.md](project_quotes.md) — Teklif modülü: Faz 1-5 tamamlandı; kalan: Faz 6 liste, Faz 7 durum, Faz 8 sipariş dönüşümü
+- [project_quotes.md](project_quotes.md) — Teklif modülü: Faz 1-8 TAMAMEN tamamlandı (sipariş dönüşümü, race condition fix dahil)
+- [project_frontend_renewal.md](project_frontend_renewal.md) — Frontend yenileme planı (frontend-renewal.md): DOM mutation fix, component lib, a11y — PLAN HAZIR, uygulama başlamadı
 
 ## Feedback
 - [feedback_no_silent_deletes.md](feedback_no_silent_deletes.md) — Kod silmeden önce onay veya net gerekçe gerekiyor

@@ -103,15 +103,23 @@ grandTotal = subtotal + vatTotal
 
 ---
 
-## CRON Endpoint'leri (middleware.ts CRON_PATHS)
+## CRON Endpoint'leri
 
+**CRON_PATHS** (middleware — sadece `Authorization: Bearer CRON_SECRET`, session bypass YOK):
 | Endpoint | İşlev |
 |----------|-------|
-| `POST /api/alerts/scan` | Stok alert taraması |
 | `POST /api/alerts/ai-suggest` | AI alert önerileri |
 | `POST /api/parasut/sync-all` | Paraşüt sync |
 | `POST /api/orders/expire-quotes` | Süresi dolan teklifleri işle |
 | `POST /api/orders/check-shipments` | Geciken sevkiyat alertları |
+| `POST /api/quotes/expire` | Süresi dolan teklifleri expire et |
+
+**ALWAYS_PUBLIC — kendi auth'unu yapanlar:**
+| Endpoint | Auth |
+|----------|------|
+| `POST /api/alerts/scan` | CRON_SECRET Bearer **veya** aktif session (UI "Tara" butonu desteklenir) |
+| `POST /api/seed` | CRON_SECRET Bearer veya aktif session |
+| `GET /api/health` | Auth yok (anonim=sade); `?detail=true`+CRON_SECRET=tam çıktı |
 
 ---
 

@@ -25,7 +25,6 @@ type: project
 - Algılama sırası: `column_mappings` hafıza → `FALLBACK_FIELD_MAP` → AI (sadece gerçekten bilinmeyen kolonlar için)
 - `normalizeColumnName()` — Türkçe transliterasyon (İ→i, ğ→g, ü→u vb.), tüm route'lar ve fallback paylaşıyor
 - Hafıza: `column_mappings` tablosu (usage_count, success_count) — success_count sadece confirm sonrası artırılıyor
-- `FALLBACK_FIELD_MAP.product.sektor_uygunlugu = "sector_compatibility"` mevcut; `import-fields.ts`'e 2026-04-15'te eklendi (öncesi import UI "Atla" gösteriyordu)
 - Import sonrası yeni kategoriler products/page.tsx'te otomatik filtre seçeneklerine yansır (dinamik useMemo)
 
 **Stage 2A:** AI memory layer, audit trail, guardrails (G1-G4), run logging (`ai_runs` tablosu)
@@ -37,35 +36,35 @@ type: project
 
 ---
 
-## Health Check
+## Health Check (2026-04-23 — B-04 fix)
 
-- `GET /api/health` — her zaman public (`ALWAYS_PUBLIC` listesinde)
-- `REQUIRED_KEYS` export: env vars + DB tabloları + RPC'ler — eksik → HTTP 503
-- Migration 011 probe: `check_migration_011_applied()` RPC ile uuid fix doğrulama
-- Regression: `src/__tests__/health-migration-011.test.ts`
+- `GET /api/health` — ALWAYS_PUBLIC (middleware kontrolü yok)
+- **Anonim (default):** env var + tek DB ping → `{"status":"ok"|"degraded"}` + 200/503. İç detay sızmaz.
+- **`?detail=true` + `Authorization: Bearer CRON_SECRET`:** Tam çıktı — env, DB tabloları, migration ID'leri, RPC varlıkları
+- `REQUIRED_KEYS` export: hangi key'lerin zorunlu olduğunu kilitler (test tarafından import edilir)
+- `interpretMigration011Result` export: migration 011 probe sonucunu string'e çevirir
+- Regression: `src/__tests__/health-migration-011.test.ts` (12 test, pure function testi)
 
 ---
 
 ## Test Altyapısı
 
 - **Framework:** Vitest · `src/__tests__/` · node environment
-- **1491 test** (2026-04-17 itibarıyla, 0 fail) · Branch coverage ≥ 80%
+- **1609 test** (2026-04-23 itibarıyla, 0 fail) · 83 dosya
 - **E2E:** `@playwright/test` · Chromium · `tests/` — 23 test, tümü yeşil
   - `tests/helpers/test-data.ts` — API üzerinden test müşteri/ürün/sipariş oluşturma/silme
   - `tests/fixtures.ts` — `demoPage` fixture (demo_mode=1 cookie)
   - `tests/global-setup.ts` — Supabase signIn → storageState persist
-- **Smoke testler:** `scripts/smoke.ts` — **24 endpoint**, response shape validation (14→24 genişletildi 2026-04-16)
-  - Her test gerçek bug senaryosunu hedefliyor (status 200 yeterli değil, body field'ları validate ediliyor)
+- **Smoke testler:** `scripts/smoke.ts` — **24 endpoint**, response shape validation
   - `npm run smoke` (dev server çalışırken)
-- **k6 load testleri:** `tests/load/alert-scan.k6.js` + `tests/load/import-wizard.k6.js`
+- **k6 load testleri:** `tests/load/` — 6 script (alert-scan, breakpoint-scan, concurrency-quote-convert, concurrency-stock-reservation, capacity-endpoints, breakpoint-api)
   - `.github/workflows/load-test.yml` — manuel tetiklemeli CI (`workflow_dispatch`)
-  - 3 VU / 10 VU max · p95<3000ms · error rate<2%
+  - Audit sonuçları: `results/` klasörü, rapor: `docs/audit/faz4-capacity-matrix.md`
+  - Kırılma noktaları: stok rezervasyon soft limit 50 VU, tam çöküş 100 VU
 - **Eval suite:** `src/__tests__/eval/` — AI kalite değerlendirmesi
-- **Sentry:** `@sentry/nextjs` — **kod tarafı tamamlandı** (2026-04-16):
-  - `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
-  - `next.config.ts` → `withSentryConfig` wrap
-  - `src/app/error.tsx` → `Sentry.captureException(error)`
-  - **DSN kurulumu manuel bekliyor:** `.env.local` → `NEXT_PUBLIC_SENTRY_DSN` + `SENTRY_DSN`, GitHub Secrets'a da eklenmeli
+- **Playwright CI:** Testler yazılı (23 test, yeşil) ama CI'da çalışmıyor — **6 GitHub Secret eksik:**
+  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (zaten var), `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`
+- **Sentry:** `@sentry/nextjs` — kod + DSN tam kurulu ✅ (2026-04-22'de DSN `.env.local` + GitHub Secrets'a eklendi)
 
 **Mock pattern:**
 ```ts
@@ -84,5 +83,14 @@ vi.mock("next/headers", () => ({
 ```ts
 vi.mock("@supabase/ssr", () => ({
     createServerClient: () => ({ auth: { getUser: mockGetUser } }),
+}));
+```
+
+**@/lib/supabase/server mock (session gerektiren route testlerinde):**
+```ts
+vi.mock("@/lib/supabase/server", () => ({
+    createClient: () => Promise.resolve({
+        auth: { getUser: () => Promise.resolve({ data: { user: { id: "test-user" } } }) },
+    }),
 }));
 ```

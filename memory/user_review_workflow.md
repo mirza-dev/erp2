@@ -11,4 +11,9 @@ Kullanıcı, her geliştirme turunu tamamladıktan sonra kodu kendi inceliyor ve
 - Rapor sonunda "sence doğru mu bunlar" sorusu gelir — önce değerlendirme bekler
 - Bazen bir "Durum" bölümü de ekler: hangi önceki sorunlar kapanmış, test/build/lint durumu
 
-**How to apply:** Bulgular geldiğinde önce her birini koda karşı doğrula ve kullanıcıya katılıp katılmadığını söyle. Doğrudan düzeltmeye geçme — kullanıcı önce değerlendirme istiyor. "düzelt" komutu geldikten sonra düzeltmeye başla.
+**Formal review kuralları:** `REVIEW.md` (proje kökünde) — Claude kodu review ederken uyması gereken kurallar:
+- 🔴 Important: yalnızca production'ı bozan bulgular (yanlış business logic, RLS bypass, data loss, API contract ihlali, `"use client"` eksikliği)
+- Nit: style, naming, refactoring — her review'da max 5 nit
+- **Her zaman flag:** Tailwind class kullanımı, Framer Motion import, hardcoded hex/rgb renk
+
+**How to apply:** Bulgular geldiğinde önce her birini koda karşı doğrula ve kullanıcıya katılıp katılmadığını söyle. Doğrudan düzeltmeye geçme — kullanıcı önce değerlendirme istiyor. "düzelt" komutu geldikten sonra düzeltmeye başla. Kendi review yaparken REVIEW.md kurallarını uygula.
