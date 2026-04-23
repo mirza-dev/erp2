@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
 type Supabase = ReturnType<typeof createServiceClient>;
@@ -59,7 +59,27 @@ async function pingColumn(supabase: Supabase, table: string, column: string): Pr
     return error ? `missing_or_error: ${error.message}` : "ok";
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+    // Anonim istek — sadece ok/degraded (iç mimari sızmaz)
+    const wantDetail = req.nextUrl.searchParams.get("detail") === "true";
+    if (!wantDetail) {
+        const envOk =
+            !!process.env.NEXT_PUBLIC_SUPABASE_URL &&
+            !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (!envOk) return NextResponse.json({ status: "degraded" }, { status: 503 });
+        const supabase = createServiceClient();
+        const { error } = await supabase.from("customers").select("id").limit(1);
+        const status = error ? "degraded" : "ok";
+        return NextResponse.json({ status }, { status: error ? 503 : 200 });
+    }
+
+    // ?detail=true — CRON_SECRET Bearer zorunlu
+    const secret = process.env.CRON_SECRET;
+    const authHeader = req.headers.get("authorization");
+    if (!secret || authHeader !== `Bearer ${secret}`) {
+        return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
+    }
+
     const checks: Record<string, string> = {};
 
     // ── Env checks ──────────────────────────────────────────────────────
