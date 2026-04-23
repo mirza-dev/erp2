@@ -5,13 +5,14 @@ import {
     dbListMovements,
     type RecordMovementInput,
 } from "@/lib/supabase/products";
+import { safeParseJson } from "@/lib/api-error";
 
 // GET /api/inventory/movements?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
         const productId = searchParams.get("product_id");
-        const limit = parseInt(searchParams.get("limit") ?? "50");
+        const limit = Math.min(parseInt(searchParams.get("limit") ?? "50") || 50, 500);
 
         if (!productId) {
             return NextResponse.json({ error: "product_id zorunludur." }, { status: 400 });
@@ -28,7 +29,9 @@ export async function GET(req: NextRequest) {
 // POST /api/inventory/movements — manual stock adjustment or receipt
 export async function POST(req: NextRequest) {
     try {
-        const body: RecordMovementInput = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as RecordMovementInput;
 
         if (!body.product_id) {
             return NextResponse.json({ error: "product_id zorunludur." }, { status: 400 });

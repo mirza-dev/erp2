@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch, dbUpdateBatchStatus, dbDeleteBatch } from "@/lib/supabase/import";
 import type { ImportBatchStatus } from "@/lib/database.types";
+import { safeParseJson } from "@/lib/api-error";
 
 // GET /api/import/[batchId]
 export async function GET(
@@ -42,7 +43,9 @@ export async function PATCH(
 ) {
     try {
         const { batchId } = await params;
-        const { status } = await req.json() as { status: ImportBatchStatus };
+        const safeParsed = await safeParseJson(req);
+        if (!safeParsed.ok) return safeParsed.response;
+        const { status } = safeParsed.data as { status: ImportBatchStatus };
         if (!status) return NextResponse.json({ error: "'status' zorunludur." }, { status: 400 });
 
         const updated = await dbUpdateBatchStatus(batchId, status);

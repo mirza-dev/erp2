@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceGetAlert, serviceUpdateAlertStatus } from "@/lib/services/alert-service";
+import { safeParseJson } from "@/lib/api-error";
 import type { AlertStatus } from "@/lib/database.types";
 
 // GET /api/alerts/[id]
@@ -26,7 +27,9 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const { status, reason } = await req.json() as { status: AlertStatus; reason?: string };
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const { status, reason } = parsed.data as { status: AlertStatus; reason?: string };
 
         if (!status) {
             return NextResponse.json({ error: "'status' alanı zorunludur." }, { status: 400 });

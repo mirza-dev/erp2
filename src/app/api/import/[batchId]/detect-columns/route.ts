@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch } from "@/lib/supabase/import";
 import { dbLookupColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { aiDetectColumns, FALLBACK_FIELD_MAP } from "@/lib/services/ai-service";
+import { safeParseJson } from "@/lib/api-error";
 
 /**
  * POST /api/import/[batchId]/detect-columns
@@ -34,7 +35,9 @@ export async function POST(
             return NextResponse.json({ error: "Batch bulunamadı." }, { status: 404 });
         }
 
-        const body = await req.json() as {
+        const safeParsed = await safeParseJson(req);
+        if (!safeParsed.ok) return safeParsed.response;
+        const body = safeParsed.data as {
             sheets: Array<{
                 sheet_name: string;
                 entity_type: string;

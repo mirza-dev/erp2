@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiParseEntity } from "@/lib/services/ai-service";
 import type { ParseEntityInput } from "@/lib/services/ai-service";
+import { safeParseJson } from "@/lib/api-error";
 
 // POST /api/ai/parse
 // Body: { raw_text: string, entity_type: "customer"|"product"|"order" }
 export async function POST(req: NextRequest) {
     try {
-        const body: ParseEntityInput = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as ParseEntityInput;
 
         if (!body.raw_text || !body.entity_type) {
             return NextResponse.json(

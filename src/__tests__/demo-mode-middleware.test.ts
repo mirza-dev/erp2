@@ -154,13 +154,11 @@ describe("middleware — demo mode blocks sensitive write endpoints", () => {
         mockGetUser.mockResolvedValue(ANON);
     });
 
+    // Regular API paths — demo mode returns 403 (write blocked)
     const sensitiveWrites: Array<[string, string]> = [
         ["POST",   "/api/admin/users"],
         ["DELETE", "/api/admin/users/user-1"],
-        ["POST",   "/api/alerts/scan"],
-        ["POST",   "/api/alerts/ai-suggest"],
         ["POST",   "/api/import/batch-1/confirm"],
-        ["POST",   "/api/parasut/sync-all"],
         ["POST",   "/api/parasut/retry"],
         ["PATCH",  "/api/recommendations/rec-1"],
         ["POST",   "/api/ai/purchase-copilot"],
@@ -171,7 +169,6 @@ describe("middleware — demo mode blocks sensitive write endpoints", () => {
         ["DELETE", "/api/production/entry-1"],
         ["PATCH",  "/api/quotes/quote-1"],
         ["DELETE", "/api/quotes/quote-1"],
-        ["POST",   "/api/quotes/expire"],
     ];
 
     for (const [method, path] of sensitiveWrites) {
@@ -182,6 +179,29 @@ describe("middleware — demo mode blocks sensitive write endpoints", () => {
             expect(body.error).toMatch(/demo/i);
         });
     }
+
+    // CRON paths — middleware returns 401 (CRON_SECRET required), not 403
+    // Demo mode does not apply: CRON paths are checked before user/demo state
+    it("POST /api/alerts/ai-suggest → 401 in demo mode (CRON_SECRET required)", async () => {
+        const res = await middleware(makeRequest("/api/alerts/ai-suggest", { method: "POST", cookies: DEMO_COOKIE }));
+        expect(res.status).toBe(401);
+    });
+
+    it("POST /api/parasut/sync-all → 401 in demo mode (CRON_SECRET required)", async () => {
+        const res = await middleware(makeRequest("/api/parasut/sync-all", { method: "POST", cookies: DEMO_COOKIE }));
+        expect(res.status).toBe(401);
+    });
+
+    it("POST /api/quotes/expire → 401 in demo mode (CRON_SECRET required)", async () => {
+        const res = await middleware(makeRequest("/api/quotes/expire", { method: "POST", cookies: DEMO_COOKIE }));
+        expect(res.status).toBe(401);
+    });
+
+    // /api/alerts/scan is in ALWAYS_PUBLIC — middleware passes through, route handles own auth
+    it("POST /api/alerts/scan → 200 from middleware (route manages own auth via CRON_SECRET or session)", async () => {
+        const res = await middleware(makeRequest("/api/alerts/scan", { method: "POST", cookies: DEMO_COOKIE }));
+        expect(res.status).toBe(200);
+    });
 
     it("GET /api/admin/users → 200 in demo mode (read-only list allowed)", async () => {
         const res = await middleware(makeRequest("/api/admin/users", { cookies: DEMO_COOKIE }));

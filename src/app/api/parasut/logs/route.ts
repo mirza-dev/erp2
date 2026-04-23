@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
         const entityType = searchParams.get("entity_type") ?? undefined;
-        const limit = parseInt(searchParams.get("limit") ?? "50", 10);
+        const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 500);
         const logs = await dbListSyncLogs(entityType, limit);
         return NextResponse.json(logs);
     } catch (err) {

@@ -5,7 +5,7 @@ import {
     dbDeleteProduct,
     type CreateProductInput,
 } from "@/lib/supabase/products";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 
 // GET /api/products/[id]
@@ -32,7 +32,9 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const body: Partial<CreateProductInput> = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as Partial<CreateProductInput>;
         const product = await dbUpdateProduct(id, body);
         revalidateTag("products", "max");
         return NextResponse.json(product);

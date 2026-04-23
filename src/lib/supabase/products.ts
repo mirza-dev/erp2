@@ -38,6 +38,7 @@ export interface ListProductsFilter {
     category?: string;
     product_type?: "manufactured" | "commercial";
     is_active?: boolean;
+    on_hand_gt?: number;
     page?: number;
     pageSize?: number;
 }
@@ -94,6 +95,7 @@ export async function dbListProducts(filter: ListProductsFilter = {}): Promise<P
     if (category) query = query.eq("category", category);
     if (product_type) query = query.eq("product_type", product_type);
     if (is_active !== undefined) query = query.eq("is_active", is_active);
+    if (filter.on_hand_gt !== undefined) query = query.gt("on_hand", filter.on_hand_gt);
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);

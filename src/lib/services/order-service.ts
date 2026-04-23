@@ -89,7 +89,9 @@ export function validateOrderCreate(input: CreateOrderInput): ValidationResult {
     for (const [i, line] of (input.lines ?? []).entries()) {
         if (!line.product_id) errors.push(`Satır ${i + 1}: Ürün seçilmedi.`);
         if (line.quantity <= 0) errors.push(`Satır ${i + 1}: Miktar 0'dan büyük olmalı.`);
+        if (line.quantity > 999_999_999) errors.push(`Satır ${i + 1}: Miktar çok büyük.`);
         if (line.unit_price < 0) errors.push(`Satır ${i + 1}: Birim fiyat negatif olamaz.`);
+        if (line.unit_price > 999_999_999) errors.push(`Satır ${i + 1}: Birim fiyat çok büyük.`);
     }
 
     return { valid: errors.length === 0, errors };

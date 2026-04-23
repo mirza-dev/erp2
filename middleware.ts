@@ -3,11 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed"];
+// /api/alerts/scan is listed here because it handles its own auth (CRON_SECRET OR session)
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan"];
 
-// Cron/external servisler: CRON_SECRET Bearer token ile erişir
+// Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
+// Not: /api/alerts/scan buraya dahil değil — kendi içinde session OR CRON_SECRET kontrolü yapar
 const CRON_PATHS = [
-    "/api/alerts/scan",
     "/api/alerts/ai-suggest",
     "/api/parasut/sync-all",
     "/api/orders/expire-quotes",
@@ -23,41 +24,53 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // Cron path'ler — CRON_SECRET ile bypass
+    // Cron path'ler — SADECE CRON_SECRET Bearer token kabul edilir, session bypass YOK (M-1)
     if (CRON_PATHS.some(p => pathname === p)) {
         const secret = process.env.CRON_SECRET;
         const authHeader = request.headers.get("authorization");
         if (secret && authHeader === `Bearer ${secret}`) {
             return NextResponse.next();
         }
-        // Secret yoksa veya header eşleşmiyorsa → session kontrolüne düş
+        return NextResponse.json(
+            { error: "CRON_SECRET gerekli." },
+            { status: 401 }
+        );
     }
 
     // Supabase session kontrolü
     let supabaseResponse = NextResponse.next({ request });
 
-    const supabase = createServerClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll() {
-                    return request.cookies.getAll();
+    // C-1: Turbopack Edge Runtime'da createServerClient başarısız olabilir.
+    // try-catch ile sarıyoruz — hata durumunda user=null → kimliksiz olarak işlenir.
+    let user = null;
+    try {
+        const supabase = createServerClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            {
+                cookies: {
+                    getAll() {
+                        return request.cookies.getAll();
+                    },
+                    setAll(cookiesToSet) {
+                        cookiesToSet.forEach(({ name, value }) =>
+                            request.cookies.set(name, value)
+                        );
+                        supabaseResponse = NextResponse.next({ request });
+                        cookiesToSet.forEach(({ name, value, options }) =>
+                            supabaseResponse.cookies.set(name, value, options)
+                        );
+                    },
                 },
-                setAll(cookiesToSet) {
-                    cookiesToSet.forEach(({ name, value }) =>
-                        request.cookies.set(name, value)
-                    );
-                    supabaseResponse = NextResponse.next({ request });
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
-                    );
-                },
-            },
-        }
-    );
+            }
+        );
 
-    const { data: { user } } = await supabase.auth.getUser();
+        const { data } = await supabase.auth.getUser();
+        user = data.user;
+    } catch {
+        // Turbopack Edge Runtime'da Supabase init başarısız olabilir.
+        // user = null → aşağıda kimliksiz olarak işlenir → doğru güvenlik davranışı.
+    }
 
     if (!user) {
         // Demo mode — oturumu yok ama demo cookie var

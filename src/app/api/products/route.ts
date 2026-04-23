@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
 import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 import { computeOrderDeadline } from "@/lib/stock-utils";
 import { unstable_cache, revalidateTag } from "next/cache";
@@ -58,7 +58,12 @@ export async function GET(req: NextRequest) {
 // POST /api/products
 export async function POST(req: NextRequest) {
     try {
-        const body: CreateProductInput = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as CreateProductInput;
+
+        const lengthErr = validateStringLengths(body as unknown as Record<string, unknown>);
+        if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
 
         if (!body.name?.trim()) {
             return NextResponse.json({ error: "Ürün adı zorunludur." }, { status: 400 });

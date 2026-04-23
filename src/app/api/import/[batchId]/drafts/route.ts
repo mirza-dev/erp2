@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListDrafts } from "@/lib/supabase/import";
 import { serviceAddDraftsToBatch } from "@/lib/services/import-service";
+import { safeParseJson } from "@/lib/api-error";
 
 // GET /api/import/[batchId]/drafts
 export async function GET(
@@ -25,7 +26,9 @@ export async function POST(
 ) {
     try {
         const { batchId } = await params;
-        const body = await req.json();
+        const safeParsed = await safeParseJson(req);
+        if (!safeParsed.ok) return safeParsed.response;
+        const body = safeParsed.data;
         const drafts = Array.isArray(body) ? body : [body];
 
         if (drafts.length === 0) {

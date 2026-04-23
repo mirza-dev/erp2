@@ -3,22 +3,46 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-22_
 
-**Son tamamlanan iş:** Faz 8 Bulgular Fix Round 1+2 (2026-04-22) — commit `3634b1c`
-- `037_unique_quote_id.sql`: `quote_id` partial UNIQUE index (race condition)
-- `quote-service.ts`: 23505 catch, `createdBy` param, geçmiş `valid_until` soft 400, atlanan satırlar → notes
-- `convert/route.ts`: `created_by` session + `existingOrderNumber` 409'da
-- `QuoteForm.tsx`: `position: i+1` (1-based satır numaraları)
-- **83 dosya · 1609 test — 0 hata · 0 TS hatası**
+**Son tamamlanan iş:** Güvenlik + Kapasite Audit — Faz 1–4 tam (2026-04-23)
+- Faz 1: Auth matrisi, HTTP header audit, CRON güvenlik, bilgi sızıntısı kontrolü
+- Faz 2: Quote convert race (migration 037 ✅), stok rezervasyon 5 VU (invariant ✅), alert scan 5→100 VU (advisory lock ✅)
+- Faz 3: Small/medium profil kapasite testi, edge case testleri
+- Faz 4: Kapasite matrisi raporu → `docs/audit/faz4-capacity-matrix.md`
+- **Önemli bulgular:** Dev/Turbopack middleware bypass, aging endpoint p95 2.6s (medium), category filter p99 7.5s (medium), JSON hataları 500 dönüyor
 
 **Önceki önemli işler:**
+- Faz 8 Bulgular Fix Round 1+2 — commit `3634b1c`
 - Faz 8 — Siparişe Dönüştür (2026-04-22)
-- Faz 7 — Durum Yönetimi (2026-04-21)
-- Faz 5+5.5 — DB Persistence + Güvenlik (2026-04-21)
 
-**Aktif odak:** —
-**Sonraki:** Belirsiz — teklif roadmap (Faz 1–8) tamamen tamamlandı
-**Bilinen açık sorunlar:** `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik; migration 037 Supabase'e henüz uygulanmadı
+**Aktif odak:** Audit bulguları fix — öncelik sırası aşağıda
 **Test sayısı:** 83 dosya · 1609 vitest (hepsi yeşil)
+
+**Fix Backlog (öncelik sırasıyla):**
+
+_Öncelik 1 — Büyüyen katalog (kullanıcı sayısı ~10, katalog zamanla büyüyecek):_
+- [ ] **H-2** `products/aging` yavaş: small p95=1.2s → medium p95=2.6s → 20K'da timeout. Index + sorgu optimize
+- [ ] **H-3** Category filter yavaş: medium p99=7.5s. `products(category)` veya `(category, is_active)` index ekle (migration)
+
+_Öncelik 2 — Production kalitesi:_
+- [ ] **C-2** Bozuk JSON body → 500 (400 olmalı, iç hata sızıyor). Tüm POST route'lara JSON parse try-catch
+- [ ] **C-3** Numeric overflow → 500 (DB hatası sızıyor). Max value validation + DB hata catch
+- [ ] **C-1** Dev middleware bypass: `middleware.ts`'e try-catch ekle (Turbopack Edge Runtime Supabase init hatası)
+
+_Öncelik 3 — Güvenlik hardening (Vercel'e çıkmadan önce):_
+- [ ] **H-1** CSP header eksik (`next.config.ts`)
+- [ ] **M-2** HSTS (`next.config.ts` veya Vercel)
+- [ ] **H-4** String boyut limiti yok (100KB+ body kabul ediyor)
+- [ ] **B-03** `handleApiError` prod'da iç hata mesajı sızıyor → prod'da generic mesaj dön, Sentry'e logla
+- [ ] **B-06** CRON endpoint'ler session ile tetiklenebilir → sadece CRON_SECRET kabul et
+
+_Öncelik 4 — Düşük risk / backlog:_
+- [ ] **B-02** Rate limiting yok (özellikle `POST /api/ai/*` maliyet saldırısı riski) → Vercel KV veya upstash
+- [ ] **B-04** `/api/health` tablo/migration adları herkese açık → auth gerektir veya sadeleştir
+- [ ] **B-05** `limit` param üst sınırı yok (`?limit=999999`) → `Math.min(limit, 500)`
+
+_Bilinen diğer sorunlar:_
+- `purchase_commitments` ve `column_mappings` tablolarında RLS migration eksik
+- `seed-large.ts --clean` 1000 limit bug (birden fazla çalıştırma gerekiyor — düşük öncelik)
 
 ---
 

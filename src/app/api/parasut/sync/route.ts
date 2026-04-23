@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
+import { safeParseJson } from "@/lib/api-error";
 
 // POST /api/parasut/sync
 // Body: { order_id: string }
 export async function POST(req: NextRequest) {
     try {
-        const { order_id } = await req.json() as { order_id: string };
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const { order_id } = parsed.data as { order_id: string };
         if (!order_id) {
             return NextResponse.json({ error: "'order_id' zorunludur." }, { status: 400 });
         }

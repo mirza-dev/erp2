@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch, dbUpdateBatchStatus, dbCreateDrafts } from "@/lib/supabase/import";
 import { aiBatchParse, isAIAvailable } from "@/lib/services/ai-service";
+import { safeParseJson } from "@/lib/api-error";
 
 /**
  * POST /api/import/[batchId]/parse
@@ -18,7 +19,9 @@ export async function POST(
             return NextResponse.json({ error: "Batch bulunamadı." }, { status: 404 });
         }
 
-        const body = await req.json() as {
+        const safeParsed = await safeParseJson(req);
+        if (!safeParsed.ok) return safeParsed.response;
+        const body = safeParsed.data as {
             sheets: Array<{
                 sheet_name: string;
                 entity_type: "customer" | "product" | "order";

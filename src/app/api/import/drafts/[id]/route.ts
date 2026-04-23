@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetDraft, dbUpdateDraft } from "@/lib/supabase/import";
 import type { ImportDraftStatus } from "@/lib/database.types";
+import { safeParseJson } from "@/lib/api-error";
 
 // GET /api/import/drafts/[id]
 export async function GET(
@@ -26,7 +27,9 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const { status, user_corrections } = await req.json() as {
+        const safeParsed = await safeParseJson(req);
+        if (!safeParsed.ok) return safeParsed.response;
+        const { status, user_corrections } = safeParsed.data as {
             status?: ImportDraftStatus;
             user_corrections?: Record<string, unknown>;
         };

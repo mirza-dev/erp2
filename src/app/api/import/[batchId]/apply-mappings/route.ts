@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch, dbUpdateBatchStatus, dbCreateDrafts, dbDeletePendingDrafts } from "@/lib/supabase/import";
 import { dbSaveColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { NUMERIC_FIELDS, IMPORT_FIELD_SET } from "@/lib/import-fields";
+import { safeParseJson } from "@/lib/api-error";
 
 function parseTRNumber(raw: string): number | null {
     const s = raw.toString().trim();
@@ -51,7 +52,9 @@ export async function POST(
             return NextResponse.json({ error: "Batch bulunamadı." }, { status: 404 });
         }
 
-        const body = await req.json() as {
+        const safeParsed = await safeParseJson(req);
+        if (!safeParsed.ok) return safeParsed.response;
+        const body = safeParsed.data as {
             sheets: Array<{
                 sheet_name: string;
                 entity_type: string;

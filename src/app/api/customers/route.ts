@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbListCustomers, dbCreateCustomer } from "@/lib/supabase/customers";
-import { handleApiError } from "@/lib/api-error";
+import { dbListCustomers, dbCreateCustomer, type CreateCustomerInput } from "@/lib/supabase/customers";
+import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 const getCachedCustomers = unstable_cache(
@@ -22,8 +22,13 @@ export async function GET() {
 // POST /api/customers
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json();
-        if (body.country && body.country.length > 2) {
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as CreateCustomerInput;
+        const lengthErr = validateStringLengths(body as unknown as Record<string, unknown>);
+        if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
+
+        if (body.country && (body.country as string).length > 2) {
             return NextResponse.json({ error: "Ülke kodu en fazla 2 karakter olabilir (ISO 3166-1 alpha-2)" }, { status: 400 });
         }
         const customer = await dbCreateCustomer(body);

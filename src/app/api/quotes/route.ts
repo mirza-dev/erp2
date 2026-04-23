@@ -3,7 +3,7 @@ import { unstable_cache, revalidateTag } from "next/cache";
 import { dbCreateQuote, dbListQuotes } from "@/lib/supabase/quotes";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { mapQuoteDetail, mapQuoteSummary } from "@/lib/api-mappers";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 
 const getCachedQuotes = unstable_cache(
     async (status?: string) => {
@@ -28,7 +28,13 @@ export async function GET(req: NextRequest) {
 // POST /api/quotes
 export async function POST(req: NextRequest) {
     try {
-        const body = await req.json() as CreateQuoteInput;
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as CreateQuoteInput;
+
+        const lengthErr = validateStringLengths(body as unknown as Record<string, unknown>);
+        if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
+
         const row = await dbCreateQuote(body);
         revalidateTag("quotes", "max");
         return NextResponse.json(mapQuoteDetail(row), { status: 201 });

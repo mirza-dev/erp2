@@ -7,7 +7,7 @@ import {
 import { aiScoreOrder } from "@/lib/services/ai-service";
 import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
 import { revalidateTag } from "next/cache";
 
@@ -34,12 +34,17 @@ export async function GET(req: NextRequest) {
 // POST /api/orders — creates a new order (draft or pending_approval)
 export async function POST(req: NextRequest) {
     try {
-        const body: CreateOrderInput = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as CreateOrderInput;
 
         // Populate created_by from the current session user (session always wins)
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
         body.created_by = user?.id ?? undefined;
+
+        const lengthErr = validateStringLengths(body as unknown as Record<string, unknown>);
+        if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
 
         const validation = validateOrderCreate(body);
         if (!validation.valid) {

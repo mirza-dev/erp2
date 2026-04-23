@@ -5,7 +5,7 @@ import {
     dbCancelCommitment,
     CommitmentConflictError,
 } from "@/lib/supabase/purchase-commitments";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-commitments/[id]
@@ -33,8 +33,10 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const body = await req.json();
-        const action: string = body.action;
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as Record<string, unknown>;
+        const action: string = body.action as string;
 
         if (!action) {
             return NextResponse.json({ error: "'action' alanı zorunludur." }, { status: 400 });

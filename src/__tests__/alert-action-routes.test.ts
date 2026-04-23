@@ -37,10 +37,30 @@ vi.mock("@/lib/supabase/service", () => ({
     }),
 }));
 
-// handleApiError mock (used by ai-suggest route)
+// handleApiError + safeParseJson mock (used by scan and alerts/[id] routes)
 vi.mock("@/lib/api-error", () => ({
     handleApiError: (_err: unknown, msg: string) =>
         NextResponse.json({ error: msg }, { status: 500 }),
+    safeParseJson: async (req: Request) => {
+        try {
+            const data = await req.json();
+            if (data === null || data === undefined) {
+                return { ok: false, response: NextResponse.json({ error: "Boş istek gövdesi." }, { status: 400 }) };
+            }
+            return { ok: true, data };
+        } catch {
+            return { ok: false, response: NextResponse.json({ error: "Geçersiz JSON." }, { status: 400 }) };
+        }
+    },
+}));
+
+// createClient mock — scan route uses session auth (fallback when no CRON_SECRET)
+vi.mock("@/lib/supabase/server", () => ({
+    createClient: () => Promise.resolve({
+        auth: {
+            getUser: () => Promise.resolve({ data: { user: { id: "test-user" } } }),
+        },
+    }),
 }));
 
 import { POST as scanPost }      from "@/app/api/alerts/scan/route";

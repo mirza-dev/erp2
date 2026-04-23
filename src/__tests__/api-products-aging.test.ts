@@ -100,12 +100,16 @@ describe("GET /api/products/aging", () => {
         expect(await res.json()).toEqual([]);
     });
 
-    it("filters out products with on_hand = 0", async () => {
+    it("filters out products with on_hand = 0 (DB-level via on_hand_gt: 0 filter)", async () => {
+        // Route calls dbListProducts({ on_hand_gt: 0 }) — DB returns only matching rows.
+        // Mock simulates DB behavior: only return products with on_hand > 0.
         mockDbListProducts.mockResolvedValue([
             makeProduct("p1", { on_hand: 10 }),
-            makeProduct("p2", { on_hand: 0 }),
         ]);
         const data = await (await GET(makeRequest())).json();
+        expect(mockDbListProducts).toHaveBeenCalledWith(
+            expect.objectContaining({ on_hand_gt: 0 })
+        );
         expect(data).toHaveLength(1);
         expect(data[0].productId).toBe("p1");
     });

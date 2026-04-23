@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetCompanySettings, dbUpdateCompanySettings } from "@/lib/supabase/company-settings";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 const getCachedCompanySettings = unstable_cache(
@@ -24,7 +24,9 @@ export async function GET() {
 // PATCH /api/settings/company
 export async function PATCH(req: NextRequest) {
     try {
-        const body = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as Record<string, unknown>;
         // Sadece izin verilen alanları al
         // logo_url burada intentionally yok — logo değişimi için /logo endpoint kullanılmalı (MIME/size doğrulama)
         const allowed = ["name", "tax_office", "tax_no", "address", "phone", "email", "website", "currency"] as const;

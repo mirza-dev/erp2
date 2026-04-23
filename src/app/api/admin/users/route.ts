@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 
 async function requireAdmin(): Promise<{ error: NextResponse } | null> {
     const supabase = await createClient();
@@ -41,8 +41,9 @@ export async function POST(req: NextRequest) {
     const adminCheck = await requireAdmin();
     if (adminCheck) return adminCheck.error;
     try {
-        const body = await req.json();
-        const { email, password } = body as { email?: string; password?: string };
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const { email, password } = parsed.data as { email?: string; password?: string };
 
         if (!email?.trim()) {
             return NextResponse.json({ error: "E-posta zorunludur." }, { status: 400 });

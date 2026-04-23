@@ -6,7 +6,7 @@ import {
     type OrderTransition,
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
 import { revalidateTag } from "next/cache";
 
@@ -36,15 +36,17 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const body = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as Record<string, unknown>;
 
         // Quote deadline update — separate from state-machine transitions
         if ("quote_valid_until" in body) {
-            await serviceUpdateQuoteDeadline(id, body.quote_valid_until ?? null);
+            await serviceUpdateQuoteDeadline(id, (body.quote_valid_until as string | null) ?? null);
             return NextResponse.json({ ok: true });
         }
 
-        const transition: OrderTransition = body.transition;
+        const transition: OrderTransition = body.transition as OrderTransition;
 
         if (!transition) {
             return NextResponse.json({ error: "'transition' alanı zorunludur." }, { status: 400 });

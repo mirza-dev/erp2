@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetRecommendationById, dbUpdateRecommendationStatus } from "@/lib/supabase/recommendations";
 import { mapRecommendation } from "@/lib/api-mappers";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 import type { RecommendationStatus } from "@/lib/database.types";
 
 export async function GET(
@@ -27,13 +27,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     const { id } = await params;
-    let body: { status?: string; editedMetadata?: Record<string, unknown>; feedbackNote?: string };
-
-    try {
-        body = await req.json();
-    } catch {
-        return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
+    const safeParsed = await safeParseJson(req);
+    if (!safeParsed.ok) return safeParsed.response;
+    const body = safeParsed.data as { status?: string; editedMetadata?: Record<string, unknown>; feedbackNote?: string };
 
     const status = body.status as RecommendationStatus;
     if (!status || !ALLOWED_STATUSES.includes(status)) {

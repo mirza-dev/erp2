@@ -59,12 +59,14 @@ export function computeAgingCategory(days: number | null): AgingCategory {
  * Her ürün için en son onaylı satış siparişinin tarihini döner.
  * order_lines JOIN sales_orders (commercial_status = 'approved')
  */
-export async function dbGetLastSaleDates(): Promise<Map<string, string>> {
+export async function dbGetLastSaleDates(productIds?: string[]): Promise<Map<string, string>> {
     const supabase = createServiceClient();
-    const { data, error } = await supabase
+    let q = supabase
         .from("order_lines")
         .select("product_id, sales_orders!inner(created_at, commercial_status)")
         .in("sales_orders.commercial_status", ["approved"]);
+    if (productIds && productIds.length > 0) q = q.in("product_id", productIds);
+    const { data, error } = await q;
     if (error || !data) return new Map();
     const map = new Map<string, string>();
     for (const row of data) {
@@ -83,12 +85,14 @@ export async function dbGetLastSaleDates(): Promise<Map<string, string>> {
  * Her ürün için en son gerçek stok girişinin tarihini döner.
  * Sadece status='received' satırlar — received_at = fiziksel teslim zamanı.
  */
-export async function dbGetLastIncomingDates(): Promise<Map<string, string>> {
+export async function dbGetLastIncomingDates(productIds?: string[]): Promise<Map<string, string>> {
     const supabase = createServiceClient();
-    const { data, error } = await supabase
+    let q = supabase
         .from("purchase_commitments")
         .select("product_id, received_at")
         .eq("status", "received");
+    if (productIds && productIds.length > 0) q = q.in("product_id", productIds);
+    const { data, error } = await q;
     if (error || !data) return new Map();
     const map = new Map<string, string>();
     for (const row of data) {
@@ -105,12 +109,14 @@ export async function dbGetLastIncomingDates(): Promise<Map<string, string>> {
  * Her mamul ürün için en son üretildiği tarihi döner.
  * Kaynak: production_entries.product_id = üretilen mamulün ID'si.
  */
-export async function dbGetLastProductionDates(): Promise<Map<string, string>> {
+export async function dbGetLastProductionDates(productIds?: string[]): Promise<Map<string, string>> {
     const supabase = createServiceClient();
-    const { data, error } = await supabase
+    let q = supabase
         .from("production_entries")
         .select("product_id, production_date")
         .order("production_date", { ascending: false });
+    if (productIds && productIds.length > 0) q = q.in("product_id", productIds);
+    const { data, error } = await q;
     if (error || !data) return new Map();
     const map = new Map<string, string>();
     for (const row of data) {

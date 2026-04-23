@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbDeleteCustomer, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbCountOrdersByCustomer } from "@/lib/supabase/orders";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 
 // PATCH /api/customers/[id]
 export async function PATCH(
@@ -10,15 +10,17 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const body = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as Record<string, unknown>;
         const PATCHABLE = ["name","email","phone","address","tax_number","tax_office","country","currency","notes"];
         if (!PATCHABLE.some(f => f in body)) {
             return NextResponse.json({ error: "Güncellenecek alan bulunamadı." }, { status: 400 });
         }
-        if ("name" in body && !body.name?.trim()) {
+        if ("name" in body && !(body.name as string)?.trim()) {
             return NextResponse.json({ error: "Firma adı boş olamaz." }, { status: 400 });
         }
-        if (body.country && body.country.length > 2) {
+        if (body.country && (body.country as string).length > 2) {
             return NextResponse.json(
                 { error: "Ülke kodu en fazla 2 karakter olabilir (ISO 3166-1 alpha-2)" },
                 { status: 400 }

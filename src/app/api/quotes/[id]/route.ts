@@ -4,7 +4,7 @@ import { dbGetQuote, dbUpdateQuote, dbDeleteQuote } from "@/lib/supabase/quotes"
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { mapQuoteDetail } from "@/lib/api-mappers";
-import { handleApiError } from "@/lib/api-error";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
 
 function getCachedQuote(id: string) {
@@ -55,11 +55,13 @@ export async function PATCH(
 ) {
     try {
         const { id } = await params;
-        const body = await req.json();
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as Record<string, unknown>;
 
         // Status transition branch
         if ("transition" in body) {
-            const result = await serviceTransitionQuote(id, body.transition);
+            const result = await serviceTransitionQuote(id, body.transition as "sent" | "accepted" | "rejected");
             if (!result.success) {
                 const httpStatus = result.notFound ? 404 : 409;
                 return NextResponse.json({ error: result.error }, { status: httpStatus });
@@ -76,7 +78,7 @@ export async function PATCH(
         if (existing.status !== "draft") {
             return NextResponse.json({ error: "Sadece taslak teklifler düzenlenebilir." }, { status: 409 });
         }
-        const row = await dbUpdateQuote(id, body as CreateQuoteInput);
+        const row = await dbUpdateQuote(id, body as unknown as CreateQuoteInput);
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");
         return NextResponse.json(mapQuoteDetail(row));

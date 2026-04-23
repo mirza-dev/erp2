@@ -18,16 +18,19 @@ export async function GET(req: NextRequest) {
     try {
         const type = req.nextUrl.searchParams.get("type") ?? "all";
 
-        const [products, lastSaleDates, lastIncomingDates, lastProductionDates] = await Promise.all([
-            dbListProducts({ is_active: true, pageSize: 10_000 }),
-            dbGetLastSaleDates(),
-            dbGetLastIncomingDates(),
-            dbGetLastProductionDates(),
+        // DB-level filter: sadece on_hand > 0 olan aktif ürünler (idx_products_active_onhand)
+        const products = await dbListProducts({ is_active: true, on_hand_gt: 0, pageSize: 10_000 });
+        const productIds = products.map(p => p.id);
+
+        // Aging sorguları sadece bu ürün kümesine sınırlı (idx_order_lines_product_id vb.)
+        const [lastSaleDates, lastIncomingDates, lastProductionDates] = await Promise.all([
+            dbGetLastSaleDates(productIds),
+            dbGetLastIncomingDates(productIds),
+            dbGetLastProductionDates(productIds),
         ]);
 
         const now = Date.now();
         const result = products
-            .filter(p => p.on_hand > 0)
             .filter(p => {
                 if (type === "manufactured")  return p.product_type === "manufactured";
                 if (type === "commercial")    return p.product_type === "commercial";
