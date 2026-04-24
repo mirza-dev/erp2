@@ -13,12 +13,11 @@ interface FormLine {
     id: string;
     productId: string;
     adet: string;
-    notlar: string;
     _lowConfidence?: boolean; // sesli girişten gelen, güven skoru düşük satır
 }
 
 function newLine(): FormLine {
-    return { id: crypto.randomUUID(), productId: "", adet: "", notlar: "" };
+    return { id: crypto.randomUUID(), productId: "", adet: "" };
 }
 
 const today = () => {
@@ -65,6 +64,7 @@ export default function ProductionPage() {
     const isDemo = useIsDemo();
     const [tarih, setTarih] = useState(today());
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
+    const [batchNote, setBatchNote] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -81,32 +81,41 @@ export default function ProductionPage() {
             const body = await res.json().catch(() => null) as { error?: string } | null;
             throw new Error(body?.error ?? "Ses işlenemedi.");
         }
-        const data = await res.json() as { text: string; entry: VoiceProductionEntry };
+        const data = await res.json() as { text: string; entries: VoiceProductionEntry[]; sessionNote: string };
         setVoiceTranscript(data.text);
-        const entry = data.entry;
-        const newLineItem: FormLine = {
+
+        const newLines = data.entries.map(entry => ({
             id: crypto.randomUUID(),
             productId: entry.productId ?? "",
             adet: entry.quantity > 0 ? String(entry.quantity) : "",
-            notlar: entry.notes ?? "",
             _lowConfidence: entry.confidence < 0.7,
-        };
+        }));
+
         setLines(prev => {
-            // Boş tek satır varsa değiştir, yoksa ekle
             const hasEmptyOnly = prev.length === 1 && !prev[0].productId && !prev[0].adet;
-            return hasEmptyOnly ? [newLineItem] : [...prev, newLineItem];
+            return hasEmptyOnly ? newLines : [...prev, ...newLines];
         });
-        if (entry.confidence < 0.7) {
-            toast({ type: "warning", message: "Sesli giriş düşük güvenle tamamlandı. Bilgileri kontrol edin." });
-        } else {
-            toast({ type: "success", message: "Sesli giriş tamamlandı. Bilgileri gözden geçirin." });
-        }
+
+        // Global not: sessionNote + fire bilgileri birleştirilir
+        const fireParts = data.entries.map(e => e.fireNotes).filter(Boolean);
+        const noteParts = [data.sessionNote, ...fireParts].filter(Boolean);
+        if (noteParts.length > 0) setBatchNote(noteParts.join("; "));
+
+        const count = data.entries.length;
+        const anyLow = data.entries.some(e => e.confidence < 0.7);
+        toast({
+            type: anyLow ? "warning" : "success",
+            message: count > 1
+                ? `${count} ürün algılandı. Bilgileri gözden geçirin.`
+                : "Sesli giriş tamamlandı. Bilgileri gözden geçirin.",
+        });
+
         // Transkript 6 saniye sonra gizlenir (önceki timer varsa iptal et)
         if (transcriptTimerRef.current) clearTimeout(transcriptTimerRef.current);
         transcriptTimerRef.current = setTimeout(() => setVoiceTranscript(null), 6000);
     }, [toast]);
 
-    const { isRecording, isProcessing, duration, error: voiceError, startRecording, stopRecording, cancelRecording } = useVoiceRecorder(handleVoiceResult);
+    const { isRecording, isProcessing, duration, volume, error: voiceError, startRecording, stopRecording, cancelRecording } = useVoiceRecorder(handleVoiceResult);
 
     const setLineField = (id: string, field: keyof FormLine, val: string) => {
         setLines(prev => prev.map(l =>
@@ -147,7 +156,7 @@ export default function ProductionPage() {
                     adet: parseInt(line.adet),
                     tarih,
                     girenKullanici: "Usta",
-                    notlar: line.notlar,
+                    notlar: batchNote,
                 });
                 succeeded++;
                 if (result?.refetchFailed) refetchWarning = true;
@@ -163,6 +172,7 @@ export default function ProductionPage() {
             const msg = `${succeeded} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi`;
             toast({ type: "success", message: refetchWarning ? msg + " (veri gecikmeli yüklenebilir)" : msg });
             setLines([newLine()]);
+            setBatchNote("");
         } else if (succeeded > 0 && failed > 0) {
             toast({ type: "warning", message: `${succeeded} kayıt başarılı, ${failed} kayıt başarısız. Başarısız satırları kontrol edin.` });
             setLines(prev => prev.filter(l => failedLineIds.includes(l.id)));
@@ -240,15 +250,21 @@ export default function ProductionPage() {
                         Üretim Kalemleri
                     </div>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        {/* Kayıt aktif: süre + durdur + iptal */}
+                        {/* Kayıt aktif: animasyonlu barlar + süre + durdur + iptal */}
                         {isRecording && (
                             <>
-                                <span style={{ fontSize: "12px", color: "var(--danger-text)", display: "flex", alignItems: "center", gap: "5px" }}>
-                                    <span style={{
-                                        display: "inline-block", width: "8px", height: "8px",
-                                        borderRadius: "50%", background: "var(--danger)",
-                                        animation: "pulse 1s infinite",
-                                    }} />
+                                <span style={{ display: "flex", gap: "2px", alignItems: "flex-end", height: "18px" }}>
+                                    {[0.5, 0.75, 1, 0.75, 0.5].map((scale, i) => {
+                                        const h = Math.max(3, Math.round((volume / 220) * 18 * scale));
+                                        return (
+                                            <span key={i} style={{
+                                                display: "inline-block", width: "3px", height: `${h}px`,
+                                                background: "var(--danger)", borderRadius: "2px",
+                                            }} />
+                                        );
+                                    })}
+                                </span>
+                                <span style={{ fontSize: "12px", color: "var(--danger-text)" }}>
                                     {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(duration % 60).padStart(2, "0")}
                                 </span>
                                 <button
@@ -322,13 +338,12 @@ export default function ProductionPage() {
                 )}
 
                 <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", minWidth: "520px", borderCollapse: "collapse" }}>
+                <table style={{ width: "100%", minWidth: "400px", borderCollapse: "collapse" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)" }}>
                             <th style={{ ...thStyle, width: "34px" }}>#</th>
                             <th style={thStyle}>Ürün</th>
                             <th style={{ ...thStyle, width: "120px", textAlign: "right" as const }}>Adet</th>
-                            <th style={thStyle}>Not</th>
                             <th style={{ ...thStyle, width: "34px" }}></th>
                         </tr>
                     </thead>
@@ -374,15 +389,6 @@ export default function ProductionPage() {
                                             style={{ ...inputStyle, textAlign: "right", width: "90px" }}
                                         />
                                     </td>
-                                    <td style={tdStyle}>
-                                        <input
-                                            type="text"
-                                            value={line.notlar}
-                                            onChange={e => setLineField(line.id, "notlar", e.target.value)}
-                                            placeholder="Opsiyonel not..."
-                                            style={inputStyle}
-                                        />
-                                    </td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
                                             onClick={() => removeLine(line.id)}
@@ -404,6 +410,17 @@ export default function ProductionPage() {
                         })}
                     </tbody>
                 </table>
+                </div>
+
+                {/* Global not alanı */}
+                <div style={{ padding: "10px 16px 0" }}>
+                    <input
+                        type="text"
+                        value={batchNote}
+                        onChange={e => setBatchNote(e.target.value)}
+                        placeholder="Not (opsiyonel) — tüm kalemler için geçerli"
+                        style={inputStyle}
+                    />
                 </div>
 
                 <div style={{ padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>

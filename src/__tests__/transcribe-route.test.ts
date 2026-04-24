@@ -1,6 +1,6 @@
 /**
  * POST /api/production/transcribe — Route Testleri
- * Auth (401), boyut limiti (400), boş audio (400), key eksik (503), başarı (200)
+ * Auth (401), boyut limiti (400), boş audio (400), MIME tip (400), key eksik (503), başarı (200)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -49,9 +49,9 @@ function makeFormDataRequest(file: File | null): Request {
     });
 }
 
-function makeAudioFile(size = 1000, name = "recording.webm"): File {
+function makeAudioFile(size = 1000, name = "recording.webm", type = "audio/webm"): File {
     const buf = new Uint8Array(size).fill(0);
-    return new File([buf], name, { type: "audio/webm" });
+    return new File([buf], name, { type });
 }
 
 // ── Testler ───────────────────────────────────────────────────────────────────
@@ -131,19 +131,20 @@ describe("POST /api/production/transcribe", () => {
         expect(body.error).toContain("Geçersiz dosya formatı");
     });
 
-    it("Başarılı çağrıda 200 ve { text, entry } döner", async () => {
+    it("Başarılı çağrıda 200 ve { text, entries, sessionNote } döner", async () => {
         mockGetUser.mockResolvedValue({ data: { user: { id: "user-1", email: "usta@pmt.com" } } });
 
         mockTranscribe.mockResolvedValue("50 adet DN50 vana ürettik");
         mockExtract.mockResolvedValue({
-            entry: {
+            entries: [{
                 productId: "prod-1",
                 productName: "DN50 Vana",
                 productSku: "DN50",
                 quantity: 50,
-                notes: "",
+                fireNotes: "",
                 confidence: 0.95,
-            },
+            }],
+            sessionNote: "",
             rawText: "50 adet DN50 vana ürettik",
         });
 
@@ -151,10 +152,12 @@ describe("POST /api/production/transcribe", () => {
         const res = await POST(makeFormDataRequest(makeAudioFile()));
 
         expect(res.status).toBe(200);
-        const body = await res.json() as { text: string; entry: { productId: string; quantity: number } };
+        const body = await res.json() as { text: string; entries: { productId: string; quantity: number }[]; sessionNote: string };
         expect(body.text).toBe("50 adet DN50 vana ürettik");
-        expect(body.entry.productId).toBe("prod-1");
-        expect(body.entry.quantity).toBe(50);
+        expect(Array.isArray(body.entries)).toBe(true);
+        expect(body.entries[0].productId).toBe("prod-1");
+        expect(body.entries[0].quantity).toBe(50);
+        expect(typeof body.sessionNote).toBe("string");
     });
 
     it("Boş ses dosyası (0 byte) 400 döner", async () => {

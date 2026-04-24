@@ -3,7 +3,7 @@
  * Sesli üretim girişi: OpenAI Whisper (transkripsiyon) + Claude Haiku (yapısal çıkarım).
  * AI öneri verir; asıl kayıt mevcut production akışından geçer (§11.1, §2.3).
  *
- * V1 scope: tek ürün + adet + opsiyonel not. "fire" → notes'a yazılır.
+ * V2 scope: çoklu ürün tek seste, global session notu.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -27,8 +27,14 @@ export interface VoiceProductionEntry {
     productName: string;       // eşleşen ürün adı veya ham metin
     productSku: string;        // eşleşen SKU
     quantity: number;
-    notes: string;             // opsiyonel not; "fire: N adet" da buraya eklenir
+    fireNotes: string;         // "fire: N adet" veya "" — sadece fire/hurda bilgisi
     confidence: number;        // 0-1
+}
+
+export interface VoiceExtractionResult {
+    entries: VoiceProductionEntry[];
+    sessionNote: string;  // tüm kayda ait genel not
+    rawText: string;
 }
 
 interface ProductRef {
@@ -42,10 +48,6 @@ interface ProductRef {
 /**
  * OpenAI Whisper API ile ses dosyasını Türkçe metne çevirir.
  * fetch ile çağrılır — openai npm paketi gerekmez.
- *
- * @param audioBuffer   Ham ses verisi (webm/mp4)
- * @param filename      Dosya adı (uzantı önemli: recording.webm veya recording.mp4)
- * @param whisperPrompt Ürün isim/SKU listesi (domain terimleri için)
  */
 export async function transcribeAudio(
     audioBuffer: Buffer,
@@ -83,32 +85,39 @@ const SYSTEM_PROMPT = `Sen bir üretim veri giriş asistanısın.
 Kullanıcının sesli mesaj transkripsiyonundan ÜRETİM verisini çıkar.
 
 Kurallar:
-- Ürün listesinden EN İYİ eşleşen ürünü bul (SKU, isim veya benzerlik ile).
-- Eşleşme yoksa productId null, productName/productSku boş string döndür.
+- Ürün listesinden eşleşen TÜM ürünleri bul. Her ürün için ayrı bir entry oluştur.
+- Tek ürün varsa tek entry, birden fazla ürün varsa birden fazla entry döndür.
+- Eşleşme yoksa productId null, productName ham metin, productSku boş string döndür.
 - Adet (quantity): pozitif tam sayı. Belirtilmemişse 1.
-- "fire", "hurda", "ıskarta" gibi kelimeler varsa: notes alanına "fire: N adet" formatında ekle.
-- notes: varsa ek bilgi. Yoksa boş string.
+- "fire", "hurda", "ıskarta" kelimeleri ilgili ürünün fireNotes alanına "fire: N adet" formatında ekle.
+- "not:", "not:" ile başlayan veya genel açıklama ifadeleri → sessionNote alanına yaz.
+- fireNotes ve sessionNote: bilgi yoksa boş string.
 - confidence: 0-1 arası float. Ürün eşleşmesi belirsizse düşük tut.
 - SADECE JSON döndür, başka metin YOK.
 
-Çıktı formatı (kesinlikle bu şema):
+Çıktı formatı (entries dizisi — tek ürün olsa bile dizi içinde):
 {
-  "productId": "uuid veya null",
-  "productName": "eşleşen ürün adı veya ham metin",
-  "productSku": "eşleşen SKU veya boş string",
-  "quantity": 50,
-  "notes": "",
-  "confidence": 0.95
+  "entries": [
+    {
+      "productId": "uuid veya null",
+      "productName": "eşleşen ürün adı veya ham metin",
+      "productSku": "eşleşen SKU veya boş string",
+      "quantity": 50,
+      "fireNotes": "",
+      "confidence": 0.95
+    }
+  ],
+  "sessionNote": "genel not veya boş string"
 }`;
 
 /**
  * Claude Haiku ile transkripsyon metninden üretim verisi çıkarır.
- * V1: tek ürün döner (entries[] değil, entry tekil).
+ * V2: çoklu ürün (entries[]) + global session notu.
  */
 export async function extractProductionData(
     transcription: string,
     products: ProductRef[],
-): Promise<{ entry: VoiceProductionEntry; rawText: string }> {
+): Promise<VoiceExtractionResult> {
     const safeText = sanitizeAiInput(transcription, 2000);
 
     const productList = products
@@ -123,7 +132,7 @@ export async function extractProductionData(
     try {
         const msg = await client.messages.create({
             model: MODEL,
-            max_tokens: 512,
+            max_tokens: 1024,
             system: SYSTEM_PROMPT,
             messages: [{ role: "user", content: userContent }],
         });
@@ -149,7 +158,6 @@ export async function extractProductionData(
     // JSON parse
     let parsed: Record<string, unknown>;
     try {
-        // Claude bazen ```json ``` bloğu döndürebilir — temizle
         const cleaned = rawResponse.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
         parsed = JSON.parse(cleaned) as Record<string, unknown>;
     } catch {
@@ -158,30 +166,44 @@ export async function extractProductionData(
     }
 
     const knownIds = new Set(products.map(p => p.id));
-    const entry: VoiceProductionEntry = {
-        productId: typeof parsed.productId === "string" && knownIds.has(parsed.productId) ? parsed.productId : null,
-        productName: typeof parsed.productName === "string" ? parsed.productName : "",
-        productSku: typeof parsed.productSku === "string" ? parsed.productSku : "",
-        quantity: typeof parsed.quantity === "number" && parsed.quantity > 0 ? Math.floor(parsed.quantity) : 1,
-        notes: typeof parsed.notes === "string" ? parsed.notes : "",
-        confidence: clampConfidence(parsed.confidence),
-    };
+
+    // entries[] parse — V1 tekil format fallback da destekleniyor
+    const rawEntries = Array.isArray(parsed.entries)
+        ? parsed.entries
+        : [parsed]; // V1 compat: tekil nesne gelirse dizi yap
+
+    const entries: VoiceProductionEntry[] = (rawEntries as Record<string, unknown>[]).map(e => ({
+        productId: typeof e.productId === "string" && knownIds.has(e.productId) ? e.productId : null,
+        productName: typeof e.productName === "string" ? e.productName : "",
+        productSku: typeof e.productSku === "string" ? e.productSku : "",
+        quantity: typeof e.quantity === "number" && e.quantity > 0 ? Math.floor(e.quantity) : 1,
+        fireNotes: typeof e.fireNotes === "string" ? e.fireNotes : "",
+        confidence: clampConfidence(e.confidence),
+    }));
+
+    // Boş dizi fallback
+    if (entries.length === 0) {
+        entries.push({ productId: null, productName: "", productSku: "", quantity: 1, fireNotes: "", confidence: 0 });
+    }
+
+    const sessionNote = typeof parsed.sessionNote === "string" ? parsed.sessionNote : "";
+
+    const avgConfidence = entries.reduce((s, e) => s + e.confidence, 0) / entries.length;
 
     logAiRun({
         feature: "production_voice",
-        entity_id: entry.productId,
+        entity_id: entries[0].productId,
         input_hash: hashInput(safeText),
-        confidence: entry.confidence,
+        confidence: avgConfidence,
         latency_ms: latencyMs,
         model: MODEL,
     });
 
-    return { entry, rawText: safeText };
+    return { entries, sessionNote, rawText: safeText };
 }
 
 /**
  * Aktif ürün listesinden Whisper prompt metni oluşturur.
- * "DN50 DN65 DN80 vana musluk fire üretim adet" formatında.
  */
 export function buildWhisperPrompt(products: ProductRef[]): string {
     const terms = products.flatMap(p => [p.sku, p.name]).filter(Boolean);

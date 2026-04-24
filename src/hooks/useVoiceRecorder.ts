@@ -5,6 +5,7 @@
  * Toggle: tıkla başlat / tıkla durdur.
  * Max süre: 90 saniye (otomatik durdurur).
  * Sessizlik algılama: YOK.
+ * V2: AudioContext AnalyserNode ile anlık mikrofon seviyesi (volume).
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -20,6 +21,7 @@ interface UseVoiceRecorder {
     isRecording: boolean;
     isProcessing: boolean;
     duration: number;       // saniye cinsinden kayıt süresi
+    volume: number;         // 0-255 arası anlık mikrofon seviyesi (kayıt sırasında)
     error: string | null;
     startRecording: () => Promise<void>;
     stopRecording: () => void;
@@ -32,6 +34,7 @@ export function useVoiceRecorder(
     const [isRecording, setIsRecording] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [duration, setDuration] = useState(0);
+    const [volume, setVolume] = useState(0);
     const [error, setError] = useState<string | null>(null);
 
     const mediaRecorder = useRef<MediaRecorder | null>(null);
@@ -40,6 +43,11 @@ export function useVoiceRecorder(
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const autoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const cancelledRef = useRef(false);
+
+    // Web Audio API refs (görselleştirme için)
+    const audioContextRef = useRef<AudioContext | null>(null);
+    const analyserRef = useRef<AnalyserNode | null>(null);
+    const animFrameRef = useRef<number | null>(null);
 
     // Timer temizleme yardımcısı
     const clearTimers = useCallback(() => {
@@ -51,6 +59,18 @@ export function useVoiceRecorder(
     const releaseStream = useCallback(() => {
         stream.current?.getTracks().forEach(t => t.stop());
         stream.current = null;
+    }, []);
+
+    // AudioContext ve AnalyserNode'u serbest bırak
+    const releaseAudio = useCallback(() => {
+        if (animFrameRef.current !== null) {
+            cancelAnimationFrame(animFrameRef.current);
+            animFrameRef.current = null;
+        }
+        audioContextRef.current?.close().catch(() => {});
+        audioContextRef.current = null;
+        analyserRef.current = null;
+        setVolume(0);
     }, []);
 
     const startRecording = useCallback(async () => {
@@ -95,6 +115,7 @@ export function useVoiceRecorder(
 
         recorder.onstop = async () => {
             clearTimers();
+            releaseAudio();
             releaseStream();
             setIsRecording(false);
             setDuration(0);
@@ -139,7 +160,29 @@ export function useVoiceRecorder(
                 mediaRecorder.current.stop();
             }
         }, MAX_DURATION_SEC * 1000);
-    }, [onResult, clearTimers, releaseStream]);
+
+        // Ses dalgası görselleştirme (non-critical — AudioContext yoksa atla)
+        try {
+            const audioCtx = new AudioContext();
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 256;
+            audioCtx.createMediaStreamSource(userStream).connect(analyser);
+            audioContextRef.current = audioCtx;
+            analyserRef.current = analyser;
+
+            const data = new Uint8Array(analyser.frequencyBinCount);
+            const tick = () => {
+                if (!analyserRef.current) return;
+                analyserRef.current.getByteFrequencyData(data);
+                const avg = data.reduce((a, b) => a + b, 0) / data.length;
+                setVolume(Math.round(avg));
+                animFrameRef.current = requestAnimationFrame(tick);
+            };
+            animFrameRef.current = requestAnimationFrame(tick);
+        } catch {
+            // AudioContext desteklenmiyorsa görselleştirme atla — kayıt devam eder
+        }
+    }, [onResult, clearTimers, releaseAudio, releaseStream]);
 
     const stopRecording = useCallback(() => {
         if (mediaRecorder.current?.state === "recording") {
@@ -150,6 +193,7 @@ export function useVoiceRecorder(
     const cancelRecording = useCallback(() => {
         cancelledRef.current = true;
         clearTimers();
+        releaseAudio();
         if (mediaRecorder.current?.state === "recording") {
             mediaRecorder.current.stop();
         }
@@ -157,16 +201,17 @@ export function useVoiceRecorder(
         setIsRecording(false);
         setDuration(0);
         setError(null);
-    }, [clearTimers, releaseStream]);
+    }, [clearTimers, releaseAudio, releaseStream]);
 
     // Unmount'ta temizlik
     useEffect(() => {
         return () => {
             cancelledRef.current = true;
             clearTimers();
+            releaseAudio();
             releaseStream();
         };
-    }, [clearTimers, releaseStream]);
+    }, [clearTimers, releaseAudio, releaseStream]);
 
-    return { isRecording, isProcessing, duration, error, startRecording, stopRecording, cancelRecording };
+    return { isRecording, isProcessing, duration, volume, error, startRecording, stopRecording, cancelRecording };
 }

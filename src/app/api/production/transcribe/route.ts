@@ -2,6 +2,8 @@
  * POST /api/production/transcribe
  * Ses dosyasını alır → Whisper ile transkripsiyon → Claude Haiku ile yapısal çıkarım.
  * domain-rules §11: AI öneri verir, asıl kayıt mevcut üretim akışından geçer.
+ *
+ * V2: çoklu ürün (entries[]) + global session notu.
  */
 
 import { NextResponse } from "next/server";
@@ -16,6 +18,7 @@ import {
 } from "@/lib/services/voice-service";
 
 const MAX_AUDIO_BYTES = 10 * 1024 * 1024; // 10MB
+const ALLOWED_AUDIO_TYPES = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav", "audio/mpeg"];
 
 export async function POST(req: Request) {
     try {
@@ -45,7 +48,6 @@ export async function POST(req: Request) {
         }
 
         // 4. MIME type kontrolü (cost-abuse koruması)
-        const ALLOWED_AUDIO_TYPES = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav", "audio/mpeg"];
         const fileType = audioFile.type.split(";")[0].toLowerCase();
         if (!ALLOWED_AUDIO_TYPES.includes(fileType)) {
             return NextResponse.json({ error: "Geçersiz dosya formatı. Ses dosyası bekleniyor." }, { status: 400 });
@@ -76,9 +78,9 @@ export async function POST(req: Request) {
 
         // 8. Claude yapısal çıkarım
         const productRefs = products.map(p => ({ id: p.id, name: p.name, sku: p.sku }));
-        const { entry, rawText } = await extractProductionData(transcription, productRefs);
+        const { entries, sessionNote, rawText } = await extractProductionData(transcription, productRefs);
 
-        return NextResponse.json({ text: rawText, entry });
+        return NextResponse.json({ text: rawText, entries, sessionNote });
     } catch (err) {
         return handleApiError(err, "POST /api/production/transcribe");
     }
