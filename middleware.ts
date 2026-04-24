@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
 // /api/alerts/scan is listed here because it handles its own auth (CRON_SECRET OR session)
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan"];
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/parasut/oauth/callback"];
 
 // Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
 // Not: /api/alerts/scan buraya dahil değil — kendi içinde session OR CRON_SECRET kontrolü yapar

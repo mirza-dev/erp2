@@ -4,41 +4,38 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Paraşüt entegrasyonu — Faz 2 sırada (OAuth token lease)
+**Aktif:** Paraşüt entegrasyonu — Faz 3 sırada (parasutApiCall wrapper)
 
 ---
 
-## Son Tamamlanan İş — Paraşüt Faz 1 (2026-04-25)
+## Son Tamamlanan İş — Paraşüt Faz 2 (2026-04-25, bulgu fix dahil)
 
-Paraşüt canlıya alma altyapısı kuruldu (API adapter hariç).
+OAuth token lease servisi + route'lar + güvenlik düzeltmeleri tamamlandı.
 
 ### Tamamlanan dosyalar
 
 | Dosya | Açıklama |
 |-------|----------|
-| `supabase/migrations/039_parasut_integration_prep.sql` | Token tablosu (singleton lease), customers/products/order_lines/sales_orders yeni kolonlar, CHECK constraints, partial unique index'ler, retry CRON index, claim/release RPCs (SECURITY DEFINER + REVOKE/GRANT) + smoke test talimatı |
-| `src/lib/parasut-constants.ts` | Sabit UUID'ler, ParasutStep/ErrorKind/InvoiceType/EDocStatus tip alias'ları |
-| `src/lib/parasut-adapter.ts` | `ParasutError` + `ParasutAdapter` interface (tüm metodlar + input/output tipleri) |
-| `src/lib/parasut.ts` | `MockParasutAdapter`: in-memory, tri-state error injection, e-doc tip tracking, reset(), legacy delegate |
-| `src/lib/database.types.ts` | CustomerRow/ProductRow/OrderLineRow/SalesOrderRow/IntegrationSyncLogRow/ParasutOAuthTokensRow güncellendi; 4 yeni Parasut* tipi |
-| `src/app/api/settings/company/route.ts` | GET allowlist koruması eklendi (token alanları sızmaz) |
-| `src/__tests__/parasut-mock-adapter.test.ts` | 36 yeni test: tüm adapter metodları, invariant assertions, state machine, tip ayrımı |
-| `src/__tests__/credentials-no-leak.test.ts` | Poisoned fixture ile güçlendirildi; 4 yeni token sızıntı testi |
+| `src/lib/parasut.ts` | `getParasutAdapter()` factory |
+| `middleware.ts` | `/api/parasut/oauth/callback` → ALWAYS_PUBLIC |
+| `src/lib/services/parasut-oauth.ts` | `getAccessToken(adapter)`: lease + **re-read after lease** (stale refresh_token fix) + CAS + polling + sync_issue alert |
+| `src/app/api/parasut/oauth/start/route.ts` | requireAdmin, HMAC-signed state cookie (`CRON_SECRET`), mock bypass |
+| `src/app/api/parasut/oauth/callback/route.ts` | CSRF (HMAC verify + timingSafeEqual), 409 lock check, **upsert** (non-atomic INSERT fix), 409/502 hata yolları |
+| `src/__tests__/parasut-oauth.test.ts` | 21 test (re-read fresh token testi dahil) |
 
-**Test sayısı:** 86 dosya · 1683 test (hepsi yeşil) · TS temiz
+### Bulgu özeti (kapatıldı)
+- HIGH: Stale refresh_token — re-read after lease ile giderildi
+- HIGH: Non-atomic first-connection INSERT — `.upsert({ onConflict })` ile giderildi
+- MEDIUM: Re-auth CAS doğrulanmıyor — pratik risk sıfır (auth code single-use + 409 guard), yapılmadı
+- LOW: State cookie imzasız — HMAC-SHA256 (CRON_SECRET) ile giderildi
 
-### Sıradaki adım — Faz 2
-OAuth token lease servisi (`src/lib/services/parasut-oauth.ts`):
-- `getAccessToken(adapter)` — lease + CAS (token_version)
-- Paralel refresh koruması: refresh_lock_until + refresh_lock_owner
-- `/api/parasut/oauth/start` — state cookie + redirect
-- `/api/parasut/oauth/callback` — CSRF doğrulama + singleton upsert
+**Test sayısı:** 87 dosya · 1704 test (hepsi yeşil) · TS temiz
 
-### Ertelenen / scope dışı
-- RPC permission smoke testi (service_role ✓, anon ✗) — gerçek DB gerektirir; talimat migration 039 sonunda. Faz 12 gate'inden önce staging'de elle doğrulanacak.
-- Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M
-- Rate limiting (Upstash Redis)
-- `purchase_commitments` + `column_mappings` RLS migration
+### Sıradaki adım — Faz 3
+`src/lib/services/parasut-api-call.ts` — `parasutApiCall()` wrapper:
+- 429 Retry-After desteği
+- PARASUT_ENABLED guard
+- Context logging (her adapter çağrısı loglanacak)
 
 **Why:** Yeni session'da Claude aktif konuyu eksiksiz bilsin.
-**How to apply:** Paraşüt Faz 1 tamamlandı. PARASUT_PLAN.md tracker'ı güncel. Faz 2'den devam et.
+**How to apply:** Faz 2 tamamen kapalı. PARASUT_PLAN.md tracker güncel. Faz 3'ten devam et.

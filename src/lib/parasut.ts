@@ -292,6 +292,21 @@ export class MockParasutAdapter implements ParasutAdapter {
 
 export const mockParasutAdapter = new MockParasutAdapter();
 
+// ── Adapter factory ───────────────────────────────────────────────────────────
+
+/**
+ * Returns the active ParasutAdapter for use in server code.
+ * PARASUT_USE_MOCK !== "false" → MockParasutAdapter (default in dev/test).
+ * When PARASUT_USE_MOCK=false, a real HTTP adapter must be returned here (Faz 10).
+ */
+export function getParasutAdapter(): ParasutAdapter {
+    if (process.env.PARASUT_USE_MOCK !== "false") {
+        return mockParasutAdapter;
+    }
+    // Real HTTP adapter placeholder — implement in Faz 10
+    throw new Error("Real ParasutAdapter not yet implemented. Set PARASUT_USE_MOCK to use mock.");
+}
+
 // ── Legacy types (backward compat) ───────────────────────────────────────────
 
 export interface ParasutDetailAttribute {

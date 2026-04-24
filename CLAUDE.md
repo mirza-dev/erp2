@@ -3,25 +3,24 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-25_
 
-**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 1 (2026-04-25)
+**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 2 (2026-04-25)
 
-Paraşüt canlıya alma altyapısı kuruldu (Faz 1/11 tamamlandı):
-- `039_parasut_integration_prep.sql`: token tablosu, tüm step/retry/e-doc kolonları, CHECK constraints, partial unique index'ler, claim/release RPCs (SECURITY DEFINER)
-- `parasut-adapter.ts`: `ParasutError` + `ParasutAdapter` interface
-- `parasut-constants.ts`: tip alias'ları + sabit UUID'ler
-- `parasut.ts`: `MockParasutAdapter` (tri-state error injection, e-doc tip tracking, invariant assertions, reset())
-- `database.types.ts`: tüm yeni Paraşüt alanları + 4 yeni tip
-- `settings/company` GET allowlist koruması (token sızıntısı engellendi)
-- 36 yeni adapter testi + güçlendirilmiş credential leak testleri
+Paraşüt OAuth token lease servisi ve route'ları kuruldu (Faz 2/11 tamamlandı):
+- `parasut.ts`: `getParasutAdapter()` factory eklendi
+- `middleware.ts`: `/api/parasut/oauth/callback` → ALWAYS_PUBLIC
+- `src/lib/services/parasut-oauth.ts`: `getAccessToken(adapter)` — lease+CAS, polling, CAS çakışma alert'i
+- `src/app/api/parasut/oauth/start/route.ts`: requireAdmin, HMAC-signed state cookie (CRON_SECRET), mock bypass
+- `src/app/api/parasut/oauth/callback/route.ts`: HMAC CSRF doğrulama, lock check, atomic upsert (ON CONFLICT)
+- 21 yeni OAuth testi (bulgu fix: re-read after lease, upsert, HMAC cookie)
 
-**Sıradaki:** Faz 2 — OAuth token lease (`parasut-oauth.ts`) + `/oauth/start` + `/oauth/callback`
+**Sıradaki:** Faz 3 — `parasutApiCall()` wrapper (429 Retry-After + context logging)
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 86 dosya · 1683 vitest (hepsi yeşil)
+**Test sayısı:** 87 dosya · 1704 vitest (hepsi yeşil)
 
 ---
 

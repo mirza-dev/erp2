@@ -3,14 +3,14 @@
 ## 🎯 Progress Tracker
 
 **Son güncelleme:** 2026-04-25
-**Durum:** Faz 1 tamamlandı, Faz 2 sırada
+**Durum:** Faz 2 tamamlandı, Faz 3 sırada
 
 ### Faz ilerlemesi
 
 | # | Faz | Durum | Son güncelleme | Notlar |
 |---|-----|-------|---------------|--------|
 | 1 | Migration + adapter interface + sabitler + mock yeniden yazımı | ✅ Tamamlandı | 2026-04-25 | 1683 test yeşil, TS temiz |
-| 2 | OAuth token lease + CAS + `/oauth/start` + `/callback` | ⬜ Başlamadı | — | Faz 1'e bağımlı |
+| 2 | OAuth token lease + CAS + `/oauth/start` + `/callback` | ✅ Tamamlandı | 2026-04-25 | 1704 test yeşil, TS temiz; bulgu fix: re-read after lease, upsert, HMAC cookie |
 | 3 | `parasutApiCall()` wrapper (429 Retry-After + context logging) | ⬜ Başlamadı | — | Faz 1'e bağımlı |
 | 4 | Error classification + step-based backoff + stats order-state | ⬜ Başlamadı | — | |
 | 5 | Contact upsert (tax_number zorunlu, email ikinci savunma) | ⬜ Başlamadı | — | |
@@ -25,9 +25,19 @@
 **Durum legend:** ⬜ Başlamadı · 🟦 Devam ediyor · ✅ Tamamlandı · ⚠️ Bloklu / manuel inceleme
 
 ### Sıradaki adım
-Faz 2 — OAuth token lease servisi (`parasut-oauth.ts`), `/oauth/start` route, `/oauth/callback` route (singleton upsert + CAS + CSRF).
+Faz 3 — `parasutApiCall()` wrapper: 429 Retry-After desteği, PARASUT_ENABLED guard, context logging (adapter çağrıları loglanacak).
 
 ### Son oturum özeti
+- **Faz 2 tamamlandı (2026-04-25) — bulgu fix dahil:**
+  - `src/lib/parasut.ts`: `getParasutAdapter()` factory eklendi
+  - `middleware.ts`: `/api/parasut/oauth/callback` → ALWAYS_PUBLIC
+  - `src/lib/services/parasut-oauth.ts`: `getAccessToken(adapter)` — token geçerliyse skip, lease+**re-read after lease** (stale refresh_token fix), CAS, CAS çakışmasında sync_issue alert, 5-poll 1s
+  - `src/app/api/parasut/oauth/start/route.ts`: requireAdmin, **HMAC-signed state cookie** (CRON_SECRET), mock bypass, gerçek mod → authorize redirect
+  - `src/app/api/parasut/oauth/callback/route.ts`: HMAC+timingSafeEqual CSRF doğrulama, 409 lock guard, **atomic upsert** (ON CONFLICT singleton_key), 502 hata yolu
+  - `src/__tests__/parasut-oauth.test.ts`: 21 test (re-read fresh token testi dahil)
+  - **1704 test yeşil, TS clean**
+  - Bulgu kapatma: HIGH stale refresh_token ✅ · HIGH non-atomic insert ✅ · LOW unsigned cookie ✅ · MEDIUM re-auth CAS → pratik risk sıfır, yapılmadı (auth code single-use)
+
 - **Faz 1 tamamlandı (2026-04-25):**
   - `039_parasut_integration_prep.sql`: token tablosu, customers/products/order_lines/sales_orders yeni kolonlar, CHECK constraints, partial unique index'ler, retry index, claim/release RPCs (SECURITY DEFINER + REVOKE/GRANT)
   - `parasut-constants.ts`: sabit UUID'ler, tip alias'ları
