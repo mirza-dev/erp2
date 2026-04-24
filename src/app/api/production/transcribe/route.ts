@@ -77,7 +77,7 @@ export async function POST(req: Request) {
         }
 
         // 8. Claude yapısal çıkarım
-        const productRefs = products.map(p => ({ id: p.id, name: p.name, sku: p.sku }));
+        const productRefs = products.map(p => ({ id: p.id, name: p.name, sku: p.sku, category: p.category }));
         const { entries, sessionNote, rawText } = await extractProductionData(transcription, productRefs);
 
         return NextResponse.json({ text: rawText, entries, sessionNote });

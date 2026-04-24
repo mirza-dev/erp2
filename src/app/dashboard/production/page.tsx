@@ -13,11 +13,13 @@ interface FormLine {
     id: string;
     productId: string;
     adet: string;
+    notlar: string;
     _lowConfidence?: boolean; // sesli girişten gelen, güven skoru düşük satır
+    _voiceHint?: string;      // belirsiz sesli girişte Claude'un anladığı ham metin
 }
 
 function newLine(): FormLine {
-    return { id: crypto.randomUUID(), productId: "", adet: "" };
+    return { id: crypto.randomUUID(), productId: "", adet: "", notlar: "" };
 }
 
 const today = () => {
@@ -64,7 +66,6 @@ export default function ProductionPage() {
     const isDemo = useIsDemo();
     const [tarih, setTarih] = useState(today());
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
-    const [batchNote, setBatchNote] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -88,22 +89,15 @@ export default function ProductionPage() {
             id: crypto.randomUUID(),
             productId: entry.productId ?? "",
             adet: entry.quantity > 0 ? String(entry.quantity) : "",
+            notlar: data.sessionNote,
             _lowConfidence: entry.confidence < 0.7,
+            _voiceHint: entry.productId ? undefined : (entry.productName || undefined),
         }));
 
         setLines(prev => {
             const hasEmptyOnly = prev.length === 1 && !prev[0].productId && !prev[0].adet;
             return hasEmptyOnly ? newLines : [...prev, ...newLines];
         });
-
-        // Global not: sadece sessionNote → batchNote (fireNotes per-entry bilgi, global nota karışmaz)
-        // Önceki değeri ezme — merge et
-        if (data.sessionNote) {
-            setBatchNote(prev => {
-                if (!prev) return data.sessionNote;
-                return `${prev}; ${data.sessionNote}`;
-            });
-        }
 
         const count = data.entries.length;
         const anyLow = data.entries.some(e => e.confidence < 0.7);
@@ -123,7 +117,11 @@ export default function ProductionPage() {
 
     const setLineField = (id: string, field: keyof FormLine, val: string) => {
         setLines(prev => prev.map(l =>
-            l.id === id ? { ...l, [field]: val, _lowConfidence: false } : l
+            l.id === id
+                ? { ...l, [field]: val,
+                    _lowConfidence: field === "productId" ? false : l._lowConfidence,
+                    _voiceHint: field === "productId" ? undefined : l._voiceHint }
+                : l
         ));
     };
 
@@ -161,7 +159,7 @@ export default function ProductionPage() {
                     adet: parseInt(line.adet),
                     tarih,
                     girenKullanici: "Usta",
-                    notlar: batchNote,
+                    notlar: line.notlar,
                 });
                 succeeded++;
                 if (result?.refetchFailed) refetchWarning = true;
@@ -183,7 +181,6 @@ export default function ProductionPage() {
                 const msg = `${succeeded} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi`;
                 toast({ type: "success", message: refetchWarning ? msg + " (veri gecikmeli yüklenebilir)" : msg });
                 setLines([newLine()]);
-                setBatchNote("");
             }
         } else if (succeeded > 0 && failed > 0) {
             toast({ type: "warning", message: `${succeeded} kayıt başarılı, ${failed} kayıt başarısız. Başarısız satırları kontrol edin.` });
@@ -356,12 +353,13 @@ export default function ProductionPage() {
                 )}
 
                 <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", minWidth: "400px", borderCollapse: "collapse" }}>
+                <table style={{ width: "100%", minWidth: "600px", borderCollapse: "collapse" }}>
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)" }}>
                             <th style={{ ...thStyle, width: "34px" }}>#</th>
                             <th style={thStyle}>Ürün</th>
-                            <th style={{ ...thStyle, width: "120px", textAlign: "right" as const }}>Adet</th>
+                            <th style={{ ...thStyle, width: "90px", textAlign: "right" as const }}>Adet</th>
+                            <th style={thStyle}>Not</th>
                             <th style={{ ...thStyle, width: "34px" }}></th>
                         </tr>
                     </thead>
@@ -391,6 +389,11 @@ export default function ProductionPage() {
                                                 Mevcut stok: {formatNumber(selectedProduct.available_now)} {selectedProduct.unit}
                                             </div>
                                         )}
+                                        {line._voiceHint && !line.productId && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                                                Sesli: &ldquo;{line._voiceHint}&rdquo; — listeden ürün seçin
+                                            </div>
+                                        )}
                                         {line._lowConfidence && (
                                             <div style={{ fontSize: "11px", color: "var(--warning-text)", marginTop: "3px" }}>
                                                 ⚠ Sesli giriş düşük güvenle eşleşti — kontrol edin
@@ -404,7 +407,16 @@ export default function ProductionPage() {
                                             value={line.adet}
                                             onChange={e => setLineField(line.id, "adet", e.target.value)}
                                             placeholder="0"
-                                            style={{ ...inputStyle, textAlign: "right", width: "90px" }}
+                                            style={{ ...inputStyle, textAlign: "right", width: "80px" }}
+                                        />
+                                    </td>
+                                    <td style={tdStyle}>
+                                        <input
+                                            type="text"
+                                            value={line.notlar}
+                                            onChange={e => setLineField(line.id, "notlar", e.target.value)}
+                                            placeholder="Not (opsiyonel)"
+                                            style={inputStyle}
                                         />
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
@@ -428,17 +440,6 @@ export default function ProductionPage() {
                         })}
                     </tbody>
                 </table>
-                </div>
-
-                {/* Global not alanı */}
-                <div style={{ padding: "10px 16px 0" }}>
-                    <input
-                        type="text"
-                        value={batchNote}
-                        onChange={e => setBatchNote(e.target.value)}
-                        placeholder="Not (opsiyonel) — tüm kalemler için geçerli"
-                        style={inputStyle}
-                    />
                 </div>
 
                 <div style={{ padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>

@@ -3,17 +3,23 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-24_
 
-**Son tamamlanan iş:** Sesli Üretim Girişi (2026-04-24)
+**Son tamamlanan iş:** Sesli Üretim Girişi — Tüm turlar tamamlandı (2026-04-24)
 
-8 dosya değişti/eklendi. MediaRecorder → Whisper → Claude Haiku → form otomatik doldurma.
-Playwright CI GitHub Secrets eklendi ✅. entered_by session'dan doldurma bug fix.
+Sesli giriş özelliği V1→V3 öncesi eksiksiz tamamlandı:
+- Notlar satır bazlı (batchNote kaldırıldı, her satır kendi notunu tutuyor)
+- Belirsiz girişte productId:null + collapse guard (aynı SKU'lu null entry'ler tek'e indirilir)
+- `_voiceHint`: belirsiz satırda Claude'un anladığı ham metin dropdown altında gösterilir
+- `category` Claude'a gönderiliyor (ürün listesinde [Kategori] formatı)
+- `setLineField` yan etki fix: `_lowConfidence` sadece ürün seçiminde temizlenir
+- SYSTEM_PROMPT yeniden yazıldı: açık çoklu ürün → çoklu satır, belirsiz → tek null satır
 
 **Kalan / ertelendi:**
-- M-3: Rate limiting (Vercel KV / upstash — altyapı kararı)
+- M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
-- Sesli giriş V2: çoklu ürün tek seste, scrap form alanı
+- Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
+- OPENAI_API_KEY: ✅ eklendi (.env.local + Vercel env)
 
-**Test sayısı:** 85 dosya · 1626 vitest (hepsi yeşil)
+**Test sayısı:** 85 dosya · 1638 vitest (hepsi yeşil)
 
 ---
 

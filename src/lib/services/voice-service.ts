@@ -41,6 +41,7 @@ interface ProductRef {
     id: string;
     name: string;
     sku: string;
+    category: string | null;
 }
 
 // ── Whisper Transkripsiyon ────────────────────────────────────────────────────
@@ -81,21 +82,75 @@ export async function transcribeAudio(
 
 // ── Claude Haiku Yapısal Çıkarım ─────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `Sen bir üretim veri giriş asistanısın.
-Kullanıcının sesli mesaj transkripsiyonundan ÜRETİM verisini çıkar.
+const SYSTEM_PROMPT = `Sen endüstriyel B2B vana firmasında üretim veri giriş asistanısın.
+Kullanıcının sesli mesaj transkripsiyonundan ÜRETİM verisini çıkarıyorsun.
 
-Kurallar:
-- Ürün listesinden eşleşen TÜM ürünleri bul. Her ürün için ayrı bir entry oluştur.
-- Tek ürün varsa tek entry, birden fazla ürün varsa birden fazla entry döndür.
-- Eşleşme yoksa productId null, productName ham metin, productSku boş string döndür.
-- Adet (quantity): pozitif tam sayı. Belirtilmemişse 1.
-- "fire", "hurda", "ıskarta" kelimeleri ilgili ürünün fireNotes alanına "fire: N adet" formatında ekle.
-- "not:", "not:" ile başlayan veya genel açıklama ifadeleri → sessionNote alanına yaz.
-- fireNotes ve sessionNote: bilgi yoksa boş string.
-- confidence: 0-1 arası float. Ürün eşleşmesi belirsizse düşük tut.
-- SADECE JSON döndür, başka metin YOK.
+## Görev
+Transkripsiyon metnini analiz et ve kullanıcının KASITLI OLARAK belirttiği her FARKLI ürün için BİR entry oluştur.
 
-Çıktı formatı (entries dizisi — tek ürün olsa bile dizi içinde):
+## Eşleştirme Kuralları (ÇOK ÖNEMLİ)
+
+1. KULLANICI KAÇ ÜRÜN BELİRTTİYSE O KADAR ENTRY OLUŞTUR.
+   - "50 adet DN50 PN16" → TEK ürün belirtilmiş → 1 entry
+   - "30 DN50 PN16, 20 DN65 PN10" → İKİ farklı ürün belirtilmiş → 2 entry
+   - "DN50" tek başına → TEK ürün belirtilmiş (belirsiz olsa bile) → 1 entry
+   - ASLA "DN50" gördüğünde DN50 içeren tüm ürünleri listeleme!
+
+2. Eşleştirme önceliği:
+   a) SKU tam eşleşme → productId: eşleşen id, confidence 0.90+
+   b) SKU + niteleyici bilgi (PN değeri, ürün tipi) birleşince tek ürüne daraltılabiliyorsa → productId: eşleşen id, confidence 0.85+
+   c) Kısmi bilgi, birden fazla ürün eşleşebilir (sadece DN kodu, PN yok) → productId: null, productName: kullanıcının söylediği ham metin, confidence 0.30-0.50
+   d) Hiç eşleşme yok → productId: null, confidence 0.10-0.20
+
+3. BELİRSİZLİK KURALI:
+   Kullanıcı kısmi bilgi verdiyse (ör. sadece "DN50" dedi, ama listede DN50 PN6, DN50 PN10, DN50 PN16 var):
+   - BİR TANE entry oluştur (birden fazla DEĞİL!)
+   - productId: null (birden fazla aday olduğu için kesin eşleşme yapılamaz)
+   - productName: kullanıcının söylediği metin (ör. "DN50 vana")
+   - productSku: kısmi eşleşen SKU prefix'i (ör. "DN50") veya boş string
+   - confidence: 0.30-0.50 (belirsiz)
+   Kullanıcı formda dropdown'dan doğru ürünü seçecek.
+
+4. ÇOKLU ÜRÜN sadece kullanıcı AÇIKÇA birden fazla farklı ürün belirttiğinde:
+   - Farklı DN kodları: "30 DN50, 20 DN65" → 2 entry (her biri kendi eşleşme kuralına tabi)
+   - Aynı DN, farklı PN: "30 DN50 PN16, 20 DN50 PN10" → 2 entry
+   - Farklı ürün tipleri: "50 sürgülü vana, 30 kelebek vana" → 2 entry
+   - Virgül, "ve", "bir de", "ayrıca" gibi ayraçlarla ayrılmış farklı ürünler → ayrı entry'ler
+
+## Confidence Puanlama
+
+| Durum | Confidence | productId |
+|-------|-----------|-----------|
+| SKU tam eşleşme + miktar açık | 0.90 – 1.00 | eşleşen UUID |
+| SKU eşleşme, miktar çıkarımla bulundu | 0.70 – 0.89 | eşleşen UUID |
+| Kısmi eşleşme (birden fazla aday) | 0.30 – 0.50 | null |
+| Çok belirsiz (sadece "vana") | 0.10 – 0.29 | null |
+| Hiç eşleşme yok | 0.05 – 0.15 | null |
+
+## Miktar (quantity)
+- Pozitif tam sayı. Belirtilmemişse 1.
+- Türkçe sayı kelimeleri: "elli" = 50, "yüz" = 100, "iki yüz" = 200
+- "adet", "tane", "parça" miktarı niteler
+
+## Fire / Hurda
+- "fire", "hurda", "ıskarta", "bozuk", "hatalı" kelimeleri → ilgili ürünün fireNotes alanına
+- Format: "fire: N adet"
+- Fire miktarı quantity'den AYRIDIR (quantity üretilen toplam, fire onun içinden hatalı olanlar)
+- Örnek: "100 adet DN50 PN16, 3 fire" → quantity: 100, fireNotes: "fire: 3 adet"
+
+## Notlar
+- "not:", "not olarak", "şunu not al", "açıklama" ile başlayan veya genel yorum ifadeleri → sessionNote
+- sessionNote tüm kayıt için geçerli genel bir nottur (per-entry değil)
+
+## Türkçe Ses Tanıma Düzeltmeleri
+Whisper bazen teknik terimleri yanlış yazabilir. Bilinen düzeltmeler:
+- "den elli", "de en elli", "d n elli" → DN50
+- "pe en on altı", "pn on altı" → PN16
+- "sürgili" → Sürgülü
+- "kellebek" → Kelebek
+
+## Çıktı Formatı
+SADECE JSON döndür, başka metin YOK.
 {
   "entries": [
     {
@@ -121,7 +176,10 @@ export async function extractProductionData(
     const safeText = sanitizeAiInput(transcription, 2000);
 
     const productList = products
-        .map(p => `${sanitizeAiInput(p.sku, 50)} — ${sanitizeAiInput(p.name, 100)} (id: ${p.id})`)
+        .map(p => {
+            const cat = p.category ? ` [${sanitizeAiInput(p.category, 30)}]` : "";
+            return `${sanitizeAiInput(p.sku, 50)} — ${sanitizeAiInput(p.name, 100)}${cat} (id: ${p.id})`;
+        })
         .join("\n");
 
     const userContent = `Ürün listesi:\n${productList}\n\nTranskripsiyon: "${safeText}"`;
@@ -184,6 +242,27 @@ export async function extractProductionData(
     // Boş dizi fallback
     if (entries.length === 0) {
         entries.push({ productId: null, productName: "", productSku: "", quantity: 1, fireNotes: "", confidence: 0 });
+    }
+
+    // Guard: prompt ihlali — Claude aynı kısmi SKU için çoklu null entry döndürdüyse tek entry'e collapse et
+    // (örn. "DN50" için DN50 PN6, DN50 PN10, DN50 PN16 ayrı satır gelirse)
+    const nullEntries = entries.filter(e => e.productId === null);
+    if (nullEntries.length > 1) {
+        const firstSku = nullEntries[0].productSku.toLowerCase();
+        const allSameSku = nullEntries.every(e => e.productSku.toLowerCase() === firstSku);
+        if (allSameSku) {
+            const collapsed: VoiceProductionEntry = {
+                productId: null,
+                productName: nullEntries[0].productName,
+                productSku: nullEntries[0].productSku,
+                quantity: nullEntries.reduce((s, e) => s + e.quantity, 0),
+                fireNotes: nullEntries.map(e => e.fireNotes).filter(Boolean).join("; "),
+                confidence: Math.min(...nullEntries.map(e => e.confidence)),
+            };
+            const validEntries = entries.filter(e => e.productId !== null);
+            entries.length = 0;
+            entries.push(...validEntries, collapsed);
+        }
     }
 
     const sessionNote = sanitizeAiOutput(parsed.sessionNote, 500);

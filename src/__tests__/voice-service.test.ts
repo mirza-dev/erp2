@@ -51,8 +51,8 @@ function makeEntries(entries: object[], sessionNote = "") {
 }
 
 const PRODUCTS = [
-    { id: "prod-1", name: "DN50 Vana", sku: "DN50" },
-    { id: "prod-2", name: "DN65 Vana", sku: "DN65" },
+    { id: "prod-1", name: "DN50 Vana", sku: "DN50", category: "Sürgülü Vanalar" },
+    { id: "prod-2", name: "DN65 Vana", sku: "DN65", category: "Kelebek Vanalar" },
 ];
 
 // ── transcribeAudio ───────────────────────────────────────────────────────────
@@ -269,6 +269,107 @@ describe("extractProductionData", () => {
 
         expect(entries).toHaveLength(1);
         expect(entries[0].productId).toBeNull();
+    });
+});
+
+// ── Prompt & category doğrulama testleri ─────────────────────────────────────
+
+describe("extractProductionData — prompt & category doğrulama", () => {
+    beforeEach(() => {
+        mockCreate.mockReset();
+    });
+
+    it("Claude'a gönderilen mesajda category bilgisi [Kategori] formatında yer alır", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([{
+            productId: "prod-1", productName: "DN50 Vana", productSku: "DN50",
+            quantity: 50, fireNotes: "", confidence: 0.95,
+        }])));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        await extractProductionData("50 DN50", PRODUCTS);
+
+        const callArgs = mockCreate.mock.calls[0][0] as { messages: { content: string }[] };
+        expect(callArgs.messages[0].content).toContain("[Sürgülü Vanalar]");
+        expect(callArgs.messages[0].content).toContain("[Kelebek Vanalar]");
+    });
+
+    it("SYSTEM_PROMPT 'TÜM ürünleri bul' ifadesi içermiyor, 'KASITLI OLARAK' içeriyor", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([{
+            productId: "prod-1", productName: "DN50 Vana", productSku: "DN50",
+            quantity: 50, fireNotes: "", confidence: 0.95,
+        }])));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        await extractProductionData("50 DN50", PRODUCTS);
+
+        const callArgs = mockCreate.mock.calls[0][0] as { system: string };
+        expect(callArgs.system).not.toContain("TÜM ürünleri bul");
+        expect(callArgs.system).toContain("KASITLI OLARAK");
+    });
+
+    it("Belirsiz girdi (kısmi SKU) → productId null, düşük confidence, TEK entry", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([{
+            productId: null,
+            productName: "DN50 vana",
+            productSku: "DN50",
+            quantity: 50,
+            fireNotes: "",
+            confidence: 0.40,
+        }])));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        const { entries } = await extractProductionData("50 adet DN50", PRODUCTS);
+
+        expect(entries).toHaveLength(1);
+        expect(entries[0].productId).toBeNull();
+        expect(entries[0].confidence).toBeLessThan(0.7);
+        expect(entries[0].productName).toBe("DN50 vana");
+    });
+
+    it("Claude aynı SKU için çoklu null entry döndürürse guard tek entry'e collapse eder", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([
+            { productId: null, productName: "DN50 PN6 Vana",  productSku: "dn50", quantity: 20, fireNotes: "", confidence: 0.40 },
+            { productId: null, productName: "DN50 PN10 Vana", productSku: "dn50", quantity: 20, fireNotes: "", confidence: 0.40 },
+            { productId: null, productName: "DN50 PN16 Vana", productSku: "dn50", quantity: 10, fireNotes: "", confidence: 0.35 },
+        ])));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        const { entries } = await extractProductionData("50 adet DN50", PRODUCTS);
+
+        expect(entries).toHaveLength(1);
+        expect(entries[0].productId).toBeNull();
+        expect(entries[0].quantity).toBe(50); // 20+20+10
+        expect(entries[0].confidence).toBe(0.35); // en düşük
+    });
+
+    it("Farklı SKU'lu null entry'ler collapse edilmez", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([
+            { productId: null, productName: "DN50 vana", productSku: "dn50", quantity: 30, fireNotes: "", confidence: 0.40 },
+            { productId: null, productName: "DN65 vana", productSku: "dn65", quantity: 20, fireNotes: "", confidence: 0.40 },
+        ])));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        const { entries } = await extractProductionData("30 DN50 ve 20 DN65", PRODUCTS);
+
+        expect(entries).toHaveLength(2); // farklı SKU → collapse yok
+    });
+
+    it("category null olan ürün listede köşeli parantez içermez", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([{
+            productId: "prod-1", productName: "DN50 Vana", productSku: "DN50",
+            quantity: 10, fireNotes: "", confidence: 0.9,
+        }])));
+
+        const productsWithNullCategory = [
+            { id: "prod-1", name: "DN50 Vana", sku: "DN50", category: null },
+        ];
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        await extractProductionData("10 DN50", productsWithNullCategory);
+
+        const callArgs = mockCreate.mock.calls[0][0] as { messages: { content: string }[] };
+        // category null ise [kategori] formatı olmamalı
+        expect(callArgs.messages[0].content).not.toMatch(/\[.*\]/);
     });
 });
 

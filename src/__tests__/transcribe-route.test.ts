@@ -22,7 +22,7 @@ vi.mock("next/headers", () => ({
 
 vi.mock("@/lib/supabase/products", () => ({
     dbListAllActiveProducts: vi.fn().mockResolvedValue([
-        { id: "prod-1", name: "DN50 Vana", sku: "DN50", on_hand: 100, reserved: 10, available_now: 90, is_active: true },
+        { id: "prod-1", name: "DN50 Vana", sku: "DN50", category: "Sürgülü Vanalar", on_hand: 100, reserved: 10, available_now: 90, is_active: true },
     ]),
 }));
 
@@ -158,6 +158,23 @@ describe("POST /api/production/transcribe", () => {
         expect(body.entries[0].productId).toBe("prod-1");
         expect(body.entries[0].quantity).toBe(50);
         expect(typeof body.sessionNote).toBe("string");
+    });
+
+    it("extractProductionData'ya gönderilen productRefs category içerir", async () => {
+        mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
+        mockTranscribe.mockResolvedValue("50 adet DN50");
+        mockExtract.mockResolvedValue({
+            entries: [{ productId: "prod-1", productName: "DN50 Vana", productSku: "DN50",
+                quantity: 50, fireNotes: "", confidence: 0.95 }],
+            sessionNote: "", rawText: "50 adet DN50",
+        });
+
+        const { POST } = await import("@/app/api/production/transcribe/route");
+        await POST(makeFormDataRequest(makeAudioFile()));
+
+        const productRefs = mockExtract.mock.calls[0][1] as { category: string | null }[];
+        expect(productRefs[0]).toHaveProperty("category");
+        expect(productRefs[0].category).toBe("Sürgülü Vanalar");
     });
 
     it("Boş ses dosyası (0 byte) 400 döner", async () => {
