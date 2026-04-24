@@ -96,10 +96,14 @@ export default function ProductionPage() {
             return hasEmptyOnly ? newLines : [...prev, ...newLines];
         });
 
-        // Global not: sessionNote + fire bilgileri birleştirilir
-        const fireParts = data.entries.map(e => e.fireNotes).filter(Boolean);
-        const noteParts = [data.sessionNote, ...fireParts].filter(Boolean);
-        if (noteParts.length > 0) setBatchNote(noteParts.join("; "));
+        // Global not: sadece sessionNote → batchNote (fireNotes per-entry bilgi, global nota karışmaz)
+        // Önceki değeri ezme — merge et
+        if (data.sessionNote) {
+            setBatchNote(prev => {
+                if (!prev) return data.sessionNote;
+                return `${prev}; ${data.sessionNote}`;
+            });
+        }
 
         const count = data.entries.length;
         const anyLow = data.entries.some(e => e.confidence < 0.7);
@@ -134,6 +138,7 @@ export default function ProductionPage() {
     const handleSave = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const valid = lines.filter(l => l.productId && parseInt(l.adet) > 0);
+        const unresolved = lines.filter(l => !l.productId && parseInt(l.adet) > 0);
         if (valid.length === 0) {
             toast({ type: "error", message: "Lütfen en az bir ürün seçin ve adet girin" });
             return;
@@ -169,10 +174,17 @@ export default function ProductionPage() {
 
         if (succeeded > 0 && failed === 0) {
             const totalAdet = valid.reduce((s, l) => s + parseInt(l.adet), 0);
-            const msg = `${succeeded} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi`;
-            toast({ type: "success", message: refetchWarning ? msg + " (veri gecikmeli yüklenebilir)" : msg });
-            setLines([newLine()]);
-            setBatchNote("");
+            if (unresolved.length > 0) {
+                // Eşleşmeyen satırları formda tut — kullanıcı ürün seçip tekrar kaydedebilsin
+                setLines(unresolved);
+                toast({ type: "warning",
+                    message: `${succeeded} kalem kaydedildi. ${unresolved.length} ürün eşleşmedi — ürünleri seçip tekrar kaydedin.` });
+            } else {
+                const msg = `${succeeded} kalem, ${totalAdet} adet üretim kaydedildi — stok güncellendi`;
+                toast({ type: "success", message: refetchWarning ? msg + " (veri gecikmeli yüklenebilir)" : msg });
+                setLines([newLine()]);
+                setBatchNote("");
+            }
         } else if (succeeded > 0 && failed > 0) {
             toast({ type: "warning", message: `${succeeded} kayıt başarılı, ${failed} kayıt başarısız. Başarısız satırları kontrol edin.` });
             setLines(prev => prev.filter(l => failedLineIds.includes(l.id)));
@@ -193,6 +205,12 @@ export default function ProductionPage() {
             toast({ type: "error", message: voiceError });
         }
     }, [voiceError, toast]);
+
+    // Unmount'ta transcript timer'ı temizle
+    useEffect(() => {
+        const ref = transcriptTimerRef;
+        return () => { if (ref.current) clearTimeout(ref.current); };
+    }, []);
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>

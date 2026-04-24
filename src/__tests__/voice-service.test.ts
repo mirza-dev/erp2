@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/ai-guards", () => ({
     sanitizeAiInput: (v: string) => v,
+    sanitizeAiOutput: (v: unknown, _maxLen: number) => (typeof v === "string" ? v : ""),
     clampConfidence: (v: unknown) => {
         const n = Number(v);
         if (isNaN(n)) return 0.5;

@@ -48,6 +48,7 @@ export function useVoiceRecorder(
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const animFrameRef = useRef<number | null>(null);
+    const prevVolRef = useRef(0); // throttle: sadece 8+ birim değişince setState
 
     // Timer temizleme yardımcısı
     const clearTimers = useCallback(() => {
@@ -70,6 +71,7 @@ export function useVoiceRecorder(
         audioContextRef.current?.close().catch(() => {});
         audioContextRef.current = null;
         analyserRef.current = null;
+        prevVolRef.current = 0;
         setVolume(0);
     }, []);
 
@@ -175,7 +177,11 @@ export function useVoiceRecorder(
                 if (!analyserRef.current) return;
                 analyserRef.current.getByteFrequencyData(data);
                 const avg = data.reduce((a, b) => a + b, 0) / data.length;
-                setVolume(Math.round(avg));
+                const rounded = Math.round(avg);
+                if (Math.abs(rounded - prevVolRef.current) > 8) {
+                    prevVolRef.current = rounded;
+                    setVolume(rounded);
+                }
                 animFrameRef.current = requestAnimationFrame(tick);
             };
             animFrameRef.current = requestAnimationFrame(tick);

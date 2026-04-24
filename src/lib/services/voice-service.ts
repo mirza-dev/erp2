@@ -7,7 +7,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { sanitizeAiInput, clampConfidence } from "@/lib/ai-guards";
+import { sanitizeAiInput, clampConfidence, sanitizeAiOutput } from "@/lib/ai-guards";
 import { logAiRun, hashInput } from "@/lib/supabase/ai-runs";
 
 const MODEL = "claude-haiku-4-5-20251001";
@@ -174,10 +174,10 @@ export async function extractProductionData(
 
     const entries: VoiceProductionEntry[] = (rawEntries as Record<string, unknown>[]).map(e => ({
         productId: typeof e.productId === "string" && knownIds.has(e.productId) ? e.productId : null,
-        productName: typeof e.productName === "string" ? e.productName : "",
-        productSku: typeof e.productSku === "string" ? e.productSku : "",
+        productName: sanitizeAiOutput(e.productName, 200),
+        productSku: sanitizeAiOutput(e.productSku, 50),
         quantity: typeof e.quantity === "number" && e.quantity > 0 ? Math.floor(e.quantity) : 1,
-        fireNotes: typeof e.fireNotes === "string" ? e.fireNotes : "",
+        fireNotes: sanitizeAiOutput(e.fireNotes, 200),
         confidence: clampConfidence(e.confidence),
     }));
 
@@ -186,7 +186,7 @@ export async function extractProductionData(
         entries.push({ productId: null, productName: "", productSku: "", quantity: 1, fireNotes: "", confidence: 0 });
     }
 
-    const sessionNote = typeof parsed.sessionNote === "string" ? parsed.sessionNote : "";
+    const sessionNote = sanitizeAiOutput(parsed.sessionNote, 500);
 
     const avgConfidence = entries.reduce((s, e) => s + e.confidence, 0) / entries.length;
 
