@@ -3,24 +3,20 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-25_
 
-**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 2 (2026-04-25)
+**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 3 (2026-04-25)
 
-Paraşüt OAuth token lease servisi ve route'ları kuruldu (Faz 2/11 tamamlandı):
-- `parasut.ts`: `getParasutAdapter()` factory eklendi
-- `middleware.ts`: `/api/parasut/oauth/callback` → ALWAYS_PUBLIC
-- `src/lib/services/parasut-oauth.ts`: `getAccessToken(adapter)` — lease+CAS, polling, CAS çakışma alert'i
-- `src/app/api/parasut/oauth/start/route.ts`: requireAdmin, HMAC-signed state cookie (CRON_SECRET), mock bypass
-- `src/app/api/parasut/oauth/callback/route.ts`: HMAC CSRF doğrulama, lock check, atomic upsert (ON CONFLICT)
-- 21 yeni OAuth testi (bulgu fix: re-read after lease, upsert, HMAC cookie)
+`parasutApiCall()` wrapper kuruldu (Faz 3/11 tamamlandı):
+- `src/lib/services/parasut-api-call.ts`: `parasutApiCall<T>(ctx, fn)` — PARASUT_ENABLED guard, 429 Retry-After (single retry, max 30s), structured JSON logging
+- `src/__tests__/parasut-api-call.test.ts`: 15 test
 
-**Sıradaki:** Faz 3 — `parasutApiCall()` wrapper (429 Retry-After + context logging)
+**Sıradaki:** Faz 4 — Error classification + step-based backoff + stats order-state
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 87 dosya · 1704 vitest (hepsi yeşil)
+**Test sayısı:** 88 dosya · 1719 vitest (hepsi yeşil)
 
 ---
 

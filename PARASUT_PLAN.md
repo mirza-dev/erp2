@@ -3,7 +3,7 @@
 ## 🎯 Progress Tracker
 
 **Son güncelleme:** 2026-04-25
-**Durum:** Faz 2 tamamlandı, Faz 3 sırada
+**Durum:** Faz 3 tamamlandı, Faz 4 sırada
 
 ### Faz ilerlemesi
 
@@ -11,7 +11,7 @@
 |---|-----|-------|---------------|--------|
 | 1 | Migration + adapter interface + sabitler + mock yeniden yazımı | ✅ Tamamlandı | 2026-04-25 | 1683 test yeşil, TS temiz |
 | 2 | OAuth token lease + CAS + `/oauth/start` + `/callback` | ✅ Tamamlandı | 2026-04-25 | 1704 test yeşil, TS temiz; bulgu fix: re-read after lease, upsert, HMAC cookie |
-| 3 | `parasutApiCall()` wrapper (429 Retry-After + context logging) | ⬜ Başlamadı | — | Faz 1'e bağımlı |
+| 3 | `parasutApiCall()` wrapper (429 Retry-After + context logging) | ✅ Tamamlandı | 2026-04-25 | 1719 test yeşil, TS temiz; PARASUT_ENABLED guard, 15 test |
 | 4 | Error classification + step-based backoff + stats order-state | ⬜ Başlamadı | — | |
 | 5 | Contact upsert (tax_number zorunlu, email ikinci savunma) | ⬜ Başlamadı | — | |
 | 6 | Product upsert (filter[code]) | ⬜ Başlamadı | — | |
@@ -25,9 +25,17 @@
 **Durum legend:** ⬜ Başlamadı · 🟦 Devam ediyor · ✅ Tamamlandı · ⚠️ Bloklu / manuel inceleme
 
 ### Sıradaki adım
-Faz 3 — `parasutApiCall()` wrapper: 429 Retry-After desteği, PARASUT_ENABLED guard, context logging (adapter çağrıları loglanacak).
+Faz 4 — Error classification + step-based backoff + stats order-state.
 
 ### Son oturum özeti
+- **Faz 3 tamamlandı (2026-04-25):**
+  - `src/lib/services/parasut-api-call.ts`: `parasutApiCall<T>(ctx, fn)` wrapper
+  - PARASUT_ENABLED guard (false/unset → `ParasutError('validation')` fırlatır, fn çağrılmaz)
+  - 429 Retry-After: `wait = min(retryAfterSec ?? 5, 30)` → tek retry; ikinci hata olursa fırlatır
+  - Structured logging: success / rate_limited / success_after_retry / error / error_after_retry
+  - `src/__tests__/parasut-api-call.test.ts`: 15 test
+  - **1719 test yeşil, TS clean**
+
 - **Faz 2 tamamlandı (2026-04-25) — bulgu fix dahil:**
   - `src/lib/parasut.ts`: `getParasutAdapter()` factory eklendi
   - `middleware.ts`: `/api/parasut/oauth/callback` → ALWAYS_PUBLIC
