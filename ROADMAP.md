@@ -25,20 +25,5 @@ Tüm maddeler tamamlandığında bu dosya silinecek.
 ### Uzun vadeli
 - [x] k6 load test — tests/load/alert-scan.k6.js + import-wizard.k6.js + load-test.yml CI workflow
   - ⚠️ Manuel: `brew install k6` (local çalıştırma için)
-- [ ] Playwright CI — GitHub Secrets ile tam E2E (altyapı var, testler yazılı)
-  - ⚠️ Manuel: 6 GitHub Secret ekle (aşağıya bak)
+- [x] Playwright CI — GitHub Secrets eklendi (2026-04-23) ✅
 
----
-
-## Playwright CI — Eksik Secrets
-
-GitHub → Repo → Settings → Secrets and variables → Actions:
-
-| Secret | Değer |
-|--------|-------|
-| `NEXT_PUBLIC_SUPABASE_URL` | .env.local'dan kopyala |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | .env.local'dan kopyala |
-| `SUPABASE_SERVICE_ROLE_KEY` | .env.local'dan kopyala |
-| `ANTHROPIC_API_KEY` | Zaten ekli (test.yml'den) |
-| `E2E_USER_EMAIL` | Test kullanıcısı e-postası |
-| `E2E_USER_PASSWORD` | Test kullanıcısı şifresi |

@@ -3,6 +3,7 @@ import { serviceCreateProductionEntry } from "@/lib/services/production-service"
 import { dbListProductionEntries } from "@/lib/supabase/production";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
 
 // GET /api/production?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
@@ -21,6 +22,9 @@ export async function GET(req: NextRequest) {
 // Body: { product_id, produced_qty, scrap_qty?, waste_reason?, production_date?, notes?, related_order_id? }
 export async function POST(req: NextRequest) {
     try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Record<string, unknown>;
@@ -40,6 +44,7 @@ export async function POST(req: NextRequest) {
             production_date,
             notes,
             related_order_id,
+            entered_by: user?.email ?? user?.id ?? undefined,
         });
 
         if (!result.success) {

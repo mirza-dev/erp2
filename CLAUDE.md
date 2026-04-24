@@ -1,34 +1,19 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-23_
+_Son güncelleme: 2026-04-24_
 
-**Son tamamlanan iş:** Audit Tam Kapandı — commit `2864c97` (2026-04-23)
+**Son tamamlanan iş:** Sesli Üretim Girişi (2026-04-24)
 
-Tüm audit bulguları giderildi. 3 commit, 43 dosya.
-
-| Bulgu | Commit | Fix |
-|-------|--------|-----|
-| C-1 | `483b3d3` | middleware.ts — Supabase init try-catch (Turbopack bypass) |
-| C-2 | `483b3d3` | safeParseJson helper + 26 route (bozuk JSON → 400) |
-| C-3 | `483b3d3` | numeric overflow catch + validateOrderCreate max value |
-| H-1 | `483b3d3` | CSP header (next.config.ts) |
-| H-2 | `483b3d3` | aging sorgusu: on_hand_gt DB filter + migration 038 indexes |
-| H-3 | `483b3d3` | category filter: idx_products_category_active (migration 038) |
-| H-4 | `f44a47e` | validateStringLengths nested array + products numeric guard |
-| M-1 | `483b3d3` | CRON paths: sadece CRON_SECRET (session bypass kapatıldı) |
-| M-2 | `483b3d3` | HSTS (next.config.ts) |
-| M-4 | `483b3d3` | handleApiError: prod generic mesaj |
-| L-1 | `483b3d3` | Permissions-Policy (next.config.ts) |
-| L-3 | `483b3d3` | limit param üst sınırı 500 |
-| B-04 | `2864c97` | health endpoint: anonim→sade, ?detail=true+CRON_SECRET→tam |
+8 dosya değişti/eklendi. MediaRecorder → Whisper → Claude Haiku → form otomatik doldurma.
+Playwright CI GitHub Secrets eklendi ✅. entered_by session'dan doldurma bug fix.
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Vercel KV / upstash — altyapı kararı)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
-- `seed-large.ts --clean` 1000 limit bug (düşük öncelik)
+- Sesli giriş V2: çoklu ürün tek seste, scrap form alanı
 
-**Test sayısı:** 83 dosya · 1609 vitest (hepsi yeşil)
+**Test sayısı:** 85 dosya · 1626 vitest (hepsi yeşil)
 
 ---
 

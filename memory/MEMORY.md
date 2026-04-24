@@ -10,9 +10,10 @@
 - [project_integrations.md](project_integrations.md) — Paraşüt mock, AI kolon eşleştirme, Sentry ✅, k6, smoke 24, 1609 test; health check B-04 fix ✅
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Sprint boş: tüm audit bulguları kapatıldı (2026-04-23), sıradaki iş belirsiz
+- [current_focus.md](current_focus.md) — Sıradaki: sesli üretim girişi (plan onaylı), Playwright CI secrets eklendi ✅
 
 ## Roadmap
+- [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi: MediaRecorder → Whisper → Claude → form doldurma — TAMAMLANDI ✅ (2026-04-24)
 - [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
 - [project_quotes.md](project_quotes.md) — Teklif modülü: Faz 1-8 TAMAMEN tamamlandı (sipariş dönüşümü, race condition fix dahil)
 - [project_frontend_renewal.md](project_frontend_renewal.md) — Frontend yenileme planı (frontend-renewal.md): DOM mutation fix, component lib, a11y — PLAN HAZIR, uygulama başlamadı

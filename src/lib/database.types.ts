@@ -24,7 +24,7 @@ export type AuditSource = "ui" | "system" | "ai" | "integration"
 export type RecommendationType = "purchase_suggestion" | "stock_risk" | "order_risk"
 export type RecommendationStatus = "suggested" | "accepted" | "edited" | "rejected" | "expired"
 export type FeedbackType = "accepted" | "edited" | "rejected" | "note"
-export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "ops_summary" | "purchase_enrich"
+export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "ops_summary" | "purchase_enrich" | "production_voice"
 export type PurchaseCommitmentStatus = "pending" | "received" | "cancelled"
 
 // ── Row Types ────────────────────────────────────────────────

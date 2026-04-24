@@ -48,3 +48,4 @@ tests/.auth/
 test-results/
 playwright-report/
 tests/fixtures/invalid.txt
+results/

@@ -62,8 +62,7 @@ type: project
   - Audit sonuçları: `results/` klasörü, rapor: `docs/audit/faz4-capacity-matrix.md`
   - Kırılma noktaları: stok rezervasyon soft limit 50 VU, tam çöküş 100 VU
 - **Eval suite:** `src/__tests__/eval/` — AI kalite değerlendirmesi
-- **Playwright CI:** Testler yazılı (23 test, yeşil) ama CI'da çalışmıyor — **6 GitHub Secret eksik:**
-  `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY` (zaten var), `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`
+- **Playwright CI:** ✅ GitHub Secrets eklendi (2026-04-23) — 23 test CI'da çalışır durumda
 - **Sentry:** `@sentry/nextjs` — kod + DSN tam kurulu ✅ (2026-04-22'de DSN `.env.local` + GitHub Secrets'a eklendi)
 
 **Mock pattern:**

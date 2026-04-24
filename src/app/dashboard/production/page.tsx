@@ -1,17 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useData } from "@/lib/data-context";
 import { formatNumber } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { useVoiceRecorder, type VoiceRecorderResult } from "@/hooks/useVoiceRecorder";
+import type { VoiceProductionEntry } from "@/lib/services/voice-service";
 
 interface FormLine {
     id: string;
     productId: string;
     adet: string;
     notlar: string;
+    _lowConfidence?: boolean; // sesli girişten gelen, güven skoru düşük satır
 }
 
 function newLine(): FormLine {
@@ -67,9 +70,48 @@ export default function ProductionPage() {
 
     const todayStr = today();
     const todayLogs = uretimKayitlari.filter(k => k.tarih === todayStr);
+    const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
+    const transcriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleVoiceResult = useCallback(async ({ blob, filename }: VoiceRecorderResult) => {
+        const formData = new FormData();
+        formData.append("audio", blob, filename);
+        const res = await fetch("/api/production/transcribe", { method: "POST", body: formData });
+        if (!res.ok) {
+            const body = await res.json().catch(() => null) as { error?: string } | null;
+            throw new Error(body?.error ?? "Ses işlenemedi.");
+        }
+        const data = await res.json() as { text: string; entry: VoiceProductionEntry };
+        setVoiceTranscript(data.text);
+        const entry = data.entry;
+        const newLineItem: FormLine = {
+            id: crypto.randomUUID(),
+            productId: entry.productId ?? "",
+            adet: entry.quantity > 0 ? String(entry.quantity) : "",
+            notlar: entry.notes ?? "",
+            _lowConfidence: entry.confidence < 0.7,
+        };
+        setLines(prev => {
+            // Boş tek satır varsa değiştir, yoksa ekle
+            const hasEmptyOnly = prev.length === 1 && !prev[0].productId && !prev[0].adet;
+            return hasEmptyOnly ? [newLineItem] : [...prev, newLineItem];
+        });
+        if (entry.confidence < 0.7) {
+            toast({ type: "warning", message: "Sesli giriş düşük güvenle tamamlandı. Bilgileri kontrol edin." });
+        } else {
+            toast({ type: "success", message: "Sesli giriş tamamlandı. Bilgileri gözden geçirin." });
+        }
+        // Transkript 6 saniye sonra gizlenir (önceki timer varsa iptal et)
+        if (transcriptTimerRef.current) clearTimeout(transcriptTimerRef.current);
+        transcriptTimerRef.current = setTimeout(() => setVoiceTranscript(null), 6000);
+    }, [toast]);
+
+    const { isRecording, isProcessing, duration, error: voiceError, startRecording, stopRecording, cancelRecording } = useVoiceRecorder(handleVoiceResult);
 
     const setLineField = (id: string, field: keyof FormLine, val: string) => {
-        setLines(prev => prev.map(l => l.id === id ? { ...l, [field]: val } : l));
+        setLines(prev => prev.map(l =>
+            l.id === id ? { ...l, [field]: val, _lowConfidence: false } : l
+        ));
     };
 
     const removeLine = (id: string) => {
@@ -133,6 +175,15 @@ export default function ProductionPage() {
 
     const canSave = lines.some(l => l.productId && parseInt(l.adet) > 0);
 
+    // Ses kaydı hatası — toast olarak göster (sadece yeni hata gelince)
+    const prevVoiceErrorRef = useRef<string | null>(null);
+    useEffect(() => {
+        if (voiceError && voiceError !== prevVoiceErrorRef.current) {
+            prevVoiceErrorRef.current = voiceError;
+            toast({ type: "error", message: voiceError });
+        }
+    }, [voiceError, toast]);
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {/* Load error banner */}
@@ -189,26 +240,86 @@ export default function ProductionPage() {
                         Üretim Kalemleri
                     </div>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        <button
-                            onClick={() => toast({ type: "info", message: "🎤 Sesli giriş özelliği yakında aktif olacak" })}
-                            title="Sesli giriş (yakında)"
-                            style={{
-                                fontSize: "13px",
-                                padding: "5px 12px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: "transparent",
-                                color: "var(--text-secondary)",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "5px",
-                            }}
-                        >
-                            🎤 Sesli Giriş (Yakında)
-                        </button>
+                        {/* Kayıt aktif: süre + durdur + iptal */}
+                        {isRecording && (
+                            <>
+                                <span style={{ fontSize: "12px", color: "var(--danger-text)", display: "flex", alignItems: "center", gap: "5px" }}>
+                                    <span style={{
+                                        display: "inline-block", width: "8px", height: "8px",
+                                        borderRadius: "50%", background: "var(--danger)",
+                                        animation: "pulse 1s infinite",
+                                    }} />
+                                    {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(duration % 60).padStart(2, "0")}
+                                </span>
+                                <button
+                                    onClick={stopRecording}
+                                    style={{
+                                        fontSize: "13px", padding: "5px 12px",
+                                        border: "0.5px solid var(--danger-border)",
+                                        borderRadius: "6px", background: "var(--danger-bg)",
+                                        color: "var(--danger-text)", cursor: "pointer",
+                                        display: "flex", alignItems: "center", gap: "5px",
+                                    }}
+                                >
+                                    ■ Durdur
+                                </button>
+                                <button
+                                    onClick={cancelRecording}
+                                    style={{
+                                        fontSize: "12px", padding: "5px 8px",
+                                        border: "0.5px solid var(--border-secondary)",
+                                        borderRadius: "6px", background: "transparent",
+                                        color: "var(--text-tertiary)", cursor: "pointer",
+                                    }}
+                                    title="İptal et"
+                                >
+                                    İptal
+                                </button>
+                            </>
+                        )}
+                        {/* İşleniyor */}
+                        {isProcessing && !isRecording && (
+                            <span style={{ fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "5px" }}>
+                                <span style={{ display: "inline-block", width: "10px", height: "10px", border: "1.5px solid var(--border-secondary)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                                Ses işleniyor...
+                            </span>
+                        )}
+                        {/* Hazır: sesli giriş butonu */}
+                        {!isRecording && !isProcessing && (
+                            <button
+                                onClick={isDemo ? () => toast({ type: "info", message: DEMO_BLOCK_TOAST }) : startRecording}
+                                disabled={isDemo}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sesli üretim girişi (90sn max)"}
+                                style={{
+                                    fontSize: "13px", padding: "5px 12px",
+                                    border: "0.5px solid var(--border-secondary)",
+                                    borderRadius: "6px", background: "transparent",
+                                    color: isDemo ? "var(--text-tertiary)" : "var(--text-secondary)",
+                                    cursor: isDemo ? "not-allowed" : "pointer",
+                                    display: "flex", alignItems: "center", gap: "5px",
+                                    opacity: isDemo ? 0.5 : 1,
+                                }}
+                            >
+                                🎤 Sesli Giriş
+                            </button>
+                        )}
                     </div>
                 </div>
+
+                {/* Transkript gösterimi — sesli giriş sonrası 6sn görünür */}
+                {voiceTranscript && (
+                    <div style={{
+                        padding: "8px 16px",
+                        borderBottom: "0.5px solid var(--border-tertiary)",
+                        fontSize: "12px",
+                        color: "var(--text-secondary)",
+                        background: "var(--bg-secondary)",
+                        display: "flex", alignItems: "center", gap: "6px",
+                    }}>
+                        <span style={{ opacity: 0.6 }}>🎤</span>
+                        <span>&ldquo;{voiceTranscript}&rdquo;</span>
+                    </div>
+                )}
 
                 <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", minWidth: "520px", borderCollapse: "collapse" }}>
@@ -225,7 +336,7 @@ export default function ProductionPage() {
                         {lines.map((line, idx) => {
                             const selectedProduct = products.find(p => p.id === line.productId);
                             return (
-                                <tr key={line.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                                <tr key={line.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)", background: line._lowConfidence ? "var(--warning-bg)" : undefined }}>
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px", textAlign: "center" }}>
                                         {idx + 1}
                                     </td>
@@ -245,6 +356,11 @@ export default function ProductionPage() {
                                         {selectedProduct && (
                                             <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "3px" }}>
                                                 Mevcut stok: {formatNumber(selectedProduct.available_now)} {selectedProduct.unit}
+                                            </div>
+                                        )}
+                                        {line._lowConfidence && (
+                                            <div style={{ fontSize: "11px", color: "var(--warning-text)", marginTop: "3px" }}>
+                                                ⚠ Sesli giriş düşük güvenle eşleşti — kontrol edin
                                             </div>
                                         )}
                                     </td>
