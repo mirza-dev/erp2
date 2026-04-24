@@ -3,9 +3,10 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-24_
 
-**Son tamamlanan iş:** Sesli Üretim Girişi — Tüm turlar tamamlandı (2026-04-24)
+**Son tamamlanan iş:** Sesli girişte per-entry not ayrımı (2026-04-24)
 
 Sesli giriş özelliği V1→V3 öncesi eksiksiz tamamlandı:
+- Per-entry note: "DN25 için not: X" → sadece DN25 satırına gider (`entry.note || sessionNote` fallback)
 - Notlar satır bazlı (batchNote kaldırıldı, her satır kendi notunu tutuyor)
 - Belirsiz girişte productId:null + collapse guard (aynı SKU'lu null entry'ler tek'e indirilir)
 - `_voiceHint`: belirsiz satırda Claude'un anladığı ham metin dropdown altında gösterilir

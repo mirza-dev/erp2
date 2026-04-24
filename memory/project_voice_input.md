@@ -51,13 +51,14 @@ export interface VoiceProductionEntry {
     productName: string;       // ham metin (belirsizde _voiceHint olarak kullanılır)
     productSku: string;
     quantity: number;
+    note: string;              // bu ürüne özel not — "" = yok; page.tsx: entry.note || sessionNote
     fireNotes: string;         // "fire: N adet" — UI'da kullanılmıyor (V3 scope)
     confidence: number;        // 0-1
 }
 
 export interface VoiceExtractionResult {
     entries: VoiceProductionEntry[];
-    sessionNote: string;  // her satırın notlar alanına pre-fill olarak yazılır
+    sessionNote: string;  // ürüne bağlı olmayan genel not; entry.note yoksa fallback
     rawText: string;
 }
 
@@ -82,7 +83,7 @@ interface FormLine {
 | Collapse guard | Claude aynı SKU için çoklu null entry döndürürse → tek entry (quantity topla, confidence min al); farklı SKU'lar korunur |
 | `_lowConfidence` sadece productId seçiminde temizlenir | Not veya adet değişimi uyarıyı silmez — kullanıcı hâlâ belirsiz olabilir |
 | `_voiceHint` → dropdown altında görünür | `entry.productName` hint olarak saklanır, ürün seçilince temizlenir |
-| `notlar` satır bazlı | `batchNote` (global) kaldırıldı; her satır kendi notunu tutar; `sessionNote` → tüm yeni satırlara pre-fill |
+| `notlar` satır bazlı | `batchNote` (global) kaldırıldı; `entry.note` (ürüne özel) → o satıra pre-fill; `sessionNote` (genel) → `entry.note` yoksa fallback |
 | `fireNotes` batchNote'a gitmez | Sadece transcript gösteriminde; DB'ye `scrap_qty` olarak yazılmıyor (V3 scope) |
 | `productId` whitelist | `knownIds.has()` ile doğrulama; Claude'un hallüsine karşı koruma |
 | Volume throttle | `prevVolRef` + >8 birim threshold — 60fps re-render önlenir |

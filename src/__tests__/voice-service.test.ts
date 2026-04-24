@@ -45,9 +45,14 @@ function makeAnthropicResponse(text: string) {
     };
 }
 
-/** V2 formatında çıktı — entries[] + sessionNote */
+/** V2/V3 formatında çıktı — entries[] + sessionNote */
 function makeEntries(entries: object[], sessionNote = "") {
     return JSON.stringify({ entries, sessionNote });
+}
+
+/** Varsayılan entry alanlarına note ekler (boş) */
+function entry(overrides: Record<string, unknown>): Record<string, unknown> {
+    return { note: "", fireNotes: "", ...overrides };
 }
 
 const PRODUCTS = [
@@ -370,6 +375,82 @@ describe("extractProductionData — prompt & category doğrulama", () => {
         const callArgs = mockCreate.mock.calls[0][0] as { messages: { content: string }[] };
         // category null ise [kategori] formatı olmamalı
         expect(callArgs.messages[0].content).not.toMatch(/\[.*\]/);
+    });
+});
+
+// ── Per-entry note ────────────────────────────────────────────────────────────
+
+describe("extractProductionData — per-entry note", () => {
+    beforeEach(() => {
+        mockCreate.mockReset();
+    });
+
+    it("Per-entry note parse edilir, doğru entry'e atanır", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([
+            entry({ productId: "prod-1", productName: "DN50 Vana", productSku: "DN50", quantity: 50, confidence: 0.95, note: "A kalite" }),
+            entry({ productId: "prod-2", productName: "DN65 Vana", productSku: "DN65", quantity: 30, confidence: 0.92, note: "" }),
+        ])));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        const { entries, sessionNote } = await extractProductionData("50 DN50 için not: A kalite, 30 DN65", PRODUCTS);
+
+        expect(entries[0].note).toBe("A kalite");
+        expect(entries[1].note).toBe("");
+        expect(sessionNote).toBe("");
+    });
+
+    it("Per-entry note sessionNote'tan bağımsızdır — ikisi aynı anda var olabilir", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([
+            entry({ productId: "prod-1", productName: "DN50 Vana", productSku: "DN50", quantity: 50, confidence: 0.95, note: "A kalite" }),
+            entry({ productId: "prod-2", productName: "DN65 Vana", productSku: "DN65", quantity: 30, confidence: 0.92, note: "" }),
+        ], "acil sevkiyat")));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        const { entries, sessionNote } = await extractProductionData("50 DN50 için not: A kalite, 30 DN65, genel not: acil sevkiyat", PRODUCTS);
+
+        expect(entries[0].note).toBe("A kalite");
+        expect(entries[1].note).toBe("");
+        expect(sessionNote).toBe("acil sevkiyat");
+    });
+
+    it("Genel not sessionNote'a gider, tüm entry note'lar boş kalır", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([
+            entry({ productId: "prod-1", productName: "DN50 Vana", productSku: "DN50", quantity: 50, confidence: 0.95, note: "" }),
+            entry({ productId: "prod-2", productName: "DN65 Vana", productSku: "DN65", quantity: 30, confidence: 0.92, note: "" }),
+        ], "bugün vardiya erken bitti")));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        const { entries, sessionNote } = await extractProductionData("50 DN50, 30 DN65, genel not: bugün vardiya erken bitti", PRODUCTS);
+
+        expect(entries[0].note).toBe("");
+        expect(entries[1].note).toBe("");
+        expect(sessionNote).toBe("bugün vardiya erken bitti");
+    });
+
+    it("SYSTEM_PROMPT 'Ürüne özel not' ifadesini içeriyor", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([
+            entry({ productId: "prod-1", productName: "DN50 Vana", productSku: "DN50", quantity: 50, confidence: 0.95 }),
+        ])));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        await extractProductionData("50 DN50", PRODUCTS);
+
+        const callArgs = mockCreate.mock.calls[0][0] as { system: string };
+        expect(callArgs.system).toContain("Ürüne özel not");
+    });
+
+    it("Collapse guard — note alanları birleştirilir", async () => {
+        mockCreate.mockResolvedValueOnce(makeAnthropicResponse(makeEntries([
+            entry({ productId: null, productName: "DN50 PN6",  productSku: "dn50", quantity: 20, confidence: 0.40, note: "A kalite" }),
+            entry({ productId: null, productName: "DN50 PN10", productSku: "dn50", quantity: 20, confidence: 0.40, note: "" }),
+            entry({ productId: null, productName: "DN50 PN16", productSku: "dn50", quantity: 10, confidence: 0.35, note: "B kalite" }),
+        ])));
+
+        const { extractProductionData } = await import("@/lib/services/voice-service");
+        const { entries } = await extractProductionData("50 DN50", PRODUCTS);
+
+        expect(entries).toHaveLength(1);
+        expect(entries[0].note).toBe("A kalite; B kalite");
     });
 });
 

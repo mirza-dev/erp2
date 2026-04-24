@@ -27,6 +27,7 @@ export interface VoiceProductionEntry {
     productName: string;       // eşleşen ürün adı veya ham metin
     productSku: string;        // eşleşen SKU
     quantity: number;
+    note: string;              // bu ürüne özel not — "" = yok; fallback: sessionNote
     fireNotes: string;         // "fire: N adet" veya "" — sadece fire/hurda bilgisi
     confidence: number;        // 0-1
 }
@@ -139,8 +140,19 @@ Transkripsiyon metnini analiz et ve kullanıcının KASITLI OLARAK belirttiği h
 - Örnek: "100 adet DN50 PN16, 3 fire" → quantity: 100, fireNotes: "fire: 3 adet"
 
 ## Notlar
-- "not:", "not olarak", "şunu not al", "açıklama" ile başlayan veya genel yorum ifadeleri → sessionNote
-- sessionNote tüm kayıt için geçerli genel bir nottur (per-entry değil)
+İki tip not vardır:
+
+1. **Ürüne özel not** → o entry'nin "note" alanına yazılır. Boş string = bu ürün için not yok.
+   Tetikleyiciler: "<ürün> için not:", "<ürün> notu:", "<ürün> şu notu al:", ürün adı geçtikten hemen sonra gelen açıklama.
+   Örn: "50 DN25 için not: A kalite" → DN25 entry'sinde note: "A kalite", DN65 entry'sinde note: ""
+   Örn: "30 DN65, A kalite" → DN65 entry'sinde note: "A kalite"
+
+2. **Genel not** → "sessionNote" alanına yazılır. Tüm kayda ait, ürüne bağlı değil.
+   Tetikleyiciler: "genel not:", "tüm kayda:", "şunu not al:" (ürün adı geçmeden), ürün bağlamı olmayan genel açıklamalar.
+   Örn: "bugün vardiya erken bitti" → sessionNote: "bugün vardiya erken bitti"
+   Örn: "50 DN25, 30 DN65, genel not: acil" → sessionNote: "acil", her iki entry'nin note: ""
+
+Bir ifade hem ürüne bağlıysa hem genel yorum içeriyorsa → ürüne bağla (entry note kazanır, sessionNote boş kalır).
 
 ## Türkçe Ses Tanıma Düzeltmeleri
 Whisper bazen teknik terimleri yanlış yazabilir. Bilinen düzeltmeler:
@@ -158,11 +170,12 @@ SADECE JSON döndür, başka metin YOK.
       "productName": "eşleşen ürün adı veya ham metin",
       "productSku": "eşleşen SKU veya boş string",
       "quantity": 50,
+      "note": "bu ürüne özel not veya boş string",
       "fireNotes": "",
       "confidence": 0.95
     }
   ],
-  "sessionNote": "genel not veya boş string"
+  "sessionNote": "ürüne bağlı olmayan genel not veya boş string"
 }`;
 
 /**
@@ -235,13 +248,14 @@ export async function extractProductionData(
         productName: sanitizeAiOutput(e.productName, 200),
         productSku: sanitizeAiOutput(e.productSku, 50),
         quantity: typeof e.quantity === "number" && e.quantity > 0 ? Math.floor(e.quantity) : 1,
+        note: sanitizeAiOutput(e.note, 200),
         fireNotes: sanitizeAiOutput(e.fireNotes, 200),
         confidence: clampConfidence(e.confidence),
     }));
 
     // Boş dizi fallback
     if (entries.length === 0) {
-        entries.push({ productId: null, productName: "", productSku: "", quantity: 1, fireNotes: "", confidence: 0 });
+        entries.push({ productId: null, productName: "", productSku: "", quantity: 1, note: "", fireNotes: "", confidence: 0 });
     }
 
     // Guard: prompt ihlali — Claude aynı kısmi SKU için çoklu null entry döndürdüyse tek entry'e collapse et
@@ -256,6 +270,7 @@ export async function extractProductionData(
                 productName: nullEntries[0].productName,
                 productSku: nullEntries[0].productSku,
                 quantity: nullEntries.reduce((s, e) => s + e.quantity, 0),
+                note: nullEntries.map(e => e.note).filter(Boolean).join("; "),
                 fireNotes: nullEntries.map(e => e.fireNotes).filter(Boolean).join("; "),
                 confidence: Math.min(...nullEntries.map(e => e.confidence)),
             };

@@ -89,7 +89,7 @@ export default function ProductionPage() {
             id: crypto.randomUUID(),
             productId: entry.productId ?? "",
             adet: entry.quantity > 0 ? String(entry.quantity) : "",
-            notlar: data.sessionNote,
+            notlar: entry.note || data.sessionNote,
             _lowConfidence: entry.confidence < 0.7,
             _voiceHint: entry.productId ? undefined : (entry.productName || undefined),
         }));
