@@ -1,26 +1,27 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-24_
+_Son güncelleme: 2026-04-25_
 
-**Son tamamlanan iş:** Sesli girişte per-entry not ayrımı (2026-04-24)
+**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 1 (2026-04-25)
 
-Sesli giriş özelliği V1→V3 öncesi eksiksiz tamamlandı:
-- Per-entry note: "DN25 için not: X" → sadece DN25 satırına gider (`entry.note || sessionNote` fallback)
-- Notlar satır bazlı (batchNote kaldırıldı, her satır kendi notunu tutuyor)
-- Belirsiz girişte productId:null + collapse guard (aynı SKU'lu null entry'ler tek'e indirilir)
-- `_voiceHint`: belirsiz satırda Claude'un anladığı ham metin dropdown altında gösterilir
-- `category` Claude'a gönderiliyor (ürün listesinde [Kategori] formatı)
-- `setLineField` yan etki fix: `_lowConfidence` sadece ürün seçiminde temizlenir
-- SYSTEM_PROMPT yeniden yazıldı: açık çoklu ürün → çoklu satır, belirsiz → tek null satır
+Paraşüt canlıya alma altyapısı kuruldu (Faz 1/11 tamamlandı):
+- `039_parasut_integration_prep.sql`: token tablosu, tüm step/retry/e-doc kolonları, CHECK constraints, partial unique index'ler, claim/release RPCs (SECURITY DEFINER)
+- `parasut-adapter.ts`: `ParasutError` + `ParasutAdapter` interface
+- `parasut-constants.ts`: tip alias'ları + sabit UUID'ler
+- `parasut.ts`: `MockParasutAdapter` (tri-state error injection, e-doc tip tracking, invariant assertions, reset())
+- `database.types.ts`: tüm yeni Paraşüt alanları + 4 yeni tip
+- `settings/company` GET allowlist koruması (token sızıntısı engellendi)
+- 36 yeni adapter testi + güçlendirilmiş credential leak testleri
+
+**Sıradaki:** Faz 2 — OAuth token lease (`parasut-oauth.ts`) + `/oauth/start` + `/oauth/callback`
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
-- OPENAI_API_KEY: ✅ eklendi (.env.local + Vercel env)
 
-**Test sayısı:** 85 dosya · 1638 vitest (hepsi yeşil)
+**Test sayısı:** 86 dosya · 1683 vitest (hepsi yeşil)
 
 ---
 

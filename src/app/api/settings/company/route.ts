@@ -11,11 +11,22 @@ const getCachedCompanySettings = unstable_cache(
     { tags: ["company-settings"], revalidate: 300 }
 );
 
+// Yalnızca bu alanlar dışarıya döner. Tabloya ileride eklenen kimlik/token alanları sızmaz.
+const SAFE_COMPANY_FIELDS = [
+    "id", "name", "tax_office", "tax_no", "address",
+    "phone", "email", "website", "logo_url", "currency", "updated_at",
+] as const;
+
 // GET /api/settings/company
 export async function GET() {
     try {
         const settings = await getCachedCompanySettings();
-        return NextResponse.json(settings ?? {});
+        if (!settings) return NextResponse.json({});
+        const safe: Record<string, unknown> = {};
+        for (const key of SAFE_COMPANY_FIELDS) {
+            if (key in settings) safe[key] = (settings as unknown as Record<string, unknown>)[key];
+        }
+        return NextResponse.json(safe);
     } catch (err) {
         return handleApiError(err, "GET /api/settings/company");
     }

@@ -26,6 +26,10 @@ export type RecommendationStatus = "suggested" | "accepted" | "edited" | "reject
 export type FeedbackType = "accepted" | "edited" | "rejected" | "note"
 export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "ops_summary" | "purchase_enrich" | "production_voice"
 export type PurchaseCommitmentStatus = "pending" | "received" | "cancelled"
+export type ParasutStep = "contact" | "product" | "shipment" | "invoice" | "edoc" | "done"
+export type ParasutErrorKind = "auth" | "validation" | "rate_limit" | "server" | "network" | "not_found"
+export type ParasutInvoiceType = "e_invoice" | "e_archive" | "manual"
+export type ParasutEDocStatus = "running" | "done" | "error" | "skipped"
 
 // ── Row Types ────────────────────────────────────────────────
 
@@ -50,6 +54,10 @@ export interface CustomerRow {
     payment_terms_days: number | null
     default_incoterm: string | null
     customer_code: string | null
+    parasut_contact_id: string | null
+    parasut_synced_at: string | null
+    city: string | null
+    district: string | null
 }
 
 export interface ProductRow {
@@ -85,6 +93,8 @@ export interface ProductRow {
     standards: string | null
     certifications: string | null
     product_notes: string | null
+    parasut_product_id: string | null
+    parasut_synced_at: string | null
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */
@@ -158,6 +168,30 @@ export interface SalesOrderRow {
     quote_id: string | null
     original_order_number: string | null
     quote_valid_until: string | null
+    shipped_at: string | null
+    parasut_invoice_series: string | null
+    parasut_invoice_number_int: number | null
+    parasut_invoice_no: string | null
+    parasut_invoice_error: string | null
+    parasut_invoice_synced_at: string | null
+    parasut_invoice_create_attempted_at: string | null
+    parasut_invoice_type: ParasutInvoiceType | null
+    parasut_shipment_document_id: string | null
+    parasut_shipment_synced_at: string | null
+    parasut_shipment_error: string | null
+    parasut_shipment_create_attempted_at: string | null
+    parasut_trackable_job_id: string | null
+    parasut_e_document_id: string | null
+    parasut_e_document_status: ParasutEDocStatus | null
+    parasut_e_document_error: string | null
+    parasut_e_document_create_attempted_at: string | null
+    parasut_step: ParasutStep | null
+    parasut_error_kind: ParasutErrorKind | null
+    parasut_retry_count: number
+    parasut_next_retry_at: string | null
+    parasut_last_failed_step: string | null
+    parasut_sync_lock_until: string | null
+    parasut_sync_lock_owner: string | null
 }
 
 export interface OrderLineRow {
@@ -172,6 +206,7 @@ export interface OrderLineRow {
     discount_pct: number
     line_total: number
     sort_order: number
+    vat_rate: number
 }
 
 export interface StockReservationRow {
@@ -376,6 +411,9 @@ export interface IntegrationSyncLogRow {
     requested_at: string
     completed_at: string | null
     source: "ui" | "system" | "scheduled"
+    error_kind: string | null
+    step: string | null
+    metadata: Json | null
 }
 
 export interface AuditLogRow {
@@ -475,4 +513,17 @@ export interface SalesOrderWithLines extends SalesOrderRow {
 
 export interface QuoteWithLines extends QuoteRow {
     lines: QuoteLineItemRow[]
+}
+
+export interface ParasutOAuthTokensRow {
+    id:                 string
+    singleton_key:      string
+    access_token:       string
+    refresh_token:      string
+    expires_at:         string
+    refresh_lock_until: string | null
+    refresh_lock_owner: string | null
+    token_version:      number
+    updated_at:         string
+    created_at:         string
 }

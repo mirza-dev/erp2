@@ -2,17 +2,34 @@
 name: KokpitERP — Entegrasyonlar, AI ve Test Altyapısı
 description: Paraşüt mock, AI kolon eşleştirme, health check, test altyapısı ve mock pattern'ler
 type: project
+originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-
 ## Paraşüt Entegrasyonu
 
-- `src/lib/parasut.ts` — **şu an MOCK** (%90 başarı, 1-1.8s rastgele gecikme)
-- Gerçek API'ye geçmek için `sendInvoiceToParasut()` içini değiştir
-- `src/lib/services/parasut-service.ts` — `serviceSyncOrderToParasut`, `serviceSyncAllPending`, `serviceRetrySyncLog`
-- **`PARASUT_ENABLED=true`** → sync aktif; boş/false → DB'ye yazmadan erken döner
-- UI bağlantı durumu `config.enabled`'dan türetiliyor
-- Sipariş detay → sevk → `await serviceSyncOrderToParasut(id)` (fire-and-forget değil)
-- Regression: `src/__tests__/parasut-disabled.test.ts`
+**Durum: Faz 1/11 tamamlandı (2026-04-25) — Faz 2 sırada**
+
+### Mimari (plan: PARASUT_PLAN.md)
+- `ParasutAdapter` interface (`parasut-adapter.ts`) — gerçek HTTP adapter en son eklenecek
+- `MockParasutAdapter` (`parasut.ts`) — in-memory, tri-state error injection, invariant assertions
+- `parasut-constants.ts` — ParasutStep, ParasutErrorKind, ALERT_ENTITY_* UUID'leri
+- `src/lib/services/parasut-service.ts` — legacy; Faz 7-9'da yeniden yazılacak
+- **`PARASUT_ENABLED=true`** → sync aktif; boş/false → erken döner
+
+### DB alanları (migration 039)
+- `parasut_oauth_tokens` tablosu (singleton lease, CAS)
+- `sales_orders`: parasut_step, parasut_error_kind, claim/release lock, crash marker'lar, e-doc alanları
+- `customers`: parasut_contact_id, city, district
+- `products`: parasut_product_id
+- `order_lines`: vat_rate
+- Claim/release RPC'leri: SECURITY DEFINER, sadece service_role
+
+### Akış sırası (planlanan)
+contact upsert → product upsert → shipment_document (inflow=false) → sales_invoice (shipment_included=false) → e-belge → trackable_job poll
+
+### Testler
+- `src/__tests__/parasut-mock-adapter.test.ts` — 36 test (tüm metodlar + invariant)
+- `src/__tests__/parasut-service.test.ts`, `parasut-disabled.test.ts`, `order-ship-parasut.test.ts`
+- `src/__tests__/credentials-no-leak.test.ts` — OAuth token sızıntı guard (poisoned fixture)
 
 ---
 
