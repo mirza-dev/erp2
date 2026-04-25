@@ -6,7 +6,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 ## Paraşüt Entegrasyonu
 
-**Durum: Faz 1-7 tamamlandı (2026-04-25) — Faz 8 sırada**
+**Durum: Faz 1-8 tamamlandı (2026-04-26) — Faz 9 sırada**
 
 ### Tamamlanan Fazlar
 | Faz | Özet | Test |
@@ -18,6 +18,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 | 5 | Contact upsert + TTL lease mutex (migration 040) + 6 bulgu fix | 1791 |
 | 6 | Product upsert + TTL lease mutex (migration 041) | 1810 |
 | 7 | Claim/lease RPC + parasutInvoiceNumberInt + mapCurrency(GBP) + stubs + bulgu fix | 1824 |
+| 8 | Shipment document: idempotent, recovery pagination, durable marker, create | 1850 |
 
 ### Mimari (plan: parasut_plan.md)
 - `ParasutAdapter` interface (`parasut-adapter.ts`) — gerçek HTTP adapter en son eklenecek

@@ -3,7 +3,7 @@
 ## 🎯 Progress Tracker
 
 **Son güncelleme:** 2026-04-26
-**Durum:** Faz 7 TAMAMEN KAPALI — Faz 8 sırada
+**Durum:** Faz 8 TAMAMEN KAPALI — Faz 9 sırada
 
 ### Faz ilerlemesi
 
@@ -16,7 +16,7 @@
 | 5 | Contact upsert (tax_number zorunlu, email ikinci savunma) | ✅ Tamamlandı | 2026-04-25 | 1791 test yeşil, TS temiz; serviceEnsureParasutContact + TTL lease mutex (migration 040) + 4 bulgu fix, 31 test |
 | 6 | Product upsert (filter[code]) | ✅ Tamamlandı | 2026-04-25 | 1810 test yeşil, TS temiz; serviceEnsureParasutProduct + TTL lease mutex (migration 041) + 19 test |
 | 7 | Claim/lease RPC + deterministik numara + remote lookup | ✅ Tamamlandı | 2026-04-26 | 1824 test yeşil, TS temiz; parasutInvoiceNumberInt + mapCurrency(GBP) + claim/release RPC + stubs(Faz8-10) + 27 test; bulgu fix: claimErr audit trail, retry skipped log, catch DB write |
-| 8 | Shipment document (inflow=false + procurement_number + marker) | ⬜ Başlamadı | — | |
+| 8 | Shipment document (inflow=false + procurement_number + marker) | ✅ Tamamlandı | 2026-04-26 | 1852 test yeşil, TS temiz; upsertShipment + dbWriteShipmentMeta + durable marker + recovery pagination + 28 test; bulgu fix: marker sırası, alert best-effort, recovery parasutApiCall, orderId context |
 | 9 | Sales invoice (shipment_included=false + warehouse YOK invariant) | ⬜ Başlamadı | — | Stok invariant sandbox gate |
 | 10 | E-belge create + trackable_job poll + invoice re-read | ⬜ Başlamadı | — | |
 | 11 | Backend preflight + step-granular manual retry + UI badges | ⬜ Başlamadı | — | |
@@ -25,9 +25,27 @@
 **Durum legend:** ⬜ Başlamadı · 🟦 Devam ediyor · ✅ Tamamlandı · ⚠️ Bloklu / manuel inceleme
 
 ### Sıradaki adım
-Faz 8 — Shipment document (inflow=false, procurement_number, durable marker, local pagination recovery).
+Faz 9 — Sales invoice (shipment_included=false, parasutInvoiceNumberInt, mapCurrency, durable marker, recovery lookup).
 
 ### Son oturum özeti
+- **Faz 8 tamamlandı + bulgu fix (2026-04-26):**
+  - `src/lib/services/parasut-service.ts`: `upsertShipment` stub → tam implementasyon
+    - `dbWriteShipmentMeta(orderId, ship)` — shipment_document_id + synced_at + error=null
+    - Idempotent: `parasut_shipment_document_id` dolu → erken dön
+    - Recovery: `listRecentShipmentDocuments` pagination (max 5 sayfa, env ile artırılabilir) + local procurement_number filter; `parasutApiCall` wrapper'ından geçiyor (429 retry + context log)
+    - `hasAttemptedBefore + recovery negatif` → alert best-effort (dbCreateAlert try/catch) + `ParasutError('validation')` her koşulda fırlatılır
+    - Durable marker: tüm validasyonlar (customer, product re-fetch, parasut_product_id) geçtikten sonra, create çağrısından hemen önce yazılır
+    - `createShipmentDocument`: `parasutApiCall({ op, orderId, step })` — orderId context dahil
+    - Import: `ALERT_ENTITY_PARASUT_SHIPMENT`, `ParasutShipmentDocument`
+  - **Bulgu fix (2026-04-26):**
+    - HIGH: Marker sırası — validasyon öncesi değil sonrası; ürün ID eksikse marker kalmaz
+    - MEDIUM: `dbCreateAlert` hata verirse `validation` semantiği maskelenmez (try/catch)
+    - MEDIUM: Recovery loop `parasutApiCall` wrapper'ından geçiyor (429 + log standardı)
+    - MEDIUM: `createShipmentDocument` wrapper'ında `orderId` eksikti — eklendi
+  - `src/__tests__/parasut-service-faz8.test.ts`: 28 test (idempotent, recovery, hasAttemptedBefore, create, validasyon, marker, meta)
+  - `src/__tests__/parasut-service-faz7.test.ts`: stub assertion'lar güncellendi
+  - **1852 test yeşil, 95 dosya, TS clean**
+
 - **Faz 7 tamamlandı + bulgu fix (2026-04-25 → 2026-04-26):**
   - `src/lib/services/parasut-service.ts`: orkestra yeniden yazıldı
     - `export function parasutInvoiceNumberInt(orderNumber)` — ORD-YYYY-NNNN → deterministik int, Date.now() fallback yok
@@ -736,7 +754,7 @@ function parasutInvoiceNumberInt(orderNumber: string): number {
 
 ---
 
-## Faz 8 — Shipment Document
+## Faz 8 — Shipment Document ✅ (2026-04-26 — 26 test)
 
 ```ts
 if (order.parasut_shipment_document_id) return; // idempotent

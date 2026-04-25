@@ -14,10 +14,11 @@ import { getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ParasutError } from "@/lib/parasut-adapter";
 import { parasutApiCall } from "@/lib/services/parasut-api-call";
-import { ALERT_ENTITY_PARASUT_AUTH } from "@/lib/parasut-constants";
+import { ALERT_ENTITY_PARASUT_AUTH, ALERT_ENTITY_PARASUT_SHIPMENT } from "@/lib/parasut-constants";
 import type { OrderWithLines } from "@/lib/supabase/orders";
 import type { SalesOrderRow } from "@/lib/database.types";
 import type { ParasutStep } from "@/lib/database.types";
+import type { ParasutShipmentDocument } from "@/lib/parasut-adapter";
 
 // ── Mapping ──────────────────────────────────────────────────
 
@@ -423,11 +424,138 @@ export async function serviceEnsureParasutProduct(productId: string): Promise<st
     }
 }
 
-// ── Faz 7 stubs (Faz 8/9/10'da doldurulacak) ─────────────────
+// ── Faz 8: Shipment document ─────────────────────────────────
 
-async function upsertShipment(_order: OrderWithLines): Promise<void> {
-    throw new ParasutError("server", "Not yet implemented — Faz 8");
+async function dbWriteShipmentMeta(orderId: string, ship: ParasutShipmentDocument): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("sales_orders")
+        .update({
+            parasut_shipment_document_id: ship.id,
+            parasut_shipment_synced_at:   new Date().toISOString(),
+            parasut_shipment_error:       null,
+        })
+        .eq("id", orderId);
+    if (error) throw new Error(`dbWriteShipmentMeta hatası: ${error.message}`);
 }
+
+async function upsertShipment(order: OrderWithLines): Promise<void> {
+    if (order.parasut_shipment_document_id) return; // idempotent
+
+    const orderId  = order.id;
+    const supabase = createServiceClient();
+    const adapter  = getParasutAdapter();
+
+    // Re-fetch customer for fresh city/district/address (order object may be stale)
+    const customer = await dbGetCustomerById(order.customer_id!);
+    if (!customer) {
+        throw new ParasutError("not_found", `Müşteri bulunamadı: ${order.customer_id}`);
+    }
+    if (!customer.parasut_contact_id) {
+        throw new ParasutError(
+            "validation",
+            "Müşteri Paraşüt contact ID eksik — önce contact upsert gerekli",
+        );
+    }
+
+    const hasAttemptedBefore = !!order.parasut_shipment_create_attempted_at;
+
+    // Remote recovery — Paraşüt API'sinde procurement_number filtresi yok
+    // → tüm son belgeler listelenir, local filter uygulanır (max 5 sayfa, env ile artırılabilir)
+    const maxPages = Math.min(20, parseInt(process.env.PARASUT_SHIPMENT_RECOVERY_MAX_PAGES ?? "5", 10));
+    let found: ParasutShipmentDocument | null = null;
+    for (let p = 1; p <= maxPages; p++) {
+        const list = await parasutApiCall(
+            { op: "listRecentShipmentDocuments", orderId, step: "shipment" as const },
+            () => adapter.listRecentShipmentDocuments(p, 25),
+        );
+        if (list.length === 0) break;
+        const hit = list.find(s => s.attributes.procurement_number === order.order_number);
+        if (hit) { found = hit; break; }
+        if (list.length < 25) break;
+    }
+
+    if (found) {
+        await dbWriteShipmentMeta(orderId, found);
+        return;
+    }
+
+    if (hasAttemptedBefore) {
+        // Alert best-effort — yazım hatası manual review semantiğini maskelemez
+        try {
+            await dbCreateAlert({
+                type:        "sync_issue",
+                severity:    "critical",
+                title:       "Shipment belgesi manuel inceleme gerekli",
+                description: `Shipment create attempted ${order.parasut_shipment_create_attempted_at} ama DB ID yok + local recovery negatif → duplicate riski, manuel inceleme gerekli`,
+                entity_type: "parasut",
+                entity_id:   ALERT_ENTITY_PARASUT_SHIPMENT,
+                source:      "system",
+            });
+        } catch (alertErr) {
+            console.error(JSON.stringify({ parasut_alert_fail: String(alertErr), orderId }));
+        }
+        throw new ParasutError(
+            "validation",
+            "Shipment manual review gerekli — duplicate riski (önceki attempt marker + recovery negatif)",
+        );
+    }
+
+    // Ürün Paraşüt ID'lerini yükle (OrderLineRow'da yok — her satır için re-fetch)
+    // Tüm validasyonlar create çağrısından ÖNCE tamamlanmalı; marker sadece gerçekten
+    // create'e gidileceği noktada yazılır (eksik product_id gibi kalıcı hatalar marker bırakmaz)
+    const details: Array<{ quantity: number; product_id: string; description: string }> = [];
+    for (const line of order.lines) {
+        const product = await dbGetProductById(line.product_id);
+        if (!product) {
+            throw new ParasutError("not_found", `Ürün bulunamadı: ${line.product_id}`);
+        }
+        if (!product.parasut_product_id) {
+            throw new ParasutError(
+                "validation",
+                `Ürün Paraşüt product ID eksik: ${line.product_sku}`,
+            );
+        }
+        details.push({
+            quantity:    line.quantity,
+            product_id:  product.parasut_product_id,
+            description: `${line.product_name} (${line.product_sku})`,
+        });
+    }
+
+    const shippedAt = (order.shipped_at ?? order.created_at).slice(0, 10);
+    const issueDate = new Date().toISOString().slice(0, 10);
+
+    // Durable attempted marker — tüm validasyonlar geçtikten sonra, create çağrısından hemen önce yazılır.
+    // Crash-before-DB-write senaryosu: sonraki retry hasAttemptedBefore=true görür, recovery pagination çalışır.
+    // Marker bu noktada çünkü product/customer validation hatası create'i engellemez — marker kalsa
+    // sonraki retry yanlışlıkla manual review'a düşer.
+    const { error: markerErr } = await supabase
+        .from("sales_orders")
+        .update({ parasut_shipment_create_attempted_at: new Date().toISOString() })
+        .eq("id", orderId);
+    if (markerErr) throw new Error(`Shipment attempted marker yazılamadı: ${markerErr.message}`);
+
+    const ship = await parasutApiCall(
+        { op: "createShipmentDocument", orderId, step: "shipment" as const },
+        () => adapter.createShipmentDocument({
+            contact_id:         customer.parasut_contact_id!,
+            issue_date:         issueDate,
+            shipment_date:      shippedAt,
+            inflow:             false,
+            procurement_number: order.order_number,
+            description:        `KokpitERP #${order.order_number}`,
+            city:               customer.city     ?? undefined,
+            district:           customer.district ?? undefined,
+            address:            customer.address  ?? undefined,
+            details,
+        }),
+    );
+
+    await dbWriteShipmentMeta(orderId, ship);
+}
+
+// ── Faz 9/10 stubs ───────────────────────────────────────────
 
 async function upsertInvoice(_order: OrderWithLines): Promise<void> {
     throw new ParasutError("server", "Not yet implemented — Faz 9");
@@ -517,7 +645,7 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
         await markStepDone(orderId, "product", "shipment");
         orderMut.parasut_retry_count = 0;
 
-        // Step: shipment (stub — Faz 8)
+        // Step: shipment
         currentStep = "shipment";
         await upsertShipment(order);
         await markStepDone(orderId, "shipment", "invoice");

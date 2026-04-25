@@ -262,11 +262,10 @@ describe("serviceSyncOrderToParasut — claim path", () => {
             .mockResolvedValueOnce({ data: true, error: null })       // claim
             .mockRejectedValueOnce(new Error("release DB error"));    // release
 
-        // Should not throw; error from stub is returned
+        // Should not throw; release error suppressed, original shipment error returned
         const result = await serviceSyncOrderToParasut("order-1");
         expect(result.success).toBe(false);
-        // The stub error message, not release error
-        expect(result.error).toMatch(/faz 8/i);
+        expect(result.error).not.toMatch(/release DB error/i);
     });
 });
 
@@ -318,8 +317,8 @@ describe("serviceSyncOrderToParasut — product step", () => {
     });
 });
 
-describe("serviceSyncOrderToParasut — shipment step (stub)", () => {
-    it("shipment stub → step='shipment', error='Not yet implemented — Faz 8'", async () => {
+describe("serviceSyncOrderToParasut — shipment step hata sınıflandırma", () => {
+    it("shipment hatası → step='shipment' olarak classify edilir", async () => {
         mockDbGetOrderById.mockResolvedValue(makeOrder());
         // contact + product both bypass (IDs exist)
         mockDbGetCustomerById.mockResolvedValue(makeCustomerWithContact());
@@ -330,13 +329,12 @@ describe("serviceSyncOrderToParasut — shipment step (stub)", () => {
         const result = await serviceSyncOrderToParasut("order-1");
 
         expect(result.success).toBe(false);
-        expect(result.error).toMatch(/faz 8/i);
         expect(mockUpdate).toHaveBeenCalledWith(
             expect.objectContaining({ parasut_step: "shipment" }),
         );
     });
 
-    it("shipment stub → sync log step='shipment' ile yazılır", async () => {
+    it("shipment hatası → sync log step='shipment' ile yazılır", async () => {
         mockDbGetOrderById.mockResolvedValue(makeOrder());
         mockDbGetCustomerById.mockResolvedValue(makeCustomerWithContact());
         mockRpc
@@ -383,9 +381,9 @@ describe("serviceSyncOrderToParasut — catch block DB write", () => {
 
         const result = await serviceSyncOrderToParasut("order-1");
 
-        // Original stub error is returned, not the DB write error
+        // Original shipment error is returned, not the DB write error
         expect(result.success).toBe(false);
-        expect(result.error).toMatch(/faz 8/i);
+        expect(result.error).not.toMatch(/write failed/i);
     });
 });
 

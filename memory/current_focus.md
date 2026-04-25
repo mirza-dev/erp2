@@ -4,37 +4,43 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Paraşüt entegrasyonu — Faz 8 sırada (Shipment document)
-**Önceki:** Faz 7 TAMAMEN KAPALI
+**Aktif:** Paraşüt entegrasyonu — Faz 9 sırada (Sales Invoice)
+**Önceki:** Faz 8 TAMAMEN KAPALI (2026-04-26)
 
 ---
 
-## Son Tamamlanan İş — Paraşüt Faz 7 (2026-04-25)
+## Son Tamamlanan İş — Paraşüt Faz 8 (2026-04-26)
 
-### Faz 7 özet
-`serviceSyncOrderToParasut` yeniden yazıldı: customer_id null guard → `parasut_claim_sync` RPC → step orchestration (contact→product→shipment stub→invoice stub→edoc stub) → catch: classifyAndPatch + DB patch + sync log → finally: `parasut_release_sync` (best-effort). `parasutInvoiceNumberInt` export, `mapCurrency` export + GBP. Stubs Faz 8/9/10'da doldurulacak.
+### Faz 8 özet
+`upsertShipment` stub'ı tam implementasyona dönüştürüldü:
+- **Idempotent:** `parasut_shipment_document_id` dolu → erken dön
+- **Remote recovery:** `listRecentShipmentDocuments` pagination + `procurement_number` local filter (max 5 sayfa, `PARASUT_SHIPMENT_RECOVERY_MAX_PAGES` env ile artırılabilir, max 20)
+- **hasAttemptedBefore + recovery negatif:** alert (`ALERT_ENTITY_PARASUT_SHIPMENT`) + `ParasutError('validation', ...)` — duplicate'den korunma
+- **Durable marker:** `parasut_shipment_create_attempted_at` create çağrısından ÖNCE yazılır
+- **Create:** `inflow=false`, `procurement_number=order.order_number`, `shipment_date=shipped_at??created_at` (ilk 10 char), müşteri city/district/address
+- **Re-fetch:** customer ve product'lar içeride re-fetch (order stale olabilir); her line için `dbGetProductById` + `parasut_product_id` kontrolü
+- **`dbWriteShipmentMeta`:** shipment_document_id + synced_at + error=null DB'ye
 
 ### Değişen dosyalar
 | Dosya | Değişiklik |
 |-------|-----------|
-| `src/lib/services/parasut-service.ts` | Orkestra rewrite: claim RPC, stubs, export mapCurrency+parasutInvoiceNumberInt, SyncOrderResult.skipped |
-| `src/__tests__/parasut-service-faz7.test.ts` | YENİ — 24 test |
-| `src/__tests__/parasut-service.test.ts` | sendInvoice bağımlı testler kaldırıldı, RPC mock eklendi |
-| `src/__tests__/parasut-disabled.test.ts` | "proceeds to sendInvoice" → "claim RPC çağrılır" |
+| `src/lib/services/parasut-service.ts` | `upsertShipment` + `dbWriteShipmentMeta` implementasyonu; import eklendi: `ALERT_ENTITY_PARASUT_SHIPMENT`, `ParasutShipmentDocument` |
+| `src/__tests__/parasut-service-faz7.test.ts` | "shipment step (stub)" → "hata sınıflandırma"; `/faz 8/i` assertionlar kaldırıldı |
+| `src/__tests__/parasut-service-faz8.test.ts` | YENİ — 26 test |
 
-### Faz 7 son durumu (tam kapalı)
-- Test: 27 yeni test (bulgu fix +3), 94 dosya · 1824 test yeşil, TS clean
+### Faz 8 son durumu (tam kapalı)
+- Test: 26 yeni test; 95 dosya · 1850 test yeşil, TS clean
 
 ---
 
-## Sıradaki adım — Faz 8
+## Sıradaki adım — Faz 9
 
-Shipment document (`upsertShipment` stub'ı doldur):
-1. Idempotent: `parasut_shipment_document_id` dolu → erken dön
-2. Durable "create attempted" marker (crash-before-DB-write koruması)
-3. Remote recovery: `listRecentShipmentDocuments` pagination + `procurement_number` local filter (max 5 sayfa)
-4. `createShipmentDocument`: `inflow=false`, `procurement_number=order.order_number`, city/district/address
-5. `dbWriteShipmentMeta` — shipment ID + synced_at DB'ye
+Sales Invoice (`upsertInvoice` stub'ı doldur):
+1. Idempotent: `parasut_invoice_id` dolu → erken dön
+2. Durable "create attempted" marker
+3. Remote recovery: `findSalesInvoicesByNumber(series, numberInt)` — idempotent
+4. `createSalesInvoice`: `shipment_included=false`, `PARASUT_INVOICE_SERIES='KE'`, `parasutInvoiceNumberInt`, `mapCurrency`
+5. `dbWriteInvoiceMeta` — invoice ID + synced_at DB'ye
 
 **Why:** Yeni session'da Claude aktif konuyu eksiksiz bilsin.
-**How to apply:** Faz 7 tamamen kapalı. Faz 8'den devam et.
+**How to apply:** Faz 8 tamamen kapalı. Faz 9'dan devam et.
