@@ -6,11 +6,18 @@
  */
 
 import { dbGetOrderById } from "@/lib/supabase/orders";
+import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/sync-log";
-import { sendInvoiceToParasut } from "@/lib/parasut";
+import { dbCreateAlert } from "@/lib/supabase/alerts";
+import { sendInvoiceToParasut, getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
+import { ParasutError } from "@/lib/parasut-adapter";
+import { parasutApiCall } from "@/lib/services/parasut-api-call";
+import { ALERT_ENTITY_PARASUT_AUTH } from "@/lib/parasut-constants";
 import type { ParasutInvoicePayload } from "@/lib/parasut";
 import type { OrderWithLines } from "@/lib/supabase/orders";
+import type { SalesOrderRow } from "@/lib/database.types";
+import type { ParasutStep } from "@/lib/database.types";
 
 // ── Mapping ──────────────────────────────────────────────────
 
@@ -63,11 +70,269 @@ function mapOrderToParasut(order: OrderWithLines): ParasutInvoicePayload {
 }
 
 // ── Enable guard ─────────────────────────────────────────────
-// Paraşüt integration must be explicitly opted in via PARASUT_ENABLED=true.
-// When disabled (staging, dev, unconfigured prod), all sync functions return
-// early without touching the database.
 function isParasutEnabled(): boolean {
     return process.env.PARASUT_ENABLED === "true";
+}
+
+// ── Error classification + backoff ───────────────────────────
+
+/**
+ * Maps a ParasutError to a DB patch for the current step.
+ * Pure function — no side effects.
+ */
+export function classifyAndPatch(
+    order: Pick<SalesOrderRow, "parasut_retry_count">,
+    step: ParasutStep,
+    pe: ParasutError,
+): Partial<SalesOrderRow> {
+    const patch: Partial<SalesOrderRow> = {
+        parasut_error:           pe.message,
+        parasut_error_kind:      pe.kind,
+        parasut_last_failed_step: step,
+        parasut_step:            step,
+    };
+
+    if (step === "shipment") patch.parasut_shipment_error        = pe.message;
+    else if (step === "invoice") patch.parasut_invoice_error     = pe.message;
+    else if (step === "edoc")    patch.parasut_e_document_error  = pe.message;
+
+    if (pe.kind === "rate_limit") {
+        patch.parasut_next_retry_at = new Date(Date.now() + (pe.retryAfterSec ?? 30) * 1000).toISOString();
+    } else if (pe.kind === "auth" || pe.kind === "validation") {
+        patch.parasut_next_retry_at = new Date("2099-01-01T00:00:00Z").toISOString();
+    } else {
+        patch.parasut_retry_count = order.parasut_retry_count + 1;
+        if (patch.parasut_retry_count >= 5) {
+            patch.parasut_next_retry_at = new Date("2099-01-01T00:00:00Z").toISOString();
+        } else {
+            const backoff = Math.min(30 * 60, 30 * 2 ** patch.parasut_retry_count);
+            patch.parasut_next_retry_at = new Date(
+                Date.now() + (backoff + Math.random() * 5) * 1000,
+            ).toISOString();
+        }
+    }
+    return patch;
+}
+
+// ── Step success ─────────────────────────────────────────────
+
+export async function markStepDone(orderId: string, step: ParasutStep, nextStep: ParasutStep): Promise<void> {
+    const supabase = createServiceClient();
+    const { error: dbErr } = await supabase
+        .from("sales_orders")
+        .update({
+            parasut_step:             nextStep,
+            parasut_error:            null,
+            parasut_error_kind:       null,
+            parasut_next_retry_at:    null,
+            parasut_retry_count:      0,
+            parasut_last_failed_step: null,
+            ...(step === "shipment" ? { parasut_shipment_error: null, parasut_shipment_synced_at: new Date().toISOString() } : {}),
+            ...(step === "invoice"  ? { parasut_invoice_error:  null, parasut_invoice_synced_at:  new Date().toISOString() } : {}),
+            ...(step === "edoc"     ? { parasut_e_document_error: null } : {}),
+        })
+        .eq("id", orderId);
+
+    if (dbErr) throw new Error(`markStepDone DB update failed (order=${orderId}, step=${step}): ${dbErr.message}`);
+
+    await dbCreateSyncLog({
+        entity_type: "sales_order",
+        entity_id:   orderId,
+        direction:   "push",
+        status:      "success",
+        step,
+        metadata:    { next_step: nextStep },
+    });
+}
+
+// ── Auth alert threshold ─────────────────────────────────────
+
+export async function checkAuthAlertThreshold(): Promise<void> {
+    const supabase  = createServiceClient();
+    const oneHourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
+    const { count } = await supabase
+        .from("integration_sync_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("error_kind", "auth")
+        .gte("requested_at", oneHourAgo);
+
+    if ((count ?? 0) >= 3) {
+        await dbCreateAlert({
+            type:        "sync_issue",
+            severity:    "critical",
+            title:       "Paraşüt auth hatası",
+            description: `Son 1 saatte ${count ?? 0} auth hatası tespit edildi — OAuth yeniden doğrulama gerekebilir.`,
+            entity_type: "parasut",
+            entity_id:   ALERT_ENTITY_PARASUT_AUTH,
+            source:      "system",
+        });
+    }
+}
+
+// ── Contact upsert ───────────────────────────────────────────
+
+/**
+ * Ensures the customer has a Paraşüt contact ID.
+ * Idempotent: if parasut_contact_id already set, returns immediately.
+ * Returns the resolved Paraşüt contact ID.
+ */
+export async function serviceEnsureParasutContact(customerId: string): Promise<string> {
+    const customer = await dbGetCustomerById(customerId);
+    if (!customer) throw new ParasutError("not_found", `Customer ${customerId} not found`);
+
+    if (customer.parasut_contact_id) return customer.parasut_contact_id;
+
+    const taxNumber = customer.tax_number?.trim() ?? "";
+    if (!taxNumber) {
+        throw new ParasutError("validation", `Müşteri ${customer.name} için vergi numarası zorunlu (Paraşüt sync)`);
+    }
+
+    const adapter = getParasutAdapter();
+    const supabase = createServiceClient();
+
+    // Find-match paths: contact already exists in Paraşüt, just record the ID.
+    async function writeContactId(contactId: string): Promise<void> {
+        const { error: dbErr } = await supabase.from("customers").update({
+            parasut_contact_id: contactId,
+            parasut_synced_at:  new Date().toISOString(),
+        }).eq("id", customerId);
+        if (dbErr) throw new Error(`customers update failed (id=${customerId}): ${dbErr.message}`);
+    }
+
+    // Create paths use a DB mutex (TTL lease) to prevent two parallel callers from both
+    // reaching createContact. Mirrors the OAuth refresh_lock_until/refresh_lock_owner pattern.
+    // parasut_contact_id stays clean: always NULL or a real Paraşüt UUID.
+    const LEASE_TTL_MS = 60_000;
+    const owner = crypto.randomUUID();
+
+    // Atomically claim the lease (WHERE contact IS NULL AND lease expired-or-absent).
+    // Returns { claimed: true } if we own the slot.
+    // Returns { claimed: false, existingId } if another caller already finished.
+    // Throws ParasutError('server') if another caller holds an active lease → retryable.
+    async function claimOrSkip(): Promise<{ claimed: true } | { claimed: false; existingId: string }> {
+        const leaseUntil = new Date(Date.now() + LEASE_TTL_MS).toISOString();
+        const nowISO     = new Date().toISOString();
+        const { data: rows, error } = await supabase
+            .from("customers")
+            .update({ parasut_contact_creating_until: leaseUntil, parasut_contact_creating_owner: owner })
+            .eq("id", customerId)
+            .is("parasut_contact_id", null)
+            .or(`parasut_contact_creating_until.is.null,parasut_contact_creating_until.lt.${nowISO}`)
+            .select("id");
+        if (error) throw new Error(`customers claim failed (id=${customerId}): ${error.message}`);
+        if (rows && rows.length > 0) return { claimed: true };
+        const refreshed = await dbGetCustomerById(customerId);
+        if (refreshed?.parasut_contact_id) return { claimed: false, existingId: refreshed.parasut_contact_id };
+        // Another worker holds an active lease — CRON will retry
+        throw new ParasutError("server", `Contact creation in progress (customer=${customerId}), will retry`);
+    }
+
+    // Owner-gated write: only succeeds if our lease is still current.
+    // 0 rows → lease was taken over (possible orphan contact in Paraşüt).
+    async function finishCreate(contactId: string): Promise<void> {
+        const { data: rows, error } = await supabase
+            .from("customers")
+            .update({
+                parasut_contact_id:              contactId,
+                parasut_synced_at:               new Date().toISOString(),
+                parasut_contact_creating_until:  null,
+                parasut_contact_creating_owner:  null,
+            })
+            .eq("id", customerId)
+            .eq("parasut_contact_creating_owner", owner)
+            .select("id");
+        if (error) throw new Error(`customers finish failed (id=${customerId}): ${error.message}`);
+        if (!rows || rows.length === 0) {
+            throw new ParasutError("server", `Lease lost for customer=${customerId} during create — possible orphan contact ${contactId}`);
+        }
+    }
+
+    async function releaseCreate(): Promise<void> {
+        // Best-effort: if this fails, the lease will expire via TTL on the next attempt.
+        try {
+            await supabase
+                .from("customers")
+                .update({ parasut_contact_creating_until: null, parasut_contact_creating_owner: null })
+                .eq("id", customerId)
+                .eq("parasut_contact_creating_owner", owner);
+        } catch { /* best-effort */ }
+    }
+
+    const byTax = await parasutApiCall({ op: "findContactsByTaxNumber", step: "contact" as const }, () =>
+        adapter.findContactsByTaxNumber(taxNumber),
+    );
+
+    if (byTax.length > 1) {
+        throw new ParasutError("validation", `Paraşüt'te ${taxNumber} VKN ile birden fazla kontakt var — manuel inceleme gerekli`);
+    }
+
+    if (byTax.length === 1) {
+        await writeContactId(byTax[0].id);
+        return byTax[0].id;
+    }
+
+    // 0 tax matches — email fallback
+    if (!customer.email) {
+        const claim = await claimOrSkip();
+        if (!claim.claimed) return claim.existingId;
+        try {
+            const created = await parasutApiCall({ op: "createContact", step: "contact" as const }, () =>
+                adapter.createContact({
+                    name:       customer.name,
+                    tax_number: taxNumber,
+                    tax_office: customer.tax_office ?? undefined,
+                }),
+            );
+            await finishCreate(created.id);
+            return created.id;
+        } catch (err) {
+            await releaseCreate();
+            throw err;
+        }
+    }
+
+    const byEmail = await parasutApiCall({ op: "findContactsByEmail", step: "contact" as const }, () =>
+        adapter.findContactsByEmail(customer.email as string),
+    );
+
+    if (byEmail.length > 1) {
+        throw new ParasutError("validation", `Paraşüt'te ${customer.email} e-posta ile birden fazla kontakt var — manuel inceleme gerekli`);
+    }
+
+    if (byEmail.length === 1) {
+        const found = byEmail[0];
+        const existingTax = found.attributes.tax_number;
+        if (existingTax !== null && existingTax !== "" && existingTax !== taxNumber) {
+            throw new ParasutError(
+                "validation",
+                `E-posta eşleşti (${customer.email}) ama Paraşüt kontağının VKN'si farklı (${existingTax} ≠ ${taxNumber}) — veri bozulma riski, manuel müdahale`,
+            );
+        }
+        await parasutApiCall({ op: "updateContact", step: "contact" as const }, () =>
+            adapter.updateContact(found.id, { tax_number: taxNumber }),
+        );
+        await writeContactId(found.id);
+        return found.id;
+    }
+
+    // 0 email matches — create new contact
+    const claim = await claimOrSkip();
+    if (!claim.claimed) return claim.existingId;
+    try {
+        const created = await parasutApiCall({ op: "createContact", step: "contact" as const }, () =>
+            adapter.createContact({
+                name:       customer.name,
+                tax_number: taxNumber,
+                email:      customer.email as string,
+                tax_office: customer.tax_office ?? undefined,
+            }),
+        );
+        await finishCreate(created.id);
+        return created.id;
+    } catch (err) {
+        await releaseCreate();
+        throw err;
+    }
 }
 
 // ── Sync ─────────────────────────────────────────────────────
@@ -113,16 +378,18 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
 
         return { success: true, invoice_id: result.invoiceId, sent_at: result.sentAt };
     } else {
-        // Hata durumunda order'da parasut_error güncelle
-        await supabase.from("sales_orders").update({
-            parasut_error: result.error,
-        }).eq("id", orderId);
+        const kind = (result.errorKind ?? "server") as import("@/lib/parasut-constants").ParasutErrorKind;
+        const pe   = new ParasutError(kind, result.error ?? "Unknown error");
+        const patch = classifyAndPatch(order, "invoice", pe);
+        await supabase.from("sales_orders").update(patch).eq("id", orderId);
 
         await dbCreateSyncLog({
-            entity_type: "sales_order",
-            entity_id: orderId,
-            direction: "push",
-            status: "error",
+            entity_type:   "sales_order",
+            entity_id:     orderId,
+            direction:     "push",
+            status:        "error",
+            step:          "invoice",
+            error_kind:    kind,
             error_message: result.error,
         });
 
@@ -168,14 +435,14 @@ export async function serviceSyncAllPending(): Promise<{
     if (!isParasutEnabled()) return { synced: 0, failed: 0, errors: [] };
     const supabase = createServiceClient();
 
-    // Find approved orders with no parasut_invoice_id and no parasut_error
+    const nowISO = new Date().toISOString();
     const { data: pendingOrders, error } = await supabase
         .from("sales_orders")
         .select("id, order_number")
-        .eq("commercial_status", "approved")
-        .eq("fulfillment_status", "shipped")
-        .is("parasut_invoice_id", null)
-        .is("parasut_error", null)
+        .not("parasut_step", "is", null)
+        .neq("parasut_step", "done")
+        .or("parasut_error_kind.is.null,parasut_error_kind.not.in.(validation,auth)")
+        .or(`parasut_next_retry_at.is.null,parasut_next_retry_at.lte.${nowISO}`)
         .limit(50);
 
     if (error) throw new Error(error.message);

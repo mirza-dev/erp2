@@ -56,6 +56,8 @@ export interface CustomerRow {
     customer_code: string | null
     parasut_contact_id: string | null
     parasut_synced_at: string | null
+    parasut_contact_creating_until: string | null
+    parasut_contact_creating_owner: string | null
     city: string | null
     district: string | null
 }

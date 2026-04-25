@@ -7,10 +7,10 @@
 - [project_stack.md](project_stack.md) — Stack, inline style kuralları, klasör yapısı, veri modelleri, seed/demo hazırlık
 - [project_domain.md](project_domain.md) — Sipariş çift ekseni, stok modeli, KDV, import kontratı, alert tipleri, tamamlanan fazlar (0–13)
 - [project_security.md](project_security.md) — RLS, middleware, demo mode, TÜM audit bulguları kapatıldı (C1-C3,H1-H4,M1-M4,L1,L3,B04 ✅)
-- [project_integrations.md](project_integrations.md) — Paraşüt mock, AI kolon eşleştirme, Sentry ✅, k6, smoke 24, 1609 test; health check B-04 fix ✅
+- [project_integrations.md](project_integrations.md) — Paraşüt Faz 1-5 ✅ (1785 test), Faz 6 sırada; AI kolon eşleştirme, Sentry ✅, k6, smoke 24
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Son: sesli üretim girişi tüm turlar tamamlandı (1638 test); sprint boş
+- [current_focus.md](current_focus.md) — Son: Paraşüt Faz 5 + 4 bulgu fix tamamlandı (1785 test); Faz 6 sırada
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi: tüm turlar ✅ 1638 test; satır bazlı not, guard, _voiceHint, prompt final

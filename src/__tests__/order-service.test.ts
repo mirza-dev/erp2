@@ -43,6 +43,13 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbBatchResolveAlerts: (...args: unknown[]) => mockDbBatchResolveAlerts(...args),
 }));
 
+const mockParasutUpdateEq = vi.fn().mockResolvedValue({ error: null });
+const mockParasutUpdate   = vi.fn(() => ({ eq: mockParasutUpdateEq }));
+
+vi.mock("@/lib/supabase/service", () => ({
+    createServiceClient: () => ({ from: () => ({ update: mockParasutUpdate }) }),
+}));
+
 import { serviceTransitionOrder, validateOrderCreate, serviceListOrders, serviceGetOrder, serviceCreateOrder, serviceUpdateQuoteDeadline } from "@/lib/services/order-service";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 
@@ -75,6 +82,8 @@ beforeEach(() => {
     mockDbCancelOrder.mockReset();
     mockDbUpdateOrderStatus.mockReset().mockResolvedValue(undefined);
     mockDbLogOrderAction.mockReset().mockResolvedValue(undefined);
+    mockParasutUpdate.mockClear();
+    mockParasutUpdateEq.mockClear();
 });
 
 // ── approve — 007 RPC response shapes ────────────────────────
@@ -162,6 +171,46 @@ describe("serviceTransitionOrder — ship (007 fulfillment guard)", () => {
         const result = await serviceTransitionOrder("order-1", "shipped");
         expect(result.success).toBe(false);
         expect(mockDbShipOrderFull).not.toHaveBeenCalled();
+    });
+
+    it("PARASUT_ENABLED=true + başarılı sevk → parasut_step='contact' DB'ye yazılır", async () => {
+        const saved = process.env.PARASUT_ENABLED;
+        process.env.PARASUT_ENABLED = "true";
+        try {
+            mockDbGetOrderById.mockResolvedValue(APPROVED_ORDER);
+            mockDbShipOrderFull.mockResolvedValue({ success: true });
+            await serviceTransitionOrder("order-1", "shipped");
+            expect(mockParasutUpdate).toHaveBeenCalledWith({ parasut_step: "contact" });
+            expect(mockParasutUpdateEq).toHaveBeenCalledWith("id", "order-1");
+        } finally {
+            process.env.PARASUT_ENABLED = saved;
+        }
+    });
+
+    it("PARASUT_ENABLED kapalıyken sevk → parasut_step güncellenmez", async () => {
+        const saved = process.env.PARASUT_ENABLED;
+        process.env.PARASUT_ENABLED = "false";
+        try {
+            mockDbGetOrderById.mockResolvedValue(APPROVED_ORDER);
+            mockDbShipOrderFull.mockResolvedValue({ success: true });
+            await serviceTransitionOrder("order-1", "shipped");
+            expect(mockParasutUpdate).not.toHaveBeenCalled();
+        } finally {
+            process.env.PARASUT_ENABLED = saved;
+        }
+    });
+
+    it("PARASUT_ENABLED=true + sevk başarısız → parasut_step güncellenmez", async () => {
+        const saved = process.env.PARASUT_ENABLED;
+        process.env.PARASUT_ENABLED = "true";
+        try {
+            mockDbGetOrderById.mockResolvedValue(APPROVED_ORDER);
+            mockDbShipOrderFull.mockResolvedValue({ success: false, error: "Stok yetersiz" });
+            await serviceTransitionOrder("order-1", "shipped");
+            expect(mockParasutUpdate).not.toHaveBeenCalled();
+        } finally {
+            process.env.PARASUT_ENABLED = saved;
+        }
     });
 });
 

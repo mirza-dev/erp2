@@ -6,19 +6,30 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 ## Paraşüt Entegrasyonu
 
-**Durum: Faz 1/11 tamamlandı (2026-04-25) — Faz 2 sırada**
+**Durum: Faz 1-5 tamamlandı (2026-04-25) — Faz 6 sırada**
 
-### Mimari (plan: PARASUT_PLAN.md)
+### Tamamlanan Fazlar
+| Faz | Özet | Test |
+|-----|------|------|
+| 1 | Migration + adapter interface + sabitler + mock | 1683 |
+| 2 | OAuth token lease + CAS + start/callback route | 1704 |
+| 3 | parasutApiCall() wrapper (429 Retry-After + log) | 1719 |
+| 4 | Error classification + step backoff + stats | 1743 |
+| 5 | Contact upsert + TTL lease mutex (migration 040) + 6 bulgu fix | 1791 |
+
+### Mimari (plan: parasut_plan.md)
 - `ParasutAdapter` interface (`parasut-adapter.ts`) — gerçek HTTP adapter en son eklenecek
 - `MockParasutAdapter` (`parasut.ts`) — in-memory, tri-state error injection, invariant assertions
 - `parasut-constants.ts` — ParasutStep, ParasutErrorKind, ALERT_ENTITY_* UUID'leri
-- `src/lib/services/parasut-service.ts` — legacy; Faz 7-9'da yeniden yazılacak
+- `parasut-api-call.ts` — parasutApiCall() wrapper (429 retry, structured log)
+- `parasut-service.ts` — serviceEnsureParasutContact (TTL lease mutex), classifyAndPatch, markStepDone, checkAuthAlertThreshold
+- `parasut-oauth.ts` — getAccessToken, CAS lease
 - **`PARASUT_ENABLED=true`** → sync aktif; boş/false → erken döner
 
 ### DB alanları (migration 039)
 - `parasut_oauth_tokens` tablosu (singleton lease, CAS)
 - `sales_orders`: parasut_step, parasut_error_kind, claim/release lock, crash marker'lar, e-doc alanları
-- `customers`: parasut_contact_id, city, district
+- `customers`: parasut_contact_id, city, district, parasut_contact_creating_until, parasut_contact_creating_owner (migration 040 — TTL lease)
 - `products`: parasut_product_id
 - `order_lines`: vat_rate
 - Claim/release RPC'leri: SECURITY DEFINER, sadece service_role
@@ -28,6 +39,10 @@ contact upsert → product upsert → shipment_document (inflow=false) → sales
 
 ### Testler
 - `src/__tests__/parasut-mock-adapter.test.ts` — 36 test (tüm metodlar + invariant)
+- `src/__tests__/parasut-service-faz5.test.ts` — 25 test (serviceEnsureParasutContact)
+- `src/__tests__/parasut-service-faz4.test.ts` — 24 test (classifyAndPatch, markStepDone, checkAuthAlertThreshold)
+- `src/__tests__/parasut-api-call.test.ts` — 15 test
+- `src/__tests__/parasut-oauth.test.ts` — 21 test
 - `src/__tests__/parasut-service.test.ts`, `parasut-disabled.test.ts`, `order-ship-parasut.test.ts`
 - `src/__tests__/credentials-no-leak.test.ts` — OAuth token sızıntı guard (poisoned fixture)
 

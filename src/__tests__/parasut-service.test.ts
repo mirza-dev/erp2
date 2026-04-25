@@ -24,12 +24,18 @@ const mockUpdate = vi.fn(() => ({ eq: mockEq }));
 
 // select mock — per-test override ile kullanılır
 let mockSelectResolve: { data: unknown[]; error: null | { message: string } } = { data: [], error: null };
-const mockLimit  = vi.fn(() => Promise.resolve(mockSelectResolve));
-const mockIs     = vi.fn().mockReturnThis();
+const mockLimit   = vi.fn(() => Promise.resolve(mockSelectResolve));
+const mockIs      = vi.fn().mockReturnThis();
 const mockEqChain = vi.fn().mockReturnThis();
-const mockSelect = vi.fn(() => ({
-    eq: mockEqChain,
-    is: mockIs,
+const mockNot     = vi.fn().mockReturnThis();
+const mockNeq     = vi.fn().mockReturnThis();
+const mockOr      = vi.fn().mockReturnThis();
+const mockSelect  = vi.fn(() => ({
+    eq:    mockEqChain,
+    is:    mockIs,
+    not:   mockNot,
+    neq:   mockNeq,
+    or:    mockOr,
     limit: mockLimit,
 }));
 
@@ -68,6 +74,7 @@ function makeOrder(overrides: Partial<{
     order_number: string;
     customer_id: string | null;
     customer_name: string;
+    parasut_retry_count: number;
 }> = {}) {
     return {
         id: "order-1",
@@ -78,6 +85,7 @@ function makeOrder(overrides: Partial<{
         currency: overrides.currency ?? "USD",
         customer_id: overrides.customer_id !== undefined ? overrides.customer_id : "cust-1",
         customer_name: overrides.customer_name ?? "Test Müşteri",
+        parasut_retry_count: overrides.parasut_retry_count ?? 0,
         lines: [{ quantity: 2, unit_price: 500, product_name: "Vana", product_sku: "VN-001", product_id: "prod-1", discount_pct: 10 }],
     };
 }
@@ -222,6 +230,90 @@ describe("serviceSyncOrderToParasut — failure path", () => {
         expect(mockDbCreateSyncLog).toHaveBeenCalledWith(
             expect.objectContaining({ status: "error", error_message: "API timeout" })
         );
+    });
+
+    it("failure → classifyAndPatch alanları DB'ye yazılır (error_kind, step, last_failed_step, next_retry_at, retry_count)", async () => {
+        mockDbGetOrderById.mockResolvedValue(makeOrder({ parasut_retry_count: 1 }));
+        mockSendInvoice.mockResolvedValue({ success: false, error: "timeout" });
+
+        await serviceSyncOrderToParasut("order-1");
+
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            parasut_error_kind:       "server",
+            parasut_step:             "invoice",
+            parasut_last_failed_step: "invoice",
+            parasut_retry_count:      2,
+        }));
+        expect(mockUpdate.mock.calls[0][0].parasut_next_retry_at).toBeDefined();
+    });
+
+    it("failure → audit log step='invoice' ve error_kind='server' içeriyor", async () => {
+        mockDbGetOrderById.mockResolvedValue(makeOrder());
+        mockSendInvoice.mockResolvedValue({ success: false, error: "timeout" });
+
+        await serviceSyncOrderToParasut("order-1");
+
+        expect(mockDbCreateSyncLog).toHaveBeenCalledWith(expect.objectContaining({
+            step:       "invoice",
+            error_kind: "server",
+            status:     "error",
+        }));
+    });
+
+    it("errorKind='auth' taşıyan result → parasut_error_kind='auth', next_retry_at=2099, retry_count değişmez", async () => {
+        mockDbGetOrderById.mockResolvedValue(makeOrder({ parasut_retry_count: 0 }));
+        mockSendInvoice.mockResolvedValue({ success: false, error: "Unauthorized", errorKind: "auth" });
+
+        await serviceSyncOrderToParasut("order-1");
+
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            parasut_error_kind:    "auth",
+            parasut_next_retry_at: "2099-01-01T00:00:00.000Z",
+        }));
+        expect(mockUpdate.mock.calls[0][0].parasut_retry_count).toBeUndefined();
+        expect(mockDbCreateSyncLog).toHaveBeenCalledWith(expect.objectContaining({
+            error_kind: "auth",
+        }));
+    });
+
+    it("errorKind='rate_limit' taşıyan result → backoff, retry_count artıyor", async () => {
+        mockDbGetOrderById.mockResolvedValue(makeOrder({ parasut_retry_count: 0 }));
+        mockSendInvoice.mockResolvedValue({ success: false, error: "Too Many Requests", errorKind: "rate_limit" });
+
+        await serviceSyncOrderToParasut("order-1");
+
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            parasut_error_kind: "rate_limit",
+        }));
+        const next = mockUpdate.mock.calls[0][0].parasut_next_retry_at;
+        expect(typeof next).toBe("string");
+        expect(next).not.toBe("2099-01-01T00:00:00.000Z");
+    });
+
+    it("errorKind='validation' taşıyan result → next_retry_at=2099, audit log error_kind='validation'", async () => {
+        mockDbGetOrderById.mockResolvedValue(makeOrder({ parasut_retry_count: 0 }));
+        mockSendInvoice.mockResolvedValue({ success: false, error: "VKN invalid", errorKind: "validation" });
+
+        await serviceSyncOrderToParasut("order-1");
+
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            parasut_error_kind:    "validation",
+            parasut_next_retry_at: "2099-01-01T00:00:00.000Z",
+        }));
+        expect(mockDbCreateSyncLog).toHaveBeenCalledWith(expect.objectContaining({
+            error_kind: "validation",
+        }));
+    });
+
+    it("errorKind eksik (undefined) → varsayılan 'server' kullanılır", async () => {
+        mockDbGetOrderById.mockResolvedValue(makeOrder({ parasut_retry_count: 0 }));
+        mockSendInvoice.mockResolvedValue({ success: false, error: "unknown" });
+
+        await serviceSyncOrderToParasut("order-1");
+
+        expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+            parasut_error_kind: "server",
+        }));
     });
 });
 

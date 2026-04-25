@@ -22,6 +22,7 @@ import {
 } from "@/lib/supabase/orders";
 
 import { dbCreateAlert, dbListActiveAlerts, dbBatchResolveAlerts, type BatchResolveEntry } from "@/lib/supabase/alerts";
+import { createServiceClient } from "@/lib/supabase/service";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 
 // ── Types ────────────────────────────────────────────────────
@@ -163,6 +164,10 @@ export async function serviceTransitionOrder(
             return { success: false, error: "Yalnızca onaylanmış siparişler sevk edilebilir." };
         }
         const result = await dbShipOrderFull(orderId);
+        if (result.success && process.env.PARASUT_ENABLED === "true") {
+            const supabase = createServiceClient();
+            await supabase.from("sales_orders").update({ parasut_step: "contact" }).eq("id", orderId);
+        }
         return { success: result.success, error: result.error };
     }
 

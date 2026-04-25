@@ -9,6 +9,9 @@ export interface CreateSyncLogInput {
     external_id?: string;
     error_message?: string;
     source?: "ui" | "system" | "scheduled";
+    step?: string;
+    error_kind?: string;
+    metadata?: Record<string, unknown>;
 }
 
 export async function dbCreateSyncLog(input: CreateSyncLogInput): Promise<IntegrationSyncLogRow> {
@@ -27,6 +30,9 @@ export async function dbCreateSyncLog(input: CreateSyncLogInput): Promise<Integr
             source: input.source ?? "system",
             requested_at: now,
             completed_at: input.status === "pending" ? null : now,
+            step: input.step ?? null,
+            error_kind: input.error_kind ?? null,
+            metadata: input.metadata ?? null,
         })
         .select("*")
         .single();

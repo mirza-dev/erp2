@@ -120,6 +120,23 @@ export class MockParasutAdapter implements ParasutAdapter {
         return contact;
     }
 
+    async updateContact(id: string, patch: Partial<ContactInput>): Promise<ParasutContact> {
+        await mockDelay();
+        this._shouldError();
+        const existing = this.contacts.get(id);
+        if (!existing) throw new ParasutError('not_found', `Contact ${id} not found`);
+        const updated: ParasutContact = {
+            id,
+            attributes: {
+                name:       patch.name       ?? existing.attributes.name,
+                tax_number: patch.tax_number ?? existing.attributes.tax_number,
+                email:      patch.email      ?? existing.attributes.email,
+            },
+        };
+        this.contacts.set(id, updated);
+        return updated;
+    }
+
     // ── Product ─────────────────────────────────────────────────────────────
 
     async findProductsByCode(code: string): Promise<ParasutProduct[]> {
@@ -340,7 +357,7 @@ export interface ParasutInvoicePayload {
 
 export type ParasutSyncResult =
     | { success: true;  invoiceId: string; sentAt: string }
-    | { success: false; error: string };
+    | { success: false; error: string; errorKind?: string };
 
 /**
  * Legacy wrapper — mevcut parasut-service.ts kullanıyor.
@@ -374,8 +391,9 @@ export async function sendInvoiceToParasut(
         });
         return { success: true, invoiceId: inv.id, sentAt: new Date().toISOString() };
     } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { success: false, error: msg };
+        const msg       = err instanceof Error ? err.message : String(err);
+        const errorKind = err instanceof ParasutError ? err.kind : "server";
+        return { success: false, error: msg, errorKind };
     }
 }
 

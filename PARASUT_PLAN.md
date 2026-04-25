@@ -3,7 +3,7 @@
 ## 🎯 Progress Tracker
 
 **Son güncelleme:** 2026-04-25
-**Durum:** Faz 3 tamamlandı, Faz 4 sırada
+**Durum:** Faz 5 TAMAMEN KAPALI (tüm bulgular dahil) — Faz 6 sırada
 
 ### Faz ilerlemesi
 
@@ -12,8 +12,8 @@
 | 1 | Migration + adapter interface + sabitler + mock yeniden yazımı | ✅ Tamamlandı | 2026-04-25 | 1683 test yeşil, TS temiz |
 | 2 | OAuth token lease + CAS + `/oauth/start` + `/callback` | ✅ Tamamlandı | 2026-04-25 | 1704 test yeşil, TS temiz; bulgu fix: re-read after lease, upsert, HMAC cookie |
 | 3 | `parasutApiCall()` wrapper (429 Retry-After + context logging) | ✅ Tamamlandı | 2026-04-25 | 1719 test yeşil, TS temiz; PARASUT_ENABLED guard, 15 test |
-| 4 | Error classification + step-based backoff + stats order-state | ⬜ Başlamadı | — | |
-| 5 | Contact upsert (tax_number zorunlu, email ikinci savunma) | ⬜ Başlamadı | — | |
+| 4 | Error classification + step-based backoff + stats order-state | ✅ Tamamlandı | 2026-04-25 | 1743 test yeşil, TS temiz; classifyAndPatch+markStepDone+checkAuthAlertThreshold, 24 yeni test |
+| 5 | Contact upsert (tax_number zorunlu, email ikinci savunma) | ✅ Tamamlandı | 2026-04-25 | 1791 test yeşil, TS temiz; serviceEnsureParasutContact + TTL lease mutex (migration 040) + 4 bulgu fix, 31 test |
 | 6 | Product upsert (filter[code]) | ⬜ Başlamadı | — | |
 | 7 | Claim/lease RPC + deterministik numara + remote lookup | ⬜ Başlamadı | — | |
 | 8 | Shipment document (inflow=false + procurement_number + marker) | ⬜ Başlamadı | — | |
@@ -25,9 +25,39 @@
 **Durum legend:** ⬜ Başlamadı · 🟦 Devam ediyor · ✅ Tamamlandı · ⚠️ Bloklu / manuel inceleme
 
 ### Sıradaki adım
-Faz 4 — Error classification + step-based backoff + stats order-state.
+Faz 6 — Product upsert (`filter[code]` = SKU, `serviceEnsureParasutProduct`).
 
 ### Son oturum özeti
+- **Faz 5 — 2. bulgu turu (2026-04-25) — 2 fix:**
+  - BLOCKER: `releaseCreate`'teki `.catch()` (PostgrestFilterBuilder'da yok) → `try/catch` block'a çevrildi
+  - HIGH: `__creating_${customerId}` placeholder yerine TTL lease pattern (migration 040):
+    - `customers` tablosuna `parasut_contact_creating_until` + `parasut_contact_creating_owner` eklendi
+    - `claimOrSkip`: `.is(null).or(lease expired)` atomic claim + stale-lease auto-recovery
+    - `finishCreate`: owner-gated write; 0 rows → lease lost → ParasutError('server')
+    - `releaseCreate`: owner-gated, best-effort try/catch
+    - `parasut_contact_id` semantiği temiz: her zaman NULL veya gerçek Paraşüt UUID
+  - Test: 25 → 31 test, tsc temiz, 1791 test yeşil
+
+- **Faz 5 bulgu düzeltmeleri (2026-04-25) — 4 fix:**
+  - HIGH: DB write hataları artık throw ediyor (tüm 4 yazım noktası)
+  - HIGH: Create path race guard: `WHERE parasut_contact_id IS NULL` + re-read on 0 rows (`writeContactIdCreate`)
+  - MEDIUM: `tax_number?.trim()` — whitespace-only boş sayılıyor
+  - MEDIUM: Tüm adapter çağrıları `parasutApiCall()` wrapper'ından geçiyor
+  - Test: 18 → 25; `PARASUT_ENABLED=true` beforeEach/afterEach; `.is().select()` mock chain eklendi
+  - **1785 test yeşil, 92 dosya, TS clean**
+
+- **Faz 5 tamamlandı (2026-04-25):**
+  - `src/lib/services/parasut-service.ts`: `serviceEnsureParasutContact(customerId)` eklendi; idempotent, tax_number trim, email fallback, updateContact çağrısı
+  - `src/__tests__/parasut-service-faz5.test.ts`: 18 yeni test
+  - **1761 test yeşil, TS clean**
+
+- **Faz 4 tamamlandı (2026-04-25):**
+  - `src/lib/supabase/sync-log.ts`: `CreateSyncLogInput`'a `step?`, `error_kind?`, `metadata?` eklendi
+  - `src/lib/services/parasut-service.ts`: `classifyAndPatch()`, `markStepDone()`, `checkAuthAlertThreshold()` eklendi; `serviceSyncAllPending()` CRON sorgusu step-tabanlıya güncellendi
+  - `src/app/api/parasut/stats/route.ts`: `pending_syncs` (step-tabanlı), `failed_syncs` (retry_count<5), `blocked_syncs` (auth/validation) step-tabanlı sorgulara güncellendi
+  - `src/__tests__/parasut-service-faz4.test.ts`: 24 yeni test (classifyAndPatch 12, markStepDone 6, checkAuthAlertThreshold 5+)
+  - **1743 test yeşil, TS clean**
+
 - **Faz 3 tamamlandı (2026-04-25):**
   - `src/lib/services/parasut-api-call.ts`: `parasutApiCall<T>(ctx, fn)` wrapper
   - PARASUT_ENABLED guard (false/unset → `ParasutError('validation')` fırlatır, fn çağrılmaz)

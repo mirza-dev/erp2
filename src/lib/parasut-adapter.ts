@@ -155,6 +155,7 @@ export interface ParasutAdapter {
     findContactsByTaxNumber(taxNumber: string): Promise<ParasutContact[]>;
     findContactsByEmail(email: string): Promise<ParasutContact[]>;
     createContact(input: ContactInput): Promise<ParasutContact>;
+    updateContact(id: string, patch: Partial<ContactInput>): Promise<ParasutContact>;
 
     // Product (filter[code] = SKU)
     findProductsByCode(code: string): Promise<ParasutProduct[]>;
