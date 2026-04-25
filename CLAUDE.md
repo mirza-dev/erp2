@@ -3,19 +3,19 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-25_
 
-**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 6 — Product upsert (2026-04-25)
+**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 7 — Claim/lease RPC + deterministik numara (2026-04-25)
 
-`serviceEnsureParasutProduct(productId)`: idempotent, SKU trim, `findProductsByCode` 0/1/>1 yolları, TTL lease mutex (migration 041: `parasut_product_creating_until` + `parasut_product_creating_owner`); `parasut_product_id` artık yalnızca NULL veya gerçek UUID.
-- Test: 19 yeni test; 1810 test yeşil
+`serviceSyncOrderToParasut` yeniden yazıldı: customer_id null guard → `parasut_claim_sync` RPC → contact→product→shipment stub→invoice stub→edoc stub → `parasut_release_sync` finally. `parasutInvoiceNumberInt` (ORD-YYYY-NNNN → deterministik int), `mapCurrency` export + GBP.
+- Test: 27 yeni test; 1824 test yeşil (94 dosya)
 
-**Sıradaki:** Faz 7 — Claim/lease RPC + deterministik invoice numarası + remote lookup
+**Sıradaki:** Faz 8 — Shipment document (inflow=false, procurement_number, durable marker, local pagination recovery)
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 93 dosya · 1810 vitest (hepsi yeşil)
+**Test sayısı:** 94 dosya · 1824 vitest (hepsi yeşil)
 
 ---
 

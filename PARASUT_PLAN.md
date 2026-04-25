@@ -2,8 +2,8 @@
 
 ## 🎯 Progress Tracker
 
-**Son güncelleme:** 2026-04-25
-**Durum:** Faz 6 TAMAMEN KAPALI — Faz 7 sırada
+**Son güncelleme:** 2026-04-26
+**Durum:** Faz 7 TAMAMEN KAPALI — Faz 8 sırada
 
 ### Faz ilerlemesi
 
@@ -15,7 +15,7 @@
 | 4 | Error classification + step-based backoff + stats order-state | ✅ Tamamlandı | 2026-04-25 | 1743 test yeşil, TS temiz; classifyAndPatch+markStepDone+checkAuthAlertThreshold, 24 yeni test |
 | 5 | Contact upsert (tax_number zorunlu, email ikinci savunma) | ✅ Tamamlandı | 2026-04-25 | 1791 test yeşil, TS temiz; serviceEnsureParasutContact + TTL lease mutex (migration 040) + 4 bulgu fix, 31 test |
 | 6 | Product upsert (filter[code]) | ✅ Tamamlandı | 2026-04-25 | 1810 test yeşil, TS temiz; serviceEnsureParasutProduct + TTL lease mutex (migration 041) + 19 test |
-| 7 | Claim/lease RPC + deterministik numara + remote lookup | ⬜ Başlamadı | — | |
+| 7 | Claim/lease RPC + deterministik numara + remote lookup | ✅ Tamamlandı | 2026-04-26 | 1824 test yeşil, TS temiz; parasutInvoiceNumberInt + mapCurrency(GBP) + claim/release RPC + stubs(Faz8-10) + 27 test; bulgu fix: claimErr audit trail, retry skipped log, catch DB write |
 | 8 | Shipment document (inflow=false + procurement_number + marker) | ⬜ Başlamadı | — | |
 | 9 | Sales invoice (shipment_included=false + warehouse YOK invariant) | ⬜ Başlamadı | — | Stok invariant sandbox gate |
 | 10 | E-belge create + trackable_job poll + invoice re-read | ⬜ Başlamadı | — | |
@@ -25,9 +25,27 @@
 **Durum legend:** ⬜ Başlamadı · 🟦 Devam ediyor · ✅ Tamamlandı · ⚠️ Bloklu / manuel inceleme
 
 ### Sıradaki adım
-Faz 7 — Claim/lease RPC + deterministik invoice numarası + remote lookup.
+Faz 8 — Shipment document (inflow=false, procurement_number, durable marker, local pagination recovery).
 
 ### Son oturum özeti
+- **Faz 7 tamamlandı + bulgu fix (2026-04-25 → 2026-04-26):**
+  - `src/lib/services/parasut-service.ts`: orkestra yeniden yazıldı
+    - `export function parasutInvoiceNumberInt(orderNumber)` — ORD-YYYY-NNNN → deterministik int, Date.now() fallback yok
+    - `export function mapCurrency(c)` — GBP eklendi (spec TRL|USD|EUR|GBP)
+    - `mapOrderToParasut` + eski `sendInvoiceToParasut` çağrısı kaldırıldı
+    - `SyncOrderResult` → `skipped?` + `reason?` alanları eklendi
+    - `serviceSyncOrderToParasut` rewrite: customer_id null guard → `parasut_claim_sync` RPC → step orchestration (contact→product→shipment stub→invoice stub→edoc stub) → catch: classifyAndPatch + DB patch + sync log → finally: `parasut_release_sync` (best-effort)
+    - `upsertShipment/Invoice/EDocument` stub fonksiyonları (Faz 8/9/10'da doldurulacak)
+    - `serviceSyncAllPending`: skipped sipariş synced/failed sayaçlarını artırmaz
+  - **Bulgu fix (2026-04-26):**
+    - HIGH (kapatıldı önceki tur): `claimErr` check eklenmişti — şimdi ayrıca `classifyAndPatch` + DB patch + sync log yazıyor (audit trail eksiği kapatıldı)
+    - MEDIUM: `serviceRetrySyncLog` skipped sonuçta log'u `"error"` yazmıyor; `"retrying"` kalıyor
+    - Sağlamlık: catch block `supabase.update().eq()` sonucundan `{ error: patchErr }` destructure, patchErr varsa `console.error` (sessiz kayıp kapatıldı)
+  - `src/__tests__/parasut-service-faz7.test.ts`: 27 test
+  - `src/__tests__/parasut-service.test.ts`: sendInvoice bağımlı testler kaldırıldı, RPC mock + skipped log testi eklendi
+  - `src/__tests__/parasut-disabled.test.ts`: "proceeds to sendInvoice" → "parasut_claim_sync çağrılır" olarak güncellendi
+  - **1824 test yeşil, 94 dosya, TS clean**
+
 - **Faz 6 tamamlandı (2026-04-25):**
   - `src/lib/services/parasut-service.ts`: `serviceEnsureParasutProduct(productId)` eklendi; idempotent, SKU trim, `findProductsByCode` 0/1/>1 yolları, TTL lease mutex
   - `supabase/migrations/041_parasut_product_lease.sql`: `products` tablosuna `parasut_product_creating_until` + `parasut_product_creating_owner` eklendi (OAuth + contact ile aynı pattern)

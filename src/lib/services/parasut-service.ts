@@ -10,64 +10,38 @@ import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/sync-log";
 import { dbCreateAlert } from "@/lib/supabase/alerts";
-import { sendInvoiceToParasut, getParasutAdapter } from "@/lib/parasut";
+import { getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ParasutError } from "@/lib/parasut-adapter";
 import { parasutApiCall } from "@/lib/services/parasut-api-call";
 import { ALERT_ENTITY_PARASUT_AUTH } from "@/lib/parasut-constants";
-import type { ParasutInvoicePayload } from "@/lib/parasut";
 import type { OrderWithLines } from "@/lib/supabase/orders";
 import type { SalesOrderRow } from "@/lib/database.types";
 import type { ParasutStep } from "@/lib/database.types";
 
 // ── Mapping ──────────────────────────────────────────────────
 
-function mapCurrency(c: string): "TRL" | "USD" | "EUR" {
+export function mapCurrency(c: string): "TRL" | "USD" | "EUR" | "GBP" {
     if (c === "USD") return "USD";
     if (c === "EUR") return "EUR";
+    if (c === "GBP") return "GBP";
     return "TRL";
 }
 
-/** SalesOrderWithLines → Paraşüt invoice payload */
-function mapOrderToParasut(order: OrderWithLines): ParasutInvoicePayload {
-    const issued = new Date(order.created_at);
-    const due = new Date(issued);
-    due.setDate(due.getDate() + 30);
-
-    // "ORD-2026-0042" → 20260042
-    const parts = order.order_number.split("-");
-    const invoiceId = parts.length >= 3
-        ? parseInt(parts[1] + parts[2], 10)
-        : Date.now();
-
-    return {
-        data: {
-            type: "sales_invoices",
-            attributes: {
-                item_type: "invoice",
-                description: `KokpitERP #${order.order_number}`,
-                issue_date: order.created_at.slice(0, 10),
-                due_date: due.toISOString().slice(0, 10),
-                currency: mapCurrency(order.currency),
-                invoice_series: "KE",
-                invoice_id: invoiceId,
-                details_attributes: order.lines.map(line => ({
-                    quantity: line.quantity,
-                    unit_price: line.unit_price,
-                    vat_rate: 20,
-                    description: `${line.product_name} (${line.product_sku})`,
-                    discount_type: "percentage",
-                    discount_value: line.discount_pct,
-                    product: { data: { type: "products", id: line.product_id } },
-                })),
-            },
-            relationships: {
-                contact: {
-                    data: { type: "contacts", id: order.customer_id ?? order.customer_name },
-                },
-            },
-        },
-    };
+/**
+ * "ORD-2026-0042" → 20260042 (deterministik Paraşüt invoice_id)
+ * Kural: yıl 4 hane, numara padStart(4,'0'). Kötü format → ParasutError('validation').
+ * Date.now() fallback YOK — idempotency bozar.
+ */
+export function parasutInvoiceNumberInt(orderNumber: string): number {
+    const m = orderNumber.match(/^ORD-(\d{4})-(\d+)$/);
+    if (!m) {
+        throw new ParasutError(
+            "validation",
+            `order_number formatı Paraşüt için uygun değil: ${orderNumber}`,
+        );
+    }
+    return parseInt(m[1] + m[2].padStart(4, "0"), 10);
 }
 
 // ── Enable guard ─────────────────────────────────────────────
@@ -449,6 +423,22 @@ export async function serviceEnsureParasutProduct(productId: string): Promise<st
     }
 }
 
+// ── Faz 7 stubs (Faz 8/9/10'da doldurulacak) ─────────────────
+
+async function upsertShipment(_order: OrderWithLines): Promise<void> {
+    throw new ParasutError("server", "Not yet implemented — Faz 8");
+}
+
+async function upsertInvoice(_order: OrderWithLines): Promise<void> {
+    throw new ParasutError("server", "Not yet implemented — Faz 9");
+}
+
+async function upsertEDocument(
+    _order: OrderWithLines,
+): Promise<{ status: "done" | "skipped" | "running" }> {
+    throw new ParasutError("server", "Not yet implemented — Faz 10");
+}
+
 // ── Sync ─────────────────────────────────────────────────────
 
 export interface SyncOrderResult {
@@ -456,10 +446,13 @@ export interface SyncOrderResult {
     invoice_id?: string;
     sent_at?: string;
     error?: string;
+    skipped?: boolean;
+    reason?: string;
 }
 
 export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOrderResult> {
     if (!isParasutEnabled()) return { success: false, error: "Paraşüt entegrasyonu devre dışı." };
+
     const order = await dbGetOrderById(orderId);
     if (!order) return { success: false, error: "Sipariş bulunamadı." };
     if (order.commercial_status !== "approved") {
@@ -468,46 +461,106 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
     if (order.fulfillment_status !== "shipped") {
         return { success: false, error: "Yalnızca sevk edilmiş siparişler Paraşüt'e gönderilebilir." };
     }
-
-    const payload = mapOrderToParasut(order);
-    const result = await sendInvoiceToParasut(payload);
+    if (!order.customer_id) {
+        return { success: false, error: "Müşteri bilgisi eksik — Paraşüt sync için zorunlu." };
+    }
 
     const supabase = createServiceClient();
+    const owner    = crypto.randomUUID();
 
-    if (result.success) {
-        // Order'da parasut alanlarını güncelle
-        await supabase.from("sales_orders").update({
-            parasut_invoice_id: result.invoiceId,
-            parasut_sent_at: result.sentAt,
-            parasut_error: null,
-        }).eq("id", orderId);
+    const { data: claimed, error: claimErr } = await supabase.rpc("parasut_claim_sync", {
+        p_order_id:   orderId,
+        p_owner:      owner,
+        p_lease_secs: 300,
+    });
+    if (claimErr) {
+        const pe       = new ParasutError("server", `parasut_claim_sync RPC hatası (order=${orderId}): ${claimErr.message}`);
+        const failStep = (order.parasut_step ?? "contact") as ParasutStep;
+        const patch    = classifyAndPatch(order, failStep, pe);
+        try {
+            const { error: patchErr } = await supabase.from("sales_orders").update(patch).eq("id", orderId);
+            if (patchErr) console.error(JSON.stringify({ parasut_patch_fail: patchErr.message, orderId }));
+        } catch (e) { console.error(String(e)); }
+        try {
+            await dbCreateSyncLog({
+                entity_type:   "sales_order",
+                entity_id:     orderId,
+                direction:     "push",
+                status:        "error",
+                step:          failStep,
+                error_kind:    pe.kind,
+                error_message: pe.message,
+            });
+        } catch { /* best-effort */ }
+        return { success: false, error: pe.message };
+    }
+    if (!claimed) return { success: false, skipped: true, reason: "not_eligible_or_locked" };
 
-        await dbCreateSyncLog({
-            entity_type: "sales_order",
-            entity_id: orderId,
-            direction: "push",
-            status: "success",
-            external_id: result.invoiceId,
-        });
+    let currentStep: ParasutStep = "contact";
+    // Local mutable copy to avoid stale read after markStepDone resets DB parasut_retry_count=0.
+    const orderMut = { parasut_retry_count: order.parasut_retry_count };
 
-        return { success: true, invoice_id: result.invoiceId, sent_at: result.sentAt };
-    } else {
-        const kind = (result.errorKind ?? "server") as import("@/lib/parasut-constants").ParasutErrorKind;
-        const pe   = new ParasutError(kind, result.error ?? "Unknown error");
-        const patch = classifyAndPatch(order, "invoice", pe);
-        await supabase.from("sales_orders").update(patch).eq("id", orderId);
+    try {
+        // Step: contact
+        currentStep = "contact";
+        await serviceEnsureParasutContact(order.customer_id);
+        await markStepDone(orderId, "contact", "product");
+        orderMut.parasut_retry_count = 0;
 
-        await dbCreateSyncLog({
-            entity_type:   "sales_order",
-            entity_id:     orderId,
-            direction:     "push",
-            status:        "error",
-            step:          "invoice",
-            error_kind:    kind,
-            error_message: result.error,
-        });
+        // Step: product (all order lines)
+        currentStep = "product";
+        for (const line of order.lines) {
+            if (line.product_id) {
+                await serviceEnsureParasutProduct(line.product_id);
+            }
+        }
+        await markStepDone(orderId, "product", "shipment");
+        orderMut.parasut_retry_count = 0;
 
-        return { success: false, error: result.error };
+        // Step: shipment (stub — Faz 8)
+        currentStep = "shipment";
+        await upsertShipment(order);
+        await markStepDone(orderId, "shipment", "invoice");
+        orderMut.parasut_retry_count = 0;
+
+        // Step: invoice (stub — Faz 9)
+        currentStep = "invoice";
+        await upsertInvoice(order);
+        await markStepDone(orderId, "invoice", "edoc");
+        orderMut.parasut_retry_count = 0;
+
+        // Step: e-doc (stub — Faz 10)
+        currentStep = "edoc";
+        const eDocResult = await upsertEDocument(order);
+        if (eDocResult.status === "done" || eDocResult.status === "skipped") {
+            await markStepDone(orderId, "edoc", "done");
+        }
+        // 'running' → parasut_step='edoc' stays; poll CRON will call markStepDone when done
+
+        return { success: true };
+    } catch (err) {
+        const pe = err instanceof ParasutError ? err : new ParasutError("server", String(err));
+        const patch = classifyAndPatch(orderMut, currentStep, pe);
+        try {
+            const { error: patchErr } = await supabase.from("sales_orders").update(patch).eq("id", orderId);
+            if (patchErr) console.error(JSON.stringify({ parasut_patch_fail: patchErr.message, orderId }));
+        } catch (e) { console.error(String(e)); }
+        try {
+            await dbCreateSyncLog({
+                entity_type:   "sales_order",
+                entity_id:     orderId,
+                direction:     "push",
+                status:        "error",
+                step:          currentStep,
+                error_kind:    pe.kind,
+                error_message: pe.message,
+            });
+        } catch { /* best-effort */ }
+        return { success: false, error: pe.message };
+    } finally {
+        try {
+            await supabase.rpc("parasut_release_sync", { p_order_id: orderId, p_owner: owner });
+        } catch { /* best-effort */ }
     }
 }
 
@@ -527,6 +580,11 @@ export async function serviceRetrySyncLog(syncLogId: string): Promise<SyncOrderR
     });
 
     const result = await serviceSyncOrderToParasut(log.entity_id);
+
+    if (result.skipped) {
+        // Claim couldn't be obtained — leave log in "retrying"; CRON will pick it up again.
+        return result;
+    }
 
     // Update the original log based on result
     await dbUpdateSyncLog(syncLogId, {
@@ -567,11 +625,13 @@ export async function serviceSyncAllPending(): Promise<{
 
     for (const order of pendingOrders ?? []) {
         const result = await serviceSyncOrderToParasut(order.id);
-        if (result.success) {
+        if (result.skipped) {
+            // Claim lost or not eligible — do not count; another worker owns it
+        } else if (result.success) {
             synced++;
         } else {
             failed++;
-            errors.push(`${order.order_number}: ${result.error}`);
+            errors.push(`${order.order_number}: ${result.error ?? "Unknown error"}`);
         }
     }
 

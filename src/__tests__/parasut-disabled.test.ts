@@ -19,11 +19,11 @@ vi.mock("next/headers", () => ({
 
 // ─── DB / parasut mocks ───────────────────────────────────────────────────────
 
-const mockSendInvoice = vi.fn();
 const mockDbGetOrderById = vi.fn();
 const mockDbGetSyncLog = vi.fn();
 const mockDbUpdateSyncLog = vi.fn();
 const mockDbCreateSyncLog = vi.fn();
+const mockRpc = vi.fn();
 const mockSupabaseUpdate = vi.fn(() => ({ eq: vi.fn() }));
 const mockSupabaseSelect = vi.fn(() => ({
     eq: vi.fn().mockReturnThis(),
@@ -32,7 +32,8 @@ const mockSupabaseSelect = vi.fn(() => ({
 }));
 
 vi.mock("@/lib/parasut", () => ({
-    sendInvoiceToParasut: (...args: unknown[]) => mockSendInvoice(...args),
+    sendInvoiceToParasut: vi.fn(),
+    getParasutAdapter:    vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/orders", () => ({
@@ -51,6 +52,7 @@ vi.mock("@/lib/supabase/service", () => ({
             update: mockSupabaseUpdate,
             select: mockSupabaseSelect,
         }),
+        rpc: mockRpc,
     }),
 }));
 
@@ -77,12 +79,12 @@ afterEach(() => {
 // ─── serviceSyncOrderToParasut ────────────────────────────────────────────────
 
 describe("serviceSyncOrderToParasut — PARASUT_ENABLED guard", () => {
-    it("returns disabled error and never calls sendInvoiceToParasut when PARASUT_ENABLED is unset", async () => {
+    it("returns disabled error and never calls RPC when PARASUT_ENABLED is unset", async () => {
         delete process.env.PARASUT_ENABLED;
         const result = await serviceSyncOrderToParasut("order-1");
         expect(result.success).toBe(false);
         expect(result.error).toMatch(/devre dışı/i);
-        expect(mockSendInvoice).not.toHaveBeenCalled();
+        expect(mockRpc).not.toHaveBeenCalled();
         expect(mockDbGetOrderById).not.toHaveBeenCalled();
     });
 
@@ -90,17 +92,17 @@ describe("serviceSyncOrderToParasut — PARASUT_ENABLED guard", () => {
         process.env.PARASUT_ENABLED = "";
         const result = await serviceSyncOrderToParasut("order-1");
         expect(result.success).toBe(false);
-        expect(mockSendInvoice).not.toHaveBeenCalled();
+        expect(mockRpc).not.toHaveBeenCalled();
     });
 
     it("returns disabled error when PARASUT_ENABLED=false", async () => {
         process.env.PARASUT_ENABLED = "false";
         const result = await serviceSyncOrderToParasut("order-1");
         expect(result.success).toBe(false);
-        expect(mockSendInvoice).not.toHaveBeenCalled();
+        expect(mockRpc).not.toHaveBeenCalled();
     });
 
-    it("proceeds to sendInvoiceToParasut when PARASUT_ENABLED=true", async () => {
+    it("parasut_claim_sync RPC çağrılır (PARASUT_ENABLED=true, tüm guard'lar geçildi)", async () => {
         process.env.PARASUT_ENABLED = "true";
         mockDbGetOrderById.mockResolvedValue({
             id: "order-1",
@@ -111,12 +113,16 @@ describe("serviceSyncOrderToParasut — PARASUT_ENABLED guard", () => {
             currency: "USD",
             customer_id: "cust-1",
             customer_name: "Test",
-            lines: [{ quantity: 1, unit_price: 100, product_name: "Test Ürün", product_sku: "SKU-001", product_id: "prod-1", discount_pct: 0 }],
+            parasut_retry_count: 0,
+            lines: [],
         });
-        mockSendInvoice.mockResolvedValue({ success: true, invoiceId: "F-2026-9999", sentAt: new Date().toISOString() });
+        // Claim fails → skipped (no further orchestration)
+        mockRpc.mockResolvedValueOnce({ data: false, error: null });
 
-        await serviceSyncOrderToParasut("order-1");
-        expect(mockSendInvoice).toHaveBeenCalledOnce();
+        const result = await serviceSyncOrderToParasut("order-1");
+
+        expect(mockRpc).toHaveBeenCalledWith("parasut_claim_sync", expect.any(Object));
+        expect(result).toMatchObject({ skipped: true });
     });
 });
 
