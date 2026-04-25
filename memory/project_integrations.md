@@ -6,7 +6,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 ## Paraşüt Entegrasyonu
 
-**Durum: Faz 1-5 tamamlandı (2026-04-25) — Faz 6 sırada**
+**Durum: Faz 1-6 tamamlandı (2026-04-25) — Faz 7 sırada**
 
 ### Tamamlanan Fazlar
 | Faz | Özet | Test |
@@ -16,6 +16,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 | 3 | parasutApiCall() wrapper (429 Retry-After + log) | 1719 |
 | 4 | Error classification + step backoff + stats | 1743 |
 | 5 | Contact upsert + TTL lease mutex (migration 040) + 6 bulgu fix | 1791 |
+| 6 | Product upsert + TTL lease mutex (migration 041) | 1810 |
 
 ### Mimari (plan: parasut_plan.md)
 - `ParasutAdapter` interface (`parasut-adapter.ts`) — gerçek HTTP adapter en son eklenecek
@@ -30,7 +31,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - `parasut_oauth_tokens` tablosu (singleton lease, CAS)
 - `sales_orders`: parasut_step, parasut_error_kind, claim/release lock, crash marker'lar, e-doc alanları
 - `customers`: parasut_contact_id, city, district, parasut_contact_creating_until, parasut_contact_creating_owner (migration 040 — TTL lease)
-- `products`: parasut_product_id
+- `products`: parasut_product_id, parasut_product_creating_until, parasut_product_creating_owner (migration 041 — TTL lease)
 - `order_lines`: vat_rate
 - Claim/release RPC'leri: SECURITY DEFINER, sadece service_role
 
@@ -39,6 +40,7 @@ contact upsert → product upsert → shipment_document (inflow=false) → sales
 
 ### Testler
 - `src/__tests__/parasut-mock-adapter.test.ts` — 36 test (tüm metodlar + invariant)
+- `src/__tests__/parasut-service-faz6.test.ts` — 19 test (serviceEnsureParasutProduct)
 - `src/__tests__/parasut-service-faz5.test.ts` — 25 test (serviceEnsureParasutContact)
 - `src/__tests__/parasut-service-faz4.test.ts` — 24 test (classifyAndPatch, markStepDone, checkAuthAlertThreshold)
 - `src/__tests__/parasut-api-call.test.ts` — 15 test

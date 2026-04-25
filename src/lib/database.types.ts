@@ -97,6 +97,8 @@ export interface ProductRow {
     product_notes: string | null
     parasut_product_id: string | null
     parasut_synced_at: string | null
+    parasut_product_creating_until: string | null
+    parasut_product_creating_owner: string | null
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */

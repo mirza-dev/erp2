@@ -7,6 +7,7 @@
 
 import { dbGetOrderById } from "@/lib/supabase/orders";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
+import { dbGetProductById } from "@/lib/supabase/products";
 import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/sync-log";
 import { dbCreateAlert } from "@/lib/supabase/alerts";
 import { sendInvoiceToParasut, getParasutAdapter } from "@/lib/parasut";
@@ -325,6 +326,119 @@ export async function serviceEnsureParasutContact(customerId: string): Promise<s
                 tax_number: taxNumber,
                 email:      customer.email as string,
                 tax_office: customer.tax_office ?? undefined,
+            }),
+        );
+        await finishCreate(created.id);
+        return created.id;
+    } catch (err) {
+        await releaseCreate();
+        throw err;
+    }
+}
+
+// ── Product upsert ───────────────────────────────────────────
+
+/**
+ * Ensures the product has a Paraşüt product ID.
+ * Idempotent: if parasut_product_id already set, returns immediately.
+ * Returns the resolved Paraşüt product ID.
+ */
+export async function serviceEnsureParasutProduct(productId: string): Promise<string> {
+    const product = await dbGetProductById(productId);
+    if (!product) throw new ParasutError("not_found", `Product ${productId} not found`);
+
+    if (product.parasut_product_id) return product.parasut_product_id;
+
+    const sku = product.sku?.trim() ?? "";
+    if (!sku) {
+        throw new ParasutError("validation", `Ürün ${product.name} için SKU zorunlu (Paraşüt sync)`);
+    }
+
+    const adapter = getParasutAdapter();
+    const supabase = createServiceClient();
+
+    // Find-match path: product already exists in Paraşüt, just record the ID.
+    async function writeProductId(parasutId: string): Promise<void> {
+        const { error: dbErr } = await supabase.from("products").update({
+            parasut_product_id: parasutId,
+            parasut_synced_at:  new Date().toISOString(),
+        }).eq("id", productId);
+        if (dbErr) throw new Error(`products update failed (id=${productId}): ${dbErr.message}`);
+    }
+
+    // TTL lease mutex — mirrors the contact pattern in serviceEnsureParasutContact.
+    // parasut_product_id stays clean: always NULL or a real Paraşüt UUID.
+    const LEASE_TTL_MS = 60_000;
+    const owner = crypto.randomUUID();
+
+    async function claimOrSkip(): Promise<{ claimed: true } | { claimed: false; existingId: string }> {
+        const leaseUntil = new Date(Date.now() + LEASE_TTL_MS).toISOString();
+        const nowISO     = new Date().toISOString();
+        const { data: rows, error } = await supabase
+            .from("products")
+            .update({ parasut_product_creating_until: leaseUntil, parasut_product_creating_owner: owner })
+            .eq("id", productId)
+            .is("parasut_product_id", null)
+            .or(`parasut_product_creating_until.is.null,parasut_product_creating_until.lt.${nowISO}`)
+            .select("id");
+        if (error) throw new Error(`products claim failed (id=${productId}): ${error.message}`);
+        if (rows && rows.length > 0) return { claimed: true };
+        const refreshed = await dbGetProductById(productId);
+        if (refreshed?.parasut_product_id) return { claimed: false, existingId: refreshed.parasut_product_id };
+        throw new ParasutError("server", `Product creation in progress (product=${productId}), will retry`);
+    }
+
+    async function finishCreate(parasutId: string): Promise<void> {
+        const { data: rows, error } = await supabase
+            .from("products")
+            .update({
+                parasut_product_id:              parasutId,
+                parasut_synced_at:               new Date().toISOString(),
+                parasut_product_creating_until:  null,
+                parasut_product_creating_owner:  null,
+            })
+            .eq("id", productId)
+            .eq("parasut_product_creating_owner", owner)
+            .select("id");
+        if (error) throw new Error(`products finish failed (id=${productId}): ${error.message}`);
+        if (!rows || rows.length === 0) {
+            throw new ParasutError("server", `Lease lost for product=${productId} during create — possible orphan product ${parasutId}`);
+        }
+    }
+
+    async function releaseCreate(): Promise<void> {
+        try {
+            await supabase
+                .from("products")
+                .update({ parasut_product_creating_until: null, parasut_product_creating_owner: null })
+                .eq("id", productId)
+                .eq("parasut_product_creating_owner", owner);
+        } catch { /* best-effort */ }
+    }
+
+    const byCode = await parasutApiCall({ op: "findProductsByCode", step: "product" as const }, () =>
+        adapter.findProductsByCode(sku),
+    );
+
+    if (byCode.length > 1) {
+        throw new ParasutError("validation", `Paraşüt'te ${sku} kodu ile birden fazla ürün var — manuel inceleme gerekli`);
+    }
+
+    if (byCode.length === 1) {
+        await writeProductId(byCode[0].id);
+        return byCode[0].id;
+    }
+
+    // 0 matches — create new product
+    const claim = await claimOrSkip();
+    if (!claim.claimed) return claim.existingId;
+    try {
+        const created = await parasutApiCall({ op: "createProduct", step: "product" as const }, () =>
+            adapter.createProduct({
+                code:        sku,
+                name:        product.name,
+                sales_price: product.price ?? undefined,
+                vat_rate:    20,
             }),
         );
         await finishCreate(created.id);

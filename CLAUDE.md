@@ -3,23 +3,19 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-25_
 
-**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 5 — TÜM BULGULAR KAPALI (2026-04-25)
+**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 6 — Product upsert (2026-04-25)
 
-6 bulgu kapatıldı (3 turda):
-- HIGH: DB write hataları artık throw ediyor
-- HIGH + BLOCKER: Remote duplicate race + `.catch()` TS hatası → TTL lease mutex (migration 040: `parasut_contact_creating_until` + `parasut_contact_creating_owner`); `parasut_contact_id` artık yalnızca NULL veya gerçek UUID; process crash → TTL auto-recovery
-- MEDIUM: `tax_number?.trim()` whitespace-only guard
-- MEDIUM: Tüm adapter çağrıları `parasutApiCall()` wrapper'ından geçiyor
-- Test: 18 → 31 test; mock chain `.or()` + ikinci `.eq()` desteği eklendi
+`serviceEnsureParasutProduct(productId)`: idempotent, SKU trim, `findProductsByCode` 0/1/>1 yolları, TTL lease mutex (migration 041: `parasut_product_creating_until` + `parasut_product_creating_owner`); `parasut_product_id` artık yalnızca NULL veya gerçek UUID.
+- Test: 19 yeni test; 1810 test yeşil
 
-**Sıradaki:** Faz 6 — Product upsert (`serviceEnsureParasutProduct`, `filter[code]` = SKU)
+**Sıradaki:** Faz 7 — Claim/lease RPC + deterministik invoice numarası + remote lookup
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 92 dosya · 1791 vitest (hepsi yeşil)
+**Test sayısı:** 93 dosya · 1810 vitest (hepsi yeşil)
 
 ---
 

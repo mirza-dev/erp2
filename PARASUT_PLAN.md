@@ -3,7 +3,7 @@
 ## 🎯 Progress Tracker
 
 **Son güncelleme:** 2026-04-25
-**Durum:** Faz 5 TAMAMEN KAPALI (tüm bulgular dahil) — Faz 6 sırada
+**Durum:** Faz 6 TAMAMEN KAPALI — Faz 7 sırada
 
 ### Faz ilerlemesi
 
@@ -14,7 +14,7 @@
 | 3 | `parasutApiCall()` wrapper (429 Retry-After + context logging) | ✅ Tamamlandı | 2026-04-25 | 1719 test yeşil, TS temiz; PARASUT_ENABLED guard, 15 test |
 | 4 | Error classification + step-based backoff + stats order-state | ✅ Tamamlandı | 2026-04-25 | 1743 test yeşil, TS temiz; classifyAndPatch+markStepDone+checkAuthAlertThreshold, 24 yeni test |
 | 5 | Contact upsert (tax_number zorunlu, email ikinci savunma) | ✅ Tamamlandı | 2026-04-25 | 1791 test yeşil, TS temiz; serviceEnsureParasutContact + TTL lease mutex (migration 040) + 4 bulgu fix, 31 test |
-| 6 | Product upsert (filter[code]) | ⬜ Başlamadı | — | |
+| 6 | Product upsert (filter[code]) | ✅ Tamamlandı | 2026-04-25 | 1810 test yeşil, TS temiz; serviceEnsureParasutProduct + TTL lease mutex (migration 041) + 19 test |
 | 7 | Claim/lease RPC + deterministik numara + remote lookup | ⬜ Başlamadı | — | |
 | 8 | Shipment document (inflow=false + procurement_number + marker) | ⬜ Başlamadı | — | |
 | 9 | Sales invoice (shipment_included=false + warehouse YOK invariant) | ⬜ Başlamadı | — | Stok invariant sandbox gate |
@@ -25,9 +25,16 @@
 **Durum legend:** ⬜ Başlamadı · 🟦 Devam ediyor · ✅ Tamamlandı · ⚠️ Bloklu / manuel inceleme
 
 ### Sıradaki adım
-Faz 6 — Product upsert (`filter[code]` = SKU, `serviceEnsureParasutProduct`).
+Faz 7 — Claim/lease RPC + deterministik invoice numarası + remote lookup.
 
 ### Son oturum özeti
+- **Faz 6 tamamlandı (2026-04-25):**
+  - `src/lib/services/parasut-service.ts`: `serviceEnsureParasutProduct(productId)` eklendi; idempotent, SKU trim, `findProductsByCode` 0/1/>1 yolları, TTL lease mutex
+  - `supabase/migrations/041_parasut_product_lease.sql`: `products` tablosuna `parasut_product_creating_until` + `parasut_product_creating_owner` eklendi (OAuth + contact ile aynı pattern)
+  - `src/lib/database.types.ts`: `ProductRow`'a 2 lease alanı eklendi
+  - `src/__tests__/parasut-service-faz6.test.ts`: 19 test (idempotent, guard, findByCode 1/multi/0, TTL lease tüm dallar)
+  - **1810 test yeşil, 93 dosya, TS clean**
+
 - **Faz 5 — 2. bulgu turu (2026-04-25) — 2 fix:**
   - BLOCKER: `releaseCreate`'teki `.catch()` (PostgrestFilterBuilder'da yok) → `try/catch` block'a çevrildi
   - HIGH: `__creating_${customerId}` placeholder yerine TTL lease pattern (migration 040):
