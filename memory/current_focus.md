@@ -90,3 +90,15 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ### Final durum
 - 101 dosya · **1958 test yeşil** · TS clean.
+
+### Faz 11 — Bulgular 2. tur fix (2026-04-27)
+- **HIGH 11.4 Dashboard:** `/api/parasut/stats` artık `byStep` + `byErrorKind` dağılımları ve `token: { connected, expiresAt, secondsRemaining, tokenVersion }` döndürüyor. Dashboard sayfasında: token durumu satırı + "Bağlan"/"Yenile" butonları, Step + Hata Tipi dağılımı kartları (tıklayınca log filtre uygular), sync log tablosuna **Step** ve **Hata Tipi** kolonları + step/error_kind/status dropdown filtreleri ve "Temizle" butonu.
+- **HIGH 11.5 Settings:** ApiTab'a "Paraşüt OAuth" bölümü — token süre göstergesi (`formatTokenDuration`), "Paraşüt'e bağlan" linki (`/api/parasut/oauth/start`), "↻ Token Yenile" butonu (yeni `POST /api/parasut/oauth/refresh` endpoint, admin-only).
+- **M1 transition update error:** `serviceTransitionOrder('shipped')` post-ship `update().eq()` artık `{ error }` kontrol ediyor; fail → `success: false` + açıklayıcı error.
+- **M2 24h deneme sayısı:** `dbCountRecentSyncLogsByStep(entityId, hours)` helper; `parasut-status` route `attemptsLast24h: Record<step,count>` döndürür; UI tooltip'inde "Son 24h: N deneme" satırı.
+- **M/L her badge için Yeniden Dene:** `canRetry = !isDemo` (eskiden `err && !isDemo`); backend dep guard zaten reddediyor.
+- **LOW STOCK_INVARIANT alert:** `upsertInvoice` içinde `createSalesInvoice` try/catch; mesaj `/shipment_included|warehouse|stok invariant/i` ise `ALERT_ENTITY_PARASUT_STOCK_INVARIANT` ile critical `sync_issue` alert üretilir.
+- **Yeni endpoint:** `POST /api/parasut/oauth/refresh` (admin-only) — expires_at'i 1970'e çekip `getAccessToken` ile zorla refresh; fail durumunda eski expires_at restore.
+- **Yeni dosyalar:** `parasut-stats-faz11-bulgular.test.ts` (4), `parasut-stock-invariant-alert.test.ts` (3); `parasut-status-route-faz11.test.ts` (+2 attempts test); `order-service-preflight-faz11.test.ts` (+3 M1 test); mevcut `parasut-stats-route.test.ts` mock parasut_oauth_tokens + ConfigError ile güncellendi.
+
+**Test:** 103 dosya · **1970 test yeşil** · TS clean.

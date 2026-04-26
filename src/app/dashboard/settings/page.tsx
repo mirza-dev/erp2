@@ -549,15 +549,69 @@ interface KeyStatus {
     vercel: boolean;
 }
 
+interface ParasutTokenInfo {
+    connected: boolean;
+    expiresAt: string | null;
+    secondsRemaining: number | null;
+    tokenVersion: number | null;
+    updatedAt: string | null;
+}
+
+function formatTokenDuration(seconds: number): string {
+    if (seconds <= 0) return "Süresi doldu";
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (h >= 24) {
+        const d = Math.floor(h / 24);
+        return `${d}g ${h % 24}s`;
+    }
+    if (h > 0) return `${h}s ${m}dk`;
+    return `${m}dk`;
+}
+
 function ApiTab() {
     const [status, setStatus] = useState<KeyStatus | null>(null);
+    const [parasutToken, setParasutToken] = useState<ParasutTokenInfo | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [feedback, setFeedback] = useState<{ type: "info" | "error"; message: string } | null>(null);
+
+    const fetchToken = async () => {
+        try {
+            const r = await fetch("/api/parasut/stats");
+            if (r.ok) {
+                const data = await r.json();
+                if (data.token) setParasutToken(data.token as ParasutTokenInfo);
+            }
+        } catch { /* sessizce geç */ }
+    };
 
     useEffect(() => {
         fetch("/api/settings/api-keys-status")
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data) setStatus(data); })
             .catch(() => {});
+        fetchToken();
     }, []);
+
+    const handleRefresh = async () => {
+        if (refreshing) return;
+        setRefreshing(true);
+        setFeedback(null);
+        try {
+            const res = await fetch("/api/parasut/oauth/refresh", { method: "POST" });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                setFeedback({ type: "info", message: "Token başarıyla yenilendi." });
+                await fetchToken();
+            } else {
+                setFeedback({ type: "error", message: data.error ?? "Token yenilenemedi." });
+            }
+        } catch (err) {
+            setFeedback({ type: "error", message: err instanceof Error ? err.message : "Token yenilenemedi." });
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     const entries: { id: keyof KeyStatus; label: string }[] = [
         { id: "parasut", label: "Paraşüt API" },
@@ -617,6 +671,89 @@ function ApiTab() {
             </div>
             <div style={{ marginTop: "10px", fontSize: "11px", color: "var(--text-tertiary)" }}>
                 Anahtarlar <code>.env.local</code> üzerinden yönetilir.
+            </div>
+
+            {/* Faz 11.5 — Paraşüt OAuth bağlantısı */}
+            <div style={{ ...sectionTitle, marginTop: "24px" }}>Paraşüt OAuth</div>
+            <div
+                style={{
+                    background: "var(--bg-secondary)",
+                    border: "0.5px solid var(--border-tertiary)",
+                    borderRadius: "8px",
+                    padding: "14px 16px",
+                }}
+            >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
+                    <div>
+                        <div style={{ fontSize: "13px", color: "var(--text-primary)", marginBottom: "4px" }}>
+                            OAuth Token
+                        </div>
+                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
+                            {parasutToken === null ? (
+                                "Yükleniyor…"
+                            ) : !parasutToken.connected ? (
+                                "Bağlantı yok — &apos;Bağlan&apos; ile akışı başlatın."
+                            ) : (
+                                <>
+                                    Geçerli ·{" "}
+                                    {parasutToken.secondsRemaining !== null
+                                        ? formatTokenDuration(parasutToken.secondsRemaining)
+                                        : "—"}
+                                    {parasutToken.tokenVersion !== null && ` · v${parasutToken.tokenVersion}`}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                        <a
+                            href="/api/parasut/oauth/start"
+                            style={{
+                                fontSize: "12px",
+                                padding: "6px 14px",
+                                border: "0.5px solid var(--accent-border)",
+                                borderRadius: "6px",
+                                background: "var(--accent-bg)",
+                                color: "var(--accent-text)",
+                                textDecoration: "none",
+                            }}
+                            title="OAuth akışını başlat"
+                        >
+                            Paraşüt&apos;e bağlan
+                        </a>
+                        <button
+                            type="button"
+                            onClick={handleRefresh}
+                            disabled={refreshing || !parasutToken}
+                            style={{
+                                fontSize: "12px",
+                                padding: "6px 14px",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "6px",
+                                background: "var(--bg-tertiary)",
+                                color: "var(--text-secondary)",
+                                cursor: refreshing || !parasutToken ? "not-allowed" : "pointer",
+                                opacity: refreshing || !parasutToken ? 0.5 : 1,
+                            }}
+                        >
+                            {refreshing ? "Yenileniyor…" : "↻ Token Yenile"}
+                        </button>
+                    </div>
+                </div>
+                {feedback && (
+                    <div
+                        style={{
+                            marginTop: "10px",
+                            padding: "6px 10px",
+                            background: feedback.type === "info" ? "var(--success-bg)" : "var(--danger-bg)",
+                            border: `0.5px solid ${feedback.type === "info" ? "var(--success-border)" : "var(--danger-border)"}`,
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                            color: feedback.type === "info" ? "var(--success-text)" : "var(--danger-text)",
+                        }}
+                    >
+                        {feedback.message}
+                    </div>
+                )}
             </div>
         </div>
     );

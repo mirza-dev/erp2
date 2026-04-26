@@ -20,32 +20,54 @@ function makeCountChain(key: string) {
     };
 }
 
-vi.mock("@/lib/supabase/service", () => ({
-    createServiceClient: () => ({
-        from: (table: string) => {
-            if (table === "customers") return makeCountChain("customers");
-            // sales_orders — return a chain that resolves to different counts per query
-            // We rely on query order: synced, pending, in_progress, failed, blocked
-            let callIndex = 0;
-            const keys = ["synced", "pending", "in_progress", "failed", "blocked"];
-            const baseChain: Record<string, unknown> = {};
-            const chain: typeof baseChain = {
-                select: vi.fn(() => {
-                    const key = keys[callIndex++ % keys.length];
+// Faz 11.4 — stats route'a parasut_oauth_tokens + dist (data) sorguları eklendi
+let salesOrderQueryIdx = 0;
+const salesOrderKeys = ["synced", "pending", "in_progress", "failed", "blocked"];
+
+vi.mock("@/lib/supabase/service", () => {
+    class ConfigErrorClass extends Error {}
+    return {
+        ConfigError: ConfigErrorClass,
+        createServiceClient: () => ({
+            from: (table: string) => {
+                if (table === "customers") return makeCountChain("customers");
+                if (table === "parasut_oauth_tokens") {
                     return {
-                        not:  vi.fn().mockReturnThis(),
-                        neq:  vi.fn().mockReturnThis(),
-                        lt:   vi.fn().mockReturnThis(),
-                        in:   vi.fn().mockReturnThis(),
-                        then: (resolve: (v: { count: number; error: null }) => void) =>
-                            resolve({ count: counts[key] ?? 0, error: null }),
+                        select: vi.fn().mockReturnThis(),
+                        eq:     vi.fn().mockReturnThis(),
+                        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+                        then: (resolve: (v: { data: null; error: null }) => void) =>
+                            resolve({ data: null, error: null }),
                     };
-                }),
-            };
-            return chain;
-        },
-    }),
-}));
+                }
+                // sales_orders — count sorguları + dist sorgusu (data)
+                return {
+                    select: vi.fn(() => {
+                        // 6. çağrı (index 5) dist sorgusu — count yok, data döner
+                        const isDist = salesOrderQueryIdx === 5;
+                        const key = salesOrderKeys[salesOrderQueryIdx];
+                        salesOrderQueryIdx++;
+                        if (isDist) {
+                            return {
+                                not: vi.fn().mockReturnThis(),
+                                then: (resolve: (v: { data: unknown[]; error: null }) => void) =>
+                                    resolve({ data: [], error: null }),
+                            };
+                        }
+                        return {
+                            not:  vi.fn().mockReturnThis(),
+                            neq:  vi.fn().mockReturnThis(),
+                            lt:   vi.fn().mockReturnThis(),
+                            in:   vi.fn().mockReturnThis(),
+                            then: (resolve: (v: { count: number; error: null }) => void) =>
+                                resolve({ count: counts[key] ?? 0, error: null }),
+                        };
+                    }),
+                };
+            },
+        }),
+    };
+});
 
 import { GET } from "@/app/api/parasut/stats/route";
 
@@ -53,6 +75,7 @@ import { GET } from "@/app/api/parasut/stats/route";
 
 describe("GET /api/parasut/stats", () => {
     beforeEach(() => {
+        salesOrderQueryIdx = 0;
         Object.assign(counts, {
             customers:   10,
             synced:       5,

@@ -1,12 +1,13 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-26_
+_Son güncelleme: 2026-04-27_
 
-**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 11 — Preflight + Manual Retry + UI Badges (2026-04-26)
+**Son tamamlanan iş:** Paraşüt Faz 11 + bulgular 2. tur (2026-04-27)
 
-11.1: `preflightShipment` (customer/products re-fetch + tax_number/SKU/order_number kontrolleri); başarı → `shipped_at` + `parasut_step='contact'`. 11.2: `serviceRetryParasutStep(orderId, step)` step state machine (dep guard, claim, single-step run, markStepDone→NEXT_STEP, release); `POST /api/parasut/retry` body `{orderId, step?}` (geriye dönük `{sync_log_id}` çalışır). 11.3: `GET /api/orders/[id]/parasut-status` (badges payload); orders/[id] sayfasında `ParasutStepBadges` 5 badge (gri/mavi/yeşil/kırmızı) + step başına ve toplu "yeniden dene" butonu.
-- Test: 41 yeni test (15 preflight + 17 retry-step + 9 status); 101 dosya · 1958 test yeşil · TS clean.
+Faz 11.1 preflight + 11.2 step-granular retry + 11.3 step badges (önceki tur).
+**Bulgular 2. tur fix (bu tur):** 11.4 Dashboard (stats route'a byStep/byErrorKind/token; dashboard'a token durumu, dağılım kartları, sync log step/error_kind kolon + filtre), 11.5 Settings (OAuth token durumu + Bağlan + Yenile + yeni `POST /api/parasut/oauth/refresh` admin-only), M1 (post-ship update error yutulmuyor), M2 (badge tooltip son 24h deneme — `dbCountRecentSyncLogsByStep`), M/L (her badge için Yeniden Dene), LOW (`upsertInvoice` invariant ihlali → `ALERT_ENTITY_PARASUT_STOCK_INVARIANT`).
+- Test: +12 yeni test (4 stats + 3 invariant + 2 attempts + 3 update-error); 103 dosya · 1970 test yeşil · TS clean.
 
 **Sıradaki:** Faz 12 — Sandbox GATE: gerçek Paraşüt API ile OAuth, list filtreleri, e-doc trackable_job, stok invariant doğrulamaları (PARASUT_PLAN.md §Faz 12).
 
@@ -15,7 +16,7 @@ _Son güncelleme: 2026-04-26_
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 101 dosya · 1958 vitest (hepsi yeşil)
+**Test sayısı:** 103 dosya · 1970 vitest (hepsi yeşil)
 
 ---
 

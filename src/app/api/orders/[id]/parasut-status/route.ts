@@ -18,6 +18,7 @@ import { handleApiError } from "@/lib/api-error";
 import { dbGetOrderById } from "@/lib/supabase/orders";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById } from "@/lib/supabase/products";
+import { dbCountRecentSyncLogsByStep } from "@/lib/supabase/sync-log";
 
 export async function GET(
     _req: NextRequest,
@@ -42,6 +43,14 @@ export async function GET(
             }
         }
 
+        // Faz 11.3 (M2 fix) — son 24h step başına sync log denemesi sayısı (audit)
+        let attemptsLast24h: Record<string, number> = {};
+        try {
+            attemptsLast24h = await dbCountRecentSyncLogsByStep(id, 24);
+        } catch (err) {
+            console.error(JSON.stringify({ parasut_status_attempts_count_fail: String(err), orderId: id }));
+        }
+
         return NextResponse.json({
             orderNumber:    order.order_number,
             parasutStep:    order.parasut_step,
@@ -54,6 +63,7 @@ export async function GET(
             invoiceNo:      order.parasut_invoice_no,
             invoiceType:    order.parasut_invoice_type,
             shipmentDocId:  order.parasut_shipment_document_id,
+            attemptsLast24h,
             eDoc: {
                 status: order.parasut_e_document_status,
                 error:  order.parasut_e_document_error,

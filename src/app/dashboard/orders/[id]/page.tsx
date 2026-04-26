@@ -24,6 +24,7 @@ interface ParasutStatusPayload {
     invoiceNo:      string | null;
     invoiceType:    "e_invoice" | "e_archive" | "manual" | null;
     shipmentDocId:  string | null;
+    attemptsLast24h: Record<string, number>;
     eDoc: {
         status: "running" | "done" | "error" | "skipped" | null;
         error:  string | null;
@@ -1203,6 +1204,9 @@ function ParasutStepBadges({
             if (data.nextRetryAt) parts.push(`Sonraki deneme: ${new Date(data.nextRetryAt).toLocaleString("tr-TR")}`);
             if (data.retryCount > 0) parts.push(`Deneme: ${data.retryCount}`);
         }
+        // Audit: son 24 saatteki bu step için toplam deneme (hata olmasa bile bilgilendirici)
+        const last24h = data.attemptsLast24h?.[s] ?? 0;
+        if (last24h > 0) parts.push(`Son 24h: ${last24h} deneme`);
         return parts.join("\n");
     }
 
@@ -1213,7 +1217,10 @@ function ParasutStepBadges({
                     const c   = stepColor(colorFor(s));
                     const err = isErrorOnStep(s);
                     const tip = tooltipFor(s);
-                    const canRetry = err && !isDemo;
+                    // Plan: her badge için "Yeniden Dene". Dep guard backend'de;
+                    // UI butonu demo dışında her badge'de görünür. Done/skipped olsa bile
+                    // (re-sync isteği makul). retrying state ile loading.
+                    const canRetry = !isDemo;
                     return (
                         <div
                             key={s}

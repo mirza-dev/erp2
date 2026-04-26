@@ -14,7 +14,14 @@ import { getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ParasutError } from "@/lib/parasut-adapter";
 import { parasutApiCall } from "@/lib/services/parasut-api-call";
-import { ALERT_ENTITY_PARASUT_AUTH, ALERT_ENTITY_PARASUT_SHIPMENT, ALERT_ENTITY_PARASUT_INVOICE, ALERT_ENTITY_PARASUT_E_DOC, PARASUT_INVOICE_SERIES } from "@/lib/parasut-constants";
+import {
+    ALERT_ENTITY_PARASUT_AUTH,
+    ALERT_ENTITY_PARASUT_SHIPMENT,
+    ALERT_ENTITY_PARASUT_INVOICE,
+    ALERT_ENTITY_PARASUT_E_DOC,
+    ALERT_ENTITY_PARASUT_STOCK_INVARIANT,
+    PARASUT_INVOICE_SERIES,
+} from "@/lib/parasut-constants";
 import type { OrderWithLines } from "@/lib/supabase/orders";
 import type { SalesOrderRow, ParasutInvoiceType, ParasutEDocStatus } from "@/lib/database.types";
 import type { ParasutStep } from "@/lib/database.types";
@@ -683,20 +690,43 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
         .eq("id", orderId);
     if (markerErr) throw new Error(`Invoice attempted marker yazılamadı: ${markerErr.message}`);
 
-    const invoice = await parasutApiCall(
-        { op: "createSalesInvoice", orderId, step: "invoice" as const },
-        () => adapter.createSalesInvoice({
-            contact_id:        customer.parasut_contact_id!,
-            invoice_series:    series,
-            invoice_id:        numberInt,
-            issue_date:        issueDate,
-            due_date:          dueDate,
-            currency:          mapCurrency(order.currency),
-            shipment_included: false, // KESIN false — shipment ayrı belgede (stok invariant)
-            description:       `KokpitERP #${order.order_number}`,
-            details,
-        }),
-    );
+    let invoice: ParasutInvoice;
+    try {
+        invoice = await parasutApiCall(
+            { op: "createSalesInvoice", orderId, step: "invoice" as const },
+            () => adapter.createSalesInvoice({
+                contact_id:        customer.parasut_contact_id!,
+                invoice_series:    series,
+                invoice_id:        numberInt,
+                issue_date:        issueDate,
+                due_date:          dueDate,
+                currency:          mapCurrency(order.currency),
+                shipment_included: false, // KESIN false — shipment ayrı belgede (stok invariant)
+                description:       `KokpitERP #${order.order_number}`,
+                details,
+            }),
+        );
+    } catch (err) {
+        // Stok invariant ihlali (shipment_included=true veya warehouse alanı detail'de var) →
+        // adapter validation error fırlatır. Critical alert: muhasebe sync, üretim stok'unu çift düşürür.
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/shipment_included|warehouse|stok invariant/i.test(msg)) {
+            try {
+                await dbCreateAlert({
+                    type:        "sync_issue",
+                    severity:    "critical",
+                    title:       "Paraşüt stok invariant ihlali",
+                    description: `Order ${order.order_number} createSalesInvoice payload'unda stok invariant ihlali: ${msg}`,
+                    entity_type: "parasut",
+                    entity_id:   ALERT_ENTITY_PARASUT_STOCK_INVARIANT,
+                    source:      "system",
+                });
+            } catch (alertErr) {
+                console.error(JSON.stringify({ parasut_alert_fail: String(alertErr), orderId, kind: "stock_invariant" }));
+            }
+        }
+        throw err;
+    }
 
     await dbWriteInvoiceMeta(orderId, invoice, series, numberInt);
 }

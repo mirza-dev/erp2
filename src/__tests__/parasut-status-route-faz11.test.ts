@@ -10,6 +10,7 @@ import { NextRequest } from "next/server";
 const mockDbGetOrderById    = vi.fn();
 const mockDbGetCustomerById = vi.fn();
 const mockDbGetProductById  = vi.fn();
+const mockDbCountRecentSyncLogsByStep = vi.fn();
 
 vi.mock("@/lib/supabase/orders", () => ({
     dbGetOrderById: (...a: unknown[]) => mockDbGetOrderById(...a),
@@ -19,6 +20,9 @@ vi.mock("@/lib/supabase/customers", () => ({
 }));
 vi.mock("@/lib/supabase/products", () => ({
     dbGetProductById: (...a: unknown[]) => mockDbGetProductById(...a),
+}));
+vi.mock("@/lib/supabase/sync-log", () => ({
+    dbCountRecentSyncLogsByStep: (...a: unknown[]) => mockDbCountRecentSyncLogsByStep(...a),
 }));
 
 import { GET } from "@/app/api/orders/[id]/parasut-status/route";
@@ -54,6 +58,7 @@ beforeEach(() => {
     mockDbGetOrderById.mockResolvedValue(baseOrder);
     mockDbGetCustomerById.mockResolvedValue({ id: "cust-1", parasut_contact_id: null });
     mockDbGetProductById.mockResolvedValue({ id: "prod-1", parasut_product_id: null });
+    mockDbCountRecentSyncLogsByStep.mockResolvedValue({});
 });
 
 describe("GET /api/orders/[id]/parasut-status", () => {
@@ -159,5 +164,22 @@ describe("GET /api/orders/[id]/parasut-status", () => {
         const res = await GET(makeReq(), params);
         const body = await res.json();
         expect(body.badges.productDone).toBe(false);
+    });
+
+    // M2 (bulgu fix) — son 24h step başına deneme sayısı
+    it("attemptsLast24h sync_log audit'inden döner", async () => {
+        mockDbCountRecentSyncLogsByStep.mockResolvedValue({ contact: 3, invoice: 1 });
+        const res = await GET(makeReq(), params);
+        const body = await res.json();
+        expect(body.attemptsLast24h).toEqual({ contact: 3, invoice: 1 });
+        expect(mockDbCountRecentSyncLogsByStep).toHaveBeenCalledWith(ORDER_ID, 24);
+    });
+
+    it("sync log count fail → endpoint düşmez (best-effort), attemptsLast24h={}", async () => {
+        mockDbCountRecentSyncLogsByStep.mockRejectedValue(new Error("DB down"));
+        const res = await GET(makeReq(), params);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.attemptsLast24h).toEqual({});
     });
 });

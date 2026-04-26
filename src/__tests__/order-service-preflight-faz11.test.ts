@@ -25,12 +25,14 @@ const mockDbCreateOrder = vi.fn();
 const mockDbListOrders = vi.fn();
 
 const updateCalls: Array<Record<string, unknown>> = [];
+const pendingUpdateResults: Array<{ error: { message: string } | null }> = [];
 function chainProxy(): unknown {
     return new Proxy({}, {
         get(_t, prop) {
             if (prop === "eq" || prop === "neq") return () => chainProxy();
             if (prop === "then") {
-                const p = Promise.resolve({ error: null });
+                const next = pendingUpdateResults.shift() ?? { error: null };
+                const p = Promise.resolve(next);
                 return p.then.bind(p);
             }
             return undefined;
@@ -111,6 +113,7 @@ const baseProduct = {
 beforeEach(() => {
     vi.clearAllMocks();
     updateCalls.length = 0;
+    pendingUpdateResults.length = 0;
     saved.PARASUT_ENABLED = process.env.PARASUT_ENABLED;
     mockDbShipOrderFull.mockResolvedValue({ success: true });
     mockDbGetOrderById.mockResolvedValue(baseOrder);
@@ -242,5 +245,32 @@ describe("Faz 11.1 — serviceTransitionOrder('shipped') sonrası DB yazımı", 
         expect(r.success).toBe(false);
         expect(mockDbGetCustomerById).not.toHaveBeenCalled();
         expect(mockDbShipOrderFull).not.toHaveBeenCalled();
+    });
+});
+
+// M1 (bulgu fix) — post-ship update hatası
+describe("M1 fix — post-ship shipped_at/parasut_step update hatası yutulmuyor", () => {
+    it("Paraşüt on + DB update fail → success:false + açıklayıcı error", async () => {
+        process.env.PARASUT_ENABLED = "true";
+        pendingUpdateResults.push({ error: { message: "DB connection lost" } });
+        const r = await serviceTransitionOrder(ORDER_ID, "shipped");
+        expect(r.success).toBe(false);
+        expect(r.error).toMatch(/shipped_at\/parasut_step yazılamadı/);
+        expect(r.error).toMatch(/DB connection lost/);
+    });
+
+    it("Paraşüt off + DB update fail → success:false (shipped_at yazımı kanonik)", async () => {
+        process.env.PARASUT_ENABLED = "false";
+        pendingUpdateResults.push({ error: { message: "fk violation" } });
+        const r = await serviceTransitionOrder(ORDER_ID, "shipped");
+        expect(r.success).toBe(false);
+        expect(r.error).toMatch(/shipped_at/);
+    });
+
+    it("DB update başarılı → success:true (regresyon)", async () => {
+        process.env.PARASUT_ENABLED = "true";
+        // pendingUpdateResults boş → default { error: null }
+        const r = await serviceTransitionOrder(ORDER_ID, "shipped");
+        expect(r.success).toBe(true);
     });
 });

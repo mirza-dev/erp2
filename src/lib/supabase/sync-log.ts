@@ -40,14 +40,34 @@ export async function dbCreateSyncLog(input: CreateSyncLogInput): Promise<Integr
     return data;
 }
 
-export async function dbListSyncLogs(entityType?: string, limit = 50): Promise<IntegrationSyncLogRow[]> {
+export interface ListSyncLogsFilter {
+    entityType?: string;
+    step?:       string;
+    errorKind?:  string;
+    status?:     string;
+    limit?:      number;
+}
+
+export async function dbListSyncLogs(
+    entityTypeOrFilter?: string | ListSyncLogsFilter,
+    limitArg = 50,
+): Promise<IntegrationSyncLogRow[]> {
     const supabase = createServiceClient();
+    const filter: ListSyncLogsFilter = typeof entityTypeOrFilter === "string"
+        ? { entityType: entityTypeOrFilter, limit: limitArg }
+        : entityTypeOrFilter ?? { limit: limitArg };
+
     let query = supabase
         .from("integration_sync_logs")
         .select("*")
         .order("requested_at", { ascending: false })
-        .limit(limit);
-    if (entityType) query = query.eq("entity_type", entityType);
+        .limit(filter.limit ?? 50);
+
+    if (filter.entityType) query = query.eq("entity_type", filter.entityType);
+    if (filter.step)       query = query.eq("step",        filter.step);
+    if (filter.errorKind)  query = query.eq("error_kind",  filter.errorKind);
+    if (filter.status)     query = query.eq("status",      filter.status);
+
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data ?? [];
@@ -83,6 +103,30 @@ export async function dbUpdateSyncLog(
         .single();
     if (error || !data) throw new Error(error?.message ?? "Sync log update failed");
     return data;
+}
+
+/**
+ * Faz 11.3 — Bir entity_id için son 24 saatteki sync log sayılarını
+ * step başına döndürür. Tooltip "son 24h X deneme" göstermek için.
+ */
+export async function dbCountRecentSyncLogsByStep(
+    entityId: string,
+    sinceHours = 24,
+): Promise<Record<string, number>> {
+    const supabase = createServiceClient();
+    const sinceISO = new Date(Date.now() - sinceHours * 3600_000).toISOString();
+    const { data, error } = await supabase
+        .from("integration_sync_logs")
+        .select("step")
+        .eq("entity_id", entityId)
+        .gte("requested_at", sinceISO);
+    if (error) throw new Error(error.message);
+    const counts: Record<string, number> = {};
+    for (const row of (data ?? []) as { step: string | null }[]) {
+        const k = row.step ?? "unknown";
+        counts[k] = (counts[k] ?? 0) + 1;
+    }
+    return counts;
 }
 
 export async function dbListFailedSyncLogs(limit = 20): Promise<IntegrationSyncLogRow[]> {

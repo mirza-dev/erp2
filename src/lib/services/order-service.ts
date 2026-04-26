@@ -231,12 +231,28 @@ export async function serviceTransitionOrder(
         if (result.success) {
             // shipped_at her zaman yazılır (Paraşüt'ten bağımsız — sevk tarihi kanonik kaynak).
             // parasut_step='contact' yalnızca Paraşüt aktifken (sync başlangıç durumu).
+            // Hata yutulmaz: stok hareketi yapılmış olsa da bu yazım başarısızsa Paraşüt sync
+            // doğru başlangıç state'ine gelemez → caller'a explicit error iletilir.
             const supabase = createServiceClient();
             const patch: Record<string, unknown> = { shipped_at: new Date().toISOString() };
             if (process.env.PARASUT_ENABLED === "true") {
                 patch.parasut_step = "contact";
             }
-            await supabase.from("sales_orders").update(patch).eq("id", orderId);
+            const { error: updErr } = await supabase
+                .from("sales_orders")
+                .update(patch)
+                .eq("id", orderId);
+            if (updErr) {
+                console.error(JSON.stringify({
+                    transition_post_ship_update_fail: updErr.message,
+                    orderId,
+                    patch,
+                }));
+                return {
+                    success: false,
+                    error: `Sevk başarılı ancak shipped_at/parasut_step yazılamadı: ${updErr.message}`,
+                };
+            }
         }
         return { success: result.success, error: result.error };
     }
