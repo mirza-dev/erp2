@@ -14,11 +14,11 @@ import { getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ParasutError } from "@/lib/parasut-adapter";
 import { parasutApiCall } from "@/lib/services/parasut-api-call";
-import { ALERT_ENTITY_PARASUT_AUTH, ALERT_ENTITY_PARASUT_SHIPMENT } from "@/lib/parasut-constants";
+import { ALERT_ENTITY_PARASUT_AUTH, ALERT_ENTITY_PARASUT_SHIPMENT, ALERT_ENTITY_PARASUT_INVOICE, ALERT_ENTITY_PARASUT_E_DOC, PARASUT_INVOICE_SERIES } from "@/lib/parasut-constants";
 import type { OrderWithLines } from "@/lib/supabase/orders";
-import type { SalesOrderRow } from "@/lib/database.types";
+import type { SalesOrderRow, ParasutInvoiceType, ParasutEDocStatus } from "@/lib/database.types";
 import type { ParasutStep } from "@/lib/database.types";
-import type { ParasutShipmentDocument } from "@/lib/parasut-adapter";
+import type { ParasutShipmentDocument, ParasutInvoice, ParasutEDocument } from "@/lib/parasut-adapter";
 
 // ── Mapping ──────────────────────────────────────────────────
 
@@ -555,16 +555,369 @@ async function upsertShipment(order: OrderWithLines): Promise<void> {
     await dbWriteShipmentMeta(orderId, ship);
 }
 
-// ── Faz 9/10 stubs ───────────────────────────────────────────
+// ── Faz 9: Sales invoice (stok invariant) ────────────────────
 
-async function upsertInvoice(_order: OrderWithLines): Promise<void> {
-    throw new ParasutError("server", "Not yet implemented — Faz 9");
+function computeDueDate(issueDate: string, paymentTermsDays: number): string {
+    const d = new Date(issueDate + "T00:00:00.000Z");
+    d.setUTCDate(d.getUTCDate() + paymentTermsDays);
+    return d.toISOString().slice(0, 10);
+}
+
+async function dbWriteInvoiceMeta(
+    orderId: string,
+    invoice: ParasutInvoice,
+    series: string,
+    numberInt: number,
+): Promise<void> {
+    const supabase = createServiceClient();
+    const nowISO   = new Date().toISOString();
+    const { error } = await supabase
+        .from("sales_orders")
+        .update({
+            parasut_invoice_id:         invoice.id,
+            parasut_invoice_no:         invoice.attributes.invoice_no,
+            parasut_invoice_series:     series,
+            parasut_invoice_number_int: numberInt,
+            parasut_invoice_synced_at:  nowISO,
+            parasut_invoice_error:      null,
+            parasut_sent_at:            nowISO, // legacy alan — UI api-mappers.ts hâlâ okuyor
+        })
+        .eq("id", orderId);
+    if (error) throw new Error(`dbWriteInvoiceMeta hatası: ${error.message}`);
+}
+
+async function upsertInvoice(order: OrderWithLines): Promise<void> {
+    if (order.parasut_invoice_id) return; // idempotent
+
+    const orderId  = order.id;
+    const supabase = createServiceClient();
+    const adapter  = getParasutAdapter();
+
+    const customer = await dbGetCustomerById(order.customer_id!);
+    if (!customer) {
+        throw new ParasutError("not_found", `Müşteri bulunamadı: ${order.customer_id}`);
+    }
+    if (!customer.parasut_contact_id) {
+        throw new ParasutError(
+            "validation",
+            "Müşteri Paraşüt contact ID eksik — önce contact upsert gerekli",
+        );
+    }
+
+    const series                    = PARASUT_INVOICE_SERIES;
+    const numberInt                 = parasutInvoiceNumberInt(order.order_number);
+    const hasInvoiceAttemptedBefore = !!order.parasut_invoice_create_attempted_at;
+
+    // Fast remote lookup — series+number deterministik unique (Paraşüt spec onaylı filter)
+    const existing = await parasutApiCall(
+        { op: "findSalesInvoicesByNumber", orderId, step: "invoice" as const },
+        () => adapter.findSalesInvoicesByNumber(series, numberInt),
+    );
+    if (existing.length > 0) {
+        await dbWriteInvoiceMeta(orderId, existing[0], series, numberInt);
+        return;
+    }
+
+    if (hasInvoiceAttemptedBefore) {
+        // Alert best-effort — yazım hatası manual review semantiğini maskelemez
+        try {
+            await dbCreateAlert({
+                type:        "sync_issue",
+                severity:    "critical",
+                title:       "Sales invoice manuel inceleme gerekli",
+                description: `Invoice create attempted ${order.parasut_invoice_create_attempted_at} ama remote lookup negatif (series=${series}, number=${numberInt}) → beklenmedik durum, manuel kontrol`,
+                entity_type: "parasut",
+                entity_id:   ALERT_ENTITY_PARASUT_INVOICE,
+                source:      "system",
+            });
+        } catch (alertErr) {
+            console.error(JSON.stringify({ parasut_alert_fail: String(alertErr), orderId }));
+        }
+        throw new ParasutError(
+            "validation",
+            "Invoice manual review gerekli — attempted marker + lookup negatif (duplicate riski)",
+        );
+    }
+
+    // Ürün Paraşüt ID'lerini yükle (OrderLineRow'da yok — her satır için re-fetch)
+    // Tüm validasyonlar create öncesi tamamlanır; marker sadece create'e gidileceği noktada yazılır
+    const details: Array<{
+        quantity:       number;
+        unit_price:     number;
+        vat_rate:       number;
+        discount_type:  "percentage";
+        discount_value: number;
+        description:    string;
+        product_id:     string;
+    }> = [];
+    for (const line of order.lines) {
+        const product = await dbGetProductById(line.product_id);
+        if (!product) {
+            throw new ParasutError("not_found", `Ürün bulunamadı: ${line.product_id}`);
+        }
+        if (!product.parasut_product_id) {
+            throw new ParasutError(
+                "validation",
+                `Ürün Paraşüt product ID eksik: ${line.product_sku}`,
+            );
+        }
+        details.push({
+            quantity:       line.quantity,
+            unit_price:     line.unit_price,
+            vat_rate:       line.vat_rate ?? 20,
+            discount_type:  "percentage",
+            discount_value: line.discount_pct,
+            description:    `${line.product_name} (${line.product_sku})`,
+            product_id:     product.parasut_product_id,
+            // warehouse: KASITLI OLARAK YOK — stok invariant
+        });
+    }
+
+    const issueDate = new Date().toISOString().slice(0, 10);
+    const dueDate   = computeDueDate(issueDate, customer.payment_terms_days ?? 30);
+
+    // Durable attempted marker — create çağrısından hemen önce, validasyonlar geçtikten sonra
+    const { error: markerErr } = await supabase
+        .from("sales_orders")
+        .update({ parasut_invoice_create_attempted_at: new Date().toISOString() })
+        .eq("id", orderId);
+    if (markerErr) throw new Error(`Invoice attempted marker yazılamadı: ${markerErr.message}`);
+
+    const invoice = await parasutApiCall(
+        { op: "createSalesInvoice", orderId, step: "invoice" as const },
+        () => adapter.createSalesInvoice({
+            contact_id:        customer.parasut_contact_id!,
+            invoice_series:    series,
+            invoice_id:        numberInt,
+            issue_date:        issueDate,
+            due_date:          dueDate,
+            currency:          mapCurrency(order.currency),
+            shipment_included: false, // KESIN false — shipment ayrı belgede (stok invariant)
+            description:       `KokpitERP #${order.order_number}`,
+            details,
+        }),
+    );
+
+    await dbWriteInvoiceMeta(orderId, invoice, series, numberInt);
+}
+
+// ── Faz 10: E-Belge ──────────────────────────────────────────
+
+async function dbWriteEDocMeta(orderId: string, eDoc: ParasutEDocument, jobId?: string): Promise<void> {
+    // Idempotent guard: Poll CRON `parasut_claim_sync` kullanmadığı için sync ile paralel çalışabilir
+    // → her done yazımı `parasut_e_document_status != 'done'` filtresi ile, jobId varsa ek olarak job_id eşleşmesi.
+    const supabase = createServiceClient();
+    let q = supabase
+        .from("sales_orders")
+        .update({
+            parasut_e_document_id:     eDoc.id,
+            parasut_e_document_status: "done" as ParasutEDocStatus,
+            parasut_e_document_error:  null,
+        })
+        .eq("id", orderId)
+        .neq("parasut_e_document_status", "done");
+    if (jobId) q = q.eq("parasut_trackable_job_id", jobId);
+    const { error } = await q;
+    if (error) throw new Error(`dbWriteEDocMeta hatası: ${error.message}`);
 }
 
 async function upsertEDocument(
-    _order: OrderWithLines,
+    order: OrderWithLines,
 ): Promise<{ status: "done" | "skipped" | "running" }> {
-    throw new ParasutError("server", "Not yet implemented — Faz 10");
+    if (!order.parasut_invoice_id) {
+        throw new ParasutError(
+            "validation",
+            "E-doc oluşturulamaz: parasut_invoice_id eksik (Faz 9 tamamlanmamış)",
+        );
+    }
+
+    const orderId  = order.id;
+    const supabase = createServiceClient();
+    const adapter  = getParasutAdapter();
+    const invoiceId = order.parasut_invoice_id;
+
+    // Idempotent: e_document_id zaten dolu → status'a göre erken dön
+    // (skipped → markStepDone'u orchestrator çağırır; running → poll CRON bitirir; done → done)
+    if (order.parasut_e_document_id) {
+        return { status: "done" };
+    }
+    if (order.parasut_e_document_status === "skipped") {
+        return { status: "skipped" };
+    }
+
+    // Crash recovery 1: Paraşüt tarafında active_e_document zaten var mı?
+    {
+        const fresh = await parasutApiCall(
+            { op: "getSalesInvoiceWithActiveEDocument", orderId, step: "edoc" as const },
+            () => adapter.getSalesInvoiceWithActiveEDocument(invoiceId),
+        );
+        if (fresh.active_e_document) {
+            await dbWriteEDocMeta(orderId, fresh.active_e_document);
+            return { status: "done" };
+        }
+    }
+
+    // Crash recovery 2: Job başlatılmış (e_document_id hâlâ yok — yukarıda erken dönüldü)
+    if (order.parasut_trackable_job_id) {
+        const job = await parasutApiCall(
+            { op: "getTrackableJob", orderId, step: "edoc" as const },
+            () => adapter.getTrackableJob(order.parasut_trackable_job_id!),
+        );
+
+        if (job.status === "done") {
+            const fresh = await parasutApiCall(
+                { op: "getSalesInvoiceWithActiveEDocument", orderId, step: "edoc" as const },
+                () => adapter.getSalesInvoiceWithActiveEDocument(invoiceId),
+            );
+            if (!fresh.active_e_document) {
+                throw new ParasutError(
+                    "server",
+                    "TrackableJob done döndü ama active_e_document yok — beklenmedik durum",
+                );
+            }
+            await dbWriteEDocMeta(orderId, fresh.active_e_document, order.parasut_trackable_job_id!);
+            return { status: "done" };
+        }
+
+        if (job.status === "running") {
+            // Idempotent guard: poll CRON paralel çalışıp 'done' yazmış olabilir → 'done'u 'running'e ezme
+            const { error: dbErr } = await supabase
+                .from("sales_orders")
+                .update({ parasut_e_document_status: "running" as ParasutEDocStatus })
+                .eq("id", orderId)
+                .eq("parasut_trackable_job_id", order.parasut_trackable_job_id!)
+                .neq("parasut_e_document_status", "done");
+            if (dbErr) throw new Error(`e-doc running update hatası: ${dbErr.message}`);
+            return { status: "running" };
+        }
+
+        // job.status === 'error'
+        const errMsg = (job.errors ?? []).join("; ") || "Trackable job error (detay yok)";
+        try {
+            await dbCreateAlert({
+                type:        "sync_issue",
+                severity:    "critical",
+                title:       "E-belge oluşturma hatası",
+                description: `Order ${order.order_number}: trackable_job ${order.parasut_trackable_job_id} → error: ${errMsg}`,
+                entity_type: "parasut",
+                entity_id:   ALERT_ENTITY_PARASUT_E_DOC,
+                source:      "system",
+            });
+        } catch (alertErr) {
+            console.error(JSON.stringify({ parasut_alert_fail: String(alertErr), orderId }));
+        }
+        // Idempotent guard: aynı sebep — done state'i ezmesin
+        const { error: dbErr } = await supabase
+            .from("sales_orders")
+            .update({
+                parasut_e_document_status: "error" as ParasutEDocStatus,
+                parasut_e_document_error:  errMsg,
+            })
+            .eq("id", orderId)
+            .eq("parasut_trackable_job_id", order.parasut_trackable_job_id!)
+            .neq("parasut_e_document_status", "done");
+        if (dbErr) throw new Error(`e-doc error update hatası: ${dbErr.message}`);
+        throw new ParasutError("server", `E-belge job hatası: ${errMsg}`);
+    }
+
+    // Yeni job
+    // Customer re-fetch (order stale olabilir; tax_number güncel olmalı)
+    const customer = await dbGetCustomerById(order.customer_id!);
+    if (!customer) {
+        throw new ParasutError("not_found", `Müşteri bulunamadı: ${order.customer_id}`);
+    }
+
+    // Tip seçimi: order.parasut_invoice_type override > VKN inbox lookup > e_archive (TC kimlik / no-tax)
+    // Türkiye: VKN=10 hane, TC kimlik=11 hane. Ham veri boşluk/tire içerebilir → numerik filtreleyip ölç.
+    let type: ParasutInvoiceType;
+    if (order.parasut_invoice_type) {
+        type = order.parasut_invoice_type;
+    } else {
+        const digits = (customer.tax_number ?? "").replace(/\D/g, "");
+        if (digits.length === 10) {
+            const inboxes = await parasutApiCall(
+                { op: "listEInvoiceInboxesByVkn", orderId, step: "edoc" as const },
+                () => adapter.listEInvoiceInboxesByVkn(digits),
+            );
+            type = inboxes.length > 0 ? "e_invoice" : "e_archive";
+        } else {
+            // TC kimlik (11), yok, veya bilinmeyen format → e_archive
+            type = "e_archive";
+        }
+    }
+
+    if (type === "manual") {
+        // "skipped" semantiği: e-belge hiç oluşturulmadı (done ile karıştırma)
+        const { error: dbErr } = await supabase
+            .from("sales_orders")
+            .update({
+                parasut_invoice_type:      "manual" as ParasutInvoiceType,
+                parasut_e_document_status: "skipped" as ParasutEDocStatus,
+            })
+            .eq("id", orderId);
+        if (dbErr) throw new Error(`e-doc manual update hatası: ${dbErr.message}`);
+        return { status: "skipped" };
+    }
+
+    // Durable attempted marker — trackable_job_id DB'ye yazılmadan önce crash olsa bile
+    // bir sonraki denemede active_e_document yoksa ve marker varsa: otomatik yeni job AÇMA → manual review
+    const hasEDocAttemptedBefore = !!order.parasut_e_document_create_attempted_at;
+    if (hasEDocAttemptedBefore && !order.parasut_trackable_job_id) {
+        // Önceki create çağrısı başarılı dönmüş ama trackable_job_id yazılamadı olabilir.
+        // Recovery 1 (active_e_document) yukarıda boş döndü → güvenli tarafa çek.
+        try {
+            await dbCreateAlert({
+                type:        "sync_issue",
+                severity:    "critical",
+                title:       "E-belge manuel inceleme gerekli",
+                description: `E-doc create attempted ${order.parasut_e_document_create_attempted_at} ama trackable_job_id yok + active_e_document yok → duplicate riski, manuel inceleme`,
+                entity_type: "parasut",
+                entity_id:   ALERT_ENTITY_PARASUT_E_DOC,
+                source:      "system",
+            });
+        } catch (alertErr) {
+            console.error(JSON.stringify({ parasut_alert_fail: String(alertErr), orderId }));
+        }
+        throw new ParasutError(
+            "validation",
+            "E-doc manual review gerekli — attempted marker + tracking bilgisi eksik (duplicate riski)",
+        );
+    }
+
+    // Marker yaz (create çağrısından hemen önce); type da burada persist edilir
+    const { error: markerErr } = await supabase
+        .from("sales_orders")
+        .update({
+            parasut_e_document_create_attempted_at: new Date().toISOString(),
+            parasut_invoice_type:                   type,
+        })
+        .eq("id", orderId);
+    if (markerErr) throw new Error(`E-doc attempted marker yazılamadı: ${markerErr.message}`);
+
+    const issueDate = new Date().toISOString().slice(0, 10);
+
+    const job = type === "e_invoice"
+        ? await parasutApiCall(
+            { op: "createEInvoice", orderId, step: "edoc" as const },
+            () => adapter.createEInvoice(invoiceId, { issue_date: issueDate, scenario: "commercial" }),
+        )
+        : await parasutApiCall(
+            { op: "createEArchive", orderId, step: "edoc" as const },
+            () => adapter.createEArchive(invoiceId, { issue_date: issueDate, internet_sale: false }),
+        );
+
+    // Idempotent guard: paralel poll CRON arada done yazmış olabilir → done'u ezme
+    const { error: jobErr } = await supabase
+        .from("sales_orders")
+        .update({
+            parasut_trackable_job_id:  job.trackable_job_id,
+            parasut_e_document_status: "running" as ParasutEDocStatus,
+        })
+        .eq("id", orderId)
+        .neq("parasut_e_document_status", "done");
+    if (jobErr) throw new Error(`e-doc trackable_job_id yazılamadı: ${jobErr.message}`);
+
+    return { status: "running" };
 }
 
 // ── Sync ─────────────────────────────────────────────────────
@@ -651,15 +1004,22 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
         await markStepDone(orderId, "shipment", "invoice");
         orderMut.parasut_retry_count = 0;
 
-        // Step: invoice (stub — Faz 9)
+        // Step: invoice
         currentStep = "invoice";
         await upsertInvoice(order);
         await markStepDone(orderId, "invoice", "edoc");
         orderMut.parasut_retry_count = 0;
 
-        // Step: e-doc (stub — Faz 10)
+        // Step: e-doc
+        // Order DB'de güncel — upsertInvoice/Shipment kendi alanlarını yazdı; in-memory snapshot stale.
+        // upsertEDocument parasut_invoice_id okuduğu için re-fetch zorunlu (aksi halde yeni invoice
+        // sonrası validation fail → 2099 retry block'a düşer).
         currentStep = "edoc";
-        const eDocResult = await upsertEDocument(order);
+        const refreshedOrder = await dbGetOrderById(orderId);
+        if (!refreshedOrder) {
+            throw new ParasutError("not_found", "Sipariş edoc adımı öncesi bulunamadı (race condition)");
+        }
+        const eDocResult = await upsertEDocument(refreshedOrder);
         if (eDocResult.status === "done" || eDocResult.status === "skipped") {
             await markStepDone(orderId, "edoc", "done");
         }
@@ -764,4 +1124,163 @@ export async function serviceSyncAllPending(): Promise<{
     }
 
     return { synced, failed, errors };
+}
+
+// ── Poll CRON: e-belge trackable_job durumu ──────────────────
+
+export interface PollEDocumentsResult {
+    polled:  number;
+    done:    number;
+    running: number;
+    error:   number;
+    errors:  string[];
+}
+
+/**
+ * Bağımsız Poll CRON — running e-document'ları tarar, trackable_job sonuçlarını işler.
+ * orchestrator (`serviceSyncOrderToParasut`) `parasut_claim_sync` ile tek-yazıcı koruması altında
+ * çalışır; bu poll CRON ise claim KULLANMAZ → idempotent DB guard'lar zorunludur:
+ *   `.eq("parasut_trackable_job_id", jobId).neq("parasut_e_document_status", "done")`
+ * (yarış: poll'un done yazımı orchestrator'ın yeni job_id yazımını ezmesin).
+ */
+export async function serviceParasutPollEDocuments(): Promise<PollEDocumentsResult> {
+    if (!isParasutEnabled()) return { polled: 0, done: 0, running: 0, error: 0, errors: [] };
+
+    const supabase = createServiceClient();
+    const adapter  = getParasutAdapter();
+
+    const { data: pendingRows, error } = await supabase
+        .from("sales_orders")
+        .select("id, order_number, parasut_invoice_id, parasut_trackable_job_id, parasut_e_document_status")
+        .eq("parasut_step", "edoc")
+        .eq("parasut_e_document_status", "running")
+        .not("parasut_trackable_job_id", "is", null)
+        .limit(100);
+    if (error) throw new Error(`poll-e-documents query hatası: ${error.message}`);
+
+    const result: PollEDocumentsResult = { polled: 0, done: 0, running: 0, error: 0, errors: [] };
+
+    for (const row of pendingRows ?? []) {
+        const orderId   = row.id as string;
+        const invoiceId = row.parasut_invoice_id as string | null;
+        const jobId     = row.parasut_trackable_job_id as string | null;
+        if (!invoiceId || !jobId) continue;
+
+        result.polled++;
+
+        try {
+            const job = await parasutApiCall(
+                { op: "getTrackableJob", orderId, step: "edoc" as const },
+                () => adapter.getTrackableJob(jobId),
+            );
+
+            // raw_status metadata: bilinmeyen / pending durumları integration_sync_logs.metadata'ya yansıt
+            // (running'e map edilir). Adapter şu an 'running' | 'done' | 'error' döner; gerçek HTTP adapter
+            // pending'i running'e map eder ve raw_status'u alanda taşırsa (Faz 12) bu log onu yakalar.
+            const rawStatus = (job as { status: string; errors?: string[] }).status;
+            if (rawStatus !== "done" && rawStatus !== "running" && rawStatus !== "error") {
+                console.log(JSON.stringify({
+                    parasut_poll_unknown_status: rawStatus,
+                    orderId,
+                    jobId,
+                }));
+                try {
+                    await dbCreateSyncLog({
+                        entity_type: "sales_order",
+                        entity_id:   orderId,
+                        direction:   "push",
+                        status:      "success",
+                        step:        "edoc" as ParasutStep,
+                        metadata:    { raw_status: rawStatus, source: "poll", note: "unknown_status_mapped_to_running" },
+                    });
+                } catch { /* best-effort */ }
+            }
+
+            if (job.status === "done") {
+                const fresh = await parasutApiCall(
+                    { op: "getSalesInvoiceWithActiveEDocument", orderId, step: "edoc" as const },
+                    () => adapter.getSalesInvoiceWithActiveEDocument(invoiceId),
+                );
+                if (!fresh.active_e_document) {
+                    result.error++;
+                    result.errors.push(`${row.order_number}: job done ama active_e_document yok`);
+                    continue;
+                }
+
+                // Idempotent yazım: aynı job_id + status henüz done değilse yaz
+                const { error: updErr } = await supabase
+                    .from("sales_orders")
+                    .update({
+                        parasut_e_document_id:     fresh.active_e_document.id,
+                        parasut_e_document_status: "done" as ParasutEDocStatus,
+                        parasut_e_document_error:  null,
+                        parasut_step:              "done",
+                        parasut_error:             null,
+                        parasut_error_kind:        null,
+                        parasut_next_retry_at:     null,
+                        parasut_retry_count:       0,
+                        parasut_last_failed_step:  null,
+                    })
+                    .eq("id", orderId)
+                    .eq("parasut_trackable_job_id", jobId)
+                    .neq("parasut_e_document_status", "done");
+                if (updErr) {
+                    result.error++;
+                    result.errors.push(`${row.order_number}: done update hatası: ${updErr.message}`);
+                    continue;
+                }
+
+                try {
+                    await dbCreateSyncLog({
+                        entity_type: "sales_order",
+                        entity_id:   orderId,
+                        direction:   "push",
+                        status:      "success",
+                        step:        "edoc" as ParasutStep,
+                        metadata:    { next_step: "done", source: "poll" },
+                    });
+                } catch { /* best-effort */ }
+
+                result.done++;
+            } else if (job.status === "error") {
+                const errMsg = (job.errors ?? []).join("; ") || "Trackable job error (detay yok)";
+                try {
+                    await dbCreateAlert({
+                        type:        "sync_issue",
+                        severity:    "critical",
+                        title:       "E-belge oluşturma hatası",
+                        description: `Order ${row.order_number}: trackable_job ${jobId} → error: ${errMsg}`,
+                        entity_type: "parasut",
+                        entity_id:   ALERT_ENTITY_PARASUT_E_DOC,
+                        source:      "system",
+                    });
+                } catch (alertErr) {
+                    console.error(JSON.stringify({ parasut_alert_fail: String(alertErr), orderId }));
+                }
+
+                const { error: updErr } = await supabase
+                    .from("sales_orders")
+                    .update({
+                        parasut_e_document_status: "error" as ParasutEDocStatus,
+                        parasut_e_document_error:  errMsg,
+                    })
+                    .eq("id", orderId)
+                    .eq("parasut_trackable_job_id", jobId)
+                    .neq("parasut_e_document_status", "done");
+                if (updErr) {
+                    result.errors.push(`${row.order_number}: error update hatası: ${updErr.message}`);
+                }
+                result.error++;
+            } else {
+                // running — DB'de zaten running; gereksiz update yapma
+                result.running++;
+            }
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            result.errors.push(`${row.order_number}: ${msg}`);
+            result.error++;
+        }
+    }
+
+    return result;
 }

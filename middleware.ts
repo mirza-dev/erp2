@@ -11,6 +11,7 @@ const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alert
 const CRON_PATHS = [
     "/api/alerts/ai-suggest",
     "/api/parasut/sync-all",
+    "/api/parasut/poll-e-documents",
     "/api/orders/expire-quotes",
     "/api/orders/check-shipments",
     "/api/quotes/expire",

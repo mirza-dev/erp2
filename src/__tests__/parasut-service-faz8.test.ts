@@ -180,7 +180,10 @@ describe("upsertShipment — idempotent skip", () => {
         expect(mockListRecentShipmentDocuments).not.toHaveBeenCalled();
         expect(mockCreateShipmentDocument).not.toHaveBeenCalled();
         // Advances past shipment to invoice stub
-        expect(result.error).toMatch(/faz 9/i);
+        // Advances past shipment to invoice (will fail because invoice adapter not mocked here)
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ parasut_step: "invoice" }),
+        );
     });
 });
 
@@ -201,7 +204,10 @@ describe("upsertShipment — recovery pagination", () => {
         );
         expect(metaCall).toBeDefined();
         // Advances to invoice stub
-        expect(result.error).toMatch(/faz 9/i);
+        // Advances past shipment to invoice (will fail because invoice adapter not mocked here)
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ parasut_step: "invoice" }),
+        );
     });
 
     it("sayfa 2'de eşleşme → iki sayfa listelenir, create çağrılmaz", async () => {

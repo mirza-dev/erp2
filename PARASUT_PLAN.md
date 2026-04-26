@@ -3,7 +3,7 @@
 ## 🎯 Progress Tracker
 
 **Son güncelleme:** 2026-04-26
-**Durum:** Faz 8 TAMAMEN KAPALI — Faz 9 sırada
+**Durum:** Faz 10 TAMAMEN KAPALI — Faz 11 sırada
 
 ### Faz ilerlemesi
 
@@ -17,7 +17,8 @@
 | 6 | Product upsert (filter[code]) | ✅ Tamamlandı | 2026-04-25 | 1810 test yeşil, TS temiz; serviceEnsureParasutProduct + TTL lease mutex (migration 041) + 19 test |
 | 7 | Claim/lease RPC + deterministik numara + remote lookup | ✅ Tamamlandı | 2026-04-26 | 1824 test yeşil, TS temiz; parasutInvoiceNumberInt + mapCurrency(GBP) + claim/release RPC + stubs(Faz8-10) + 27 test; bulgu fix: claimErr audit trail, retry skipped log, catch DB write |
 | 8 | Shipment document (inflow=false + procurement_number + marker) | ✅ Tamamlandı | 2026-04-26 | 1852 test yeşil, TS temiz; upsertShipment + dbWriteShipmentMeta + durable marker + recovery pagination + 28 test; bulgu fix: marker sırası, alert best-effort, recovery parasutApiCall, orderId context |
-| 9 | Sales invoice (shipment_included=false + warehouse YOK invariant) | ⬜ Başlamadı | — | Stok invariant sandbox gate |
+| 9 | Sales invoice (shipment_included=false + warehouse YOK invariant) | ✅ Tamamlandı | 2026-04-26 | 1880 test yeşil, TS temiz; upsertInvoice + dbWriteInvoiceMeta + computeDueDate + ALERT_ENTITY_PARASUT_INVOICE + 28 test; bulgu fix: yanlış entity_id (a003→a005) |
+| 10 | E-belge create + trackable_job poll + invoice re-read | ✅ Tamamlandı | 2026-04-26 | 1914 test yeşil, TS temiz; upsertEDocument + dbWriteEDocMeta + serviceParasutPollEDocuments (poll CRON) + /api/parasut/poll-e-documents route + middleware CRON_PATHS güncellendi + 35 test (24 faz10 + 9 poll + 2 stale-order); bulgu fix: stale order re-fetch, idempotent guard'lar (.eq jobId.neq status='done'), pending→running map |
 | 10 | E-belge create + trackable_job poll + invoice re-read | ⬜ Başlamadı | — | |
 | 11 | Backend preflight + step-granular manual retry + UI badges | ⬜ Başlamadı | — | |
 | 12 | Gerçek API adapter + sandbox GATE | ⬜ Başlamadı | — | Kullanıcı yapacak (en son) |
@@ -25,9 +26,53 @@
 **Durum legend:** ⬜ Başlamadı · 🟦 Devam ediyor · ✅ Tamamlandı · ⚠️ Bloklu / manuel inceleme
 
 ### Sıradaki adım
-Faz 9 — Sales invoice (shipment_included=false, parasutInvoiceNumberInt, mapCurrency, durable marker, recovery lookup).
+Faz 11 — Backend preflight + step-granular manual retry + UI badges.
 
 ### Son oturum özeti
+- **Faz 10 tamamlandı + bulgu fix (2026-04-26):**
+  - `src/lib/services/parasut-service.ts`: `upsertEDocument` stub → tam implementasyon
+    - `dbWriteEDocMeta(orderId, eDoc)` — id + status='done' + error=null
+    - Idempotent: e_document_id dolu → done; status='skipped' → skipped (erken dön)
+    - Recovery 1: `getSalesInvoiceWithActiveEDocument` — active_e_document varsa meta yaz
+    - Recovery 2: `getTrackableJob` — done/running/error 3 dal; running ve error idempotent guard ile yazılır (.eq jobId .neq status='done')
+    - Type detection: order.parasut_invoice_type override > VKN inbox lookup (10 hane normalize) > e_archive
+    - Manual: status=skipped, create yapılmaz
+    - hasEDocAttemptedBefore + trackable_job_id null → alert + validation error
+    - Marker (validasyonlar geçtikten sonra) + create + trackable_job_id idempotent yazımı
+  - `src/lib/services/parasut-service.ts`: `serviceParasutPollEDocuments()` (yeni)
+    - Bağımsız Poll CRON — claim KULLANMAZ; idempotent DB guard'lar zorunlu
+    - .eq jobId .neq status='done' guard tüm yazımlarda
+    - pending → running map + raw_status console.log
+    - done dalında: invoice re-read + meta + step='done' + sync log (source: poll)
+  - `src/app/api/parasut/poll-e-documents/route.ts`: yeni POST route (CRON-only)
+  - `middleware.ts`: CRON_PATHS'a `/api/parasut/poll-e-documents` eklendi
+  - `serviceSyncOrderToParasut`: invoice→edoc geçişinde order re-fetch (stale snapshot fix)
+  - **Bulgu fix (2026-04-26):**
+    - HIGH: Fresh sync invoice sonrası edoc adımı stale snapshot yüzünden validation fail oluyordu → orchestrator invoice→edoc'da `dbGetOrderById` ile re-fetch
+    - HIGH: Bağımsız Poll CRON yoktu → `/api/parasut/poll-e-documents` route + service + middleware güncellemesi
+    - MEDIUM/HIGH: trackable_job update'leri idempotent guard ile korunmuyordu → tüm running/error/job_id yazımlarına .eq jobId .neq status='done' guard eklendi
+    - MEDIUM: pending → running map + raw_status metadata log davranışı yoktu → poll service'inde implementasyon
+    - VKN normalize: tax_number boşluk/tire içerse de 10 hane sayısal olduğunda VKN sayılır (`replace(/\D/g, '')`)
+  - `src/__tests__/parasut-service-faz10.test.ts`: 25 test (idempotent skip, recovery 1/2, type detection, manual, marker, validation)
+  - `src/__tests__/parasut-service-poll-edocs.test.ts`: 9 test (disabled guard, done/running/error dalları, raw_status log, multi-row)
+  - **1914 test yeşil, 98 dosya, TS clean**
+
+- **Faz 9 tamamlandı + bulgu fix (2026-04-26):**
+  - `src/lib/services/parasut-service.ts`: `upsertInvoice` stub → tam implementasyon
+    - `computeDueDate(issueDate, paymentTermsDays)` — UTC-safe, payment_terms_days ?? 30
+    - `dbWriteInvoiceMeta(orderId, invoice, series, numberInt)` — invoice_id/no/series/number_int/synced_at/error=null + legacy `parasut_sent_at`
+    - Idempotent: `parasut_invoice_id` dolu → erken dön
+    - Fast lookup: `findSalesInvoicesByNumber(series, numberInt)` — parasutApiCall wrapper, deterministik unique
+    - `hasInvoiceAttemptedBefore` + lookup negatif → alert best-effort (`ALERT_ENTITY_PARASUT_INVOICE`) + validation error
+    - Marker: ürün validasyonları geçtikten sonra, create öncesi (Faz 8 marker pattern)
+    - `createSalesInvoice`: `shipment_included=false`, warehouse YOK (stok invariant), vat_rate/discount/product_id
+    - `ALERT_ENTITY_PARASUT_INVOICE` yeni sabit (`a005`) eklendi `parasut-constants.ts`'e
+  - **Bulgu fix (2026-04-26):**
+    - MEDIUM: invoice alert `entity_id` yanlışlıkla `ALERT_ENTITY_PARASUT_SHIPMENT` (a003) kullanıyordu → `ALERT_ENTITY_PARASUT_INVOICE` (a005) eklendi ve kullanıma alındı (dedup category karışması kapatıldı)
+  - `src/__tests__/parasut-service-faz9.test.ts`: 28 test
+  - `src/lib/parasut-constants.ts`: `ALERT_ENTITY_PARASUT_INVOICE` eklendi
+  - **1880 test yeşil, 96 dosya, TS clean**
+
 - **Faz 8 tamamlandı + bulgu fix (2026-04-26):**
   - `src/lib/services/parasut-service.ts`: `upsertShipment` stub → tam implementasyon
     - `dbWriteShipmentMeta(orderId, ship)` — shipment_document_id + synced_at + error=null

@@ -3,19 +3,19 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-25_
 
-**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 8 — Shipment document (2026-04-26)
+**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 10 — E-belge (2026-04-26)
 
-`upsertShipment` implementasyonu: idempotent check → recovery pagination (max 5 sayfa, local filter) → hasAttemptedBefore → alert + validation error → durable marker write → `createShipmentDocument` (inflow=false, procurement_number, city/district/address) → `dbWriteShipmentMeta`.
-- Test: 26 yeni test; 1850 test yeşil (95 dosya)
+`upsertEDocument` + bağımsız Poll CRON: idempotent skip → recovery 1 (active_e_document) → recovery 2 (trackable_job, idempotent guard'lı) → type detection (VKN inbox > e_archive, normalize) → manual skip → marker + create + job_id yazımı. Yeni: `serviceParasutPollEDocuments`, `/api/parasut/poll-e-documents` CRON route, middleware CRON_PATHS güncellendi. Bulgu fix: stale order re-fetch (invoice→edoc), idempotent guard'lar (`.eq jobId .neq status='done'`), pending→running map, VKN whitespace normalize.
+- Test: 35 yeni test (24 faz10 + 9 poll + 2 stale); 1914 test yeşil (98 dosya)
 
-**Sıradaki:** Faz 9 — Sales Invoice (shipment_included=false, parasutInvoiceNumberInt, mapCurrency)
+**Sıradaki:** Faz 11 — Backend preflight + step-granular manual retry + UI badges
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 95 dosya · 1852 vitest (hepsi yeşil)
+**Test sayısı:** 98 dosya · 1914 vitest (hepsi yeşil)
 
 ---
 
