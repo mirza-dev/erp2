@@ -14,15 +14,46 @@ const mockDbCreateSyncLog   = vi.fn();
 const mockDbCreateAlert     = vi.fn();
 const mockRpc               = vi.fn();
 
-// Update zinciri: .update().eq() veya .update().eq().eq().neq() (yeni idempotent guard'lı yazımlar)
-// chainProxy hem .eq()/.neq() chain destekler hem awaitable (thenable) — sonuç sıralı pendingResults'tan tüketilir
+// Update zinciri: .update().eq()/.neq()/.select() destekli chainProxy
+// pendingUpdateResults sıralı tüketilir; .select() ayrıca data: [{id}] döner
 const pendingUpdateResults: Array<{ error: null | { message: string } }> = [];
+// Re-read için .from().select().eq().single() sonuçları
+const pendingRereadResults: Array<{ data: { parasut_e_document_status?: string } | null; error: null | { message: string } }> = [];
+
+// dbWriteEDocMeta .select("id") dönüş verisini test başına kontrol et (boş dizi = 0 satır)
+const pendingUpdateSelectRows: Array<Array<{ id: string }>> = [];
+
+function selectResultProxy(): unknown {
+    return new Proxy({}, {
+        get(_t, prop) {
+            if (prop === "eq" || prop === "neq") return () => selectResultProxy();
+            if (prop === "then") {
+                const next = pendingUpdateResults.shift();
+                if (next?.error) {
+                    const p = Promise.resolve({ data: null, error: next.error });
+                    return p.then.bind(p);
+                }
+                const rows = pendingUpdateSelectRows.shift() ?? [{ id: "order-1" }];
+                const p = Promise.resolve({ data: rows, error: null });
+                return p.then.bind(p);
+            }
+            if (prop === "catch") {
+                const p = Promise.resolve({ data: [{ id: "order-1" }], error: null });
+                return p.catch.bind(p);
+            }
+            return undefined;
+        },
+    });
+}
 
 function chainProxy(): unknown {
     return new Proxy({}, {
         get(_t, prop) {
             if (prop === "eq" || prop === "neq") {
                 return () => chainProxy();
+            }
+            if (prop === "select") {
+                return () => selectResultProxy();
             }
             if (prop === "then") {
                 const next = pendingUpdateResults.shift() ?? { error: null };
@@ -32,6 +63,21 @@ function chainProxy(): unknown {
             if (prop === "catch") {
                 const p = Promise.resolve(pendingUpdateResults[0] ?? { error: null });
                 return p.catch.bind(p);
+            }
+            return undefined;
+        },
+    });
+}
+
+// Re-read mock: from().select().eq().single()
+function rereadProxy(): unknown {
+    return new Proxy({}, {
+        get(_t, prop) {
+            if (prop === "eq" || prop === "neq") return () => rereadProxy();
+            if (prop === "single") {
+                return () => Promise.resolve(
+                    pendingRereadResults.shift() ?? { data: { parasut_e_document_status: "done" }, error: null },
+                );
             }
             return undefined;
         },
@@ -95,7 +141,7 @@ vi.mock("@/lib/parasut", () => ({
 
 vi.mock("@/lib/supabase/service", () => ({
     createServiceClient: () => ({
-        from: () => ({ update: mockUpdate }),
+        from: () => ({ update: mockUpdate, select: () => rereadProxy() }),
         rpc:  mockRpc,
     }),
 }));
@@ -169,6 +215,8 @@ const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
     vi.clearAllMocks();
     pendingUpdateResults.length = 0;
+    pendingUpdateSelectRows.length = 0;
+    pendingRereadResults.length = 0;
     saved.PARASUT_ENABLED = process.env.PARASUT_ENABLED;
     process.env.PARASUT_ENABLED = "true";
 
@@ -603,6 +651,48 @@ describe("upsertEDocument — parasutApiCall context", () => {
 
         expect(mockCreateEArchive).toHaveBeenCalledTimes(1);
         // Wrapper'dan geçtiğinin dolaylı kanıtı: PARASUT_ENABLED guard görür (devre dışı senaryosunda fonksiyon hiç çağrılmaz)
+    });
+});
+
+// ─── dbWriteEDocMeta — 0 satır guard durumu ──────────────────────────────────
+
+describe("dbWriteEDocMeta — 0 satır guard durumu", () => {
+    it("poll zaten 'done' yazdıysa (0 satır güncellendi) → güvenli, markStepDone çağrılır", async () => {
+        mockDbGetOrderById.mockResolvedValue(makeOrder());
+        mockGetSalesInvoiceWithActiveEDocument.mockResolvedValue(
+            makeFreshInvoice(makeEDoc("poll-wrote-this")),
+        );
+        // dbWriteEDocMeta .select() → 0 satır güncellendi
+        pendingUpdateSelectRows.push([]);
+        // re-read: poll zaten 'done' yazmış — güvenli geç
+        pendingRereadResults.push({ data: { parasut_e_document_status: "done" }, error: null });
+
+        const result = await serviceSyncOrderToParasut("order-1");
+
+        expect(result.success).toBe(true);
+        expect(mockUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ parasut_step: "done" }),
+        );
+    });
+
+    it("0 satır güncellendi + durum 'done' değil → server error, markStepDone çağrılmaz", async () => {
+        mockDbGetOrderById.mockResolvedValue(makeOrder());
+        mockGetSalesInvoiceWithActiveEDocument.mockResolvedValue(
+            makeFreshInvoice(makeEDoc("edoc-x")),
+        );
+        // dbWriteEDocMeta .select() → 0 satır güncellendi
+        pendingUpdateSelectRows.push([]);
+        // re-read: beklenmedi durum (örn. poll hata yazmış)
+        pendingRereadResults.push({ data: { parasut_e_document_status: "error" }, error: null });
+
+        const result = await serviceSyncOrderToParasut("order-1");
+
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/0 satır güncellendi/i);
+        const stepDoneCall = mockUpdate.mock.calls.find(
+            (c: unknown[]) => (c[0] as Record<string, unknown>)?.parasut_step === "done",
+        );
+        expect(stepDoneCall).toBeUndefined();
     });
 });
 

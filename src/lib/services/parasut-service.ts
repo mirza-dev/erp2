@@ -704,10 +704,10 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
 // ── Faz 10: E-Belge ──────────────────────────────────────────
 
 async function dbWriteEDocMeta(orderId: string, eDoc: ParasutEDocument, jobId?: string): Promise<void> {
-    // Idempotent guard: Poll CRON `parasut_claim_sync` kullanmadığı için sync ile paralel çalışabilir
-    // → her done yazımı `parasut_e_document_status != 'done'` filtresi ile, jobId varsa ek olarak job_id eşleşmesi.
+    // Idempotent guard: Poll CRON `parasut_claim_sync` kullanmadığı için sync ile paralel çalışabilir.
+    // .select("id") ile güncellenen satırları döndür — 0 satır = guard nedeniyle atlandı.
     const supabase = createServiceClient();
-    let q = supabase
+    const base = supabase
         .from("sales_orders")
         .update({
             parasut_e_document_id:     eDoc.id,
@@ -716,9 +716,26 @@ async function dbWriteEDocMeta(orderId: string, eDoc: ParasutEDocument, jobId?: 
         })
         .eq("id", orderId)
         .neq("parasut_e_document_status", "done");
-    if (jobId) q = q.eq("parasut_trackable_job_id", jobId);
-    const { error } = await q;
+    const filtered = jobId ? base.eq("parasut_trackable_job_id", jobId) : base;
+    const { data, error } = await filtered.select("id");
     if (error) throw new Error(`dbWriteEDocMeta hatası: ${error.message}`);
+
+    if (!data || data.length === 0) {
+        // 0 satır güncellendi — guard nedeniyle atlandı. Beklenen tek durum: poll zaten 'done' yazdı.
+        const { data: current, error: readErr } = await supabase
+            .from("sales_orders")
+            .select("parasut_e_document_status")
+            .eq("id", orderId)
+            .single();
+        if (readErr) throw new Error(`dbWriteEDocMeta re-read hatası: ${readErr.message}`);
+        if (current?.parasut_e_document_status !== "done") {
+            throw new ParasutError(
+                "server",
+                `dbWriteEDocMeta: 0 satır güncellendi, beklenen 'done' değil (mevcut status=${current?.parasut_e_document_status})`,
+            );
+        }
+        // status='done' → poll bizi geçti; markStepDone step='done' yazacak, idempotent, güvenli.
+    }
 }
 
 async function upsertEDocument(
