@@ -19,9 +19,12 @@ import {
     type CreateOrderInput,
     type ListOrdersFilter,
     type ApproveOrderResult,
+    type OrderWithLines,
 } from "@/lib/supabase/orders";
 
 import { dbCreateAlert, dbListActiveAlerts, dbBatchResolveAlerts, type BatchResolveEntry } from "@/lib/supabase/alerts";
+import { dbGetCustomerById } from "@/lib/supabase/customers";
+import { dbGetProductById } from "@/lib/supabase/products";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 
@@ -118,6 +121,59 @@ export async function serviceCreateOrder(input: CreateOrderInput) {
     return dbCreateOrder({ ...input, fulfillment_status: "unallocated" });
 }
 
+// ── Faz 11.1: Shipment Preflight ─────────────────────────────
+// Sevk öncesi customer/product güncel okuma + Paraşüt için zorunlu alan kontrolü.
+// Transition fail olursa stok hareketi yapılmaz, sync başlamaz.
+
+const PARASUT_ORDER_NUMBER_REGEX = /^ORD-(\d{4})-(\d+)$/;
+
+export interface PreflightResult {
+    valid: boolean;
+    error?: string;
+}
+
+export async function preflightShipment(order: OrderWithLines): Promise<PreflightResult> {
+    if (!order.customer_id) {
+        return { valid: false, error: "Sipariş müşterisiz sevk edilemez." };
+    }
+
+    const parasutEnabled = process.env.PARASUT_ENABLED === "true";
+    if (!parasutEnabled) {
+        return { valid: true };
+    }
+
+    const customer = await dbGetCustomerById(order.customer_id);
+    if (!customer) {
+        return { valid: false, error: "Sevk için müşteri kaydı bulunamadı." };
+    }
+    if (!customer.tax_number || customer.tax_number.trim() === "") {
+        return { valid: false, error: "Paraşüt için müşteri vergi numarası (tax_number) zorunludur." };
+    }
+
+    if (!PARASUT_ORDER_NUMBER_REGEX.test(order.order_number)) {
+        return {
+            valid: false,
+            error: `Sipariş numarası Paraşüt için uygun değil (beklenen: ORD-YYYY-NNNN): ${order.order_number}`,
+        };
+    }
+
+    for (const line of order.lines) {
+        if (!line.product_id) continue;
+        const product = await dbGetProductById(line.product_id);
+        if (!product) {
+            return {
+                valid: false,
+                error: `Sipariş satırındaki ürün bulunamadı: ${line.product_name || line.product_id}`,
+            };
+        }
+        if (!product.sku || product.sku.trim() === "") {
+            return { valid: false, error: `Paraşüt için ürün SKU eksik: ${product.name}` };
+        }
+    }
+
+    return { valid: true };
+}
+
 // ── Status Transitions ───────────────────────────────────────
 
 export async function serviceTransitionOrder(
@@ -156,17 +212,31 @@ export async function serviceTransitionOrder(
         };
     }
 
-    // ── approved+allocated → shipped: atomic RPC ──
+    // ── approved+allocated → shipped: preflight + atomic RPC ──
     if (transition === "shipped") {
         const order = await dbGetOrderById(orderId);
         if (!order) return { success: false, error: "Sipariş bulunamadı." };
         if (order.commercial_status !== "approved") {
             return { success: false, error: "Yalnızca onaylanmış siparişler sevk edilebilir." };
         }
+
+        // Faz 11.1: Preflight — customer/products güncel okuma + Paraşüt zorunluları.
+        // Fail → stok hareketi yapılmaz, sync başlamaz.
+        const preflight = await preflightShipment(order);
+        if (!preflight.valid) {
+            return { success: false, error: preflight.error };
+        }
+
         const result = await dbShipOrderFull(orderId);
-        if (result.success && process.env.PARASUT_ENABLED === "true") {
+        if (result.success) {
+            // shipped_at her zaman yazılır (Paraşüt'ten bağımsız — sevk tarihi kanonik kaynak).
+            // parasut_step='contact' yalnızca Paraşüt aktifken (sync başlangıç durumu).
             const supabase = createServiceClient();
-            await supabase.from("sales_orders").update({ parasut_step: "contact" }).eq("id", orderId);
+            const patch: Record<string, unknown> = { shipped_at: new Date().toISOString() };
+            if (process.env.PARASUT_ENABLED === "true") {
+                patch.parasut_step = "contact";
+            }
+            await supabase.from("sales_orders").update(patch).eq("id", orderId);
         }
         return { success: result.success, error: result.error };
     }

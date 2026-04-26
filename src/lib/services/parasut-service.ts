@@ -1074,7 +1074,161 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
     }
 }
 
-// ── Retry ────────────────────────────────────────────────────
+// ── Faz 11.2: Step-granular manual retry ─────────────────────
+//
+// Step state machine — her step öncekinin tamamlanmasını gerektirir:
+//   contact:  no dep
+//   product:  customer.parasut_contact_id != null
+//   shipment: tüm ürünlerin parasut_product_id != null
+//   invoice:  parasut_shipment_document_id != null
+//   edoc:     parasut_invoice_id != null
+//
+// step='all' → tüm orchestrator'ı çağırır (idempotent helper'lar zaten skip yapar).
+// step='X'   → dep guard + claim + sadece o step + markStepDone(next) + release.
+
+export type RetryableParasutStep = Exclude<ParasutStep, "done">;
+
+const NEXT_STEP: Record<RetryableParasutStep, ParasutStep> = {
+    contact:  "product",
+    product:  "shipment",
+    shipment: "invoice",
+    invoice:  "edoc",
+    edoc:     "done",
+};
+
+async function checkStepDeps(
+    step: RetryableParasutStep,
+    order: OrderWithLines,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+    if (step === "contact") return { ok: true };
+
+    if (step === "product") {
+        if (!order.customer_id) return { ok: false, error: "Müşteri bilgisi eksik." };
+        const customer = await dbGetCustomerById(order.customer_id);
+        if (!customer?.parasut_contact_id) {
+            return { ok: false, error: "'product' adımı için önce 'contact' tamamlanmalı." };
+        }
+        return { ok: true };
+    }
+
+    if (step === "shipment") {
+        for (const line of order.lines) {
+            if (!line.product_id) continue;
+            const product = await dbGetProductById(line.product_id);
+            if (!product?.parasut_product_id) {
+                return { ok: false, error: "'shipment' adımı için önce tüm 'product' adımları tamamlanmalı." };
+            }
+        }
+        return { ok: true };
+    }
+
+    if (step === "invoice") {
+        if (!order.parasut_shipment_document_id) {
+            return { ok: false, error: "'invoice' adımı için önce 'shipment' tamamlanmalı." };
+        }
+        return { ok: true };
+    }
+
+    // edoc
+    if (!order.parasut_invoice_id) {
+        return { ok: false, error: "'edoc' adımı için önce 'invoice' tamamlanmalı." };
+    }
+    return { ok: true };
+}
+
+export async function serviceRetryParasutStep(
+    orderId: string,
+    step: RetryableParasutStep | "all",
+): Promise<SyncOrderResult> {
+    if (!isParasutEnabled()) return { success: false, error: "Paraşüt entegrasyonu devre dışı." };
+
+    if (step === "all") {
+        return serviceSyncOrderToParasut(orderId);
+    }
+
+    const order = await dbGetOrderById(orderId);
+    if (!order) return { success: false, error: "Sipariş bulunamadı." };
+    if (order.commercial_status !== "approved") {
+        return { success: false, error: "Yalnızca onaylı siparişler için retry yapılabilir." };
+    }
+    if (order.fulfillment_status !== "shipped") {
+        return { success: false, error: "Yalnızca sevk edilmiş siparişler için retry yapılabilir." };
+    }
+    if (!order.customer_id) {
+        return { success: false, error: "Müşteri bilgisi eksik — Paraşüt sync için zorunlu." };
+    }
+
+    const dep = await checkStepDeps(step, order);
+    if (!dep.ok) return { success: false, error: dep.error };
+
+    const supabase = createServiceClient();
+    const owner    = crypto.randomUUID();
+
+    const { data: claimed, error: claimErr } = await supabase.rpc("parasut_claim_sync", {
+        p_order_id:   orderId,
+        p_owner:      owner,
+        p_lease_secs: 300,
+    });
+    if (claimErr) {
+        return { success: false, error: `parasut_claim_sync RPC hatası: ${claimErr.message}` };
+    }
+    if (!claimed) return { success: false, skipped: true, reason: "not_eligible_or_locked" };
+
+    try {
+        if (step === "contact") {
+            await serviceEnsureParasutContact(order.customer_id);
+        } else if (step === "product") {
+            for (const line of order.lines) {
+                if (line.product_id) {
+                    await serviceEnsureParasutProduct(line.product_id);
+                }
+            }
+        } else if (step === "shipment") {
+            await upsertShipment(order);
+        } else if (step === "invoice") {
+            await upsertInvoice(order);
+        } else {
+            // edoc — invoice_id zaten dep guard ile garantili; recovery branch'leri içeride.
+            const refreshed = await dbGetOrderById(orderId);
+            if (!refreshed) {
+                throw new ParasutError("not_found", "Sipariş edoc retry öncesi bulunamadı.");
+            }
+            const eDocResult = await upsertEDocument(refreshed);
+            if (eDocResult.status === "running") {
+                // Poll CRON markStepDone yapacak — orchestrator burada step=edoc bırakır
+                return { success: true };
+            }
+        }
+
+        await markStepDone(orderId, step, NEXT_STEP[step]);
+        return { success: true };
+    } catch (err) {
+        const pe = err instanceof ParasutError ? err : new ParasutError("server", String(err));
+        const patch = classifyAndPatch({ parasut_retry_count: order.parasut_retry_count }, step, pe);
+        try {
+            const { error: patchErr } = await supabase.from("sales_orders").update(patch).eq("id", orderId);
+            if (patchErr) console.error(JSON.stringify({ parasut_patch_fail: patchErr.message, orderId }));
+        } catch (e) { console.error(String(e)); }
+        try {
+            await dbCreateSyncLog({
+                entity_type:   "sales_order",
+                entity_id:     orderId,
+                direction:     "push",
+                status:        "error",
+                step,
+                error_kind:    pe.kind,
+                error_message: pe.message,
+            });
+        } catch { /* best-effort */ }
+        return { success: false, error: pe.message };
+    } finally {
+        try {
+            await supabase.rpc("parasut_release_sync", { p_order_id: orderId, p_owner: owner });
+        } catch { /* best-effort */ }
+    }
+}
+
+// ── Retry (sync log bazlı — eski API geriye dönük) ───────────
 
 export async function serviceRetrySyncLog(syncLogId: string): Promise<SyncOrderResult> {
     if (!isParasutEnabled()) return { success: false, error: "Paraşüt entegrasyonu devre dışı." };

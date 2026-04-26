@@ -34,6 +34,21 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbBatchResolveAlerts: vi.fn().mockResolvedValue(0),
 }));
 
+// Faz 11.1 preflight için müşteri/ürün lookup'ları (Paraşüt off → bunlar çağrılmaz; on senaryosu için default success)
+vi.mock("@/lib/supabase/customers", () => ({
+    dbGetCustomerById: vi.fn().mockResolvedValue({ id: "cust-1", tax_number: "1234567890" }),
+}));
+vi.mock("@/lib/supabase/products", () => ({
+    dbGetProductById: vi.fn().mockResolvedValue({ id: "prod-1", name: "Vana", sku: "VAN-001" }),
+}));
+
+// Service client (parasut_step yazımı için)
+vi.mock("@/lib/supabase/service", () => ({
+    createServiceClient: () => ({
+        from: () => ({ update: vi.fn(() => ({ eq: vi.fn().mockResolvedValue({ error: null }) })) }),
+    }),
+}));
+
 import { serviceTransitionOrder } from "@/lib/services/order-service";
 
 // ── Fixtures ──────────────────────────────────────────────────
@@ -52,8 +67,11 @@ const PENDING_ORDER = {
 
 const APPROVED_ORDER = {
     id: "order-1",
+    order_number: "ORD-2026-0001",
+    customer_id: "cust-1",
     commercial_status: "approved",
     fulfillment_status: "allocated",
+    lines: [{ product_id: "prod-1", product_name: "Vana", quantity: 1 }],
 };
 
 beforeEach(() => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -10,6 +10,42 @@ import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+type ParasutStepKey = "contact" | "product" | "shipment" | "invoice" | "edoc";
+
+interface ParasutStatusPayload {
+    orderNumber:    string;
+    parasutStep:    "contact" | "product" | "shipment" | "invoice" | "edoc" | "done" | null;
+    errorKind:      string | null;
+    error:          string | null;
+    lastFailedStep: string | null;
+    retryCount:     number;
+    nextRetryAt:    string | null;
+    invoiceId:      string | null;
+    invoiceNo:      string | null;
+    invoiceType:    "e_invoice" | "e_archive" | "manual" | null;
+    shipmentDocId:  string | null;
+    eDoc: {
+        status: "running" | "done" | "error" | "skipped" | null;
+        error:  string | null;
+        id:     string | null;
+    };
+    badges: {
+        contactDone:  boolean;
+        productDone:  boolean;
+        shipmentDone: boolean;
+        invoiceDone:  boolean;
+        edocStatus:   "running" | "done" | "error" | "skipped" | null;
+    };
+}
+
+const STEP_LABELS: Record<ParasutStepKey, string> = {
+    contact:  "Müşteri",
+    product:  "Ürün",
+    shipment: "İrsaliye",
+    invoice:  "Fatura",
+    edoc:     "E-Belge",
+};
+
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string; description: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral", description: "Onaya gönderilmedi" },
     pending_approval: { label: "Bekliyor",    cls: "badge-warning", description: "Stok kontrol bekleniyor" },
@@ -104,6 +140,10 @@ export default function OrderDetailPage() {
     const [parasutStatus, setParasutStatus] = useState<ParasutStatus>("idle");
     const [parasutInvoiceId, setParasutInvoiceId] = useState<string | null>(null);
     const [parasutError, setParasutError] = useState<string | null>(null);
+
+    // Faz 11.3 — step badges
+    const [parasutSteps, setParasutSteps] = useState<ParasutStatusPayload | null>(null);
+    const [retryingStep, setRetryingStep] = useState<string | null>(null);
     // Update parasut state when order loads
     useEffect(() => {
         if (order) {
@@ -117,6 +157,50 @@ export default function OrderDetailPage() {
             }
         }
     }, [order]);
+
+    // Faz 11.3 — Paraşüt step badges fetch
+    const fetchParasutStatus = useCallback(async () => {
+        if (!order || order.fulfillment_status !== "shipped") return;
+        try {
+            const res = await fetch(`/api/orders/${order.id}/parasut-status`);
+            if (res.ok) {
+                const data = (await res.json()) as ParasutStatusPayload;
+                setParasutSteps(data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch parasut status:", err);
+        }
+    }, [order]);
+
+    useEffect(() => {
+        fetchParasutStatus();
+    }, [fetchParasutStatus]);
+
+    const handleRetryStep = async (step: "contact" | "product" | "shipment" | "invoice" | "edoc" | "all") => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!order) return;
+        setRetryingStep(step);
+        try {
+            const res = await fetch("/api/parasut/retry", {
+                method:  "POST",
+                headers: { "Content-Type": "application/json" },
+                body:    JSON.stringify({ orderId: order.id, step }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                toast({ type: "success", message: `'${step}' adımı yeniden gönderildi` });
+            } else if (data.skipped) {
+                toast({ type: "info", message: "Başka bir işlem bu siparişi tutuyor; daha sonra tekrar deneyin" });
+            } else {
+                toast({ type: "error", message: data.error || "Adım yeniden denenemedi" });
+            }
+            await fetchParasutStatus();
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Adım yeniden denenemedi" });
+        } finally {
+            setRetryingStep(null);
+        }
+    };
 
     // Sync commercial/fulfillment status when order loads
     useEffect(() => {
@@ -734,6 +818,15 @@ export default function OrderDetailPage() {
                                         invoiceId={parasutInvoiceId}
                                         error={parasutError}
                                     />
+                                    {/* Faz 11.3 — Step badges */}
+                                    {parasutSteps && (
+                                        <ParasutStepBadges
+                                            data={parasutSteps}
+                                            isDemo={isDemo}
+                                            retrying={retryingStep}
+                                            onRetry={handleRetryStep}
+                                        />
+                                    )}
                                 </div>
                             )}
 
@@ -1035,6 +1128,166 @@ function ParasutBadge({
             <div style={{ fontSize: "11px", color: "var(--danger-text)", opacity: 0.8 }}>
                 {error}
             </div>
+        </div>
+    );
+}
+
+// ── Faz 11.3 — Step Badges ────────────────────────────────────
+
+type StepColor = "gray" | "blue" | "green" | "red";
+
+function stepColor(c: StepColor): { bg: string; border: string; text: string; dot: string } {
+    if (c === "green")
+        return { bg: "var(--success-bg)", border: "var(--success-border)", text: "var(--success-text)", dot: "var(--success)" };
+    if (c === "blue")
+        return { bg: "var(--accent-bg)",  border: "var(--accent-border)",  text: "var(--accent-text)",  dot: "var(--accent)" };
+    if (c === "red")
+        return { bg: "var(--danger-bg)",  border: "var(--danger-border)",  text: "var(--danger-text)",  dot: "var(--danger)" };
+    return { bg: "var(--bg-tertiary)",    border: "var(--border-tertiary)", text: "var(--text-tertiary)", dot: "var(--border-primary)" };
+}
+
+function ParasutStepBadges({
+    data,
+    isDemo,
+    retrying,
+    onRetry,
+}: {
+    data:     ParasutStatusPayload;
+    isDemo:   boolean;
+    retrying: string | null;
+    onRetry:  (step: ParasutStepKey | "all") => void;
+}) {
+    const order: ParasutStepKey[] = ["contact", "product", "shipment", "invoice", "edoc"];
+    const isErrorOnStep = (s: ParasutStepKey): boolean =>
+        data.lastFailedStep === s || (s === "edoc" && data.eDoc.status === "error");
+
+    function colorFor(s: ParasutStepKey): StepColor {
+        if (isErrorOnStep(s)) return "red";
+        if (s === "edoc") {
+            if (data.eDoc.status === "done")    return "green";
+            if (data.eDoc.status === "skipped") return "gray";
+            if (data.eDoc.status === "running") return "blue";
+            return "gray";
+        }
+        const done = (
+            (s === "contact"  && data.badges.contactDone) ||
+            (s === "product"  && data.badges.productDone) ||
+            (s === "shipment" && data.badges.shipmentDone) ||
+            (s === "invoice"  && data.badges.invoiceDone)
+        );
+        if (done) return "green";
+        if (data.parasutStep === s) return "blue";
+        return "gray";
+    }
+
+    function labelFor(s: ParasutStepKey): string {
+        const base = STEP_LABELS[s];
+        if (s === "edoc") {
+            if (data.eDoc.status === "done")    return `${base} ✓`;
+            if (data.eDoc.status === "skipped") return `${base} (Manuel)`;
+            if (data.eDoc.status === "running") return `${base}…`;
+            if (data.eDoc.status === "error")   return `${base} ✕`;
+        }
+        if (colorFor(s) === "green") return `${base} ✓`;
+        if (colorFor(s) === "blue")  return `${base}…`;
+        if (colorFor(s) === "red")   return `${base} ✕`;
+        return base;
+    }
+
+    function tooltipFor(s: ParasutStepKey): string {
+        const parts: string[] = [];
+        if (isErrorOnStep(s)) {
+            const msg = s === "edoc" ? data.eDoc.error : data.error;
+            if (msg) parts.push(msg);
+            if (data.errorKind) parts.push(`Tip: ${data.errorKind}`);
+            if (data.nextRetryAt) parts.push(`Sonraki deneme: ${new Date(data.nextRetryAt).toLocaleString("tr-TR")}`);
+            if (data.retryCount > 0) parts.push(`Deneme: ${data.retryCount}`);
+        }
+        return parts.join("\n");
+    }
+
+    return (
+        <div style={{ marginTop: "10px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {order.map((s) => {
+                    const c   = stepColor(colorFor(s));
+                    const err = isErrorOnStep(s);
+                    const tip = tooltipFor(s);
+                    const canRetry = err && !isDemo;
+                    return (
+                        <div
+                            key={s}
+                            title={tip || undefined}
+                            style={{
+                                display:    "inline-flex",
+                                alignItems: "center",
+                                gap:        "6px",
+                                padding:    "5px 8px",
+                                background: c.bg,
+                                border:     `0.5px solid ${c.border}`,
+                                borderRadius: "5px",
+                                fontSize:   "11px",
+                                color:      c.text,
+                                fontWeight: 500,
+                            }}
+                        >
+                            <span
+                                style={{
+                                    width:        "5px",
+                                    height:       "5px",
+                                    borderRadius: "50%",
+                                    background:   c.dot,
+                                }}
+                            />
+                            <span>{labelFor(s)}</span>
+                            {canRetry && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRetry(s)}
+                                    disabled={retrying === s}
+                                    title={isDemo ? DEMO_DISABLED_TOOLTIP : `'${STEP_LABELS[s]}' adımını yeniden dene`}
+                                    style={{
+                                        marginLeft: "2px",
+                                        background: "transparent",
+                                        border:     "none",
+                                        color:      c.text,
+                                        cursor:     retrying === s ? "wait" : "pointer",
+                                        fontSize:   "10px",
+                                        textDecoration: "underline",
+                                        padding:    0,
+                                    }}
+                                >
+                                    {retrying === s ? "…" : "yeniden dene"}
+                                </button>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+            {(data.error || data.eDoc.error) && (
+                <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--danger-text)" }}>
+                    {data.error || data.eDoc.error}
+                </div>
+            )}
+            {!isDemo && (data.parasutStep && data.parasutStep !== "done") && (
+                <button
+                    type="button"
+                    onClick={() => onRetry("all")}
+                    disabled={retrying === "all"}
+                    style={{
+                        marginTop:  "8px",
+                        padding:    "4px 10px",
+                        background: "var(--bg-tertiary)",
+                        border:     "0.5px solid var(--border-secondary)",
+                        borderRadius: "4px",
+                        fontSize:   "11px",
+                        color:      "var(--text-secondary)",
+                        cursor:     retrying === "all" ? "wait" : "pointer",
+                    }}
+                >
+                    {retrying === "all" ? "Senkronize ediliyor…" : "Tüm adımları yeniden dene"}
+                </button>
+            )}
         </div>
     );
 }

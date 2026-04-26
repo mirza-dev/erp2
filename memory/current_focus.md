@@ -4,8 +4,8 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Paraşüt entegrasyonu — Faz 11 sırada (Preflight + manual retry + UI)
-**Önceki:** Faz 10 TAMAMEN KAPALI (2026-04-26)
+**Aktif:** Paraşüt Faz 11 TAMAMEN KAPALI (2026-04-26) — Sıradaki: Faz 12 sandbox gate
+**Önceki:** Faz 10 TAMAMEN KAPALI (2026-04-26, +3 tur bulgu fix)
 
 ---
 
@@ -64,17 +64,29 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ---
 
-## Sıradaki adım — Faz 11
+## Faz 11 (2026-04-26) — TAMAMLANDI
 
-Backend preflight + step-granular manual retry + UI badges:
-1. **`serviceTransitionOrder` preflight** (order-service.ts):
-   - customer + products re-fetch
-   - customer_id null, tax_number null (Paraşüt enabled), SKU eksik, order_number format kontrolleri
-   - Transition başarılı → `shipped_at = now()`, `parasut_step = 'contact'` (başlangıç)
-2. **`POST /api/parasut/retry`** body: `{ orderId, step?: 'contact'|'product'|'shipment'|'invoice'|'edoc'|'all' }`
-   - `Exclude<ParasutStep, 'done'>` retry map
-   - Step state machine
-3. **UI badges:** sipariş listesi/detay sayfasında step + error_kind görünür hale getir
+### 11.1 — Sevk preflight (order-service.ts)
+- `preflightShipment(order)`: customer_id NULL → red; Paraşüt enabled iken customer.tax_number NULL/empty, product SKU empty, order_number `^ORD-(\d{4})-(\d+)$` regex fail → red.
+- `serviceTransitionOrder('shipped')`: preflight başarılıysa `dbShipOrderFull` → `shipped_at=now()` her zaman + `parasut_step='contact'` Paraşüt enabled iken.
+- Test: `order-service-preflight-faz11.test.ts` (15 test).
 
-**Why:** Yeni session'da Claude aktif konuyu eksiksiz bilsin.
-**How to apply:** Faz 10 tamamen kapalı. Faz 11'den devam et.
+### 11.2 — Step-granular manual retry
+- `serviceRetryParasutStep(orderId, step)`:
+  - `step='all'` → `serviceSyncOrderToParasut` (mevcut orchestrator).
+  - `step='X'` → dep guard (contact: dep yok; product: contact_id; shipment: tüm product_id'ler; invoice: shipment_doc_id; edoc: invoice_id) → claim → tek step → markStepDone(NEXT) → release.
+  - `RetryableParasutStep = Exclude<ParasutStep,'done'>`, `NEXT_STEP` map.
+  - eDoc 'running' → markStepDone çağrılmaz (poll bitirir).
+- `POST /api/parasut/retry` body kontratı: `{ orderId, step? }` + geriye dönük `{ sync_log_id }`. `skipped:true` → 200 (400 değil).
+- Test: `parasut-retry-step-faz11.test.ts` (17 test).
+
+### 11.3 — UI step badges
+- `GET /api/orders/[id]/parasut-status` — order + customer + products join; badges (contactDone/productDone/shipmentDone/invoiceDone/edocStatus).
+- `OrderDetailPage` — `ParasutStepBadges` 5 badge (gri/mavi/yeşil/kırmızı), error tooltip (next_retry_at + retry_count), step başına "yeniden dene" butonu (sadece error iken), "Tüm adımları yeniden dene" butonu.
+- Test: `parasut-status-route-faz11.test.ts` (9 test).
+
+### Etkilenen testler
+- `order-service.test.ts`, `DR-5.1-reservation-invariant.test.ts` — Mock'lara customers/products + service client + zenginleştirilmiş APPROVED_ORDER fixture eklendi.
+
+### Final durum
+- 101 dosya · **1958 test yeşil** · TS clean.

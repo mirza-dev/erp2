@@ -1,21 +1,21 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-25_
+_Son güncelleme: 2026-04-26_
 
-**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 10 — E-belge (2026-04-26)
+**Son tamamlanan iş:** Paraşüt entegrasyonu Faz 11 — Preflight + Manual Retry + UI Badges (2026-04-26)
 
-`upsertEDocument` + bağımsız Poll CRON: idempotent skip → recovery 1 (active_e_document) → recovery 2 (trackable_job, idempotent guard'lı) → type detection (VKN inbox > e_archive, normalize) → manual skip → marker + create + job_id yazımı. Yeni: `serviceParasutPollEDocuments`, `/api/parasut/poll-e-documents` CRON route, middleware CRON_PATHS güncellendi. Bulgu fix: stale order re-fetch (invoice→edoc), idempotent guard'lar (`.eq jobId .neq status='done'`), pending→running map, VKN whitespace normalize.
-- Test: 35 yeni test (24 faz10 + 9 poll + 2 stale); 1914 test yeşil (98 dosya)
+11.1: `preflightShipment` (customer/products re-fetch + tax_number/SKU/order_number kontrolleri); başarı → `shipped_at` + `parasut_step='contact'`. 11.2: `serviceRetryParasutStep(orderId, step)` step state machine (dep guard, claim, single-step run, markStepDone→NEXT_STEP, release); `POST /api/parasut/retry` body `{orderId, step?}` (geriye dönük `{sync_log_id}` çalışır). 11.3: `GET /api/orders/[id]/parasut-status` (badges payload); orders/[id] sayfasında `ParasutStepBadges` 5 badge (gri/mavi/yeşil/kırmızı) + step başına ve toplu "yeniden dene" butonu.
+- Test: 41 yeni test (15 preflight + 17 retry-step + 9 status); 101 dosya · 1958 test yeşil · TS clean.
 
-**Sıradaki:** Faz 11 — Backend preflight + step-granular manual retry + UI badges
+**Sıradaki:** Faz 12 — Sandbox GATE: gerçek Paraşüt API ile OAuth, list filtreleri, e-doc trackable_job, stok invariant doğrulamaları (PARASUT_PLAN.md §Faz 12).
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` ve `column_mappings` RLS migration eksik
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 98 dosya · 1914 vitest (hepsi yeşil)
+**Test sayısı:** 101 dosya · 1958 vitest (hepsi yeşil)
 
 ---
 

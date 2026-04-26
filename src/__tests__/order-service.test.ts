@@ -43,6 +43,14 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbBatchResolveAlerts: (...args: unknown[]) => mockDbBatchResolveAlerts(...args),
 }));
 
+// Faz 11.1 preflight için müşteri/ürün lookup'ları default success
+vi.mock("@/lib/supabase/customers", () => ({
+    dbGetCustomerById: vi.fn().mockResolvedValue({ id: "cust-1", tax_number: "1234567890" }),
+}));
+vi.mock("@/lib/supabase/products", () => ({
+    dbGetProductById: vi.fn().mockResolvedValue({ id: "prod-1", name: "Vana", sku: "VAN-001" }),
+}));
+
 const mockParasutUpdateEq = vi.fn().mockResolvedValue({ error: null });
 const mockParasutUpdate   = vi.fn(() => ({ eq: mockParasutUpdateEq }));
 
@@ -57,20 +65,29 @@ import type { CreateOrderInput } from "@/lib/supabase/orders";
 
 const PENDING_ORDER = {
     id: "order-1",
+    order_number: "ORD-2026-0001",
+    customer_id: "cust-1",
     commercial_status: "pending_approval",
     fulfillment_status: "unallocated",
+    lines: [],
 };
 
 const APPROVED_ORDER = {
     id: "order-1",
+    order_number: "ORD-2026-0001",
+    customer_id: "cust-1",
     commercial_status: "approved",
     fulfillment_status: "allocated",
+    lines: [{ product_id: "prod-1", product_name: "Vana", quantity: 1 }],
 };
 
 const DRAFT_ORDER = {
     id: "order-1",
+    order_number: "ORD-2026-0001",
+    customer_id: "cust-1",
     commercial_status: "draft",
     fulfillment_status: "unallocated",
+    lines: [],
 };
 
 // ── beforeEach ────────────────────────────────────────────────
@@ -173,28 +190,33 @@ describe("serviceTransitionOrder — ship (007 fulfillment guard)", () => {
         expect(mockDbShipOrderFull).not.toHaveBeenCalled();
     });
 
-    it("PARASUT_ENABLED=true + başarılı sevk → parasut_step='contact' DB'ye yazılır", async () => {
+    it("PARASUT_ENABLED=true + başarılı sevk → shipped_at + parasut_step='contact' DB'ye yazılır", async () => {
         const saved = process.env.PARASUT_ENABLED;
         process.env.PARASUT_ENABLED = "true";
         try {
             mockDbGetOrderById.mockResolvedValue(APPROVED_ORDER);
             mockDbShipOrderFull.mockResolvedValue({ success: true });
             await serviceTransitionOrder("order-1", "shipped");
-            expect(mockParasutUpdate).toHaveBeenCalledWith({ parasut_step: "contact" });
+            expect(mockParasutUpdate).toHaveBeenCalledWith(
+                expect.objectContaining({ parasut_step: "contact", shipped_at: expect.any(String) }),
+            );
             expect(mockParasutUpdateEq).toHaveBeenCalledWith("id", "order-1");
         } finally {
             process.env.PARASUT_ENABLED = saved;
         }
     });
 
-    it("PARASUT_ENABLED kapalıyken sevk → parasut_step güncellenmez", async () => {
+    it("PARASUT_ENABLED kapalıyken sevk → shipped_at yazılır, parasut_step yazılmaz (Faz 11.1)", async () => {
         const saved = process.env.PARASUT_ENABLED;
         process.env.PARASUT_ENABLED = "false";
         try {
             mockDbGetOrderById.mockResolvedValue(APPROVED_ORDER);
             mockDbShipOrderFull.mockResolvedValue({ success: true });
             await serviceTransitionOrder("order-1", "shipped");
-            expect(mockParasutUpdate).not.toHaveBeenCalled();
+            expect(mockParasutUpdate).toHaveBeenCalledTimes(1);
+            const patch = mockParasutUpdate.mock.calls[0][0] as Record<string, unknown>;
+            expect(patch.shipped_at).toBeTruthy();
+            expect(patch).not.toHaveProperty("parasut_step");
         } finally {
             process.env.PARASUT_ENABLED = saved;
         }
