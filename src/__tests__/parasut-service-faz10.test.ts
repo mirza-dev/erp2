@@ -14,11 +14,13 @@ const mockDbCreateSyncLog   = vi.fn();
 const mockDbCreateAlert     = vi.fn();
 const mockRpc               = vi.fn();
 
-// Update zinciri: .update().eq()/.neq()/.select() destekli chainProxy
+// Update zinciri: .update().eq()/.neq()/.or()/.select() destekli chainProxy
 // pendingUpdateResults sıralı tüketilir; .select() ayrıca data: [{id}] döner
 const pendingUpdateResults: Array<{ error: null | { message: string } }> = [];
 // Re-read için .from().select().eq().single() sonuçları
 const pendingRereadResults: Array<{ data: { parasut_e_document_status?: string } | null; error: null | { message: string } }> = [];
+// chainProxy üzerinde çağrılan .or() argümanlarını izle — NULL guard regresyonu için
+const orFilterCalls: string[] = [];
 
 // dbWriteEDocMeta .select("id") dönüş verisini test başına kontrol et (boş dizi = 0 satır)
 const pendingUpdateSelectRows: Array<Array<{ id: string }>> = [];
@@ -27,6 +29,7 @@ function selectResultProxy(): unknown {
     return new Proxy({}, {
         get(_t, prop) {
             if (prop === "eq" || prop === "neq") return () => selectResultProxy();
+            if (prop === "or") return (s: string) => { orFilterCalls.push(s); return selectResultProxy(); };
             if (prop === "then") {
                 const next = pendingUpdateResults.shift();
                 if (next?.error) {
@@ -51,6 +54,9 @@ function chainProxy(): unknown {
         get(_t, prop) {
             if (prop === "eq" || prop === "neq") {
                 return () => chainProxy();
+            }
+            if (prop === "or") {
+                return (s: string) => { orFilterCalls.push(s); return chainProxy(); };
             }
             if (prop === "select") {
                 return () => selectResultProxy();
@@ -217,6 +223,7 @@ beforeEach(() => {
     pendingUpdateResults.length = 0;
     pendingUpdateSelectRows.length = 0;
     pendingRereadResults.length = 0;
+    orFilterCalls.length = 0;
     saved.PARASUT_ENABLED = process.env.PARASUT_ENABLED;
     process.env.PARASUT_ENABLED = "true";
 
@@ -638,6 +645,28 @@ describe("upsertEDocument — yeni job create", () => {
             (c: unknown[]) => (c[0] as Record<string, unknown>)?.parasut_step === "done",
         );
         expect(stepDoneCall).toBeUndefined();
+    });
+
+    it("NULL e_document_status guard regresyon: .neq yerine .or(is.null,neq.done) kullanılır", async () => {
+        // Yeni e-doc oluşturma yolu: status NULL (fresh order). Eğer guard sadece .neq('done') olsaydı
+        // PostgREST `NULL != 'done'` → NULL → satır eşleşmez → trackable_job_id YAZILMAZDI.
+        // Doğru semantik: IS DISTINCT FROM 'done' → OR(is.null, neq.done)
+        mockDbGetOrderById.mockResolvedValue(makeOrder({
+            parasut_invoice_type:      "e_archive",
+            parasut_e_document_status: null,
+        }));
+
+        await serviceSyncOrderToParasut("order-1");
+
+        // Yeni job yazımı için OR filtresi çağrıldı
+        expect(orFilterCalls).toContain(
+            "parasut_e_document_status.is.null,parasut_e_document_status.neq.done",
+        );
+        // En az 1 update (job_id + running) yazımında bu OR çağrıldı
+        const orCount = orFilterCalls.filter(
+            (s) => s === "parasut_e_document_status.is.null,parasut_e_document_status.neq.done",
+        ).length;
+        expect(orCount).toBeGreaterThanOrEqual(1);
     });
 });
 

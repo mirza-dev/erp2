@@ -706,6 +706,8 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
 async function dbWriteEDocMeta(orderId: string, eDoc: ParasutEDocument, jobId?: string): Promise<void> {
     // Idempotent guard: Poll CRON `parasut_claim_sync` kullanmadığı için sync ile paralel çalışabilir.
     // .select("id") ile güncellenen satırları döndür — 0 satır = guard nedeniyle atlandı.
+    // SQL'de `NULL != 'done'` NULL'a eval olur (FALSE değil) → NULL satırlar `.neq` ile eşleşmez.
+    // Recovery 1'de status sıklıkla NULL → IS DISTINCT FROM semantiği için OR ile NULL'u kapsa.
     const supabase = createServiceClient();
     const base = supabase
         .from("sales_orders")
@@ -715,7 +717,7 @@ async function dbWriteEDocMeta(orderId: string, eDoc: ParasutEDocument, jobId?: 
             parasut_e_document_error:  null,
         })
         .eq("id", orderId)
-        .neq("parasut_e_document_status", "done");
+        .or("parasut_e_document_status.is.null,parasut_e_document_status.neq.done");
     const filtered = jobId ? base.eq("parasut_trackable_job_id", jobId) : base;
     const { data, error } = await filtered.select("id");
     if (error) throw new Error(`dbWriteEDocMeta hatası: ${error.message}`);
@@ -797,13 +799,14 @@ async function upsertEDocument(
         }
 
         if (job.status === "running") {
-            // Idempotent guard: poll CRON paralel çalışıp 'done' yazmış olabilir → 'done'u 'running'e ezme
+            // Idempotent guard: poll CRON paralel çalışıp 'done' yazmış olabilir → 'done'u 'running'e ezme.
+            // NULL satırları kapsamak için OR (NULL != 'done' → NULL → WHERE false).
             const { error: dbErr } = await supabase
                 .from("sales_orders")
                 .update({ parasut_e_document_status: "running" as ParasutEDocStatus })
                 .eq("id", orderId)
                 .eq("parasut_trackable_job_id", order.parasut_trackable_job_id!)
-                .neq("parasut_e_document_status", "done");
+                .or("parasut_e_document_status.is.null,parasut_e_document_status.neq.done");
             if (dbErr) throw new Error(`e-doc running update hatası: ${dbErr.message}`);
             return { status: "running" };
         }
@@ -823,7 +826,7 @@ async function upsertEDocument(
         } catch (alertErr) {
             console.error(JSON.stringify({ parasut_alert_fail: String(alertErr), orderId }));
         }
-        // Idempotent guard: aynı sebep — done state'i ezmesin
+        // Idempotent guard: done state'i ezmesin; NULL'u kapsa (NULL != 'done' → NULL).
         const { error: dbErr } = await supabase
             .from("sales_orders")
             .update({
@@ -832,7 +835,7 @@ async function upsertEDocument(
             })
             .eq("id", orderId)
             .eq("parasut_trackable_job_id", order.parasut_trackable_job_id!)
-            .neq("parasut_e_document_status", "done");
+            .or("parasut_e_document_status.is.null,parasut_e_document_status.neq.done");
         if (dbErr) throw new Error(`e-doc error update hatası: ${dbErr.message}`);
         throw new ParasutError("server", `E-belge job hatası: ${errMsg}`);
     }
@@ -923,7 +926,9 @@ async function upsertEDocument(
             () => adapter.createEArchive(invoiceId, { issue_date: issueDate, internet_sale: false }),
         );
 
-    // Idempotent guard: paralel poll CRON arada done yazmış olabilir → done'u ezme
+    // Idempotent guard: paralel poll CRON arada done yazmış olabilir → done'u ezme.
+    // KRİTİK: Yeni job yazımında order.parasut_e_document_status NULL (fresh) → `.neq('done')`
+    // satırı eşleştirmez (SQL: NULL != 'done' → NULL). NULL'u kapsamak için OR.
     const { error: jobErr } = await supabase
         .from("sales_orders")
         .update({
@@ -931,7 +936,7 @@ async function upsertEDocument(
             parasut_e_document_status: "running" as ParasutEDocStatus,
         })
         .eq("id", orderId)
-        .neq("parasut_e_document_status", "done");
+        .or("parasut_e_document_status.is.null,parasut_e_document_status.neq.done");
     if (jobErr) throw new Error(`e-doc trackable_job_id yazılamadı: ${jobErr.message}`);
 
     return { status: "running" };

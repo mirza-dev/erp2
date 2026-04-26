@@ -53,7 +53,14 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **ORTA** — `dbWriteEDocMeta` (line 706) sadece `.eq("id", orderId)` ile yazıyordu → idempotent guard eklendi: `.neq("parasut_e_document_status", "done")` her zaman; `jobId` parametresi varsa ek olarak `.eq("parasut_trackable_job_id", jobId)`. Recovery 2 done branch (line 773) artık jobId ile çağırıyor. Recovery 1 (active_e_document) jobId'siz çağırıyor (sadece status guard yeterli).
 - **DÜŞÜK/ORTA** — Poll'de unknown/pending status'u sadece `console.log` yazıyordu; plan PARASUT_PLAN.md:1031 `metadata.raw_status` istiyordu → `dbCreateSyncLog` ile `metadata: { raw_status, source: "poll", note: "unknown_status_mapped_to_running" }` eklendi (best-effort try/catch).
 - **DÜŞÜK** — Poll catch block'unda `result.error++` eksikti → CRON çıktısı `error: 0` ama `errors[]` dolu olabiliyordu. Eklendi.
-- 98 dosya · 1914 test yeşil, TS clean.
+
+### Faz 10 ek bulgu fix (2026-04-26, 3. tur)
+- **ORTA** — `dbWriteEDocMeta` 0 satır güncellendiğinde sessiz başarı sayılıyordu → markStepDone yanlış 'done' yazabilirdi. `.select("id")` ile etkilenen satır kontrolü; 0 satırda DB re-read; status='done' değilse `ParasutError` fırlat → markStepDone tetiklenmez. +2 test (poll-beat-us / unexpected state).
+- **YÜKSEK (KRİTİK)** — `.neq("parasut_e_document_status", "done")` SQL'de NULL satırları kapsamıyor (`NULL != 'done'` → NULL → WHERE false). Yeni e-doc create akışında status başlangıçta NULL → guard yüzünden `parasut_trackable_job_id` HİÇ yazılmazdı → next sync attempted_marker var + job_id yok → manuel review hatası (sistem çıkmaza girerdi). 4 yer fix: dbWriteEDocMeta, recovery 2 running/error, yeni job yazımı. `.or("parasut_e_document_status.is.null,parasut_e_document_status.neq.done")` ile IS DISTINCT FROM semantiği. +1 regresyon test (orFilterCalls assertion).
+
+**Test:** 98 dosya · 1917 test yeşil, TS clean.
+
+**Domain kuralı:** PostgREST'te nullable column'a `.neq("X")` filtresi NULL satırları içermez. NULL'u kapsamak için `.or("col.is.null,col.neq.X")` kullan.
 
 ---
 
