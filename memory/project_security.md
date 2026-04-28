@@ -2,8 +2,8 @@
 name: KokpitERP — Güvenlik ve Demo Mode
 description: RLS, auth middleware, demo mode mimarisi, credential güvenliği, audit fix durumu
 type: project
+originSessionId: 9b856903-3698-4fae-92be-9c687d469cdf
 ---
-
 ## Supabase RLS
 
 Tüm 23 tablo için Row Level Security aktif.
@@ -87,4 +87,4 @@ Tüm rotalar için (`/:path*`):
 
 Son kalan ertelenen:
 - M-3: Rate limiting — Vercel KV / upstash, altyapı kararı gerekiyor
-- `purchase_commitments` + `column_mappings` RLS migration eksik (düşük öncelik)
+- `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)

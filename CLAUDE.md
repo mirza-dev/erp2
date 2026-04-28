@@ -1,22 +1,25 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-27_
+_Son güncelleme: 2026-04-29_
 
-**Son tamamlanan iş:** Paraşüt Faz 11 + bulgular 2. tur (2026-04-27)
+**Son tamamlanan iş:** Paraşüt Faz 11 bulgular 3. tur (2026-04-29) — KAPALI
 
-Faz 11.1 preflight + 11.2 step-granular retry + 11.3 step badges (önceki tur).
-**Bulgular 2. tur fix (bu tur):** 11.4 Dashboard (stats route'a byStep/byErrorKind/token; dashboard'a token durumu, dağılım kartları, sync log step/error_kind kolon + filtre), 11.5 Settings (OAuth token durumu + Bağlan + Yenile + yeni `POST /api/parasut/oauth/refresh` admin-only), M1 (post-ship update error yutulmuyor), M2 (badge tooltip son 24h deneme — `dbCountRecentSyncLogsByStep`), M/L (her badge için Yeniden Dene), LOW (`upsertInvoice` invariant ihlali → `ALERT_ENTITY_PARASUT_STOCK_INVARIANT`).
-- Test: +12 yeni test (4 stats + 3 invariant + 2 attempts + 3 update-error); 103 dosya · 1970 test yeşil · TS clean.
+**Bulgular 3. tur fix:**
+- **HIGH→MEDIUM (retry regression):** `serviceRetryParasutStep`'e `parasut_step='done'` guard eklendi — RPC'den bağımsız servis katmanı koruması. UI'da `canRetry` done (yeşil) ve edoc skipped badge'lerde `false`; yanıltıcı "başka işlem tutuyor" toastı ortadan kalktı.
+- **MEDIUM (OAuth false-success):** `POST /api/parasut/oauth/refresh` içindeki `expires_at` update hatası artık `throw` ediyor → `success:true` false-success imkansız.
+- **MEDIUM (intermediate step regression):** `serviceRetryParasutStep`'e `STEP_ORDER` map guard eklendi — `parasut_step='invoice'` iken `step='contact'` gibi geri adım istekleri servis katmanında bloklanıyor (RPC çağrılmadan).
+- +5 test: 3 `parasut-retry-step-faz11.test.ts` + yeni `parasut-oauth-refresh.test.ts` (2 test).
+- **104 dosya · 1975 test yeşil · TS clean.**
 
 **Sıradaki:** Faz 12 — Sandbox GATE: gerçek Paraşüt API ile OAuth, list filtreleri, e-doc trackable_job, stok invariant doğrulamaları (PARASUT_PLAN.md §Faz 12).
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
-- `purchase_commitments` ve `column_mappings` RLS migration eksik
+- `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY eklendi ✅ (explicit policy yok; proje genelinde aynı pattern — tüm erişim service_role'den)
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 103 dosya · 1970 vitest (hepsi yeşil)
+**Test sayısı:** 104 dosya · 1975 vitest (hepsi yeşil)
 
 ---
 

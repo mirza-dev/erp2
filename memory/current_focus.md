@@ -4,8 +4,8 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Paraşüt Faz 11 TAMAMEN KAPALI (2026-04-26) — Sıradaki: Faz 12 sandbox gate
-**Önceki:** Faz 10 TAMAMEN KAPALI (2026-04-26, +3 tur bulgu fix)
+**Aktif:** Faz 12 sandbox gate — gerçek Paraşüt API ile OAuth, e-doc, stok invariant doğrulamaları
+**Önceki:** Faz 11 bulgular 3. tur KAPALI (2026-04-29)
 
 ---
 

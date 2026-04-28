@@ -1217,10 +1217,11 @@ function ParasutStepBadges({
                     const c   = stepColor(colorFor(s));
                     const err = isErrorOnStep(s);
                     const tip = tooltipFor(s);
-                    // Plan: her badge için "Yeniden Dene". Dep guard backend'de;
-                    // UI butonu demo dışında her badge'de görünür. Done/skipped olsa bile
-                    // (re-sync isteği makul). retrying state ile loading.
-                    const canRetry = !isDemo;
+                    const color = colorFor(s);
+                    const canRetry =
+                        !isDemo &&
+                        color !== "green" &&
+                        !(s === "edoc" && data.eDoc.status === "skipped");
                     return (
                         <div
                             key={s}

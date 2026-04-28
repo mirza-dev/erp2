@@ -263,6 +263,39 @@ describe("serviceRetryParasutStep — eligibility", () => {
         expect(r.success).toBe(false);
         expect(r.skipped).toBe(true);
     });
+
+    it("parasut_step='done' → RPC çağrılmadan erken hata döner", async () => {
+        mockDbGetOrderById.mockResolvedValue({ ...baseOrder, parasut_step: "done" });
+        const r = await serviceRetryParasutStep(ORDER_ID, "contact");
+        expect(r.success).toBe(false);
+        expect(r.error).toMatch(/zaten tamamlanmış/);
+        expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it("parasut_step='invoice' + step='contact' → RPC çağrılmadan bloklanır", async () => {
+        mockDbGetOrderById.mockResolvedValue({
+            ...baseOrder,
+            parasut_step: "invoice",
+            parasut_shipment_document_id: "sh-1",
+        });
+        const r = await serviceRetryParasutStep(ORDER_ID, "contact");
+        expect(r.success).toBe(false);
+        expect(r.error).toMatch(/zaten geçildi/);
+        expect(mockRpc).not.toHaveBeenCalled();
+    });
+
+    it("parasut_step='invoice' + step='invoice' → step order guard geçer, RPC çağrılır", async () => {
+        mockDbGetOrderById.mockResolvedValue({
+            ...baseOrder,
+            parasut_step: "invoice",
+            parasut_shipment_document_id: "sh-1",
+        });
+        mockDbGetCustomerById.mockResolvedValue({ ...baseCustomer, parasut_contact_id: "ct-1" });
+        mockDbGetProductById.mockResolvedValue({ ...baseProduct, parasut_product_id: "pr-1" });
+        await serviceRetryParasutStep(ORDER_ID, "invoice");
+        // Kilit alındı = guard bloklamadı (done guard da step order guard da devreye girmedi)
+        expect(mockRpc).toHaveBeenCalledWith("parasut_claim_sync", expect.any(Object));
+    });
 });
 
 // ─── serviceRetryParasutStep — step='all' ────────────────────────────────────

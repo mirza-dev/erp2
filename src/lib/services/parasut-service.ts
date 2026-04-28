@@ -1188,6 +1188,25 @@ export async function serviceRetryParasutStep(
         return { success: false, error: "Müşteri bilgisi eksik — Paraşüt sync için zorunlu." };
     }
 
+    if (order.parasut_step === "done") {
+        return { success: false, error: "Sipariş Paraşüt senkronizasyonu zaten tamamlanmış." };
+    }
+
+    // Step order guard: geçmiş adımlara retry state'i geriye düşürür.
+    const STEP_ORDER: Record<ParasutStep, number> = {
+        contact: 0, product: 1, shipment: 2, invoice: 3, edoc: 4, done: 5,
+    };
+    if (order.parasut_step !== null) {
+        const currentOrder   = STEP_ORDER[order.parasut_step as ParasutStep] ?? -1;
+        const requestedOrder = STEP_ORDER[step];
+        if (currentOrder > requestedOrder) {
+            return {
+                success: false,
+                error: `'${step}' adımı zaten geçildi (mevcut durum: ${order.parasut_step}). Geçmiş adımlara retry yapılamaz.`,
+            };
+        }
+    }
+
     const dep = await checkStepDeps(step, order);
     if (!dep.ok) return { success: false, error: dep.error };
 

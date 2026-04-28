@@ -55,10 +55,11 @@ export async function POST(): Promise<NextResponse> {
 
         // Buffer'ı bypass et: expires_at'i geçmişe çek → getAccessToken refresh'i tetikleyecek.
         const oldExpiresAt = row.expires_at as string;
-        await supabase
+        const { error: updateErr } = await supabase
             .from("parasut_oauth_tokens")
             .update({ expires_at: new Date(0).toISOString() })
             .eq("singleton_key", "default");
+        if (updateErr) throw new Error(`Token expiry güncelleme hatası: ${updateErr.message}`);
 
         try {
             await getAccessToken(getParasutAdapter());
