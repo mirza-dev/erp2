@@ -67,6 +67,24 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
 
     let created = 0;
     const toResolve: BatchResolveEntry[] = [];
+
+    // Orphan cleanup — aktif ürün setinde olmayan uyarıları resolve et.
+    // Sebep: ürün silinince (hard delete) ya da is_active=false yapılınca,
+    // ona bağlı stok/sipariş tabanlı uyarılar geçersiz kalıyor; liste çöp doluyor.
+    const activeProductIds = new Set(products.map(p => p.id));
+    const ORPHAN_TARGET_TYPES = ["stock_critical", "stock_risk", "order_deadline", "order_shortage"] as const;
+    for (const a of activeAlerts) {
+        if (
+            a.entity_type === "product" &&
+            a.entity_id &&
+            !activeProductIds.has(a.entity_id) &&
+            (ORPHAN_TARGET_TYPES as readonly string[]).includes(a.type)
+        ) {
+            toResolve.push({ type: a.type, entityId: a.entity_id, reason: "product_deleted_or_deactivated" });
+            // activeMap'ten de düş ki sonraki create akışları yanılmasın.
+            activeMap.delete(`${a.type}:${a.entity_id}`);
+        }
+    }
     // Deferred creates for severity-change cases (resolved first, then created)
     const toCreate: Parameters<typeof dbCreateAlert>[0][] = [];
 
