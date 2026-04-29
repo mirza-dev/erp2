@@ -67,6 +67,10 @@ const ALERT_TYPE_LABEL: Record<string, string> = {
     stock_risk:           "Stok Uyarısı",
     order_shortage:       "Sipariş Eksik",
     purchase_recommended: "Satın Alma Önerisi",
+    quote_expired:        "Teklif Süresi Geçti",
+    overdue_shipment:     "Geciken Sevkiyat",
+    order_deadline:       "Sipariş Teslim Riski",
+    sync_issue:           "Paraşüt Senkron Hatası",
 };
 
 // ── useIsMobile ────────────────────────────────────────────────
@@ -306,11 +310,11 @@ export default function AlertsPage() {
         }
 
         if (failedCount > 0 && succeeded.length > 0) {
-            toast({ type: "warning", message: `${succeeded.length} yoksayıldı, ${failedCount} işlem başarısız` });
+            toast({ type: "warning", message: `${succeeded.length} uyarı yoksayıldı (24 saat boyunca yeniden açılmaz). ${failedCount} işlem başarısız.` });
         } else if (failedCount > 0) {
             toast({ type: "error", message: "Yoksayma işlemi başarısız" });
         } else {
-            toast({ type: "info", message: `${succeeded.length} uyarı yoksayıldı` });
+            toast({ type: "info", message: `${succeeded.length} uyarı yoksayıldı. 24 saat içinde durum kötüleşmezse yeniden açılmaz.` });
         }
     };
 
@@ -329,7 +333,7 @@ export default function AlertsPage() {
                 if (remaining.length === 0) setDrawerGroup(null);
                 else setDrawerGroup({ ...drawerGroup, alerts: remaining });
             }
-            toast({ type: "info", message: "Uyarı yoksayıldı" });
+            toast({ type: "info", message: "Uyarı yoksayıldı. 24 saat içinde durum kötüleşmezse yeniden açılmaz." });
         } catch {
             toast({ type: "error", message: "İşlem başarısız" });
         }
