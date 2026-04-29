@@ -757,32 +757,77 @@ export default function AlertsPage() {
                     </div>
                 ) : (
                     <div style={{ padding: "0 24px 16px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                        {aiAlerts.map((alert) => (
-                            <div key={alert.id} style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "10px",
+                        {/* G7 — Genel durum özeti (tüm insight'lar için aynı; tek sefer gösterilir) */}
+                        {aiAlerts[0]?.description && (
+                            <div style={{
                                 padding: "9px 12px",
-                                background: "var(--bg-secondary)",
-                                border: "0.5px solid var(--border-tertiary)",
+                                background: "var(--accent-bg)",
+                                border: "0.5px solid var(--accent-border)",
                                 borderRadius: "5px",
+                                fontSize: "12px",
+                                color: "var(--accent-text)",
+                                lineHeight: 1.5,
                             }}>
-                                <span style={{
-                                    fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
-                                    padding: "1px 5px", borderRadius: "3px", flexShrink: 0,
-                                    background: "var(--accent-bg)", color: "var(--accent-text)",
-                                    border: "0.5px solid var(--accent-border)",
-                                }}>
-                                    AI
-                                </span>
-                                <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: 1, lineHeight: 1.45 }}>
-                                    {alert.title}
-                                </span>
-                                <span style={{ fontSize: "10px", color: "var(--text-tertiary)", flexShrink: 0 }}>
-                                    {formatRelTime(alert.created_at)}
-                                </span>
+                                <span style={{ fontWeight: 600, marginRight: "6px" }}>Genel durum:</span>
+                                {aiAlerts[0].description}
                             </div>
-                        ))}
+                        )}
+                        {aiAlerts.map((alert) => {
+                            const confidencePct = alert.ai_confidence != null
+                                ? Math.round(alert.ai_confidence * 100)
+                                : null;
+                            return (
+                                <div key={alert.id} style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "10px",
+                                    padding: "9px 12px",
+                                    background: "var(--bg-secondary)",
+                                    border: "0.5px solid var(--border-tertiary)",
+                                    borderRadius: "5px",
+                                }}>
+                                    <span style={{
+                                        fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
+                                        padding: "1px 5px", borderRadius: "3px", flexShrink: 0,
+                                        background: "var(--accent-bg)", color: "var(--accent-text)",
+                                        border: "0.5px solid var(--accent-border)",
+                                    }}>
+                                        AI
+                                    </span>
+                                    <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: 1, lineHeight: 1.45 }}>
+                                        {alert.title}
+                                    </span>
+                                    {confidencePct !== null && (
+                                        <span
+                                            title="AI'ın bu öneriye olan güveni"
+                                            style={{
+                                                fontSize: "10px", fontWeight: 600,
+                                                padding: "2px 6px", borderRadius: "3px",
+                                                background: "var(--accent-bg)",
+                                                color: "var(--accent-text)",
+                                                border: "0.5px solid var(--accent-border)",
+                                                flexShrink: 0,
+                                            }}
+                                        >
+                                            %{confidencePct}
+                                        </span>
+                                    )}
+                                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", flexShrink: 0 }}>
+                                        {formatRelTime(alert.created_at)}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                        {aiAlerts[0]?.ai_model_version && (
+                            <div style={{
+                                fontSize: "10px",
+                                color: "var(--text-tertiary)",
+                                marginTop: "4px",
+                                paddingLeft: "2px",
+                            }}>
+                                Model: {aiAlerts[0].ai_model_version}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
