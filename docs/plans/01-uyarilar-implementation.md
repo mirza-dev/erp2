@@ -86,7 +86,7 @@ Drawer'da `ALERT_TYPE_LABEL[alert.type] ?? alert.type` fallback olduğu için ha
 
 **Dosya:** `src/app/api/alerts/ai-suggest/route.ts` + `src/components/ai/AiUnavailableBanner.tsx` (yeni, paylaşımlı)
 
-**Test:** `alerts-ai-banner.test.ts` — fail → banner; başarı → banner kayboluyor.
+**Test:** Codebase'de React component testi yok (hepsi service/route tabanlı; jsdom+RTL setup yok). Banner manuel doğrulanır — "AI Analiz" butonuna basıp banner'ın çıkışı + "Yeniden dene" linkinin tetiklenmesi gözle kontrol edilir.
 
 ### G4 — "Açık" Sütununun Anlamlandırılması
 
