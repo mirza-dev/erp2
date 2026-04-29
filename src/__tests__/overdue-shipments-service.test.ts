@@ -26,6 +26,7 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbUpdateAlertStatus:    vi.fn(),
     dbDismissAlertsBySource: vi.fn(),
     dbListActiveAlerts:     (...args: unknown[]) => mockDbListActiveAlerts(...args),
+    dbListRecentlyDismissed: vi.fn().mockResolvedValue([]),
     dbBatchResolveAlerts:   vi.fn(),
 }));
 

@@ -277,6 +277,7 @@ export interface AlertRow {
     acknowledged_at: string | null
     resolved_at: string | null
     dismissed_at: string | null
+    dismissed_severity: AlertSeverity | null
     resolution_reason: string | null
     ai_confidence: number | null
     ai_reason: string | null

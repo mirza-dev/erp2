@@ -24,6 +24,7 @@ vi.mock("@/lib/supabase/products", () => ({
 vi.mock("@/lib/supabase/alerts", () => ({
     dbListAlerts:              vi.fn().mockResolvedValue([]),
     dbListActiveAlerts:        (...args: unknown[]) => mockDbListActiveAlerts(...args),
+    dbListRecentlyDismissed: vi.fn().mockResolvedValue([]),
     dbCreateAlert:             (...args: unknown[]) => mockDbCreateAlert(...args),
     dbResolveAlertsForEntity:  (...args: unknown[]) => mockDbResolveAlertsForEntity(...args),
     dbBatchResolveAlerts:      vi.fn().mockResolvedValue(0),

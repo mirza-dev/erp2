@@ -40,6 +40,7 @@ const mockDbBatchResolveAlerts = vi.fn().mockResolvedValue(0);
 vi.mock("@/lib/supabase/alerts", () => ({
     dbCreateAlert:        vi.fn(),
     dbListActiveAlerts:   vi.fn().mockResolvedValue([]),
+    dbListRecentlyDismissed: vi.fn().mockResolvedValue([]),
     dbBatchResolveAlerts: (...args: unknown[]) => mockDbBatchResolveAlerts(...args),
 }));
 

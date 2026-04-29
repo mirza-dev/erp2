@@ -110,7 +110,14 @@ export async function dbUpdateAlertStatus(
 
     if (status === "acknowledged") updates.acknowledged_at = now;
     if (status === "resolved")     { updates.resolved_at = now; if (reason) updates.resolution_reason = reason; }
-    if (status === "dismissed")    { updates.dismissed_at = now; if (reason) updates.resolution_reason = reason; }
+    if (status === "dismissed") {
+        updates.dismissed_at = now;
+        if (reason) updates.resolution_reason = reason;
+        // Sprint A G8: severity'yi yoksay zamanında yakala (24h dedup + escalation bypass için).
+        const { data: cur } = await supabase
+            .from("alerts").select("severity").eq("id", id).maybeSingle();
+        if (cur?.severity) updates.dismissed_severity = cur.severity;
+    }
 
     const { data, error } = await supabase
         .from("alerts").update(updates).eq("id", id).select("*").single();
@@ -171,6 +178,27 @@ export async function dbListActiveAlerts(): Promise<AlertRow[]> {
         .from("alerts")
         .select("*")
         .in("status", ["open", "acknowledged"]);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}
+
+/**
+ * Sprint A G8: Son N saatte yoksaylanan (status='dismissed' AND dismissed_at >= now-Nh)
+ * alert'leri getirir. Scan'de "yoksaydığı uyarıyı 5 dk sonra geri verme" davranışını
+ * kapatmak için kullanılır.
+ *
+ * Sadece dedup hedef tipler döner (stock_critical, stock_risk, order_deadline, order_shortage)
+ * — purchase_recommended (AI) bu kuraldan muaf, AI'ın kendi mantığı var.
+ */
+export async function dbListRecentlyDismissed(hoursBack = 24): Promise<AlertRow[]> {
+    const supabase = createServiceClient();
+    const cutoff = new Date(Date.now() - hoursBack * 3600 * 1000).toISOString();
+    const { data, error } = await supabase
+        .from("alerts")
+        .select("*")
+        .eq("status", "dismissed")
+        .gte("dismissed_at", cutoff)
+        .in("type", ["stock_critical", "stock_risk", "order_deadline", "order_shortage"]);
     if (error) throw new Error(error.message);
     return data ?? [];
 }

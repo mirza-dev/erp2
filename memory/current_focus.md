@@ -4,8 +4,28 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Faz 12 sandbox gate — gerçek Paraşüt API ile OAuth, e-doc, stok invariant doğrulamaları
-**Önceki:** Faz 11 bulgular 3. tur KAPALI (2026-04-29)
+**Aktif:** Sprint B — AI İçeri Aktar stabilizasyonu (`docs/plans/02-ai-import-implementation.md`)
+**Önceki:** Sprint A — Üretim & Stok Uyarıları stabilizasyonu KAPALI (2026-04-29; 1987 test)
+
+---
+
+## Sprint A Özet (2026-04-29) — KAPALI
+
+**Hedef:** /dashboard/alerts sayfasının görünür "amacına uygun çalışmıyor" sorununu çözmek; mevcut tasarımı bozmadan sadece eksik işlevsellik + bug + lifecycle.
+
+**4 commit:**
+- Part 1 (`d842be3`): Türkçe etiketler (4 yeni tip) + 24h dismiss toast + dead code (import_review_required)
+- Part 2 (`0ffc8c9`): Silinmiş ürün uyarılarının auto-cleanup'ı — scan başında orphan resolution
+- Part 3 (`7d0471c`): AI servisi kullanılamıyor sarı banner (kırmızı toast yerine)
+- Part 4a (`a384aa1`): AI önerilerinde "Genel durum" + %X confidence + model adı
+- Part 4b (`1764545`): quote_expired drawer'da inline "Süreyi Uzat" formu (PATCH /api/orders/[id])
+- Part 4c (this): 24h dismiss dedup + severity escalation bypass + migration 042
+
+**Migration:** `042_alerts_dismissed_severity.sql` — `dismissed_severity` kolonu + index.
+
+**Domain kuralı:** Manuel yoksay → 24 saat aynı tip+entity+severity için yeni alert oluşturma. Severity yükseldiyse bypass et. purchase_recommended muaf.
+
+**Test:** 106 dosya · 1987 test yeşil · TS clean.
 
 ---
 

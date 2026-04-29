@@ -12,6 +12,7 @@ import {
     dbUpdateAlertStatus,
     dbDismissAlertsBySource,
     dbListActiveAlerts,
+    dbListRecentlyDismissed,
     dbBatchResolveAlerts,
     type ListAlertsFilter,
     type BatchResolveEntry,
@@ -51,18 +52,45 @@ export interface ScanResult {
  * resolve operations into a batch, and relies on the unique index
  * idx_alerts_active_dedup as a safety net against duplicate creates.
  */
+// Sprint A G8: severity rank for escalation detection.
+// Daha düşük severity yoksaylanmışken daha yüksek severity'ye çıkıldıysa bypass eder.
+const SEVERITY_RANK: Record<string, number> = { info: 0, warning: 1, critical: 2 };
+
 export async function serviceScanStockAlerts(): Promise<ScanResult> {
-    const [products, shortageMap, activeAlerts, quotedMap] = await Promise.all([
+    const [products, shortageMap, activeAlerts, quotedMap, recentlyDismissed] = await Promise.all([
         dbListAllActiveProducts(),
         dbGetOpenShortagesByProduct(),
         dbListActiveAlerts(),
         dbGetQuotedQuantities(),
+        dbListRecentlyDismissed(24),
     ]);
 
     // Build dedup map: "type:entityId" → severity, for O(1) lookups + severity diff detection
     const activeMap = new Map<string, string>();
     for (const a of activeAlerts) {
         if (a.entity_id) activeMap.set(`${a.type}:${a.entity_id}`, a.severity);
+    }
+
+    // Sprint A G8: Son 24 saatteki dismissed → "type:entityId" → dismissed_severity (en yenisi).
+    // Severity escalation bypass: yeni severity rank > yoksaylan severity rank → izin ver.
+    const dismissedMap = new Map<string, string>();
+    for (const a of recentlyDismissed) {
+        if (!a.entity_id) continue;
+        const key = `${a.type}:${a.entity_id}`;
+        const existing = dismissedMap.get(key);
+        // Birden fazla dismiss varsa en yenisini tut (DB sırası garanti değil; severity rank max'ını koru).
+        if (!existing || (SEVERITY_RANK[a.dismissed_severity ?? a.severity] ?? 0) > (SEVERITY_RANK[existing] ?? 0)) {
+            dismissedMap.set(key, a.dismissed_severity ?? a.severity);
+        }
+    }
+
+    /** Bu type+entity için yeni alert oluşturmak yasak mı? (24h dismiss + severity bypass kuralı) */
+    function isBlockedByDismiss(type: string, entityId: string, newSeverity: string): boolean {
+        const dismissedSev = dismissedMap.get(`${type}:${entityId}`);
+        if (!dismissedSev) return false;
+        const newRank      = SEVERITY_RANK[newSeverity] ?? 0;
+        const dismissedRnk = SEVERITY_RANK[dismissedSev] ?? 0;
+        return newRank <= dismissedRnk; // sadece daha kötü durumda (newRank > dismissedRnk) bypass
     }
 
     let created = 0;
@@ -104,7 +132,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
             // Resolve any existing warning for this product (escalate)
             toResolve.push({ type: "stock_risk", entityId, reason: "escalated_to_critical" });
 
-            if (!activeMap.has(`stock_critical:${entityId}`)) {
+            if (!activeMap.has(`stock_critical:${entityId}`) && !isBlockedByDismiss("stock_critical", entityId, "critical")) {
                 const alert = await dbCreateAlert({
                     type: "stock_critical",
                     severity: "critical",
@@ -117,7 +145,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                 if (alert) created++;
             }
         } else if (isWarning) {
-            if (!activeMap.has(`stock_risk:${entityId}`)) {
+            if (!activeMap.has(`stock_risk:${entityId}`) && !isBlockedByDismiss("stock_risk", entityId, "warning")) {
                 const alert = await dbCreateAlert({
                     type: "stock_risk",
                     severity: "warning",
@@ -164,9 +192,13 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                 };
                 const existingSeverity = activeMap.get(`order_deadline:${entityId}`);
                 if (existingSeverity === undefined) {
-                    // Alert yok — inline oluştur
-                    const alert = await dbCreateAlert(alertInput);
-                    if (alert) created++;
+                    if (isBlockedByDismiss("order_deadline", entityId, newSeverity)) {
+                        // 24h içinde aynı/daha yüksek severity ile yoksaylanmış → atla.
+                    } else {
+                        // Alert yok — inline oluştur
+                        const alert = await dbCreateAlert(alertInput);
+                        if (alert) created++;
+                    }
                 } else if (existingSeverity !== newSeverity) {
                     // Severity değişti (warning → critical veya tersi) — eski resolve et, yeni oluştur
                     toResolve.push({ type: "order_deadline", entityId, reason: "deadline_severity_changed" });
@@ -186,7 +218,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
         // Order shortage: source of truth is the shortages table.
         const openShortageQty = shortageMap.get(product.id) ?? 0;
         if (openShortageQty > 0) {
-            if (!activeMap.has(`order_shortage:${entityId}`)) {
+            if (!activeMap.has(`order_shortage:${entityId}`) && !isBlockedByDismiss("order_shortage", entityId, "critical")) {
                 const alert = await dbCreateAlert({
                     type: "order_shortage",
                     severity: "critical",

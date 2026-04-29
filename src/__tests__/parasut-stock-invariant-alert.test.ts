@@ -52,6 +52,7 @@ vi.mock("@/lib/supabase/sync-log", () => ({
 vi.mock("@/lib/supabase/alerts", () => ({
     dbCreateAlert:      (...a: unknown[]) => mockDbCreateAlert(...a),
     dbListActiveAlerts: (...a: unknown[]) => mockDbListActiveAlerts(...a),
+    dbListRecentlyDismissed: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/parasut", () => ({

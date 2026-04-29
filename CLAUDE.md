@@ -3,7 +3,17 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-04-29_
 
-**Son tamamlanan iş:** Paraşüt Faz 11 bulgular 3. tur (2026-04-29) — KAPALI
+**Son tamamlanan iş:** Sprint A — Üretim & Stok Uyarıları stabilizasyonu (2026-04-29)
+
+**Sprint A özet (4 commit):**
+- Part 1: Türkçe etiketler (quote_expired/overdue_shipment/order_deadline/sync_issue) + 24h dismiss açıklaması toast + dead code temizliği (import_review_required AlertType union'undan çıkarıldı)
+- Part 2: Silinmiş ürün uyarılarının auto-cleanup'ı (G1) — scan başında orphan resolution (4 tip için, reason='product_deleted_or_deactivated')
+- Part 3: AI servisi kullanılamıyor banner'ı (G3) — kırmızı toast yerine sayfa üstünde sarı banner + "Yeniden dene"
+- Part 4a/4b/4c: AI önerilerinde "neden öneriliyor" şeffaflığı (G7), quote_expired drawer'ında inline "Süreyi Uzat" formu (G6), 24h dismiss dedup + severity escalation bypass (G8)
+- Migration `042_alerts_dismissed_severity.sql` (dismissed_severity kolonu)
+- 106 dosya · 1987 test yeşil · TS clean
+
+**Önceki:** Paraşüt Faz 11 bulgular 3. tur (2026-04-29)
 
 **Bulgular 3. tur fix:**
 - **HIGH→MEDIUM (retry regression):** `serviceRetryParasutStep`'e `parasut_step='done'` guard eklendi — RPC'den bağımsız servis katmanı koruması. UI'da `canRetry` done (yeşil) ve edoc skipped badge'lerde `false`; yanıltıcı "başka işlem tutuyor" toastı ortadan kalktı.
@@ -12,14 +22,18 @@ _Son güncelleme: 2026-04-29_
 - +5 test: 3 `parasut-retry-step-faz11.test.ts` + yeni `parasut-oauth-refresh.test.ts` (2 test).
 - **104 dosya · 1975 test yeşil · TS clean.**
 
-**Sıradaki:** Faz 12 — Sandbox GATE: gerçek Paraşüt API ile OAuth, list filtreleri, e-doc trackable_job, stok invariant doğrulamaları (PARASUT_PLAN.md §Faz 12).
+**Sıradaki:**
+- Sprint B — AI İçeri Aktar stabilizasyonu (file size limit, inline edit rollback, race condition CAS, sort_order fix, entity-bazlı sonuç tablosu — `docs/plans/02-ai-import-implementation.md`)
+- Sprint C — Satın Alma Önerileri stabilizasyonu (`docs/plans/03-purchase-suggested-implementation.md`)
+- G11 — AI öneri tutarlılığı (diff-merge + 6 saatlik CRON + manuel yenile) — ayrı plan dosyası gelecek
+- Faz 12 — Sandbox GATE: gerçek Paraşüt API ile OAuth, list filtreleri, e-doc trackable_job, stok invariant doğrulamaları (PARASUT_PLAN.md §Faz 12)
 
 **Kalan / ertelendi:**
 - M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY eklendi ✅ (explicit policy yok; proje genelinde aynı pattern — tüm erişim service_role'den)
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 104 dosya · 1975 vitest (hepsi yeşil)
+**Test sayısı:** 106 dosya · 1987 vitest (hepsi yeşil)
 
 ---
 
