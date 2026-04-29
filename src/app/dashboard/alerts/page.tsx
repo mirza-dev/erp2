@@ -608,45 +608,18 @@ export default function AlertsPage() {
                     ) : (
                         <div>
                             {visibleOrderAlerts.map((alert) => (
-                                <div
+                                <OrderAlertRow
                                     key={alert.id}
-                                    style={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "flex-start",
-                                        padding: "14px 20px",
-                                        borderBottom: "0.5px solid var(--border-tertiary)",
-                                        gap: "16px",
+                                    alert={alert}
+                                    isDemo={isDemo}
+                                    onExtended={() => {
+                                        // Süre uzatıldı → bu alert'i UI'dan resolved olarak düş
+                                        setRawAlerts((prev) => prev.map((a) =>
+                                            a.id === alert.id ? { ...a, status: "resolved" as const } : a
+                                        ));
+                                        toast({ type: "success", message: "Teklif süresi güncellendi ve uyarı kapatıldı." });
                                     }}
-                                >
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
-                                            {alert.title}
-                                        </div>
-                                        {alert.description && (
-                                            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                                                {alert.description}
-                                            </div>
-                                        )}
-                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                                            {new Date(alert.created_at).toLocaleDateString("tr-TR")}
-                                        </div>
-                                    </div>
-                                    {alert.entity_id && (
-                                        <Link
-                                            href={`/dashboard/orders/${alert.entity_id}`}
-                                            style={{
-                                                fontSize: "12px",
-                                                color: "var(--accent)",
-                                                whiteSpace: "nowrap",
-                                                flexShrink: 0,
-                                                textDecoration: "none",
-                                            }}
-                                        >
-                                            Siparişe Git →
-                                        </Link>
-                                    )}
-                                </div>
+                                />
                             ))}
                         </div>
                     );
@@ -841,6 +814,180 @@ export default function AlertsPage() {
                     onAcknowledge={acknowledgeAlert}
                     onResolve={resolveAlert}
                 />
+            )}
+        </div>
+    );
+}
+
+// ── OrderAlertRow ────────────────────────────────────────────
+// Sipariş bazlı uyarı satırı. quote_expired için inline "Süreyi Uzat" formu içerir.
+
+interface OrderAlertRowProps {
+    alert: AlertRow;
+    isDemo: boolean;
+    onExtended: () => void;
+}
+
+function OrderAlertRow({ alert, isDemo, onExtended }: OrderAlertRowProps) {
+    const [extending, setExtending] = useState(false);
+    const [showExtend, setShowExtend] = useState(false);
+    const [newDate, setNewDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        return d.toISOString().slice(0, 10);
+    });
+    const [error, setError] = useState<string | null>(null);
+    const isQuoteExpired = alert.type === "quote_expired";
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const handleExtend = async () => {
+        if (isDemo || extending) return;
+        if (!newDate || newDate < todayStr) {
+            setError("Lütfen bugünden ileri bir tarih seçin.");
+            return;
+        }
+        setExtending(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/orders/${alert.entity_id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ quote_valid_until: newDate }),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || `HTTP ${res.status}`);
+            }
+            onExtended();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Süre uzatılamadı.");
+        } finally {
+            setExtending(false);
+        }
+    };
+
+    return (
+        <div style={{
+            padding: "14px 20px",
+            borderBottom: "0.5px solid var(--border-tertiary)",
+            display: "flex", flexDirection: "column", gap: "10px",
+        }}>
+            <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "16px",
+            }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
+                        {alert.title}
+                    </div>
+                    {alert.description && (
+                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                            {alert.description}
+                        </div>
+                    )}
+                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                        {new Date(alert.created_at).toLocaleDateString("tr-TR")}
+                    </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end", flexShrink: 0 }}>
+                    {isQuoteExpired && !showExtend && (
+                        <button
+                            onClick={() => setShowExtend(true)}
+                            disabled={isDemo}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Teklifin geçerlilik süresini uzat"}
+                            style={{
+                                fontSize: "12px", padding: "5px 11px",
+                                border: "0.5px solid var(--accent-border)",
+                                borderRadius: "4px", background: "var(--accent-bg)",
+                                color: "var(--accent-text)",
+                                cursor: isDemo ? "not-allowed" : "pointer",
+                                opacity: isDemo ? 0.6 : 1,
+                                whiteSpace: "nowrap", fontWeight: 500,
+                            }}
+                        >
+                            Süreyi Uzat
+                        </button>
+                    )}
+                    {alert.entity_id && (
+                        <Link
+                            href={`/dashboard/orders/${alert.entity_id}`}
+                            style={{
+                                fontSize: "12px",
+                                color: "var(--accent)",
+                                whiteSpace: "nowrap",
+                                textDecoration: "none",
+                            }}
+                        >
+                            Siparişe Git →
+                        </Link>
+                    )}
+                </div>
+            </div>
+            {isQuoteExpired && showExtend && (
+                <div style={{
+                    display: "flex", flexDirection: "column", gap: "8px",
+                    padding: "10px 12px",
+                    background: "var(--bg-secondary)",
+                    border: "0.5px solid var(--border-tertiary)",
+                    borderRadius: "5px",
+                }}>
+                    <label style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 600, letterSpacing: "0.04em" }}>
+                        YENİ GEÇERLİLİK TARİHİ
+                    </label>
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                            type="date"
+                            value={newDate}
+                            min={todayStr}
+                            onChange={(e) => { setNewDate(e.target.value); setError(null); }}
+                            disabled={extending}
+                            style={{
+                                fontSize: "12px", padding: "5px 8px",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "4px",
+                                background: "var(--bg-primary)",
+                                color: "var(--text-primary)",
+                            }}
+                        />
+                        <button
+                            onClick={handleExtend}
+                            disabled={isDemo || extending}
+                            style={{
+                                fontSize: "12px", padding: "5px 12px",
+                                border: "0.5px solid var(--success-border)",
+                                borderRadius: "4px",
+                                background: "var(--success-bg)",
+                                color: "var(--success-text)",
+                                cursor: isDemo || extending ? "not-allowed" : "pointer",
+                                opacity: isDemo || extending ? 0.6 : 1,
+                                fontWeight: 500,
+                            }}
+                        >
+                            {extending ? "Kaydediliyor..." : "Kaydet"}
+                        </button>
+                        <button
+                            onClick={() => { setShowExtend(false); setError(null); }}
+                            disabled={extending}
+                            style={{
+                                fontSize: "12px", padding: "5px 10px",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "4px",
+                                background: "transparent",
+                                color: "var(--text-secondary)",
+                                cursor: extending ? "not-allowed" : "pointer",
+                            }}
+                        >
+                            Vazgeç
+                        </button>
+                    </div>
+                    {error && (
+                        <div style={{ fontSize: "11px", color: "var(--danger-text)" }}>
+                            {error}
+                        </div>
+                    )}
+                </div>
             )}
         </div>
     );
