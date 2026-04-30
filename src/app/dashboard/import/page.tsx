@@ -180,6 +180,13 @@ export default function ImportPage() {
             setParseError("Desteklenmeyen dosya formatı. Lütfen .xlsx, .xls veya .csv dosyası yükleyin.");
             return;
         }
+        // Sprint B G1: Browser FileReader büyük dosyalarda RAM'i şişirir, sekme donar.
+        const MAX_FILE_SIZE = 25 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+            const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+            setParseError(`Dosya çok büyük (${sizeMb} MB). En fazla 25 MB kabul edilir; dosyayı bölerek tekrar deneyin.`);
+            return;
+        }
         setParseError(null);
         parseExcelFile(file);
     };
@@ -310,16 +317,23 @@ export default function ImportPage() {
         setEditingCell(null);
         const prev = draftEdits[draftId] ?? {};
         const newEdits = { ...prev, [field]: editingValue };
+        // Optimistic UI: kullanıcı düzeltmeyi hemen görür
         setDraftEdits(d => ({ ...d, [draftId]: newEdits }));
 
-        // Persist to server (best-effort)
+        // Sprint B G2: Sunucu kayıt başarısızsa kullanıcının düzeltmesi
+        // sessizce kayboluyordu — confirm anında orijinal data merge'leniyordu.
+        // Şimdi rollback + toast.
         try {
-            await fetch(`/api/import/drafts/${draftId}`, {
+            const res = await fetch(`/api/import/drafts/${draftId}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ user_corrections: newEdits }),
             });
-        } catch { /* ignore */ }
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        } catch {
+            setDraftEdits(d => ({ ...d, [draftId]: prev })); // rollback
+            toast({ type: "error", message: "Düzeltme kaydedilemedi — tekrar deneyin." });
+        }
     };
 
     const getEffectiveValue = (draft: DraftRow, field: string): unknown => {
@@ -490,7 +504,7 @@ export default function ImportPage() {
                             {["XLSX", "XLS", "CSV"].map(ext => (
                                 <span key={ext} style={{ fontSize: "11px", padding: "3px 10px", background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", color: "var(--text-secondary)", fontFamily: "monospace", fontWeight: 600 }}>{ext}</span>
                             ))}
-                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>· çok-sheet desteklenir</span>
+                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>· çok-sheet desteklenir · max 25 MB</span>
                         </div>
                     </div>
 
