@@ -48,11 +48,37 @@ export async function serviceAddDraftsToBatch(
 
 // ── Confirm ──────────────────────────────────────────────────
 
-export interface ConfirmResult {
-    added: number;    // gerçekten INSERT edilen yeni kayıtlar
-    updated: number;  // mevcut kaydın UPDATE edildiği veya eşlendiği durumlar
+export type ConfirmEntityType =
+    | "customer" | "product" | "quote" | "order" | "order_line"
+    | "stock" | "shipment" | "invoice" | "payment";
+
+export interface EntityCounts {
+    added: number;
+    updated: number;
     skipped: number;
+}
+
+export interface ConfirmResult {
+    added: number;    // gerçekten INSERT edilen yeni kayıtlar (toplam — geriye dönük uyumlu)
+    updated: number;  // mevcut kaydın UPDATE edildiği veya eşlendiği durumlar (toplam)
+    skipped: number;  // (toplam)
     errors: string[];
+    /** Sprint B G6: Sonuç ekranında "neyin ne kadar aktarıldığı" için entity-bazlı kırılım. */
+    byEntity: Record<ConfirmEntityType, EntityCounts>;
+}
+
+function makeEmptyByEntity(): Record<ConfirmEntityType, EntityCounts> {
+    return {
+        customer:   { added: 0, updated: 0, skipped: 0 },
+        product:    { added: 0, updated: 0, skipped: 0 },
+        quote:      { added: 0, updated: 0, skipped: 0 },
+        order:      { added: 0, updated: 0, skipped: 0 },
+        order_line: { added: 0, updated: 0, skipped: 0 },
+        stock:      { added: 0, updated: 0, skipped: 0 },
+        shipment:   { added: 0, updated: 0, skipped: 0 },
+        invoice:    { added: 0, updated: 0, skipped: 0 },
+        payment:    { added: 0, updated: 0, skipped: 0 },
+    };
 }
 
 // Entity processing order — respects dependency chain
@@ -98,6 +124,11 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
     let updated = 0;
     let skipped = 0;
     const errors: string[] = [];
+    const byEntity = makeEmptyByEntity();
+    const bumpEntity = (et: string, kind: "added" | "updated" | "skipped"): void => {
+        const key = et as ConfirmEntityType;
+        if (key in byEntity) byEntity[key][kind]++;
+    };
 
     // Cross-reference map — resolve entity references within this batch
     const refMap = {
@@ -111,7 +142,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
     let rowNum = 0;
     for (const draft of toMerge) {
         rowNum++;
-        if (draft.status === "rejected") { skipped++; continue; }
+        if (draft.status === "rejected") { skipped++; bumpEntity(draft.entity_type, "skipped"); continue; }
 
         const base = (draft.parsed_data ?? {}) as Record<string, unknown>;
         const corrections = (draft.user_corrections ?? {}) as Record<string, unknown>;
@@ -153,14 +184,14 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     customerId = aliasMatch;
                     await dbUpdateCustomer(aliasMatch, customerUpdateFields);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: aliasMatch });
-                    updated++;
+                    updated++; bumpEntity(draft.entity_type, "updated");
                 } else if (existing) {
                     customerId = existing.id;
                     await dbUpdateCustomer(existing.id, customerUpdateFields);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
                     // Bu eşleşmeyi gelecek import'lar için kaydet
                     if (customerName) void dbSaveEntityAlias(customerName, "customer", existing.id, existing.name);
-                    updated++;
+                    updated++; bumpEntity(draft.entity_type, "updated");
                 } else {
                     const customer = await dbCreateCustomer({
                         name: customerName,
@@ -180,7 +211,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: customer.id });
                     // Yeni müşteri — bu ismi gelecek import'lar için kaydet
                     if (customerName) void dbSaveEntityAlias(customerName, "customer", customer.id, customerName);
-                    added++;
+                    added++; bumpEntity(draft.entity_type, "added");
                 }
                 if (customerCode) refMap.customerCodes.set(customerCode, customerId);
 
@@ -192,7 +223,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     if (!data.unit) missing.push("ölçü birimi");
                     errors.push(`Satır ${rowNum}: ${missing.join(", ")} eksik.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
                 const sku = String(data.sku);
@@ -230,7 +261,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     productId = updatedProduct.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: updatedProduct.id });
-                    updated++;
+                    updated++; bumpEntity(draft.entity_type, "updated");
                 } else {
                     // ── New product creation ───────────────────────────────────────
                     // on_hand IS included here to set the initial inventory level
@@ -265,7 +296,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     productId = product.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: product.id });
-                    added++;
+                    added++; bumpEntity(draft.entity_type, "added");
                 }
                 refMap.productSkus.set(sku, productId);
 
@@ -274,7 +305,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 if (!quoteNumber) {
                     errors.push(`Satır ${rowNum}: Teklif numarası eksik.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
 
@@ -296,7 +327,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     refMap.quoteNumbers.set(quoteNumber, existing.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
-                    updated++;
+                    updated++; bumpEntity(draft.entity_type, "updated");
                 } else {
                     const quote = await dbCreateQuote({
                         quote_number: quoteNumber,
@@ -310,7 +341,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     refMap.quoteNumbers.set(quoteNumber, quote.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: quote.id });
-                    added++;
+                    added++; bumpEntity(draft.entity_type, "added");
                 }
 
             } else if (draft.entity_type === "order") {
@@ -362,7 +393,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
 
                 if (originalOrderNumber) refMap.orderNumbers.set(originalOrderNumber, order.id);
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: order.id });
-                added++;
+                added++; bumpEntity(draft.entity_type, "added");
 
             } else if (draft.entity_type === "order_line") {
                 const orderNumber = data.order_number ? String(data.order_number) : undefined;
@@ -371,7 +402,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 if (!orderNumber || !productSku) {
                     errors.push(`Satır ${rowNum}: Sipariş numarası ve ürün kodu (SKU) zorunludur.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
 
@@ -380,7 +411,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 if (!orderId) {
                     errors.push(`Satır ${rowNum}: '${orderNumber}' numaralı sipariş bulunamadı.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
 
@@ -430,40 +461,40 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 }).eq("id", orderId);
 
                 await dbUpdateDraft(draft.id, { status: "merged" });
-                added++;
+                added++; bumpEntity(draft.entity_type, "added");
 
             } else if (draft.entity_type === "stock") {
                 if (!data.sku) {
                     errors.push(`Satır ${rowNum}: Ürün kodu (SKU) eksik.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
                 if (data.on_hand === undefined) {
                     errors.push(`Satır ${rowNum}: Stok miktarı (on_hand) eksik.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
                 const prod = await dbFindProductBySku(String(data.sku));
                 if (!prod) {
                     errors.push(`Satır ${rowNum}: '${data.sku}' kodlu ürün bulunamadı.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
                 // Additive: imported qty is added to existing stock (not overwrite)
                 const newOnHand = prod.on_hand + Number(data.on_hand);
                 await dbUpdateProduct(prod.id, { on_hand: newOnHand });
                 await dbUpdateDraft(draft.id, { status: "merged" });
-                updated++;
+                updated++; bumpEntity(draft.entity_type, "updated");
 
             } else if (draft.entity_type === "shipment") {
                 const shipmentNumber = String(data.shipment_number ?? "");
                 if (!shipmentNumber) {
                     errors.push(`Satır ${rowNum}: Sevkiyat numarası eksik.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
 
@@ -482,14 +513,14 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     gross_weight_kg: parseNumeric(data.gross_weight_kg),
                 });
                 await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: shipment.id });
-                added++;
+                added++; bumpEntity(draft.entity_type, "added");
 
             } else if (draft.entity_type === "invoice") {
                 const invoiceNumber = String(data.invoice_number ?? "");
                 if (!invoiceNumber) {
                     errors.push(`Satır ${rowNum}: Fatura numarası eksik.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
 
@@ -517,7 +548,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     refMap.invoiceNumbers.set(invoiceNumber, existing.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
-                    updated++;
+                    updated++; bumpEntity(draft.entity_type, "updated");
                 } else {
                     const invoice = await dbCreateInvoice({
                         invoice_number: invoiceNumber,
@@ -532,7 +563,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                     });
                     refMap.invoiceNumbers.set(invoiceNumber, invoice.id);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: invoice.id });
-                    added++;
+                    added++; bumpEntity(draft.entity_type, "added");
                 }
 
             } else if (draft.entity_type === "payment") {
@@ -540,7 +571,7 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 if (!paymentNumber) {
                     errors.push(`Satır ${rowNum}: Ödeme numarası eksik.`);
                     await dbUpdateDraft(draft.id, { status: "rejected" });
-                    skipped++;
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
 
@@ -570,18 +601,18 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 }
 
                 await dbUpdateDraft(draft.id, { status: "merged" });
-                added++;
+                added++; bumpEntity(draft.entity_type, "added");
             } else {
                 errors.push(`Satır ${rowNum}: Bilinmeyen varlık türü — '${draft.entity_type}'.`);
                 await dbUpdateDraft(draft.id, { status: "rejected" });
-                skipped++;
+                skipped++; bumpEntity(draft.entity_type, "skipped");
             }
 
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
             errors.push(`${draft.id} (Satır ${rowNum}): İşlem hatası — ${msg}`);
             try { await dbUpdateDraft(draft.id, { status: "rejected" }); } catch { /* best-effort */ }
-            skipped++;
+            skipped++; bumpEntity(draft.entity_type, "skipped");
         }
     }
 
@@ -603,5 +634,5 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
             }
         }
     }
-    return { added, updated, skipped, errors };
+    return { added, updated, skipped, errors, byEntity };
 }

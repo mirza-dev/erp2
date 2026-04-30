@@ -156,7 +156,7 @@ describe("serviceConfirmBatch — batch lifecycle", () => {
         expect(mockDbUpdateBatchStatus).toHaveBeenCalledWith("batch-1", "confirmed");
     });
 
-    it("returns { added, updated, skipped, errors } result shape", async () => {
+    it("returns { added, updated, skipped, errors, byEntity } result shape", async () => {
         mockDbGetBatch.mockResolvedValue(makeBatch());
         mockDbListDrafts.mockResolvedValue([]);
         mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
@@ -167,10 +167,57 @@ describe("serviceConfirmBatch — batch lifecycle", () => {
         expect(result).toHaveProperty("updated");
         expect(result).toHaveProperty("skipped");
         expect(result).toHaveProperty("errors");
+        expect(result).toHaveProperty("byEntity");
         expect(typeof result.added).toBe("number");
         expect(typeof result.updated).toBe("number");
         expect(typeof result.skipped).toBe("number");
         expect(Array.isArray(result.errors)).toBe(true);
+        // byEntity: 9 entity tipi, her biri { added, updated, skipped }
+        expect(result.byEntity.customer).toEqual({ added: 0, updated: 0, skipped: 0 });
+        expect(result.byEntity.product).toEqual({ added: 0, updated: 0, skipped: 0 });
+        expect(result.byEntity.order_line).toEqual({ added: 0, updated: 0, skipped: 0 });
+    });
+
+});
+
+// Sprint B G6: byEntity entity-bazlı sayım
+describe("serviceConfirmBatch — byEntity (Sprint B G6)", () => {
+    beforeEach(() => {
+        // Test izolasyonu: önceki test'ten kalan mock state'i temizle.
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+    });
+
+    it("ürün eklendiğinde sadece byEntity.product.added artar (toplam ile uyumlu)", async () => {
+        mockDbListDrafts.mockResolvedValue([
+            makeDraft({ entity_type: "product", parsed_data: { sku: "P-1", name: "Vana A", unit: "adet" } }),
+        ]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "p-1", sku: "P-1" });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.added).toBe(1);
+        expect(result.byEntity.product.added).toBe(1);
+        expect(result.byEntity.customer.added).toBe(0);
+        expect(result.byEntity.order.added).toBe(0);
+        // toplamlar tutar
+        const totalByEntity = Object.values(result.byEntity).reduce((s, c) => s + c.added + c.updated + c.skipped, 0);
+        expect(totalByEntity).toBe(result.added + result.updated + result.skipped);
+    });
+
+    it("missing field skipped → byEntity.product.skipped artar", async () => {
+        mockDbListDrafts.mockResolvedValue([
+            makeDraft({ entity_type: "product", parsed_data: { name: "Eksik SKU" } }),
+        ]);
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.skipped).toBe(1);
+        expect(result.byEntity.product.skipped).toBe(1);
+        expect(result.byEntity.product.added).toBe(0);
     });
 });
 
@@ -1994,3 +2041,4 @@ describe("serviceConfirmBatch — meta processing (column_mapping_meta)", () => 
         expect(mockDbIncrementMappingSuccess).not.toHaveBeenCalled();
     });
 });
+

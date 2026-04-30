@@ -101,7 +101,13 @@ export default function ImportPage() {
     const [sheets, setSheets] = useState<SheetInfo[]>([]);
     const [activeTab, setActiveTab] = useState("");
     const [importProgress, setImportProgress] = useState<Record<string, number>>({});
-    const [confirmResult, setConfirmResult] = useState<{ added: number; updated: number; skipped: number; errors: string[] } | null>(null);
+    const [confirmResult, setConfirmResult] = useState<{
+        added: number;
+        updated: number;
+        skipped: number;
+        errors: string[];
+        byEntity?: Record<string, { added: number; updated: number; skipped: number }>;
+    } | null>(null);
     const [drafts, setDrafts] = useState<DraftRow[]>([]);
     const [parseError, setParseError] = useState<string | null>(null);
     const [batchId, setBatchId] = useState<string | null>(null);
@@ -965,6 +971,57 @@ export default function ImportPage() {
                             </div>
                         )}
                     </div>
+                    {/* Sprint B G6: Entity-bazlı kırılım — neyin ne kadar aktarıldığı */}
+                    {confirmResult?.byEntity && (() => {
+                        const ENTITY_LABELS: Record<string, string> = {
+                            customer:   "Müşteri",
+                            product:    "Ürün",
+                            quote:      "Teklif",
+                            order:      "Sipariş",
+                            order_line: "Sipariş Satırı",
+                            stock:      "Stok Hareketi",
+                            shipment:   "Sevkiyat",
+                            invoice:    "Fatura",
+                            payment:    "Tahsilat",
+                        };
+                        const rows = Object.entries(confirmResult.byEntity)
+                            .filter(([, c]) => c.added + c.updated + c.skipped > 0)
+                            .map(([key, c]) => ({ key, label: ENTITY_LABELS[key] ?? key, ...c }));
+                        if (rows.length === 0) return null;
+                        return (
+                            <div style={{ marginBottom: "16px", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", overflow: "hidden" }}>
+                                <div style={{
+                                    display: "grid",
+                                    gridTemplateColumns: "1fr 90px 90px 90px",
+                                    fontSize: "10px", fontWeight: 600,
+                                    color: "var(--text-tertiary)", letterSpacing: "0.06em",
+                                    padding: "8px 12px",
+                                    background: "var(--bg-secondary)",
+                                    borderBottom: "0.5px solid var(--border-tertiary)",
+                                }}>
+                                    <div>TÜR</div>
+                                    <div style={{ textAlign: "right" }}>EKLENDİ</div>
+                                    <div style={{ textAlign: "right" }}>GÜNCELLENDİ</div>
+                                    <div style={{ textAlign: "right" }}>ATLANDI</div>
+                                </div>
+                                {rows.map((r) => (
+                                    <div key={r.key} style={{
+                                        display: "grid",
+                                        gridTemplateColumns: "1fr 90px 90px 90px",
+                                        fontSize: "12px",
+                                        color: "var(--text-secondary)",
+                                        padding: "8px 12px",
+                                        borderBottom: "0.5px solid var(--border-tertiary)",
+                                    }}>
+                                        <div style={{ color: "var(--text-primary)" }}>{r.label}</div>
+                                        <div style={{ textAlign: "right", color: r.added > 0 ? "var(--success-text)" : "var(--text-tertiary)" }}>{r.added}</div>
+                                        <div style={{ textAlign: "right", color: r.updated > 0 ? "var(--accent-text)" : "var(--text-tertiary)" }}>{r.updated}</div>
+                                        <div style={{ textAlign: "right", color: r.skipped > 0 ? "var(--warning-text)" : "var(--text-tertiary)" }}>{r.skipped}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })()}
                     {confirmResult && confirmResult.errors.length > 0 && (
                         <div style={{ marginBottom: "16px", background: "var(--danger-bg)", border: "0.5px solid var(--danger-border)", borderRadius: "6px", padding: "12px 14px" }}>
                             <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "8px" }}>{confirmResult.errors.length} satırda sorun oluştu</div>
