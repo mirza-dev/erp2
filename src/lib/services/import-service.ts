@@ -139,6 +139,11 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
         productSkus:   new Map<string, string>(),   // Urun_Kodu → product uuid
     };
 
+    // Sprint B G4: Aynı order'a multiple line draft → her birinde DB'den okumak
+    // güncel olmayan state veriyordu (mevcut INSERT henüz commit olmadıysa görünmez).
+    // Per-order cache ile sıralı sort_order garanti.
+    const nextSortByOrder = new Map<string, number>();
+
     let rowNum = 0;
     for (const draft of toMerge) {
         rowNum++;
@@ -424,14 +429,22 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
                 const discountPct = Number(data.discount_pct ?? 0);
                 const lineTotal = parseNumeric(data.line_total) ?? quantity * unitPrice * (1 - discountPct / 100);
 
-                // Get current max sort_order for this order
-                const { data: existingLines } = await supabase
-                    .from("order_lines")
-                    .select("sort_order")
-                    .eq("order_id", orderId)
-                    .order("sort_order", { ascending: false })
-                    .limit(1);
-                const sortOrder = existingLines && existingLines.length > 0 ? existingLines[0].sort_order + 1 : 1;
+                // Sprint B G4: Cache'te varsa onu kullan (aynı batch'te çoklu line için collision önler);
+                // ilk kez görüyorsak DB'den max + 1 oku.
+                let sortOrder: number;
+                const cached = nextSortByOrder.get(orderId);
+                if (cached !== undefined) {
+                    sortOrder = cached;
+                } else {
+                    const { data: existingLines } = await supabase
+                        .from("order_lines")
+                        .select("sort_order")
+                        .eq("order_id", orderId)
+                        .order("sort_order", { ascending: false })
+                        .limit(1);
+                    sortOrder = existingLines && existingLines.length > 0 ? existingLines[0].sort_order + 1 : 1;
+                }
+                nextSortByOrder.set(orderId, sortOrder + 1);
 
                 await supabase.from("order_lines").insert({
                     order_id: orderId,

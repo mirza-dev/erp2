@@ -1825,6 +1825,56 @@ describe("serviceConfirmBatch — order_line entity", () => {
             expect.objectContaining({ sort_order: 6 })
         );
     });
+
+    // Sprint B G4: aynı order'a multiple line draft → DB henüz commit olmadan cache devreye girer
+    it("aynı order'a 3 line draft → sort_order 1, 2, 3 (cache; DB her seferinde okumaz)", async () => {
+        const drafts = [1, 2, 3].map((i) =>
+            makeDraft({
+                id: `draft-line-${i}`,
+                entity_type: "order_line",
+                parsed_data: { order_number: "ORD-2026-0042", product_sku: `SKU-${i}`, quantity: 1, unit_price: 100 },
+            })
+        );
+        mockDbListDrafts.mockResolvedValue(drafts);
+        mockDbFindOrderByOriginalNumber.mockResolvedValue({ id: "order-42" });
+        mockDbFindProductBySku.mockResolvedValue({ id: "prod-X" });
+
+        const { mockFrom, mockInsert } = makeSupabaseMock({
+            existingSortOrders: [], // boş → ilk sort_order=1
+            allLines: [{ line_total: 100 }],
+        });
+        vi.mocked(createServiceClient).mockReturnValue({ from: mockFrom } as ReturnType<typeof createServiceClient>);
+
+        await serviceConfirmBatch("batch-1");
+
+        // 3 insert: sort_order 1, 2, 3
+        const insertCalls = mockInsert.mock.calls.map((c) => (c[0] as { sort_order: number }).sort_order);
+        expect(insertCalls).toEqual([1, 2, 3]);
+    });
+
+    it("mevcut order'a 2 line eklendiğinde DB max=5 → cache 6, 7", async () => {
+        const drafts = [1, 2].map((i) =>
+            makeDraft({
+                id: `draft-line-${i}`,
+                entity_type: "order_line",
+                parsed_data: { order_number: "ORD-2026-0099", product_sku: `SKU-${i}`, quantity: 1, unit_price: 100 },
+            })
+        );
+        mockDbListDrafts.mockResolvedValue(drafts);
+        mockDbFindOrderByOriginalNumber.mockResolvedValue({ id: "order-99" });
+        mockDbFindProductBySku.mockResolvedValue({ id: "prod-X" });
+
+        const { mockFrom, mockInsert } = makeSupabaseMock({
+            existingSortOrders: [{ sort_order: 5 }],
+            allLines: [{ line_total: 100 }],
+        });
+        vi.mocked(createServiceClient).mockReturnValue({ from: mockFrom } as ReturnType<typeof createServiceClient>);
+
+        await serviceConfirmBatch("batch-1");
+
+        const insertCalls = mockInsert.mock.calls.map((c) => (c[0] as { sort_order: number }).sort_order);
+        expect(insertCalls).toEqual([6, 7]);
+    });
 });
 
 // ─── parseNumeric — TR format ─────────────────────────────────────────────────
