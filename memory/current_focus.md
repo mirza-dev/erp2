@@ -5,7 +5,7 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
-**Son:** Sprint A bulgular review fixes KAPALI (2026-05-01; 2020 test) — G1/G4/G6/G7/G9 kapatıldı
+**Son:** Sprint A bulgular 2. tur KAPALI (2026-05-01; 2056 test) — lint 0 error, aiAvailable naming, reason split, 5 named test
 **Önceki:** Sprint C post-review fixes KAPALI (2026-05-01; 2014 test) — timer cleanup, purchase-utils pure fn, AiUnavailableBanner shared component
 **Önceki²:** Sprint C — Satın Alma Önerileri stabilizasyonu KAPALI (2026-05-01; 2003 test)
 
