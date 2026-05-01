@@ -397,6 +397,24 @@ export async function dbListOverdueShipments(): Promise<SalesOrderRow[]> {
     return data ?? [];
 }
 
+export async function dbGetOpenOrderCountByProduct(): Promise<Map<string, number>> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("order_lines")
+        .select("product_id, order_id, sales_orders!inner(commercial_status, fulfillment_status)")
+        .eq("sales_orders.commercial_status", "approved")
+        .not("sales_orders.fulfillment_status", "eq", "shipped");
+    if (error) throw new Error(error.message);
+    const orderSets = new Map<string, Set<string>>();
+    for (const row of data ?? []) {
+        const pid = row.product_id as string;
+        const oid = row.order_id as string;
+        if (!orderSets.has(pid)) orderSets.set(pid, new Set());
+        orderSets.get(pid)!.add(oid);
+    }
+    return new Map([...orderSets.entries()].map(([pid, s]) => [pid, s.size]));
+}
+
 // ── Hard Delete ──────────────────────────────────────────────
 
 export async function dbHardDeleteOrder(id: string): Promise<void> {

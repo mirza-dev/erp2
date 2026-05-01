@@ -25,6 +25,7 @@ interface ProductAlertGroup {
     available: number;
     minStock: number;
     reserved: number;
+    openOrderCount: number;
     unit: string;
     coverageDays: number | null;
     topSeverity: "critical" | "warning";
@@ -101,6 +102,7 @@ export default function AlertsPage() {
 
     const [rawAlerts, setRawAlerts]         = useState<AlertRow[]>([]);
     const [products, setProducts]           = useState<Product[]>([]);
+    const [openOrderCounts, setOpenOrderCounts] = useState<Record<string, number>>({});
     const [loading, setLoading]             = useState(true);
     const [activeFilter, setActiveFilter]   = useState<AlertFilter>("all");
     const [showResolved, setShowResolved]   = useState(false);
@@ -115,9 +117,10 @@ export default function AlertsPage() {
 
     // ── Fetch ──
     const refetch = useCallback(async () => {
-        const [alertsRes, productsRes] = await Promise.all([
+        const [alertsRes, productsRes, openCountRes] = await Promise.all([
             fetch("/api/alerts"),
             fetch("/api/products"),
+            fetch("/api/orders/open-count-by-product"),
         ]);
         if (alertsRes.ok) {
             const data = await alertsRes.json();
@@ -126,6 +129,10 @@ export default function AlertsPage() {
         if (productsRes.ok) {
             const data = await productsRes.json();
             if (Array.isArray(data)) setProducts(data.map(mapProduct));
+        }
+        if (openCountRes.ok) {
+            const data = await openCountRes.json();
+            if (data && typeof data === "object") setOpenOrderCounts(data as Record<string, number>);
         }
     }, []);
 
@@ -173,6 +180,7 @@ export default function AlertsPage() {
                 available,
                 minStock,
                 reserved,
+                openOrderCount: openOrderCounts[entityId] ?? 0,
                 unit,
                 coverageDays: covDays,
                 topSeverity:  topSev as "critical" | "warning",
@@ -189,7 +197,7 @@ export default function AlertsPage() {
             if (a.topSeverity !== b.topSeverity) return a.topSeverity === "critical" ? -1 : 1;
             return (a.coverageDays ?? 999) - (b.coverageDays ?? 999);
         });
-    }, [activeAlerts, productMap]);
+    }, [activeAlerts, productMap, openOrderCounts]);
 
     const aiAlerts           = useMemo(() => activeAlerts.filter((a) => a.source === "ai"), [activeAlerts]);
     const orderAlerts        = useMemo(() => activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "sales_order"), [activeAlerts]);
@@ -626,7 +634,7 @@ export default function AlertsPage() {
                                 { label: "ÜRÜN",            pad: "8px 16px", tooltip: undefined },
                                 { label: "NEDEN",           pad: "8px 12px", tooltip: undefined },
                                 { label: "ETKİ",            pad: "8px 12px", tooltip: undefined },
-                                { label: "Açık Sipariş",   pad: "8px 12px", tooltip: "Bu üründe onaylı siparişler için ayrılmış birim sayısı" },
+                                { label: "Açık Sipariş",   pad: "8px 12px", tooltip: "Onaylı ve henüz sevk edilmemiş sipariş sayısı" },
                                 { label: "ÖNERİLEN ADIM",  pad: "8px 12px", tooltip: undefined },
                                 { label: "",               pad: "8px 12px", tooltip: undefined },
                             ].map(({ label, pad, tooltip }) => (
@@ -1207,20 +1215,15 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
                 </span>
             </div>
 
-            {/* Açık Sipariş — onaylı siparişler için ayrılmış birim */}
+            {/* Açık Sipariş — onaylı + sevk edilmemiş sipariş sayısı */}
             <div style={{ padding: "12px 12px" }}
-                title="Bu üründe onaylı siparişler için ayrılmış birim sayısı">
+                title="Bu ürün için onaylı ve henüz sevk edilmemiş sipariş sayısı">
                 <span style={{
                     fontSize: "13px", fontWeight: 600,
-                    color: group.reserved > 0 ? "var(--accent-text)" : "var(--text-tertiary)",
+                    color: group.openOrderCount > 0 ? "var(--accent-text)" : "var(--text-tertiary)",
                 }}>
-                    {group.reserved}
+                    {group.openOrderCount}
                 </span>
-                {group.reserved > 0 && (
-                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", marginLeft: "3px" }}>
-                        {group.unit}
-                    </span>
-                )}
             </div>
 
             {/* Recommended action */}
