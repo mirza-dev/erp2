@@ -4,8 +4,32 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Sprint C — Satın Alma Önerileri stabilizasyonu (`docs/plans/03-purchase-suggested-implementation.md`)
-**Önceki:** Sprint B — AI İçeri Aktar stabilizasyonu KAPALI (2026-05-01; 1993 test)
+**Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
+**Son:** Sprint A bulgular review fixes KAPALI (2026-05-01; 2020 test) — G1/G4/G6/G7/G9 kapatıldı
+**Önceki:** Sprint C post-review fixes KAPALI (2026-05-01; 2014 test) — timer cleanup, purchase-utils pure fn, AiUnavailableBanner shared component
+**Önceki²:** Sprint C — Satın Alma Önerileri stabilizasyonu KAPALI (2026-05-01; 2003 test)
+
+---
+
+## Sprint C Özet (2026-05-01) — KAPALI
+
+**Hedef:** /dashboard/purchase/suggested sayfasının tasarımını koruyup eksik işlevsellik + bug + lifecycle.
+
+**3 commit:**
+- Part 1 (`2816193`): AI fail banner + costPrice NULL fallback + 300ms refetch + isDemo guard. Backend route'a `ai_call_failed` flag.
+- Part 2 (`27ca6b6`): `dbExpireRecommendationsForMissingEntities` — silinmiş ürünün suggested+decided rec'lerini expire eder; route scan başında çağrı (Sprint A G1 alerts pattern paralel).
+- Part 3 (`d45bd2b`): "Açık" → "Stok Açığı" (header + tooltip + 0); multi-currency TOPLAM (Map ile group; tek currency mevcut görünüm, karışıksa "+ $X" alt satır).
+
+**Atlanan:** G5 (KARAR cell-içi buton seti) — mevcut "Karar ver →" drawer pattern korundu; plan'ın "mevcut tasarım korunur" hükmü gereği.
+
+**Domain kuralı:** Recommendations için iki ayrı orphan cleanup var:
+- `dbExpireSuggestedRecommendations` — stok min'in üstüne çıkan ürünler için (sadece suggested)
+- `dbExpireRecommendationsForMissingEntities` — silinmiş/deaktif ürünler için (suggested + decided dahil hepsi)
+İki farklı senaryo, iki farklı helper; karar tutmak vs. hayalet öneri önlemek arasında ayrım net.
+
+**Test:** 106 dosya · 2003 test yeşil · TS clean.
+
+---
 
 ---
 
