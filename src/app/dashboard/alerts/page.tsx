@@ -12,6 +12,7 @@ import { extractShortageQty, shortReason, shortImpact } from "@/lib/alert-ui-hel
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { AI_SUMMARY_LABELS } from "@/lib/ai-summary-labels";
+import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -65,16 +66,6 @@ const SEV: Record<"critical" | "warning" | "info", {
     info:     { dot: "var(--accent)",  text: "var(--accent-text)",  bg: "var(--accent-bg)",  border: "var(--accent-border)",  label: "AI"     },
 };
 
-const ALERT_TYPE_LABEL: Record<string, string> = {
-    stock_critical:       "Kritik Stok",
-    stock_risk:           "Stok Uyarısı",
-    order_shortage:       "Sipariş Eksik",
-    purchase_recommended: "Satın Alma Önerisi",
-    quote_expired:        "Teklif Süresi Geçti",
-    overdue_shipment:     "Geciken Sevkiyat",
-    order_deadline:       "Sipariş Teslim Riski",
-    sync_issue:           "Paraşüt Senkron Hatası",
-};
 
 // ── useIsMobile ────────────────────────────────────────────────
 
@@ -255,7 +246,7 @@ export default function AlertsPage() {
             const res = await fetch("/api/alerts/ai-suggest", { method: "POST" });
             if (!res.ok) throw new Error(String(res.status));
             const data = await res.json();
-            if (!data.ai_available) {
+            if (!data.aiAvailable) {
                 setAiUnavailable({ reason: "not_configured" });
                 return;
             }

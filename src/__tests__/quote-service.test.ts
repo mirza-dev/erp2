@@ -108,7 +108,7 @@ describe("serviceTransitionQuote", () => {
     it("sent → draft (reverse) geçersiz", async () => {
         mockDbGetQuote.mockResolvedValue(stubQuote("sent"));
         // "sent" as QuoteTransition would be wrong but testing the guard
-        const result = await serviceTransitionQuote(QUOTE_ID, "sent" as "sent");
+        const result = await serviceTransitionQuote(QUOTE_ID, "sent" as const);
         // sent→sent is not in the map
         expect(result.success).toBe(false);
         expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();

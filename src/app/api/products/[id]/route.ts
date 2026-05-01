@@ -14,9 +14,9 @@ const PRODUCT_ALERT_TYPES: AlertType[] = [
     "stock_critical", "stock_risk", "order_deadline", "order_shortage", "purchase_recommended",
 ];
 
-async function resolveProductAlerts(productId: string): Promise<void> {
+async function resolveProductAlerts(productId: string, reason: string): Promise<void> {
     await dbBatchResolveAlerts(
-        PRODUCT_ALERT_TYPES.map(type => ({ type, entityId: productId, reason: "product_deleted_or_deactivated" }))
+        PRODUCT_ALERT_TYPES.map(type => ({ type, entityId: productId, reason }))
     ).catch(() => { /* best-effort — alert cleanup must not block product response */ });
 }
 
@@ -51,7 +51,7 @@ export async function PATCH(
         revalidateTag("products", "max");
         // Ürün deaktif edildiyse ilgili aktif uyarıları da kapat (G1 ileriye dönük fix)
         if (body.is_active === false) {
-            await resolveProductAlerts(id);
+            await resolveProductAlerts(id, "product_deactivated");
         }
         return NextResponse.json(product);
     } catch (err) {
@@ -68,7 +68,7 @@ export async function DELETE(
         const { id } = await params;
         await dbDeleteProduct(id);
         // G1 ileriye dönük fix: silinen ürünün aktif uyarılarını hemen kapat
-        await resolveProductAlerts(id);
+        await resolveProductAlerts(id, "product_deleted");
         revalidateTag("products", "max");
         return NextResponse.json({ ok: true });
     } catch (err) {

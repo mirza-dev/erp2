@@ -152,9 +152,9 @@ describe("POST /api/alerts/scan — HTTP status contract", () => {
 // ── POST /api/alerts/ai-suggest ───────────────────────────────────────────────
 
 describe("POST /api/alerts/ai-suggest — HTTP status contract", () => {
-    it("200 + ai_available:true when AI runs successfully", async () => {
+    it("200 + aiAvailable:true when AI runs successfully", async () => {
         mockServiceGenerateAiAlerts.mockResolvedValue({
-            ai_available: true,
+            aiAvailable: true,
             dismissed: 1,
             created: 3,
             summary: "AI özeti",
@@ -164,13 +164,13 @@ describe("POST /api/alerts/ai-suggest — HTTP status contract", () => {
         const body = await res.json();
 
         expect(res.status).toBe(200);
-        expect(body.ai_available).toBe(true);
+        expect(body.aiAvailable).toBe(true);
         expect(body.created).toBe(3);
     });
 
-    it("200 + ai_available:false when API key missing — UI shows config warning (not error)", async () => {
+    it("200 + aiAvailable:false when API key missing — UI shows config warning (not error)", async () => {
         mockServiceGenerateAiAlerts.mockResolvedValue({
-            ai_available: false,
+            aiAvailable: false,
             dismissed: 0,
             created: 0,
             summary: "",
@@ -180,7 +180,7 @@ describe("POST /api/alerts/ai-suggest — HTTP status contract", () => {
         const body = await res.json();
 
         expect(res.status).toBe(200);
-        expect(body.ai_available).toBe(false);
+        expect(body.aiAvailable).toBe(false);
     });
 
     it("500 when service throws — UI res.ok check catches this, shows error toast", async () => {
@@ -191,13 +191,13 @@ describe("POST /api/alerts/ai-suggest — HTTP status contract", () => {
         expect(res.status).toBe(500);
     });
 
-    it("500 body does NOT contain ai_available — confirms old misleading parse is prevented", async () => {
+    it("500 body does NOT contain aiAvailable — confirms old misleading parse is prevented", async () => {
         mockServiceGenerateAiAlerts.mockRejectedValue(new Error("AI servis hatası"));
 
         const res = await aiSuggestPost();
         const body = await res.json();
 
-        expect(body.ai_available).toBeUndefined();
+        expect(body.aiAvailable).toBeUndefined();
         expect(body.error).toBeDefined();
     });
 

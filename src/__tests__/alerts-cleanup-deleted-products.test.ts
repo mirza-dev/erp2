@@ -4,7 +4,7 @@
  * Senaryo:
  *   - Aktif ürün listesinde olmayan (silinmiş veya is_active=false) ürünlere
  *     ait stock_critical / stock_risk / order_deadline / order_shortage uyarıları
- *     scan başında batch resolve edilir; reason: "product_deleted_or_deactivated".
+ *     scan başında batch resolve edilir; reason: "auto_cleanup_orphaned".
  *   - Aktif ürün uyarıları etkilenmez.
  *   - Mevcut N+1 optimize akış bozulmaz.
  */
@@ -122,7 +122,7 @@ describe("serviceScanStockAlerts — orphan cleanup (Sprint A G1)", () => {
         expect(calls.length).toBeGreaterThan(0);
         const allEntries = calls.flatMap((c) => c[0] as Array<{ type: string; entityId: string; reason: string }>);
         const orphanEntry = allEntries.find(
-            (e) => e.entityId === "prod-deleted-1" && e.reason === "product_deleted_or_deactivated"
+            (e) => e.entityId === "prod-deleted-1" && e.reason === "auto_cleanup_orphaned"
         );
         expect(orphanEntry).toBeDefined();
         expect(orphanEntry!.type).toBe("stock_critical");
@@ -142,7 +142,7 @@ describe("serviceScanStockAlerts — orphan cleanup (Sprint A G1)", () => {
         const allEntries = mockDbBatchResolveAlerts.mock.calls.flatMap(
             (c) => c[0] as Array<{ type: string; entityId: string; reason: string }>
         );
-        const orphanEntries = allEntries.filter((e) => e.reason === "product_deleted_or_deactivated");
+        const orphanEntries = allEntries.filter((e) => e.reason === "auto_cleanup_orphaned");
         expect(orphanEntries).toHaveLength(4);
         const types = new Set(orphanEntries.map((e) => e.type));
         expect(types).toEqual(new Set(["stock_critical", "stock_risk", "order_deadline", "order_shortage"]));
@@ -150,7 +150,7 @@ describe("serviceScanStockAlerts — orphan cleanup (Sprint A G1)", () => {
 
     it("aktif üründeki uyarı orphan SAYILMAZ (kendi yaşam döngüsü işler)", async () => {
         // Aktif ürün stoğu sağlıklı → eski stock_critical "stock_recovered" reason ile resolve olur,
-        // ama "product_deleted_or_deactivated" reason ile DEĞİL.
+        // ama "auto_cleanup_orphaned" reason ile DEĞİL.
         mockDbListAllActiveProducts.mockResolvedValue([makeProduct({ id: "prod-active-1", available_now: 500, min_stock_level: 10 })]);
         mockDbListActiveAlerts.mockResolvedValue([
             makeAlert({ id: "a-active", type: "stock_critical", entity_id: "prod-active-1" }),
@@ -162,7 +162,7 @@ describe("serviceScanStockAlerts — orphan cleanup (Sprint A G1)", () => {
             (c) => c[0] as Array<{ type: string; entityId: string; reason: string }>
         );
         const orphanForActive = allEntries.find(
-            (e) => e.entityId === "prod-active-1" && e.reason === "product_deleted_or_deactivated"
+            (e) => e.entityId === "prod-active-1" && e.reason === "auto_cleanup_orphaned"
         );
         expect(orphanForActive).toBeUndefined();
     });

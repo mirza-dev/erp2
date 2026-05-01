@@ -31,17 +31,23 @@ vi.mock("@/lib/supabase/alerts", () => ({
 }));
 
 vi.mock("@/lib/api-error", () => ({
-    handleApiError: (_err: unknown, msg: string) => {
-        const { NextResponse } = require("next/server");
-        return NextResponse.json({ error: msg }, { status: 500 });
-    },
+    handleApiError: (_err: unknown, msg: string) =>
+        new Response(JSON.stringify({ error: msg }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+        }),
     safeParseJson: async (req: Request) => {
         try {
             const data = await req.json();
             return { ok: true, data };
         } catch {
-            const { NextResponse } = require("next/server");
-            return { ok: false, response: NextResponse.json({ error: "bad json" }, { status: 400 }) };
+            return {
+                ok: false,
+                response: new Response(JSON.stringify({ error: "bad json" }), {
+                    status: 400,
+                    headers: { "Content-Type": "application/json" },
+                }),
+            };
         }
     },
 }));
@@ -79,7 +85,7 @@ describe("DELETE /api/products/[id] — alert cleanup", () => {
             expect(types).toContain(t);
         }
         expect(entries.every(e => e.entityId === "prod-123")).toBe(true);
-        expect(entries.every(e => e.reason === "product_deleted_or_deactivated")).toBe(true);
+        expect(entries.every(e => e.reason === "product_deleted")).toBe(true);
     });
 
     it("still returns 200 even if dbBatchResolveAlerts throws", async () => {
@@ -110,7 +116,7 @@ describe("PATCH /api/products/[id] — alert cleanup on deactivation", () => {
         expect(mockDbBatchResolveAlerts).toHaveBeenCalledOnce();
         const entries: Array<{ type: string; reason: string }> =
             mockDbBatchResolveAlerts.mock.calls[0][0];
-        expect(entries.every(e => e.reason === "product_deleted_or_deactivated")).toBe(true);
+        expect(entries.every(e => e.reason === "product_deactivated")).toBe(true);
     });
 
     it("does NOT call dbBatchResolveAlerts when is_active is not changed", async () => {

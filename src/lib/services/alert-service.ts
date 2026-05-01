@@ -108,7 +108,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
             !activeProductIds.has(a.entity_id) &&
             (ORPHAN_TARGET_TYPES as readonly string[]).includes(a.type)
         ) {
-            toResolve.push({ type: a.type, entityId: a.entity_id, reason: "product_deleted_or_deactivated" });
+            toResolve.push({ type: a.type, entityId: a.entity_id, reason: "auto_cleanup_orphaned" });
             // activeMap'ten de düş ki sonraki create akışları yanılmasın.
             activeMap.delete(`${a.type}:${a.entity_id}`);
         }
@@ -265,7 +265,7 @@ export interface UpdateAlertStatusResult {
 // ── AI Alert Generation ─────────────────────────────────────
 
 export interface AiAlertGenerationResult {
-    ai_available: boolean;
+    aiAvailable: boolean;
     dismissed: number;
     created: number;
     summary: string;
@@ -273,7 +273,7 @@ export interface AiAlertGenerationResult {
 
 export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult> {
     if (!isAIAvailable()) {
-        return { ai_available: false, dismissed: 0, created: 0, summary: "" };
+        return { aiAvailable: false, dismissed: 0, created: 0, summary: "" };
     }
 
     // Gather metrics (same logic as ops-summary route)
@@ -352,7 +352,7 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
         if (alert) created++;
     }
 
-    return { ai_available: true, dismissed, created, summary: result.summary };
+    return { aiAvailable: true, dismissed, created, summary: result.summary };
 }
 
 export async function serviceUpdateAlertStatus(

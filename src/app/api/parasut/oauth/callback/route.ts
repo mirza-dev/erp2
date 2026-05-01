@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createHmac } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
 
@@ -29,7 +29,6 @@ function verifyCookieState(cookieValue: string, stateParam: string): boolean {
         const a = Buffer.from(sig, "hex");
         const b = Buffer.from(expected, "hex");
         if (a.length !== b.length) return false;
-        const { timingSafeEqual } = require("crypto") as typeof import("crypto");
         return timingSafeEqual(a, b) && state === stateParam;
     } catch {
         return false;
