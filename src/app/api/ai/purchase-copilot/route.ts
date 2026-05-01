@@ -6,6 +6,7 @@ import {
     dbUpsertRecommendation,
     dbExpireSuggestedRecommendations,
     dbExpireStaleRecommendations,
+    dbExpireRecommendationsForMissingEntities,
     dbGetActiveRecommendationsForEntities,
 } from "@/lib/supabase/recommendations";
 import type { AiRecommendationRow } from "@/lib/database.types";
@@ -22,6 +23,17 @@ export async function POST() {
     } catch (err) {
         return handleApiError(err, "Satın alma önerileri toplanamadı.");
     }
+
+    // Sprint C G1: Silinmiş veya deaktif edilmiş ürünlerin aktif önerilerini
+    // expire et (suggested + accepted/edited/rejected). Aksi halde sayfada
+    // hayalet öneriler görünür ve ürün geri etkinleştiğinde eski karar geri
+    // dirilir. `products` zaten is_active=true ile yüklendiği için aktif id
+    // setini doğrudan kullanıyoruz; alerts scan'indeki orphan cleanup ile
+    // aynı pattern (Sprint A G1).
+    try {
+        const allActiveProductIds = products.map(p => p.id);
+        await dbExpireRecommendationsForMissingEntities("product", allActiveProductIds, "purchase_suggestion");
+    } catch { /* non-fatal — main flow continues */ }
 
     const needsPurchase = products.filter(p => p.product_type !== "manufactured" && p.available_now <= p.min_stock_level);
 

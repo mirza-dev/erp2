@@ -30,10 +30,16 @@ vi.mock("@/lib/services/ai-service", () => ({
 
 const mockDbUpsertRecommendation = vi.fn();
 const mockDbExpireSuggestedRecommendations = vi.fn();
+const mockDbExpireStaleRecommendations = vi.fn();
+const mockDbExpireRecommendationsForMissingEntities = vi.fn();
+const mockDbGetActiveRecommendationsForEntities = vi.fn();
 
 vi.mock("@/lib/supabase/recommendations", () => ({
     dbUpsertRecommendation: (...args: unknown[]) => mockDbUpsertRecommendation(...args),
     dbExpireSuggestedRecommendations: (...args: unknown[]) => mockDbExpireSuggestedRecommendations(...args),
+    dbExpireStaleRecommendations: (...args: unknown[]) => mockDbExpireStaleRecommendations(...args),
+    dbExpireRecommendationsForMissingEntities: (...args: unknown[]) => mockDbExpireRecommendationsForMissingEntities(...args),
+    dbGetActiveRecommendationsForEntities: (...args: unknown[]) => mockDbGetActiveRecommendationsForEntities(...args),
 }));
 
 import { POST } from "@/app/api/ai/purchase-copilot/route";
@@ -44,8 +50,16 @@ beforeEach(() => {
     mockDbListProducts.mockReset();
     mockAiEnrichPurchaseSuggestions.mockReset();
     // Default: upsert resolves with a mock rec row; expire resolves with 0
+    mockDbUpsertRecommendation.mockReset();
     mockDbUpsertRecommendation.mockResolvedValue({ id: "rec-mock", status: "suggested" });
+    mockDbExpireSuggestedRecommendations.mockReset();
     mockDbExpireSuggestedRecommendations.mockResolvedValue(0);
+    mockDbExpireStaleRecommendations.mockReset();
+    mockDbExpireStaleRecommendations.mockResolvedValue(0);
+    mockDbExpireRecommendationsForMissingEntities.mockReset();
+    mockDbExpireRecommendationsForMissingEntities.mockResolvedValue(0);
+    mockDbGetActiveRecommendationsForEntities.mockReset();
+    mockDbGetActiveRecommendationsForEntities.mockResolvedValue([]);
     mockIsAIAvailable.mockReset();
 });
 
@@ -344,6 +358,40 @@ describe("POST /api/ai/purchase-copilot — ai_call_failed flag (Sprint C G2)", 
         // ile zaten "deterministik mod" gösterir.
         expect(body.ai_call_failed).toBe(false);
         expect(body.ai_available).toBe(false);
+    });
+});
+
+// Sprint C G1: Silinmiş ürünlerin recommendations'ı orphan cleanup
+describe("POST /api/ai/purchase-copilot — orphan rec cleanup (Sprint C G1)", () => {
+    beforeEach(() => {
+        mockIsAIAvailable.mockReturnValue(false);
+        mockDbListProducts.mockResolvedValue([
+            makeProduct({ id: "p-active-1", available_now: 5, min_stock_level: 20 }),
+            makeProduct({ id: "p-active-2", available_now: 8, min_stock_level: 15 }),
+        ]);
+    });
+
+    it("dbExpireRecommendationsForMissingEntities aktif id seti ile çağrılır", async () => {
+        await POST();
+        expect(mockDbExpireRecommendationsForMissingEntities).toHaveBeenCalledTimes(1);
+        const [entityType, ids, recType] = mockDbExpireRecommendationsForMissingEntities.mock.calls[0];
+        expect(entityType).toBe("product");
+        expect(ids).toEqual(["p-active-1", "p-active-2"]);
+        expect(recType).toBe("purchase_suggestion");
+    });
+
+    it("aktif ürün listesi boşsa boş array geçer (helper kendi guard'ı no-op)", async () => {
+        mockDbListProducts.mockResolvedValue([]);
+        await POST();
+        expect(mockDbExpireRecommendationsForMissingEntities).toHaveBeenCalledWith(
+            "product", [], "purchase_suggestion"
+        );
+    });
+
+    it("orphan cleanup throw → main flow devam eder (non-fatal)", async () => {
+        mockDbExpireRecommendationsForMissingEntities.mockRejectedValueOnce(new Error("DB hata"));
+        const res = await POST();
+        expect(res.status).toBe(200);
     });
 });
 

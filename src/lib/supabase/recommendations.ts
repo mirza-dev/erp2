@@ -247,3 +247,37 @@ export async function dbExpireSuggestedRecommendations(
     if (error) throw new Error(error.message);
     return data?.length ?? 0;
 }
+
+/**
+ * Sprint C G1: Expire all ACTIVE recommendations (including user decisions)
+ * whose entity_id is no longer in the active entity list — i.e. the entity
+ * was deleted or deactivated.
+ *
+ * Different from `dbExpireSuggestedRecommendations`:
+ *   - That one only touches "suggested" rows (system state).
+ *   - This one also expires "accepted"/"edited"/"rejected" rows because the
+ *     entity itself no longer exists; keeping the decision causes ghost
+ *     suggestions to reappear if the entity is reactivated.
+ *
+ * Safety: empty `validEntityIds` → no-op (returns 0). Caller must pass the
+ * full active set; otherwise valid recs would be wiped.
+ */
+export async function dbExpireRecommendationsForMissingEntities(
+    entityType: string,
+    validEntityIds: string[],
+    recommendationType: RecommendationType
+): Promise<number> {
+    if (validEntityIds.length === 0) return 0;
+    const supabase = createServiceClient();
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+        .from("ai_recommendations")
+        .update({ status: "expired", expired_at: now })
+        .eq("entity_type", entityType)
+        .eq("recommendation_type", recommendationType)
+        .in("status", ["suggested", "accepted", "edited", "rejected"])
+        .not("entity_id", "in", `("${validEntityIds.join('","')}")`)
+        .select("id");
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+}

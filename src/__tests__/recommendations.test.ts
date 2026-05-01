@@ -48,6 +48,7 @@ import {
     dbGetRecommendationById,
     dbUpdateRecommendationStatus,
     dbExpireSuggestedRecommendations,
+    dbExpireRecommendationsForMissingEntities,
     dbExpireStaleRecommendations,
     dbGetActiveRecommendationsForEntities,
 } from "@/lib/supabase/recommendations";
@@ -455,6 +456,72 @@ describe("dbExpireSuggestedRecommendations — marks only suggested rows", () =>
         const count = await dbExpireSuggestedRecommendations("product", [], "purchase_suggestion");
         expect(count).toBe(0);
         expect(mockFrom).not.toHaveBeenCalled();
+    });
+});
+
+// Sprint C G1: silinmiş entity için tüm aktif rec statüleri expire edilir
+describe("dbExpireRecommendationsForMissingEntities — all active statuses (Sprint C G1)", () => {
+    it("status filter olarak suggested+accepted+edited+rejected geçer", async () => {
+        let inStatusArg: unknown = null;
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.update = () => ({
+                    eq: () => ({
+                        eq: () => ({
+                            in: (col: string, vals: unknown) => {
+                                if (col === "status") inStatusArg = vals;
+                                return {
+                                    not: () => ({
+                                        select: async () => ({ data: [{ id: "r1" }, { id: "r2" }], error: null }),
+                                    }),
+                                };
+                            },
+                        }),
+                    }),
+                });
+                return b;
+            },
+        });
+
+        const count = await dbExpireRecommendationsForMissingEntities("product", ["p-1"], "purchase_suggestion");
+        expect(count).toBe(2);
+        expect(inStatusArg).toEqual(["suggested", "accepted", "edited", "rejected"]);
+    });
+
+    it("validEntityIds boş → no-op (DB call yok, veri kaybı koruması)", async () => {
+        const count = await dbExpireRecommendationsForMissingEntities("product", [], "purchase_suggestion");
+        expect(count).toBe(0);
+        expect(mockFrom).not.toHaveBeenCalled();
+    });
+
+    it("update payload status=expired ve expired_at set ediliyor", async () => {
+        let updatePayload: Record<string, unknown> | null = null;
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.update = (data: Record<string, unknown>) => {
+                    updatePayload = data;
+                    return {
+                        eq: () => ({
+                            eq: () => ({
+                                in: () => ({
+                                    not: () => ({
+                                        select: async () => ({ data: [], error: null }),
+                                    }),
+                                }),
+                            }),
+                        }),
+                    };
+                };
+                return b;
+            },
+        });
+
+        await dbExpireRecommendationsForMissingEntities("product", ["p-1", "p-2"], "purchase_suggestion");
+        expect(updatePayload).not.toBeNull();
+        expect((updatePayload as unknown as Record<string, unknown>).status).toBe("expired");
+        expect((updatePayload as unknown as Record<string, unknown>).expired_at).toBeDefined();
     });
 });
 
