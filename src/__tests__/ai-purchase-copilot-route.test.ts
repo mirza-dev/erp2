@@ -302,6 +302,49 @@ describe("POST /api/ai/purchase-copilot — AI error graceful degradation", () =
         expect(item.aiQuantityRationale).toBeNull();
         expect(item.aiConfidence).toBeNull();
     });
+
+    // Sprint C G2: AI key var ama call fail → frontend banner için flag
+    it("ai_call_failed: true (Sprint C G2 — frontend banner sinyali)", async () => {
+        const res = await POST();
+        const body = await res.json();
+        expect(body.ai_call_failed).toBe(true);
+    });
+
+    it("ai_available stays true — key var, sadece call fail", async () => {
+        const res = await POST();
+        const body = await res.json();
+        expect(body.ai_available).toBe(true);
+    });
+});
+
+// Sprint C G2 happy-path regression: AI başarılıysa ai_call_failed=false
+describe("POST /api/ai/purchase-copilot — ai_call_failed flag (Sprint C G2)", () => {
+    it("ai_call_failed: false when AI succeeds", async () => {
+        mockIsAIAvailable.mockReturnValue(true);
+        mockDbListProducts.mockResolvedValue([
+            makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20 }),
+        ]);
+        mockAiEnrichPurchaseSuggestions.mockResolvedValue({
+            enrichments: [{ productId: "p-1", whyNow: "x", quantityRationale: "y", urgencyLevel: "high", confidence: 0.7 }],
+            generatedAt: new Date().toISOString(),
+        });
+        const res = await POST();
+        const body = await res.json();
+        expect(body.ai_call_failed).toBe(false);
+    });
+
+    it("ai_call_failed: false when AI is unavailable (key yok)", async () => {
+        mockIsAIAvailable.mockReturnValue(false);
+        mockDbListProducts.mockResolvedValue([
+            makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20 }),
+        ]);
+        const res = await POST();
+        const body = await res.json();
+        // AI çağrılmadığı için fail flag de false; frontend isDemo/ai_available
+        // ile zaten "deterministik mod" gösterir.
+        expect(body.ai_call_failed).toBe(false);
+        expect(body.ai_available).toBe(false);
+    });
 });
 
 // ─── DB error ─────────────────────────────────────────────────────────────────
@@ -499,7 +542,7 @@ describe("POST /api/ai/purchase-copilot — §11.1 mutation prevention", () => {
         expect(body).not.toHaveProperty("alertId");
         expect(body).not.toHaveProperty("orderId");
         expect(body).not.toHaveProperty("stockMutation");
-        expect(Object.keys(body).sort()).toEqual(["ai_available", "counts", "generatedAt", "items", "recommendations"]);
+        expect(Object.keys(body).sort()).toEqual(["ai_available", "ai_call_failed", "counts", "generatedAt", "items", "recommendations"]);
     });
 
     it("route does not import alert-service, order-service, or production-service", () => {

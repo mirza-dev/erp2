@@ -88,13 +88,17 @@ export async function POST() {
         confidence: number;
     };
     let freshEnrichments: EnrichmentEntry[] = [];
+    // Sprint C G2: AI key var ama call fail olursa frontend "AI kullanılamıyor"
+    // banner'ı gösterebilsin diye ayrı flag tutuyoruz; aiAvailable=true + call_failed=true
+    // durumunda kullanıcı "Yeniden dene" butonuyla tekrar tetikleyebilir.
+    let aiCallFailed = false;
 
     if (aiAvailable && needsAiItems.length > 0) {
         try {
             const result = await aiEnrichPurchaseSuggestions(needsAiItems);
             freshEnrichments = result.enrichments;
         } catch {
-            // AI error doesn't bring down the route
+            aiCallFailed = true;
         }
     }
 
@@ -227,6 +231,7 @@ export async function POST() {
 
     return NextResponse.json({
         ai_available: aiAvailable,
+        ai_call_failed: aiCallFailed,
         counts: {
             total_products: products.length,
             needs_purchase: needsPurchase.length,

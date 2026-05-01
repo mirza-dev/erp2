@@ -445,6 +445,7 @@ export default function PurchaseSuggestedPage() {
     const isDemo = useIsDemo();
     const [aiData, setAiData] = useState<{
         ai_available: boolean;
+        ai_call_failed?: boolean;
         items: AiEnrichmentItem[];
         recommendations?: Array<{ productId: string; recommendationId: string | null; status: string; decidedAt?: string | null }>;
         generatedAt?: string;
@@ -458,6 +459,14 @@ export default function PurchaseSuggestedPage() {
     const [recMap, setRecMap] = useState<Map<string, RecEntry & { editedQty?: number }>>(new Map());
 
     const loadAiData = useCallback(async (signal?: AbortSignal) => {
+        // Sprint C G7: demo modda AI POST yapma — middleware 403 dönüyor ve sessiz
+        // yutuluyor. Önceden AI banner'ı gösterip user'ı yanıltıyordu; şimdi
+        // hiç çağırmıyoruz, mavi info banner ile durum bildiriliyor.
+        if (isDemo) {
+            setAiData(null);
+            setAiError(false);
+            return;
+        }
         setAiLoading(true);
         setAiError(false);
         try {
@@ -480,6 +489,8 @@ export default function PurchaseSuggestedPage() {
                     }
                     setRecMap(newMap);
                 }
+            } else {
+                setAiError(true);
             }
         } catch (e) {
             if (!(e instanceof Error && e.name === "AbortError")) {
@@ -488,7 +499,7 @@ export default function PurchaseSuggestedPage() {
         } finally {
             setAiLoading(false);
         }
-    }, []);
+    }, [isDemo]);
 
     useEffect(() => {
         if (reorderSuggestions.length === 0) return;
@@ -529,6 +540,10 @@ export default function PurchaseSuggestedPage() {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, decidedAt: recommendation.decidedAt }));
                 toast({ type: "success", message: "Sipariş önerisi kabul edildi" });
+                // Sprint C G6: özet kartlar (Toplam Kritik, Toplam Tutar, kabul edilen)
+                // recMap üzerinden hesaplanıyor; sayaç guarantilenmesi için debounce ile
+                // arkaplandan refetch — kullanıcı satır state'ini hemen görür.
+                setTimeout(() => loadAiData(), 300);
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -558,6 +573,7 @@ export default function PurchaseSuggestedPage() {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, decidedAt: recommendation.decidedAt }));
                 toast({ type: "info", message: "Öneri reddedildi" });
+                setTimeout(() => loadAiData(), 300);
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -588,6 +604,7 @@ export default function PurchaseSuggestedPage() {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, editedQty: qty, decidedAt: recommendation.decidedAt }));
                 toast({ type: "success", message: `Miktar güncellendi: ${qty} ${unit}` });
+                setTimeout(() => loadAiData(), 300);
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -635,20 +652,25 @@ export default function PurchaseSuggestedPage() {
         });
     }, [reorderSuggestions, search, filter, decisionFilter, recMap]);
 
-    const { totalOrderCost, acceptedOrderCost } = reorderSuggestions.reduce(
+    // Sprint C G4: costPrice ve price NULL ise satır toplama dahil edilmez (silently
+    // 0 ile çarpılırsa toplam yanıltıcı görünür). Etkilenen ürünleri sayıp
+    // kullanıcıya not ediyoruz: "X üründe fiyat eksik — toplam tutar onları içermez".
+    const { totalOrderCost, acceptedOrderCost, missingPriceCount } = reorderSuggestions.reduce(
         (acc, p) => {
             const rec = recMap.get(p.id);
             const isEdited = rec?.status === "edited";
             const qty = isEdited && rec?.editedQty != null ? rec.editedQty : computeSuggestion(p).suggestQty;
-            const lineCost = qty * (p.costPrice ?? p.price ?? 0);
+            const unitPrice = p.costPrice ?? p.price ?? null;
+            const lineCost = unitPrice !== null ? qty * unitPrice : null;
             return {
-                totalOrderCost: acc.totalOrderCost + lineCost,
-                acceptedOrderCost: rec?.status === "accepted"
+                totalOrderCost: lineCost !== null ? acc.totalOrderCost + lineCost : acc.totalOrderCost,
+                acceptedOrderCost: rec?.status === "accepted" && lineCost !== null
                     ? acc.acceptedOrderCost + lineCost
                     : acc.acceptedOrderCost,
+                missingPriceCount: lineCost === null ? acc.missingPriceCount + 1 : acc.missingPriceCount,
             };
         },
-        { totalOrderCost: 0, acceptedOrderCost: 0 }
+        { totalOrderCost: 0, acceptedOrderCost: 0, missingPriceCount: 0 }
     );
 
     const mostUrgent = [...reorderSuggestions]
@@ -718,7 +740,9 @@ export default function PurchaseSuggestedPage() {
                 Minimum stok seviyesinin altına düşen ürünler · Öncelik sırasına göre
             </p>
             <div style={{ marginTop: "4px", fontSize: "11px" }}>
-                {aiError ? (
+                {isDemo ? (
+                    <span style={{ color: "var(--text-tertiary)" }}>Demo modu — AI önerileri devre dışı</span>
+                ) : aiError || aiData?.ai_call_failed ? (
                     <span style={{ color: "var(--warning-text)" }}>AI kullanılamıyor — deterministik mod</span>
                 ) : aiLoading ? (
                     <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>AI analizi yükleniyor...</span>
@@ -728,6 +752,73 @@ export default function PurchaseSuggestedPage() {
                     <span style={{ color: "var(--text-tertiary)" }}>Deterministik mod</span>
                 )}
             </div>
+
+            {/* Sprint C G7: Demo modu mavi info banner */}
+            {isDemo && (
+                <div
+                    style={{
+                        marginTop: "16px",
+                        padding: "10px 14px",
+                        background: "var(--accent-bg)",
+                        border: "0.5px solid var(--accent-border)",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        fontSize: "12px",
+                        color: "var(--accent-text)",
+                    }}
+                >
+                    <span style={{ fontSize: "14px" }}>ℹ</span>
+                    <span>
+                        Demo modunda AI önerileri devre dışı. Aşağıda standart hesaplamalara dayalı öneriler gösteriliyor.
+                    </span>
+                </div>
+            )}
+
+            {/* Sprint C G2: AI çağrısı başarısız sarı banner + Yeniden dene */}
+            {!isDemo && (aiError || aiData?.ai_call_failed) && (
+                <div
+                    style={{
+                        marginTop: "16px",
+                        padding: "10px 14px",
+                        background: "var(--warning-bg)",
+                        border: "0.5px solid var(--warning-border)",
+                        borderRadius: "8px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "10px",
+                        fontSize: "12px",
+                        color: "var(--warning-text)",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ fontSize: "14px" }}>⚠</span>
+                        <span>
+                            AI önerisi şu an oluşturulamadı. Aşağıda standart hesaplamalara dayalı öneriler gösteriliyor.
+                        </span>
+                    </div>
+                    <button
+                        onClick={() => loadAiData()}
+                        disabled={aiLoading}
+                        style={{
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            padding: "4px 12px",
+                            borderRadius: "6px",
+                            background: "transparent",
+                            color: "var(--warning-text)",
+                            border: "0.5px solid var(--warning-border)",
+                            cursor: aiLoading ? "not-allowed" : "pointer",
+                            whiteSpace: "nowrap",
+                            opacity: aiLoading ? 0.6 : 1,
+                        }}
+                    >
+                        Yeniden dene
+                    </button>
+                </div>
+            )}
 
             {/* Summary cards */}
             {reorderSuggestions.length > 0 && (
@@ -796,6 +887,14 @@ export default function PurchaseSuggestedPage() {
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
                             {reorderSuggestions.length} ürün · {formatCurrency(acceptedOrderCost, "TRY")} kabul edildi
                         </div>
+                        {missingPriceCount > 0 && (
+                            <div
+                                style={{ fontSize: "11px", color: "var(--warning-text)", marginTop: "4px" }}
+                                title="Maliyet veya satış fiyatı tanımlı olmayan ürünler"
+                            >
+                                {missingPriceCount} üründe fiyat eksik — toplam tutar bu ürünleri içermez.
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
