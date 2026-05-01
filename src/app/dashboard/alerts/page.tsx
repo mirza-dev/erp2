@@ -10,6 +10,7 @@ import { EmptyState, LoadingState } from "@/components/ui/StateViews";
 import type { AlertRow } from "@/lib/database.types";
 import { extractShortageQty, shortReason, shortImpact } from "@/lib/alert-ui-helpers";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
+import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -418,56 +419,17 @@ export default function AlertsPage() {
 
             {/* ── AI Unavailable Banner (Sprint A G3) ── */}
             {aiUnavailable && (
-                <div
-                    role="status"
-                    style={{
-                        margin: "12px 24px 0",
-                        padding: "10px 14px",
-                        border: "0.5px solid var(--warning-border)",
-                        borderRadius: "6px",
-                        background: "var(--warning-bg)",
-                        color: "var(--warning-text)",
-                        fontSize: "12px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "12px",
-                    }}
-                >
-                    <span>
-                        {aiUnavailable.reason === "not_configured"
+                <AiUnavailableBanner
+                    message={
+                        aiUnavailable.reason === "not_configured"
                             ? "AI servisi yapılandırılmamış (ANTHROPIC_API_KEY gerekli). Stok ve sipariş uyarıları gösterilmeye devam ediyor."
-                            : "AI analizi şu an oluşturulamadı. Stok ve sipariş uyarıları gösterilmeye devam ediyor."}
-                    </span>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                        {aiUnavailable.reason === "error" && (
-                            <button
-                                onClick={handleAiSuggest}
-                                disabled={aiGenerating}
-                                style={{
-                                    fontSize: "11px", padding: "4px 10px",
-                                    border: "0.5px solid var(--warning-border)",
-                                    borderRadius: "4px", background: "transparent",
-                                    color: "var(--warning-text)", cursor: aiGenerating ? "not-allowed" : "pointer",
-                                    opacity: aiGenerating ? 0.6 : 1,
-                                }}
-                            >
-                                Yeniden dene
-                            </button>
-                        )}
-                        <button
-                            onClick={() => setAiUnavailable(null)}
-                            aria-label="Banner'ı kapat"
-                            style={{
-                                fontSize: "14px", padding: "0 6px",
-                                border: "none", background: "transparent",
-                                color: "var(--warning-text)", cursor: "pointer", lineHeight: 1,
-                            }}
-                        >
-                            ×
-                        </button>
-                    </div>
-                </div>
+                            : "AI analizi şu an oluşturulamadı. Stok ve sipariş uyarıları gösterilmeye devam ediyor."
+                    }
+                    onRetry={aiUnavailable.reason === "error" ? handleAiSuggest : undefined}
+                    retryDisabled={aiGenerating}
+                    onClose={() => setAiUnavailable(null)}
+                    style={{ margin: "12px 24px 0" }}
+                />
             )}
 
             {/* ── Filter Tabs ── */}

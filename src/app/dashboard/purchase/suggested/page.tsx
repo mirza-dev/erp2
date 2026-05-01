@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useData } from "@/lib/data-context";
 import { computeCoverageDays, computeTargetStock, daysColor, daysBg, dateDaysFromToday } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
+import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { formatCurrency } from "@/lib/utils";
+import { computeOrderTotals } from "@/lib/purchase-utils";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -443,6 +445,7 @@ export default function PurchaseSuggestedPage() {
     const isMobile = useIsMobile();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const [aiData, setAiData] = useState<{
         ai_available: boolean;
         ai_call_failed?: boolean;
@@ -508,6 +511,8 @@ export default function PurchaseSuggestedPage() {
         return () => controller.abort();
     }, [reorderSuggestions.length, loadAiData]);
 
+    useEffect(() => () => clearTimeout(refetchTimerRef.current), []);
+
     const handleRefresh = async () => {
         if (refreshing || aiLoading) return;
         setRefreshing(true);
@@ -543,7 +548,8 @@ export default function PurchaseSuggestedPage() {
                 // Sprint C G6: özet kartlar (Toplam Kritik, Toplam Tutar, kabul edilen)
                 // recMap üzerinden hesaplanıyor; sayaç guarantilenmesi için debounce ile
                 // arkaplandan refetch — kullanıcı satır state'ini hemen görür.
-                setTimeout(() => loadAiData(), 300);
+                clearTimeout(refetchTimerRef.current);
+                refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -573,7 +579,8 @@ export default function PurchaseSuggestedPage() {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, decidedAt: recommendation.decidedAt }));
                 toast({ type: "info", message: "Öneri reddedildi" });
-                setTimeout(() => loadAiData(), 300);
+                clearTimeout(refetchTimerRef.current);
+                refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -604,7 +611,8 @@ export default function PurchaseSuggestedPage() {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, editedQty: qty, decidedAt: recommendation.decidedAt }));
                 toast({ type: "success", message: `Miktar güncellendi: ${qty} ${unit}` });
-                setTimeout(() => loadAiData(), 300);
+                clearTimeout(refetchTimerRef.current);
+                refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -652,36 +660,25 @@ export default function PurchaseSuggestedPage() {
         });
     }, [reorderSuggestions, search, filter, decisionFilter, recMap]);
 
-    // Sprint C G4 + G8: costPrice ve price NULL ise satır toplama dahil edilmez
-    // (silently 0 yerine eksik say). Ürünler farklı currency'de olabildiği için
-    // (USD/TRY karışık) her para birimi için ayrı toplam tutuyoruz; UI tek
-    // currency varsa mevcut görünümü korur, karışıksa her satırı ayrı render eder.
-    const totalsByCurrency = new Map<string, { total: number; accepted: number }>();
-    let missingPriceCount = 0;
-    for (const p of reorderSuggestions) {
-        const rec = recMap.get(p.id);
-        const isEdited = rec?.status === "edited";
-        const qty = isEdited && rec?.editedQty != null ? rec.editedQty : computeSuggestion(p).suggestQty;
-        const unitPrice = p.costPrice ?? p.price ?? null;
-        if (unitPrice === null) {
-            missingPriceCount += 1;
-            continue;
-        }
-        const currency = p.currency || "TRY";
-        const lineCost = qty * unitPrice;
-        const bucket = totalsByCurrency.get(currency) ?? { total: 0, accepted: 0 };
-        bucket.total += lineCost;
-        if (rec?.status === "accepted") bucket.accepted += lineCost;
-        totalsByCurrency.set(currency, bucket);
-    }
-    const currencyEntries = [...totalsByCurrency.entries()].sort(
-        // TRY öncelik (mevcut UI tek-currency case'inde TRY varsayıyordu)
-        (a, b) => (a[0] === "TRY" ? -1 : b[0] === "TRY" ? 1 : a[0].localeCompare(b[0]))
+    // Sprint C G4 + G8: costPrice ve price NULL ise satır toplama dahil edilmez.
+    // Multi-currency: her currency ayrı toplanır; tek currency mevcut görünüm korunur.
+    const { currencyEntries, isSingleCurrency, primaryCurrency, primaryTotal, primaryAccepted, missingPriceCount } = useMemo(
+        () => computeOrderTotals(
+            reorderSuggestions.map(p => {
+                const rec = recMap.get(p.id);
+                return {
+                    id: p.id,
+                    costPrice: p.costPrice ?? null,
+                    price: p.price ?? null,
+                    currency: p.currency,
+                    suggestQty: computeSuggestion(p).suggestQty,
+                    decidedStatus: rec?.status,
+                    decidedQty: rec?.editedQty,
+                };
+            })
+        ),
+        [reorderSuggestions, recMap]
     );
-    const isSingleCurrency = currencyEntries.length <= 1;
-    const primaryCurrency = currencyEntries[0]?.[0] ?? "TRY";
-    const primaryTotal = currencyEntries[0]?.[1].total ?? 0;
-    const primaryAccepted = currencyEntries[0]?.[1].accepted ?? 0;
 
     const mostUrgent = [...reorderSuggestions]
         .filter(p => p.dailyUsage)
@@ -788,46 +785,12 @@ export default function PurchaseSuggestedPage() {
 
             {/* Sprint C G2: AI çağrısı başarısız sarı banner + Yeniden dene */}
             {!isDemo && (aiError || aiData?.ai_call_failed) && (
-                <div
-                    style={{
-                        marginTop: "16px",
-                        padding: "10px 14px",
-                        background: "var(--warning-bg)",
-                        border: "0.5px solid var(--warning-border)",
-                        borderRadius: "8px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "10px",
-                        fontSize: "12px",
-                        color: "var(--warning-text)",
-                    }}
-                >
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ fontSize: "14px" }}>⚠</span>
-                        <span>
-                            AI önerisi şu an oluşturulamadı. Aşağıda standart hesaplamalara dayalı öneriler gösteriliyor.
-                        </span>
-                    </div>
-                    <button
-                        onClick={() => loadAiData()}
-                        disabled={aiLoading}
-                        style={{
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            padding: "4px 12px",
-                            borderRadius: "6px",
-                            background: "transparent",
-                            color: "var(--warning-text)",
-                            border: "0.5px solid var(--warning-border)",
-                            cursor: aiLoading ? "not-allowed" : "pointer",
-                            whiteSpace: "nowrap",
-                            opacity: aiLoading ? 0.6 : 1,
-                        }}
-                    >
-                        Yeniden dene
-                    </button>
-                </div>
+                <AiUnavailableBanner
+                    message="AI önerisi şu an oluşturulamadı. Aşağıda standart hesaplamalara dayalı öneriler gösteriliyor."
+                    onRetry={() => loadAiData()}
+                    retryDisabled={aiLoading}
+                    style={{ marginTop: "16px", borderRadius: "8px" }}
+                />
             )}
 
             {/* Summary cards */}
