@@ -652,26 +652,36 @@ export default function PurchaseSuggestedPage() {
         });
     }, [reorderSuggestions, search, filter, decisionFilter, recMap]);
 
-    // Sprint C G4: costPrice ve price NULL ise satır toplama dahil edilmez (silently
-    // 0 ile çarpılırsa toplam yanıltıcı görünür). Etkilenen ürünleri sayıp
-    // kullanıcıya not ediyoruz: "X üründe fiyat eksik — toplam tutar onları içermez".
-    const { totalOrderCost, acceptedOrderCost, missingPriceCount } = reorderSuggestions.reduce(
-        (acc, p) => {
-            const rec = recMap.get(p.id);
-            const isEdited = rec?.status === "edited";
-            const qty = isEdited && rec?.editedQty != null ? rec.editedQty : computeSuggestion(p).suggestQty;
-            const unitPrice = p.costPrice ?? p.price ?? null;
-            const lineCost = unitPrice !== null ? qty * unitPrice : null;
-            return {
-                totalOrderCost: lineCost !== null ? acc.totalOrderCost + lineCost : acc.totalOrderCost,
-                acceptedOrderCost: rec?.status === "accepted" && lineCost !== null
-                    ? acc.acceptedOrderCost + lineCost
-                    : acc.acceptedOrderCost,
-                missingPriceCount: lineCost === null ? acc.missingPriceCount + 1 : acc.missingPriceCount,
-            };
-        },
-        { totalOrderCost: 0, acceptedOrderCost: 0, missingPriceCount: 0 }
+    // Sprint C G4 + G8: costPrice ve price NULL ise satır toplama dahil edilmez
+    // (silently 0 yerine eksik say). Ürünler farklı currency'de olabildiği için
+    // (USD/TRY karışık) her para birimi için ayrı toplam tutuyoruz; UI tek
+    // currency varsa mevcut görünümü korur, karışıksa her satırı ayrı render eder.
+    const totalsByCurrency = new Map<string, { total: number; accepted: number }>();
+    let missingPriceCount = 0;
+    for (const p of reorderSuggestions) {
+        const rec = recMap.get(p.id);
+        const isEdited = rec?.status === "edited";
+        const qty = isEdited && rec?.editedQty != null ? rec.editedQty : computeSuggestion(p).suggestQty;
+        const unitPrice = p.costPrice ?? p.price ?? null;
+        if (unitPrice === null) {
+            missingPriceCount += 1;
+            continue;
+        }
+        const currency = p.currency || "TRY";
+        const lineCost = qty * unitPrice;
+        const bucket = totalsByCurrency.get(currency) ?? { total: 0, accepted: 0 };
+        bucket.total += lineCost;
+        if (rec?.status === "accepted") bucket.accepted += lineCost;
+        totalsByCurrency.set(currency, bucket);
+    }
+    const currencyEntries = [...totalsByCurrency.entries()].sort(
+        // TRY öncelik (mevcut UI tek-currency case'inde TRY varsayıyordu)
+        (a, b) => (a[0] === "TRY" ? -1 : b[0] === "TRY" ? 1 : a[0].localeCompare(b[0]))
     );
+    const isSingleCurrency = currencyEntries.length <= 1;
+    const primaryCurrency = currencyEntries[0]?.[0] ?? "TRY";
+    const primaryTotal = currencyEntries[0]?.[1].total ?? 0;
+    const primaryAccepted = currencyEntries[0]?.[1].accepted ?? 0;
 
     const mostUrgent = [...reorderSuggestions]
         .filter(p => p.dailyUsage)
@@ -882,10 +892,26 @@ export default function PurchaseSuggestedPage() {
                             Toplam Sipariş Tutarı
                         </div>
                         <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--accent-text)", marginTop: "4px", lineHeight: 1 }}>
-                            {formatCurrency(totalOrderCost, "TRY")}
+                            {formatCurrency(primaryTotal, primaryCurrency)}
                         </div>
+                        {!isSingleCurrency && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginTop: "4px" }}>
+                                {currencyEntries.slice(1).map(([cur, val]) => (
+                                    <div key={cur} style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                                        + {formatCurrency(val.total, cur)}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                            {reorderSuggestions.length} ürün · {formatCurrency(acceptedOrderCost, "TRY")} kabul edildi
+                            {reorderSuggestions.length} ürün · {formatCurrency(primaryAccepted, primaryCurrency)} kabul edildi
+                            {!isSingleCurrency && currencyEntries.slice(1).some(([, v]) => v.accepted > 0) && (
+                                <>
+                                    {currencyEntries.slice(1).filter(([, v]) => v.accepted > 0).map(([cur, val]) => (
+                                        <span key={cur}> + {formatCurrency(val.accepted, cur)}</span>
+                                    ))}
+                                </>
+                            )}
                         </div>
                         {missingPriceCount > 0 && (
                             <div
@@ -1084,11 +1110,11 @@ export default function PurchaseSuggestedPage() {
                                         <span style={{ color: "var(--text-tertiary)" }}>Min:</span>{" "}
                                         <span style={{ fontWeight: 600 }}>{p.minStockLevel.toLocaleString("tr-TR")}</span>
                                     </div>
-                                    <div style={{ fontSize: "12px" }}>
-                                        <span style={{ color: "var(--text-tertiary)" }}>Açık:</span>{" "}
+                                    <div style={{ fontSize: "12px" }} title="Min seviyenin altındaki eksik miktar">
+                                        <span style={{ color: "var(--text-tertiary)" }}>Stok Açığı:</span>{" "}
                                         {deficit > 0
                                             ? <span style={{ fontWeight: 700, color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
-                                            : <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                                            : <span style={{ fontWeight: 500, color: "var(--text-tertiary)" }}>0</span>
                                         }
                                     </div>
                                     {p.leadTimeDays != null && (
@@ -1146,19 +1172,36 @@ export default function PurchaseSuggestedPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
-                                {["Tür", "Ürün Adı", "SKU", "Depo", "Stok", "Açık", "Önerilen · Tükenme", "Karar"].map(h => (
-                                    <th key={h} style={{
-                                        padding: "10px 12px",
-                                        textAlign: "left",
-                                        fontWeight: 500,
-                                        color: "var(--text-tertiary)",
-                                        fontSize: "11px",
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.04em",
-                                        borderBottom: "1px solid var(--border-secondary)",
-                                        whiteSpace: "nowrap",
-                                    }}>
-                                        {h}
+                                {/* Sprint C G3: "Açık" → "Stok Açığı" + tooltip; mevcut deficit
+                                    (min - available_now) anlamı netleştirildi (açık sipariş ile
+                                    karıştırılmasın). */}
+                                {[
+                                    { label: "Tür" },
+                                    { label: "Ürün Adı" },
+                                    { label: "SKU" },
+                                    { label: "Depo" },
+                                    { label: "Stok" },
+                                    { label: "Stok Açığı", tooltip: "Mevcut stoğun minimum stoğun altında kalan eksik miktarı" },
+                                    { label: "Önerilen · Tükenme" },
+                                    { label: "Karar" },
+                                ].map(({ label, tooltip }) => (
+                                    <th
+                                        key={label}
+                                        title={tooltip}
+                                        style={{
+                                            padding: "10px 12px",
+                                            textAlign: "left",
+                                            fontWeight: 500,
+                                            color: "var(--text-tertiary)",
+                                            fontSize: "11px",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.04em",
+                                            borderBottom: "1px solid var(--border-secondary)",
+                                            whiteSpace: "nowrap",
+                                            cursor: tooltip ? "help" : undefined,
+                                        }}
+                                    >
+                                        {label}
                                     </th>
                                 ))}
                             </tr>
@@ -1234,11 +1277,11 @@ export default function PurchaseSuggestedPage() {
                                                 min {p.minStockLevel.toLocaleString("tr-TR")}
                                             </div>
                                         </td>
-                                        {/* Açık */}
+                                        {/* Stok Açığı (G3: 0 göster, "—" değil) */}
                                         <td style={{ padding: "10px 12px", fontWeight: 700, fontSize: "14px" }}>
                                             {deficit > 0
                                                 ? <span style={{ color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
-                                                : <span style={{ color: "var(--text-tertiary)" }}>—</span>
+                                                : <span style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>0</span>
                                             }
                                         </td>
                                         {/* Önerilen + Tükenme */}
