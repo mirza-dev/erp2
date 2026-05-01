@@ -59,6 +59,31 @@ export async function dbUpdateBatchStatus(
     return data;
 }
 
+/**
+ * Sprint B G3: Atomik CAS — confirm yetkisi al.
+ *
+ * Aynı batch'i iki sekmeden aynı anda confirm etmek mümkündü çünkü
+ * SELECT → JS koşul → UPDATE arasında lock yoktu. Bu helper tek SQL'le
+ * pending/review durumundaki batch'i 'confirming'e geçirir; yarışı kazanan
+ * batch row'unu döner, kaybeden null döner.
+ *
+ * Kullanım: serviceConfirmBatch başında çağrılır; null dönerse "zaten işleniyor".
+ * İş bitince dbUpdateBatchStatus(id, 'confirmed') yazılır; hata olursa
+ * dbUpdateBatchStatus(id, 'pending') ile geri çekilir.
+ */
+export async function dbClaimBatchForConfirm(id: string): Promise<ImportBatchRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("import_batches")
+        .update({ status: "confirming" })
+        .eq("id", id)
+        .in("status", ["pending", "review"])
+        .select("*")
+        .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+}
+
 // ── Drafts ───────────────────────────────────────────────────
 
 export interface CreateDraftInput {

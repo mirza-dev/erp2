@@ -4,8 +4,26 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Sprint B — AI İçeri Aktar stabilizasyonu (`docs/plans/02-ai-import-implementation.md`)
-**Önceki:** Sprint A — Üretim & Stok Uyarıları stabilizasyonu KAPALI (2026-04-29; 1987 test)
+**Aktif:** Sprint C — Satın Alma Önerileri stabilizasyonu (`docs/plans/03-purchase-suggested-implementation.md`)
+**Önceki:** Sprint B — AI İçeri Aktar stabilizasyonu KAPALI (2026-05-01; 1993 test)
+
+---
+
+## Sprint B Özet (2026-05-01) — KAPALI
+
+**Hedef:** /dashboard/import wizard'ı tasarımını koruyup eksik işlevsellik + bug + veri bütünlüğü.
+
+**4 commit:**
+- Part 1 (`3e0a196`): file size limit (25 MB) + inline edit rollback (sessiz fail kaldırıldı)
+- Part 2 (`8e6a1ca`): Sonuç ekranında entity-bazlı kırılım tablosu (G6) — Türkçe etiket
+- Part 3 (`6c266d7`): order_line sort_order collision fix — per-order cache
+- Part 4 (this): race condition CAS + migration 043 + rollback
+
+**Migration:** `043_import_batches_confirming_status.sql` — status enum'una 'confirming' eklendi.
+
+**Domain kuralı:** Aynı batch'i iki sekmeden confirm etmek imkansız → atomik UPDATE..IN (pending,review) → confirming. Yarışı kaybeden 'zaten işleniyor' hatası alır. Flow ortasında exception olursa 'review'e geri çekilir (stuck önlemi).
+
+**Test:** 106 dosya · 1993 test yeşil · TS clean.
 
 ---
 

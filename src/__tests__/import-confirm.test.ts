@@ -17,6 +17,8 @@ import type { ImportDraftRow, ImportBatchRow } from "@/lib/database.types";
 
 const mockDbGetBatch = vi.fn();
 const mockDbUpdateBatchStatus = vi.fn();
+// Sprint B G3: claim mock — default success (claimed batch row döner)
+const mockDbClaimBatchForConfirm = vi.fn().mockResolvedValue({ id: "batch-1", status: "confirming" });
 const mockDbListDrafts = vi.fn();
 const mockDbUpdateDraft = vi.fn();
 const mockDbCreateCustomer = vi.fn();
@@ -53,6 +55,8 @@ vi.mock("@/lib/supabase/import", () => ({
     dbListDrafts: (...args: unknown[]) => mockDbListDrafts(...args),
     dbUpdateDraft: (...args: unknown[]) => mockDbUpdateDraft(...args),
     dbCreateDrafts: vi.fn(),
+    // Sprint B G3: default → claim başarılı (mevcut tüm testler bozulmasın)
+    dbClaimBatchForConfirm: (...args: unknown[]) => mockDbClaimBatchForConfirm(...args),
 }));
 vi.mock("@/lib/supabase/customers", () => ({
     dbCreateCustomer: (...args: unknown[]) => mockDbCreateCustomer(...args),
@@ -144,6 +148,24 @@ describe("serviceConfirmBatch — batch lifecycle", () => {
     it("throws when batch is already confirmed", async () => {
         mockDbGetBatch.mockResolvedValue(makeBatch({ status: "confirmed" }));
         await expect(serviceConfirmBatch("batch-1")).rejects.toThrow();
+    });
+
+    // Sprint B G3: race condition — claim alınamadığında throw
+    it("dbClaimBatchForConfirm null dönerse → 'zaten işleniyor' throw, drafts okunmaz", async () => {
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbClaimBatchForConfirm.mockResolvedValueOnce(null); // yarışı kaybetti
+
+        await expect(serviceConfirmBatch("batch-1")).rejects.toThrow(/zaten işleniyor/);
+        expect(mockDbListDrafts).not.toHaveBeenCalled();
+    });
+
+    it("flow exception fırlarsa batch 'review'e geri çekilir (stuck 'confirming' önler)", async () => {
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbClaimBatchForConfirm.mockResolvedValueOnce({ id: "batch-1", status: "confirming" });
+        mockDbListDrafts.mockRejectedValueOnce(new Error("DB read fail"));
+
+        await expect(serviceConfirmBatch("batch-1")).rejects.toThrow(/DB read fail/);
+        expect(mockDbUpdateBatchStatus).toHaveBeenCalledWith("batch-1", "review");
     });
 
     it("sets batch status to 'confirmed' after all drafts are processed", async () => {

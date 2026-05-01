@@ -6,6 +6,7 @@
 
 import {
     dbGetBatch, dbUpdateBatchStatus, dbListDrafts, dbUpdateDraft,
+    dbClaimBatchForConfirm,
     type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
 import { dbIncrementMappingSuccess } from "@/lib/supabase/column-mappings";
@@ -115,6 +116,24 @@ export async function serviceConfirmBatch(batchId: string): Promise<ConfirmResul
     if (!batch) throw new Error("Batch bulunamadı.");
     if (batch.status === "confirmed") throw new Error("Batch zaten onaylanmış.");
 
+    // Sprint B G3: Atomik CAS — yarışı kazan veya çık.
+    // pending/review değilse (örn: zaten confirming/failed/processing) null döner.
+    const claimed = await dbClaimBatchForConfirm(batchId);
+    if (!claimed) {
+        throw new Error("Bu içe aktarım zaten işleniyor veya uygun durumda değil.");
+    }
+
+    try {
+        return await runConfirmFlow(batchId);
+    } catch (err) {
+        // Eğer confirm tamamlanmadan exception olursa batch 'confirming' durumda
+        // kalır ve hiçbir zaman yeniden tetiklenemez. 'review'e geri çek.
+        try { await dbUpdateBatchStatus(batchId, "review"); } catch { /* best-effort */ }
+        throw err;
+    }
+}
+
+async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
     const drafts = await dbListDrafts(batchId);
     const toMerge = drafts
         .filter(d => d.status === "confirmed" || d.status === "pending")
