@@ -866,15 +866,11 @@ export default function PurchaseSuggestedPage() {
                                 ))}
                             </div>
                         )}
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                            {reorderSuggestions.length} ürün · {formatCurrency(primaryAccepted, primaryCurrency)} kabul edildi
-                            {!isSingleCurrency && currencyEntries.slice(1).some(([, v]) => v.accepted > 0) && (
-                                <>
-                                    {currencyEntries.slice(1).filter(([, v]) => v.accepted > 0).map(([cur, val]) => (
-                                        <span key={cur}> + {formatCurrency(val.accepted, cur)}</span>
-                                    ))}
-                                </>
-                            )}
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px", display: "flex", flexDirection: "column", gap: "2px" }}>
+                            <span>{reorderSuggestions.length} ürün · {formatCurrency(primaryAccepted, primaryCurrency)} kabul edildi</span>
+                            {!isSingleCurrency && currencyEntries.slice(1).filter(([, v]) => v.accepted > 0).map(([cur, val]) => (
+                                <span key={cur}>+ {formatCurrency(val.accepted, cur)} kabul edildi</span>
+                            ))}
                         </div>
                         {missingPriceCount > 0 && (
                             <div
