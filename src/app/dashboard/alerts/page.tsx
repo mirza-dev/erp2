@@ -11,6 +11,7 @@ import type { AlertRow } from "@/lib/database.types";
 import { extractShortageQty, shortReason, shortImpact } from "@/lib/alert-ui-helpers";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
+import { AI_SUMMARY_LABELS } from "@/lib/ai-summary-labels";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -107,7 +108,9 @@ export default function AlertsPage() {
     const [refreshing, setRefreshing]       = useState(false);
     const [aiGenerating, setAiGenerating]   = useState(false);
     const [aiUnavailable, setAiUnavailable] = useState<{ reason: "not_configured" | "error" } | null>(null);
-    const [drawerGroup, setDrawerGroup]     = useState<ProductAlertGroup | null>(null);
+    const [drawerGroup, setDrawerGroup]         = useState<ProductAlertGroup | null>(null);
+    const [drawerOrderAlert, setDrawerOrderAlert] = useState<AlertRow | null>(null);
+    const [drawerAiAlert, setDrawerAiAlert]       = useState<AlertRow | null>(null);
     const [lastRefreshed, setLastRefreshed] = useState("az önce");
 
     // ── Fetch ──
@@ -574,6 +577,7 @@ export default function AlertsPage() {
                                     key={alert.id}
                                     alert={alert}
                                     isDemo={isDemo}
+                                    onOpenDrawer={setDrawerOrderAlert}
                                     onExtended={() => {
                                         // Süre uzatıldı → bu alert'i UI'dan resolved olarak düş
                                         setRawAlerts((prev) => prev.map((a) =>
@@ -613,24 +617,26 @@ export default function AlertsPage() {
                     {!isMobile && (
                         <div style={{
                             display: "grid",
-                            gridTemplateColumns: "3px 1fr 170px 120px 148px 110px",
+                            gridTemplateColumns: "3px 1fr 170px 120px 80px 148px 110px",
                             alignItems: "center",
                             borderBottom: "0.5px solid var(--border-tertiary)",
                         }}>
                             <div />
                             {[
-                                { label: "ÜRÜN",            pad: "8px 16px" },
-                                { label: "NEDEN",           pad: "8px 12px" },
-                                { label: "ETKİ",            pad: "8px 12px" },
-                                { label: "ÖNERİLEN ADIM",   pad: "8px 12px" },
-                                { label: "",                pad: "8px 12px" },
-                            ].map(({ label, pad }) => (
-                                <div key={label} style={{
+                                { label: "ÜRÜN",            pad: "8px 16px", tooltip: undefined },
+                                { label: "NEDEN",           pad: "8px 12px", tooltip: undefined },
+                                { label: "ETKİ",            pad: "8px 12px", tooltip: undefined },
+                                { label: "Açık Sipariş",   pad: "8px 12px", tooltip: "Bu üründe onaylı siparişler için ayrılmış birim sayısı" },
+                                { label: "ÖNERİLEN ADIM",  pad: "8px 12px", tooltip: undefined },
+                                { label: "",               pad: "8px 12px", tooltip: undefined },
+                            ].map(({ label, pad, tooltip }) => (
+                                <div key={label || "_actions"} title={tooltip} style={{
                                     padding: pad,
                                     fontSize: "10px",
                                     color: "var(--text-tertiary)",
                                     fontWeight: 600,
                                     letterSpacing: "0.06em",
+                                    cursor: tooltip ? "help" : undefined,
                                 }}>
                                     {label}
                                 </div>
@@ -750,6 +756,18 @@ export default function AlertsPage() {
                                     <span style={{ fontSize: "10px", color: "var(--text-tertiary)", flexShrink: 0 }}>
                                         {formatRelTime(alert.created_at)}
                                     </span>
+                                    <button
+                                        onClick={() => setDrawerAiAlert(alert)}
+                                        style={{
+                                            fontSize: "10px", padding: "3px 8px",
+                                            border: "0.5px solid var(--border-secondary)",
+                                            borderRadius: "4px", background: "transparent",
+                                            color: "var(--text-tertiary)", cursor: "pointer",
+                                            flexShrink: 0, whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        Detay
+                                    </button>
                                 </div>
                             );
                         })}
@@ -777,6 +795,30 @@ export default function AlertsPage() {
                     onResolve={resolveAlert}
                 />
             )}
+
+            {/* ── G6: Sipariş Uyarısı Drawer ── */}
+            {drawerOrderAlert && (
+                <OrderAlertDrawer
+                    alert={drawerOrderAlert}
+                    isDemo={isDemo}
+                    onClose={() => setDrawerOrderAlert(null)}
+                    onExtended={() => {
+                        setRawAlerts((prev) => prev.map((a) =>
+                            a.id === drawerOrderAlert.id ? { ...a, status: "resolved" as const } : a
+                        ));
+                        setDrawerOrderAlert(null);
+                        toast({ type: "success", message: "Teklif süresi güncellendi ve uyarı kapatıldı." });
+                    }}
+                />
+            )}
+
+            {/* ── G7: AI Uyarısı Drawer ── */}
+            {drawerAiAlert && (
+                <AiAlertDrawer
+                    alert={drawerAiAlert}
+                    onClose={() => setDrawerAiAlert(null)}
+                />
+            )}
         </div>
     );
 }
@@ -788,9 +830,10 @@ interface OrderAlertRowProps {
     alert: AlertRow;
     isDemo: boolean;
     onExtended: () => void;
+    onOpenDrawer: (alert: AlertRow) => void;
 }
 
-function OrderAlertRow({ alert, isDemo, onExtended }: OrderAlertRowProps) {
+function OrderAlertRow({ alert, isDemo, onExtended, onOpenDrawer }: OrderAlertRowProps) {
     const [extending, setExtending] = useState(false);
     const [showExtend, setShowExtend] = useState(false);
     const [newDate, setNewDate] = useState(() => {
@@ -872,6 +915,18 @@ function OrderAlertRow({ alert, isDemo, onExtended }: OrderAlertRowProps) {
                             Süreyi Uzat
                         </button>
                     )}
+                    <button
+                        onClick={() => onOpenDrawer(alert)}
+                        style={{
+                            fontSize: "11px", padding: "4px 9px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "4px", background: "transparent",
+                            color: "var(--text-secondary)", cursor: "pointer",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        Detay
+                    </button>
                     {alert.entity_id && (
                         <Link
                             href={`/dashboard/orders/${alert.entity_id}`}
@@ -1093,7 +1148,7 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
         <div
             style={{
                 display: "grid",
-                gridTemplateColumns: "3px 1fr 170px 120px 148px 110px",
+                gridTemplateColumns: "3px 1fr 170px 120px 80px 148px 110px",
                 alignItems: "center",
                 borderBottom: "0.5px solid var(--border-tertiary)",
                 opacity: isAllAck ? 0.6 : 1,
@@ -1150,6 +1205,22 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
                 }}>
                     {group.impact}
                 </span>
+            </div>
+
+            {/* Açık Sipariş — onaylı siparişler için ayrılmış birim */}
+            <div style={{ padding: "12px 12px" }}
+                title="Bu üründe onaylı siparişler için ayrılmış birim sayısı">
+                <span style={{
+                    fontSize: "13px", fontWeight: 600,
+                    color: group.reserved > 0 ? "var(--accent-text)" : "var(--text-tertiary)",
+                }}>
+                    {group.reserved}
+                </span>
+                {group.reserved > 0 && (
+                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", marginLeft: "3px" }}>
+                        {group.unit}
+                    </span>
+                )}
             </div>
 
             {/* Recommended action */}
@@ -1653,6 +1724,337 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                         </div>
                     </DrawerSection>
 
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ── OrderAlertDrawer (G6) ─────────────────────────────────────────────────────
+// Sipariş uyarısı detay paneli; quote_expired için "Süreyi Uzat" inline form
+// "ÖNERİLEN AKSİYON" bölümünde, diğer tiplerde sipariş linki gösterir.
+
+interface OrderAlertDrawerProps {
+    alert: AlertRow;
+    isDemo: boolean;
+    onClose: () => void;
+    onExtended: () => void;
+}
+
+function OrderAlertDrawer({ alert, isDemo, onClose, onExtended }: OrderAlertDrawerProps) {
+    const panelRef = useRef<HTMLDivElement>(null);
+    const isQuoteExpired = alert.type === "quote_expired";
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const [newDate, setNewDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        return d.toISOString().slice(0, 10);
+    });
+    const [extending, setExtending] = useState(false);
+    const [extError, setExtError] = useState<string | null>(null);
+
+    useEffect(() => {
+        function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [onClose]);
+
+    const handleExtend = async () => {
+        if (isDemo || extending) return;
+        if (!newDate || newDate < todayStr) { setExtError("Bugünden ileri bir tarih seçin."); return; }
+        setExtending(true);
+        setExtError(null);
+        try {
+            const res = await fetch(`/api/orders/${alert.entity_id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ quote_valid_until: newDate }),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.error || `HTTP ${res.status}`);
+            }
+            onExtended();
+        } catch (e) {
+            setExtError(e instanceof Error ? e.message : "Süre uzatılamadı.");
+        } finally {
+            setExtending(false);
+        }
+    };
+
+    return (
+        <>
+            <div
+                onClick={onClose}
+                style={{
+                    position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+                    zIndex: 49,
+                }}
+            />
+            <div
+                ref={panelRef}
+                role="dialog"
+                aria-modal="true"
+                style={{
+                    position: "fixed", top: 0, right: 0, bottom: 0, width: "360px",
+                    background: "var(--bg-primary)", borderLeft: "1px solid var(--border-secondary)",
+                    zIndex: 50, overflowY: "auto", display: "flex", flexDirection: "column",
+                }}
+            >
+                {/* Header */}
+                <div style={{
+                    padding: "16px 20px", borderBottom: "0.5px solid var(--border-tertiary)",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                    <div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--warning-text)", letterSpacing: "0.06em" }}>
+                            {ALERT_TYPE_LABEL[alert.type] ?? alert.type}
+                        </div>
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginTop: "3px" }}>
+                            {alert.title}
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        aria-label="Kapat"
+                        style={{
+                            fontSize: "18px", lineHeight: 1, padding: "2px 8px",
+                            border: "none", background: "transparent",
+                            color: "var(--text-tertiary)", cursor: "pointer",
+                        }}
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
+                    {/* ÖNERİLEN AKSİYON */}
+                    <DrawerSection title="ÖNERİLEN AKSİYON">
+                        {isQuoteExpired ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                                    Teklifin geçerlilik süresini uzatarak müşteriyle görüşmeye devam edebilirsiniz.
+                                </p>
+                                <div style={{
+                                    padding: "12px 14px", background: "var(--bg-secondary)",
+                                    border: "0.5px solid var(--border-tertiary)", borderRadius: "6px",
+                                    display: "flex", flexDirection: "column", gap: "8px",
+                                }}>
+                                    <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}>
+                                        YENİ GEÇERLİLİK TARİHİ
+                                    </label>
+                                    <input
+                                        type="date"
+                                        value={newDate}
+                                        min={todayStr}
+                                        onChange={e => { setNewDate(e.target.value); setExtError(null); }}
+                                        disabled={isDemo || extending}
+                                        style={{
+                                            fontSize: "13px", padding: "7px 10px",
+                                            border: "0.5px solid var(--border-secondary)",
+                                            borderRadius: "4px", background: "var(--bg-primary)",
+                                            color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
+                                        }}
+                                    />
+                                    {extError && (
+                                        <span style={{ fontSize: "11px", color: "var(--danger-text)" }}>{extError}</span>
+                                    )}
+                                    <button
+                                        onClick={handleExtend}
+                                        disabled={isDemo || extending}
+                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                                        style={{
+                                            fontSize: "13px", fontWeight: 600, padding: "8px 14px",
+                                            border: "0.5px solid var(--accent-border)",
+                                            borderRadius: "5px", background: "var(--accent-bg)",
+                                            color: "var(--accent-text)",
+                                            cursor: (isDemo || extending) ? "not-allowed" : "pointer",
+                                            opacity: (isDemo || extending) ? 0.6 : 1,
+                                        }}
+                                    >
+                                        {extending ? "Uzatılıyor..." : "Süreyi Uzat"}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            alert.entity_id && (
+                                <Link
+                                    href={`/dashboard/orders/${alert.entity_id}`}
+                                    style={{
+                                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                                        padding: "10px 14px",
+                                        background: "var(--warning-bg)", border: "0.5px solid var(--warning-border)",
+                                        borderRadius: "5px", fontSize: "13px", fontWeight: 600,
+                                        color: "var(--warning-text)", textDecoration: "none",
+                                    }}
+                                >
+                                    <span>Siparişi incele</span>
+                                    <span>→</span>
+                                </Link>
+                            )
+                        )}
+                    </DrawerSection>
+
+                    {/* İLGİLİ KAYITLAR */}
+                    {alert.entity_id && (
+                        <DrawerSection title="İLGİLİ KAYITLAR">
+                            <Link
+                                href={`/dashboard/orders/${alert.entity_id}`}
+                                style={{
+                                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                                    padding: "8px 12px",
+                                    background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)",
+                                    borderRadius: "5px", fontSize: "12px",
+                                    color: "var(--text-secondary)", textDecoration: "none",
+                                }}
+                            >
+                                <span>Sipariş detayına git</span>
+                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>→</span>
+                            </Link>
+                        </DrawerSection>
+                    )}
+                </div>
+            </div>
+        </>
+    );
+}
+
+// ── AiAlertDrawer (G7) ────────────────────────────────────────────────────────
+// AI uyarısı detay paneli; ai_inputs_summary alanlarını Türkçe etiketle
+// kapanabilir "AI ANALİZİ" accordion'ında gösterir.
+
+interface AiAlertDrawerProps {
+    alert: AlertRow;
+    onClose: () => void;
+}
+
+function AiAlertDrawer({ alert, onClose }: AiAlertDrawerProps) {
+    const [accordionOpen, setAccordionOpen] = useState(false);
+    const summary = alert.ai_inputs_summary as Record<string, unknown> | null;
+    const summaryEntries = summary
+        ? Object.entries(summary).filter(([, v]) => v != null)
+        : [];
+
+    useEffect(() => {
+        function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
+        document.addEventListener("keydown", onKey);
+        return () => document.removeEventListener("keydown", onKey);
+    }, [onClose]);
+
+    const confidencePct = alert.ai_confidence != null ? Math.round(alert.ai_confidence * 100) : null;
+
+    return (
+        <>
+            <div
+                onClick={onClose}
+                style={{
+                    position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
+                    zIndex: 49,
+                }}
+            />
+            <div
+                role="dialog"
+                aria-modal="true"
+                style={{
+                    position: "fixed", top: 0, right: 0, bottom: 0, width: "360px",
+                    background: "var(--bg-primary)", borderLeft: "1px solid var(--border-secondary)",
+                    zIndex: 50, overflowY: "auto", display: "flex", flexDirection: "column",
+                }}
+            >
+                {/* Header */}
+                <div style={{
+                    padding: "16px 20px", borderBottom: "0.5px solid var(--border-tertiary)",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                    <div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--accent-text)", letterSpacing: "0.06em" }}>
+                            AI ANALİZİ
+                        </div>
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginTop: "3px" }}>
+                            {alert.title}
+                        </div>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        aria-label="Kapat"
+                        style={{
+                            fontSize: "18px", lineHeight: 1, padding: "2px 8px",
+                            border: "none", background: "transparent",
+                            color: "var(--text-tertiary)", cursor: "pointer",
+                        }}
+                    >
+                        ×
+                    </button>
+                </div>
+
+                <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
+                    {/* AI Önerisi açıklaması */}
+                    {alert.description && (
+                        <DrawerSection title="AI ÖNERİSİ">
+                            <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
+                                {alert.description}
+                            </p>
+                        </DrawerSection>
+                    )}
+
+                    {/* AI ANALİZİ accordion — ai_inputs_summary */}
+                    {summaryEntries.length > 0 && (
+                        <div>
+                            <button
+                                onClick={() => setAccordionOpen(o => !o)}
+                                style={{
+                                    width: "100%", display: "flex", alignItems: "center",
+                                    justifyContent: "space-between", padding: "0 0 8px",
+                                    border: "none", background: "transparent", cursor: "pointer",
+                                    fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)",
+                                    letterSpacing: "0.07em", textTransform: "uppercase",
+                                }}
+                            >
+                                <span>AI GİRDİLERİ</span>
+                                <span style={{ fontSize: "12px", lineHeight: 1 }}>{accordionOpen ? "▲" : "▼"}</span>
+                            </button>
+                            {accordionOpen && (
+                                <div style={{
+                                    display: "flex", flexDirection: "column", gap: "6px",
+                                    padding: "10px 12px",
+                                    background: "var(--bg-secondary)",
+                                    border: "0.5px solid var(--border-tertiary)",
+                                    borderRadius: "6px",
+                                }}>
+                                    {summaryEntries.map(([key, value]) => (
+                                        <div key={key} style={{
+                                            display: "flex", alignItems: "center",
+                                            justifyContent: "space-between", gap: "8px",
+                                        }}>
+                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                                {AI_SUMMARY_LABELS[key] ?? key}
+                                            </span>
+                                            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
+                                                {String(value)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Metadata */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        {confidencePct !== null && (
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                Güven: <span style={{ fontWeight: 600, color: "var(--accent-text)" }}>%{confidencePct}</span>
+                            </div>
+                        )}
+                        {alert.ai_model_version && (
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                Model: {alert.ai_model_version}
+                            </div>
+                        )}
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                            {formatRelTime(alert.created_at)} oluşturuldu
+                        </div>
+                    </div>
                 </div>
             </div>
         </>
