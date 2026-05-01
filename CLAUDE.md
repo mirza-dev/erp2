@@ -1,9 +1,18 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-04-29_
+_Son güncelleme: 2026-05-01_
 
-**Son tamamlanan iş:** Sprint B — AI İçeri Aktar stabilizasyonu (2026-05-01)
+**Son tamamlanan iş:** Sprint C — Satın Alma Önerileri stabilizasyonu (2026-05-01)
+
+**Sprint C özet (3 commit):**
+- Part 1: AI fail banner (büyük sarı, "Yeniden dene") + costPrice/price NULL → toplama dahil değil + "X üründe fiyat eksik" sayacı + karar sonrası loadAiData(300ms) + isDemo guard ile AI POST kapatma + mavi info banner. Backend route'a `ai_call_failed` flag eklendi.
+- Part 2: `dbExpireRecommendationsForMissingEntities` yeni helper — silinmiş/deaktif ürünlerin TÜM aktif rec'lerini (suggested+accepted+edited+rejected) expire eder. Route scan başında entegre — alerts orphan cleanup ile paralel pattern.
+- Part 3: "Açık" → "Stok Açığı" (header netleştirme + tooltip + 0 göster) + multi-currency TOPLAM SİPARİŞ TUTARI (currency'ye göre Map; tek currency mevcut görünüm, karışıksa "+ $X" alt satırlar).
+- Atlandı: G5 (KARAR cell-içi buton seti) — mevcut "Karar ver →" drawer pattern korundu (plan'ın "mevcut tasarım korunur" hükmü).
+- 106 dosya · 2003 test yeşil · TS clean.
+
+**Önceki:** Sprint B — AI İçeri Aktar stabilizasyonu (2026-05-01)
 
 **Sprint B özet (4 commit):**
 - Part 1: file size limit (max 25 MB) + inline edit rollback (silent fail kaldırıldı)
@@ -33,7 +42,6 @@ _Son güncelleme: 2026-04-29_
 - **104 dosya · 1975 test yeşil · TS clean.**
 
 **Sıradaki:**
-- Sprint C — Satın Alma Önerileri stabilizasyonu (`docs/plans/03-purchase-suggested-implementation.md`)
 - G11 — AI öneri tutarlılığı (diff-merge + 6 saatlik CRON + manuel yenile) — ayrı plan dosyası gelecek
 - Faz 12 — Sandbox GATE: gerçek Paraşüt API ile OAuth, list filtreleri, e-doc trackable_job, stok invariant doğrulamaları (PARASUT_PLAN.md §Faz 12)
 
@@ -42,7 +50,7 @@ _Son güncelleme: 2026-04-29_
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY eklendi ✅ (explicit policy yok; proje genelinde aynı pattern — tüm erişim service_role'den)
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
-**Test sayısı:** 106 dosya · 1993 vitest (hepsi yeşil)
+**Test sayısı:** 106 dosya · 2003 vitest (hepsi yeşil)
 
 ---
 
