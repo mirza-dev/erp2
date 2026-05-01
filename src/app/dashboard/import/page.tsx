@@ -76,6 +76,19 @@ const tabBtnStyle = (active: boolean): React.CSSProperties => ({
     cursor: "pointer", whiteSpace: "nowrap",
 });
 
+export function validateFileSize(size: number): { ok: boolean; sizeMb?: string } {
+    const MAX = 25 * 1024 * 1024;
+    if (size > MAX) return { ok: false, sizeMb: (size / (1024 * 1024)).toFixed(1) };
+    return { ok: true };
+}
+
+export function sourceChipLabel(source: string, confidence: number): string {
+    if (source === "memory") return "Hafıza";
+    if (source === "ai") return confidence ? `AI %${Math.round(confidence * 100)}` : "AI";
+    if (source === "user") return "Kullanıcı";
+    return "?";
+}
+
 const sourceChipStyle = (src: "memory" | "ai" | "fallback" | "user"): React.CSSProperties => {
     const map = {
         memory: { bg: "var(--success-bg)", color: "var(--success-text)" },
@@ -190,7 +203,9 @@ export default function ImportPage() {
         const MAX_FILE_SIZE = 25 * 1024 * 1024;
         if (file.size > MAX_FILE_SIZE) {
             const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-            setParseError(`Dosya çok büyük (${sizeMb} MB). En fazla 25 MB kabul edilir; dosyayı bölerek tekrar deneyin.`);
+            const msg = `Dosya çok büyük (${sizeMb} MB). En fazla 25 MB kabul edilir; dosyayı bölerek tekrar deneyin.`;
+            setParseError(msg);
+            toast({ type: "error", message: msg });
             return;
         }
         setParseError(null);
@@ -385,6 +400,14 @@ export default function ImportPage() {
             if (confirmRes.ok) {
                 const result = await confirmRes.json();
                 setConfirmResult(result);
+            } else {
+                let errMsg = `Sunucu hatası (HTTP ${confirmRes.status})`;
+                try {
+                    const errBody = await confirmRes.json();
+                    if (errBody?.error) errMsg = errBody.error;
+                } catch { /* json parse fail — ham mesajı kullan */ }
+                setConfirmResult({ added: 0, updated: 0, skipped: 0, errors: [errMsg] });
+                toast({ type: "error", message: errMsg });
             }
             await refetchAll();
             setState("done");
@@ -683,7 +706,7 @@ export default function ImportPage() {
                                                     ))}
                                                 </select>
                                                 <span style={sourceChipStyle(m.source)}>
-                                                    {m.source === "memory" ? "Hafıza" : m.source === "ai" ? "AI" : m.source === "user" ? "Kullanıcı" : "?"}
+                                                    {sourceChipLabel(m.source, m.confidence)}
                                                 </span>
                                             </div>
                                         ))}

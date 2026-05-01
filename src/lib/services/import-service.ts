@@ -465,7 +465,7 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
                 }
                 nextSortByOrder.set(orderId, sortOrder + 1);
 
-                await supabase.from("order_lines").insert({
+                const { error: lineInsertErr } = await supabase.from("order_lines").insert({
                     order_id: orderId,
                     product_id: productId ?? null,
                     product_name: data.product_name ? String(data.product_name) : productSku,
@@ -477,20 +477,27 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
                     line_total: lineTotal,
                     sort_order: sortOrder,
                 });
+                if (lineInsertErr) {
+                    errors.push(`Satır ${rowNum}: Sipariş satırı kaydedilemedi — ${lineInsertErr.message}`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
+                    continue;
+                }
 
-                // Update order totals
+                // Update order totals — best-effort, non-blocking
                 const { data: allLines } = await supabase
                     .from("order_lines")
                     .select("line_total")
                     .eq("order_id", orderId);
                 const subtotal = (allLines ?? []).reduce((s, l) => s + (l.line_total ?? 0), 0);
                 const vatTotal = subtotal * 0.20;
-                await supabase.from("sales_orders").update({
+                const { error: updateErr } = await supabase.from("sales_orders").update({
                     subtotal,
                     vat_total: vatTotal,
                     grand_total: subtotal + vatTotal,
                     item_count: (allLines ?? []).length,
                 }).eq("id", orderId);
+                if (updateErr) console.warn("[import] order totals update failed:", updateErr.message);
 
                 await dbUpdateDraft(draft.id, { status: "merged" });
                 added++; bumpEntity(draft.entity_type, "added");
