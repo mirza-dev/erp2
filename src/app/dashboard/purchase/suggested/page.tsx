@@ -660,6 +660,7 @@ export default function PurchaseSuggestedPage() {
                 body: JSON.stringify({ status: "suggested" }),
             });
             if (res.ok) {
+                toast({ type: "success", message: "Karar geri alındı." });
                 clearTimeout(refetchTimerRef.current);
                 refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
             } else {
@@ -1054,7 +1055,6 @@ export default function PurchaseSuggestedPage() {
                 <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     {sorted.map(p => {
                         const urgency = p.minStockLevel > 0 ? Math.round((1 - p.available_now / p.minStockLevel) * 100) : 100;
-                        const deficit = p.minStockLevel - p.available_now;
                         const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                         const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
                         const recEntry = recMap.get(p.id);
@@ -1118,12 +1118,9 @@ export default function PurchaseSuggestedPage() {
                                         <span style={{ color: "var(--text-tertiary)" }}>Min:</span>{" "}
                                         <span style={{ fontWeight: 600 }}>{p.minStockLevel.toLocaleString("tr-TR")}</span>
                                     </div>
-                                    <div style={{ fontSize: "12px" }} title="Min seviyenin altındaki eksik miktar">
-                                        <span style={{ color: "var(--text-tertiary)" }}>Stok Açığı:</span>{" "}
-                                        {deficit > 0
-                                            ? <span style={{ fontWeight: 700, color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
-                                            : <span style={{ fontWeight: 500, color: "var(--text-tertiary)" }}>0</span>
-                                        }
+                                    <div style={{ fontSize: "12px" }} title="Bu üründe açık (onaylı + sevk edilmemiş) sipariş sayısı">
+                                        <span style={{ color: "var(--text-tertiary)" }}>Açık Sipariş:</span>{" "}
+                                        <span style={{ fontWeight: 500, color: "var(--text-tertiary)" }}>0</span>
                                     </div>
                                     {p.leadTimeDays != null && (
                                         <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
@@ -1189,7 +1186,7 @@ export default function PurchaseSuggestedPage() {
                                     { label: "SKU" },
                                     { label: "Depo" },
                                     { label: "Stok" },
-                                    { label: "Stok Açığı", tooltip: "Mevcut stoğun minimum stoğun altında kalan eksik miktarı" },
+                                    { label: "Açık Sipariş", tooltip: "Bu üründe açık (onaylı + sevk edilmemiş) sipariş sayısı" },
                                     { label: "Önerilen · Tükenme" },
                                     { label: "Karar" },
                                 ].map(({ label, tooltip }) => (
@@ -1218,7 +1215,6 @@ export default function PurchaseSuggestedPage() {
                             {sorted.map((p, idx) => {
                                 const urgency = p.minStockLevel > 0 ? Math.round((1 - p.available_now / p.minStockLevel) * 100) : 100;
                                 const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
-                                const deficit = p.minStockLevel - p.available_now;
                                 const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
                                 const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
                                 const recEntry = recMap.get(p.id);
@@ -1285,12 +1281,9 @@ export default function PurchaseSuggestedPage() {
                                                 min {p.minStockLevel.toLocaleString("tr-TR")}
                                             </div>
                                         </td>
-                                        {/* Stok Açığı (G3: 0 göster, "—" değil) */}
-                                        <td style={{ padding: "10px 12px", fontWeight: 700, fontSize: "14px" }}>
-                                            {deficit > 0
-                                                ? <span style={{ color: "var(--danger-text)" }}>-{deficit.toLocaleString("tr-TR")}</span>
-                                                : <span style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>0</span>
-                                            }
+                                        {/* Açık Sipariş */}
+                                        <td style={{ padding: "10px 12px", fontWeight: 500, fontSize: "14px", color: "var(--text-tertiary)" }}>
+                                            0
                                         </td>
                                         {/* Önerilen + Tükenme */}
                                         <td style={{ padding: "10px 12px" }}>
@@ -1340,28 +1333,19 @@ export default function PurchaseSuggestedPage() {
                                                 );
                                             })()}
                                         </td>
-                                        {/* Karar — status only; actions in AI drawer */}
-                                        <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
-                                            {(() => {
-                                                const st = recEntry?.status ?? "no_rec";
-                                                const undoBtn = !isDemo ? <button onClick={() => handleUndo(p.id)} style={{ display: "block", marginTop: "3px", fontSize: "10px", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>Kararı geri al</button> : null;
-                                                if (st === "accepted") return <div><span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--success-bg)", color: "var(--success-text)", border: "0.5px solid var(--success-border)" }}>✓ Kabul</span>{undoBtn}</div>;
-                                                if (st === "rejected") return <div><span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", color: "var(--danger-text)" }}>✕ Red</span>{undoBtn}</div>;
-                                                if (st === "edited") return <div><span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--accent-border)" }}>✎ Düzenlendi</span>{undoBtn}</div>;
-                                                if (!recEntry) return <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>—</span>;
-                                                return (
-                                                    <button
-                                                        onClick={() => setAiDrawerProductId(p.id)}
-                                                        style={{
-                                                            fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px",
-                                                            background: "var(--warning-bg)", color: "var(--warning-text)",
-                                                            border: "0.5px solid var(--warning-border)", cursor: "pointer",
-                                                        }}
-                                                    >
-                                                        Karar ver →
-                                                    </button>
-                                                );
-                                            })()}
+                                        {/* Karar — inline chip-buton seti (G5) */}
+                                        <td style={{ padding: "10px 12px" }}>
+                                            <RecActionCell
+                                                productId={p.id}
+                                                recEntry={recEntry}
+                                                suggestQty={suggestQty}
+                                                unit={p.unit}
+                                                onAccept={handleAccept}
+                                                onReject={handleReject}
+                                                onEdit={handleEdit}
+                                                onUndo={handleUndo}
+                                                isDemo={isDemo}
+                                            />
                                         </td>
                                     </tr>
                                 );

@@ -11,6 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ─── Module mocks ────────────────────────────────────────────────────────────
 
 const mockDbListProducts = vi.fn();
+const mockDbGetAllActiveProductIds = vi.fn();
 const mockDbExpireStaleRecommendations = vi.fn();
 const mockDbExpireRecommendationsForMissingEntities = vi.fn();
 const mockDbGetActiveRecommendationsForEntities = vi.fn();
@@ -21,6 +22,7 @@ const mockAiEnrichPurchaseSuggestions = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
     dbListProducts: (...a: unknown[]) => mockDbListProducts(...a),
+    dbGetAllActiveProductIds: (...a: unknown[]) => mockDbGetAllActiveProductIds(...a),
 }));
 
 vi.mock("@/lib/supabase/recommendations", () => ({
@@ -62,6 +64,7 @@ const mockRec = {
 beforeEach(() => {
     vi.clearAllMocks();
     mockDbListProducts.mockResolvedValue([belowMinProduct]);
+    mockDbGetAllActiveProductIds.mockResolvedValue(["prod-1"]);
     mockDbExpireStaleRecommendations.mockResolvedValue(0);
     mockDbExpireRecommendationsForMissingEntities.mockResolvedValue(0);
     mockDbGetActiveRecommendationsForEntities.mockResolvedValue([]);

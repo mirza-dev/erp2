@@ -82,6 +82,16 @@ export async function dbListAllActiveProducts(): Promise<ProductWithStock[]> {
     return (data ?? []).map(p => ({ ...p, available_now: p.on_hand - p.reserved }));
 }
 
+export async function dbGetAllActiveProductIds(): Promise<string[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("products")
+        .select("id")
+        .eq("is_active", true);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(r => r.id);
+}
+
 export async function dbListProducts(filter: ListProductsFilter = {}): Promise<ProductWithStock[]> {
     const supabase = createServiceClient();
     const { page = 1, pageSize = 100, category, product_type, is_active } = filter;

@@ -11,9 +11,11 @@ import { resolve } from "node:path";
 // ─── DB query mock ────────────────────────────────────────────────────────────
 
 const mockDbListProducts = vi.fn();
+const mockDbGetAllActiveProductIds = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
     dbListProducts: (...args: unknown[]) => mockDbListProducts(...args),
+    dbGetAllActiveProductIds: (...args: unknown[]) => mockDbGetAllActiveProductIds(...args),
 }));
 
 // ─── AI service mock ──────────────────────────────────────────────────────────
@@ -48,6 +50,8 @@ import { ConfigError } from "@/lib/supabase/service";
 // Reset all mocks before every test to prevent state leakage
 beforeEach(() => {
     mockDbListProducts.mockReset();
+    mockDbGetAllActiveProductIds.mockReset();
+    mockDbGetAllActiveProductIds.mockResolvedValue([]);
     mockAiEnrichPurchaseSuggestions.mockReset();
     // Default: upsert resolves with a mock rec row; expire resolves with 0
     mockDbUpsertRecommendation.mockReset();
@@ -362,6 +366,7 @@ describe("POST /api/ai/purchase-copilot — ai_call_failed flag (Sprint C G2)", 
 });
 
 // Sprint C G1: Silinmiş ürünlerin recommendations'ı orphan cleanup
+// G1 fix (bulgular): dbGetAllActiveProductIds kullanılır (pageSize truncation'ından bağımsız)
 describe("POST /api/ai/purchase-copilot — orphan rec cleanup (Sprint C G1)", () => {
     beforeEach(() => {
         mockIsAIAvailable.mockReturnValue(false);
@@ -369,6 +374,7 @@ describe("POST /api/ai/purchase-copilot — orphan rec cleanup (Sprint C G1)", (
             makeProduct({ id: "p-active-1", available_now: 5, min_stock_level: 20 }),
             makeProduct({ id: "p-active-2", available_now: 8, min_stock_level: 15 }),
         ]);
+        mockDbGetAllActiveProductIds.mockResolvedValue(["p-active-1", "p-active-2"]);
     });
 
     it("dbExpireRecommendationsForMissingEntities aktif id seti ile çağrılır", async () => {
@@ -382,6 +388,7 @@ describe("POST /api/ai/purchase-copilot — orphan rec cleanup (Sprint C G1)", (
 
     it("aktif ürün listesi boşsa boş array geçer (helper kendi guard'ı no-op)", async () => {
         mockDbListProducts.mockResolvedValue([]);
+        mockDbGetAllActiveProductIds.mockResolvedValue([]);
         await POST();
         expect(mockDbExpireRecommendationsForMissingEntities).toHaveBeenCalledWith(
             "product", [], "purchase_suggestion"

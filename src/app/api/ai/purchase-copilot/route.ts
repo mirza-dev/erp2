@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dbListProducts } from "@/lib/supabase/products";
+import { dbListProducts, dbGetAllActiveProductIds } from "@/lib/supabase/products";
 import { computeTargetStock, computeCoverageDays, computeUrgencyPct } from "@/lib/stock-utils";
 import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem } from "@/lib/services/ai-service";
 import {
@@ -27,11 +27,11 @@ export async function POST() {
     // Sprint C G1: Silinmiş veya deaktif edilmiş ürünlerin aktif önerilerini
     // expire et (suggested + accepted/edited/rejected). Aksi halde sayfada
     // hayalet öneriler görünür ve ürün geri etkinleştiğinde eski karar geri
-    // dirilir. `products` zaten is_active=true ile yüklendiği için aktif id
-    // setini doğrudan kullanıyoruz; alerts scan'indeki orphan cleanup ile
-    // aynı pattern (Sprint A G1).
+    // dirilir. Ayrı bir "tüm aktif ID" sorgusu kullanıyoruz çünkü `products`
+    // pageSize:500 ile yüklenmiş olabilir; truncated listeden orphan expire
+    // yapılırsa 501+ ürünlerin geçerli önerileri yanlışlıkla expire olurdu.
     try {
-        const allActiveProductIds = products.map(p => p.id);
+        const allActiveProductIds = await dbGetAllActiveProductIds();
         await dbExpireRecommendationsForMissingEntities("product", allActiveProductIds, "purchase_suggestion");
     } catch { /* non-fatal — main flow continues */ }
 
