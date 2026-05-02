@@ -6,6 +6,7 @@ import {
     type CreateProductInput,
 } from "@/lib/supabase/products";
 import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
+import { dbExpireEntityRecommendations } from "@/lib/supabase/recommendations";
 import type { AlertType } from "@/lib/database.types";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
@@ -49,9 +50,10 @@ export async function PATCH(
         const body = parsed.data as Partial<CreateProductInput> & { is_active?: boolean };
         const product = await dbUpdateProduct(id, body);
         revalidateTag("products", "max");
-        // Ürün deaktif edildiyse ilgili aktif uyarıları da kapat (G1 ileriye dönük fix)
+        // Ürün deaktif edildiyse ilgili aktif uyarıları ve önerileri kapat
         if (body.is_active === false) {
             await resolveProductAlerts(id, "product_deactivated");
+            await dbExpireEntityRecommendations(id, "product").catch(() => {});
         }
         return NextResponse.json(product);
     } catch (err) {
@@ -67,8 +69,9 @@ export async function DELETE(
     try {
         const { id } = await params;
         await dbDeleteProduct(id);
-        // G1 ileriye dönük fix: silinen ürünün aktif uyarılarını hemen kapat
+        // Silinen ürünün aktif uyarılarını ve önerilerini hemen kapat
         await resolveProductAlerts(id, "product_deleted");
+        await dbExpireEntityRecommendations(id, "product").catch(() => {});
         revalidateTag("products", "max");
         return NextResponse.json({ ok: true });
     } catch (err) {

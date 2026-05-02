@@ -34,6 +34,10 @@ export interface UpdateRecommendationStatusOpts {
 // Valid transitions from a given status
 const VALID_TRANSITIONS: Partial<Record<RecommendationStatus, RecommendationStatus[]>> = {
     suggested: ["accepted", "edited", "rejected", "expired"],
+    // "Kararı geri al" — user can undo any decision back to suggested
+    accepted:  ["suggested"],
+    edited:    ["suggested"],
+    rejected:  ["suggested"],
 };
 
 // ── Queries ──────────────────────────────────────────────────
@@ -138,6 +142,11 @@ export async function dbUpdateRecommendationStatus(
         updates.expired_at = now;
         updates.decided_at = null;
     }
+    // "Kararı geri al" — undo reverts to undecided state
+    if (status === "suggested") {
+        updates.decided_at = null;
+        updates.edited_metadata = null;
+    }
 
     const { data, error } = await supabase
         .from("ai_recommendations")
@@ -147,8 +156,8 @@ export async function dbUpdateRecommendationStatus(
         .single();
     if (error || !data) throw new Error(error?.message ?? "Recommendation status update failed");
 
-    // Record feedback (not for expire — that's a system action)
-    if (status !== "expired") {
+    // Record feedback — skip for system actions (expire) and undos (suggested)
+    if (status !== "expired" && status !== "suggested") {
         const feedbackType = status as FeedbackType;
         await supabase.from("ai_feedback").insert({
             recommendation_id: id,
@@ -280,4 +289,23 @@ export async function dbExpireRecommendationsForMissingEntities(
         .select("id");
     if (error) throw new Error(error.message);
     return data?.length ?? 0;
+}
+
+/**
+ * Immediately expire all active recommendations for a single entity.
+ * Called on product delete or deactivate so the purchase-suggested page
+ * never shows ghost recommendations before the next copilot run.
+ */
+export async function dbExpireEntityRecommendations(
+    entityId: string,
+    entityType: string,
+): Promise<void> {
+    const supabase = createServiceClient();
+    await supabase
+        .from("ai_recommendations")
+        .update({ status: "expired", expired_at: new Date().toISOString() })
+        .eq("entity_id", entityId)
+        .eq("entity_type", entityType)
+        .in("status", ["suggested", "accepted", "edited", "rejected"]);
+    // error not thrown — best-effort; lazy cleanup via copilot route is the backup
 }

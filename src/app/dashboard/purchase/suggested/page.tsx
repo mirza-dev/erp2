@@ -232,6 +232,7 @@ function RecActionCell({
     onAccept,
     onReject,
     onEdit,
+    onUndo,
     isDemo,
 }: {
     productId: string;
@@ -241,6 +242,7 @@ function RecActionCell({
     onAccept: (productId: string) => void;
     onReject: (productId: string, feedbackNote?: string) => void;
     onEdit: (productId: string, qty: number, unit: string) => void;
+    onUndo: (productId: string) => void;
     isDemo?: boolean;
 }) {
     const [editMode, setEditMode] = useState(false);
@@ -254,39 +256,61 @@ function RecActionCell({
         ? new Date(recEntry.decidedAt).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
         : null;
 
+    const undoButton = !isDemo ? (
+        <button
+            onClick={() => onUndo(productId)}
+            style={{
+                display: "block", marginTop: "4px", fontSize: "10px",
+                color: "var(--text-tertiary)", background: "none", border: "none",
+                cursor: "pointer", textDecoration: "underline", padding: 0,
+            }}
+        >
+            Kararı geri al
+        </button>
+    ) : null;
+
     if (status === "accepted") {
         return (
-            <span style={{
-                fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
-                background: "var(--success-bg)", color: "var(--success-text)",
-                border: "0.5px solid var(--success-border)",
-            }}>
-                ✓ Kabul Edildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
-            </span>
+            <div>
+                <span style={{
+                    fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                    background: "var(--success-bg)", color: "var(--success-text)",
+                    border: "0.5px solid var(--success-border)",
+                }}>
+                    ✓ Kabul Edildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
+                </span>
+                {undoButton}
+            </div>
         );
     }
 
     if (status === "edited") {
         const editedQty = recEntry?.editedQty ?? null;
         return (
-            <span style={{
-                fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
-                background: "var(--accent-bg)", color: "var(--accent-text)",
-                border: "0.5px solid var(--accent-border)",
-            }}>
-                ✎ Düzenlendi{editedQty != null ? `: ${editedQty} ${unit}` : ""}{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
-            </span>
+            <div>
+                <span style={{
+                    fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                    background: "var(--accent-bg)", color: "var(--accent-text)",
+                    border: "0.5px solid var(--accent-border)",
+                }}>
+                    ✎ Düzenlendi{editedQty != null ? `: ${editedQty} ${unit}` : ""}{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
+                </span>
+                {undoButton}
+            </div>
         );
     }
 
     if (status === "rejected") {
         return (
-            <span style={{
-                fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
-                color: "var(--danger-text)",
-            }}>
-                ✕ Reddedildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
-            </span>
+            <div>
+                <span style={{
+                    fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
+                    color: "var(--danger-text)",
+                }}>
+                    ✕ Reddedildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
+                </span>
+                {undoButton}
+            </div>
         );
     }
 
@@ -623,6 +647,31 @@ export default function PurchaseSuggestedPage() {
         }
     };
 
+    const handleUndo = async (productId: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        const rec = recMap.get(productId);
+        if (!rec) return;
+        const prev = { ...rec };
+        setRecMap(m => new Map(m).set(productId, { ...rec, status: "suggested", decidedAt: undefined }));
+        try {
+            const res = await fetch(`/api/recommendations/${rec.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "suggested" }),
+            });
+            if (res.ok) {
+                clearTimeout(refetchTimerRef.current);
+                refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
+            } else {
+                setRecMap(m => new Map(m).set(productId, prev));
+                toast({ type: "error", message: "Karar geri alınamadı — tekrar deneyin." });
+            }
+        } catch {
+            setRecMap(m => new Map(m).set(productId, prev));
+            toast({ type: "error", message: "Karar geri alınamadı — tekrar deneyin." });
+        }
+    };
+
     const manufacturedItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "manufactured"), [reorderSuggestions]);
     const commercialItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "commercial"), [reorderSuggestions]);
 
@@ -668,8 +717,8 @@ export default function PurchaseSuggestedPage() {
                 const rec = recMap.get(p.id);
                 return {
                     id: p.id,
-                    costPrice: p.costPrice ?? null,
-                    price: p.price ?? null,
+                    costPrice: p.costPrice || null,
+                    price: p.price || null,
                     currency: p.currency,
                     suggestQty: computeSuggestion(p).suggestQty,
                     decidedStatus: rec?.status,
@@ -1295,9 +1344,10 @@ export default function PurchaseSuggestedPage() {
                                         <td style={{ padding: "10px 12px", whiteSpace: "nowrap" }}>
                                             {(() => {
                                                 const st = recEntry?.status ?? "no_rec";
-                                                if (st === "accepted") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--success-bg)", color: "var(--success-text)", border: "0.5px solid var(--success-border)" }}>✓ Kabul</span>;
-                                                if (st === "rejected") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", color: "var(--danger-text)" }}>✕ Red</span>;
-                                                if (st === "edited") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--accent-border)" }}>✎ Düzenlendi</span>;
+                                                const undoBtn = !isDemo ? <button onClick={() => handleUndo(p.id)} style={{ display: "block", marginTop: "3px", fontSize: "10px", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer", textDecoration: "underline", padding: 0 }}>Kararı geri al</button> : null;
+                                                if (st === "accepted") return <div><span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--success-bg)", color: "var(--success-text)", border: "0.5px solid var(--success-border)" }}>✓ Kabul</span>{undoBtn}</div>;
+                                                if (st === "rejected") return <div><span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", color: "var(--danger-text)" }}>✕ Red</span>{undoBtn}</div>;
+                                                if (st === "edited") return <div><span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--accent-border)" }}>✎ Düzenlendi</span>{undoBtn}</div>;
                                                 if (!recEntry) return <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>—</span>;
                                                 return (
                                                     <button
@@ -1480,6 +1530,7 @@ export default function PurchaseSuggestedPage() {
                                     onAccept={handleAccept}
                                     onReject={handleReject}
                                     onEdit={handleEdit}
+                                    onUndo={handleUndo}
                                     isDemo={isDemo}
                                 />
                             </div>

@@ -1,9 +1,31 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-01_
+_Son güncelleme: 2026-05-02_
 
-**Son tamamlanan iş:** Sprint C — Satın Alma Önerileri stabilizasyonu (2026-05-01)
+**Son tamamlanan iş:** Sprint C bulgular 2. tur — 4 fix + 5 adlandırılmış test (2026-05-02)
+
+**Sprint C bulgular 2. tur (1 commit):**
+- Fix 1 (HIGH): NULL fiyat sıfıra düşüyor → `??` → `||` (page.tsx) — missingPriceCount artık doğru
+- Fix 2 backend (HIGH): "Kararı geri al" akışı → VALID_TRANSITIONS'a reverse geçişler + ALLOWED_STATUSES'a "suggested"
+- Fix 2 frontend (HIGH): handleUndo + optimistic rollback + "Kararı geri al" butonu (table + drawer)
+- Fix 3 (MEDIUM): Ürün silinince/deaktif edilince rec'ler anında expire — dbExpireEntityRecommendations yeni helper
+- Fix 4: 5 adlandırılmış test — action-feedback, cost-fallback, ai-banner, product-cleanup, empty
+- G3 "Açık Sipariş" bulgusu geçersiz (kasıtlı tasarım — "Stok Açığı" = min − available doğru metrik)
+- 124 dosya · 2128 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** Sprint B bulgular 2. tur — import sayfası 5 fix + 6 adlandırılmış test (2026-05-01)
+
+**Sprint B bulgular 2. tur (1 commit):**
+- Fix 1 (HIGH): Confirm API hatası UI'da yutulmuyordu → !confirmRes.ok dalı + hata parse + toast
+- Fix 2 (MEDIUM): Kolon chip'leri AI confidence %'sini gösteriyor (sourceChipLabel helper export)
+- Fix 3 (MEDIUM): order_line insert/update hataları kontrol ediliyor — lineInsertErr → rejected
+- Fix 4 (LOW): Dosya boyutu aşımında inline hata + toast birlikte
+- Fix 5 (LOW): validateFileSize() helper export (test edilebilirlik)
+- 6 adlandırılmış test dosyası: file-size-limit, source-chips, inline-edit-rollback, confirm-race, order-line-sort-order, result-by-entity
+- 119 dosya · 2092 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** Sprint C — Satın Alma Önerileri stabilizasyonu (2026-05-01)
 
 **Sprint C özet (3 commit):**
 - Part 1: AI fail banner (büyük sarı, "Yeniden dene") + costPrice/price NULL → toplama dahil değil + "X üründe fiyat eksik" sayacı + karar sonrası loadAiData(300ms) + isDemo guard ile AI POST kapatma + mavi info banner. Backend route'a `ai_call_failed` flag eklendi.

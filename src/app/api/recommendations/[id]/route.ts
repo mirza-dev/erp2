@@ -20,7 +20,7 @@ export async function GET(
     }
 }
 
-const ALLOWED_STATUSES: RecommendationStatus[] = ["accepted", "edited", "rejected"];
+const ALLOWED_STATUSES: RecommendationStatus[] = ["accepted", "edited", "rejected", "suggested"];
 
 export async function PATCH(
     req: NextRequest,
