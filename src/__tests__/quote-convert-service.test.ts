@@ -1,7 +1,7 @@
 /**
  * Tests for serviceConvertQuoteToOrder — Faz 8.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from "vitest";
 
 // ─── DB mocks ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +59,15 @@ vi.mock("@/lib/supabase/alerts", () => ({
 }));
 
 import { serviceConvertQuoteToOrder } from "@/lib/services/quote-service";
+
+// ─── Time anchor ─────────────────────────────────────────────────────────────
+// Fixture valid_until = "2026-05-01"; freeze clock to before that so the
+// service's expiry guard doesn't fire on otherwise-valid quotes.
+beforeAll(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-04-15T00:00:00Z"));
+});
+afterAll(() => { vi.useRealTimers(); });
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
