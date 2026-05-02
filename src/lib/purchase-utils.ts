@@ -54,3 +54,28 @@ export function computeOrderTotals(items: OrderTotalsItem[]): OrderTotalsResult 
 
     return { totalsByCurrency, currencyEntries, isSingleCurrency, primaryCurrency, primaryTotal, primaryAccepted, missingPriceCount };
 }
+
+/**
+ * Mutation sonrası loadAiData çağrısını 300ms (default) gecikmeyle planlar.
+ * Aynı timer ref'i ile birden fazla çağrı: önceki timer iptal edilir, sadece son
+ * planlama çalışır (debounce). 4 handler arasında duplicate edilen pattern'in
+ * tek noktada tutulması için extract.
+ */
+export function scheduleRefetchAfterMutation(
+    timerRef: { current: ReturnType<typeof setTimeout> | undefined },
+    loadFn: () => void,
+    delayMs = 300,
+): void {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(loadFn, delayMs);
+}
+
+/**
+ * Demo modda /api/ai/purchase-copilot POST middleware tarafından 403 veriyor.
+ * UI da çağrı yapmadan önce kısa devre yapmalı (gereksiz network + sessiz toast'tan
+ * kaçınma). Bu helper karar mantığını tek noktada tutar; loadAiData içinde
+ * if (shouldSkipAiFetch(isDemo)) return; pattern'iyle kullanılır.
+ */
+export function shouldSkipAiFetch(isDemo: boolean): boolean {
+    return isDemo;
+}

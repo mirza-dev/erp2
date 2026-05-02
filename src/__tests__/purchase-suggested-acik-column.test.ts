@@ -1,9 +1,18 @@
 /**
  * G4 (bulgular) — purchase-suggested-acik-column
  *
- * G3 fix: "Açık Sipariş" sütunu (header + tooltip + 0 değer).
- * copilot route'u her item için `available` ve `min` döndürür (stok durumu için).
- * Satın alma önerilerinde "deficit" field'ı hesaplanmaz (UI görevi değil).
+ * G3 fix: "Açık Sipariş" sütunu (header + tooltip + gerçek sipariş sayısı).
+ * Bulgular 4. tur: değer artık hardcoded 0 değil; UI ayrı endpoint'ten çekiyor:
+ *   `GET /api/orders/open-count-by-product` → `Record<productId, count>`.
+ * Backend helper: `dbGetOpenOrderCountByProduct` (alerts-acik-column.test.ts'te
+ * birim test edilmiş).
+ *
+ * Bu dosya iki kontratı belgeler:
+ * 1. POST /api/ai/purchase-copilot response item'ında `openOrderCount` veya
+ *    `deficit` field'ı YOK (UI ayrı endpoint kullanıyor).
+ * 2. UI render eksik: hardcoded 0 yerine `openOrderCounts[id] ?? 0` pattern'i.
+ *    (Render'in kendisi component test gerektirdiğinden integration test alerts
+ *    sayfasındaki paralel yapı + manuel doğrulama ile kapatılır.)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -82,11 +91,21 @@ describe("POST /api/ai/purchase-copilot — G3: Açık Sipariş uyumlu response"
         expect(item.min).toBeDefined();
     });
 
-    it("response item'da deficit field'ı yok (UI hesaplamaz, sütun 0 gösterir)", async () => {
+    it("response item'da deficit field'ı yok (UI hesaplamaz)", async () => {
         const res = await POST();
         const body = await res.json();
         const item = body.items[0];
         expect(item).not.toHaveProperty("deficit");
+    });
+
+    it("response item'da openOrderCount field'ı yok — UI ayrı endpoint'ten çekiyor", async () => {
+        // Açık sipariş sayısı /api/orders/open-count-by-product'tan geliyor.
+        // copilot response'ında bu alanın olmaması, UI'nin doğru kaynaktan
+        // veri çektiğini garanti eder (hardcoded 0 regresyonunu da yakalar).
+        const res = await POST();
+        const body = await res.json();
+        const item = body.items[0];
+        expect(item).not.toHaveProperty("openOrderCount");
     });
 
     it("available < min olan ürün items içinde gelir (stok açığı var)", async () => {

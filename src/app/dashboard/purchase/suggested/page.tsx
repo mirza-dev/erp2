@@ -9,7 +9,7 @@ import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { formatCurrency } from "@/lib/utils";
-import { computeOrderTotals } from "@/lib/purchase-utils";
+import { computeOrderTotals, scheduleRefetchAfterMutation, shouldSkipAiFetch } from "@/lib/purchase-utils";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -363,8 +363,9 @@ function RecActionCell({
                 <input
                     type="text"
                     value={rejectNote}
-                    placeholder="Ret sebebi (isteğe bağlı)"
+                    placeholder="Ret sebebi (isteğe bağlı, max 200)"
                     onChange={e => setRejectNote(e.target.value)}
+                    maxLength={200}
                     autoFocus
                     style={{
                         padding: "3px 8px",
@@ -485,11 +486,24 @@ export default function PurchaseSuggestedPage() {
     // recMap: productId → { id, status, editedQty? }
     const [recMap, setRecMap] = useState<Map<string, RecEntry & { editedQty?: number }>>(new Map());
 
+    // G3 (bulgular 4. tur): "Açık Sipariş" sütunu için onaylı + sevk edilmemiş
+    // sipariş sayısı. Mount'ta bir kez çekilir; sayfa içinde sipariş yaratımı yok.
+    const [openOrderCounts, setOpenOrderCounts] = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        const ctrl = new AbortController();
+        fetch("/api/orders/open-count-by-product", { signal: ctrl.signal })
+            .then(r => r.ok ? r.json() : {})
+            .then(data => setOpenOrderCounts(data ?? {}))
+            .catch(() => { /* best-effort: hata → 0 default */ });
+        return () => ctrl.abort();
+    }, []);
+
     const loadAiData = useCallback(async (signal?: AbortSignal) => {
         // Sprint C G7: demo modda AI POST yapma — middleware 403 dönüyor ve sessiz
         // yutuluyor. Önceden AI banner'ı gösterip user'ı yanıltıyordu; şimdi
         // hiç çağırmıyoruz, mavi info banner ile durum bildiriliyor.
-        if (isDemo) {
+        if (shouldSkipAiFetch(isDemo)) {
             setAiData(null);
             setAiError(false);
             return;
@@ -572,8 +586,7 @@ export default function PurchaseSuggestedPage() {
                 // Sprint C G6: özet kartlar (Toplam Kritik, Toplam Tutar, kabul edilen)
                 // recMap üzerinden hesaplanıyor; sayaç guarantilenmesi için debounce ile
                 // arkaplandan refetch — kullanıcı satır state'ini hemen görür.
-                clearTimeout(refetchTimerRef.current);
-                refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
+                scheduleRefetchAfterMutation(refetchTimerRef, () => loadAiData());
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -603,8 +616,7 @@ export default function PurchaseSuggestedPage() {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, decidedAt: recommendation.decidedAt }));
                 toast({ type: "info", message: "Öneri reddedildi" });
-                clearTimeout(refetchTimerRef.current);
-                refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
+                scheduleRefetchAfterMutation(refetchTimerRef, () => loadAiData());
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -635,8 +647,7 @@ export default function PurchaseSuggestedPage() {
                 const { recommendation } = await res.json();
                 setRecMap(m => new Map(m).set(productId, { ...rec, status: recommendation.status, editedQty: qty, decidedAt: recommendation.decidedAt }));
                 toast({ type: "success", message: `Miktar güncellendi: ${qty} ${unit}` });
-                clearTimeout(refetchTimerRef.current);
-                refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
+                scheduleRefetchAfterMutation(refetchTimerRef, () => loadAiData());
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Kaydedilemedi — tekrar deneyin" });
@@ -661,8 +672,7 @@ export default function PurchaseSuggestedPage() {
             });
             if (res.ok) {
                 toast({ type: "success", message: "Karar geri alındı." });
-                clearTimeout(refetchTimerRef.current);
-                refetchTimerRef.current = setTimeout(() => loadAiData(), 300);
+                scheduleRefetchAfterMutation(refetchTimerRef, () => loadAiData());
             } else {
                 setRecMap(m => new Map(m).set(productId, prev));
                 toast({ type: "error", message: "Karar geri alınamadı — tekrar deneyin." });
@@ -1120,7 +1130,12 @@ export default function PurchaseSuggestedPage() {
                                     </div>
                                     <div style={{ fontSize: "12px" }} title="Bu üründe açık (onaylı + sevk edilmemiş) sipariş sayısı">
                                         <span style={{ color: "var(--text-tertiary)" }}>Açık Sipariş:</span>{" "}
-                                        <span style={{ fontWeight: 500, color: "var(--text-tertiary)" }}>0</span>
+                                        <span style={{
+                                            fontWeight: 500,
+                                            color: (openOrderCounts[p.id] ?? 0) > 0 ? "var(--accent-text)" : "var(--text-tertiary)",
+                                        }}>
+                                            {openOrderCounts[p.id] ?? 0}
+                                        </span>
                                     </div>
                                     {p.leadTimeDays != null && (
                                         <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
@@ -1139,28 +1154,19 @@ export default function PurchaseSuggestedPage() {
                                     <FormulaLabel p={p} formula={formula} leadTimeDemand={leadTimeDemand} />
                                 </div>
 
-                                {/* Action — open drawer to decide */}
+                                {/* Action — inline RecActionCell (G5 mobile) */}
                                 <div style={{ marginTop: "12px" }}>
-                                    {(() => {
-                                        const rec = recMap.get(p.id);
-                                        const st = rec?.status ?? "no_rec";
-                                        if (st === "accepted") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--success-bg)", color: "var(--success-text)", border: "0.5px solid var(--success-border)" }}>✓ Kabul Edildi</span>;
-                                        if (st === "rejected") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", color: "var(--danger-text)" }}>✕ Reddedildi</span>;
-                                        if (st === "edited") return <span style={{ fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--accent-border)" }}>✎ Düzenlendi{rec?.editedQty != null ? `: ${rec.editedQty} ${p.unit}` : ""}</span>;
-                                        if (!rec) return null;
-                                        return (
-                                            <button
-                                                onClick={() => setAiDrawerProductId(p.id)}
-                                                style={{
-                                                    fontSize: "11px", fontWeight: 600, padding: "3px 10px", borderRadius: "4px",
-                                                    background: "var(--warning-bg)", color: "var(--warning-text)",
-                                                    border: "0.5px solid var(--warning-border)", cursor: "pointer",
-                                                }}
-                                            >
-                                                Karar ver →
-                                            </button>
-                                        );
-                                    })()}
+                                    <RecActionCell
+                                        productId={p.id}
+                                        recEntry={recEntry}
+                                        suggestQty={suggestQty}
+                                        unit={p.unit}
+                                        onAccept={handleAccept}
+                                        onReject={handleReject}
+                                        onEdit={handleEdit}
+                                        onUndo={handleUndo}
+                                        isDemo={isDemo}
+                                    />
                                 </div>
                             </div>
                         );
@@ -1282,8 +1288,13 @@ export default function PurchaseSuggestedPage() {
                                             </div>
                                         </td>
                                         {/* Açık Sipariş */}
-                                        <td style={{ padding: "10px 12px", fontWeight: 500, fontSize: "14px", color: "var(--text-tertiary)" }}>
-                                            0
+                                        <td style={{
+                                            padding: "10px 12px",
+                                            fontWeight: 500,
+                                            fontSize: "14px",
+                                            color: (openOrderCounts[p.id] ?? 0) > 0 ? "var(--accent-text)" : "var(--text-tertiary)",
+                                        }}>
+                                            {openOrderCounts[p.id] ?? 0}
                                         </td>
                                         {/* Önerilen + Tükenme */}
                                         <td style={{ padding: "10px 12px" }}>
