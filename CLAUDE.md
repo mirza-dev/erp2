@@ -1,9 +1,39 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-02_
+_Son güncelleme: 2026-05-04_
 
-**Son tamamlanan iş:** Sprint C bulgular 2. tur — 4 fix + 5 adlandırılmış test (2026-05-02)
+**Son tamamlanan iş:** Demo seed yenileme — sade öz boyut + tüm modüller dolu (2026-05-04)
+
+**Demo seed rewrite (1 commit):**
+- Mevcut seed (1613 satır, 39 ürün, 15 sipariş) müşteri turuna kalabalıktı; LOAD- prefix kalıntıları temizlenmiyordu; quotes/ai_recommendations/import_*/company_settings/parasut_oauth_tokens boş kalıyordu.
+- Yeni seed: 8 ürün · 4 müşteri · 7 sipariş · 3 teklif · 5 AI öneri · 2 import batch · 3 üretim · 1 şirket ayarı + parasut stub. Her sayfada anlamlı veri, çift eksen sipariş matrisi tam (draft/pending/approved×{unallocated,partially_allocated,allocated,partially_shipped,shipped}/cancelled).
+- DELETE: LOAD- temizliği (sales_orders.notes/customers.name/products.sku LIKE) + 25 demo tablosu + company_settings reset (silmez, sıfırlar) + order_counters reset.
+- POST: company_settings UPDATE → parasut_oauth_tokens UPSERT → products → customers → quotes (TKL-2026-001/002/003: sent/expired/accepted) → orders (ORD-2026-0001..0007, TKL-003 → ORD-0003 quote_id) → reservations + shortages → BOM (KV-3P-DN50 ← CT-SS + BE-SC) → commitments → production → movements → shipments + invoices + payments → ai_recommendations + ai_feedback → import_batches + drafts → column_mappings + ai_entity_aliases → sync_logs + audit_log.
+- Stok senaryoları: KV-DB-DN100 critical, KV-3P-DN80 warning, KB-WT-DN150 past deadline, AA-SOV-DN80 imminent 3 gün (Almanya 45 gün lead), CV-KV-DN65 imminent 1 gün, CT-SS-DN50 fiyat eksik (price=NULL).
+- Müşteriler: Tüpraş (TRY), Abdi İbrahim (EUR), Enerjisa (USD), Ülker (VKN-eksik — Paraşüt preflight test).
+- 129 dosya · 2157 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** Sprint C bulgular 4. tur — G3 gerçek veri + G5 mobil + test tamamlama (2026-05-02)
+
+**Sprint C bulgular 4. tur (1 commit `3e01cd0`):**
+- G3 (HIGH): "Açık Sipariş" hardcoded 0 → gerçek sipariş sayısı (mount fetch + alerts pattern paralel; vurgu rengi). Backend helper + endpoint zaten hazırdı, sadece UI bağlantısı eksikti.
+- G5 (MEDIUM): Mobil kart inline IIFE → `RecActionCell`; pending'de inline aksiyon, decided'da "Kararı geri al"; RejectMode input `maxLength={200}`
+- G4: 2 yeni test — `refetch-after-mutation`, `demo-mode`. 2 helper extract: `scheduleRefetchAfterMutation` (4 handler debounce DRY), `shouldSkipAiFetch` (demo guard)
+- `acik-column` testine `openOrderCount` regression notu + assertion
+- "Undo başarı toast'ı yok" iddiası geçersiz — 3. turda eklenmişti (page.tsx:663)
+- 129 dosya · 2157 test yeşil · TS clean · 0 lint hatası
+
+**Önceki²:** Sprint C bulgular 3. tur — G1/G3/G5 fix + 3 adlandırılmış test (2026-05-02)
+
+**Sprint C bulgular 3. tur (1 commit `52a082d`):**
+- G1 (HIGH): `dbGetAllActiveProductIds` yeni helper — pageSize:500 truncation'ından bağımsız tam aktif ID seti ile orphan expire
+- G3 (HIGH): "Stok Açığı" → "Açık Sipariş" (masaüstü + mobil; tooltip güncellendi; unused deficit hesabı kaldırıldı)
+- G5 (MEDIUM): Masaüstü KARAR hücresi → inline `RecActionCell` (Kabul Et/Düzenle/Reddet); handleUndo başarı → "Karar geri alındı." toast
+- 3 yeni test: multi-currency (8), on-product-delete (5), acik-column (5)
+- 127 dosya · 2145 test yeşil · TS clean · 0 lint hatası
+
+**Önceki²:** Sprint C bulgular 2. tur — 4 fix + 5 adlandırılmış test (2026-05-02)
 
 **Sprint C bulgular 2. tur (1 commit):**
 - Fix 1 (HIGH): NULL fiyat sıfıra düşüyor → `??` → `||` (page.tsx) — missingPriceCount artık doğru
@@ -11,7 +41,6 @@ _Son güncelleme: 2026-05-02_
 - Fix 2 frontend (HIGH): handleUndo + optimistic rollback + "Kararı geri al" butonu (table + drawer)
 - Fix 3 (MEDIUM): Ürün silinince/deaktif edilince rec'ler anında expire — dbExpireEntityRecommendations yeni helper
 - Fix 4: 5 adlandırılmış test — action-feedback, cost-fallback, ai-banner, product-cleanup, empty
-- G3 "Açık Sipariş" bulgusu geçersiz (kasıtlı tasarım — "Stok Açığı" = min − available doğru metrik)
 - 124 dosya · 2128 test yeşil · TS clean · 0 lint hatası
 
 **Önceki:** Sprint B bulgular 2. tur — import sayfası 5 fix + 6 adlandırılmış test (2026-05-01)
