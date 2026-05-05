@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, ReactNode } from "react";
+import { useIsDemo } from "@/lib/demo-utils";
 
 interface DemoBannerProps {
     children?: ReactNode;
@@ -11,11 +12,14 @@ export default function DemoBanner({
     children = "Bu sayfa demo verileriyle çalışmaktadır. Backend entegrasyonu yakında.",
     storageKey,
 }: DemoBannerProps) {
+    const isDemo = useIsDemo();
     const [dismissed, setDismissed] = useState(() => {
         if (typeof window === "undefined" || !storageKey) return false;
         try { return sessionStorage.getItem(`demo-${storageKey}`) === "1"; } catch { return false; }
     });
 
+    // Production (auth'lu) kullanıcıda banner görünmez
+    if (!isDemo) return null;
     if (dismissed) return null;
 
     const handleDismiss = () => {

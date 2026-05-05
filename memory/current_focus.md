@@ -5,9 +5,58 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
-**Son:** Production bulgular 1. tur KAPALI (2026-05-05; 2158 test) — AI filter alignment + import UI + multi-currency netleştirme
-**Önceki:** Seed idempotent + UI tetikleyici KAPALI (2026-05-05) — settings'te "Tüm Verileri Sıfırla ve Demo Yükle" butonu
-**Önceki²:** Demo seed yenileme KAPALI (2026-05-04) — sade öz boyut + tüm modüller dolu
+**Son:** Ayarlar production-ready KAPALI (2026-05-05; 2194 test) — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu
+**Önceki:** Production bulgular 1. tur KAPALI (2026-05-05; 2158 test) — AI filter alignment + import UI + multi-currency netleştirme
+**Önceki²:** Seed idempotent + UI tetikleyici KAPALI (2026-05-05) — settings'te "Tüm Verileri Sıfırla ve Demo Yükle" butonu
+
+---
+
+## Ayarlar Production-Ready (2026-05-05) — KAPALI
+
+**Hedef:** Settings sayfası 5 sekmeli ama Kullanıcı/Bildirimler tamamen mock + Firma validation yok + DemoBanner her zaman görünüyordu. Production-ready hale getirmek.
+
+**1 commit, 12 dosya:**
+
+**Backend:**
+- Migration `045_user_preferences_avatars.sql`: `user_notification_preferences` tablosu (auth.users FK + UNIQUE user_id+notification_type) + `user-avatars` storage bucket (1MB, public, RLS service_role only).
+- `src/lib/notification-types.ts`: 5 tip sabit liste (stock_critical, order_pending, order_new, sync_error, order_shipped) + her birinin label/desc'i.
+- `src/lib/validation.ts`: isValidEmail (regex), isValidTaxNumber (10/11 hane filter), isValidUrl (protokol opsiyonel).
+- `src/lib/supabase/user-profile.ts`: dbGetUserProfile / dbUpdateUserFullName / dbUpdateUserAvatarUrl — Supabase `auth.users.user_metadata` üzerinde merge update (admin API).
+- `src/lib/supabase/user-preferences.ts`: dbListUserPrefs (DB satırı yoksa default virtual list) / dbUpsertUserPrefs (whitelist + onConflict upsert).
+
+**API endpoints:**
+- `GET/PATCH /api/settings/user/profile` — session auth, fullName 2-100 char validation, trim
+- `POST /api/settings/user/password` — cookie'siz anon client ile signInWithPassword doğrulaması → updateUser({ password }) → audit_log entry. Supabase updateUser mevcut şifre sormuyor; manuel doğrulama zorunlu.
+- `POST /api/settings/user/avatar` — multipart, image MIME, ≤1MB, path `${user.id}.{ext}`, cache-bust ?t={ts}
+- `GET/PATCH /api/settings/user/preferences` — session auth, sanitize+whitelist, upsert
+
+**Frontend:**
+- KullanıcıTab: tüm mock kaldırıldı, gerçek API'ye bağlandı. Avatar upload, profile save, password change tam akış. Demo modda guard mesajı korundu.
+- BildirimlerTab: mock kaldırıldı, NOTIFICATION_TYPES'a göre render, GET/PATCH wire. Demo modda toggle disabled.
+- FirmaTab: inline validation eklendi (required name, email/VKN/URL format). Hatalı alanlarda border kırmızı + FieldError component. Save anında validate, hata varsa toast + bloklu.
+- DemoBanner: `useIsDemo` koşulu — production'da hiç render edilmiyor.
+
+**Yeni 4 test dosyası (36 test):**
+- `settings-user-profile.test.ts` (8 test): GET 401/200, PATCH 401/400 (boş, kısa, uzun)/200, trim
+- `settings-user-password.test.ts` (7 test): 401, current empty, < 8 char, same as new, wrong current, happy path + audit_log, updateUser error
+- `settings-user-preferences.test.ts` (5 test): GET 401/200, PATCH 401/400 (non-array)/200/sanitize
+- `settings-firma-validation.test.ts` (16 test): EMAIL_RE valid/invalid, taxNumber 10/11/9/12 + non-digit filter, URL with/without protocol/path
+
+**Domain kuralı:**
+- User profile data Supabase `auth.users.user_metadata`'da tutulur (full_name, avatar_url) — custom tablo gereksiz
+- Şifre değişikliğinde mevcut şifre doğrulaması ZORUNLU (Supabase updateUser eski şifre sormuyor — çalınmış oturum riskine karşı). Cookie'siz fresh anon client kullan, persistSession:false.
+- DemoBanner her zaman koşullu — `useIsDemo()` üzerinden, sayfa içi if/return ile değil.
+- NOTIFICATION_TYPES tek source of truth (frontend display + backend whitelist).
+
+**Test:** 133 dosya · 2194 test yeşil · TS clean · 0 lint hatası
+
+---
+
+## Kapsam Dışı (Sonraki turlar)
+- E-posta değiştirme (Supabase auto-confirm + grace period UX)
+- SMTP gönderim altyapısı (Resend/SendGrid) — preferences kaydedilir, gönderim ayrı iş
+- Browser push notifications (service worker + Web Push API)
+- Locale/timezone, role-based access
 
 ---
 

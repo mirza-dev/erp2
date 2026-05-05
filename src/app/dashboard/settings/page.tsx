@@ -4,8 +4,24 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
-import { isDemoMode } from "@/lib/demo-utils";
+import { isDemoMode, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import ResetDemoSection from "@/components/settings/ResetDemoSection";
+import { isValidEmail, isValidTaxNumber, isValidUrl } from "@/lib/validation";
+import { NOTIFICATION_TYPES, type NotificationTypeKey } from "@/lib/notification-types";
+
+interface UserProfile {
+    id: string;
+    email: string;
+    fullName: string;
+    avatarUrl: string | null;
+    createdAt: string;
+}
+
+interface NotificationPref {
+    type: string;
+    emailEnabled: boolean;
+    browserEnabled: boolean;
+}
 
 type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
 
@@ -37,6 +53,14 @@ const sectionTitle: React.CSSProperties = {
     textTransform: "uppercase",
     marginBottom: "12px",
 };
+
+function FieldError({ msg }: { msg: string }) {
+    return (
+        <div style={{ fontSize: "11px", color: "var(--danger-text)", marginTop: "4px" }}>
+            {msg}
+        </div>
+    );
+}
 
 function SaveButton({ onClick, loading, dirty }: { onClick: () => void; loading?: boolean; dirty?: boolean }) {
     return (
@@ -75,6 +99,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [logoDragging, setLogoDragging] = useState(false);
     const [logoUploading, setLogoUploading] = useState(false);
+    const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof typeof initialFirmaForm, string>>>({});
     const logoFileRef = useRef<HTMLInputElement>(null);
 
     // Yükle: DB'den mevcut ayarları çek
@@ -107,9 +132,25 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
         setIsDirty(dirty);
         onDirtyChange?.(dirty);
+        // Tek alanda yazarken sadece o alanın hatasını temizle (diğer hatalar görünür kalır)
+        if (fieldErrors[key]) setFieldErrors(p => ({ ...p, [key]: undefined }));
+    };
+
+    const validate = (): boolean => {
+        const errors: Partial<Record<keyof typeof initialFirmaForm, string>> = {};
+        if (!form.name.trim()) errors.name = "Firma adı zorunludur.";
+        if (form.email && !isValidEmail(form.email)) errors.email = "Geçerli bir e-posta girin.";
+        if (form.taxNo && !isValidTaxNumber(form.taxNo)) errors.taxNo = "Vergi numarası 10 veya 11 hane olmalı.";
+        if (form.website && !isValidUrl(form.website)) errors.website = "Geçerli bir web adresi girin.";
+        setFieldErrors(errors);
+        return Object.keys(errors).length === 0;
     };
 
     const handleSave = async () => {
+        if (!validate()) {
+            toast({ type: "error", message: "Lütfen hatalı alanları düzeltin." });
+            return;
+        }
         setIsSaving(true);
         try {
             const res = await fetch("/api/settings/company", {
@@ -235,8 +276,13 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                 <div style={sectionTitle}>Firma Bilgileri</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div style={{ gridColumn: "1 / -1" }}>
-                        <label style={labelStyle}>Firma Adı</label>
-                        <input style={inputStyle} value={form.name} onChange={set("name")} />
+                        <label style={labelStyle}>Firma Adı *</label>
+                        <input
+                            style={fieldErrors.name ? { ...inputStyle, borderColor: "var(--danger-border)" } : inputStyle}
+                            value={form.name}
+                            onChange={set("name")}
+                        />
+                        {fieldErrors.name && <FieldError msg={fieldErrors.name} />}
                     </div>
                     <div>
                         <label style={labelStyle}>Vergi Dairesi</label>
@@ -244,7 +290,13 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     </div>
                     <div>
                         <label style={labelStyle}>Vergi No</label>
-                        <input style={inputStyle} value={form.taxNo} onChange={set("taxNo")} />
+                        <input
+                            style={fieldErrors.taxNo ? { ...inputStyle, borderColor: "var(--danger-border)" } : inputStyle}
+                            value={form.taxNo}
+                            onChange={set("taxNo")}
+                            placeholder="10 hane (kurumsal) veya 11 hane (TC)"
+                        />
+                        {fieldErrors.taxNo && <FieldError msg={fieldErrors.taxNo} />}
                     </div>
                     <div style={{ gridColumn: "1 / -1" }}>
                         <label style={labelStyle}>Adres</label>
@@ -256,11 +308,23 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     </div>
                     <div>
                         <label style={labelStyle}>E-posta</label>
-                        <input style={inputStyle} value={form.email} onChange={set("email")} type="email" />
+                        <input
+                            style={fieldErrors.email ? { ...inputStyle, borderColor: "var(--danger-border)" } : inputStyle}
+                            value={form.email}
+                            onChange={set("email")}
+                            type="email"
+                        />
+                        {fieldErrors.email && <FieldError msg={fieldErrors.email} />}
                     </div>
                     <div>
                         <label style={labelStyle}>Web Sitesi</label>
-                        <input style={inputStyle} value={form.website} onChange={set("website")} />
+                        <input
+                            style={fieldErrors.website ? { ...inputStyle, borderColor: "var(--danger-border)" } : inputStyle}
+                            value={form.website}
+                            onChange={set("website")}
+                            placeholder="ornek.com.tr"
+                        />
+                        {fieldErrors.website && <FieldError msg={fieldErrors.website} />}
                     </div>
                     <div>
                         <label style={labelStyle}>Varsayılan Para Birimi</label>
@@ -279,52 +343,133 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
 }
 
 // ─── Kullanıcı / Profil ────────────────────────────────────────────────────────
-const initialProfileForm = { fullName: "", email: "" };
 
 function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
-    const [form, setForm] = useState({ ...initialProfileForm });
-    const savedRef = useRef({ ...initialProfileForm });
+    const [profile, setProfile] = useState<UserProfile | null>(null);
+    const [fullName, setFullName] = useState("");
+    const savedFullNameRef = useRef("");
     const [isDirty, setIsDirty] = useState(false);
-    const [isSaving, setIsSaving] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [avatarUploading, setAvatarUploading] = useState(false);
+    const avatarFileRef = useRef<HTMLInputElement>(null);
+
     const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
     const [pwError, setPwError] = useState("");
+    const [isChangingPw, setIsChangingPw] = useState(false);
 
-    const handleProfileFieldChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const next = { ...form, fullName: e.target.value };
-        setForm(next);
-        const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
+    const isDemo = isDemoMode();
+
+    useEffect(() => {
+        if (isDemo) { setIsLoading(false); return; }
+        const ctrl = new AbortController();
+        fetch("/api/settings/user/profile", { signal: ctrl.signal })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+            .then((p: UserProfile) => {
+                setProfile(p);
+                setFullName(p.fullName);
+                savedFullNameRef.current = p.fullName;
+            })
+            .catch(err => {
+                if (err?.name !== "AbortError") {
+                    toast({ type: "error", message: "Profil yüklenemedi." });
+                }
+            })
+            .finally(() => setIsLoading(false));
+        return () => ctrl.abort();
+    }, [isDemo, toast]);
+
+    const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const v = e.target.value;
+        setFullName(v);
+        const dirty = v !== savedFullNameRef.current;
         setIsDirty(dirty);
         onDirtyChange?.(dirty);
     };
 
     const handleProfileSave = async () => {
-        setIsSaving(true);
-        await new Promise(r => setTimeout(r, 800));
-        savedRef.current = { ...form };
-        setIsDirty(false);
-        onDirtyChange?.(false);
-        setIsSaving(false);
-        toast({ type: "success", message: "Profil bilgileri güncellendi" });
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        const trimmed = fullName.trim();
+        if (trimmed.length < 2) {
+            toast({ type: "error", message: "Ad soyad en az 2 karakter olmalı." });
+            return;
+        }
+        setIsSavingProfile(true);
+        try {
+            const res = await fetch("/api/settings/user/profile", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ fullName: trimmed }),
+            });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                throw new Error(errBody.error ?? "Profil güncellenemedi.");
+            }
+            const updated: UserProfile = await res.json();
+            setProfile(updated);
+            setFullName(updated.fullName);
+            savedFullNameRef.current = updated.fullName;
+            setIsDirty(false);
+            onDirtyChange?.(false);
+            toast({ type: "success", message: "Profil güncellendi." });
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Hata oluştu." });
+        } finally {
+            setIsSavingProfile(false);
+        }
     };
 
-    const handlePwSave = () => {
-        if (pwForm.next !== pwForm.confirm) {
-            setPwError("Yeni şifreler eşleşmiyor.");
-            toast({ type: "error", message: "Yeni şifreler eşleşmiyor" });
-            return;
+    const handleAvatarFile = async (file: File) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setAvatarUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await fetch("/api/settings/user/avatar", { method: "POST", body: fd });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                throw new Error(errBody.error ?? "Yükleme başarısız.");
+            }
+            const { avatarUrl } = await res.json();
+            setProfile(p => p ? { ...p, avatarUrl } : p);
+            toast({ type: "success", message: "Profil fotoğrafı güncellendi." });
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Yükleme başarısız." });
+        } finally {
+            setAvatarUploading(false);
         }
-        if (pwForm.next.length < 8) {
-            setPwError("Şifre en az 8 karakter olmalı.");
-            toast({ type: "error", message: "Şifre en az 8 karakter olmalı" });
-            return;
-        }
+    };
+
+    const handlePwSave = async () => {
         setPwError("");
-        setPwForm({ current: "", next: "", confirm: "" });
-        toast({ type: "success", message: "Şifre başarıyla değiştirildi" });
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!pwForm.current) { setPwError("Mevcut şifrenizi girin."); return; }
+        if (pwForm.next.length < 8) { setPwError("Yeni şifre en az 8 karakter olmalı."); return; }
+        if (pwForm.next !== pwForm.confirm) { setPwError("Yeni şifreler eşleşmiyor."); return; }
+        if (pwForm.current === pwForm.next) { setPwError("Yeni şifre mevcut şifreden farklı olmalı."); return; }
+
+        setIsChangingPw(true);
+        try {
+            const res = await fetch("/api/settings/user/password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ currentPassword: pwForm.current, newPassword: pwForm.next }),
+            });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                throw new Error(errBody.error ?? "Şifre güncellenemedi.");
+            }
+            setPwForm({ current: "", next: "", confirm: "" });
+            toast({ type: "success", message: "Şifre güncellendi." });
+        } catch (err) {
+            setPwError(err instanceof Error ? err.message : "Hata oluştu.");
+        } finally {
+            setIsChangingPw(false);
+        }
     };
 
-    if (isDemoMode()) {
+    if (isDemo) {
         return (
             <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                 Kullanıcı bilgileri yalnızca yetkili kullanıcılara gösterilir.
@@ -332,32 +477,59 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
         );
     }
 
+    if (isLoading) {
+        return (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                Yükleniyor…
+            </div>
+        );
+    }
+
+    const initial = (profile?.fullName || profile?.email || "?").charAt(0).toUpperCase();
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
             {/* Avatar */}
             <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                <div
-                    style={{
-                        width: "56px",
-                        height: "56px",
-                        borderRadius: "50%",
-                        background: "var(--accent-bg)",
-                        border: "0.5px solid var(--accent-border)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "20px",
-                        fontWeight: 600,
-                        color: "var(--accent-text)",
-                        flexShrink: 0,
-                    }}
-                >
-                    {form.fullName.charAt(0)}
-                </div>
+                <input
+                    ref={avatarFileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    style={{ display: "none" }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarFile(f); e.target.value = ""; }}
+                />
+                {profile?.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                        src={profile.avatarUrl}
+                        alt="Profil fotoğrafı"
+                        style={{
+                            width: "56px", height: "56px",
+                            borderRadius: "50%", objectFit: "cover",
+                            border: "0.5px solid var(--border-secondary)",
+                            flexShrink: 0,
+                        }}
+                    />
+                ) : (
+                    <div
+                        style={{
+                            width: "56px", height: "56px", borderRadius: "50%",
+                            background: "var(--accent-bg)", border: "0.5px solid var(--accent-border)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "20px", fontWeight: 600, color: "var(--accent-text)",
+                            flexShrink: 0,
+                        }}
+                    >
+                        {initial}
+                    </div>
+                )}
                 <div>
-                    <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}>{form.fullName}</div>
+                    <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}>
+                        {profile?.fullName || profile?.email}
+                    </div>
                     <button
-                        onClick={() => toast({ type: "info", message: "Fotoğraf yükleme yakında açılacak" })}
+                        onClick={() => avatarFileRef.current?.click()}
+                        disabled={avatarUploading}
                         style={{
                             fontSize: "11px",
                             marginTop: "3px",
@@ -366,11 +538,14 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                             borderRadius: "4px",
                             background: "transparent",
                             color: "var(--text-tertiary)",
-                            cursor: "pointer",
+                            cursor: avatarUploading ? "wait" : "pointer",
                         }}
                     >
-                        Fotoğraf Değiştir
+                        {avatarUploading ? "Yükleniyor…" : "Fotoğraf Değiştir"}
                     </button>
+                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                        PNG, JPEG, SVG, WebP · Maks 1MB
+                    </div>
                 </div>
             </div>
 
@@ -382,23 +557,25 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                         <label style={labelStyle}>Ad Soyad</label>
                         <input
                             style={inputStyle}
-                            value={form.fullName}
-                            onChange={handleProfileFieldChange}
+                            value={fullName}
+                            onChange={handleNameChange}
+                            placeholder="Ad Soyad"
                         />
                     </div>
                     <div>
                         <label style={labelStyle}>E-posta</label>
                         <input
                             style={{ ...inputStyle, opacity: 0.6, cursor: "not-allowed" }}
-                            value={form.email}
+                            value={profile?.email ?? ""}
                             readOnly
+                            title="E-posta değiştirmek için destek ile iletişime geçin."
                         />
                         <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "3px" }}>
                             E-posta değiştirmek için destek ile iletişime geçin
                         </div>
                     </div>
                 </div>
-                <SaveButton onClick={handleProfileSave} loading={isSaving} dirty={isDirty} />
+                <SaveButton onClick={handleProfileSave} loading={isSavingProfile} dirty={isDirty} />
             </div>
 
             {/* Password */}
@@ -416,37 +593,59 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                                 value={pwForm[key]}
                                 onChange={e => setPwForm(f => ({ ...f, [key]: e.target.value }))}
                                 placeholder="••••••••"
+                                autoComplete={key === "current" ? "current-password" : "new-password"}
                             />
                         </div>
                     ))}
-                    {pwError && (
-                        <div style={{ fontSize: "12px", color: "var(--danger-text)" }}>{pwError}</div>
-                    )}
+                    {pwError && <FieldError msg={pwError} />}
                 </div>
-                <SaveButton onClick={handlePwSave} />
+                <SaveButton onClick={handlePwSave} loading={isChangingPw} />
             </div>
         </div>
     );
 }
 
 // ─── Bildirimler ───────────────────────────────────────────────────────────────
-const initialPrefs = [
-    { id: "stock-critical", label: "Kritik stok uyarıları", email: true, browser: false },
-    { id: "order-pending", label: "Sipariş onay bekliyor", email: true, browser: true },
-    { id: "order-new", label: "Yeni sipariş oluşturuldu", email: false, browser: true },
-    { id: "sync-error", label: "Paraşüt sync hataları", email: true, browser: false },
-    { id: "order-shipped", label: "Sipariş sevk edildi", email: false, browser: true },
-];
+
+function defaultPrefs(): NotificationPref[] {
+    return NOTIFICATION_TYPES.map(t => ({
+        type: t.key,
+        emailEnabled: true,
+        browserEnabled: true,
+    }));
+}
 
 function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
-    const [prefs, setPrefs] = useState(initialPrefs.map(p => ({ ...p })));
-    const savedRef = useRef(initialPrefs.map(p => ({ ...p })));
+    const isDemo = isDemoMode();
+    const [prefs, setPrefs] = useState<NotificationPref[]>(() => defaultPrefs());
+    const savedRef = useRef<NotificationPref[]>(defaultPrefs());
     const [isDirty, setIsDirty] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
 
-    const toggle = (id: string, channel: "email" | "browser") => {
-        const next = prefs.map(p => p.id === id ? { ...p, [channel]: !p[channel] } : p);
+    useEffect(() => {
+        if (isDemo) { setIsLoading(false); return; }
+        const ctrl = new AbortController();
+        fetch("/api/settings/user/preferences", { signal: ctrl.signal })
+            .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+            .then((data: NotificationPref[]) => {
+                if (Array.isArray(data) && data.length > 0) {
+                    setPrefs(data);
+                    savedRef.current = data;
+                }
+            })
+            .catch(err => {
+                if (err?.name !== "AbortError") {
+                    toast({ type: "error", message: "Tercihler yüklenemedi." });
+                }
+            })
+            .finally(() => setIsLoading(false));
+        return () => ctrl.abort();
+    }, [isDemo, toast]);
+
+    const toggle = (type: NotificationTypeKey, channel: "emailEnabled" | "browserEnabled") => {
+        const next = prefs.map(p => p.type === type ? { ...p, [channel]: !p[channel] } : p);
         setPrefs(next);
         const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
         setIsDirty(dirty);
@@ -454,14 +653,38 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
     };
 
     const handleSave = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setIsSaving(true);
-        await new Promise(r => setTimeout(r, 800));
-        savedRef.current = prefs.map(p => ({ ...p }));
-        setIsDirty(false);
-        onDirtyChange?.(false);
-        setIsSaving(false);
-        toast({ type: "success", message: "Bildirim tercihleri kaydedildi" });
+        try {
+            const res = await fetch("/api/settings/user/preferences", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prefs }),
+            });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                throw new Error(errBody.error ?? "Tercihler kaydedilemedi.");
+            }
+            const updated: NotificationPref[] = await res.json();
+            setPrefs(updated);
+            savedRef.current = updated;
+            setIsDirty(false);
+            onDirtyChange?.(false);
+            toast({ type: "success", message: "Bildirim tercihleri kaydedildi." });
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Hata oluştu." });
+        } finally {
+            setIsSaving(false);
+        }
     };
+
+    if (isLoading && !isDemo) {
+        return (
+            <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                Yükleniyor…
+            </div>
+        );
+    }
 
     return (
         <div>
@@ -492,51 +715,63 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                     <span style={{ textAlign: "center" }}>Tarayıcı</span>
                 </div>
 
-                {prefs.map((p, i) => (
-                    <div
-                        key={p.id}
-                        style={{
-                            display: "grid",
-                            gridTemplateColumns: "1fr 80px 80px",
-                            padding: "12px 16px",
-                            borderBottom: i < prefs.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
-                            alignItems: "center",
-                        }}
-                    >
-                        <span style={{ fontSize: "13px", color: "var(--text-primary)" }}>{p.label}</span>
-                        {(["email", "browser"] as const).map(channel => (
-                            <div key={channel} style={{ display: "flex", justifyContent: "center" }}>
-                                <button
-                                    onClick={() => toggle(p.id, channel)}
-                                    style={{
-                                        width: "36px",
-                                        height: "20px",
-                                        borderRadius: "10px",
-                                        border: "none",
-                                        background: p[channel] ? "var(--accent)" : "var(--bg-tertiary)",
-                                        cursor: "pointer",
-                                        position: "relative",
-                                        transition: "background 0.2s",
-                                        flexShrink: 0,
-                                    }}
-                                >
-                                    <span
-                                        style={{
-                                            position: "absolute",
-                                            top: "2px",
-                                            left: p[channel] ? "18px" : "2px",
-                                            width: "16px",
-                                            height: "16px",
-                                            borderRadius: "50%",
-                                            background: "white",
-                                            transition: "left 0.2s",
-                                        }}
-                                    />
-                                </button>
+                {NOTIFICATION_TYPES.map((typeDef, i) => {
+                    const pref = prefs.find(p => p.type === typeDef.key)
+                        ?? { type: typeDef.key, emailEnabled: true, browserEnabled: true };
+                    return (
+                        <div
+                            key={typeDef.key}
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 80px 80px",
+                                padding: "12px 16px",
+                                borderBottom: i < NOTIFICATION_TYPES.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+                                alignItems: "center",
+                            }}
+                        >
+                            <div>
+                                <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>{typeDef.label}</div>
+                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                    {typeDef.desc}
+                                </div>
                             </div>
-                        ))}
-                    </div>
-                ))}
+                            {(["emailEnabled", "browserEnabled"] as const).map(channel => (
+                                <div key={channel} style={{ display: "flex", justifyContent: "center" }}>
+                                    <button
+                                        onClick={() => toggle(typeDef.key, channel)}
+                                        title={isDemo ? "Demo modunda devre dışı" : undefined}
+                                        disabled={isDemo}
+                                        style={{
+                                            width: "36px",
+                                            height: "20px",
+                                            borderRadius: "10px",
+                                            border: "none",
+                                            background: pref[channel] ? "var(--accent)" : "var(--bg-tertiary)",
+                                            cursor: isDemo ? "not-allowed" : "pointer",
+                                            position: "relative",
+                                            transition: "background 0.2s",
+                                            flexShrink: 0,
+                                            opacity: isDemo ? 0.5 : 1,
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                position: "absolute",
+                                                top: "2px",
+                                                left: pref[channel] ? "18px" : "2px",
+                                                width: "16px",
+                                                height: "16px",
+                                                borderRadius: "50%",
+                                                background: "white",
+                                                transition: "left 0.2s",
+                                            }}
+                                        />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })}
             </div>
             <SaveButton onClick={handleSave} loading={isSaving} dirty={isDirty} />
         </div>

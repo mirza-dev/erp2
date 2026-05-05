@@ -3,7 +3,23 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-05_
 
-**Son tamamlanan iş:** Production bulgular 1. tur — AI filtre + import UI + multi-currency netleştirme (2026-05-05)
+**Son tamamlanan iş:** Ayarlar production-ready — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu (2026-05-05)
+
+**Ayarlar production-ready (1 commit, 12 dosya):**
+- Migration 045: `user_notification_preferences` tablosu (user_id, notification_type, email_enabled, browser_enabled, unique constraint) + `user-avatars` storage bucket (1MB, public).
+- Yeni 4 endpoint: `/api/settings/user/{profile,password,avatar,preferences}` — session auth, validation, audit_log entegrasyonu.
+- `notification-types.ts` — 5 tip sabit liste (stock_critical, order_pending, order_new, sync_error, order_shipped).
+- `validation.ts` — `isValidEmail`, `isValidTaxNumber` (10/11 hane), `isValidUrl`.
+- `user-profile.ts` — Supabase `auth.users.user_metadata`'da full_name + avatar_url (yeni custom tablo gereksiz).
+- `user-preferences.ts` — DB satırı yoksa default true/true virtual liste; PATCH'te whitelist + upsert.
+- Şifre değişikliği: cookie'siz fresh anon client ile mevcut şifre doğrulaması (Supabase updateUser eski şifre sormuyor; çalınmış oturum riskine karşı koruma).
+- Avatar upload: `/api/settings/company/logo` pattern paralel, path `${user.id}.{ext}`.
+- KullanıcıTab + BildirimlerTab gerçek API'ye bağlandı (öncesi: `setTimeout` mock).
+- FirmaTab inline validation: required name, email regex, VKN 10/11 hane, URL formatı; hatalı alanlarda border kırmızı + FieldError mesajı.
+- DemoBanner artık `useIsDemo` ile koşullu — production'da görünmüyor (mevcut UX bug).
+- 4 yeni test dosyası (36 test): profile, password, preferences, firma validation. 133 dosya · 2194 test yeşil · TS clean · 0 lint hatası.
+
+**Önceki:** Production bulgular 1. tur — AI filtre + import UI + multi-currency netleştirme (2026-05-05)
 
 **Production bulgular 1. tur (1 commit):**
 - AI route filter aligned with frontend `shouldSuggestReorder`: `available <= min` veya `orderDeadline ≤ 7 gün` — AA-SOV gibi deadline-imminent ürünler artık öneri listesinde "Beklemede" değil aktif öneriyle gözüküyor (purchase-copilot/route.ts).
