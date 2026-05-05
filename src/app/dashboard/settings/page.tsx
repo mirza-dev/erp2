@@ -8,20 +8,8 @@ import { isDemoMode, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import ResetDemoSection from "@/components/settings/ResetDemoSection";
 import { isValidEmail, isValidTaxNumber, isValidUrl } from "@/lib/validation";
 import { NOTIFICATION_TYPES, type NotificationTypeKey } from "@/lib/notification-types";
-
-interface UserProfile {
-    id: string;
-    email: string;
-    fullName: string;
-    avatarUrl: string | null;
-    createdAt: string;
-}
-
-interface NotificationPref {
-    type: string;
-    emailEnabled: boolean;
-    browserEnabled: boolean;
-}
+import type { UserProfile } from "@/lib/supabase/user-profile";
+import type { NotificationPref } from "@/lib/supabase/user-preferences";
 
 type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
 
@@ -361,6 +349,11 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
 
     const isDemo = isDemoMode();
 
+    // Concurrent mutation lock — name + avatar + password aynı anda gönderilmemeli.
+    // patchUserMetadata GET-merge-SET race window'unu UI tarafında kapatır
+    // (lost-update koruması).
+    const isMutating = isSavingProfile || avatarUploading || isChangingPw;
+
     useEffect(() => {
         if (isDemo) { setIsLoading(false); return; }
         const ctrl = new AbortController();
@@ -390,6 +383,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
 
     const handleProfileSave = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (isMutating) return; // concurrent guard
         const trimmed = fullName.trim();
         if (trimmed.length < 2) {
             toast({ type: "error", message: "Ad soyad en az 2 karakter olmalı." });
@@ -422,6 +416,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
 
     const handleAvatarFile = async (file: File) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (isMutating) return; // concurrent guard
         setAvatarUploading(true);
         try {
             const fd = new FormData();
@@ -444,6 +439,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
     const handlePwSave = async () => {
         setPwError("");
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (isMutating) return; // concurrent guard
         if (!pwForm.current) { setPwError("Mevcut şifrenizi girin."); return; }
         if (pwForm.next.length < 8) { setPwError("Yeni şifre en az 8 karakter olmalı."); return; }
         if (pwForm.next !== pwForm.confirm) { setPwError("Yeni şifreler eşleşmiyor."); return; }
@@ -529,7 +525,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                     </div>
                     <button
                         onClick={() => avatarFileRef.current?.click()}
-                        disabled={avatarUploading}
+                        disabled={isMutating}
                         style={{
                             fontSize: "11px",
                             marginTop: "3px",
@@ -538,7 +534,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                             borderRadius: "4px",
                             background: "transparent",
                             color: "var(--text-tertiary)",
-                            cursor: avatarUploading ? "wait" : "pointer",
+                            cursor: isMutating ? "wait" : "pointer",
                         }}
                     >
                         {avatarUploading ? "Yükleniyor…" : "Fotoğraf Değiştir"}
@@ -618,8 +614,9 @@ function defaultPrefs(): NotificationPref[] {
 function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
     const isDemo = isDemoMode();
-    const [prefs, setPrefs] = useState<NotificationPref[]>(() => defaultPrefs());
-    const savedRef = useRef<NotificationPref[]>(defaultPrefs());
+    const initialPrefsRef = useRef<NotificationPref[]>(defaultPrefs());
+    const [prefs, setPrefs] = useState<NotificationPref[]>(() => initialPrefsRef.current);
+    const savedRef = useRef<NotificationPref[]>(initialPrefsRef.current);
     const [isDirty, setIsDirty] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);

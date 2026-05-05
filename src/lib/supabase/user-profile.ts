@@ -23,9 +23,20 @@ export async function dbGetUserProfile(userId: string): Promise<UserProfile> {
     };
 }
 
+/**
+ * GET → merge → admin updateUserById. Supabase admin updateUserById,
+ * `user_metadata` içeriğini REPLACE ediyor (client-side updateUser merge yapar
+ * ama admin API replace yapar) — bu yüzden mevcut metadata'yı önce çekip merge ediyoruz.
+ *
+ * Race window: GET ile UPDATE arasında başka bir işlem aynı kullanıcının metadata'sını
+ * değiştirirse lost-update olabilir (avatar yüklerken aynı anda full_name kaydetme gibi).
+ * Settings sayfası tek kullanıcı tek-tab senaryosunda bu pratikte mümkün değil; UI
+ * ek olarak frontend mutation lock ile concurrent çağrıları önlüyor (KullaniciTab
+ * `isMutating` flag). Çoklu istemci/sekme senaryosu gerekirse atomic JSONB merge
+ * RPC eklenmeli (sonraki tur).
+ */
 async function patchUserMetadata(userId: string, patch: Record<string, unknown>): Promise<void> {
     const supabase = createServiceClient();
-    // Mevcut metadata'yı al, sonra merge et — admin update tüm metadata'yı override ediyor
     const { data, error: getErr } = await supabase.auth.admin.getUserById(userId);
     if (getErr || !data?.user) throw new Error("Kullanıcı bulunamadı.");
     const merged = { ...(data.user.user_metadata ?? {}), ...patch };

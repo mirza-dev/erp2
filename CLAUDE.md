@@ -3,7 +3,19 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-05_
 
-**Son tamamlanan iş:** Ayarlar production-ready — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu (2026-05-05)
+**Son tamamlanan iş:** Settings güvenlik + semantik audit fix'leri (2026-05-05)
+
+**Settings audit fix'leri (1 commit, 6 dosya):**
+- **HIGH — Avatar orphan file**: metadata güncellemesi başarısız olursa storage'daki dosya temizlenir (try/catch ile sb.storage.remove). Yoksa bucket'ta orphan kalırdı.
+- **HIGH — patchUserMetadata race**: GET-merge-SET window dokümante edildi (Supabase admin updateUserById user_metadata'yı REPLACE ediyor — merge gerekli; race UI tarafından korunur).
+- **MEDIUM — KullaniciTab concurrent mutation**: 3 handler (profile save / avatar upload / password change) global `isMutating` flag ile gate'li. Lost-update koruması.
+- **MEDIUM — Type duplication**: UserProfile + NotificationPref `settings/page.tsx`'e import edildi (önce duplicate define).
+- **MEDIUM — defaultPrefs() çift çağrı**: useState + useRef arasında shared ref ile tek instance.
+- **LOW — Avatar tests**: 8 yeni test (MIME, size, path traversal, orphan cleanup, upload error).
+- **Kod yorumları**: Password endpoint'a Supabase GoTrue rate-limit notu, avatar route ext sanitization açıklaması, user-profile.ts patchUserMetadata race window açıklaması.
+- 134 dosya · 2202 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** Ayarlar production-ready — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu (2026-05-05)
 
 **Ayarlar production-ready (1 commit, 12 dosya):**
 - Migration 045: `user_notification_preferences` tablosu (user_id, notification_type, email_enabled, browser_enabled, unique constraint) + `user-avatars` storage bucket (1MB, public).

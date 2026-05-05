@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Dosya 1MB'ı aşıyor." }, { status: 400 });
         }
 
+        // Ext sanitization: alfa-numerik dışı tüm karakterler temizlenir (path traversal koruması).
+        // user.id zaten UUID; path = "{uuid}.{ext}". Boş ext "png"e fallback.
         const ext = (file.name.split(".").pop() ?? "png").toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
         const path = `${user.id}.${ext}`;
         const buffer = Buffer.from(await file.arrayBuffer());
@@ -39,7 +41,14 @@ export async function POST(req: NextRequest) {
         const { data: { publicUrl } } = sb.storage.from("user-avatars").getPublicUrl(path);
         const avatarUrl = `${publicUrl}?t=${Date.now()}`;
 
-        await dbUpdateUserAvatarUrl(user.id, avatarUrl);
+        // Metadata update başarısız olursa storage'daki orphan dosyayı temizle
+        // (yoksa bucket'ta URL'i auth.users'a kaydedilmemiş ölü dosya kalır).
+        try {
+            await dbUpdateUserAvatarUrl(user.id, avatarUrl);
+        } catch (metaErr) {
+            await sb.storage.from("user-avatars").remove([path]).catch(() => { /* best-effort cleanup */ });
+            throw metaErr;
+        }
 
         return NextResponse.json({ avatarUrl });
     } catch (err) {

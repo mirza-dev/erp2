@@ -15,6 +15,12 @@ import { handleApiError, safeParseJson } from "@/lib/api-error";
 //    paylaşılmayan ayrı client kullanıyoruz; signOut çağırmamıza gerek yok.)
 // 3. Mevcut session ile updateUser({ password: newPassword })
 // 4. audit_log entry
+//
+// Brute-force koruması: Supabase GoTrue katmanı signInWithPassword için kendi
+// rate-limit'ini uyguluyor (~15 dakikada 30 deneme/IP, GoTrue config). Endpoint
+// yine de session-locked: yalnızca giriş yapmış kullanıcı kendi şifresini
+// değiştirebilir. Çoklu hesap enumeration veya IP-bazlı brute-force için ek
+// Upstash rate-limit altyapısı sonraki tur.
 export async function POST(req: NextRequest) {
     try {
         const supabase = await createClient();

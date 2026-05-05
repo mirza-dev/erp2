@@ -5,9 +5,35 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
-**Son:** Ayarlar production-ready KAPALI (2026-05-05; 2194 test) — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu
-**Önceki:** Production bulgular 1. tur KAPALI (2026-05-05; 2158 test) — AI filter alignment + import UI + multi-currency netleştirme
-**Önceki²:** Seed idempotent + UI tetikleyici KAPALI (2026-05-05) — settings'te "Tüm Verileri Sıfırla ve Demo Yükle" butonu
+**Son:** Settings audit fix'leri KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+**Önceki:** Ayarlar production-ready KAPALI (2026-05-05; 2194 test) — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu
+**Önceki²:** Production bulgular 1. tur KAPALI (2026-05-05; 2158 test) — AI filter alignment + import UI + multi-currency netleştirme
+
+---
+
+## Settings Audit Fix'leri (2026-05-05) — KAPALI
+
+**Hedef:** Audit'te bulunan HIGH/MEDIUM güvenlik + semantik sorunları kapatmak.
+
+**1 commit, 6 dosya:**
+- **HIGH — Avatar orphan**: `avatar/route.ts:42-49` — `dbUpdateUserAvatarUrl` fail'inde storage'dan dosya temizlenir (try/catch + sb.storage.remove([path]).catch). Best-effort cleanup; throw metaErr yine yapılır.
+- **HIGH — patchUserMetadata race**: `user-profile.ts:26-41` JSDoc + race açıklaması. Supabase admin updateUserById `user_metadata`'yı REPLACE eder (client-side updateUser merge yapar, admin REPLACE). GET-merge-SET zorunlu; race window UI mutation lock ile kapatılır.
+- **MEDIUM — KullaniciTab concurrent lock**: `settings/page.tsx` 3 handler (profile/avatar/password) `isMutating = isSavingProfile || avatarUploading || isChangingPw` ile gate. Avatar butonu disabled. Lost-update korumalı.
+- **MEDIUM — Type dedup**: UserProfile + NotificationPref artık `@/lib/supabase/user-profile` ve `@/lib/supabase/user-preferences`'tan import (settings/page.tsx duplicate kaldırıldı).
+- **MEDIUM — defaultPrefs çift çağrı**: `initialPrefsRef` shared instance — useState + useRef aynı array'i kullanır.
+- **LOW — Avatar test**: `settings-user-avatar.test.ts` 8 test (401, dosya yok, MIME, 1MB+ size, happy path, path traversal sanitize, orphan cleanup, upload error).
+- **Kod yorumları**: password rate-limit (Supabase GoTrue ~30/15dk), avatar ext sanitization açıklaması, patchUserMetadata race window.
+
+**Atlanan (audit'te bulunan ama scope dışı):**
+- Atomic JSONB merge RPC migration (overkill — UI lock yeterli)
+- Upstash rate-limit altyapısı (Supabase GoTrue throttle yeterli; ek katman ayrı altyapı)
+- Storage policy granularity (033 pattern korunur)
+
+**Domain kuralı:**
+- Supabase admin `updateUserById({ user_metadata })` REPLACE eder (NOT merge). Manual GET → merge → SET zorunlu, race window UI mutation lock ile kapatılır.
+- Avatar/dosya upload'larında metadata persist fail'inde orphan cleanup zorunlu (storage leak engellemek için).
+
+**Test:** 134 dosya · 2202 test yeşil · TS clean · 0 lint hatası
 
 ---
 
