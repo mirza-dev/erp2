@@ -5,9 +5,48 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
-**Son:** Settings audit fix'leri KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
-**Önceki:** Ayarlar production-ready KAPALI (2026-05-05; 2194 test) — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu
-**Önceki²:** Production bulgular 1. tur KAPALI (2026-05-05; 2158 test) — AI filter alignment + import UI + multi-currency netleştirme
+**Son:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
+**Önceki:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+**Önceki²:** Ayarlar production-ready KAPALI (2026-05-05; 2194 test) — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu
+
+---
+
+## Settings Audit 2. Tur (2026-05-05) — KAPALI
+
+**Hedef:** Audit'te bulunan demo cookie kalıntısı + avatar SVG + server-side validation eksiklikleri.
+
+**1 commit, 9 dosya:**
+
+**HIGH — Demo cookie geçişte temizlenmiyordu** (`login/page.tsx`, `dashboard/layout.tsx`):
+- `clearDemoMode()` ne login submit'inde ne dashboard banner link'inde çağrılmıyordu.
+- Senaryo: kullanıcı demo modda gez → "giriş yapın" link'ine tıkla → login → auth ol → dashboard'a geç. Bu süreçte `demo_mode` cookie hâlâ set'li, `isDemoMode()` true → settings'te Firma/Kullanıcı/Bildirimler sekmeleri demo guard mesajı gösterir.
+- Fix: login `handleSubmit` başarılı `signInWithPassword` sonrası `clearDemoMode()`. Dashboard banner link'i `onClick={(e) => { e.preventDefault(); clearDemoMode(); router.push("/login"); }}` — kullanıcı login'e gidince cookie zaten temizlenmiş, login submit ek olarak güvence katmanı.
+
+**Orta — Avatar SVG XSS riski** (`avatar/route.ts:7`, `045_user_preferences_avatars.sql:31`, yeni `046_user_avatars_no_svg.sql`):
+- Public bucket'tan kullanıcı kontrollü `image/svg+xml` servis edildiğinde XSS riski (`<script>` embedded). `<img src>` çoğu browser'da script çalıştırmasa da production avatar için gereksiz risk.
+- Fix: `ALLOWED_MIME` listesinden çıkarıldı, hata mesajı "PNG, JPEG veya WebP yükleyin" oldu. Migration 045 yeni deploy'lar için güncellendi; production'daki mevcut bucket için yeni migration 046 (`update storage.buckets set allowed_mime_types = ...`).
+- UI: `accept="image/png,image/jpeg,image/webp"`, format açıklaması "PNG, JPEG, WebP · Maks 1MB".
+- Şirket logosu (company-assets) farklı bağlam: admin yüklüyor, scope farklı, SVG hâlâ kabul.
+
+**Düşük/Orta — Firma PATCH API validation eksik** (`/api/settings/company/route.ts`):
+- UI'da inline validation vardı ama auth'lu biri endpoint'i doğrudan PATCH ile çağırıp geçersiz email/VKN/URL/currency yazabilirdi.
+- Fix: `validateCompanyPatch` helper eklendi — required name (boş/200+ char red), email (`isValidEmail`), tax_no (10/11 hane), website (`isValidUrl`), currency (USD/EUR/TRY whitelist). Hata varsa 400 + Türkçe mesaj.
+
+**Düşük — Preferences PATCH boolean coercion** (`/api/settings/user/preferences/route.ts:38`):
+- `!!value` string `"false"` veya number `1`'i true'ya çeviriyordu. Garbage input sessizce kabul ediliyordu.
+- Fix: `typeof === "boolean"` strict kontrol; her satırda emailEnabled/browserEnabled boolean değilse 400 + alan adı/index belirtilen hata mesajı.
+
+**2 yeni / güncellenen test:**
+- `settings-company-route.test.ts` (yeni, 10 test): boş/uzun name, geçersiz email, VKN 9/10/11, geçersiz website, currency whitelist, happy path, logo_url drop
+- `settings-user-preferences.test.ts` (güncellendi): malformed boolean → 400 (önceki "sanitize edilir" testi kaldırıldı, strict kontrat).
+
+**Domain kuralı:**
+- Demo→login geçişinde `clearDemoMode()` zorunlu — yoksa auth sonrası UI demo gibi davranır.
+- Public storage bucket'larda SVG MIME yalnızca admin-yüklü içerik için kabul edilebilir; kullanıcı yükleyebileceği bucket'larda raster sınırla.
+- API tarafında validation defense-in-depth: UI validation tek başına yetmez (auth'lu kullanıcı endpoint'i doğrudan çağırabilir).
+- Boolean kontratlar strict (`typeof === "boolean"`); coercion (`!!value`) garbage input sessizce yutar.
+
+**Test:** 135 dosya · 2215 test yeşil · TS clean · 0 lint hatası
 
 ---
 

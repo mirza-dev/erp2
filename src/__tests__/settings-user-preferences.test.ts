@@ -88,23 +88,41 @@ describe("PATCH /api/settings/user/preferences", () => {
         expect(body).toEqual(inputPrefs);
     });
 
-    it("malformed pref objects → sanitize edilir", async () => {
+    it("emailEnabled boolean değil → 400", async () => {
+        const res = await PATCH(makePatchReq({
+            prefs: [
+                { type: "order_new", emailEnabled: "yes", browserEnabled: false },
+            ],
+        }));
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toContain("emailEnabled");
+    });
+
+    it("browserEnabled number → 400 (strict boolean kontratı)", async () => {
+        const res = await PATCH(makePatchReq({
+            prefs: [
+                { type: "order_new", emailEnabled: true, browserEnabled: 1 },
+            ],
+        }));
+        expect(res.status).toBe(400);
+    });
+
+    it("malformed type değerleri filter (null, boş string, undefined type) — boolean valid", async () => {
         mockDbUpsertUserPrefs.mockResolvedValue(undefined);
         mockDbListUserPrefs.mockResolvedValue([]);
 
         await PATCH(makePatchReq({
             prefs: [
                 { type: "stock_critical", emailEnabled: true, browserEnabled: true },
-                null,
-                { type: "" },                                  // boş type filter
-                { emailEnabled: true },                        // type yok filter
-                { type: "order_new", emailEnabled: "yes", browserEnabled: 0 },  // truthy/falsy
+                null,                                            // null → atlandı
+                { type: "", emailEnabled: true, browserEnabled: true },  // boş type → filter
+                { emailEnabled: true, browserEnabled: false },           // type yok → filter
             ],
         }));
 
         expect(mockDbUpsertUserPrefs).toHaveBeenCalledWith("u-1", [
             { type: "stock_critical", emailEnabled: true, browserEnabled: true },
-            { type: "order_new", emailEnabled: true, browserEnabled: false },
         ]);
     });
 });

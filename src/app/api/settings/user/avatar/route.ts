@@ -4,7 +4,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { dbUpdateUserAvatarUrl } from "@/lib/supabase/user-profile";
 import { handleApiError } from "@/lib/api-error";
 
-const ALLOWED_MIME = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
+// Avatar için yalnızca raster formatlar — SVG kullanıcı kontrollü XML olduğu için
+// public bucket'tan servis edildiğinde XSS/embedded-script riski yaratır.
+// Şirket logosu (company-assets) farklı bağlam: admin yükler, az kullanıcı görür.
+const ALLOWED_MIME = ["image/png", "image/jpeg", "image/webp"];
 const MAX_SIZE = 1 * 1024 * 1024; // 1MB
 
 // POST /api/settings/user/avatar — multipart/form-data, field: "file"
@@ -20,7 +23,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
         }
         if (!ALLOWED_MIME.includes(file.type)) {
-            return NextResponse.json({ error: "Geçersiz dosya türü. PNG, JPEG, SVG veya WebP yükleyin." }, { status: 400 });
+            return NextResponse.json({ error: "Geçersiz dosya türü. PNG, JPEG veya WebP yükleyin." }, { status: 400 });
         }
         if (file.size > MAX_SIZE) {
             return NextResponse.json({ error: "Dosya 1MB'ı aşıyor." }, { status: 400 });

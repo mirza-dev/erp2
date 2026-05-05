@@ -3,7 +3,17 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-05_
 
-**Son tamamlanan iş:** Settings güvenlik + semantik audit fix'leri (2026-05-05)
+**Son tamamlanan iş:** Settings audit 2. tur — demo cookie temizleme + SVG sınırla + server validation (2026-05-05)
+
+**Settings audit 2. tur (1 commit, 9 dosya):**
+- **HIGH/Orta — Demo cookie geçişte temizlenmiyordu**: `clearDemoMode()` ne login submit'inde ne dashboard banner link'inde çağrılıyordu. Auth'lu kullanıcı dashboard'a girse bile `isDemoMode()` true kalıyor → settings demo gibi davranıyor. Fix: login `handleSubmit` başarılı dönünce `clearDemoMode()`; dashboard banner link'i `onClick` ile cookie temizler + router.push.
+- **Orta — Avatar SVG kabul ediyordu**: Public bucket'tan kullanıcı kontrollü XML servis edildiğinde XSS riski. Fix: `ALLOWED_MIME` listesinden `image/svg+xml` çıkarıldı (avatar/route.ts), migration 045 + yeni migration 046 (idempotent update), UI accept attribute + format yazısı güncellendi. Şirket logosu (company-assets) farklı: admin yüklüyor, scope farklı, SVG kalır.
+- **Düşük/Orta — Firma PATCH API tarafında validation yoktu**: UI inline validation vardı ama auth'lu biri doğrudan PATCH /api/settings/company çağırıp geçersiz email/VKN/URL yazabilirdi. Fix: `validateCompanyPatch` helper — required name, email regex, VKN 10/11 hane, URL formatı, currency whitelist (USD/EUR/TRY).
+- **Düşük — Preferences PATCH boolean coercion**: `!!value` string `"false"`'u true'ya çeviriyordu. Fix: `typeof === "boolean"` strict kontrol — non-boolean değerlere 400 dön.
+- 2 yeni test dosyası: `settings-company-route.test.ts` (10 test), `settings-user-preferences.test.ts` güncellendi (boolean strict + malformed type sanitization)
+- 135 dosya · 2215 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** Settings güvenlik + semantik audit fix'leri (2026-05-05)
 
 **Settings audit fix'leri (1 commit, 6 dosya):**
 - **HIGH — Avatar orphan file**: metadata güncellemesi başarısız olursa storage'daki dosya temizlenir (try/catch ile sb.storage.remove). Yoksa bucket'ta orphan kalırdı.

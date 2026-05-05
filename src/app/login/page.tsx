@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { clearDemoMode } from "@/lib/demo-utils";
 import DemoButton from "@/components/ui/DemoButton";
 
 export default function LoginPage() {
@@ -26,6 +27,9 @@ export default function LoginPage() {
             setLoading(false);
             return;
         }
+        // Demo cookie'yi temizle — auth'lu kullanıcı dashboard'a girince
+        // settings tarafında isDemoMode() false dönsün, mutation guard'lar kalksın
+        clearDemoMode();
         router.push("/dashboard");
         router.refresh();
     };

@@ -6,7 +6,8 @@ import Topbar from "@/components/layout/Topbar";
 import { DataProvider } from "@/lib/data-context";
 import { ToastProvider } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
-import { isDemoMode } from "@/lib/demo-utils";
+import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
+import { useRouter } from "next/navigation";
 
 export default function DashboardLayout({
     children,
@@ -15,6 +16,15 @@ export default function DashboardLayout({
 }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isDemo] = useState(() => isDemoMode());
+    const router = useRouter();
+
+    const handleLoginFromDemo = (e: React.MouseEvent<HTMLAnchorElement>) => {
+        e.preventDefault();
+        // Demo cookie'yi login öncesi temizle — login sayfasında auth flow başlasa da
+        // ortada demo cookie kalmasın, kullanıcı vazgeçerse stale cookie kalmasın
+        clearDemoMode();
+        router.push("/login");
+    };
 
     return (
         <DataProvider>
@@ -50,7 +60,11 @@ export default function DashboardLayout({
                         {isDemo && (
                             <DemoBanner storageKey="demo-readonly">
                                 Demo modundasınız — değişiklik yapabilmek için{" "}
-                                <a href="/login" style={{ color: "var(--accent-text)", textDecoration: "underline" }}>
+                                <a
+                                    href="/login"
+                                    onClick={handleLoginFromDemo}
+                                    style={{ color: "var(--accent-text)", textDecoration: "underline" }}
+                                >
                                     giriş yapın
                                 </a>.
                             </DemoBanner>

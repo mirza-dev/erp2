@@ -23,14 +23,15 @@ create policy "service_user_notification_preferences_all" on user_notification_p
     for all using (auth.role() = 'service_role');
 
 -- ── Supabase Storage bucket: user-avatars ────────────────────
--- Public bucket: avatar URL doğrudan <img src> olarak kullanılabilir
+-- Public bucket: avatar URL doğrudan <img src> olarak kullanılabilir.
+-- SVG kabul edilmez — kullanıcı kontrollü XML public servisi XSS riski.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
     'user-avatars',
     'user-avatars',
     true,
     1048576,  -- 1MB
-    array['image/png', 'image/jpeg', 'image/svg+xml', 'image/webp']
+    array['image/png', 'image/jpeg', 'image/webp']
 )
 on conflict (id) do nothing;
 

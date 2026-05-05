@@ -490,7 +490,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                 <input
                     ref={avatarFileRef}
                     type="file"
-                    accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                    accept="image/png,image/jpeg,image/webp"
                     style={{ display: "none" }}
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleAvatarFile(f); e.target.value = ""; }}
                 />
@@ -540,7 +540,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                         {avatarUploading ? "Yükleniyor…" : "Fotoğraf Değiştir"}
                     </button>
                     <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                        PNG, JPEG, SVG, WebP · Maks 1MB
+                        PNG, JPEG, WebP · Maks 1MB
                     </div>
                 </div>
             </div>
