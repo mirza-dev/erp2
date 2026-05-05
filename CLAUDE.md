@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-05_
 
-**Son tamamlanan iş:** Seed idempotent + UI tetikleyici — settings'te tek tıkla reset (2026-05-05)
+**Son tamamlanan iş:** Production bulgular 1. tur — AI filtre + import UI + multi-currency netleştirme (2026-05-05)
+
+**Production bulgular 1. tur (1 commit):**
+- AI route filter aligned with frontend `shouldSuggestReorder`: `available <= min` veya `orderDeadline ≤ 7 gün` — AA-SOV gibi deadline-imminent ürünler artık öneri listesinde "Beklemede" değil aktif öneriyle gözüküyor (purchase-copilot/route.ts).
+- `sourceChipLabel`: "?" yerine "fallback" → "Otomatik", bilinmeyen → "—" (import sayfası kolon eşleştirme rozetleri).
+- `apply-mappings` route catch block: generic "başarısız" yerine actual error message dön ("Eşleştirme uygulanamadı: {detail}").
+- Multi-currency tutarın "+" ön eki kaldırıldı; her tutar yanına currency code eklendi (€518.400,00 EUR / $133.600,00 USD). Başlık "Toplam Sipariş Tutarı" → "Önerilen Satın Alma Tutarı" + tooltip.
+- Test güncellendi (1 ai-purchase-copilot test, 1 source-chips test). 129 dosya · 2158 test yeşil · TS clean · 0 lint hatası.
+
+**Önceki:** Seed idempotent + UI tetikleyici — settings'te tek tıkla reset (2026-05-05)
 
 **Seed idempotent + UI (1 commit):**
 - `clearAllData` helper extract → DELETE handler ve POST handler ikisi de kullanıyor (DRY).

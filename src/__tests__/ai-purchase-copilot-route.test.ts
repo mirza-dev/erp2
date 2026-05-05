@@ -110,7 +110,8 @@ describe("POST /api/ai/purchase-copilot — counts computation", () => {
     it("needs_purchase: products where available_now <= min_stock_level", async () => {
         mockDbListProducts.mockResolvedValue([
             makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20 }),   // needs purchase
-            makeProduct({ id: "p-2", available_now: 25, min_stock_level: 20 }),  // healthy
+            // Healthy: above min AND no imminent order deadline (daily_usage=null disables deadline path)
+            makeProduct({ id: "p-2", available_now: 25, min_stock_level: 20, daily_usage: null }),
         ]);
         const res = await POST();
         const body = await res.json();

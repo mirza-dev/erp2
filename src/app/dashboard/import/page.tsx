@@ -86,7 +86,8 @@ export function sourceChipLabel(source: string, confidence: number): string {
     if (source === "memory") return "Hafıza";
     if (source === "ai") return confidence ? `AI %${Math.round(confidence * 100)}` : "AI";
     if (source === "user") return "Kullanıcı";
-    return "?";
+    if (source === "fallback") return "Otomatik";
+    return "—";
 }
 
 const sourceChipStyle = (src: "memory" | "ai" | "fallback" | "user"): React.CSSProperties => {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbListProducts, dbGetAllActiveProductIds } from "@/lib/supabase/products";
-import { computeTargetStock, computeCoverageDays, computeUrgencyPct } from "@/lib/stock-utils";
+import { computeTargetStock, computeCoverageDays, computeUrgencyPct, computeOrderDeadline, dateDaysFromToday } from "@/lib/stock-utils";
 import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem } from "@/lib/services/ai-service";
 import {
     dbUpsertRecommendation,
@@ -35,7 +35,18 @@ export async function POST() {
         await dbExpireRecommendationsForMissingEntities("product", allActiveProductIds, "purchase_suggestion");
     } catch { /* non-fatal — main flow continues */ }
 
-    const needsPurchase = products.filter(p => p.product_type !== "manufactured" && p.available_now <= p.min_stock_level);
+    // Frontend `shouldSuggestReorder` ile aynı kapsam: ticari ürün VE
+    // (stok ≤ min OR orderDeadline ≤ 7 gün). Aksi halde sayfada listelenen
+    // ama AI route filtre dışı kalan ürünlerin önerileri sürekli expire olur
+    // ve UI "Beklemede" boş satır gösterir.
+    const REORDER_DEADLINE_WINDOW_DAYS = 7;
+    const needsPurchase = products.filter(p => {
+        if (p.product_type === "manufactured") return false;
+        if (p.available_now <= p.min_stock_level) return true;
+        const promisable = p.promisable ?? p.available_now;
+        const { orderDeadline } = computeOrderDeadline(promisable, p.daily_usage, p.lead_time_days);
+        return !!(orderDeadline && dateDaysFromToday(orderDeadline) <= REORDER_DEADLINE_WINDOW_DAYS);
+    });
 
     const manufacturedCount = needsPurchase.filter(p => p.product_type === "manufactured").length;
     const commercialCount = needsPurchase.filter(p => p.product_type === "commercial").length;

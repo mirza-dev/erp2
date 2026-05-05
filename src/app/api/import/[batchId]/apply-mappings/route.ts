@@ -139,6 +139,10 @@ export async function POST(
         return NextResponse.json({ drafts: allDrafts }, { status: 201 });
     } catch (err) {
         console.error("[POST /api/import/[batchId]/apply-mappings]", err);
-        return NextResponse.json({ error: "Eşleştirme uygulaması başarısız." }, { status: 500 });
+        const detail = err instanceof Error ? err.message : "Bilinmeyen hata";
+        return NextResponse.json(
+            { error: `Eşleştirme uygulanamadı: ${detail}` },
+            { status: 500 }
+        );
     }
 }

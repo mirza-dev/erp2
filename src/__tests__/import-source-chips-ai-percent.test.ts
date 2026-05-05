@@ -32,8 +32,13 @@ describe("sourceChipLabel — source chip etiket mantığı", () => {
         expect(sourceChipLabel("user", 0.5)).toBe("Kullanıcı");
     });
 
-    it("bilinmeyen source → '?'", () => {
-        expect(sourceChipLabel("fallback", 0.9)).toBe("?");
+    it("fallback source → 'Otomatik' (sözlük tabanlı eşleşme)", () => {
+        expect(sourceChipLabel("fallback", 0.9)).toBe("Otomatik");
+    });
+
+    it("bilinmeyen / boş source → '—'", () => {
+        expect(sourceChipLabel("xyz", 0.9)).toBe("—");
+        expect(sourceChipLabel("", 0)).toBe("—");
     });
 
     it("memory source'da confidence yüzdesi gösterilmez", () => {

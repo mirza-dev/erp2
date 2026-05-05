@@ -5,9 +5,29 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
-**Son:** Seed idempotent + UI tetikleyici KAPALI (2026-05-05) — settings'te "Tüm Verileri Sıfırla ve Demo Yükle" butonu
-**Önceki:** Demo seed yenileme KAPALI (2026-05-04) — sade öz boyut + tüm modüller dolu
-**Önceki²:** Sprint C bulgular 4. tur KAPALI (2026-05-02; 2157 test) — G3 gerçek veri + G5 mobil + test tamamlama
+**Son:** Production bulgular 1. tur KAPALI (2026-05-05; 2158 test) — AI filter alignment + import UI + multi-currency netleştirme
+**Önceki:** Seed idempotent + UI tetikleyici KAPALI (2026-05-05) — settings'te "Tüm Verileri Sıfırla ve Demo Yükle" butonu
+**Önceki²:** Demo seed yenileme KAPALI (2026-05-04) — sade öz boyut + tüm modüller dolu
+
+---
+
+## Production Bulgular 1. Tur (2026-05-05) — KAPALI
+
+**Hedef:** Production deploy sonrası kullanıcı tarafından bildirilen 4 sorun.
+
+**1 commit, 6 dosya:**
+- **Bulgu 1 — "Beklemede" ghost satır (HIGH):** Frontend `reorderSuggestions` filtresi `available ≤ min` VEYA `orderDeadline ≤ 7 gün` listesi gösteriyordu, ama `/api/ai/purchase-copilot` route sadece `available ≤ min` filtresi kullanıyordu. Frontend'de listelenen ama AI'da olmayan ürünlerin (örn. AA-SOV-DN80: available=14, min=6, ama deadline geçmiş) suggested rec'leri her load'da expire oluyor → UI "Beklemede" gösteriyor. Fix: AI route'a `computeOrderDeadline` + `dateDaysFromToday` import edildi, filtre `shouldSuggestReorder` ile aligned.
+- **Bulgu 2 — Import "Kaynak ?" rozet (MEDIUM):** `sourceChipLabel` sadece "memory"/"ai"/"user" tanırdı; detect-columns route'unun döndürdüğü `"fallback"` (FALLBACK_FIELD_MAP hit) için "?" gösteriyordu. Fix: "fallback" → "Otomatik", default → "—".
+- **Bulgu 3 — Apply-mappings sessiz hata (MEDIUM):** Route catch block generic `"Eşleştirme uygulaması başarısız."` döndürüyordu, debugging için kötü. Fix: actual error message propagate (`Eşleştirme uygulanamadı: ${err.message}`).
+- **Bulgu 4 — Multi-currency tutar netleştirme (LOW):** `+ $133.600,00` formatı kullanıcılarda toplama gibi algılanıyordu. Fix: "+" kaldırıldı, her tutar yanına currency code eklendi (`€518.400,00 EUR` / `$133.600,00 USD`); başlık "Toplam Sipariş Tutarı" → "Önerilen Satın Alma Tutarı" + tooltip.
+
+**Domain kuralı:** AI öneri filtresi UI filtresiyle aynı kapsamda olmalı. Aksi halde "stok ≥ min ama deadline geçmiş" ürünler için frontend liste gösterirken AI sürekli expire ederek "Beklemede" placeholder'a düşüyor — kullanıcı confused.
+
+**Test güncellemeleri:**
+- `ai-purchase-copilot-route.test.ts:110-118` — "healthy" product fixture'da `daily_usage: null` ekle (deadline path'i devre dışı bırak)
+- `import-source-chips-ai-percent.test.ts:35-37` — fallback test güncelle, bilinmeyen test ayrıldı
+
+**Test:** 129 dosya · 2158 test yeşil · TS clean · 0 lint hatası
 
 ---
 
