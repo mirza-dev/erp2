@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import { isDemoMode } from "@/lib/demo-utils";
+import ResetDemoSection from "@/components/settings/ResetDemoSection";
 
 type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
 
@@ -999,6 +1000,9 @@ export default function SettingsPage() {
                     {activeTab === "yapay-zeka" && <AiTab />}
                 </div>
             </div>
+
+            {/* Tehlikeli Bölge — sayfanın en altında, ayrı blok */}
+            <ResetDemoSection />
         </div>
     );
 }

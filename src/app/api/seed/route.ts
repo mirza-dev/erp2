@@ -15,10 +15,21 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { createClient } from "@/lib/supabase/server";
 
 async function checkAuth(request: NextRequest): Promise<boolean> {
+    // 1. CRON_SECRET (cron veya curl tetikleme)
     const secret = process.env.CRON_SECRET;
-    return !!(secret && request.headers.get("authorization") === `Bearer ${secret}`);
+    if (secret && request.headers.get("authorization") === `Bearer ${secret}`) return true;
+
+    // 2. Authenticated user session (UI'dan tetikleme — settings → reset butonu)
+    try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        return !!user;
+    } catch {
+        return false;
+    }
 }
 
 // ── Date Helpers ─────────────────────────────────────────────────────────────
@@ -380,6 +391,77 @@ const SEED_ORDERS: SeedOrder[] = [
 ];
 
 // ════════════════════════════════════════════════════════════════════════════
+// clearAllData — tüm demo + LOAD- prefix'li verileri temizler, singleton'ları resetler
+// DELETE handler ve POST handler ikisi de bu helper'ı kullanır (idempotent reset)
+// ════════════════════════════════════════════════════════════════════════════
+
+async function clearAllData(
+    supabase: ReturnType<typeof createServiceClient>,
+): Promise<{ load_orders: number; demo_tables: number }> {
+    // ── Aşama 1: LOAD- prefix'li veriler (scripts/seed-large.ts kalıntıları) ──
+    const { data: loadOrders } = await supabase
+        .from("sales_orders").select("id").like("notes", "LOAD-%");
+    const loadOrderIds = (loadOrders ?? []).map(o => o.id);
+    if (loadOrderIds.length > 0) {
+        const chunks: string[][] = [];
+        for (let i = 0; i < loadOrderIds.length; i += 500) chunks.push(loadOrderIds.slice(i, i + 500));
+        for (const chunk of chunks) {
+            await supabase.from("order_lines").delete().in("order_id", chunk);
+            await supabase.from("stock_reservations").delete().in("order_id", chunk);
+        }
+    }
+    await supabase.from("sales_orders").delete().like("notes", "LOAD-%");
+    await supabase.from("customers").delete().like("name", "LOAD%");
+    await supabase.from("products").delete().like("sku", "LOAD-%");
+
+    // ── Aşama 2: Demo verileri (FK alt → üst sırasıyla) ─────────────────────
+    const tables = [
+        "audit_log",
+        "integration_sync_logs",
+        "alerts",
+        "ai_feedback",
+        "ai_recommendations",
+        "ai_entity_aliases",
+        "ai_runs",
+        "column_mappings",
+        "import_drafts",
+        "import_batches",
+        "quote_line_items",
+        "quotes",
+        "payments",
+        "invoices",
+        "shipments",
+        "shortages",
+        "stock_reservations",
+        "inventory_movements",
+        "order_lines",
+        "sales_orders",
+        "purchase_commitments",
+        "production_entries",
+        "bills_of_materials",
+        "customers",
+        "products",
+        "parasut_oauth_tokens",
+    ] as const;
+
+    for (const table of tables) {
+        const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
+        if (error) throw new Error(`${table}: ${error.message}`);
+    }
+
+    // ── Aşama 3: Singleton company_settings sıfırlanır (silinmez) ───────────
+    await supabase.from("company_settings").update({
+        name: "", tax_office: "", tax_no: "", address: "",
+        phone: "", email: "", website: "", logo_url: null, currency: "USD",
+    }).neq("id", "00000000-0000-0000-0000-000000000000");
+
+    // ── Aşama 4: order_counters reset ───────────────────────────────────────
+    await supabase.from("order_counters").upsert({ year: 2026, last_seq: 0 }, { onConflict: "year" });
+
+    return { load_orders: loadOrderIds.length, demo_tables: tables.length };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // DELETE — tüm demo + LOAD- prefix'li veriler temizlenir, singleton'lar resetlenir
 // ════════════════════════════════════════════════════════════════════════════
 
@@ -389,71 +471,11 @@ export async function DELETE(request: NextRequest) {
     }
     try {
         const supabase = createServiceClient();
-
-        // ── Aşama 1: LOAD- prefix'li veriler (scripts/seed-large.ts kalıntıları) ──
-        const { data: loadOrders } = await supabase
-            .from("sales_orders").select("id").like("notes", "LOAD-%");
-        const loadOrderIds = (loadOrders ?? []).map(o => o.id);
-        if (loadOrderIds.length > 0) {
-            const chunks: string[][] = [];
-            for (let i = 0; i < loadOrderIds.length; i += 500) chunks.push(loadOrderIds.slice(i, i + 500));
-            for (const chunk of chunks) {
-                await supabase.from("order_lines").delete().in("order_id", chunk);
-                await supabase.from("stock_reservations").delete().in("order_id", chunk);
-            }
-        }
-        await supabase.from("sales_orders").delete().like("notes", "LOAD-%");
-        await supabase.from("customers").delete().like("name", "LOAD%");
-        await supabase.from("products").delete().like("sku", "LOAD-%");
-
-        // ── Aşama 2: Demo verileri (FK alt → üst sırasıyla) ─────────────────────
-        const tables = [
-            "audit_log",
-            "integration_sync_logs",
-            "alerts",
-            "ai_feedback",
-            "ai_recommendations",
-            "ai_entity_aliases",
-            "ai_runs",
-            "column_mappings",
-            "import_drafts",
-            "import_batches",
-            "quote_line_items",
-            "quotes",
-            "payments",
-            "invoices",
-            "shipments",
-            "shortages",
-            "stock_reservations",
-            "inventory_movements",
-            "order_lines",
-            "sales_orders",
-            "purchase_commitments",
-            "production_entries",
-            "bills_of_materials",
-            "customers",
-            "products",
-            "parasut_oauth_tokens",
-        ] as const;
-
-        for (const table of tables) {
-            const { error } = await supabase.from(table).delete().neq("id", "00000000-0000-0000-0000-000000000000");
-            if (error) throw new Error(`${table}: ${error.message}`);
-        }
-
-        // ── Aşama 3: Singleton company_settings sıfırlanır (silinmez) ───────────
-        await supabase.from("company_settings").update({
-            name: "", tax_office: "", tax_no: "", address: "",
-            phone: "", email: "", website: "", logo_url: null, currency: "USD",
-        }).neq("id", "00000000-0000-0000-0000-000000000000");
-
-        // ── Aşama 4: order_counters reset ───────────────────────────────────────
-        await supabase.from("order_counters").upsert({ year: 2026, last_seq: 0 }, { onConflict: "year" });
-
+        const cleaned = await clearAllData(supabase);
         return NextResponse.json({
             ok: true,
             message: "Tüm demo + LOAD verileri temizlendi. POST /api/seed ile yeniden yükle.",
-            cleaned: { load_orders: loadOrderIds.length, demo_tables: tables.length },
+            cleaned,
         });
     } catch (err) {
         console.error("[DELETE /api/seed]", err);
@@ -474,6 +496,9 @@ export async function POST(request: NextRequest) {
     }
     try {
         const supabase = createServiceClient();
+
+        // ── 0. Idempotent reset: tüm demo + LOAD- veriyi temizle ───────────────
+        const cleared = await clearAllData(supabase);
 
         // ── 1. company_settings (singleton UPDATE) ─────────────────────────────
         await supabase.from("company_settings").update({
@@ -1179,6 +1204,7 @@ export async function POST(request: NextRequest) {
         // ── Response ────────────────────────────────────────────────────────────
         return NextResponse.json({
             ok: true,
+            cleared,
             seeded: {
                 products: SEED_PRODUCTS.length,
                 customers: SEED_CUSTOMERS.length,

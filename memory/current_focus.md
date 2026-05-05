@@ -5,9 +5,27 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
-**Son:** Demo seed yenileme KAPALI (2026-05-04) — sade öz boyut + tüm modüller dolu
-**Önceki:** Sprint C bulgular 4. tur KAPALI (2026-05-02; 2157 test) — G3 gerçek veri + G5 mobil + test tamamlama
-**Önceki²:** Sprint C bulgular 3. tur KAPALI (2026-05-02; 2145 test) — G1/G3/G5 fix + 3 adlandırılmış test
+**Son:** Seed idempotent + UI tetikleyici KAPALI (2026-05-05) — settings'te "Tüm Verileri Sıfırla ve Demo Yükle" butonu
+**Önceki:** Demo seed yenileme KAPALI (2026-05-04) — sade öz boyut + tüm modüller dolu
+**Önceki²:** Sprint C bulgular 4. tur KAPALI (2026-05-02; 2157 test) — G3 gerçek veri + G5 mobil + test tamamlama
+
+---
+
+## Seed Idempotent + UI Tetikleyici (2026-05-05) — KAPALI
+
+**Hedef:** Production DB hâlâ eski junk veriyle dolu (811 alert, silinmiş ürünler, "cart curt" siparişleri) — seed endpoint hiç manuel curl ile çağrılmamıştı. Tek tıkla "tüm veri temiz + demo seed yükle" akışı gerekti.
+
+**1 commit, 3 dosya:**
+- **`src/app/api/seed/route.ts`** —
+  - `clearAllData(supabase)` helper extract (DELETE flow tek yerden, DRY).
+  - `POST` artık idempotent: önce `clearAllData`, sonra seed insert. Response'a `cleared: { load_orders, demo_tables }` eklendi.
+  - `checkAuth` genişletildi: `CRON_SECRET` Bearer **VEYA** authenticated user session (`@/lib/supabase/server` `createClient`). UI'dan tetikleme için.
+- **`src/components/settings/ResetDemoSection.tsx`** (yeni) — kırmızı "Tehlikeli Bölge" kartı + confirm modal + busy state + toast + 2 sn sonra reload. Demo modda disabled (DEMO_DISABLED_TOOLTIP).
+- **`src/app/dashboard/settings/page.tsx`** — 2-kolon layout altına `<ResetDemoSection />` mount.
+
+**Domain kuralı:** Seed endpoint authenticated user **veya** CRON_SECRET bearer ile tetiklenebilir. UI tarafından çağrı için Authorization header gerekmez (cookie-based session). Demo cookie kabul edilmez (sadece gerçek auth). Tek admin kullanan iç araç olduğu için ek role kontrolü yok.
+
+**Test:** 129 dosya · 2157 test yeşil · TS clean · 0 lint hatası
 
 ---
 

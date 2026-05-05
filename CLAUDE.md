@@ -1,9 +1,19 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-04_
+_Son güncelleme: 2026-05-05_
 
-**Son tamamlanan iş:** Demo seed yenileme — sade öz boyut + tüm modüller dolu (2026-05-04)
+**Son tamamlanan iş:** Seed idempotent + UI tetikleyici — settings'te tek tıkla reset (2026-05-05)
+
+**Seed idempotent + UI (1 commit):**
+- `clearAllData` helper extract → DELETE handler ve POST handler ikisi de kullanıyor (DRY).
+- POST artık idempotent: önce temizle, sonra yükle. Response: `{ ok, cleared: {...}, seeded: {...} }`. Tek çağrı = tam reset + seed.
+- `checkAuth` genişletildi: `CRON_SECRET` **VEYA** authenticated session (`@/lib/supabase/server`). UI'dan Authorization header'sız çağrılabilir.
+- Yeni `src/components/settings/ResetDemoSection.tsx` — kırmızı "Tehlikeli Bölge" kartı, confirm modal, busy state, toast, 2 sn sonra reload. Demo modda disabled.
+- `/dashboard/settings` en altına mount edildi.
+- 129 dosya · 2157 test yeşil · TS clean · 0 lint hatası
+
+**Önceki tamamlanan iş:** Demo seed yenileme — sade öz boyut + tüm modüller dolu (2026-05-04)
 
 **Demo seed rewrite (1 commit):**
 - Mevcut seed (1613 satır, 39 ürün, 15 sipariş) müşteri turuna kalabalıktı; LOAD- prefix kalıntıları temizlenmiyordu; quotes/ai_recommendations/import_*/company_settings/parasut_oauth_tokens boş kalıyordu.
