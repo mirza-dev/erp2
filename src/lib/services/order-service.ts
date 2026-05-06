@@ -26,6 +26,7 @@ import { dbCreateAlert, dbListActiveAlerts, dbBatchResolveAlerts, type BatchReso
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { createServiceClient } from "@/lib/supabase/service";
+import { notifyUsersByEmail } from "@/lib/services/email-service";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 
 // ── Types ────────────────────────────────────────────────────
@@ -192,6 +193,18 @@ export async function serviceTransitionOrder(
         await dbLogOrderAction(orderId, "status_transition",
             { commercial_status: order.commercial_status },
             { commercial_status: "pending_approval" });
+        // Fire-and-forget e-posta bildirimi
+        notifyUsersByEmail({
+            notificationType: "order_pending",
+            entityType: "sales_order",
+            entityId: orderId,
+            render: { type: "order_pending", ctx: {
+                orderNumber: order.order_number,
+                customerName: order.customer_name,
+                total: order.grand_total,
+                currency: order.currency,
+            } },
+        }).catch(err => console.error("[email order_pending]", err));
         return { success: true };
     }
 

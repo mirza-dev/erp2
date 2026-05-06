@@ -532,3 +532,22 @@ export interface ParasutOAuthTokensRow {
     updated_at:         string
     created_at:         string
 }
+
+export type EmailLogStatus = "pending" | "sent" | "failed"
+
+export interface EmailLogRow {
+    id:                string
+    user_id:           string
+    notification_type: string
+    entity_type:       string | null
+    entity_id:         string | null
+    recipient_email:   string
+    subject:           string
+    status:            EmailLogStatus
+    error_message:     string | null
+    attempt_count:     number
+    last_attempt_at:   string | null
+    sent_at:           string | null
+    metadata:          Json | null
+    created_at:        string
+}

@@ -15,6 +15,7 @@ const CRON_PATHS = [
     "/api/orders/expire-quotes",
     "/api/orders/check-shipments",
     "/api/quotes/expire",
+    "/api/email/retry-failed",
 ];
 
 export async function middleware(request: NextRequest) {

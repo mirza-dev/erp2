@@ -6,6 +6,7 @@ import {
     type OrderTransition,
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
+import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
 import { revalidateTag } from "next/cache";
@@ -67,6 +68,20 @@ export async function PATCH(
 
         // Return updated order with shortage info if partial allocation occurred
         const updated = await serviceGetOrder(id);
+
+        // Fire-and-forget order_shipped e-posta bildirimi — updated kullanılarak
+        // ekstra DB call'a gerek kalmıyor; parasut sync'den sonraki güncel state
+        if (transition === "shipped" && result.success && updated) {
+            notifyUsersByEmail({
+                notificationType: "order_shipped",
+                entityType: "sales_order",
+                entityId: id,
+                render: { type: "order_shipped", ctx: {
+                    orderNumber: updated.order_number,
+                    customerName: updated.customer_name,
+                } },
+            }).catch(err => console.error("[email order_shipped]", err));
+        }
         revalidateTag("products", "max");
         const response: Record<string, unknown> = { ...updated };
         if (result.shortages && result.shortages.length > 0) {

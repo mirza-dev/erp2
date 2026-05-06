@@ -5,6 +5,7 @@ import {
     validateOrderCreate,
 } from "@/lib/services/order-service";
 import { aiScoreOrder } from "@/lib/services/ai-service";
+import { notifyUsersByEmail } from "@/lib/services/email-service";
 import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
@@ -57,6 +58,19 @@ export async function POST(req: NextRequest) {
         aiScoreOrder(result.id).catch(err =>
             console.error("[AI Score] fire-and-forget:", err)
         );
+
+        // Fire-and-forget order_new e-posta bildirimi
+        notifyUsersByEmail({
+            notificationType: "order_new",
+            entityType: "sales_order",
+            entityId: result.id,
+            render: { type: "order_new", ctx: {
+                orderNumber: result.order_number,
+                customerName: result.customer_name,
+                total: result.grand_total,
+                currency: result.currency,
+            } },
+        }).catch(err => console.error("[email order_new]", err));
 
         revalidateTag("products", "max");
         return NextResponse.json(result, { status: 201 });

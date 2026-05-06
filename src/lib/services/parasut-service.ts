@@ -10,6 +10,7 @@ import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/sync-log";
 import { dbCreateAlert } from "@/lib/supabase/alerts";
+import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ParasutError } from "@/lib/parasut-adapter";
@@ -140,15 +141,26 @@ export async function checkAuthAlertThreshold(): Promise<void> {
         .gte("requested_at", oneHourAgo);
 
     if ((count ?? 0) >= 3) {
+        const description = `Son 1 saatte ${count ?? 0} auth hatası tespit edildi — OAuth yeniden doğrulama gerekebilir.`;
         await dbCreateAlert({
             type:        "sync_issue",
             severity:    "critical",
             title:       "Paraşüt auth hatası",
-            description: `Son 1 saatte ${count ?? 0} auth hatası tespit edildi — OAuth yeniden doğrulama gerekebilir.`,
+            description,
             entity_type: "parasut",
             entity_id:   ALERT_ENTITY_PARASUT_AUTH,
             source:      "system",
         });
+        // Fire-and-forget e-posta bildirimi — dedup penceresi spam'i engelliyor
+        notifyUsersByEmail({
+            notificationType: "sync_error",
+            entityType: "parasut",
+            entityId: ALERT_ENTITY_PARASUT_AUTH,
+            render: { type: "sync_error", ctx: {
+                entityName: "Paraşüt OAuth",
+                errorMessage: description,
+            } },
+        }).catch(err => console.error("[email sync_error]", err));
     }
 }
 

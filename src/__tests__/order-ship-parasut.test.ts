@@ -24,6 +24,10 @@ vi.mock("@/lib/services/parasut-service", () => ({
     serviceSyncOrderToParasut: (...args: unknown[]) => mockServiceSyncOrderToParasut(...args),
 }));
 
+vi.mock("@/lib/services/email-service", () => ({
+    notifyUsersByEmail: vi.fn(() => Promise.resolve({ sent: 0, skipped: 0, failed: 0 })),
+}));
+
 import { PATCH } from "@/app/api/orders/[id]/route";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

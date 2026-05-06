@@ -5,9 +5,56 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
-**Son:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
-**Önceki:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
-**Önceki²:** Ayarlar production-ready KAPALI (2026-05-05; 2194 test) — Kullanıcı/Bildirimler API + validation + DemoBanner koşullu
+**Son:** SMTP/Resend e-posta altyapısı KAPALI (2026-05-06; 2242 test) — 5 türde fire-and-forget entegrasyon
+**Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
+**Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## SMTP / E-posta Altyapısı (Resend) (2026-05-06) — KAPALI
+
+**Hedef:** Settings → Bildirimler `email_enabled` toggle'ı sembolik olmaktan çıkıp gerçek e-posta göndersin. 5 bildirim türü için fire-and-forget entegrasyon.
+
+**1 commit, ~15 dosya:**
+
+**Backend:**
+- Migration 047 (`email_logs`): user_id+notification_type+entity_type+entity_id (dedup index) + status+last_attempt_at (retry index) + RLS service_role
+- `src/lib/notification-types.ts` zaten vardı; whitelist kontrol burada
+- `src/lib/supabase/email-logs.ts` — dbCreateEmailLog (status='pending'), dbUpdateEmailLogStatus (sent/failed + attempt_count++), dbCheckRecentDuplicate (composite filter, status in ['pending','sent']), dbListFailedEmailsForRetry (failed + attempt<3 + last 24h)
+- `src/lib/supabase/users-with-prefs.ts` — `dbListUsersForEmailNotification(type)` auth.admin.listUsers + user_notification_preferences join (DB satırı yoksa default email_enabled=true)
+- `src/lib/email/templates.ts` — 5 render fonksiyonu (StockCritical/OrderPending/OrderNew/SyncError/OrderShipped) inline HTML + plain-text. `renderEmail({ type, ctx })` dispatch fonksiyonu
+- `src/lib/services/email-service.ts` — `notifyUsersByEmail({ notificationType, entityType, entityId, render })` ve `retryFailedEmails()`. Resend client cached + key-aware (env değişiminde reset). Fail-safe: API_KEY/EMAIL_FROM eksikse erken return.
+- `/api/email/retry-failed/route.ts` — CRON endpoint, middleware CRON_PATHS'e eklendi
+
+**Trigger entegrasyonları (fire-and-forget):**
+- `alert-service.ts:142` — stock_critical alert oluşunca
+- `order-service.ts:198` — pending_approval transition'da
+- `orders/route.ts:65` — order_new POST sonrası
+- `orders/[id]/route.ts:80` — shipped transition + parasut sync sonrası, `updated` state ile
+- `parasut-service.ts:153` — auth threshold alert sonrası
+
+**Dedup penceresi:** 6 saat. CRON tekrar tarayıp aynı entity için tekrar bildirim üretirse spam atılmaz.
+
+**Domain kuralı:**
+- Tüm trigger noktaları `.catch(err => console.error(...))` ile fire-and-forget; request response'u bekletilmez.
+- `dbCheckRecentDuplicate` 'pending' veya 'sent' status'ları sayıyor ('failed' dedup'a dahil değil — yeniden denenmesi gerek).
+- Resend client module-level cache + key-aware: env değişimi (test ortamı) cache invalidate.
+- Avatar/notification gibi user-scoped işlemlerde her zaman session'dan user.id alınır; ID input'lanmaz.
+
+**Test (27 yeni):**
+- `email-logs.test.ts` (10): create/update/checkDup/listFailed + error truncation
+- `email-service.test.ts` (14): config fail-safe, recipient resolution, dedup, Resend success/error/throw, multi-recipient, retry (boş/happy/error)
+- `email-retry-failed.test.ts` (3): CRON happy/empty/throw
+
+**Test:** 138 dosya · 2242 test yeşil · TS clean · 0 lint hatası
+
+---
+
+## Production Setup (kullanıcı tarafında)
+1. Migration 047 → Supabase dashboard'a uygula
+2. resend.com hesap + domain verify (test için: `EMAIL_FROM="KokpitERP <onboarding@resend.dev>"`)
+3. Vercel env: `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL`
+4. Vercel cron: `/api/email/retry-failed` saatte bir tetiklensin (vercel.ts crons config — sonraki tur)
 
 ---
 

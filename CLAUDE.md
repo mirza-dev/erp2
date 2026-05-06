@@ -1,9 +1,22 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-05_
+_Son güncelleme: 2026-05-06_
 
-**Son tamamlanan iş:** Settings audit 2. tur — demo cookie temizleme + SVG sınırla + server validation (2026-05-05)
+**Son tamamlanan iş:** SMTP / e-posta gönderim altyapısı (Resend) — 5 bildirim türü tamamı (2026-05-06)
+
+**SMTP entegrasyonu (1 commit):**
+- Yeni: `resend` npm package; `.env.example`'a `RESEND_API_KEY`, `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL`.
+- Migration 047: `email_logs` tablosu (audit + retry tracking) + 2 index (status/attempt + dedup) + RLS service_role.
+- Yeni helper'lar: `email-logs.ts` (DB CRUD + dedup check + retry list), `users-with-prefs.ts` (auth.users + preferences join), `email/templates.ts` (5 türde HTML+text render), `email-service.ts` (notifyUsersByEmail + retryFailedEmails).
+- Yeni endpoint: `/api/email/retry-failed` (CRON, middleware CRON_PATHS'e eklendi).
+- 5 trigger noktası fire-and-forget entegrasyon: `alert-service.ts` (stock_critical), `order-service.ts` (order_pending), `orders/route.ts` (order_new), `orders/[id]/route.ts` (order_shipped — updated state ile), `parasut-service.ts` (sync_error).
+- Dedup penceresi: 6 saat (entity+type+user); retry: max 3 deneme, son 24 saat.
+- Fail-safe: `RESEND_API_KEY` veya `EMAIL_FROM` yoksa fonksiyon erkenden return (config eksikliği request'i bozmaz).
+- 3 yeni test dosyası (27 test): email-logs (10), email-service (14), email-retry-failed (3). order-ship-parasut.test.ts'e email-service mock eklendi.
+- 138 dosya · 2242 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** Settings audit 2. tur — demo cookie temizleme + SVG sınırla + server validation (2026-05-05)
 
 **Settings audit 2. tur (1 commit, 9 dosya):**
 - **HIGH/Orta — Demo cookie geçişte temizlenmiyordu**: `clearDemoMode()` ne login submit'inde ne dashboard banner link'inde çağrılıyordu. Auth'lu kullanıcı dashboard'a girse bile `isDemoMode()` true kalıyor → settings demo gibi davranıyor. Fix: login `handleSubmit` başarılı dönünce `clearDemoMode()`; dashboard banner link'i `onClick` ile cookie temizler + router.push.

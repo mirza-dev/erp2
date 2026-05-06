@@ -20,6 +20,7 @@ import {
 import type { AlertStatus } from "@/lib/database.types";
 import { computeCoverageDays, computeOrderDeadline, dateDaysFromToday, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
 import { isAIAvailable, aiGenerateOpsSummary, type OpsSummaryInput } from "@/lib/services/ai-service";
+import { notifyUsersByEmail } from "@/lib/services/email-service";
 
 // ── Lifecycle transitions (domain-rules §12.3) ───────────────
 
@@ -142,7 +143,21 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     entity_id: entityId,
                     ai_inputs_summary: { available, min, dailyUsage, coverageDays, leadTimeDays, unit: product.unit },
                 });
-                if (alert) created++;
+                if (alert) {
+                    created++;
+                    // Fire-and-forget e-posta bildirimi (preferences/dedup email-service'te kontrol edilir)
+                    notifyUsersByEmail({
+                        notificationType: "stock_critical",
+                        entityType: "product",
+                        entityId,
+                        render: { type: "stock_critical", ctx: {
+                            productName: product.name,
+                            sku: product.sku,
+                            available,
+                            min,
+                        } },
+                    }).catch(err => console.error("[email stock_critical]", err));
+                }
             }
         } else if (isWarning) {
             if (!activeMap.has(`stock_risk:${entityId}`) && !isBlockedByDismiss("stock_risk", entityId, "warning")) {
