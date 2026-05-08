@@ -51,6 +51,17 @@ vi.mock("@/lib/supabase/orders", () => ({
 vi.mock("@/lib/supabase/recommendations", () => ({
     dbUpsertRecommendation: vi.fn().mockResolvedValue({ id: "rec-mock" }),
     dbExpireSuggestedRecommendations: vi.fn().mockResolvedValue(0),
+    dbExpireStaleRecommendations: vi.fn().mockResolvedValue(0),
+    dbExpireRecommendationsForMissingEntities: vi.fn().mockResolvedValue(0),
+    dbExpireEntityRecommendations: vi.fn().mockResolvedValue(undefined),
+    dbGetActiveRecommendationsForEntities: vi.fn().mockResolvedValue([]),
+    dbUpdateRecommendationMetadata: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+    createClient: () => Promise.resolve({
+        auth: { getUser: () => Promise.resolve({ data: { user: { id: "test-user" } } }) },
+    }),
 }));
 
 vi.mock("@/lib/supabase/service", () => ({

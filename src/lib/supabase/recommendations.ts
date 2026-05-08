@@ -292,6 +292,31 @@ export async function dbExpireRecommendationsForMissingEntities(
 }
 
 /**
+ * G11 diff-merge: mevcut bir rec'in metadata'sındaki belirli alanları
+ * günceller (suggestQty, urgencyPct, coverageDays, targetStock, formula).
+ * AI metni (aiWhyNow, aiQuantityRationale, aiUrgencyLevel) korunur.
+ *
+ * GET → JS-merge → UPDATE — JSONB tüm key'leri overwrite etmesin diye.
+ * Best-effort: rec yoksa veya update fail olursa sessizce çıkar.
+ */
+export async function dbUpdateRecommendationMetadata(
+    id: string,
+    metadataPatch: Record<string, unknown>,
+): Promise<void> {
+    const supabase = createServiceClient();
+    const current = await dbGetRecommendationById(id);
+    if (!current) return;
+    const merged = {
+        ...((current.metadata as Record<string, unknown> | null) ?? {}),
+        ...metadataPatch,
+    };
+    await supabase
+        .from("ai_recommendations")
+        .update({ metadata: merged })
+        .eq("id", id);
+}
+
+/**
  * Immediately expire all active recommendations for a single entity.
  * Called on product delete or deactivate so the purchase-suggested page
  * never shows ghost recommendations before the next copilot run.

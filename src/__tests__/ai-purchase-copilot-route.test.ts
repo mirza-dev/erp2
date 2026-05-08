@@ -34,14 +34,26 @@ const mockDbUpsertRecommendation = vi.fn();
 const mockDbExpireSuggestedRecommendations = vi.fn();
 const mockDbExpireStaleRecommendations = vi.fn();
 const mockDbExpireRecommendationsForMissingEntities = vi.fn();
+const mockDbExpireEntityRecommendations = vi.fn();
 const mockDbGetActiveRecommendationsForEntities = vi.fn();
+const mockDbUpdateRecommendationMetadata = vi.fn();
 
 vi.mock("@/lib/supabase/recommendations", () => ({
     dbUpsertRecommendation: (...args: unknown[]) => mockDbUpsertRecommendation(...args),
     dbExpireSuggestedRecommendations: (...args: unknown[]) => mockDbExpireSuggestedRecommendations(...args),
     dbExpireStaleRecommendations: (...args: unknown[]) => mockDbExpireStaleRecommendations(...args),
     dbExpireRecommendationsForMissingEntities: (...args: unknown[]) => mockDbExpireRecommendationsForMissingEntities(...args),
+    dbExpireEntityRecommendations: (...args: unknown[]) => mockDbExpireEntityRecommendations(...args),
     dbGetActiveRecommendationsForEntities: (...args: unknown[]) => mockDbGetActiveRecommendationsForEntities(...args),
+    dbUpdateRecommendationMetadata: (...args: unknown[]) => mockDbUpdateRecommendationMetadata(...args),
+}));
+
+// G11: Auth mock — testler request arg'sız POST() çağırıyor; session-auth path
+// üzerinden authorize etsin diye supabase server client'ı user döndürecek şekilde mock'lanır.
+vi.mock("@/lib/supabase/server", () => ({
+    createClient: () => Promise.resolve({
+        auth: { getUser: () => Promise.resolve({ data: { user: { id: "test-user" } } }) },
+    }),
 }));
 
 import { POST } from "@/app/api/ai/purchase-copilot/route";
@@ -62,8 +74,12 @@ beforeEach(() => {
     mockDbExpireStaleRecommendations.mockResolvedValue(0);
     mockDbExpireRecommendationsForMissingEntities.mockReset();
     mockDbExpireRecommendationsForMissingEntities.mockResolvedValue(0);
+    mockDbExpireEntityRecommendations.mockReset();
+    mockDbExpireEntityRecommendations.mockResolvedValue(undefined);
     mockDbGetActiveRecommendationsForEntities.mockReset();
     mockDbGetActiveRecommendationsForEntities.mockResolvedValue([]);
+    mockDbUpdateRecommendationMetadata.mockReset();
+    mockDbUpdateRecommendationMetadata.mockResolvedValue(undefined);
     mockIsAIAvailable.mockReset();
 });
 

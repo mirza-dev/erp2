@@ -1,20 +1,58 @@
-import { NextResponse } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 import { dbListProducts, dbGetAllActiveProductIds } from "@/lib/supabase/products";
-import { computeTargetStock, computeCoverageDays, computeUrgencyPct, computeOrderDeadline, dateDaysFromToday } from "@/lib/stock-utils";
+import {
+    computeTargetStock,
+    computeCoverageDays,
+    computeUrgencyPct,
+    computeUrgencyLevel,
+    computeOrderDeadline,
+    dateDaysFromToday,
+} from "@/lib/stock-utils";
 import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem } from "@/lib/services/ai-service";
 import {
     dbUpsertRecommendation,
     dbExpireSuggestedRecommendations,
     dbExpireStaleRecommendations,
     dbExpireRecommendationsForMissingEntities,
+    dbExpireEntityRecommendations,
     dbGetActiveRecommendationsForEntities,
+    dbUpdateRecommendationMetadata,
 } from "@/lib/supabase/recommendations";
 import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
 
-export async function POST() {
+type UrgencyLevel = "critical" | "high" | "moderate";
+
+// G11: Hibrit auth — CRON_SECRET Bearer veya authenticated session.
+// Middleware ALWAYS_PUBLIC listesinde olduğu için route kendi auth'unu yapar.
+async function checkAuth(request?: NextRequest): Promise<boolean> {
+    const secret = process.env.CRON_SECRET;
+    const authHeader = request?.headers?.get("authorization") ?? null;
+    if (secret && authHeader === `Bearer ${secret}`) return true;
+    try {
+        const supabase = await createServerSupabaseClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        return !!user;
+    } catch {
+        return false;
+    }
+}
+
+function readUrgencyLevelFromMeta(meta: Record<string, unknown> | null | undefined): UrgencyLevel | null {
+    if (!meta) return null;
+    const direct = meta.urgencyLevel;
+    if (direct === "critical" || direct === "high" || direct === "moderate") return direct;
+    if (typeof meta.urgencyPct === "number") return computeUrgencyLevel(meta.urgencyPct);
+    return null;
+}
+
+export async function POST(request?: NextRequest) {
+    if (!(await checkAuth(request))) {
+        return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
+    }
+
     // Expire suggested recommendations that were never acted on after 48 hours.
-    // Runs before any DB read so stale rows don't block re-generation.
     try { await dbExpireStaleRecommendations(48); } catch { /* non-fatal */ }
 
     let products: Awaited<ReturnType<typeof dbListProducts>>;
@@ -24,21 +62,12 @@ export async function POST() {
         return handleApiError(err, "Satın alma önerileri toplanamadı.");
     }
 
-    // Sprint C G1: Silinmiş veya deaktif edilmiş ürünlerin aktif önerilerini
-    // expire et (suggested + accepted/edited/rejected). Aksi halde sayfada
-    // hayalet öneriler görünür ve ürün geri etkinleştiğinde eski karar geri
-    // dirilir. Ayrı bir "tüm aktif ID" sorgusu kullanıyoruz çünkü `products`
-    // pageSize:500 ile yüklenmiş olabilir; truncated listeden orphan expire
-    // yapılırsa 501+ ürünlerin geçerli önerileri yanlışlıkla expire olurdu.
+    // Sprint C G1: orphan cleanup for deleted/deactivated products.
     try {
         const allActiveProductIds = await dbGetAllActiveProductIds();
         await dbExpireRecommendationsForMissingEntities("product", allActiveProductIds, "purchase_suggestion");
-    } catch { /* non-fatal — main flow continues */ }
+    } catch { /* non-fatal */ }
 
-    // Frontend `shouldSuggestReorder` ile aynı kapsam: ticari ürün VE
-    // (stok ≤ min OR orderDeadline ≤ 7 gün). Aksi halde sayfada listelenen
-    // ama AI route filtre dışı kalan ürünlerin önerileri sürekli expire olur
-    // ve UI "Beklemede" boş satır gösterir.
     const REORDER_DEADLINE_WINDOW_DAYS = 7;
     const needsPurchase = products.filter(p => {
         if (p.product_type === "manufactured") return false;
@@ -83,37 +112,94 @@ export async function POST() {
     const aiAvailable = isAIAvailable();
     const activeProductIds = items.map(i => i.productId);
 
-    // ── Load existing active recommendations ──────────────────────────────────
-    // Products with an active rec (suggested/accepted/edited/rejected) skip AI
-    // re-enrichment. Stability: the user sees the same suggestion on refresh.
-    let existingRecMap = new Map<string, AiRecommendationRow>();
+    // ── G11: Mevcut aktif rec'leri yükle ve sınıflandır ──────────────────────
+    // suggestedRecMap → diff-merge target (status='suggested')
+    // decidedRecMap   → frozen, drift hesaplanır (accepted/edited/rejected)
+    const suggestedRecMap = new Map<string, AiRecommendationRow>();
+    const decidedRecMap = new Map<string, AiRecommendationRow>();
     try {
         const existingRecs = await dbGetActiveRecommendationsForEntities(
-            "product",
-            activeProductIds,
-            "purchase_suggestion"
+            "product", activeProductIds, "purchase_suggestion"
         );
-        existingRecMap = new Map(existingRecs.map(r => [r.entity_id, r]));
+        for (const r of existingRecs) {
+            if (r.status === "suggested") suggestedRecMap.set(r.entity_id, r);
+            else decidedRecMap.set(r.entity_id, r);
+        }
     } catch {
         // Non-fatal: if we can't load existing, treat all as needing fresh AI
     }
 
-    // Split: need fresh AI vs. reuse from DB
-    const needsAiItems = items.filter(i => !existingRecMap.has(i.productId));
-    const hasExistingItems = items.filter(i => existingRecMap.has(i.productId));
+    // ── G11 diff-merge: 'suggested' rec'leri level karşılaştırmasıyla böl ────
+    // levelSame → metadata in-place refresh, AI metni dokunulmaz
+    // levelChanged → eski rec expire, AI yeniden çağrılır
+    // noRec → fresh upsert, AI çağrılır
+    const levelSameItems: PurchaseSuggestionItem[] = [];
+    const levelChangedItems: PurchaseSuggestionItem[] = [];
+    const noRecItems: PurchaseSuggestionItem[] = [];
+    for (const item of items) {
+        const suggestedRec = suggestedRecMap.get(item.productId);
+        if (suggestedRec) {
+            const meta = suggestedRec.metadata as Record<string, unknown> | null;
+            const currentLevel = computeUrgencyLevel(computeUrgencyPct(item.available, item.min));
+            const existingLevel = readUrgencyLevelFromMeta(meta);
+            if (existingLevel === currentLevel) levelSameItems.push(item);
+            else levelChangedItems.push(item);
+            continue;
+        }
+        // Decided rec ise frozen kalır — AI flow'una düşmemeli
+        if (decidedRecMap.has(item.productId)) continue;
+        noRecItems.push(item);
+    }
 
-    // ── AI enrichment: only for products with no active recommendation ────────
+    // Level değişen rec'leri expire et — yeni rec için unique index temizlensin
+    await Promise.all(levelChangedItems.map(item =>
+        dbExpireEntityRecommendations(item.productId, "product").catch(() => undefined)
+    ));
+
+    // Level-aynı rec'lerin metadata'sını sayısal alanlarla güncelle (best-effort)
+    await Promise.all(levelSameItems.map(item => {
+        const rec = suggestedRecMap.get(item.productId)!;
+        const urgencyPct = computeUrgencyPct(item.available, item.min);
+        return dbUpdateRecommendationMetadata(rec.id, {
+            suggestQty: item.suggestQty,
+            moq: item.moq,
+            urgencyPct,
+            urgencyLevel: computeUrgencyLevel(urgencyPct),
+            coverageDays: item.coverageDays,
+            targetStock: item.targetStock,
+            formula: item.formula,
+        }).catch(() => undefined);
+    }));
+
+    // ── G11 decided drift detection ──────────────────────────────────────────
+    type Drift = { suggestQty: number; urgencyLevel: UrgencyLevel };
+    const driftMap = new Map<string, Drift>();
+    for (const item of items) {
+        const decided = decidedRecMap.get(item.productId);
+        if (!decided) continue;
+        const meta = decided.metadata as Record<string, unknown> | null;
+        const frozenSuggestQty = (meta?.suggestQty as number | undefined) ?? null;
+        const frozenLevel = readUrgencyLevelFromMeta(meta);
+        const currentLevel = computeUrgencyLevel(computeUrgencyPct(item.available, item.min));
+        if (frozenSuggestQty !== item.suggestQty || frozenLevel !== currentLevel) {
+            driftMap.set(item.productId, {
+                suggestQty: item.suggestQty,
+                urgencyLevel: currentLevel,
+            });
+        }
+    }
+
+    // ── AI enrichment: only items needing fresh AI (no rec or level changed) ─
+    const needsAiItems = [...noRecItems, ...levelChangedItems];
     type EnrichmentEntry = {
         productId: string;
         whyNow: string;
         quantityRationale: string;
-        urgencyLevel: "critical" | "high" | "moderate";
+        urgencyLevel: UrgencyLevel;
         confidence: number;
     };
     let freshEnrichments: EnrichmentEntry[] = [];
-    // Sprint C G2: AI key var ama call fail olursa frontend "AI kullanılamıyor"
-    // banner'ı gösterebilsin diye ayrı flag tutuyoruz; aiAvailable=true + call_failed=true
-    // durumunda kullanıcı "Yeniden dene" butonuyla tekrar tetikleyebilir.
+    // Sprint C G2: AI key var ama call fail → frontend banner sinyali
     let aiCallFailed = false;
 
     if (aiAvailable && needsAiItems.length > 0) {
@@ -127,11 +213,11 @@ export async function POST() {
 
     const freshAiMap = new Map(freshEnrichments.map(e => [e.productId, e]));
 
-    // Build merged AI map: fresh enrichments + content recovered from existing rec metadata
+    // mergedAiMap: AI fields per item — fresh enrichment OR rec metadata reuse
     const mergedAiMap = new Map<string, {
         aiWhyNow: string | null;
         aiQuantityRationale: string | null;
-        aiUrgencyLevel: "critical" | "high" | "moderate" | null;
+        aiUrgencyLevel: UrgencyLevel | null;
         aiConfidence: number | null;
     }>();
 
@@ -145,14 +231,28 @@ export async function POST() {
         });
     }
 
-    for (const item of hasExistingItems) {
-        const rec = existingRecMap.get(item.productId)!;
+    for (const item of levelSameItems) {
+        const rec = suggestedRecMap.get(item.productId)!;
         const meta = rec.metadata as Record<string, unknown> | null;
         mergedAiMap.set(item.productId, {
             aiWhyNow: (meta?.aiWhyNow as string) ?? null,
             aiQuantityRationale: (meta?.aiQuantityRationale as string) ?? null,
-            aiUrgencyLevel: (meta?.aiUrgencyLevel as "critical" | "high" | "moderate") ?? null,
+            aiUrgencyLevel: (meta?.aiUrgencyLevel as UrgencyLevel) ?? null,
             aiConfidence: rec.confidence ?? null,
+        });
+    }
+
+    // Decided rec'lerden AI metnini çek (frozen — kullanıcı kararı sırasındaki AI yorumu)
+    for (const item of items) {
+        if (mergedAiMap.has(item.productId)) continue;
+        const decided = decidedRecMap.get(item.productId);
+        if (!decided) continue;
+        const meta = decided.metadata as Record<string, unknown> | null;
+        mergedAiMap.set(item.productId, {
+            aiWhyNow: (meta?.aiWhyNow as string) ?? null,
+            aiQuantityRationale: (meta?.aiQuantityRationale as string) ?? null,
+            aiUrgencyLevel: (meta?.aiUrgencyLevel as UrgencyLevel) ?? null,
+            aiConfidence: decided.confidence ?? null,
         });
     }
 
@@ -191,20 +291,26 @@ export async function POST() {
             return a.coverageDays - b.coverageDays;
         });
 
-    // ── Persist recommendations ───────────────────────────────────────────────
-    // Only upsert for products that needed fresh AI. Existing recs are returned as-is.
-    const recommendations: Array<{ productId: string; recommendationId: string | null; status: string; decidedAt: string | null; editedMetadata: Record<string, unknown> | null }> = [];
+    // ── Persist + build response.recommendations ─────────────────────────────
+    type RecRef = {
+        productId: string;
+        recommendationId: string | null;
+        status: string;
+        decidedAt: string | null;
+        editedMetadata: Record<string, unknown> | null;
+        currentDrift: Drift | null;
+    };
+    const recommendations: RecRef[] = [];
 
     try {
-        // Expire suggestions for products no longer below min stock
         const expirePromise = activeProductIds.length > 0
             ? dbExpireSuggestedRecommendations("product", activeProductIds, "purchase_suggestion")
             : Promise.resolve(0);
 
-        // Insert new recommendations only for products without an existing active rec
         const upsertPromises = needsAiItems.map(async item => {
             const ai = freshAiMap.get(item.productId);
             const urgencyPct = computeUrgencyPct(item.available, item.min);
+            const urgencyLevel = computeUrgencyLevel(urgencyPct);
             const severity = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
             try {
                 const rec = await dbUpsertRecommendation({
@@ -220,6 +326,7 @@ export async function POST() {
                         suggestQty: item.suggestQty,
                         moq: item.moq,
                         urgencyPct,
+                        urgencyLevel,
                         aiWhyNow: ai?.whyNow ?? null,
                         aiQuantityRationale: ai?.quantityRationale ?? null,
                         aiUrgencyLevel: ai?.urgencyLevel ?? null,
@@ -228,26 +335,42 @@ export async function POST() {
                         formula: item.formula,
                     },
                 });
-                return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at, editedMetadata: null };
+                return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at, editedMetadata: null, currentDrift: null } as RecRef;
             } catch {
-                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null };
+                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null } as RecRef;
             }
         });
 
-        // Collect existing rec references (no DB write needed)
-        const existingRefs = hasExistingItems.map(item => {
-            const rec = existingRecMap.get(item.productId)!;
+        // Reuse: level-same suggested rec'leri (metadata in-place güncellendi)
+        const levelSameRefs: RecRef[] = levelSameItems.map(item => {
+            const rec = suggestedRecMap.get(item.productId)!;
             return {
                 productId: item.productId,
                 recommendationId: rec.id,
                 status: rec.status,
                 decidedAt: rec.decided_at,
                 editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
+                currentDrift: null,
             };
         });
 
+        // Decided rec'ler — frozen metadata + drift bilgisi
+        const decidedRefs: RecRef[] = items
+            .filter(item => decidedRecMap.has(item.productId))
+            .map(item => {
+                const rec = decidedRecMap.get(item.productId)!;
+                return {
+                    productId: item.productId,
+                    recommendationId: rec.id,
+                    status: rec.status,
+                    decidedAt: rec.decided_at,
+                    editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
+                    currentDrift: driftMap.get(item.productId) ?? null,
+                };
+            });
+
         const [, upsertResults] = await Promise.all([expirePromise, Promise.all(upsertPromises)]);
-        recommendations.push(...upsertResults, ...existingRefs);
+        recommendations.push(...upsertResults, ...levelSameRefs, ...decidedRefs);
     } catch {
         // Persistence errors must not affect the main response
     }

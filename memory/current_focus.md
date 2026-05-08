@@ -4,14 +4,64 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Sıradaki — G11 (AI öneri tutarlılığı, 6h CRON + manuel) ve Faz 12 (gerçek Paraşüt API)
-**Son:** SMTP/Resend e-posta altyapısı KAPALI (2026-05-06; 2242 test) — 5 türde fire-and-forget entegrasyon
+**Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
+**Son:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
+**Önceki:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
 
 ---
 
-## SMTP / E-posta Altyapısı (Resend) (2026-05-06) — KAPALI
+## G11 — AI Öneri Tutarlılığı (2026-05-09) — KAPALI
+
+**Hedef:** Aktif `suggested` rec'lerin metadata'sı state ile uyumsuz kalıyordu (route'un "aktif rec varsa AI'yi atla" optimizasyonu yüzünden). Stok geldiyse, daily_usage düştüyse, lead_time uzadıysa eski sayılar UI'da kalıyordu. Plan: hibrit diff-merge + 6 saatlik Vercel CRON + sayfa içi görünür yenile butonu.
+
+**1 commit, ~10 dosya:**
+
+**Backend:**
+- `src/lib/stock-utils.ts` — `computeUrgencyLevel(urgencyPct)` yeni export. Tek source-of-truth: rec metadata'daki `urgencyLevel` ile route severity hesabı arasında tutarlı kalsın diye.
+- `src/lib/supabase/recommendations.ts` — `dbUpdateRecommendationMetadata(id, patch)` yeni helper. GET → JS-merge → UPDATE (JSONB tüm key'leri overwrite etmesin diye). Best-effort: rec yoksa veya update fail olursa sessizce çıkar.
+- `src/app/api/ai/purchase-copilot/route.ts` — full refactor:
+  - **Hybrid auth (line 28-41):** `checkAuth(request)` — CRON_SECRET Bearer veya authenticated session. Middleware ALWAYS_PUBLIC'e taşındı, route kendi auth'unu yapar.
+  - **Suggested rec sınıflandırma (line 119-144):** `suggestedRecMap` ve `decidedRecMap` ayrı. Her item için: suggested rec varsa level karşılaştır → aynı ise `levelSameItems`, farklı ise `levelChangedItems`; decided rec varsa skip; yoksa `noRecItems`.
+  - **Diff-merge (line 146-164):** levelChanged → `dbExpireEntityRecommendations` paralel; levelSame → `dbUpdateRecommendationMetadata` paralel (suggestQty, moq, urgencyPct, urgencyLevel, coverageDays, targetStock, formula).
+  - **Drift detection (line 167-181):** decided rec'lerde frozen suggestQty/urgencyLevel vs current → fark varsa `driftMap.set(productId, { suggestQty, urgencyLevel })`.
+  - **AI çağrısı:** Sadece `needsAiItems = noRecItems + levelChangedItems` için. Level-aynı rec'ler AI atlama optimizasyonunu korur.
+  - **Response:** `recommendations[]` array entry'lerine `currentDrift` field'ı eklendi. Suggested ve fresh-upsert için null; decided için `driftMap` lookup.
+  - Yeni rec metadata'sına `urgencyLevel` field'ı yazılır (deterministik, urgencyPct'ten türetilmiş).
+- `middleware.ts` — `/api/ai/purchase-copilot` ALWAYS_PUBLIC'e eklendi.
+
+**Vercel CRON:**
+- `vercel.json` yeni dosya: `{ "crons": [{ "path": "/api/ai/purchase-copilot", "schedule": "0 */6 * * *" }] }` — 4×/gün UTC. Vercel CRON otomatik `Authorization: Bearer ${CRON_SECRET}` gönderir.
+
+**Frontend (`src/app/dashboard/purchase/suggested/page.tsx`):**
+- `RecEntry` tipine `currentDrift?: { suggestQty, urgencyLevel } | null` eklendi.
+- Yeni `<StaleDriftBadge>` component — `var(--warning-bg)` arka plan, "Stok değişti — güncel: X adet, Yüksek aciliyet" yazısı.
+- `handleRefresh` — demo guard + `setLastRefreshed` + success/error toast.
+- Sayfa başlığı yanındaki yenile butonu — `disabled={isDemo || refreshing || aiLoading}`, `title={isDemo ? DEMO_DISABLED_TOOLTIP : "Verileri yenile"}`, `opacity:0.6` demo'da. Yan tarafta "Son güncelleme: HH:MM" yazısı.
+- `RecActionCell` — accepted/edited/rejected branch'lerinin her birinde `driftBadge` render edilir. Suggested branch'inde gösterilmez (UI guard).
+
+**Tests (4 yeni dosya, 38 yeni test):**
+- `compute-urgency-level.test.ts` (7): boundaries 50/80, 0%, 30%/60%/90%, 100%
+- `purchase-copilot-auth.test.ts` (7): Bearer CRON_SECRET, session, no-auth (401), wrong secret + session, empty CRON_SECRET env, createClient throws
+- `purchase-copilot-diff-merge.test.ts` (14): level-same → metadata refresh + AI skip, level-changed → expire + AI re-call, eski sürüm metadata (urgencyLevel field eksik), boş metadata, decided drift suggestQty/urgencyLevel/no-drift, frozen metadata immutable
+- `purchase-suggested-stale-badge.test.ts` (8): recMap populate kontratı, currentDrift null/dolu, suggested guard, edited editedQty extract
+
+**Mevcut test güncellemeleri (5 dosya):**
+- `ai-purchase-copilot-route.test.ts`, `purchase-suggested-acik-column.test.ts`, `purchase-suggested-ai-banner.test.ts`, `purchase-suggestions-on-product-delete.test.ts`, `ai-cross-capability.test.ts` — `dbExpireEntityRecommendations`, `dbUpdateRecommendationMetadata` ve `@/lib/supabase/server` (createClient) mock'ları eklendi.
+- `demo-mode-middleware.test.ts` — `/api/ai/purchase-copilot` ALWAYS_PUBLIC olarak hareket etti; sensitiveWrites'tan çıkarıldı, alerts/scan paralelinde 200 testi eklendi.
+
+**Domain kuralı:**
+- Tek source-of-truth: rec metadata'daki `urgencyLevel` ile route severity hesabı `computeUrgencyLevel(urgencyPct)` üzerinden aynı eşikleri (≥80 critical, ≥50 high) kullanır.
+- Diff-merge optimizasyonu: AI çağrısı maliyetli olduğundan level değişmiyorsa metni yeniden üretmiyoruz; sayısal alanları her CRON'da güncelleyerek tutarlılığı sağlıyoruz.
+- Decided rec'ler dokunulmaz (frozen) — kullanıcı kararını verdiği andaki bağlamı saklıyor; UI'da drift rozeti ile durumu bilgilendiriyoruz.
+- Vercel CRON otomatik Authorization header gönderir; ek setup gerekmez.
+
+**Test:** 142 dosya · 2280 test yeşil · TS clean · 0 lint hatası
+
+---
+
+## SMTP / E-posta Altyapısı (Resend) (2026-05-06) — KOD TAMAM / PRODUCTION EKSİK
 
 **Hedef:** Settings → Bildirimler `email_enabled` toggle'ı sembolik olmaktan çıkıp gerçek e-posta göndersin. 5 bildirim türü için fire-and-forget entegrasyon.
 

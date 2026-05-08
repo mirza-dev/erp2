@@ -26,9 +26,17 @@ const mockDbUpsertRecommendation = vi.fn();
 vi.mock("@/lib/supabase/recommendations", () => ({
     dbExpireStaleRecommendations: (...a: unknown[]) => mockDbExpireStaleRecommendations(...a),
     dbExpireRecommendationsForMissingEntities: (...a: unknown[]) => mockDbExpireRecommendationsForMissingEntities(...a),
+    dbExpireEntityRecommendations: vi.fn(() => Promise.resolve(undefined)),
     dbGetActiveRecommendationsForEntities: (...a: unknown[]) => mockDbGetActiveRecommendationsForEntities(...a),
     dbExpireSuggestedRecommendations: (...a: unknown[]) => mockDbExpireSuggestedRecommendations(...a),
+    dbUpdateRecommendationMetadata: vi.fn(() => Promise.resolve(undefined)),
     dbUpsertRecommendation: (...a: unknown[]) => mockDbUpsertRecommendation(...a),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+    createClient: () => Promise.resolve({
+        auth: { getUser: () => Promise.resolve({ data: { user: { id: "test-user" } } }) },
+    }),
 }));
 
 vi.mock("@/lib/services/ai-service", () => ({

@@ -161,7 +161,6 @@ describe("middleware — demo mode blocks sensitive write endpoints", () => {
         ["POST",   "/api/import/batch-1/confirm"],
         ["POST",   "/api/parasut/retry"],
         ["PATCH",  "/api/recommendations/rec-1"],
-        ["POST",   "/api/ai/purchase-copilot"],
         ["DELETE", "/api/orders/order-1"],
         ["PATCH",  "/api/orders/order-1"],
         ["DELETE", "/api/customers/cust-1"],
@@ -200,6 +199,12 @@ describe("middleware — demo mode blocks sensitive write endpoints", () => {
     // /api/alerts/scan is in ALWAYS_PUBLIC — middleware passes through, route handles own auth
     it("POST /api/alerts/scan → 200 from middleware (route manages own auth via CRON_SECRET or session)", async () => {
         const res = await middleware(makeRequest("/api/alerts/scan", { method: "POST", cookies: DEMO_COOKIE }));
+        expect(res.status).toBe(200);
+    });
+
+    // G11: /api/ai/purchase-copilot is in ALWAYS_PUBLIC — vercel cron + UI session triggers
+    it("POST /api/ai/purchase-copilot → 200 from middleware (route manages own auth via CRON_SECRET or session)", async () => {
+        const res = await middleware(makeRequest("/api/ai/purchase-copilot", { method: "POST", cookies: DEMO_COOKIE }));
         expect(res.status).toBe(200);
     });
 

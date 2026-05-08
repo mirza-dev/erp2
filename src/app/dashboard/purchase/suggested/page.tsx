@@ -7,7 +7,7 @@ import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { useToast } from "@/components/ui/Toast";
-import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import { formatCurrency } from "@/lib/utils";
 import { computeOrderTotals, scheduleRefetchAfterMutation, shouldSkipAiFetch } from "@/lib/purchase-utils";
 
@@ -19,10 +19,46 @@ interface AiEnrichmentItem {
     aiConfidence: number | null;
 }
 
+type UrgencyLevel = "critical" | "high" | "moderate";
+
 interface RecEntry {
     id: string;
     status: string;
     decidedAt?: string | null;
+    /** G11: decided rec'lerde mevcut state ile dondurulan metadata arası fark.
+     *  null ise drift yok; objeyse "Stok değişti" rozeti gösterilir. */
+    currentDrift?: { suggestQty: number; urgencyLevel: UrgencyLevel } | null;
+}
+
+const URGENCY_LABEL: Record<UrgencyLevel, string> = {
+    critical: "Kritik",
+    high: "Yüksek",
+    moderate: "Orta",
+};
+
+/** G11: Decided rec'lerde stok/aciliyet drift'i varsa gösterilen rozet. */
+function StaleDriftBadge({ drift, unit }: {
+    drift: { suggestQty: number; urgencyLevel: UrgencyLevel };
+    unit: string;
+}) {
+    return (
+        <span
+            title="Karar verildikten sonra ürün state'i değişti. Güncel öneri değerleri yanda."
+            style={{
+                display: "inline-block",
+                marginTop: "4px",
+                fontSize: "10px",
+                fontWeight: 500,
+                padding: "2px 6px",
+                borderRadius: "3px",
+                background: "var(--warning-bg)",
+                color: "var(--warning-text)",
+                border: "0.5px solid var(--warning-border)",
+            }}
+        >
+            Stok değişti — güncel: {drift.suggestQty} {unit}, {URGENCY_LABEL[drift.urgencyLevel]} aciliyet
+        </span>
+    );
 }
 
 /** Compact AI signal button — click to open drawer */
@@ -269,6 +305,9 @@ function RecActionCell({
         </button>
     ) : null;
 
+    const drift = recEntry?.currentDrift ?? null;
+    const driftBadge = drift ? <StaleDriftBadge drift={drift} unit={unit} /> : null;
+
     if (status === "accepted") {
         return (
             <div>
@@ -279,6 +318,7 @@ function RecActionCell({
                 }}>
                     ✓ Kabul Edildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
                 </span>
+                {driftBadge}
                 {undoButton}
             </div>
         );
@@ -295,6 +335,7 @@ function RecActionCell({
                 }}>
                     ✎ Düzenlendi{editedQty != null ? `: ${editedQty} ${unit}` : ""}{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
                 </span>
+                {driftBadge}
                 {undoButton}
             </div>
         );
@@ -309,6 +350,7 @@ function RecActionCell({
                 }}>
                     ✕ Reddedildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
                 </span>
+                {driftBadge}
                 {undoButton}
             </div>
         );
@@ -475,12 +517,20 @@ export default function PurchaseSuggestedPage() {
         ai_available: boolean;
         ai_call_failed?: boolean;
         items: AiEnrichmentItem[];
-        recommendations?: Array<{ productId: string; recommendationId: string | null; status: string; decidedAt?: string | null }>;
+        recommendations?: Array<{
+            productId: string;
+            recommendationId: string | null;
+            status: string;
+            decidedAt?: string | null;
+            editedMetadata?: Record<string, unknown> | null;
+            currentDrift?: { suggestQty: number; urgencyLevel: UrgencyLevel } | null;
+        }>;
         generatedAt?: string;
     } | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
     const [aiDrawerProductId, setAiDrawerProductId] = useState<string | null>(null);
 
     // recMap: productId → { id, status, editedQty? }
@@ -525,7 +575,13 @@ export default function PurchaseSuggestedPage() {
                             const editedQty = r.status === "edited"
                                 ? (r.editedMetadata?.suggestQty as number | undefined)
                                 : undefined;
-                            newMap.set(r.productId, { id: r.recommendationId, status: r.status, decidedAt: r.decidedAt ?? null, ...(editedQty != null && { editedQty }) });
+                            newMap.set(r.productId, {
+                                id: r.recommendationId,
+                                status: r.status,
+                                decidedAt: r.decidedAt ?? null,
+                                currentDrift: r.currentDrift ?? null,
+                                ...(editedQty != null && { editedQty }),
+                            });
                         }
                     }
                     setRecMap(newMap);
@@ -552,11 +608,16 @@ export default function PurchaseSuggestedPage() {
     useEffect(() => () => clearTimeout(refetchTimerRef.current), []);
 
     const handleRefresh = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (refreshing || aiLoading) return;
         setRefreshing(true);
         try {
             await refetchAll();
             await loadAiData();
+            setLastRefreshed(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
+            toast({ type: "success", message: "Öneriler güncellendi" });
+        } catch {
+            toast({ type: "error", message: "Yenileme başarısız" });
         } finally {
             setRefreshing(false);
         }
@@ -777,31 +838,39 @@ export default function PurchaseSuggestedPage() {
                 <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
                     Satın Alma Önerileri
                 </h1>
-                <button
-                    onClick={handleRefresh}
-                    disabled={refreshing || aiLoading}
-                    title="Verileri yenile"
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "6px 12px",
-                        fontSize: "12px",
-                        fontWeight: 500,
-                        color: (refreshing || aiLoading) ? "var(--text-tertiary)" : "var(--text-secondary)",
-                        background: "var(--bg-secondary)",
-                        border: "1px solid var(--border-secondary)",
-                        borderRadius: "6px",
-                        cursor: (refreshing || aiLoading) ? "not-allowed" : "pointer",
-                        flexShrink: 0,
-                    }}
-                >
-                    <span style={{
-                        display: "inline-block",
-                        animation: (refreshing || aiLoading) ? "spin 0.8s linear infinite" : "none",
-                    }}>↻</span>
-                    {refreshing ? "Yenileniyor..." : "Yenile"}
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {lastRefreshed && (
+                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                            Son güncelleme: {lastRefreshed}
+                        </span>
+                    )}
+                    <button
+                        onClick={handleRefresh}
+                        disabled={isDemo || refreshing || aiLoading}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Verileri yenile"}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "6px 12px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            color: (isDemo || refreshing || aiLoading) ? "var(--text-tertiary)" : "var(--text-secondary)",
+                            background: "var(--bg-secondary)",
+                            border: "1px solid var(--border-secondary)",
+                            borderRadius: "6px",
+                            cursor: (isDemo || refreshing || aiLoading) ? "not-allowed" : "pointer",
+                            opacity: isDemo ? 0.6 : 1,
+                            flexShrink: 0,
+                        }}
+                    >
+                        <span style={{
+                            display: "inline-block",
+                            animation: (refreshing || aiLoading) ? "spin 0.8s linear infinite" : "none",
+                        }}>↻</span>
+                        {refreshing ? "Yenileniyor..." : "Yenile"}
+                    </button>
+                </div>
             </div>
             <p style={{ fontSize: "13px", color: "var(--text-tertiary)", marginTop: "4px" }}>
                 Minimum stok seviyesinin altına düşen ürünler · Öncelik sırasına göre

@@ -69,6 +69,17 @@ export function computeUrgencyPct(available: number, min: number): number {
     return Math.max(0, Math.min(100, Math.round((1 - available / min) * 100)));
 }
 
+/**
+ * Tek source-of-truth: urgencyPct → urgencyLevel mapping.
+ * Hem AI metadata.aiUrgencyLevel hem route severity hesabı bunu kullanır,
+ * G11 diff-merge'de level karşılaştırması için tutarlı kalsın diye.
+ */
+export function computeUrgencyLevel(urgencyPct: number): "critical" | "high" | "moderate" {
+    if (urgencyPct >= 80) return "critical";
+    if (urgencyPct >= 50) return "high";
+    return "moderate";
+}
+
 // ── Color helpers (CSS variable strings) ─────────────────────
 
 export function daysColor(days: number | null): string {
