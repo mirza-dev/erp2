@@ -5,11 +5,42 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 1. tur KAPALI (2026-05-09; 2286 test) — Vercel CRON GET, expire scope, source-of-truth coverage-based, false-success toast
-**Önceki:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
-**Önceki²:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
+**Son:** G11 audit 2. tur KAPALI (2026-05-09; 2312 test) — CSRF guard, defansif expire, boş list, lead-time aware, moq=0
+**Önceki:** G11 audit 1. tur KAPALI (2026-05-09; 2286 test) — Vercel CRON GET, expire scope, SoT coverage-based, false-success toast
+**Önceki²:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
+**Önceki³:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 2. Tur (2026-05-09) — KAPALI
+
+**Hedef:** 1. tur sonrası dış inceleme 5 yeni bulgu çıkardı. CSRF, decided rec defansif koruma, orphan suggested cleanup, lead-time risk, moq=0 NaN/Inf riski.
+
+**1 commit, ~10 dosya:**
+
+- **Fix 1 (HIGH) — CSRF guard**: `route.ts:29-46` — `checkAuth(request, method)` iki argümanlı; GET sadece CRON_SECRET, POST hem CRON_SECRET hem session. `<img src="...purchase-copilot">` ile session-cookie'li yan etki tetikleme imkansızlaştırıldı. Export'lar `(req?: NextRequest) => handler(req, "GET"|"POST")` arrow wrapper.
+- **Fix 2 (MEDIUM defansif) — Helper status filter**: `dbExpireEntityRecommendations` artık `recommendationType` belirtildiyse SADECE `'suggested'` filtreliyor. Aynı entity için (invariant kırılırsa) decided rec varsa expire edilmez. Silme akışı (param yok) tüm aktif statüleri kapsamaya devam eder.
+- **Fix 3 (MEDIUM) — Boş aktif liste**: `dbExpireSuggestedRecommendations` boş entity ID listesinde no-op olduğundan, tüm ürünler healthy olunca eski suggested DB'de takılı kalıyordu. Yeni `dbExpireAllSuggestedRecommendations(entityType, recType)` helper + route'da `activeProductIds.length===0` koşullu fallback.
+- **Fix 4 (MEDIUM) — Lead-time aware urgency**: `computeUrgencyLevel(cov, lead?)` — `cov < lead` durumunda critical (Sprint A `computeStockRiskLevel` ile aynı semantik). cov=20/lead=45 → critical, cov=20/lead=14 → moderate. `readUrgencyLevelFromMeta` eski rec'lerde `leadTimeDays` opsiyonel okur. Yeni rec metadata'sına `leadTimeDays` field'ı yazılır.
+- **Fix 5 (MEDIUM) — moq guard**: `moq = Math.max(1, p.reorder_qty ?? p.min_stock_level)` (frontend `page.tsx:226` paterni). `reorder_qty=NULL && min=0` senaryosunda `Math.ceil(needed/0)=Infinity` riskini kapatır.
+
+**Test (15 yeni + 10 ek):**
+- `purchase-copilot-empty-products.test.ts` (4): healthy → dbExpireAll çağrılır, needsPurchase var → dbExpireSuggested
+- `purchase-copilot-moq-guard.test.ts` (6): NaN/Infinity guard, fallback chain, JSON serializable
+- `purchase-copilot-decided-defense.test.ts` (3): helper recType varsa `.eq("status","suggested")`, yoksa `.in("status",[...])`
+- `compute-urgency-level.test.ts` (+10): lead-time risk kombinasyonları (cov<lead → critical, boundary, lead=null/0)
+- `purchase-copilot-auth.test.ts` (+5): GET+session 401, GET+Bearer 200, POST+session 200, POST+Bearer 200
+- `purchase-copilot-diff-merge.test.ts` ve diğer 7 mevcut test: `dbExpireAllSuggestedRecommendations` mock eklendi
+
+**Domain kuralı:**
+- HTTP method'a göre auth: state değiştiren handler GET'te session kabul edemez (CSRF). Cron-tetiklenen mutation endpoint'leri GET kullanıyorsa Bearer-only.
+- `recommendation_type` filtresine sahip helper'larda status range'i de daraltmak (`'suggested'` only) "decided rec frozen" invariant'ını defansif olarak korur.
+- Boş aktif liste senaryosu (zero-in-clause) her zaman ayrı bir code path: ya tüm aktiflerden ya hiç birinden işlem yap, asla "boş clause = noop" varsayma.
+- `computeUrgencyLevel`'a lead-time arg geçilmesi tek source-of-truth: AI rozeti, diff-merge sinyali ve domain stok risk bildirimi aynı semantiği taşır.
+
+**Test:** 145 dosya · 2312 test yeşil · TS clean · 0 lint hatası
 
 ---
 

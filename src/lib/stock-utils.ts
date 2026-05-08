@@ -70,21 +70,29 @@ export function computeUrgencyPct(available: number, min: number): number {
 }
 
 /**
- * Tek source-of-truth: stok aciliyet seviyesi (coverage-based).
+ * Tek source-of-truth: stok aciliyet seviyesi (coverage + lead-time).
  *
  * Hem AI metni (`aiUrgencyLevel` echo'lanır) hem G11 diff-merge level
  * karşılaştırması bunu kullanır → AI rozeti ile diff-merge sinyali daima
  * aynı kavramı temsil eder.
  *
- *   - critical: coverageDays < 7 (haftadan az stok)
- *   - high:     coverageDays 7-14 (1-2 hafta)
- *   - moderate: coverageDays > 14 veya null (yeterli stok / veri yok)
+ *   - critical: coverageDays < leadTimeDays (tedarik gelmeden stok biter)
+ *               VEYA coverageDays < 7
+ *   - high:     coverageDays 7-14 (1-2 hafta) [lead-time risk yoksa]
+ *   - moderate: coverageDays > 14, veya coverageDays null (veri yok)
+ *
+ * Lead-time semantiği `computeStockRiskLevel` ile aynı: tedarikçi süresinden
+ * kısa stok stockout demektir.
  *
  * Not: Bu, route'taki `severity` alanından (urgencyPct-based: 80/50 eşik)
  * farklı bir kavramdır — severity rec.severity DB sütunu için kullanılır.
  */
-export function computeUrgencyLevel(coverageDays: number | null): "critical" | "high" | "moderate" {
+export function computeUrgencyLevel(
+    coverageDays: number | null,
+    leadTimeDays?: number | null,
+): "critical" | "high" | "moderate" {
     if (coverageDays === null) return "moderate";
+    if (leadTimeDays != null && leadTimeDays > 0 && coverageDays < leadTimeDays) return "critical";
     if (coverageDays < 7) return "critical";
     if (coverageDays <= 14) return "high";
     return "moderate";

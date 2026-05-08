@@ -51,6 +51,7 @@ vi.mock("@/lib/supabase/orders", () => ({
 vi.mock("@/lib/supabase/recommendations", () => ({
     dbUpsertRecommendation: vi.fn().mockResolvedValue({ id: "rec-mock" }),
     dbExpireSuggestedRecommendations: vi.fn().mockResolvedValue(0),
+    dbExpireAllSuggestedRecommendations: vi.fn().mockResolvedValue(0),
     dbExpireStaleRecommendations: vi.fn().mockResolvedValue(0),
     dbExpireRecommendationsForMissingEntities: vi.fn().mockResolvedValue(0),
     dbExpireEntityRecommendations: vi.fn().mockResolvedValue(undefined),

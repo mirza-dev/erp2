@@ -41,6 +41,7 @@ const mockDbUpdateRecommendationMetadata = vi.fn();
 vi.mock("@/lib/supabase/recommendations", () => ({
     dbUpsertRecommendation: (...args: unknown[]) => mockDbUpsertRecommendation(...args),
     dbExpireSuggestedRecommendations: (...args: unknown[]) => mockDbExpireSuggestedRecommendations(...args),
+    dbExpireAllSuggestedRecommendations: vi.fn().mockResolvedValue(0),
     dbExpireStaleRecommendations: (...args: unknown[]) => mockDbExpireStaleRecommendations(...args),
     dbExpireRecommendationsForMissingEntities: (...args: unknown[]) => mockDbExpireRecommendationsForMissingEntities(...args),
     dbExpireEntityRecommendations: (...args: unknown[]) => mockDbExpireEntityRecommendations(...args),

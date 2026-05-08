@@ -3,17 +3,20 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-09_
 
-**Son tamamlanan iş:** G11 audit 1. tur — 5 bulgu fix (Vercel CRON GET, expire scope, source-of-truth) (2026-05-09)
+**Son tamamlanan iş:** G11 audit 2. tur — 5 bulgu fix (CSRF, expire scope defansif, empty list, lead-time, moq=0) (2026-05-09)
 
-**G11 audit fix (1 commit, ~10 dosya):**
-- **Fix 1 (HIGH) — Vercel CRON GET**: route sadece POST export ediyordu, Vercel Cron Jobs GET gönderiyor → production cron 405. `/api/ai/purchase-copilot`'da artık `export const GET = handler; export const POST = handler;` ikiz export. 3 yeni test (auth dosyasında).
-- **Fix 2 (HIGH) — Expire scope geniş**: `dbExpireEntityRecommendations` `recommendation_type` filtrelemiyor, level değişiminde aynı ürünün diğer rec türleri (varsa) da expire oluyordu. Helper'a opsiyonel 3. parametre eklendi; copilot route `"purchase_suggestion"` geçiyor; product delete/deactivate akışı (param geçmez) tüm tipleri expire etmeye devam.
-- **Fix 3 (MEDIUM) — Plan deviation dokümanı**: `readUrgencyLevelFromMeta` plan'daki `aiUrgencyLevel` yerine deterministik `urgencyLevel` okuyor (kasıtlı — LLM non-determinism'ten bağımsız "state değişti mi" sinyali). Açıklayıcı yorum eklendi.
-- **Fix 4 (MEDIUM) — Source-of-truth split**: AI prompt urgencyLevel kuralları coverage-based (< 7 critical, 7-14 high, > 14 moderate), `computeUrgencyLevel` ise pct-based idi. UI rozeti AI level'ı gösteriyordu → drift riski. Çözüm: `computeUrgencyLevel(coverageDays)` coverage-based oldu (eval fixtures ile uyumlu); `PurchaseSuggestionItem.urgencyLevel` zorunlu input field; AI bu seviyeyi echo eder, hesaplamaz; AI prompt'tan urgencyLevel output şeması kaldırıldı.
-- **Fix 5 (LOW/MED) — handleRefresh false-success**: AI POST 500 dönse bile yeşil "Öneriler güncellendi" toast çıkıyordu. `loadAiData` artık `Promise<boolean>` dönüyor; `handleRefresh` aiOk false ise "AI önerileri yenilenemedi — sayfa verisi güncel" hata toast'ı gösteriyor.
-- 142 dosya · 2286 test yeşil · TS clean · 0 lint hatası
+**G11 audit 2. tur (1 commit, ~10 dosya):**
+- **Fix 1 (HIGH) — GET CSRF guard**: handler GET ile çağrıldığında session-cookie kabul ediyordu → `<img src>` ile yan etki tetiklenebilirdi. Yeni: GET sadece CRON_SECRET; POST hibrit (session VEYA Bearer). `checkAuth(request, method)` imzası, `GET/POST` ayrı arrow wrapper'larla export.
+- **Fix 2 (MEDIUM defansif) — Helper status filter**: `dbExpireEntityRecommendations(id, type, recType?)` artık `recType` belirtildiyse SADECE `'suggested'` expire eder. Decided rec invariant kırılırsa bile dokunulmaz. Silme akışında (param geçmez) tüm aktif statüler korunur (regresyon yok).
+- **Fix 3 (MEDIUM) — Boş ürün listesi**: tüm ürünler stok üstüne çıkıp `needsPurchase=[]` olduğunda eski `suggested` rec'ler 48h TTL'e kadar takılı kalıyordu. Yeni `dbExpireAllSuggestedRecommendations` helper + route koşullu fallback.
+- **Fix 4 (MEDIUM) — Lead-time aware urgency**: `computeUrgencyLevel(cov, lead?)` artık `cov < lead` durumunda critical (Sprint A `computeStockRiskLevel` ile aynı semantik). Senaryo: cov=20, lead=45 → eskiden moderate, şimdi critical. `readUrgencyLevelFromMeta` backward-compat (eski rec'lerde `leadTimeDays` opsiyonel). Rec metadata'sına `leadTimeDays` field'ı yazılır.
+- **Fix 5 (MEDIUM) — moq=0 NaN/Infinity guard**: route `moq = Math.max(1, p.reorder_qty ?? p.min_stock_level)` (frontend `page.tsx:226` paterniyle aynı). `reorder_qty=NULL && min=0` durumunda `Math.ceil(needed/0)=Infinity` riski kapatıldı.
+- **Yeni 3 test dosyası (15 yeni test):** `purchase-copilot-empty-products.test.ts` (4), `purchase-copilot-moq-guard.test.ts` (6), `purchase-copilot-decided-defense.test.ts` (3). `compute-urgency-level.test.ts` lead-time kapsamıyla genişletildi (10 yeni). `purchase-copilot-auth.test.ts` Fix 1 testleri (CSRF guard).
+- 145 dosya · 2312 test yeşil · TS clean · 0 lint hatası
 
-**Önceki:** G11 — AI öneri tutarlılığı (diff-merge + 6h CRON + manuel yenile) (2026-05-09)
+**Önceki:** G11 audit 1. tur — Vercel CRON GET, expire scope, source-of-truth (2026-05-09; 2286 test)
+
+**Önceki²:** G11 — AI öneri tutarlılığı (diff-merge + 6h CRON + manuel yenile) (2026-05-09)
 
 **G11 (1 commit, ~10 dosya):**
 - **Hibrit diff-merge** (`/api/ai/purchase-copilot/route.ts`): aktif `suggested` rec'in `urgencyLevel`'ı state'le aynıysa metadata in-place refresh; değiştiyse eski rec expire + AI yeniden çağrılır. Sayısal alanlar her CRON'da güncellenir; AI metni sadece level değiştiğinde yenilenir.

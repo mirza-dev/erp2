@@ -16,6 +16,7 @@ vi.mock("@/lib/supabase/recommendations", () => ({
     dbGetRecommendationById: (...a: unknown[]) => mockDbGetRecommendationById(...a),
     dbUpdateRecommendationStatus: (...a: unknown[]) => mockDbUpdateRecommendationStatus(...a),
     dbExpireSuggestedRecommendations: vi.fn(),
+    dbExpireAllSuggestedRecommendations: vi.fn(),
     dbExpireStaleRecommendations: vi.fn(),
     dbExpireRecommendationsForMissingEntities: vi.fn(),
     dbGetActiveRecommendationsForEntities: vi.fn(),

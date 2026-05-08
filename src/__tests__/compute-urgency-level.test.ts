@@ -47,3 +47,47 @@ describe("computeUrgencyLevel (coverage-based)", () => {
         expect(computeUrgencyLevel(30)).toBe("moderate");
     });
 });
+
+describe("computeUrgencyLevel — lead-time aware (Fix 4)", () => {
+    it("cov=20, lead=45 → critical (lead-time risk: stok tedarikten kısa)", () => {
+        // Sprint A computeStockRiskLevel ile aynı semantik
+        expect(computeUrgencyLevel(20, 45)).toBe("critical");
+    });
+
+    it("cov=20, lead=14 → moderate (cov >= lead, normal threshold uygulanır)", () => {
+        expect(computeUrgencyLevel(20, 14)).toBe("moderate");
+    });
+
+    it("cov=10, lead=null → high (lead bilgisi yok, normal threshold)", () => {
+        expect(computeUrgencyLevel(10, null)).toBe("high");
+    });
+
+    it("cov=10, lead=undefined → high (default davranış)", () => {
+        expect(computeUrgencyLevel(10)).toBe("high");
+    });
+
+    it("cov=10, lead=5 → high (cov >= lead, threshold)", () => {
+        expect(computeUrgencyLevel(10, 5)).toBe("high");
+    });
+
+    it("cov=10, lead=10 → high (cov >= lead → strict less-than ile critical değil)", () => {
+        // Boundary: coverageDays < leadTimeDays kuralı strict (`<`, `<=` değil)
+        expect(computeUrgencyLevel(10, 10)).toBe("high");
+    });
+
+    it("cov=9, lead=10 → critical (cov < lead)", () => {
+        expect(computeUrgencyLevel(9, 10)).toBe("critical");
+    });
+
+    it("cov=null, lead=45 → moderate (veri eksik olduğunda lead-time risk hesaplanamaz)", () => {
+        expect(computeUrgencyLevel(null, 45)).toBe("moderate");
+    });
+
+    it("cov=20, lead=0 → moderate (lead=0 geçersiz, lead-time check pas geçilir)", () => {
+        expect(computeUrgencyLevel(20, 0)).toBe("moderate");
+    });
+
+    it("cov=5, lead=0 → critical (cov < 7, lead-time check pas, normal threshold)", () => {
+        expect(computeUrgencyLevel(5, 0)).toBe("critical");
+    });
+});

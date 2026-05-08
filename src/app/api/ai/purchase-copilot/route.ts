@@ -12,6 +12,7 @@ import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem
 import {
     dbUpsertRecommendation,
     dbExpireSuggestedRecommendations,
+    dbExpireAllSuggestedRecommendations,
     dbExpireStaleRecommendations,
     dbExpireRecommendationsForMissingEntities,
     dbExpireEntityRecommendations,
@@ -24,12 +25,20 @@ import { createClient as createServerSupabaseClient } from "@/lib/supabase/serve
 
 type UrgencyLevel = "critical" | "high" | "moderate";
 
-// G11: Hibrit auth — CRON_SECRET Bearer veya authenticated session.
+// G11: Method'a göre auth.
+//   GET  → SADECE CRON_SECRET Bearer (Vercel Cron yolu).
+//          Session-cookie'li GET kabul edilirse CSRF benzeri risk:
+//          <img src="...purchase-copilot"> ile yan etki tetiklenebilir.
+//   POST → CRON_SECRET Bearer VEYA authenticated session (UI yolu, manuel curl).
 // Middleware ALWAYS_PUBLIC listesinde olduğu için route kendi auth'unu yapar.
-async function checkAuth(request?: NextRequest): Promise<boolean> {
+function hasValidCronSecret(request: NextRequest | undefined): boolean {
     const secret = process.env.CRON_SECRET;
+    if (!secret) return false;
     const authHeader = request?.headers?.get("authorization") ?? null;
-    if (secret && authHeader === `Bearer ${secret}`) return true;
+    return authHeader === `Bearer ${secret}`;
+}
+
+async function hasAuthenticatedSession(): Promise<boolean> {
     try {
         const supabase = await createServerSupabaseClient();
         const { data: { user } } = await supabase.auth.getUser();
@@ -37,6 +46,12 @@ async function checkAuth(request?: NextRequest): Promise<boolean> {
     } catch {
         return false;
     }
+}
+
+async function checkAuth(request: NextRequest | undefined, method: "GET" | "POST"): Promise<boolean> {
+    if (hasValidCronSecret(request)) return true;
+    if (method === "GET") return false; // GET'te session kabul edilmez
+    return await hasAuthenticatedSession();
 }
 
 /**
@@ -55,14 +70,16 @@ function readUrgencyLevelFromMeta(meta: Record<string, unknown> | null | undefin
     if (!meta) return null;
     const direct = meta.urgencyLevel;
     if (direct === "critical" || direct === "high" || direct === "moderate") return direct;
-    if (typeof meta.coverageDays === "number") return computeUrgencyLevel(meta.coverageDays);
+    // Backward-compat: eski rec'lerde urgencyLevel field'ı yoksa coverageDays + leadTimeDays'ten türet
+    const lead = typeof meta.leadTimeDays === "number" ? meta.leadTimeDays : null;
+    if (typeof meta.coverageDays === "number") return computeUrgencyLevel(meta.coverageDays, lead);
     if (meta.coverageDays === null) return computeUrgencyLevel(null);
     return null;
 }
 
 // G11: Vercel Cron GET ile çağırır, UI POST ile çağırır → ikisini de destekle.
-async function handler(request?: NextRequest) {
-    if (!(await checkAuth(request))) {
+async function handler(request: NextRequest | undefined, method: "GET" | "POST") {
+    if (!(await checkAuth(request, method))) {
         return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
     }
 
@@ -97,7 +114,9 @@ async function handler(request?: NextRequest) {
     const items: PurchaseSuggestionItem[] = needsPurchase.map(p => {
         const dailyUsage = p.daily_usage ?? null;
         const leadTimeDays = p.lead_time_days ?? null;
-        const moq = p.reorder_qty ?? p.min_stock_level;
+        // Math.max(1, ...) guard — reorder_qty=NULL && min_stock_level=0 senaryosunda
+        // moq=0 olur ve Math.ceil(needed/0)=Infinity üretirdi (frontend page.tsx:226 ile aynı pattern)
+        const moq = Math.max(1, p.reorder_qty ?? p.min_stock_level);
         const { target, formula, leadTimeDemand } = computeTargetStock(p.min_stock_level, dailyUsage, leadTimeDays);
         const needed = Math.max(0, target - p.available_now);
         const suggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
@@ -121,7 +140,7 @@ async function handler(request?: NextRequest) {
             leadTimeDemand,
             preferredVendor: p.preferred_vendor ?? null,
             // G11 tek source-of-truth — AI bu seviyeyi echo eder, hesaplamaz
-            urgencyLevel: computeUrgencyLevel(coverageDays),
+            urgencyLevel: computeUrgencyLevel(coverageDays, leadTimeDays),
         };
     });
 
@@ -156,7 +175,7 @@ async function handler(request?: NextRequest) {
         const suggestedRec = suggestedRecMap.get(item.productId);
         if (suggestedRec) {
             const meta = suggestedRec.metadata as Record<string, unknown> | null;
-            const currentLevel = computeUrgencyLevel(item.coverageDays);
+            const currentLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
             const existingLevel = readUrgencyLevelFromMeta(meta);
             if (existingLevel === currentLevel) levelSameItems.push(item);
             else levelChangedItems.push(item);
@@ -180,8 +199,9 @@ async function handler(request?: NextRequest) {
             suggestQty: item.suggestQty,
             moq: item.moq,
             urgencyPct: computeUrgencyPct(item.available, item.min),
-            urgencyLevel: computeUrgencyLevel(item.coverageDays),
+            urgencyLevel: computeUrgencyLevel(item.coverageDays, item.leadTimeDays),
             coverageDays: item.coverageDays,
+            leadTimeDays: item.leadTimeDays,
             targetStock: item.targetStock,
             formula: item.formula,
         }).catch(() => undefined);
@@ -196,7 +216,7 @@ async function handler(request?: NextRequest) {
         const meta = decided.metadata as Record<string, unknown> | null;
         const frozenSuggestQty = (meta?.suggestQty as number | undefined) ?? null;
         const frozenLevel = readUrgencyLevelFromMeta(meta);
-        const currentLevel = computeUrgencyLevel(item.coverageDays);
+        const currentLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
         if (frozenSuggestQty !== item.suggestQty || frozenLevel !== currentLevel) {
             driftMap.set(item.productId, {
                 suggestQty: item.suggestQty,
@@ -319,14 +339,17 @@ async function handler(request?: NextRequest) {
     const recommendations: RecRef[] = [];
 
     try {
+        // Tüm ürünler stok üstüne çıkıp activeProductIds=[] olursa
+        // dbExpireSuggestedRecommendations no-op olur → orphan suggested'lar
+        // 48h TTL'e kadar takılı kalmaz, tek seferde temizlensin.
         const expirePromise = activeProductIds.length > 0
             ? dbExpireSuggestedRecommendations("product", activeProductIds, "purchase_suggestion")
-            : Promise.resolve(0);
+            : dbExpireAllSuggestedRecommendations("product", "purchase_suggestion");
 
         const upsertPromises = needsAiItems.map(async item => {
             const ai = freshAiMap.get(item.productId);
             const urgencyPct = computeUrgencyPct(item.available, item.min);
-            const urgencyLevel = computeUrgencyLevel(item.coverageDays);
+            const urgencyLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
             // severity (DB sütunu) urgencyPct-based; urgencyLevel'dan bağımsız bir kavram
             const severity = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
             try {
@@ -348,6 +371,7 @@ async function handler(request?: NextRequest) {
                         aiQuantityRationale: ai?.quantityRationale ?? null,
                         aiUrgencyLevel: ai?.urgencyLevel ?? null,
                         coverageDays: item.coverageDays,
+                        leadTimeDays: item.leadTimeDays,
                         targetStock: item.targetStock,
                         formula: item.formula,
                     },
@@ -407,5 +431,5 @@ async function handler(request?: NextRequest) {
     });
 }
 
-export const GET = handler;
-export const POST = handler;
+export const GET  = (req?: NextRequest) => handler(req, "GET");
+export const POST = (req?: NextRequest) => handler(req, "POST");

@@ -236,6 +236,10 @@ export async function dbExpireStaleRecommendations(
  * whose entity_id is NOT in the provided list.
  * Used when the purchase copilot regenerates — products no longer
  * below min stock should have their suggestions expired.
+ *
+ * Aktif liste boşsa no-op döner (defensive: aksi halde `.not(...in)` clause
+ * tüm rec'leri expire ederdi). "Tüm aktif suggested'ları expire et" senaryosu
+ * için `dbExpireAllSuggestedRecommendations` kullan.
  */
 export async function dbExpireSuggestedRecommendations(
     entityType: string,
@@ -252,6 +256,28 @@ export async function dbExpireSuggestedRecommendations(
         .eq("recommendation_type", recommendationType)
         .eq("status", "suggested")
         .not("entity_id", "in", `("${activeEntityIds.join('","')}")`)
+        .select("id");
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+}
+
+/**
+ * G11: Belirli (entity_type, recommendation_type) için TÜM aktif 'suggested'
+ * rec'leri expire eder. `dbExpireSuggestedRecommendations` boş aktif listesinde
+ * no-op olduğundan, bütün ürünler stok üstüne çıkıp `needsPurchase=[]` olduğunda
+ * orphan suggested'ları temizlemek için kullanılır.
+ */
+export async function dbExpireAllSuggestedRecommendations(
+    entityType: string,
+    recommendationType: RecommendationType,
+): Promise<number> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("ai_recommendations")
+        .update({ status: "expired", expired_at: new Date().toISOString() })
+        .eq("entity_type", entityType)
+        .eq("recommendation_type", recommendationType)
+        .eq("status", "suggested")
         .select("id");
     if (error) throw new Error(error.message);
     return data?.length ?? 0;
@@ -318,14 +344,13 @@ export async function dbUpdateRecommendationMetadata(
 
 /**
  * Immediately expire active recommendations for a single entity.
- * Called on product delete or deactivate so the purchase-suggested page
- * never shows ghost recommendations before the next copilot run.
  *
- * `recommendationType` opsiyonel:
- *   - omit → entity tipindeki TÜM rec'leri expire eder (silme akışı)
- *   - belirtilirse → yalnızca o tipi expire eder (G11 diff-merge gibi
- *     belirli bir tip için level değişimini handle ederken kullanılır;
- *     diğer rec türlerine zarar vermez)
+ * Status kapsamı `recommendationType`'a göre değişir:
+ *   - omit (silme akışı) → tüm tipler + tüm aktif statüler (suggested/accepted/edited/rejected).
+ *     Ürün silindi/deaktif edildi: kullanıcı kararları dahil her şey expire edilir.
+ *   - belirtildi (G11 diff-merge: level değişimi) → o tipte SADECE 'suggested' expire edilir.
+ *     Defansif: aynı entity için (invariant kırılırsa) bir decided rec varsa
+ *     yanlışlıkla expire edilmez. "Decided rec frozen" kuralı korunur.
  */
 export async function dbExpireEntityRecommendations(
     entityId: string,
@@ -337,9 +362,14 @@ export async function dbExpireEntityRecommendations(
         .from("ai_recommendations")
         .update({ status: "expired", expired_at: new Date().toISOString() })
         .eq("entity_id", entityId)
-        .eq("entity_type", entityType)
-        .in("status", ["suggested", "accepted", "edited", "rejected"]);
-    if (recommendationType) query = query.eq("recommendation_type", recommendationType);
+        .eq("entity_type", entityType);
+    if (recommendationType) {
+        query = query
+            .eq("recommendation_type", recommendationType)
+            .eq("status", "suggested");
+    } else {
+        query = query.in("status", ["suggested", "accepted", "edited", "rejected"]);
+    }
     await query;
     // error not thrown — best-effort; lazy cleanup via copilot route is the backup
 }

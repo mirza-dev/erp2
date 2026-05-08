@@ -31,6 +31,7 @@ vi.mock("@/lib/supabase/recommendations", () => ({
     dbExpireEntityRecommendations: vi.fn(() => Promise.resolve(undefined)),
     dbGetActiveRecommendationsForEntities: (...a: unknown[]) => mockDbGetActiveRecommendationsForEntities(...a),
     dbExpireSuggestedRecommendations: (...a: unknown[]) => mockDbExpireSuggestedRecommendations(...a),
+    dbExpireAllSuggestedRecommendations: vi.fn().mockResolvedValue(0),
     dbUpdateRecommendationMetadata: vi.fn(() => Promise.resolve(undefined)),
     dbUpsertRecommendation: (...a: unknown[]) => mockDbUpsertRecommendation(...a),
 }));

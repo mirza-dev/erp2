@@ -26,6 +26,7 @@ vi.mock("@/lib/supabase/recommendations", () => ({
     dbExpireRecommendationsForMissingEntities: vi.fn().mockResolvedValue(0),
     dbExpireEntityRecommendations: vi.fn().mockResolvedValue(undefined),
     dbExpireSuggestedRecommendations: vi.fn().mockResolvedValue(0),
+    dbExpireAllSuggestedRecommendations: vi.fn().mockResolvedValue(0),
     dbGetActiveRecommendationsForEntities: vi.fn().mockResolvedValue([]),
     dbUpdateRecommendationMetadata: vi.fn().mockResolvedValue(undefined),
     dbUpsertRecommendation: vi.fn().mockResolvedValue({ id: "rec-mock", status: "suggested" }),
@@ -103,8 +104,10 @@ describe("/api/ai/purchase-copilot — hybrid auth", () => {
         expect(res.status).toBe(401);
     });
 
-    // Vercel Cron GET ile çağırır → GET handler'ı POST ile aynı davranmalı
-    it("GET + Bearer CRON_SECRET → 200 (Vercel Cron path)", async () => {
+    // ─── Method-aware auth (G11 audit 2. tur Fix 1) ──────────────────────
+    // GET sadece CRON_SECRET; session-cookie'li GET CSRF benzeri risk taşıdığı için 401.
+
+    it("GET + Bearer CRON_SECRET → 200 (Vercel Cron yolu)", async () => {
         mockGetUser.mockResolvedValue({ data: { user: null } });
         const res = await GET(makeRequest("Bearer test-cron-secret"));
         expect(res.status).toBe(200);
@@ -116,8 +119,30 @@ describe("/api/ai/purchase-copilot — hybrid auth", () => {
         expect(res.status).toBe(401);
     });
 
-    it("GET ile POST aynı handler'a delegate edilir", async () => {
-        // Aynı modülden export ediliyorlar → referans aynı olmalı
-        expect(GET).toBe(POST);
+    it("GET + session (no Bearer) → 401 — CSRF guard", async () => {
+        // Authenticated kullanıcının cookie'siyle gelen GET kabul EDİLMEMELİ.
+        // <img src="...purchase-copilot"> ile yan etki tetiklenmesini engeller.
+        mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
+        const res = await GET(makeRequest(null));
+        expect(res.status).toBe(401);
+    });
+
+    it("GET + valid session + Bearer → 200 (Bearer path)", async () => {
+        // Bearer doğruysa session olsa da olmasa da geçer.
+        mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
+        const res = await GET(makeRequest("Bearer test-cron-secret"));
+        expect(res.status).toBe(200);
+    });
+
+    it("POST + session (no Bearer) → 200 (UI yolu, regresyon)", async () => {
+        mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
+        const res = await POST(makeRequest(null));
+        expect(res.status).toBe(200);
+    });
+
+    it("POST + Bearer + no session → 200 (manuel curl)", async () => {
+        mockGetUser.mockResolvedValue({ data: { user: null } });
+        const res = await POST(makeRequest("Bearer test-cron-secret"));
+        expect(res.status).toBe(200);
     });
 });

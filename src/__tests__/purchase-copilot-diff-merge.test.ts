@@ -27,6 +27,7 @@ vi.mock("@/lib/services/ai-service", () => ({
 
 const mockDbUpsertRecommendation = vi.fn();
 const mockDbExpireSuggestedRecommendations = vi.fn();
+const mockDbExpireAllSuggestedRecommendations = vi.fn();
 const mockDbExpireStaleRecommendations = vi.fn();
 const mockDbExpireRecommendationsForMissingEntities = vi.fn();
 const mockDbExpireEntityRecommendations = vi.fn();
@@ -36,6 +37,7 @@ const mockDbUpdateRecommendationMetadata = vi.fn();
 vi.mock("@/lib/supabase/recommendations", () => ({
     dbUpsertRecommendation: (...a: unknown[]) => mockDbUpsertRecommendation(...a),
     dbExpireSuggestedRecommendations: (...a: unknown[]) => mockDbExpireSuggestedRecommendations(...a),
+    dbExpireAllSuggestedRecommendations: (...a: unknown[]) => mockDbExpireAllSuggestedRecommendations(...a),
     dbExpireStaleRecommendations: (...a: unknown[]) => mockDbExpireStaleRecommendations(...a),
     dbExpireRecommendationsForMissingEntities: (...a: unknown[]) => mockDbExpireRecommendationsForMissingEntities(...a),
     dbExpireEntityRecommendations: (...a: unknown[]) => mockDbExpireEntityRecommendations(...a),
@@ -92,6 +94,8 @@ beforeEach(() => {
     mockDbUpsertRecommendation.mockResolvedValue({ id: "rec-new", status: "suggested", decided_at: null });
     mockDbExpireSuggestedRecommendations.mockReset();
     mockDbExpireSuggestedRecommendations.mockResolvedValue(0);
+    mockDbExpireAllSuggestedRecommendations.mockReset();
+    mockDbExpireAllSuggestedRecommendations.mockResolvedValue(0);
     mockDbExpireStaleRecommendations.mockReset();
     mockDbExpireStaleRecommendations.mockResolvedValue(0);
     mockDbExpireRecommendationsForMissingEntities.mockReset();
