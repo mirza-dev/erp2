@@ -39,15 +39,29 @@ async function checkAuth(request?: NextRequest): Promise<boolean> {
     }
 }
 
+/**
+ * G11 diff-merge: rec metadata'sından deterministik urgencyLevel'ı oku.
+ *
+ * Plan'dan kasıtlı sapma: plan `aiUrgencyLevel` (AI'ın subjektif yorumu) okumayı
+ * öneriyordu, biz `urgencyLevel` (coverage-based computeUrgencyLevel) okuyoruz.
+ * Sebep: diff-merge'in amacı "stok state'i değişti mi?" — AI'ın yorumu LLM
+ * non-determinism'i nedeniyle aynı state'te bile değişebilir; deterministik
+ * karşılaştırma daha güvenilir bir "değişiklik sinyali" verir.
+ *
+ * Fallback: eski rec'lerde `urgencyLevel` field'ı yoksa `coverageDays` her zaman
+ * stored — runtime'da computeUrgencyLevel ile yeniden türetilir.
+ */
 function readUrgencyLevelFromMeta(meta: Record<string, unknown> | null | undefined): UrgencyLevel | null {
     if (!meta) return null;
     const direct = meta.urgencyLevel;
     if (direct === "critical" || direct === "high" || direct === "moderate") return direct;
-    if (typeof meta.urgencyPct === "number") return computeUrgencyLevel(meta.urgencyPct);
+    if (typeof meta.coverageDays === "number") return computeUrgencyLevel(meta.coverageDays);
+    if (meta.coverageDays === null) return computeUrgencyLevel(null);
     return null;
 }
 
-export async function POST(request?: NextRequest) {
+// G11: Vercel Cron GET ile çağırır, UI POST ile çağırır → ikisini de destekle.
+async function handler(request?: NextRequest) {
     if (!(await checkAuth(request))) {
         return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
     }
@@ -106,6 +120,8 @@ export async function POST(request?: NextRequest) {
             formula,
             leadTimeDemand,
             preferredVendor: p.preferred_vendor ?? null,
+            // G11 tek source-of-truth — AI bu seviyeyi echo eder, hesaplamaz
+            urgencyLevel: computeUrgencyLevel(coverageDays),
         };
     });
 
@@ -140,7 +156,7 @@ export async function POST(request?: NextRequest) {
         const suggestedRec = suggestedRecMap.get(item.productId);
         if (suggestedRec) {
             const meta = suggestedRec.metadata as Record<string, unknown> | null;
-            const currentLevel = computeUrgencyLevel(computeUrgencyPct(item.available, item.min));
+            const currentLevel = computeUrgencyLevel(item.coverageDays);
             const existingLevel = readUrgencyLevelFromMeta(meta);
             if (existingLevel === currentLevel) levelSameItems.push(item);
             else levelChangedItems.push(item);
@@ -151,20 +167,20 @@ export async function POST(request?: NextRequest) {
         noRecItems.push(item);
     }
 
-    // Level değişen rec'leri expire et — yeni rec için unique index temizlensin
+    // Level değişen rec'leri expire et — yeni rec için unique index temizlensin.
+    // Yalnızca purchase_suggestion: aynı ürünün diğer rec türleri (varsa) korunur.
     await Promise.all(levelChangedItems.map(item =>
-        dbExpireEntityRecommendations(item.productId, "product").catch(() => undefined)
+        dbExpireEntityRecommendations(item.productId, "product", "purchase_suggestion").catch(() => undefined)
     ));
 
     // Level-aynı rec'lerin metadata'sını sayısal alanlarla güncelle (best-effort)
     await Promise.all(levelSameItems.map(item => {
         const rec = suggestedRecMap.get(item.productId)!;
-        const urgencyPct = computeUrgencyPct(item.available, item.min);
         return dbUpdateRecommendationMetadata(rec.id, {
             suggestQty: item.suggestQty,
             moq: item.moq,
-            urgencyPct,
-            urgencyLevel: computeUrgencyLevel(urgencyPct),
+            urgencyPct: computeUrgencyPct(item.available, item.min),
+            urgencyLevel: computeUrgencyLevel(item.coverageDays),
             coverageDays: item.coverageDays,
             targetStock: item.targetStock,
             formula: item.formula,
@@ -180,7 +196,7 @@ export async function POST(request?: NextRequest) {
         const meta = decided.metadata as Record<string, unknown> | null;
         const frozenSuggestQty = (meta?.suggestQty as number | undefined) ?? null;
         const frozenLevel = readUrgencyLevelFromMeta(meta);
-        const currentLevel = computeUrgencyLevel(computeUrgencyPct(item.available, item.min));
+        const currentLevel = computeUrgencyLevel(item.coverageDays);
         if (frozenSuggestQty !== item.suggestQty || frozenLevel !== currentLevel) {
             driftMap.set(item.productId, {
                 suggestQty: item.suggestQty,
@@ -310,7 +326,8 @@ export async function POST(request?: NextRequest) {
         const upsertPromises = needsAiItems.map(async item => {
             const ai = freshAiMap.get(item.productId);
             const urgencyPct = computeUrgencyPct(item.available, item.min);
-            const urgencyLevel = computeUrgencyLevel(urgencyPct);
+            const urgencyLevel = computeUrgencyLevel(item.coverageDays);
+            // severity (DB sütunu) urgencyPct-based; urgencyLevel'dan bağımsız bir kavram
             const severity = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
             try {
                 const rec = await dbUpsertRecommendation({
@@ -389,3 +406,6 @@ export async function POST(request?: NextRequest) {
         generatedAt: new Date().toISOString(),
     });
 }
+
+export const GET = handler;
+export const POST = handler;

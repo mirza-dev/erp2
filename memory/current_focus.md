@@ -5,10 +5,46 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
-**Önceki:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
+**Son:** G11 audit 1. tur KAPALI (2026-05-09; 2286 test) — Vercel CRON GET, expire scope, source-of-truth coverage-based, false-success toast
+**Önceki:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
+**Önceki²:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 1. Tur (2026-05-09) — KAPALI
+
+**Hedef:** İlk G11 commit'inden sonra dış audit 5 bulgu tespit etti. Hepsi sırayla doğrulandı + düzeltildi.
+
+**1 commit, ~10 dosya:**
+
+- **Fix 1 (HIGH) — Vercel CRON GET vs POST**: `route.ts` sadece POST export ediyordu, Vercel Cron Jobs **GET** request gönderir → production cron 405 Method Not Allowed → otomatik refresh çalışmaz. Çözüm: `async function handler(...)` rename + `export const GET = handler; export const POST = handler;`. Auth testine 3 yeni test eklendi (GET+Bearer/no-auth, GET===POST identity).
+- **Fix 2 (HIGH) — Expire scope çok geniş**: `dbExpireEntityRecommendations(entityId, entityType)` `recommendation_type` filtrelemiyordu → level değişiminde aynı ürünün diğer rec türleri (varsa: stock_risk, order_review_risk vb.) yanlışlıkla expire olabilirdi. Helper'a opsiyonel 3. parametre `recommendationType?: RecommendationType` eklendi. Copilot route artık `"purchase_suggestion"` geçiyor; product delete/deactivate akışları (`/api/products/[id]/route.ts:56,74`) parametresiz çağrıyor → tüm tipleri expire (semantik beklenti).
+- **Fix 3 (MEDIUM) — Plan deviation dokümanı**: Plan `aiUrgencyLevel` (AI subjective) okumayı söylüyordu; kod `urgencyLevel` (deterministik) okuyor. Kasıtlı sapma — LLM non-determinism aynı state'te bile farklı level üretebilir; deterministik karşılaştırma daha güvenilir "state değişti mi" sinyali. `readUrgencyLevelFromMeta` üstüne açıklayıcı yorum eklendi.
+- **Fix 4 (MEDIUM) — Source-of-truth ayrışması**: AI prompt `urgencyLevel` kuralları **coverage-based** (< 7 critical, 7-14 high, > 14 moderate); `computeUrgencyLevel(urgencyPct)` ise **pct-based** (≥80/≥50). UI rozeti `aiUrgencyLevel`'ı render ediyordu → state değişimi rozet ile diff-merge sinyali arasında drift. Çözüm:
+  - `computeUrgencyLevel(coverageDays | null)` artık coverage-based (null → moderate)
+  - `PurchaseSuggestionItem.urgencyLevel` zorunlu input field
+  - AI prompt'tan `urgencyLevel` output schema'sı çıkarıldı; `itemUrgencyMap` ile input echo'lanıyor (`ai-service.ts:944-955`)
+  - Prompt: "Bu seviyeyi yeniden hesaplama; metnin tonunu bu seviyeye göre ayarla"
+  - `readUrgencyLevelFromMeta` fallback: `coverageDays` (eski rec'lerde her zaman var, urgencyPct yerine)
+  - Eval fixtures (`purchase-fixtures.ts`) urgencyLevel input field'ı ile güncellendi
+- **Fix 5 (LOW/MED) — handleRefresh false-success**: AI POST 500 dönse bile yeşil "Öneriler güncellendi" toast çıkıyordu (yan yan sarı aiError banner ile çelişki). `loadAiData` artık `Promise<boolean>` dönüyor (success=true; ok=false ise setAiError(true) + return false). `handleRefresh` aiOk false ise "AI önerileri yenilenemedi — sayfa verisi güncel" hata toast'ı.
+
+**Test güncellemeleri:**
+- `compute-urgency-level.test.ts` — coverage-based testlere yeniden yazıldı (9 test)
+- `purchase-copilot-diff-merge.test.ts` — fixture metadata `urgencyLevel/coverageDays` field'larıyla güncellendi (mevcut testler korundu, expire helper signature 3-arg oldu)
+- `purchase-copilot-auth.test.ts` — 3 yeni GET test
+- `ai-purchase-copilot.test.ts` — `makePurchaseItem` urgencyLevel field'ı, "input urgencyLevel echo" testleri (eski "missing urgencyLevel defaults to moderate" yerine)
+- `fixtures/purchase-fixtures.ts` — 4 archetype urgencyLevel field'ı
+
+**Domain kuralı:**
+- `computeUrgencyLevel` artık coverage-based: < 7 critical, 7-14 high, > 14 / null moderate
+- `urgencyLevel` deterministik input olarak hesaplanır → AI'ye geçirilir → AI echo eder, hesaplamaz
+- Vercel Cron path'leri **hem GET hem POST** export etmeli (Vercel GET gönderir; manuel curl POST kullanır)
+- `dbExpireEntityRecommendations` 3. parametre opsiyonel: belirtilirse o tipi, aksi halde tüm tipleri expire eder
+
+**Test:** 142 dosya · 2286 test yeşil · TS clean · 0 lint hatası
 
 ---
 

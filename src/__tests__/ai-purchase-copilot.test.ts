@@ -42,6 +42,7 @@ function makePurchaseItem(overrides: Partial<PurchaseSuggestionItem> = {}): Purc
         formula: "lead_time",
         leadTimeDemand: 42,
         preferredVendor: "Vendor A",
+        urgencyLevel: "critical", // coverageDays=2 < 7 → critical
         ...overrides,
     };
 }
@@ -265,9 +266,16 @@ describe("aiEnrichPurchaseSuggestions — partial AI response", () => {
         expect(result.enrichments[0].quantityRationale).toBe("");
     });
 
-    it("missing urgencyLevel defaults to 'moderate'", async () => {
+    it("urgencyLevel input'tan echo edilir, AI çıktısı yok sayılır", async () => {
+        // G11 tek source-of-truth: AI urgencyLevel hesaplamaz, input'taki değer döner.
+        // PARTIAL_RESPONSE'da urgencyLevel yok ama input "critical" → echo "critical".
         const result = await aiEnrichPurchaseSuggestions([makePurchaseItem()]);
-        expect(result.enrichments[0].urgencyLevel).toBe("moderate");
+        expect(result.enrichments[0].urgencyLevel).toBe("critical");
+    });
+
+    it("input urgencyLevel 'high' → output 'high' (AI çıktısı override etmez)", async () => {
+        const result = await aiEnrichPurchaseSuggestions([makePurchaseItem({ urgencyLevel: "high" })]);
+        expect(result.enrichments[0].urgencyLevel).toBe("high");
     });
 
     it("missing confidence defaults to 0.5", async () => {

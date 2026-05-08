@@ -40,6 +40,7 @@ function makePurchaseItem(overrides: Partial<PurchaseSuggestionItem> = {}): Purc
         formula: "lead_time",
         leadTimeDemand: 42,
         preferredVendor: null,
+        urgencyLevel: "critical", // default — coverageDays=2 < 7
         ...overrides,
     };
 }
@@ -70,7 +71,7 @@ export const CRITICAL_PURCHASE_GOLDEN = JSON.stringify({
 });
 
 // ── HIGH_URGENCY archetype ────────────────────────────────────
-// coverageDays=10, leadTimeDays=14 — within 7-14 day window → high
+// coverageDays=10 — within 7-14 day window → high
 export const HIGH_URGENCY_PURCHASE_ITEM = makePurchaseItem({
     productId: "p-high",
     productName: "Ball Valve DN25",
@@ -80,6 +81,7 @@ export const HIGH_URGENCY_PURCHASE_ITEM = makePurchaseItem({
     coverageDays: 10,
     leadTimeDays: 14,
     suggestQty: 40,
+    urgencyLevel: "high",
 });
 
 export const HIGH_URGENCY_PURCHASE_GOLDEN = JSON.stringify({
@@ -95,7 +97,7 @@ export const HIGH_URGENCY_PURCHASE_GOLDEN = JSON.stringify({
 });
 
 // ── MODERATE archetype ────────────────────────────────────────
-// formula="fallback", dailyUsage=null — limited data → moderate
+// coverageDays=null (no data) → moderate
 export const MODERATE_PURCHASE_ITEM = makePurchaseItem({
     productId: "p-moderate",
     productName: "Check Valve DN80",
@@ -107,6 +109,7 @@ export const MODERATE_PURCHASE_ITEM = makePurchaseItem({
     formula: "fallback",
     leadTimeDemand: null,
     suggestQty: 40,
+    urgencyLevel: "moderate",
 });
 
 export const MODERATE_PURCHASE_GOLDEN = JSON.stringify({
@@ -122,7 +125,7 @@ export const MODERATE_PURCHASE_GOLDEN = JSON.stringify({
 });
 
 // ── NULL_FIELDS archetype ─────────────────────────────────────
-// dailyUsage/leadTimeDays/vendor all null — very limited data
+// dailyUsage/leadTimeDays/vendor all null — coverageDays=null → moderate
 export const NULL_FIELDS_PURCHASE_ITEM = makePurchaseItem({
     productId: "p-null",
     productName: "Globe Valve DN150",
@@ -135,6 +138,7 @@ export const NULL_FIELDS_PURCHASE_ITEM = makePurchaseItem({
     leadTimeDemand: null,
     preferredVendor: null,
     suggestQty: 40,
+    urgencyLevel: "moderate",
 });
 
 export const NULL_FIELDS_PURCHASE_GOLDEN = JSON.stringify({

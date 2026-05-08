@@ -549,14 +549,14 @@ export default function PurchaseSuggestedPage() {
         return () => ctrl.abort();
     }, []);
 
-    const loadAiData = useCallback(async (signal?: AbortSignal) => {
+    const loadAiData = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
         // Sprint C G7: demo modda AI POST yapma — middleware 403 dönüyor ve sessiz
         // yutuluyor. Önceden AI banner'ı gösterip user'ı yanıltıyordu; şimdi
         // hiç çağırmıyoruz, mavi info banner ile durum bildiriliyor.
         if (shouldSkipAiFetch(isDemo)) {
             setAiData(null);
             setAiError(false);
-            return;
+            return true;
         }
         setAiLoading(true);
         setAiError(false);
@@ -586,13 +586,16 @@ export default function PurchaseSuggestedPage() {
                     }
                     setRecMap(newMap);
                 }
+                return true;
             } else {
                 setAiError(true);
+                return false;
             }
         } catch (e) {
             if (!(e instanceof Error && e.name === "AbortError")) {
                 setAiError(true);
             }
+            return false;
         } finally {
             setAiLoading(false);
         }
@@ -613,9 +616,13 @@ export default function PurchaseSuggestedPage() {
         setRefreshing(true);
         try {
             await refetchAll();
-            await loadAiData();
+            const aiOk = await loadAiData();
             setLastRefreshed(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
-            toast({ type: "success", message: "Öneriler güncellendi" });
+            if (aiOk) {
+                toast({ type: "success", message: "Öneriler güncellendi" });
+            } else {
+                toast({ type: "error", message: "AI önerileri yenilenemedi — sayfa verisi güncel" });
+            }
         } catch {
             toast({ type: "error", message: "Yenileme başarısız" });
         } finally {

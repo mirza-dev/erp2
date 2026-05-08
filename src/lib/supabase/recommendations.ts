@@ -317,20 +317,29 @@ export async function dbUpdateRecommendationMetadata(
 }
 
 /**
- * Immediately expire all active recommendations for a single entity.
+ * Immediately expire active recommendations for a single entity.
  * Called on product delete or deactivate so the purchase-suggested page
  * never shows ghost recommendations before the next copilot run.
+ *
+ * `recommendationType` opsiyonel:
+ *   - omit → entity tipindeki TÜM rec'leri expire eder (silme akışı)
+ *   - belirtilirse → yalnızca o tipi expire eder (G11 diff-merge gibi
+ *     belirli bir tip için level değişimini handle ederken kullanılır;
+ *     diğer rec türlerine zarar vermez)
  */
 export async function dbExpireEntityRecommendations(
     entityId: string,
     entityType: string,
+    recommendationType?: RecommendationType,
 ): Promise<void> {
     const supabase = createServiceClient();
-    await supabase
+    let query = supabase
         .from("ai_recommendations")
         .update({ status: "expired", expired_at: new Date().toISOString() })
         .eq("entity_id", entityId)
         .eq("entity_type", entityType)
         .in("status", ["suggested", "accepted", "edited", "rejected"]);
+    if (recommendationType) query = query.eq("recommendation_type", recommendationType);
+    await query;
     // error not thrown — best-effort; lazy cleanup via copilot route is the backup
 }

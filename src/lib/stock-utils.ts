@@ -70,13 +70,23 @@ export function computeUrgencyPct(available: number, min: number): number {
 }
 
 /**
- * Tek source-of-truth: urgencyPct → urgencyLevel mapping.
- * Hem AI metadata.aiUrgencyLevel hem route severity hesabı bunu kullanır,
- * G11 diff-merge'de level karşılaştırması için tutarlı kalsın diye.
+ * Tek source-of-truth: stok aciliyet seviyesi (coverage-based).
+ *
+ * Hem AI metni (`aiUrgencyLevel` echo'lanır) hem G11 diff-merge level
+ * karşılaştırması bunu kullanır → AI rozeti ile diff-merge sinyali daima
+ * aynı kavramı temsil eder.
+ *
+ *   - critical: coverageDays < 7 (haftadan az stok)
+ *   - high:     coverageDays 7-14 (1-2 hafta)
+ *   - moderate: coverageDays > 14 veya null (yeterli stok / veri yok)
+ *
+ * Not: Bu, route'taki `severity` alanından (urgencyPct-based: 80/50 eşik)
+ * farklı bir kavramdır — severity rec.severity DB sütunu için kullanılır.
  */
-export function computeUrgencyLevel(urgencyPct: number): "critical" | "high" | "moderate" {
-    if (urgencyPct >= 80) return "critical";
-    if (urgencyPct >= 50) return "high";
+export function computeUrgencyLevel(coverageDays: number | null): "critical" | "high" | "moderate" {
+    if (coverageDays === null) return "moderate";
+    if (coverageDays < 7) return "critical";
+    if (coverageDays <= 14) return "high";
     return "moderate";
 }
 

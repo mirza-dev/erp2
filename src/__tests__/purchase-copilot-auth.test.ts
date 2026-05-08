@@ -36,7 +36,7 @@ vi.mock("@/lib/services/ai-service", () => ({
     aiEnrichPurchaseSuggestions: vi.fn(),
 }));
 
-import { POST } from "@/app/api/ai/purchase-copilot/route";
+import { GET, POST } from "@/app/api/ai/purchase-copilot/route";
 import type { NextRequest } from "next/server";
 
 function makeRequest(authHeader: string | null): NextRequest {
@@ -101,5 +101,23 @@ describe("/api/ai/purchase-copilot — hybrid auth", () => {
         mockGetUser.mockRejectedValue(new Error("no cookies"));
         const res = await POST(makeRequest(null));
         expect(res.status).toBe(401);
+    });
+
+    // Vercel Cron GET ile çağırır → GET handler'ı POST ile aynı davranmalı
+    it("GET + Bearer CRON_SECRET → 200 (Vercel Cron path)", async () => {
+        mockGetUser.mockResolvedValue({ data: { user: null } });
+        const res = await GET(makeRequest("Bearer test-cron-secret"));
+        expect(res.status).toBe(200);
+    });
+
+    it("GET no auth → 401", async () => {
+        mockGetUser.mockResolvedValue({ data: { user: null } });
+        const res = await GET(makeRequest(null));
+        expect(res.status).toBe(401);
+    });
+
+    it("GET ile POST aynı handler'a delegate edilir", async () => {
+        // Aynı modülden export ediliyorlar → referans aynı olmalı
+        expect(GET).toBe(POST);
     });
 });

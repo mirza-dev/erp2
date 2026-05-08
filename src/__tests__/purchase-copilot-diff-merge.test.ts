@@ -110,7 +110,7 @@ describe("G11 diff-merge — suggested rec + level same", () => {
     beforeEach(() => {
         mockIsAIAvailable.mockReturnValue(true);
         mockDbListProducts.mockResolvedValue([
-            // available=5, min=20 → urgencyPct = round((1-5/20)*100) = 75 → "high"
+            // available=5, dailyUsage=3 → coverageDays = round(5/3) = 2 → "critical" (< 7)
             makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20 }),
         ]);
         mockDbGetActiveRecommendationsForEntities.mockResolvedValue([
@@ -122,11 +122,11 @@ describe("G11 diff-merge — suggested rec + level same", () => {
                 status: "suggested",
                 metadata: {
                     suggestQty: 50,
-                    urgencyPct: 75,
-                    urgencyLevel: "high",
+                    coverageDays: 2,
+                    urgencyLevel: "critical",
                     aiWhyNow: "Önceki AI yorumu",
                     aiQuantityRationale: "Önceki rationale",
-                    aiUrgencyLevel: "high",
+                    aiUrgencyLevel: "critical",
                 },
                 confidence: 0.7,
                 decided_at: null,
@@ -142,8 +142,8 @@ describe("G11 diff-merge — suggested rec + level same", () => {
         const [recId, patch] = mockDbUpdateRecommendationMetadata.mock.calls[0];
         expect(recId).toBe("rec-1");
         expect(patch).toMatchObject({
-            urgencyLevel: "high",
-            urgencyPct: 75,
+            urgencyLevel: "critical",
+            coverageDays: 2,
         });
         expect(typeof patch.suggestQty).toBe("number");
     });
@@ -180,7 +180,7 @@ describe("G11 diff-merge — suggested rec + level changed", () => {
     beforeEach(() => {
         mockIsAIAvailable.mockReturnValue(true);
         mockDbListProducts.mockResolvedValue([
-            // available=5, min=20 → urgencyPct = 75 → "high"
+            // available=5, dailyUsage=3 → coverageDays=2 → "critical"
             makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20 }),
         ]);
         mockDbGetActiveRecommendationsForEntities.mockResolvedValue([
@@ -190,8 +190,8 @@ describe("G11 diff-merge — suggested rec + level changed", () => {
                 entity_type: "product",
                 recommendation_type: "purchase_suggestion",
                 status: "suggested",
-                // Eski metadata: critical (urgencyPct 90) → şimdi high (75) → level changed
-                metadata: { urgencyLevel: "critical", urgencyPct: 90, suggestQty: 80 },
+                // Eski metadata: high (coverage 10) → şimdi critical (coverage 2) → level changed
+                metadata: { urgencyLevel: "high", coverageDays: 10, suggestQty: 80 },
                 confidence: 0.9,
                 decided_at: null,
                 edited_metadata: null,
@@ -203,16 +203,17 @@ describe("G11 diff-merge — suggested rec + level changed", () => {
                 productId: "p-1",
                 whyNow: "Yeni AI yorumu",
                 quantityRationale: "Yeni rationale",
-                urgencyLevel: "high",
+                urgencyLevel: "critical",
                 confidence: 0.8,
             }],
             generatedAt: new Date().toISOString(),
         });
     });
 
-    it("Eski rec dbExpireEntityRecommendations ile expire edilir", async () => {
+    it("Eski rec dbExpireEntityRecommendations ile expire edilir (sadece purchase_suggestion)", async () => {
         await POST();
-        expect(mockDbExpireEntityRecommendations).toHaveBeenCalledWith("p-1", "product");
+        // Recommendation_type filtresi: aynı ürünün diğer rec türlerini koru
+        expect(mockDbExpireEntityRecommendations).toHaveBeenCalledWith("p-1", "product", "purchase_suggestion");
     });
 
     it("AI yeniden çağrılır (level değişti)", async () => {
@@ -220,11 +221,11 @@ describe("G11 diff-merge — suggested rec + level changed", () => {
         expect(mockAiEnrichPurchaseSuggestions).toHaveBeenCalledTimes(1);
     });
 
-    it("Yeni rec upsert edilir, AI metadata'sı güncel level içerir", async () => {
+    it("Yeni rec upsert edilir, metadata'sı güncel level içerir", async () => {
         await POST();
         const [input] = mockDbUpsertRecommendation.mock.calls[0];
         expect(input.entity_id).toBe("p-1");
-        expect(input.metadata.urgencyLevel).toBe("high");
+        expect(input.metadata.urgencyLevel).toBe("critical");
     });
 
     it("dbUpdateRecommendationMetadata çağrılmaz (level değişti, in-place değil)", async () => {
@@ -236,10 +237,10 @@ describe("G11 diff-merge — suggested rec + level changed", () => {
 // ─── Suggested rec metadata'da urgencyLevel eksik (eski sürüm rec) ───────────
 
 describe("G11 diff-merge — eski sürüm metadata (urgencyLevel field eksik)", () => {
-    it("metadata.urgencyPct'ten level türetilir, eşleşirse refresh", async () => {
+    it("metadata.coverageDays'ten level türetilir, eşleşirse refresh", async () => {
         mockIsAIAvailable.mockReturnValue(true);
         mockDbListProducts.mockResolvedValue([
-            makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20 }), // urgencyPct=75 → high
+            makeProduct({ id: "p-1", available_now: 5, min_stock_level: 20 }), // coverageDays=2 → critical
         ]);
         mockDbGetActiveRecommendationsForEntities.mockResolvedValue([
             {
@@ -248,7 +249,7 @@ describe("G11 diff-merge — eski sürüm metadata (urgencyLevel field eksik)", 
                 entity_type: "product",
                 recommendation_type: "purchase_suggestion",
                 status: "suggested",
-                metadata: { urgencyPct: 75 }, // urgencyLevel field yok ama urgencyPct → "high"
+                metadata: { coverageDays: 2 }, // urgencyLevel field yok ama coverageDays → "critical"
                 confidence: null,
                 decided_at: null,
                 edited_metadata: null,
@@ -256,7 +257,7 @@ describe("G11 diff-merge — eski sürüm metadata (urgencyLevel field eksik)", 
             },
         ]);
         await POST();
-        // urgencyPct=75 → derived "high" → matches → refresh path
+        // coverageDays=2 → derived "critical" → matches → refresh path
         expect(mockDbUpdateRecommendationMetadata).toHaveBeenCalledTimes(1);
         expect(mockAiEnrichPurchaseSuggestions).not.toHaveBeenCalled();
     });
@@ -282,7 +283,7 @@ describe("G11 diff-merge — eski sürüm metadata (urgencyLevel field eksik)", 
         ]);
         mockAiEnrichPurchaseSuggestions.mockResolvedValue({ enrichments: [], generatedAt: new Date().toISOString() });
         await POST();
-        // existingLevel null, currentLevel "high" → değişti → expire + AI
+        // existingLevel null, currentLevel "critical" → değişti → expire + AI
         expect(mockDbExpireEntityRecommendations).toHaveBeenCalled();
         expect(mockAiEnrichPurchaseSuggestions).toHaveBeenCalled();
     });
@@ -313,8 +314,9 @@ describe("G11 drift — decided rec'lerde state karşılaştırması", () => {
     }
 
     it("frozen suggestQty/urgencyLevel == current → currentDrift null", async () => {
-        // Şu an: available=5,min=20 → urgencyPct=75 → "high", suggestQty (target=62, needed=57, ceil/10=60) = 60
-        setupDecided({ suggestQty: 60, urgencyLevel: "high", urgencyPct: 75 });
+        // Şu an: available=5, dailyUsage=3 → coverageDays=2 → "critical"
+        // suggestQty (target=62, needed=57, ceil/10=60) = 60
+        setupDecided({ suggestQty: 60, urgencyLevel: "critical", coverageDays: 2 });
         const res = await POST();
         const body = await res.json();
         const rec = body.recommendations.find((r: { productId: string }) => r.productId === "p-1");
@@ -322,30 +324,31 @@ describe("G11 drift — decided rec'lerde state karşılaştırması", () => {
     });
 
     it("frozen suggestQty değişti → currentDrift döner", async () => {
-        setupDecided({ suggestQty: 999, urgencyLevel: "high", urgencyPct: 75 });
+        setupDecided({ suggestQty: 999, urgencyLevel: "critical", coverageDays: 2 });
         const res = await POST();
         const body = await res.json();
         const rec = body.recommendations.find((r: { productId: string }) => r.productId === "p-1");
-        expect(rec.currentDrift).toEqual({ suggestQty: 60, urgencyLevel: "high" });
+        expect(rec.currentDrift).toEqual({ suggestQty: 60, urgencyLevel: "critical" });
     });
 
     it("frozen urgencyLevel değişti → currentDrift döner", async () => {
-        setupDecided({ suggestQty: 60, urgencyLevel: "critical", urgencyPct: 90 });
+        // Frozen "high" (coverage 10), şimdi "critical" (coverage 2)
+        setupDecided({ suggestQty: 60, urgencyLevel: "high", coverageDays: 10 });
         const res = await POST();
         const body = await res.json();
         const rec = body.recommendations.find((r: { productId: string }) => r.productId === "p-1");
-        expect(rec.currentDrift).toEqual({ suggestQty: 60, urgencyLevel: "high" });
+        expect(rec.currentDrift).toEqual({ suggestQty: 60, urgencyLevel: "critical" });
     });
 
     it("Decided rec metadata frozen kalır — dbUpdateRecommendationMetadata çağrılmaz", async () => {
-        setupDecided({ suggestQty: 999, urgencyLevel: "critical", urgencyPct: 90 });
+        setupDecided({ suggestQty: 999, urgencyLevel: "high", coverageDays: 10 });
         await POST();
         expect(mockDbUpdateRecommendationMetadata).not.toHaveBeenCalled();
         expect(mockDbExpireEntityRecommendations).not.toHaveBeenCalled();
     });
 
     it("Decided rec için response status 'accepted' olarak gelir", async () => {
-        setupDecided({ suggestQty: 60, urgencyLevel: "high", urgencyPct: 75 });
+        setupDecided({ suggestQty: 60, urgencyLevel: "critical", coverageDays: 2 });
         const res = await POST();
         const body = await res.json();
         const rec = body.recommendations.find((r: { productId: string }) => r.productId === "p-1");

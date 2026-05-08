@@ -850,6 +850,12 @@ export interface PurchaseSuggestionItem {
     formula: "lead_time" | "fallback";
     leadTimeDemand: number | null;
     preferredVendor: string | null;
+    /**
+     * G11 tek source-of-truth: caller (route.ts) urgencyLevel'ı deterministik
+     * computeUrgencyLevel(urgencyPct) ile hesaplayıp geçer. AI bu seviyeyi
+     * yeniden hesaplamaz; sadece tonunu bu seviyeye göre ayarlar.
+     */
+    urgencyLevel: "critical" | "high" | "moderate";
 }
 
 export interface PurchaseEnrichment {
@@ -869,6 +875,8 @@ const PURCHASE_COPILOT_SYSTEM = `Sen endüstriyel ERP satın alma asistanısın.
 
 Görev: Verilen her ürün için neden şimdi satın alınması gerektiğini ve önerilen miktarın neden mantıklı olduğunu açıkla.
 
+Her ürünün urgencyLevel'ı (critical/high/moderate) input'ta önceden hesaplanmış olarak verilir. Bu seviyeyi yeniden hesaplama; metnin tonunu bu seviyeye göre ayarla (critical → vurgulu/aciliyetli, high → uyarıcı, moderate → ölçülü).
+
 SADECE aşağıdaki JSON formatında cevap ver, başka hiçbir şey yazma:
 {
   "enrichments": [
@@ -876,16 +884,10 @@ SADECE aşağıdaki JSON formatında cevap ver, başka hiçbir şey yazma:
       "productId": "uuid-string",
       "whyNow": "Neden şimdi satın alınması gerektiğine dair 1-2 cümle",
       "quantityRationale": "Önerilen miktarın neden mantıklı olduğuna dair 1-2 cümle",
-      "urgencyLevel": "critical|high|moderate",
       "confidence": 0.80
     }
   ]
 }
-
-urgencyLevel kuralları:
-- critical: coverageDays < 7 VEYA coverageDays < leadTimeDays
-- high: coverageDays 7-14 arasında
-- moderate: diğer durumlar (günlük kullanım verisi yoksa veya daha uzun süre varsa)
 
 confidence kuralları:
 - 0.75-0.90: dailyUsage ve leadTimeDays ikisi de varsa
@@ -941,15 +943,20 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
         if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             if (Array.isArray(parsed.enrichments)) {
-                const enrichments = parsed.enrichments.map((e: Record<string, unknown>) => ({
-                    productId: sanitizeAiOutput(typeof e.productId === "string" ? e.productId : "", 100),
-                    whyNow: sanitizeAiOutput(typeof e.whyNow === "string" ? e.whyNow : "", 500),
-                    quantityRationale: sanitizeAiOutput(typeof e.quantityRationale === "string" ? e.quantityRationale : "", 500),
-                    urgencyLevel: (e.urgencyLevel === "critical" || e.urgencyLevel === "high" || e.urgencyLevel === "moderate")
-                        ? e.urgencyLevel
-                        : "moderate",
-                    confidence: clampConfidence(e.confidence),
-                }));
+                // G11 tek source-of-truth: urgencyLevel input'tan echo edilir,
+                // AI çıktısı yeniden parse edilmez. Eski sürüm AI'ın çıktısında
+                // urgencyLevel olsa bile yok sayılır.
+                const itemUrgencyMap = new Map(items.map(i => [i.productId, i.urgencyLevel]));
+                const enrichments = parsed.enrichments.map((e: Record<string, unknown>) => {
+                    const productId = sanitizeAiOutput(typeof e.productId === "string" ? e.productId : "", 100);
+                    return {
+                        productId,
+                        whyNow: sanitizeAiOutput(typeof e.whyNow === "string" ? e.whyNow : "", 500),
+                        quantityRationale: sanitizeAiOutput(typeof e.quantityRationale === "string" ? e.quantityRationale : "", 500),
+                        urgencyLevel: itemUrgencyMap.get(productId) ?? "moderate",
+                        confidence: clampConfidence(e.confidence),
+                    };
+                });
                 const avgConf = enrichments.length > 0
                     ? enrichments.reduce((s: number, e: { confidence: number }) => s + e.confidence, 0) / enrichments.length
                     : null;
