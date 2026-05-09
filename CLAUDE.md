@@ -3,7 +3,17 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-09_
 
-**Son tamamlanan iş:** G11 audit 7. tur — 4 bulgu fix (auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper, runtime test) (2026-05-09)
+**Son tamamlanan iş:** G11 audit 8. tur — 4 bulgu fix (in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter) (2026-05-09)
+
+**G11 audit 8. tur (1 commit, ~9 dosya):**
+- **Fix 1 (HIGH) — Backend in-scope items clamp**: route `needed = max(0, target - promisable)` over-quoted ürünler için `suggestQty` şişiriyordu (UI 40, backend 50). Yeni: `stock = max(0, promisable)` + `needed = max(0, target - stock)` + `coverageDays = computeCoverageDays(stock, ...)`. Frontend `pickStock` paterniyle birebir → UI ile backend item.suggestQty eşit.
+- **Fix 2 (HIGH) — `computeUrgencyLevel` pctFallback**: `coverageDays === null` (daily_usage yoksa) durumunda her zaman `moderate` dönüyordu; severity (`urgencyPct ≥ 80`) ile çelişkili rozet/AI metni. Yeni 3. opsiyonel param `pctFallback`: cov=null durumunda ≥80 → critical, ≥50 → high, else moderate. Route tüm caller'lar `computeUrgencyPct(stock, min)` geçer; `item.urgencyLevel` zaten hesaplandığı için diğer noktalar `item.urgencyLevel`'i tek source kullanır. `readUrgencyLevelFromMeta` `meta.urgencyPct` fallback alır. `ai-service.ts` yorumu güncel.
+- **Fix 3 (MEDIUM) — Tab counts/pendingCount displayProducts üzerinden**: `tabs.count`, `manufacturedItems`/`commercialItems`, `pendingCount` `reorderSuggestions` üzerinden hesaplanıyordu → out-of-scope accepted ürünleri saymıyordu, `pendingCount` negatif çıkabiliyordu. Hepsi `displayProducts` üzerinden. `acceptedCount`/`rejectedCount` `displayIds` filtresiyle (recMap'te kalan silinmiş ürünleri sayma).
+- **Fix 4 (LOW) — Silinmiş ürün entry filter**: `productMap.has(productId)` kontrolü `outOfScopeDecidedItems` ve `decidedRefs` filter'larında → orphan cleanup henüz tetiklenmediyse bile UI'a `productName: "—"` placeholder sızmaz.
+- **Yeni 1 test dosyası (8 yeni test):** `purchase-suggested-tab-counts.test.ts`. `purchase-copilot-promisable-deep.test.ts` (+3 in-scope clamp), `compute-urgency-level.test.ts` (+9 pctFallback), `purchase-copilot-out-of-scope-decided.test.ts` (1 test güncellendi + 1 yeni "items'a girmez").
+- 155 dosya · 2432 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 7. tur — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper (2026-05-09; 2411 test)
 
 **G11 audit 7. tur (1 commit, ~7 dosya):**
 - **Fix 1 (HIGH) — Auto-reload imzası `displayProducts`'ı kapsar**: `reorderSignature` `reorderSuggestions` üzerinden hesaplanıyordu → out-of-scope decided ürünlerin stok/quote değişimi imzayı değiştirmiyordu. Yeni `signatureSource` useMemo (= `displayProducts`) hem imza hem listeleme için tek source-of-truth. Out-of-scope ürün stok değişiminde auto-reload tetiklenir, drift güncellenir.

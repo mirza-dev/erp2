@@ -169,3 +169,45 @@ describe("Bulgu 2 — tüm hesaplar promisable üzerinden", () => {
         expect(body.counts.needs_purchase).toBe(1);
     });
 });
+
+// ─── Audit 8. tur Fix 1 — over-quoted in-scope items clamp ──────────────────
+
+describe("Audit 8 Fix 1 — backend in-scope items max(0, promisable) clamp", () => {
+    it("Over-quoted in-scope (promisable=-5) → suggestQty UI ile aynı (40, eski 50)", async () => {
+        // available=10, quoted=15 → promisable=-5
+        // target = min*2 = 40 (fallback formula, dailyUsage=null)
+        // Eski: needed = max(0, 40-(-5)) = 45 → suggestQty = 50
+        // Yeni: stock=max(0,-5)=0, needed = 40 → suggestQty = 40 (UI ile aynı)
+        mockDbListAllActiveProducts.mockResolvedValue([
+            makeProduct({ available_now: 10, min_stock_level: 20, reorder_qty: 10 }),
+        ]);
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map([["p-1", 15]]));
+        const res = await POST();
+        const body = await res.json();
+        expect(body.items).toHaveLength(1);
+        expect(body.items[0].suggestQty).toBe(40);
+    });
+
+    it("Over-quoted in-scope coverageDays = 0 (negatif değil)", async () => {
+        // promisable=-5, dailyUsage=2 → stock=max(0,-5)=0 → coverageDays=0
+        mockDbListAllActiveProducts.mockResolvedValue([
+            makeProduct({ available_now: 10, min_stock_level: 20, daily_usage: 2 }),
+        ]);
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map([["p-1", 15]]));
+        const res = await POST();
+        const body = await res.json();
+        expect(body.items[0].coverageDays).toBe(0);
+    });
+
+    it("Pozitif promisable: clamp etkisi yok (regresyon)", async () => {
+        // available=50, quoted=10, min=20 → promisable=40 > min, deadline path
+        // daily_usage=null → deadline path pasif → öneriye girmez
+        mockDbListAllActiveProducts.mockResolvedValue([
+            makeProduct({ available_now: 50, min_stock_level: 20 }),
+        ]);
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map([["p-1", 10]]));
+        const res = await POST();
+        const body = await res.json();
+        expect(body.counts.needs_purchase).toBe(0);
+    });
+});

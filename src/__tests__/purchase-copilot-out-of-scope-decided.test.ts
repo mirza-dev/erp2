@@ -162,8 +162,9 @@ describe("Fix 1 — out-of-scope decided rec drift", () => {
         expect(rec.status).toBe("rejected");
     });
 
-    it("ürün silinmiş (productMap'te yok) → drift hesaplanmaz, ama rec response'a girer", async () => {
-        // productMap p-other içermiyor; decided rec p-other için → drift skip, response'a girer
+    it("Audit 8. Fix 4: ürün silinmiş → response.recommendations'a GİRMEZ", async () => {
+        // productMap p-other içermiyor; orphan cleanup henüz çalışmadıysa
+        // bile UI'da placeholder görünmesin (decidedRefs filter ile)
         mockDbListAllActiveProducts.mockResolvedValue([]);
         mockDbListRecommendations.mockResolvedValue([
             makeDecidedRec({ id: "rec-other", entity_id: "p-other" }),
@@ -172,8 +173,19 @@ describe("Fix 1 — out-of-scope decided rec drift", () => {
         const res = await POST();
         const body = await res.json();
         const rec = body.recommendations.find((r: { productId: string }) => r.productId === "p-other");
-        expect(rec).toBeDefined();
-        expect(rec.currentDrift).toBeNull(); // silinmiş ürün için drift hesaplanmaz
+        expect(rec).toBeUndefined();
+    });
+
+    it("Audit 8. Fix 4: ürün silinmiş → response.items'a GİRMEZ", async () => {
+        mockDbListAllActiveProducts.mockResolvedValue([]);
+        mockDbListRecommendations.mockResolvedValue([
+            makeDecidedRec({ id: "rec-other", entity_id: "p-other" }),
+        ]);
+
+        const res = await POST();
+        const body = await res.json();
+        const item = body.items.find((i: { productId: string }) => i.productId === "p-other");
+        expect(item).toBeUndefined();
     });
 
     it("needsPurchase + decided rec aynı anda → eski davranış (item-bazlı drift)", async () => {

@@ -91,3 +91,46 @@ describe("computeUrgencyLevel — lead-time aware (Fix 4)", () => {
         expect(computeUrgencyLevel(5, 0)).toBe("critical");
     });
 });
+
+// ─── Audit 8. tur Fix 2 — pctFallback (coverage null durumunda severity uyumu) ──
+
+describe("computeUrgencyLevel — pctFallback (Fix 2)", () => {
+    it("cov=null + pctFallback=85 → critical (eski moderate)", () => {
+        expect(computeUrgencyLevel(null, null, 85)).toBe("critical");
+    });
+
+    it("cov=null + pctFallback=80 → critical (boundary)", () => {
+        expect(computeUrgencyLevel(null, null, 80)).toBe("critical");
+    });
+
+    it("cov=null + pctFallback=60 → high", () => {
+        expect(computeUrgencyLevel(null, null, 60)).toBe("high");
+    });
+
+    it("cov=null + pctFallback=50 → high (boundary)", () => {
+        expect(computeUrgencyLevel(null, null, 50)).toBe("high");
+    });
+
+    it("cov=null + pctFallback=30 → moderate", () => {
+        expect(computeUrgencyLevel(null, null, 30)).toBe("moderate");
+    });
+
+    it("cov=null + pctFallback yok → moderate (regresyon)", () => {
+        expect(computeUrgencyLevel(null)).toBe("moderate");
+        expect(computeUrgencyLevel(null, 14)).toBe("moderate");
+    });
+
+    it("cov=10 + pctFallback=85 → high (coverage öncelikli, fallback ihmal)", () => {
+        // Coverage hesaplanabiliyorsa pctFallback yoksayılır; severity ayrı kavram
+        expect(computeUrgencyLevel(10, null, 85)).toBe("high");
+    });
+
+    it("cov=5 + pctFallback=30 → critical (coverage öncelikli)", () => {
+        expect(computeUrgencyLevel(5, null, 30)).toBe("critical");
+    });
+
+    it("Senaryo: available=0, min=20, daily_usage=null → cov=null, pct=100 → critical", () => {
+        // computeUrgencyPct(0, 20) = 100; ürün açıkça kritik ama coverage hesaplanamaz
+        expect(computeUrgencyLevel(null, null, 100)).toBe("critical");
+    });
+});

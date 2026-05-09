@@ -5,8 +5,9 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 7. tur KAPALI (2026-05-09; 2411 test) — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper, runtime test
-**Önceki:** G11 audit 6. tur KAPALI (2026-05-09; 2396 test) — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich
+**Son:** G11 audit 8. tur KAPALI (2026-05-09; 2432 test) — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter
+**Önceki:** G11 audit 7. tur KAPALI (2026-05-09; 2411 test) — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper
+**Önceki²:** G11 audit 6. tur KAPALI (2026-05-09; 2396 test) — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich
 **Önceki²:** G11 audit 5. tur KAPALI (2026-05-09; 2369 test) — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter
 **Önceki²:** G11 audit 4. tur KAPALI (2026-05-09; 2344 test) — promisable filter+hesaplar, UI full scan, auto-reload imzası
 **Önceki²:** G11 audit 3. tur KAPALI (2026-05-09; 2325 test) — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place
@@ -16,6 +17,33 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 8. Tur (2026-05-09) — KAPALI
+
+**Hedef:** 7. turdan sonra incelemeci 4 yeni bulgu çıkardı: backend in-scope clamp eksik (over-quoted suggestQty UI ile farklı), `computeUrgencyLevel` cov=null durumunda severity ile çelişiyor, tab counts displayProducts'ı yansıtmıyor, silinmiş ürün placeholder sızıntısı.
+
+**1 commit, ~9 dosya:**
+
+- **Fix 1 (HIGH) — In-scope items max(0, promisable)**: route items.map içinde `stock = max(0, promisable)` ve `needed = max(0, target - stock)`. Frontend `pickStock` paterniyle aynı clamp. UI ↔ backend `suggestQty` eşit (örn. promisable=-5, target=40, moq=10 → 40).
+- **Fix 2 (HIGH) — `computeUrgencyLevel` pctFallback**: 3. opsiyonel param. cov=null + pctFallback≥80 → critical, ≥50 → high. Route caller'ları `computeUrgencyPct(stock, min)` geçer; diff-merge/drift/buildAiMetadata `item.urgencyLevel`'i tek source kullanır. `readUrgencyLevelFromMeta` `meta.urgencyPct` fallback. `ai-service.ts` yorum güncel.
+- **Fix 3 (MEDIUM) — Tab counts displayProducts**: `tabs[i].count`, `manufacturedItems`/`commercialItems`, `pendingCount` `reorderSuggestions` yerine `displayProducts` üzerinden. `acceptedCount`/`rejectedCount` `displayIds` filter ile recMap'teki dış ürünleri saymaz. `pendingCount` artık asla negatif değil (out-of-scope accepted senaryosunda 0+).
+- **Fix 4 (LOW) — Silinmiş ürün filter**: `outOfScopeDecidedItems` ve `decidedRefs` `productMap.has(productId)` filter ile. Orphan cleanup henüz tetiklenmediyse UI'da "—" placeholder görünmez.
+
+**Test (21 yeni):**
+- `purchase-suggested-tab-counts.test.ts` (8): tab/pendingCount senaryoları (out-of-scope accepted/rejected, silinmiş ürün, edited rec)
+- `purchase-copilot-promisable-deep.test.ts` (+3): in-scope over-quoted clamp, coverageDays=0, pozitif promisable regresyon
+- `compute-urgency-level.test.ts` (+9): pctFallback boundary'ler, coverage öncelik, ai-service senaryosu
+- `purchase-copilot-out-of-scope-decided.test.ts` (1 testi update + 1 yeni): silinmiş ürün response.recommendations VE response.items'a girmez
+
+**Domain kuralı:**
+- Stock clamp (`Math.max(0, ...)`) UI ve backend tüm hesap noktalarında zorunlu invariant — over-quoted durumunda needed/coverageDays/urgency tutarlı kalır.
+- `urgencyLevel` ile `severity` farklı kavramlar olsa bile UI'a tutarlı görünmek için `coverageDays=null` durumunda `urgencyPct` fallback kullanılır.
+- React effect dependency'lerinde tek bir liste/set kavramı (displayProducts) hem render hem sayım hem imza için tek source-of-truth.
+- Mutation endpoint'leri response'unda silinmiş entity placeholder'larıyla data dönmemeli; lazy cleanup'a güvenmek UI tutarsızlığı yaratır.
+
+**Test:** 155 dosya · 2432 test yeşil · TS clean · 0 lint hatası
 
 ---
 

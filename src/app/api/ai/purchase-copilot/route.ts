@@ -71,10 +71,12 @@ function readUrgencyLevelFromMeta(meta: Record<string, unknown> | null | undefin
     if (!meta) return null;
     const direct = meta.urgencyLevel;
     if (direct === "critical" || direct === "high" || direct === "moderate") return direct;
-    // Backward-compat: eski rec'lerde urgencyLevel field'ı yoksa coverageDays + leadTimeDays'ten türet
+    // Backward-compat: eski rec'lerde urgencyLevel field'ı yoksa coverageDays + leadTimeDays'ten türet.
+    // Audit 8. tur Fix 2: urgencyPct varsa pctFallback olarak geçilir (severity uyumu).
     const lead = typeof meta.leadTimeDays === "number" ? meta.leadTimeDays : null;
-    if (typeof meta.coverageDays === "number") return computeUrgencyLevel(meta.coverageDays, lead);
-    if (meta.coverageDays === null) return computeUrgencyLevel(null);
+    const pctFb = typeof meta.urgencyPct === "number" ? meta.urgencyPct : undefined;
+    if (typeof meta.coverageDays === "number") return computeUrgencyLevel(meta.coverageDays, lead, pctFb);
+    if (meta.coverageDays === null) return computeUrgencyLevel(null, lead, pctFb);
     return null;
 }
 
@@ -135,17 +137,18 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     const items: PurchaseSuggestionItem[] = needsPurchase.map(p => {
         const dailyUsage = p.daily_usage ?? null;
         const leadTimeDays = p.lead_time_days ?? null;
-        // Audit 4. tur Bulgu 2: tüm satın alma hesapları promisable üzerinden.
-        // suggestQty/coverageDays/urgency available_now değil promisable bakar
-        // (quote'lu siparişler ayrılmış olarak).
+        // Audit 4. tur Bulgu 2 + 8. tur Fix 1: tüm satın alma hesapları
+        // promisable üzerinden ve over-quoted (negatif) durumda 0'a clamp.
+        // Frontend `pickStock` paterniyle birebir — UI ↔ backend suggestQty eşit.
         const promisable = promisableMap.get(p.id) ?? p.available_now;
+        const stock = Math.max(0, promisable);
         // Math.max(1, ...) guard — reorder_qty=NULL && min_stock_level=0 senaryosunda
         // moq=0 olur ve Math.ceil(needed/0)=Infinity üretirdi (frontend page.tsx:226 ile aynı pattern)
         const moq = Math.max(1, p.reorder_qty ?? p.min_stock_level);
         const { target, formula, leadTimeDemand } = computeTargetStock(p.min_stock_level, dailyUsage, leadTimeDays);
-        const needed = Math.max(0, target - promisable);
+        const needed = Math.max(0, target - stock);
         const suggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
-        const coverageDays = computeCoverageDays(Math.max(0, promisable), dailyUsage);
+        const coverageDays = computeCoverageDays(stock, dailyUsage);
 
         return {
             productId: p.id,
@@ -165,8 +168,13 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             formula,
             leadTimeDemand,
             preferredVendor: p.preferred_vendor ?? null,
-            // G11 tek source-of-truth — AI bu seviyeyi echo eder, hesaplamaz
-            urgencyLevel: computeUrgencyLevel(coverageDays, leadTimeDays),
+            // G11 tek source-of-truth — AI bu seviyeyi echo eder, hesaplamaz.
+            // Audit 8. tur Fix 2: coverageDays null ise pctFallback ile severity uyumlu.
+            urgencyLevel: computeUrgencyLevel(
+                coverageDays,
+                leadTimeDays,
+                computeUrgencyPct(stock, p.min_stock_level),
+            ),
         };
     });
 
@@ -233,7 +241,9 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         const suggestedRec = suggestedRecMap.get(item.productId);
         if (suggestedRec) {
             const meta = suggestedRec.metadata as Record<string, unknown> | null;
-            const currentLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
+            // Audit 8. tur Fix 2: item.urgencyLevel zaten pctFallback dahil hesaplandı —
+            // tek source-of-truth, level karşılaştırması da onu kullansın.
+            const currentLevel = item.urgencyLevel;
             const existingLevel = readUrgencyLevelFromMeta(meta);
             if (existingLevel === currentLevel) levelSameItems.push(item);
             else levelChangedItems.push(item);
@@ -258,7 +268,8 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             suggestQty: item.suggestQty,
             moq: item.moq,
             urgencyPct: computeUrgencyPct(item.available, item.min),
-            urgencyLevel: computeUrgencyLevel(item.coverageDays, item.leadTimeDays),
+            // Audit 8. tur Fix 2: item.urgencyLevel pctFallback dahil zaten hesaplandı
+            urgencyLevel: item.urgencyLevel,
             coverageDays: item.coverageDays,
             leadTimeDays: item.leadTimeDays,
             targetStock: item.targetStock,
@@ -283,7 +294,8 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
 
         if (item) {
             currentSuggestQty = item.suggestQty;
-            currentLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
+            // Audit 8. tur Fix 2: item.urgencyLevel pctFallback dahil hesaplandı
+            currentLevel = item.urgencyLevel;
         } else {
             // Out-of-scope: ürünün güncel state'inden hesapla
             const p = productMap.get(productId);
@@ -297,7 +309,12 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             const needed = Math.max(0, target - stock);
             currentSuggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
             const coverageDays = computeCoverageDays(stock, dailyUsage);
-            currentLevel = computeUrgencyLevel(coverageDays, leadTimeDays);
+            // Audit 8. tur Fix 2: out-of-scope için pctFallback geçilir (severity uyumlu)
+            currentLevel = computeUrgencyLevel(
+                coverageDays,
+                leadTimeDays,
+                computeUrgencyPct(stock, p.min_stock_level),
+            );
         }
 
         const meta = decided.metadata as Record<string, unknown> | null;
@@ -390,6 +407,9 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     const inScopeIds = new Set(items.map(i => i.productId));
     const outOfScopeDecidedItems = Array.from(decidedRecMap.entries())
         .filter(([productId]) => !inScopeIds.has(productId))
+        // Audit 8. tur Fix 4: silinmiş ürün decided rec items'a girmesin.
+        // Orphan cleanup henüz tetiklenmediyse UI'da "—" placeholder görünmesini engeller.
+        .filter(([productId]) => productMap.has(productId))
         .map(([productId, decided]) => {
             const p = productMap.get(productId);
             const meta = decided.metadata as Record<string, unknown> | null;
@@ -510,7 +530,8 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             const aiUrgencyLevel = ai?.urgencyLevel ?? fbUrgencyLevel;
 
             const urgencyPct = computeUrgencyPct(item.available, item.min);
-            const urgencyLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
+            // Audit 8. tur Fix 2: item.urgencyLevel zaten pctFallback dahil — tek source
+            const urgencyLevel = item.urgencyLevel;
             const severity: "critical" | "warning" | "info" = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
             return {
                 ai,
@@ -595,14 +616,18 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         // Decided rec'ler — frozen metadata + drift bilgisi.
         // Audit 6. tur Fix 1: items'a bağımlı değil — decidedRecMap tüm aktif
         // decided rec'leri içeriyor (out-of-scope dahil), her biri response'a girer.
-        const decidedRefs: RecRef[] = Array.from(decidedRecMap.entries()).map(([productId, rec]) => ({
-            productId,
-            recommendationId: rec.id,
-            status: rec.status,
-            decidedAt: rec.decided_at,
-            editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
-            currentDrift: driftMap.get(productId) ?? null,
-        }));
+        // Audit 8. tur Fix 4: silinmiş ürün decided rec response'a girmesin
+        // (orphan cleanup henüz tetiklenmediyse UI'da ölü kayıt görünmemeli).
+        const decidedRefs: RecRef[] = Array.from(decidedRecMap.entries())
+            .filter(([productId]) => productMap.has(productId))
+            .map(([productId, rec]) => ({
+                productId,
+                recommendationId: rec.id,
+                status: rec.status,
+                decidedAt: rec.decided_at,
+                editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
+                currentDrift: driftMap.get(productId) ?? null,
+            }));
 
         const [, upsertResults, levelChangedResults] = await Promise.all([
             expirePromise,

@@ -79,19 +79,32 @@ export function computeUrgencyPct(available: number, min: number): number {
  *   - critical: coverageDays < leadTimeDays (tedarik gelmeden stok biter)
  *               VEYA coverageDays < 7
  *   - high:     coverageDays 7-14 (1-2 hafta) [lead-time risk yoksa]
- *   - moderate: coverageDays > 14, veya coverageDays null (veri yok)
+ *   - moderate: coverageDays > 14
  *
  * Lead-time semantiği `computeStockRiskLevel` ile aynı: tedarikçi süresinden
  * kısa stok stockout demektir.
  *
- * Not: Bu, route'taki `severity` alanından (urgencyPct-based: 80/50 eşik)
- * farklı bir kavramdır — severity rec.severity DB sütunu için kullanılır.
+ * Audit 8. tur Fix 2: `coverageDays === null` (daily_usage yoksa) durumunda
+ * eskiden her zaman `moderate` dönüyordu; severity alanı (`urgencyPct >= 80
+ * → critical`) ile çelişebiliyordu. Yeni: opsiyonel `pctFallback`
+ * (`computeUrgencyPct(available, min)`) parametresi geçilirse coverage null
+ * iken pct eşikleriyle critical/high/moderate döner — severity ile uyumlu.
+ *
+ * Not: Bu, route'taki `severity` alanından farklı bir kavram — severity
+ * rec.severity DB sütunu için, urgencyLevel UI/AI rozeti için.
  */
 export function computeUrgencyLevel(
     coverageDays: number | null,
     leadTimeDays?: number | null,
+    pctFallback?: number,
 ): "critical" | "high" | "moderate" {
-    if (coverageDays === null) return "moderate";
+    if (coverageDays === null) {
+        if (pctFallback != null) {
+            if (pctFallback >= 80) return "critical";
+            if (pctFallback >= 50) return "high";
+        }
+        return "moderate";
+    }
     if (leadTimeDays != null && leadTimeDays > 0 && coverageDays < leadTimeDays) return "critical";
     if (coverageDays < 7) return "critical";
     if (coverageDays <= 14) return "high";

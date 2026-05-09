@@ -812,15 +812,17 @@ export default function PurchaseSuggestedPage() {
         }
     };
 
-    const manufacturedItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "manufactured"), [reorderSuggestions]);
-    const commercialItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "commercial"), [reorderSuggestions]);
-
     // Audit 6. tur Fix 1: out-of-scope decided ürünler — needsPurchase=false
     // ama recMap'te kararı olan (accepted/edited/rejected). Bunlar
     // reorderSuggestions'da yok → drift rozetiyle görünmek için ayrıca eklenir.
     // Audit 7. tur: signatureSource ile aynı set; imza hesaplaması ve listeleme
     // tek kavramdan türer (DRY).
     const displayProducts = signatureSource;
+
+    // Audit 8. tur Fix 3: tab/sayım displayProducts üzerinden — out-of-scope
+    // decided ürünler de sekme sayılarına ve "Tümü" toplamına yansır.
+    const manufacturedItems = useMemo(() => displayProducts.filter(p => p.productType === "manufactured"), [displayProducts]);
+    const commercialItems = useMemo(() => displayProducts.filter(p => p.productType === "commercial"), [displayProducts]);
 
     const sorted = useMemo(() => {
         const purchaseSearched = search.trim().toLowerCase();
@@ -900,16 +902,25 @@ export default function PurchaseSuggestedPage() {
         ? computeCoverageDays(pickStock(aiDrawerProduct), aiDrawerProduct.dailyUsage)
         : null;
 
+    // Audit 8. tur Fix 3: tab count'ları displayProducts (in-scope + out-of-scope) üzerinden
     const tabs: { key: FilterType; label: string; count: number }[] = [
-        { key: "all", label: "Tümü", count: reorderSuggestions.length },
+        { key: "all", label: "Tümü", count: displayProducts.length },
         { key: "manufactured", label: "İmalat", count: manufacturedItems.length },
         { key: "commercial", label: "Ticari", count: commercialItems.length },
     ];
 
     // Summary stats for decisions
-    const acceptedCount = [...recMap.values()].filter(r => r.status === "accepted").length;
-    const rejectedCount = [...recMap.values()].filter(r => r.status === "rejected").length;
-    const pendingCount = reorderSuggestions.length - acceptedCount - rejectedCount;
+    // Audit 8. tur Fix 3: acceptedCount/rejectedCount displayProducts kapsamında
+    // (recMap'te map dışında ürünler olabilir; sadece görünen ürünleri say)
+    const displayIds = useMemo(() => new Set(displayProducts.map(p => p.id)), [displayProducts]);
+    const acceptedCount = [...recMap.entries()].filter(([id, r]) => displayIds.has(id) && r.status === "accepted").length;
+    const rejectedCount = [...recMap.entries()].filter(([id, r]) => displayIds.has(id) && r.status === "rejected").length;
+    // pendingCount: displayProducts içinde recMap'te status=suggested veya status yok olanlar.
+    // Bu hesap reorderSuggestions.length - accepted - rejected formülüne göre asla negatif değil.
+    const pendingCount = displayProducts.filter(p => {
+        const st = recMap.get(p.id)?.status;
+        return !st || st === "suggested";
+    }).length;
 
     return (
         <div style={{ padding: "24px 32px" }}>

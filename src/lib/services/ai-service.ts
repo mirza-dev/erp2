@@ -852,8 +852,13 @@ export interface PurchaseSuggestionItem {
     preferredVendor: string | null;
     /**
      * G11 tek source-of-truth: caller (route.ts) urgencyLevel'ı deterministik
-     * computeUrgencyLevel(urgencyPct) ile hesaplayıp geçer. AI bu seviyeyi
-     * yeniden hesaplamaz; sadece tonunu bu seviyeye göre ayarlar.
+     * computeUrgencyLevel(coverageDays, leadTimeDays, pctFallback) ile hesaplayıp
+     * geçer (coverage-based: <7 critical, 7-14 high, >14 moderate; coverage<lead
+     * → critical; coverage null + pctFallback ≥80/50 → critical/high). AI bu
+     * seviyeyi yeniden hesaplamaz; sadece tonunu bu seviyeye göre ayarlar.
+     *
+     * Not: Route'taki `severity` (urgencyPct ≥80/50) ile farklı kavram —
+     * severity DB sütunu için, urgencyLevel UI/AI rozeti için.
      */
     urgencyLevel: "critical" | "high" | "moderate";
 }
