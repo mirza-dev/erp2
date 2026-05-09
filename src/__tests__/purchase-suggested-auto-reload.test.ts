@@ -14,21 +14,23 @@ interface ReorderProductLite {
     minStockLevel: number;
     dailyUsage: number | null;
     reserved: number;
+    quoted: number;
 }
 
 // Page.tsx'deki signature hesabını birebir taklit eden helper
+// Audit 5. tur Fix 3: quoted alanı eklendi
 function computeReorderSignature(items: ReorderProductLite[]): string {
     if (items.length === 0) return "";
     return items
-        .map(p => `${p.id}:${p.available_now}:${p.minStockLevel}:${p.dailyUsage ?? "_"}:${p.reserved}`)
+        .map(p => `${p.id}:${p.available_now}:${p.minStockLevel}:${p.dailyUsage ?? "_"}:${p.reserved}:${p.quoted}`)
         .sort()
         .join("|");
 }
 
 describe("Bulgu 4 — reorderSignature: aynı length farklı set'te değişir", () => {
     const baseSet: ReorderProductLite[] = [
-        { id: "p-1", available_now: 5, minStockLevel: 20, dailyUsage: 3, reserved: 0 },
-        { id: "p-2", available_now: 10, minStockLevel: 15, dailyUsage: 2, reserved: 5 },
+        { id: "p-1", available_now: 5, minStockLevel: 20, dailyUsage: 3, reserved: 0, quoted: 0 },
+        { id: "p-2", available_now: 10, minStockLevel: 15, dailyUsage: 2, reserved: 5, quoted: 0 },
     ];
 
     it("aynı set → aynı imza (regresyon: gereksiz fetch tetiklenmez)", () => {
@@ -39,8 +41,8 @@ describe("Bulgu 4 — reorderSignature: aynı length farklı set'te değişir", 
 
     it("aynı length, farklı productId → imza değişir (eski .length yetmiyordu)", () => {
         const swapped: ReorderProductLite[] = [
-            { id: "p-1", available_now: 5, minStockLevel: 20, dailyUsage: 3, reserved: 0 },
-            { id: "p-3", available_now: 10, minStockLevel: 15, dailyUsage: 2, reserved: 5 }, // p-2 yerine p-3
+            { id: "p-1", available_now: 5, minStockLevel: 20, dailyUsage: 3, reserved: 0, quoted: 0 },
+            { id: "p-3", available_now: 10, minStockLevel: 15, dailyUsage: 2, reserved: 5, quoted: 0 }, // p-2 yerine p-3
         ];
         expect(computeReorderSignature(baseSet)).not.toBe(computeReorderSignature(swapped));
     });
@@ -84,5 +86,43 @@ describe("Bulgu 4 — reorderSignature: aynı length farklı set'te değişir", 
     it("sıralama deterministik (sort), input order değişse aynı set aynı imza", () => {
         const reordered: ReorderProductLite[] = [baseSet[1], baseSet[0]];
         expect(computeReorderSignature(baseSet)).toBe(computeReorderSignature(reordered));
+    });
+
+    // ─── Audit 5. tur Fix 3 — quoted değişimi imzaya yansır ─────────────────
+
+    it("quoted değişimi (sipariş eklendi/iptal) → imza değişir", () => {
+        // available_now sabit kalıp quote eklendiğinde imza değişmeli;
+        // promisable=available_now-quoted değişir → AI auto-reload tetiklenmeli
+        const quoteAdded: ReorderProductLite[] = [
+            baseSet[0],
+            { ...baseSet[1], quoted: 5 }, // 0 → 5 (quote eklendi)
+        ];
+        expect(computeReorderSignature(baseSet)).not.toBe(computeReorderSignature(quoteAdded));
+    });
+
+    it("quoted ve available_now aynı anda ters yönde değişebilir → imza yine değişir", () => {
+        // available_now=10 → 8 (-2); quoted=0 → 2 (+2). Promisable değişmedi (10-0=10 vs 8-2=6 ... aslında değişti)
+        // Test: imza değişmeli çünkü hem available_now hem quoted ayrı kanallarda izleniyor
+        const both: ReorderProductLite[] = [
+            { ...baseSet[0], available_now: 8, quoted: 2 },
+            baseSet[1],
+        ];
+        expect(computeReorderSignature(baseSet)).not.toBe(computeReorderSignature(both));
+    });
+
+    it("sadece quoted değişiminde, available_now sabit → imza değişir (regresyon)", () => {
+        // Audit 5. tur: önceden imzada quoted yoktu, bu senaryo kaçıyordu
+        const quoteOnly: ReorderProductLite[] = [
+            { ...baseSet[0], quoted: 10 }, // sadece quoted 0 → 10
+            baseSet[1],
+        ];
+        expect(computeReorderSignature(baseSet)).not.toBe(computeReorderSignature(quoteOnly));
+    });
+
+    it("imzada `quoted` field'ı encoding doğru (regresyon)", () => {
+        // Imza string'i quoted içermeli; quoted=99 ile yapılı arama
+        const withQuote: ReorderProductLite[] = [{ ...baseSet[0], quoted: 99 }];
+        const sig = computeReorderSignature(withQuote);
+        expect(sig).toContain(":99"); // quoted=99 görünmeli
     });
 });

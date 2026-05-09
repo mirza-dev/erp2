@@ -359,10 +359,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         throw new Error(errBody?.error ?? "Üretim kaydedilemedi.");
       }
       // POST succeeded — refetch production and products (stock has changed)
+      // Audit 5. tur Fix 4: ?all=1 — global state ilk 100'e düşmesin
       let refetchFailed = false;
       const [prodRes, prodDataRes] = await Promise.all([
         fetch("/api/production"),
-        fetch("/api/products"),
+        fetch("/api/products?all=1"),
       ]);
       if (prodRes.ok) {
         const data = await prodRes.json();
@@ -397,9 +398,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       setUretimKayitlari((prev) => prev.filter((k) => k.id !== id));
       // Refetch products and production (stock has changed)
+      // Audit 5. tur Fix 4: ?all=1 — global state ilk 100'e düşmesin
       let refetchFailed = false;
       const [productsRes, prodRes] = await Promise.all([
-        fetch("/api/products"),
+        fetch("/api/products?all=1"),
         fetch("/api/production"),
       ]);
       if (productsRes.ok) {
@@ -504,8 +506,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       );
 
       // Refetch products for any transition that affects stock (reserved/on_hand)
+      // Audit 5. tur Fix 4: ?all=1 — global state ilk 100'e düşmesin
       if (transition === "approved" || transition === "cancelled" || transition === "shipped") {
-        const productsRes = await fetch("/api/products");
+        const productsRes = await fetch("/api/products?all=1");
         if (productsRes.ok) {
           const data = await productsRes.json();
           setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
@@ -530,10 +533,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const reorderSuggestions = useMemo(
     () =>
       products.filter((p) =>
+        // Audit 5. tur Fix 1: filter promisable üzerinden — backend
+        // (purchase-copilot route) ile aynı semantik. available_now=50,
+        // quoted=40, min=20 → promisable=10 ≤ min, öneriye girer.
         shouldSuggestReorder({
           isActive: p.isActive,
           productType: p.productType,
-          available: p.available_now,
+          available: p.promisable ?? p.available_now,
           min: p.minStockLevel,
           orderDeadline: p.orderDeadline,
         })

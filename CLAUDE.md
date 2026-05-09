@@ -3,7 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-09_
 
-**Son tamamlanan iş:** G11 audit 4. tur — 4 bulgu fix (promisable filter+hesaplar, UI full scan, set imzası) (2026-05-09)
+**Son tamamlanan iş:** G11 audit 5. tur — 5 bulgu fix (UI promisable, refetch ?all=1, signature quoted, ?all=1 filter) (2026-05-09)
+
+**G11 audit 5. tur (1 commit, ~9 dosya):**
+- **Fix 1 (HIGH) — DataContext promisable filter**: `reorderSuggestions` `shouldSuggestReorder({ available: p.available_now })` çağırıyordu → quote'lu siparişler hesaba katılmıyordu, UI öneriyi kaçırıyordu. Yeni: `available: p.promisable ?? p.available_now` — backend `purchase-copilot/route.ts:124` ile semantik eşleşme.
+- **Fix 2 (HIGH) — page.tsx tüm hesaplar promisable**: `computeSuggestion`, mobil kart, masaüstü tablo `p.available_now` kullanıyordu. UI'da gösterilen suggestQty/coverage/urgency backend'le çelişebilirdi (örn. backend 90 öneriyor, UI 10 gösteriyor). `computeSuggestion` ve yeni `computeRowStock` helper'ları artık `p.promisable ?? p.available_now` ile çalışır; ikisi de export'lu (test edilebilirlik). Mobil kart "Mevcut" sütunu + masaüstü "Stok" sütunu artık satılabilir stok (promisable) gösterir.
+- **Fix 3 (MEDIUM) — reorderSignature quoted**: imza `id:available:min:daily:reserved` idi → quote eklenince available_now sabit kalsa bile imza değişmiyordu, auto-reload kaçıyordu. Yeni: `:quoted` suffix eklendi.
+- **Fix 4 (MEDIUM) — Refetch ?all=1**: `data-context.tsx`'de 3 mutasyon path'i (uretimEkle, uretimSil, updateOrderStatus) çıplak `/api/products` çağırıyordu → 100+ ürünlü setlerde global state ilk 100'e düşüyordu. Hepsi `?all=1`'e geçirildi (ilk yükleme paterni).
+- **Fix 5 (LOW) — `?all=1` filter desteği**: `?all=1` branch erken return; `category/product_type/is_active` parse edilmiyordu. Yeni `getCachedAllProducts(category, productType, isActive)` filter-aware (cache key `["products-all-filtered"]`); `dbListProducts({...filters, pageSize: 10000})` kullanır.
+- **Yeni 4 test dosyası (25 yeni test):** `purchase-suggested-promisable-ui.test.ts` (12), `data-context-refetch-all.test.ts` (3), `data-context-reorder-promisable.test.ts` (2), `purchase-suggested-auto-reload.test.ts` quoted ekstreleri (4), `api-products-quoted.test.ts` filter-aware (4 ek + mock güncelleme).
+- 152 dosya · 2369 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 4. tur — promisable filter+hesaplar, UI full scan, set imzası (2026-05-09; 2344 test)
 
 **G11 audit 4. tur (1 commit, ~9 dosya):**
 - **Fix 1 (HIGH) — Promisable filter**: route filtresi ilk dalında `available_now <= min_stock_level` kontrol ediyordu. Senaryo: available=50, quoted=40, min=20, daily_usage=null → promisable=10 ≤ min=20 ama eski filter pas geçiyor + deadline path daily_usage=null nedeniyle pasif → öneri kaybı. Fix: filter `promisable <= min` üzerinden bakar (`purchase-service.ts:81` paterniyle aynı).

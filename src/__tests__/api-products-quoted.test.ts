@@ -259,34 +259,70 @@ describe("GET /api/products — deadline enrichment", () => {
     });
 });
 
-// ─── Audit 4. tur Bulgu 3 — ?all=1 query parametresi ─────────────────────────
+// ─── Audit 4-5. tur — ?all=1 query parametresi ────────────────────────────────
 
-describe("GET /api/products?all=1 — pagination'sız tüm aktif ürünler", () => {
-    function makeAllRequest(): NextRequest {
-        return new NextRequest("http://localhost/api/products?all=1", { method: "GET" });
+describe("GET /api/products?all=1 — pagination'sız + filter-aware", () => {
+    function makeAllRequest(qs = ""): NextRequest {
+        return new NextRequest(`http://localhost/api/products?all=1${qs}`, { method: "GET" });
     }
 
-    it("?all=1 → dbListAllActiveProducts kullanır (dbListProducts değil)", async () => {
-        mockDbListAllActiveProducts.mockResolvedValue([]);
+    it("?all=1 → dbListProducts pageSize:10000 ile çağrılır", async () => {
+        mockDbListProducts.mockResolvedValue([]);
         await GET(makeAllRequest());
-        expect(mockDbListAllActiveProducts).toHaveBeenCalledTimes(1);
-        expect(mockDbListProducts).not.toHaveBeenCalled();
+        expect(mockDbListProducts).toHaveBeenCalledTimes(1);
+        const [filter] = mockDbListProducts.mock.calls[0];
+        expect(filter.pageSize).toBe(10000);
+        expect(filter.page).toBe(1);
     });
 
-    it("?all=0 (default) → dbListProducts (paginated, eski davranış regresyon)", async () => {
+    it("?all=0 (default) → dbListProducts pageSize default (paginated, regresyon)", async () => {
         mockDbListProducts.mockResolvedValue([]);
         await GET(makeRequest());
         expect(mockDbListProducts).toHaveBeenCalledTimes(1);
-        expect(mockDbListAllActiveProducts).not.toHaveBeenCalled();
+        const [filter] = mockDbListProducts.mock.calls[0];
+        // Default pageSize helper içinde 100; ?all=1 değil
+        expect(filter.pageSize).toBeUndefined();
     });
 
-    it("?all=1 enrichment — promisable hesaplanır (paginated path ile aynı)", async () => {
+    it("?all=1 enrichment — promisable hesaplanır", async () => {
         const product = makeProduct("prod-1", 100, 0);
-        mockDbListAllActiveProducts.mockResolvedValue([product]);
+        mockDbListProducts.mockResolvedValue([product]);
         mockDbGetQuotedQuantities.mockResolvedValue(new Map([["prod-1", 30]]));
         const res = await GET(makeAllRequest());
         const data = await res.json();
         expect(data[0].quoted).toBe(30);
         expect(data[0].promisable).toBe(70);
+    });
+
+    // Audit 5. tur Fix 5: ?all=1 filter-aware
+
+    it("?all=1&category=Vana → category filter'ı dbListProducts'a geçer", async () => {
+        mockDbListProducts.mockResolvedValue([]);
+        await GET(makeAllRequest("&category=Vana"));
+        const [filter] = mockDbListProducts.mock.calls[0];
+        expect(filter.category).toBe("Vana");
+    });
+
+    it("?all=1&product_type=manufactured → product_type filter'ı geçer", async () => {
+        mockDbListProducts.mockResolvedValue([]);
+        await GET(makeAllRequest("&product_type=manufactured"));
+        const [filter] = mockDbListProducts.mock.calls[0];
+        expect(filter.product_type).toBe("manufactured");
+    });
+
+    it("?all=1&is_active=false → is_active false filter'ı geçer", async () => {
+        mockDbListProducts.mockResolvedValue([]);
+        await GET(makeAllRequest("&is_active=false"));
+        const [filter] = mockDbListProducts.mock.calls[0];
+        expect(filter.is_active).toBe(false);
+    });
+
+    it("?all=1 (filtersiz) → is_active default true, category/type undefined", async () => {
+        mockDbListProducts.mockResolvedValue([]);
+        await GET(makeAllRequest());
+        const [filter] = mockDbListProducts.mock.calls[0];
+        expect(filter.is_active).toBe(true);
+        expect(filter.category).toBeUndefined();
+        expect(filter.product_type).toBeUndefined();
     });
 });

@@ -5,14 +5,43 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 4. tur KAPALI (2026-05-09; 2344 test) — promisable filter+hesaplar, UI full scan, auto-reload imzası
-**Önceki:** G11 audit 3. tur KAPALI (2026-05-09; 2325 test) — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place
+**Son:** G11 audit 5. tur KAPALI (2026-05-09; 2369 test) — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter
+**Önceki:** G11 audit 4. tur KAPALI (2026-05-09; 2344 test) — promisable filter+hesaplar, UI full scan, auto-reload imzası
+**Önceki²:** G11 audit 3. tur KAPALI (2026-05-09; 2325 test) — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place
 **Önceki:** G11 audit 2. tur KAPALI (2026-05-09; 2312 test) — CSRF guard, defansif expire, boş list, lead-time aware, moq=0
 **Önceki²:** G11 audit 1. tur KAPALI (2026-05-09; 2286 test) — Vercel CRON GET, expire scope, SoT coverage-based, false-success toast
 **Önceki³:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 5. Tur (2026-05-09) — KAPALI
+
+**Hedef:** 4. turdan sonra incelemeci frontend tarafında 5 yeni bulgu çıkardı: UI promisable kullanmıyor, hesaplar available_now üzerinden, auto-reload imzası quoted'a duyarsız, refetch'lerin bir kısmı paginated, `?all=1` filter ignore.
+
+**1 commit, ~9 dosya:**
+
+- **Fix 1 (HIGH) — DataContext promisable**: `reorderSuggestions` `available: p.promisable ?? p.available_now` — backend filter ile semantik eşleşme. Quote'lu siparişlerle promisable<min olan ürünler artık UI listesinde de görünür.
+- **Fix 2 (HIGH) — page.tsx hesaplar**: `computeSuggestion` (target-promisable), `computeRowStock` (yeni helper: stock/urgency/daysLeft promisable bazlı). Mobil kart + masaüstü tablo "Stok" sütunu artık satılabilir stok gösterir; tooltip "Mevcut − teklif verilen" açıklaması ekledi. Backend route ile UI sayıları tutarlı.
+- **Fix 3 (MEDIUM) — reorderSignature quoted**: imzaya `:${quoted}` eklendi. Quote eklendiğinde available_now sabit kalsa bile imza değişir → AI/recMap auto-reload tetiklenir.
+- **Fix 4 (MEDIUM) — Refetch ?all=1**: 3 mutasyon path'i (uretimEkle, uretimSil, updateOrderStatus) çıplak `/api/products` yerine `/api/products?all=1` kullanır. Global state 100+ ürünlü setlerde tutarlı kalır.
+- **Fix 5 (LOW) — `?all=1` filter-aware**: `getCachedAllProducts(category, productType, isActive)` cache key filter dahil; `dbListProducts({...filters, pageSize: 10000})` ile pagination'sız çağrı. Eski `getCachedAllActiveProducts` (filter'sız) silindi.
+
+**Test (25 yeni):**
+- `purchase-suggested-promisable-ui.test.ts` (12): computeSuggestion + computeRowStock promisable senaryoları
+- `data-context-refetch-all.test.ts` (3): kaynak dosyada `?all=1` tutarlılığı
+- `data-context-reorder-promisable.test.ts` (2): `available: p.promisable ?? p.available_now` regression
+- `purchase-suggested-auto-reload.test.ts` (+4): quoted değişimi imza testleri
+- `api-products-quoted.test.ts` (+4): filter-aware ?all=1 testleri
+
+**Domain kuralı:**
+- "Promisable" hesabı UI ile backend için tek source-of-truth — DataContext, page.tsx hesapları, route'lar hep `available_now - quoted` kullanır.
+- React effect dependency'leri için stable string imzası; promisable'ı dolaylı etkileyen tüm field'ları (available_now + quoted + reserved + min + dailyUsage) dahil etmeli — aksi halde signal kaçar.
+- "?all=1" gibi pagination opt-out flag'leri her zaman diğer filtreleri korur; erken return cache key/filter parse'i atlamamalı.
+
+**Test:** 152 dosya · 2369 test yeşil · TS clean · 0 lint hatası
 
 ---
 

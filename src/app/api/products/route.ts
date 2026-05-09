@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbListProducts, dbListAllActiveProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
+import { dbListProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
 import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
@@ -57,34 +57,42 @@ const getCachedProducts = unstable_cache(
     { tags: ["products"], revalidate: 30 }
 );
 
-// Audit 4. tur Bulgu 3: DataContext (UI global state) tüm aktif ürünleri çekiyor.
-// /api/products?all=1 → pagination'sız full active list. Kategorik filtreler
-// client-side uygulanır. Cache key ayrı tutulur (paginated cache'le karışmasın).
-const getCachedAllActiveProducts = unstable_cache(
-    async () => {
+// Audit 4-5. tur: DataContext (UI global state) için tüm filtrelenmiş ürünleri
+// pagination'sız çek. /api/products?all=1 → category/product_type/is_active
+// query parametreleri normal endpoint'le aynı şekilde uygulanır; sadece
+// pagination devre dışı (pageSize: 10000). Cache key filter-aware.
+const getCachedAllProducts = unstable_cache(
+    async (category: string, productType: string, isActive: boolean) => {
         const [products, quotedMap, incomingMap] = await Promise.all([
-            dbListAllActiveProducts(),
+            dbListProducts({
+                category: category || undefined,
+                product_type: (productType || undefined) as "manufactured" | "commercial" | undefined,
+                is_active: isActive,
+                page: 1,
+                pageSize: 10000,
+            }),
             dbGetQuotedQuantities(),
             dbGetIncomingQuantities(),
         ]);
         return enrichProducts(products, quotedMap, incomingMap);
     },
-    ["products-all-active"],
+    ["products-all-filtered"],
     { tags: ["products"], revalidate: 30 }
 );
 
 // GET /api/products?category=xxx&product_type=manufactured&is_active=false&page=1
-// GET /api/products?all=1 — pagination'sız tüm aktif ürünler (UI global state için)
+// GET /api/products?all=1[&category=...&product_type=...&is_active=false]
+//   → pagination'sız aktif filtrelerle ürünler (UI global state için)
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
-        if (searchParams.get("all") === "1") {
-            const enriched = await getCachedAllActiveProducts();
-            return NextResponse.json(enriched);
-        }
         const category = searchParams.get("category") ?? "";
         const productType = searchParams.get("product_type") ?? "";
         const isActive = searchParams.get("is_active") !== "false";
+        if (searchParams.get("all") === "1") {
+            const enriched = await getCachedAllProducts(category, productType, isActive);
+            return NextResponse.json(enriched);
+        }
         const page = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
         const enriched = await getCachedProducts(category, productType, isActive, page);
         return NextResponse.json(enriched);

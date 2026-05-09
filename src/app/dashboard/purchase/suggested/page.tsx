@@ -218,15 +218,40 @@ function useIsMobile(breakpoint = 768): boolean {
 
 type DecisionFilter = "all" | "pending" | "accepted" | "rejected";
 
-/** Compute suggestion for a single product row */
-function computeSuggestion(p: Product) {
+/**
+ * Compute suggestion for a single product row.
+ *
+ * Audit 5. tur Fix 2: hesap promisable (= available_now - quoted) üzerinden.
+ * Backend purchase-copilot route'uyla aynı semantik:
+ *   needed = max(0, target - promisable)
+ * Quote'lu siparişler ayrılmış olarak — UI sayısı backend metadata.suggestQty
+ * ile tutarlı kalır.
+ */
+export function computeSuggestion(p: Product) {
     const { target, formula, leadTimeDemand } = computeTargetStock(
         p.minStockLevel, p.dailyUsage ?? null, p.leadTimeDays ?? null
     );
     const moq = Math.max(1, p.reorderQty ?? p.minStockLevel);
-    const needed = Math.max(0, target - p.available_now);
+    const stock = p.promisable ?? p.available_now;
+    const needed = Math.max(0, target - stock);
     const suggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
     return { suggestQty, target, formula, leadTimeDemand, moq };
+}
+
+/**
+ * Audit 5. tur Fix 2: row-level UI hesapları için promisable bazlı stok değeri.
+ * Mobil kart + masaüstü tablo bunu kullanır → urgency/coverage/stok rozeti
+ * UI ile backend tutarlı olur.
+ */
+export function computeRowStock(p: Product): {
+    stock: number;
+    urgency: number;
+    daysLeft: number | null;
+} {
+    const stock = p.promisable ?? p.available_now;
+    const urgency = p.minStockLevel > 0 ? Math.round((1 - stock / p.minStockLevel) * 100) : 100;
+    const daysLeft = computeCoverageDays(stock, p.dailyUsage);
+    return { stock, urgency, daysLeft };
 }
 
 /** Formula label for UI display */
@@ -601,14 +626,16 @@ export default function PurchaseSuggestedPage() {
         }
     }, [isDemo]);
 
-    // Audit 4. tur Bulgu 4: reorderSuggestions.length yerine set imzası.
-    // Aynı sayıda ama farklı ürün setleri (örn. p-1 satıldı + p-2 stoğu düştü)
-    // veya aynı ürünlerde stok/quote değişimi → AI/recMap otomatik yenilensin.
-    // Imza: productId + available_now + min + dailyUsage + reserved hash'i.
+    // Audit 4-5. tur: reorderSuggestions.length yerine set imzası.
+    // Aynı sayıda ama farklı ürün setleri veya stok/quote değişimi →
+    // AI/recMap otomatik yenilensin.
+    // Imza alanları: productId + available_now + min + dailyUsage + reserved + quoted
+    // (Audit 5. tur Fix 3: quoted eklendi — quote artarsa available_now sabit kalsa
+    // bile imza değişir, çünkü promisable=available_now-quoted değişti).
     const reorderSignature = useMemo(() => {
         if (reorderSuggestions.length === 0) return "";
         return reorderSuggestions
-            .map(p => `${p.id}:${p.available_now}:${p.minStockLevel}:${p.dailyUsage ?? "_"}:${p.reserved}`)
+            .map(p => `${p.id}:${p.available_now}:${p.minStockLevel}:${p.dailyUsage ?? "_"}:${p.reserved}:${p.quoted}`)
             .sort()
             .join("|");
     }, [reorderSuggestions]);
@@ -1161,8 +1188,8 @@ export default function PurchaseSuggestedPage() {
                 /* Mobile card layout */
                 <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
                     {sorted.map(p => {
-                        const urgency = p.minStockLevel > 0 ? Math.round((1 - p.available_now / p.minStockLevel) * 100) : 100;
-                        const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
+                        // Audit 5. tur Fix 2: stok = promisable, backend uyumlu
+                        const { stock, urgency, daysLeft } = computeRowStock(p);
                         const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
                         const recEntry = recMap.get(p.id);
                         const isRejected = recEntry?.status === "rejected";
@@ -1217,9 +1244,9 @@ export default function PurchaseSuggestedPage() {
 
                                 {/* Stock details */}
                                 <div style={{ display: "flex", gap: "16px", marginTop: "10px", flexWrap: "wrap" }}>
-                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                    <div style={{ fontSize: "12px", color: "var(--text-secondary)" }} title="Satılabilir stok = Mevcut − teklif verilen">
                                         <span style={{ color: "var(--text-tertiary)" }}>Mevcut:</span>{" "}
-                                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{p.available_now.toLocaleString("tr-TR")}</span>
+                                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{stock.toLocaleString("tr-TR")}</span>
                                     </div>
                                     <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                                         <span style={{ color: "var(--text-tertiary)" }}>Min:</span>{" "}
@@ -1316,9 +1343,11 @@ export default function PurchaseSuggestedPage() {
                         </thead>
                         <tbody>
                             {sorted.map((p, idx) => {
-                                const urgency = p.minStockLevel > 0 ? Math.round((1 - p.available_now / p.minStockLevel) * 100) : 100;
-                                const stockPct = Math.min(100, Math.round((p.available_now / p.minStockLevel) * 100));
-                                const daysLeft = computeCoverageDays(p.available_now, p.dailyUsage);
+                                // Audit 5. tur Fix 2: tüm satır hesapları promisable üzerinden
+                                const { stock, urgency, daysLeft } = computeRowStock(p);
+                                const stockPct = p.minStockLevel > 0
+                                    ? Math.min(100, Math.round((stock / p.minStockLevel) * 100))
+                                    : 100;
                                 const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
                                 const recEntry = recMap.get(p.id);
                                 const isRejected = recEntry?.status === "rejected";
@@ -1360,10 +1389,10 @@ export default function PurchaseSuggestedPage() {
                                         <td style={{ padding: "10px 12px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                                             {p.warehouse}
                                         </td>
-                                        {/* Stok */}
-                                        <td style={{ padding: "10px 12px" }}>
+                                        {/* Stok (satılabilir = mevcut − teklif verilen) */}
+                                        <td style={{ padding: "10px 12px" }} title="Satılabilir stok = Mevcut − teklif verilen miktar">
                                             <div style={{ fontSize: "13px", color: "var(--text-primary)", fontWeight: 500 }}>
-                                                {p.available_now.toLocaleString("tr-TR")}
+                                                {stock.toLocaleString("tr-TR")}
                                             </div>
                                             <div style={{
                                                 width: "72px",
