@@ -5,13 +5,39 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 3. tur KAPALI (2026-05-09; 2325 test) — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place
+**Son:** G11 audit 4. tur KAPALI (2026-05-09; 2344 test) — promisable filter+hesaplar, UI full scan, auto-reload imzası
+**Önceki:** G11 audit 3. tur KAPALI (2026-05-09; 2325 test) — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place
 **Önceki:** G11 audit 2. tur KAPALI (2026-05-09; 2312 test) — CSRF guard, defansif expire, boş list, lead-time aware, moq=0
 **Önceki²:** G11 audit 1. tur KAPALI (2026-05-09; 2286 test) — Vercel CRON GET, expire scope, SoT coverage-based, false-success toast
 **Önceki³:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 4. Tur (2026-05-09) — KAPALI
+
+**Hedef:** 3. turdan sonra incelemeci 4 yeni bulgu çıkardı: promisable hesabı yarım kalmış (sadece filter'ın 2. dalında kullanılıyor), UI tüm aktif ürünleri çekmiyor, auto-reload sınırlı.
+
+**1 commit, ~9 dosya:**
+
+- **Fix 1 (HIGH) — Promisable filter ilk dalı**: route'ta `if (available_now <= min) return true` quote'tan bağımsız. available=50/quoted=40/min=20 → eski: pas (50>20), yeni: promisable=10≤20 → öneri. Filter `purchase-service.ts:81` ile hizalandı.
+- **Fix 2 (HIGH) — Tüm hesaplar promisable**: items.map içindeki `suggestQty` hesabı `target - p.available_now`, `coverageDays` `p.available_now`, response.available `p.available_now`, urgencyPct/severity `item.available` üzerinden — hepsi promisable'a geçirildi. `item.available = promisable` set edildi → urgencyPct/severity zincirini de otomatik düzeltti.
+- **Fix 3 (MEDIUM) — UI full active list**: `/api/products?all=1` opt-in flag — `dbListAllActiveProducts` çağırır, ayrı cache key. DataContext `?all=1` kullanır. 100+ ürünlü production setlerinde UI'da gizli kalan ürünler artık görünür.
+- **Fix 4 (MEDIUM/LOW) — Auto-reload imzası**: `reorderSignature = sort(map(p => id:available:min:daily:reserved)).join("|")` useMemo. useEffect dep'i bu imza → set/state değişiminde otomatik AI/recMap fetch.
+
+**Test (19 yeni):**
+- `purchase-copilot-promisable-deep.test.ts` (8): filter promisable bazlı 3 senaryo + tüm hesaplar promisable 5 senaryo
+- `purchase-suggested-auto-reload.test.ts` (8): signature stable/değişen/boundary
+- `api-products-quoted.test.ts` (+3): `?all=1` flag, default regresyon, enrichment
+
+**Domain kuralı:**
+- "Promisable" hesabı domain genelinde tek kavram: alert servisi, purchase servisi, AI route, UI hep `available_now - quoted` kullanır. Filter eşiği de promisable bazlı (available_now değil).
+- Background CRON ile global UI state aynı set'i kapsamalı: cron tüm aktif ürünleri tarıyorsa UI'nın da pagination'sız fetch yapması gerekir, aksi halde rec ile UI sapması olur.
+- React effect dependency'leri primitif `length`'le sınırlı tutulmamalı: aynı kardinalitedeki içerik değişimleri kaçar. Stable string imzası deterministik signal sağlar.
+
+**Test:** 149 dosya · 2344 test yeşil · TS clean · 0 lint hatası
 
 ---
 

@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-09_
 
-**Son tamamlanan iş:** G11 audit 3. tur — 5 bulgu fix (promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place) (2026-05-09)
+**Son tamamlanan iş:** G11 audit 4. tur — 4 bulgu fix (promisable filter+hesaplar, UI full scan, set imzası) (2026-05-09)
+
+**G11 audit 4. tur (1 commit, ~9 dosya):**
+- **Fix 1 (HIGH) — Promisable filter**: route filtresi ilk dalında `available_now <= min_stock_level` kontrol ediyordu. Senaryo: available=50, quoted=40, min=20, daily_usage=null → promisable=10 ≤ min=20 ama eski filter pas geçiyor + deadline path daily_usage=null nedeniyle pasif → öneri kaybı. Fix: filter `promisable <= min` üzerinden bakar (`purchase-service.ts:81` paterniyle aynı).
+- **Fix 2 (HIGH) — Promisable tüm hesaplara**: `suggestQty`, `coverageDays`, `available` (response'a), `urgencyPct`, `urgencyLevel` hâlâ `p.available_now` üzerindendi → quote'lu siparişlerde miktar yanlıştı (örn. 100 stok / 80 quoted / 110 target → eski 10 açık göziyor, gerçek 90). Fix: tüm hesaplar promisable; `item.available` artık promisable (UI'da "Stok" sütunu satılabilir miktarı gösterir).
+- **Fix 3 (MEDIUM) — UI full active list**: `/api/products` default page=1+pageSize=100; DataContext sadece ilk 100 ürünü çekiyordu. Cron full scan, UI 100 sınırlı → 100+ ürünlü setlerde sayfa eksik gösteriyordu. `/api/products?all=1` opt-in eklendi (`dbListAllActiveProducts`, ayrı cache key); DataContext bu flag'i kullanıyor.
+- **Fix 4 (MEDIUM/LOW) — Auto-reload set imzası**: `useEffect` dependency `reorderSuggestions.length` idi; aynı sayıda farklı ürün seti veya stok/quote değişimi auto-fetch tetiklemiyordu. Yeni: `reorderSignature = sort(map(p => id:available:min:daily:reserved)).join("|")` — değişen her şey effect'i tetikler.
+- 149 dosya · 2344 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 3. tur — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place (2026-05-09; 2325 test)
 
 **G11 audit 3. tur (1 commit, ~13 dosya):**
 - **Fix 1 (HIGH) — Promisable hesabı**: route ham `dbListProducts` çağırıp `p.promisable ?? p.available_now` fallback kullanıyordu; helper promisable üretmiyor → quote'lu siparişler hiç dikkate alınmıyordu. Yeni: `dbListAllActiveProducts` + `dbGetQuotedQuantities` paralel; `promisable = available_now - quoted` UI ile aynı semantikte.

@@ -158,7 +158,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const [productsRes, customersRes, ordersRes, productionRes, alertsRes] =
         await Promise.all([
-          fetch("/api/products"),
+          // Audit 4. tur Bulgu 3: ?all=1 → pagination'sız tüm aktif ürünler.
+          // Önceden default page=1 (100 ürün); 100+ ürün setlerinde UI'da
+          // gösterilmeyen ürünler için cron rec üretirken purchase/suggested
+          // sayfası onları listelemiyordu.
+          fetch("/api/products?all=1"),
           fetch("/api/customers"),
           fetch("/api/orders"),
           fetch("/api/production"),

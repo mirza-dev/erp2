@@ -13,10 +13,13 @@ const mockDbListProducts = vi.fn();
 const mockDbGetQuotedQuantities = vi.fn();
 const mockDbGetIncomingQuantities = vi.fn();
 
+const mockDbListAllActiveProducts = vi.fn();
+
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts:        (...args: unknown[]) => mockDbListProducts(...args),
-    dbCreateProduct:       vi.fn(),
-    dbGetQuotedQuantities: (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
+    dbListProducts:           (...args: unknown[]) => mockDbListProducts(...args),
+    dbListAllActiveProducts:  (...args: unknown[]) => mockDbListAllActiveProducts(...args),
+    dbCreateProduct:          vi.fn(),
+    dbGetQuotedQuantities:    (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
 }));
 
 vi.mock("@/lib/supabase/purchase-commitments", () => ({
@@ -79,6 +82,7 @@ function makeProduct(id: string, on_hand: number, reserved: number) {
 beforeEach(() => {
     vi.clearAllMocks();
     mockDbListProducts.mockResolvedValue([]);
+    mockDbListAllActiveProducts.mockResolvedValue([]);
     mockDbGetQuotedQuantities.mockResolvedValue(new Map());
     mockDbGetIncomingQuantities.mockResolvedValue(new Map());
 });
@@ -252,5 +256,37 @@ describe("GET /api/products — deadline enrichment", () => {
         const [row] = await (await GET(makeRequest())).json();
         expect(row.stockoutDate).not.toBeNull();
         expect(row.orderDeadline).not.toBeNull();
+    });
+});
+
+// ─── Audit 4. tur Bulgu 3 — ?all=1 query parametresi ─────────────────────────
+
+describe("GET /api/products?all=1 — pagination'sız tüm aktif ürünler", () => {
+    function makeAllRequest(): NextRequest {
+        return new NextRequest("http://localhost/api/products?all=1", { method: "GET" });
+    }
+
+    it("?all=1 → dbListAllActiveProducts kullanır (dbListProducts değil)", async () => {
+        mockDbListAllActiveProducts.mockResolvedValue([]);
+        await GET(makeAllRequest());
+        expect(mockDbListAllActiveProducts).toHaveBeenCalledTimes(1);
+        expect(mockDbListProducts).not.toHaveBeenCalled();
+    });
+
+    it("?all=0 (default) → dbListProducts (paginated, eski davranış regresyon)", async () => {
+        mockDbListProducts.mockResolvedValue([]);
+        await GET(makeRequest());
+        expect(mockDbListProducts).toHaveBeenCalledTimes(1);
+        expect(mockDbListAllActiveProducts).not.toHaveBeenCalled();
+    });
+
+    it("?all=1 enrichment — promisable hesaplanır (paginated path ile aynı)", async () => {
+        const product = makeProduct("prod-1", 100, 0);
+        mockDbListAllActiveProducts.mockResolvedValue([product]);
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map([["prod-1", 30]]));
+        const res = await GET(makeAllRequest());
+        const data = await res.json();
+        expect(data[0].quoted).toBe(30);
+        expect(data[0].promisable).toBe(70);
     });
 });

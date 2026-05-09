@@ -601,12 +601,24 @@ export default function PurchaseSuggestedPage() {
         }
     }, [isDemo]);
 
+    // Audit 4. tur Bulgu 4: reorderSuggestions.length yerine set imzası.
+    // Aynı sayıda ama farklı ürün setleri (örn. p-1 satıldı + p-2 stoğu düştü)
+    // veya aynı ürünlerde stok/quote değişimi → AI/recMap otomatik yenilensin.
+    // Imza: productId + available_now + min + dailyUsage + reserved hash'i.
+    const reorderSignature = useMemo(() => {
+        if (reorderSuggestions.length === 0) return "";
+        return reorderSuggestions
+            .map(p => `${p.id}:${p.available_now}:${p.minStockLevel}:${p.dailyUsage ?? "_"}:${p.reserved}`)
+            .sort()
+            .join("|");
+    }, [reorderSuggestions]);
+
     useEffect(() => {
-        if (reorderSuggestions.length === 0) return;
+        if (!reorderSignature) return;
         const controller = new AbortController();
         loadAiData(controller.signal);
         return () => controller.abort();
-    }, [reorderSuggestions.length, loadAiData]);
+    }, [reorderSignature, loadAiData]);
 
     useEffect(() => () => clearTimeout(refetchTimerRef.current), []);
 

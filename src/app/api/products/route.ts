@@ -1,10 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbListProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
+import { dbListProducts, dbListAllActiveProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
 import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 import { computeOrderDeadline } from "@/lib/stock-utils";
 import { unstable_cache, revalidateTag } from "next/cache";
+
+type EnrichedProduct = Awaited<ReturnType<typeof dbListProducts>>[number] & {
+    quoted: number;
+    promisable: number;
+    incoming: number;
+    forecasted: number;
+    stockoutDate: string | null;
+    orderDeadline: string | null;
+};
+
+function enrichProducts(
+    products: Awaited<ReturnType<typeof dbListProducts>>,
+    quotedMap: Map<string, number>,
+    incomingMap: Map<string, number>,
+): EnrichedProduct[] {
+    return products.map(p => {
+        const quoted   = quotedMap.get(p.id)   ?? 0;
+        const incoming = incomingMap.get(p.id) ?? 0;
+        const promisable = p.available_now - quoted;
+        const { stockoutDate, orderDeadline } = computeOrderDeadline(
+            promisable, p.daily_usage, p.lead_time_days
+        );
+        return {
+            ...p,
+            quoted,
+            promisable,
+            incoming,
+            forecasted: p.available_now + incoming - quoted,
+            stockoutDate,
+            orderDeadline,
+        };
+    });
+}
 
 const getCachedProducts = unstable_cache(
     async (category: string, productType: string, isActive: boolean, page: number) => {
@@ -18,32 +51,37 @@ const getCachedProducts = unstable_cache(
             dbGetQuotedQuantities(),
             dbGetIncomingQuantities(),
         ]);
-        return products.map(p => {
-            const quoted   = quotedMap.get(p.id)   ?? 0;
-            const incoming = incomingMap.get(p.id) ?? 0;
-            const promisable = p.available_now - quoted;
-            const { stockoutDate, orderDeadline } = computeOrderDeadline(
-                promisable, p.daily_usage, p.lead_time_days
-            );
-            return {
-                ...p,
-                quoted,
-                promisable,
-                incoming,
-                forecasted: p.available_now + incoming - quoted,
-                stockoutDate,
-                orderDeadline,
-            };
-        });
+        return enrichProducts(products, quotedMap, incomingMap);
     },
     ["products-list"],
     { tags: ["products"], revalidate: 30 }
 );
 
+// Audit 4. tur Bulgu 3: DataContext (UI global state) tüm aktif ürünleri çekiyor.
+// /api/products?all=1 → pagination'sız full active list. Kategorik filtreler
+// client-side uygulanır. Cache key ayrı tutulur (paginated cache'le karışmasın).
+const getCachedAllActiveProducts = unstable_cache(
+    async () => {
+        const [products, quotedMap, incomingMap] = await Promise.all([
+            dbListAllActiveProducts(),
+            dbGetQuotedQuantities(),
+            dbGetIncomingQuantities(),
+        ]);
+        return enrichProducts(products, quotedMap, incomingMap);
+    },
+    ["products-all-active"],
+    { tags: ["products"], revalidate: 30 }
+);
+
 // GET /api/products?category=xxx&product_type=manufactured&is_active=false&page=1
+// GET /api/products?all=1 — pagination'sız tüm aktif ürünler (UI global state için)
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
+        if (searchParams.get("all") === "1") {
+            const enriched = await getCachedAllActiveProducts();
+            return NextResponse.json(enriched);
+        }
         const category = searchParams.get("category") ?? "";
         const productType = searchParams.get("product_type") ?? "";
         const isActive = searchParams.get("is_active") !== "false";

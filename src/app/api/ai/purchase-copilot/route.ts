@@ -112,15 +112,18 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     } catch { /* non-fatal */ }
 
     const REORDER_DEADLINE_WINDOW_DAYS = 7;
-    // Audit 3. tur Fix 1: promisable = available_now - quoted (UI ile aynı).
+    // Audit 3-4. tur Fix 1: promisable = available_now - quoted (UI ile aynı).
+    // Domain'in tek hesabı; alert/satınalma servisleriyle uyumlu.
     const promisableMap = new Map<string, number>();
     for (const p of products) {
         promisableMap.set(p.id, p.available_now - (quotedMap.get(p.id) ?? 0));
     }
     const needsPurchase = products.filter(p => {
         if (p.product_type === "manufactured") return false;
-        if (p.available_now <= p.min_stock_level) return true;
         const promisable = promisableMap.get(p.id) ?? p.available_now;
+        // Audit 4. tur Bulgu 1: ilk eşik available_now değil promisable olmalı.
+        // available_now=50, quoted=40, min=20 → promisable=10 < min=20 → öneri.
+        if (promisable <= p.min_stock_level) return true;
         const { orderDeadline } = computeOrderDeadline(promisable, p.daily_usage, p.lead_time_days);
         return !!(orderDeadline && dateDaysFromToday(orderDeadline) <= REORDER_DEADLINE_WINDOW_DAYS);
     });
@@ -131,13 +134,17 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     const items: PurchaseSuggestionItem[] = needsPurchase.map(p => {
         const dailyUsage = p.daily_usage ?? null;
         const leadTimeDays = p.lead_time_days ?? null;
+        // Audit 4. tur Bulgu 2: tüm satın alma hesapları promisable üzerinden.
+        // suggestQty/coverageDays/urgency available_now değil promisable bakar
+        // (quote'lu siparişler ayrılmış olarak).
+        const promisable = promisableMap.get(p.id) ?? p.available_now;
         // Math.max(1, ...) guard — reorder_qty=NULL && min_stock_level=0 senaryosunda
         // moq=0 olur ve Math.ceil(needed/0)=Infinity üretirdi (frontend page.tsx:226 ile aynı pattern)
         const moq = Math.max(1, p.reorder_qty ?? p.min_stock_level);
         const { target, formula, leadTimeDemand } = computeTargetStock(p.min_stock_level, dailyUsage, leadTimeDays);
-        const needed = Math.max(0, target - p.available_now);
+        const needed = Math.max(0, target - promisable);
         const suggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
-        const coverageDays = computeCoverageDays(p.available_now, dailyUsage);
+        const coverageDays = computeCoverageDays(Math.max(0, promisable), dailyUsage);
 
         return {
             productId: p.id,
@@ -145,7 +152,8 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             sku: p.sku,
             productType: p.product_type as "manufactured" | "commercial",
             unit: p.unit,
-            available: p.available_now,
+            // available alanı UI'da "Stok" olarak gösterilir — promisable (satılabilir) yansıtılır
+            available: promisable,
             min: p.min_stock_level,
             dailyUsage,
             coverageDays,
