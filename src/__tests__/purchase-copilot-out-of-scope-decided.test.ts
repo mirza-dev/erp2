@@ -208,4 +208,108 @@ describe("Fix 1 — out-of-scope decided rec drift", () => {
         // 7-gün window dışı → response'a girmez
         expect(rec).toBeUndefined();
     });
+
+    it("Audit 7. Fix 3: statusIn filter ile dbListRecommendations çağrılır", async () => {
+        mockDbListAllActiveProducts.mockResolvedValue([makeProduct()]);
+        mockDbListRecommendations.mockResolvedValue([]);
+        await POST();
+        const callArgs = mockDbListRecommendations.mock.calls[0]?.[0];
+        expect(callArgs).toBeDefined();
+        expect(callArgs.statusIn).toEqual(["accepted", "edited", "rejected"]);
+    });
+});
+
+// ─── Audit 7. tur Fix 2: out-of-scope decided ürünler data.items'da bulunur ──
+
+describe("Fix 2 — out-of-scope decided ürünler responseItems'a girer", () => {
+    it("Out-of-scope decided ürün data.items'da bulunur (UI aiMap erişebilir)", async () => {
+        mockDbListAllActiveProducts.mockResolvedValue([makeProduct()]);
+        mockDbListRecommendations.mockResolvedValue([
+            makeDecidedRec({
+                metadata: {
+                    suggestQty: 40,
+                    urgencyLevel: "critical",
+                    coverageDays: 2,
+                    aiWhyNow: "Önceki AI yorumu",
+                    aiQuantityRationale: "Önceki rationale",
+                    aiUrgencyLevel: "critical",
+                },
+            }),
+        ]);
+
+        const res = await POST();
+        const body = await res.json();
+        const item = body.items.find((i: { productId: string }) => i.productId === "p-healthy");
+        expect(item).toBeDefined();
+        // Frozen AI metni response'a yansır → UI drawer/AI rozeti görebilir
+        expect(item.aiWhyNow).toBe("Önceki AI yorumu");
+        expect(item.aiQuantityRationale).toBe("Önceki rationale");
+        expect(item.aiUrgencyLevel).toBe("critical");
+    });
+
+    it("Out-of-scope ürün için item.suggestQty frozen değer (kullanıcı kararı)", async () => {
+        mockDbListAllActiveProducts.mockResolvedValue([makeProduct()]);
+        mockDbListRecommendations.mockResolvedValue([
+            makeDecidedRec({
+                metadata: { suggestQty: 40, urgencyLevel: "critical", coverageDays: 2 },
+            }),
+        ]);
+
+        const res = await POST();
+        const body = await res.json();
+        const item = body.items.find((i: { productId: string }) => i.productId === "p-healthy");
+        expect(item).toBeDefined();
+        // Frozen suggestQty=40 (decided rec metadata'sından) — current=10 değil
+        expect(item.suggestQty).toBe(40);
+    });
+
+    it("Out-of-scope ürün için item.available güncel state'i yansıtır (frozen değil)", async () => {
+        // Ürün şu an stock=200; frozen state coverageDays=2
+        mockDbListAllActiveProducts.mockResolvedValue([makeProduct()]);
+        mockDbListRecommendations.mockResolvedValue([
+            makeDecidedRec({
+                metadata: { suggestQty: 40, urgencyLevel: "critical", coverageDays: 2 },
+            }),
+        ]);
+
+        const res = await POST();
+        const body = await res.json();
+        const item = body.items.find((i: { productId: string }) => i.productId === "p-healthy");
+        // available = current promisable (200 - 0 = 200) — kullanıcı güncel stoku görür
+        expect(item.available).toBe(200);
+    });
+
+    it("In-scope ürün ile out-of-scope ürün aynı items dizisinde", async () => {
+        const inScope = makeProduct({ id: "p-low", available_now: 5, min_stock_level: 20 });
+        const outOfScope = makeProduct({ id: "p-healthy" });
+        mockDbListAllActiveProducts.mockResolvedValue([inScope, outOfScope]);
+        mockDbListRecommendations.mockResolvedValue([
+            makeDecidedRec({ entity_id: "p-healthy" }),
+        ]);
+
+        const res = await POST();
+        const body = await res.json();
+        const items = body.items.map((i: { productId: string }) => i.productId).sort();
+        // Hem in-scope hem out-of-scope items'da
+        expect(items).toContain("p-low");
+        expect(items).toContain("p-healthy");
+    });
+
+    it("In-scope decided ürün duplicate edilmez (dedup)", async () => {
+        // p-low aynı anda hem needsPurchase hem decided rec sahibi
+        mockDbListAllActiveProducts.mockResolvedValue([
+            makeProduct({ id: "p-low", available_now: 5, min_stock_level: 20 }),
+        ]);
+        mockDbGetActiveRecommendationsForEntities.mockResolvedValue([
+            makeDecidedRec({ entity_id: "p-low" }),
+        ]);
+        mockDbListRecommendations.mockResolvedValue([
+            makeDecidedRec({ entity_id: "p-low" }),
+        ]);
+
+        const res = await POST();
+        const body = await res.json();
+        const matches = body.items.filter((i: { productId: string }) => i.productId === "p-low");
+        expect(matches).toHaveLength(1);
+    });
 });

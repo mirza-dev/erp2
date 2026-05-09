@@ -195,12 +195,15 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         // Non-fatal: if we can't load existing, treat all as needing fresh AI
     }
 
-    // Out-of-scope decided rec'ler — tüm aktif decided rec'leri çek (purchase_suggestion);
-    // 7-günlük decided window ve orphan cleanup zaten upstream uygulanıyor.
+    // Out-of-scope decided rec'ler — sadece accepted/edited/rejected çek;
+    // 7-günlük decided window JS-side uygulanır.
+    // Audit 7. tur Fix 3: statusIn filter'ı SQL'e taşındı; büyük tabloda
+    // SELECT-then-JS-filter overhead'i engellenir.
     try {
-        const allActiveRecs = await dbListRecommendations({
+        const allDecidedRecs = await dbListRecommendations({
             entity_type: "product",
             recommendation_type: "purchase_suggestion",
+            statusIn: ["accepted", "edited", "rejected"],
         });
         const DECIDED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
         const now = Date.now();
@@ -208,8 +211,7 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             ...suggestedRecMap.keys(),
             ...decidedRecMap.keys(),
         ]);
-        for (const r of allActiveRecs) {
-            if (r.status !== "accepted" && r.status !== "edited" && r.status !== "rejected") continue;
+        for (const r of allDecidedRecs) {
             if (seen.has(r.entity_id)) continue;
             const pivot = r.decided_at ?? r.created_at;
             if (now - new Date(pivot).getTime() >= DECIDED_MAX_AGE_MS) continue;
@@ -380,8 +382,60 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         });
     }
 
-    const responseItems = items
-        .map(item => {
+    // ── responseItems oluşturma ─────────────────────────────────────────────
+    // items dizisindeki ürünler (needsPurchase) + out-of-scope decided ürünler
+    // (Audit 7. tur Fix 2): UI tarafı `aiMap` üzerinden AI metnine erişiyor;
+    // out-of-scope decided ürünler items'da olmadığı için drawer/AI rozeti
+    // bilgisi gösterilemiyordu. Frozen metadata'dan items'a benzer entry üret.
+    const inScopeIds = new Set(items.map(i => i.productId));
+    const outOfScopeDecidedItems = Array.from(decidedRecMap.entries())
+        .filter(([productId]) => !inScopeIds.has(productId))
+        .map(([productId, decided]) => {
+            const p = productMap.get(productId);
+            const meta = decided.metadata as Record<string, unknown> | null;
+            // Frozen değerler (decided rec metadata'sından — kullanıcı kararı sırasındaki snapshot)
+            const frozenSuggestQty = (meta?.suggestQty as number | undefined) ?? null;
+            const frozenCoverageDays = typeof meta?.coverageDays === "number" ? meta.coverageDays as number : null;
+            const frozenLeadTimeDays = typeof meta?.leadTimeDays === "number" ? meta.leadTimeDays as number : null;
+            const frozenTargetStock = (meta?.targetStock as number | undefined) ?? null;
+            const frozenFormula = (meta?.formula === "lead_time" || meta?.formula === "fallback") ? meta.formula : "fallback";
+            const frozenMoq = (meta?.moq as number | undefined) ?? null;
+            const frozenUrgencyPct = (meta?.urgencyPct as number | undefined) ?? null;
+            // Güncel state (drift bilgisi için kullanılan değerler)
+            const promisable = p ? p.available_now - (quotedMap.get(p.id) ?? 0) : 0;
+            const stock = Math.max(0, promisable);
+
+            return {
+                productId,
+                productName: p?.name ?? "—",
+                sku: p?.sku ?? "—",
+                productType: (p?.product_type ?? "commercial") as "manufactured" | "commercial",
+                unit: p?.unit ?? "adet",
+                // available: out-of-scope için "güncel satılabilir stok" (UI ne göstermeli — frozen değil current)
+                available: stock,
+                min: p?.min_stock_level ?? 0,
+                dailyUsage: p?.daily_usage ?? null,
+                coverageDays: p ? computeCoverageDays(stock, p.daily_usage ?? null) : frozenCoverageDays,
+                leadTimeDays: p?.lead_time_days ?? frozenLeadTimeDays,
+                // suggestQty/target frozen — kullanıcı kararı sırasındaki değer
+                suggestQty: frozenSuggestQty ?? 0,
+                moq: frozenMoq ?? 1,
+                targetStock: frozenTargetStock ?? 0,
+                formula: frozenFormula as "lead_time" | "fallback",
+                leadTimeDemand: null,
+                preferredVendor: p?.preferred_vendor ?? null,
+                urgencyPct: frozenUrgencyPct ?? 0,
+                aiWhyNow: typeof meta?.aiWhyNow === "string" ? meta.aiWhyNow : null,
+                aiQuantityRationale: typeof meta?.aiQuantityRationale === "string" ? meta.aiQuantityRationale : null,
+                aiUrgencyLevel: (meta?.aiUrgencyLevel === "critical" || meta?.aiUrgencyLevel === "high" || meta?.aiUrgencyLevel === "moderate")
+                    ? meta.aiUrgencyLevel as UrgencyLevel
+                    : null,
+                aiConfidence: decided.confidence ?? null,
+            };
+        });
+
+    const responseItems = [
+        ...items.map(item => {
             const ai = mergedAiMap.get(item.productId);
             const urgencyPct = computeUrgencyPct(item.available, item.min);
             return {
@@ -407,13 +461,14 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                 aiUrgencyLevel: ai?.aiUrgencyLevel ?? null,
                 aiConfidence: ai?.aiConfidence ?? null,
             };
-        })
-        .sort((a, b) => {
-            if (a.coverageDays === null && b.coverageDays === null) return 0;
-            if (a.coverageDays === null) return -1;
-            if (b.coverageDays === null) return 1;
-            return a.coverageDays - b.coverageDays;
-        });
+        }),
+        ...outOfScopeDecidedItems,
+    ].sort((a, b) => {
+        if (a.coverageDays === null && b.coverageDays === null) return 0;
+        if (a.coverageDays === null) return -1;
+        if (b.coverageDays === null) return 1;
+        return a.coverageDays - b.coverageDays;
+    });
 
     // ── Persist + build response.recommendations ─────────────────────────────
     type RecRef = {

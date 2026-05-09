@@ -5,8 +5,9 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 6. tur KAPALI (2026-05-09; 2396 test) — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich
-**Önceki:** G11 audit 5. tur KAPALI (2026-05-09; 2369 test) — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter
+**Son:** G11 audit 7. tur KAPALI (2026-05-09; 2411 test) — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper, runtime test
+**Önceki:** G11 audit 6. tur KAPALI (2026-05-09; 2396 test) — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich
+**Önceki²:** G11 audit 5. tur KAPALI (2026-05-09; 2369 test) — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter
 **Önceki²:** G11 audit 4. tur KAPALI (2026-05-09; 2344 test) — promisable filter+hesaplar, UI full scan, auto-reload imzası
 **Önceki²:** G11 audit 3. tur KAPALI (2026-05-09; 2325 test) — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place
 **Önceki:** G11 audit 2. tur KAPALI (2026-05-09; 2312 test) — CSRF guard, defansif expire, boş list, lead-time aware, moq=0
@@ -15,6 +16,31 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 7. Tur (2026-05-09) — KAPALI
+
+**Hedef:** 6. turdan sonra incelemeci 4 yeni bulgu çıkardı: out-of-scope decided ürünler için auto-reload sinyali eksik (imza), `data.items` boşluğu (UI aiMap erişemez), `dbListRecommendations` performans, runtime test boşluğu.
+
+**1 commit, ~7 dosya:**
+
+- **Fix 1 (HIGH) — Auto-reload imzası displayProducts**: `signatureSource` useMemo = `[...reorderSuggestions, ...products.filter(out-of-scope decided)]`. Hem imza hem `displayProducts` aynı kaynaktan. Out-of-scope ürün stok değişimi → imza değişir → AI auto-reload.
+- **Fix 2 (HIGH) — Out-of-scope responseItems**: backend `outOfScopeDecidedItems` decided rec metadata'sından `items` benzeri entry üretir (frozen `suggestQty/targetStock/aiWhyNow/aiQuantityRationale/aiUrgencyLevel`; `available` = güncel promisable). `responseItems = items + outOfScopeDecidedItems`. UI'da `aiMap.get(productId)` artık out-of-scope için de doludur → AI rozeti + drawer çalışır.
+- **Fix 3 (MEDIUM) — statusIn**: `ListRecommendationsFilter.statusIn?: RecommendationStatus[]` + helper `.in("status", [...])`. Route `statusIn: ["accepted","edited","rejected"]` geçer. SQL-side filter, ai_recommendations tablosu büyüse de JS overhead yok. `statusIn` `status`'tan öncelikli.
+- **Fix 4 (LOW) — Runtime test**: `purchase-suggested-auto-reload.test.ts`'e `signatureSource` simülasyon mantığı (dedup, status filter, stok değişimi) test edildi.
+
+**Test (15 yeni):**
+- `purchase-suggested-auto-reload.test.ts` (+5): signatureSource displayProducts simulation
+- `purchase-copilot-out-of-scope-decided.test.ts` (+6): items'a out-of-scope (aiWhyNow, frozen suggestQty, current available, dedup, in-scope+out-scope mix); statusIn arg geçişi
+- `recommendations.test.ts` (+4): statusIn filter `.in()` çağrısı, boş array, `status` ile çakışma, eski `status` davranış regresyonu
+
+**Domain kuralı:**
+- Stable string imzası `displayProducts`'tan türeyebilir (UI scope = state imzası); ayrı list ve imza tutmak DRY ihlali ve sinyal kaybı.
+- Backend mutation endpoint'leri response'unda UI'nın gösterebilmesi gereken tüm alanları kapsamalı; aksi halde "data var ama UI gösteremez" boşluğu olur.
+- `dbList*` helper'larında çoklu status (`statusIn`) varsa `.in()` kullan; SELECT-then-JS-filter overhead'i kabul edilemez büyük tablolarda.
+
+**Test:** 154 dosya · 2411 test yeşil · TS clean · 0 lint hatası
 
 ---
 

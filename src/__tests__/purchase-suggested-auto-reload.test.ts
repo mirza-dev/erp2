@@ -126,3 +126,67 @@ describe("Bulgu 4 — reorderSignature: aynı length farklı set'te değişir", 
         expect(sig).toContain(":99"); // quoted=99 görünmeli
     });
 });
+
+// ─── Audit 7. tur Fix 1 — imza displayProducts (out-of-scope dahil) üzerinden ─
+
+describe("signatureSource simulation — out-of-scope decided ürünler imzada", () => {
+    // Page'deki signatureSource hesabını birebir taklit
+    function buildSignatureSource(
+        reorderSuggestions: ReorderProductLite[],
+        products: ReorderProductLite[],
+        recMap: Map<string, { status: string }>,
+    ): ReorderProductLite[] {
+        const seen = new Set(reorderSuggestions.map(p => p.id));
+        const outOfScope = products.filter(p => {
+            if (seen.has(p.id)) return false;
+            const status = recMap.get(p.id)?.status;
+            return status === "accepted" || status === "edited" || status === "rejected";
+        });
+        return [...reorderSuggestions, ...outOfScope];
+    }
+
+    const reorder: ReorderProductLite[] = [
+        { id: "p-1", available_now: 5, minStockLevel: 20, dailyUsage: 3, reserved: 0, quoted: 0 },
+    ];
+    const allProducts: ReorderProductLite[] = [
+        { id: "p-1", available_now: 5, minStockLevel: 20, dailyUsage: 3, reserved: 0, quoted: 0 },
+        { id: "p-2", available_now: 200, minStockLevel: 20, dailyUsage: null, reserved: 0, quoted: 0 },
+    ];
+
+    it("Out-of-scope accepted ürün imzaya eklenir (decided rec varsa)", () => {
+        const recMap = new Map<string, { status: string }>([["p-2", { status: "accepted" }]]);
+        const src = buildSignatureSource(reorder, allProducts, recMap);
+        expect(src.map(p => p.id).sort()).toEqual(["p-1", "p-2"]);
+    });
+
+    it("Out-of-scope ürün accepted değilse (suggested) imzaya eklenmez", () => {
+        const recMap = new Map<string, { status: string }>([["p-2", { status: "suggested" }]]);
+        const src = buildSignatureSource(reorder, allProducts, recMap);
+        expect(src.map(p => p.id)).toEqual(["p-1"]);
+    });
+
+    it("Out-of-scope ürün stok değişimi imza değişimine yol açar (Fix 1 ana senaryo)", () => {
+        const recMap = new Map<string, { status: string }>([["p-2", { status: "accepted" }]]);
+        const before = computeReorderSignature(buildSignatureSource(reorder, allProducts, recMap));
+        const allProductsModified: ReorderProductLite[] = [
+            allProducts[0],
+            { ...allProducts[1], quoted: 50 }, // p-2 quoted 0 → 50
+        ];
+        const after = computeReorderSignature(buildSignatureSource(reorder, allProductsModified, recMap));
+        expect(before).not.toBe(after);
+    });
+
+    it("rejected ürün de imzaya eklenir (drift bilgisi yenilenir)", () => {
+        const recMap = new Map<string, { status: string }>([["p-2", { status: "rejected" }]]);
+        const src = buildSignatureSource(reorder, allProducts, recMap);
+        expect(src.map(p => p.id).sort()).toEqual(["p-1", "p-2"]);
+    });
+
+    it("In-scope + out-of-scope dedup: aynı ID iki kere girmez", () => {
+        // p-1 hem reorder içinde hem accepted olsa bile dedup
+        const recMap = new Map<string, { status: string }>([["p-1", { status: "accepted" }]]);
+        const src = buildSignatureSource(reorder, allProducts, recMap);
+        const ids = src.map(p => p.id);
+        expect(ids.filter(id => id === "p-1")).toHaveLength(1);
+    });
+});

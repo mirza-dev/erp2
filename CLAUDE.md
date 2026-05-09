@@ -3,7 +3,17 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-09_
 
-**Son tamamlanan iş:** G11 audit 6. tur — 5 bulgu fix (decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich) (2026-05-09)
+**Son tamamlanan iş:** G11 audit 7. tur — 4 bulgu fix (auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper, runtime test) (2026-05-09)
+
+**G11 audit 7. tur (1 commit, ~7 dosya):**
+- **Fix 1 (HIGH) — Auto-reload imzası `displayProducts`'ı kapsar**: `reorderSignature` `reorderSuggestions` üzerinden hesaplanıyordu → out-of-scope decided ürünlerin stok/quote değişimi imzayı değiştirmiyordu. Yeni `signatureSource` useMemo (= `displayProducts`) hem imza hem listeleme için tek source-of-truth. Out-of-scope ürün stok değişiminde auto-reload tetiklenir, drift güncellenir.
+- **Fix 2 (HIGH) — Out-of-scope decided ürünler `data.items`'da**: backend `responseItems` sadece `items` (= needsPurchase) üzerinden kuruluyordu → UI `aiMap.get(p.id)` undefined → "✦ AI" rozeti gizli, drawer'da AI yorumu yok. Frozen metadata DB'de var ama UI'a ulaşmıyordu. Yeni: `outOfScopeDecidedItems` dizisi (decided rec metadata'sından `aiWhyNow/aiQuantityRationale/aiUrgencyLevel/suggestQty/targetStock/...` çıkarılır; `available` güncel state); `responseItems = items ∪ outOfScopeDecidedItems`. `productMap` lookup ile ürün adı/SKU vb. doldurulur.
+- **Fix 3 (MEDIUM) — `dbListRecommendations` statusIn**: `ListRecommendationsFilter`'a `statusIn?: RecommendationStatus[]` eklendi; helper `.in("status", [...])` kullanır. Route `statusIn: ["accepted","edited","rejected"]` geçer → SQL-side filter, JS-side `if (r.status !== ...) continue` overhead yok. Büyük tabloda performans. `statusIn` `status`'tan öncelikli.
+- **Fix 4 (LOW) — `displayProducts`/`signatureSource` runtime testi**: simülasyon helper'ı ile dedup, accepted/rejected/edited filter, stok değişimi → imza değişimi senaryoları test edildi.
+- **Yeni 5 test (Fix 1) + 5 test (Fix 2) + 4 test (Fix 3):** `purchase-suggested-auto-reload.test.ts` (+5), `purchase-copilot-out-of-scope-decided.test.ts` (+6, statusIn dahil), `recommendations.test.ts` (+4 statusIn).
+- 154 dosya · 2411 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 6. tur — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich (2026-05-09; 2396 test)
 
 **G11 audit 6. tur (1 commit, ~10 dosya):**
 - **Fix 1 (HIGH) — Decided rec drift kapsamı**: route `dbGetActiveRecommendationsForEntities` sadece needsPurchase ürünleri için decided rec çekiyordu → kullanıcı kabul + stok düzelmiş senaryosunda rec response/UI dışında kalıyor, drift rozeti hiç görünmüyordu. Yeni: `dbListRecommendations` ile tüm aktif decided rec'ler ayrıca yüklenir (7-gün window içinde); items dışı ürünler için drift hesabı `productMap` üzerinden güncel state'e göre yapılır. UI: `displayProducts = reorderSuggestions ∪ outOfScopeDecided` — decision filter `accepted/rejected` seçilince out-of-scope ürünler de listede görünür.

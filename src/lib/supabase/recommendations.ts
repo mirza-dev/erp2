@@ -23,6 +23,13 @@ export interface ListRecommendationsFilter {
     entity_id?: string;
     recommendation_type?: RecommendationType;
     status?: RecommendationStatus;
+    /**
+     * Audit 7. tur Fix 3: birden fazla status'u tek sorguda filtrele.
+     * `status` ile birlikte verilirse `status` ihmal edilir; sadece `statusIn`
+     * uygulanır (`.in("status", [...])`). Büyük tabloda copilot route'unun
+     * SELECT-then-JS-filter overhead'ini engeller.
+     */
+    statusIn?: RecommendationStatus[];
 }
 
 export interface UpdateRecommendationStatusOpts {
@@ -97,7 +104,11 @@ export async function dbListRecommendations(
     if (filter.entity_type)        query = query.eq("entity_type", filter.entity_type);
     if (filter.entity_id)          query = query.eq("entity_id", filter.entity_id);
     if (filter.recommendation_type) query = query.eq("recommendation_type", filter.recommendation_type);
-    if (filter.status)             query = query.eq("status", filter.status);
+    if (filter.statusIn && filter.statusIn.length > 0) {
+        query = query.in("status", filter.statusIn);
+    } else if (filter.status) {
+        query = query.eq("status", filter.status);
+    }
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);

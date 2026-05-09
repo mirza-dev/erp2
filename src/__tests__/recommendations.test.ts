@@ -87,11 +87,18 @@ function setupFrom(tableHandlers: Record<string, () => unknown>) {
 }
 
 // Thenable builder for queries that use `await query` directly (e.g. dbListRecommendations)
-function makeThenableBuilder(rows: unknown[], eqSpy?: ReturnType<typeof vi.fn>) {
+function makeThenableBuilder(
+    rows: unknown[],
+    eqSpy?: ReturnType<typeof vi.fn>,
+    inSpy?: ReturnType<typeof vi.fn>,
+) {
     const b: Record<string, unknown> = {};
     b.select = () => b;
     b.eq = eqSpy
         ? (...args: unknown[]) => { (eqSpy as (...args: unknown[]) => unknown)(...args); return b; }
+        : () => b;
+    b.in = inSpy
+        ? (...args: unknown[]) => { (inSpy as (...args: unknown[]) => unknown)(...args); return b; }
         : () => b;
     b.order = () => b;
     b.then = (resolve: (v: unknown) => void, reject?: (e: unknown) => void) =>
@@ -279,6 +286,59 @@ describe("dbListRecommendations — applies recommendation_type filter", () => {
         });
         await dbListRecommendations({ recommendation_type: "purchase_suggestion" });
         expect(eqSpy).toHaveBeenCalledWith("recommendation_type", "purchase_suggestion");
+    });
+});
+
+// ─── Audit 7. tur Fix 3 — statusIn filter ─────────────────────────────────
+
+describe("dbListRecommendations — statusIn filter", () => {
+    it("statusIn dizisi geçildiğinde .in('status', [...]) çağrılır", async () => {
+        const inSpy = vi.fn();
+        setupFrom({
+            ai_recommendations: () => makeThenableBuilder([], undefined, inSpy),
+        });
+        await dbListRecommendations({ statusIn: ["accepted", "edited", "rejected"] });
+        expect(inSpy).toHaveBeenCalledWith("status", ["accepted", "edited", "rejected"]);
+    });
+
+    it("statusIn boş dizi → .in çağrılmaz, .eq da çağrılmaz", async () => {
+        const eqSpy = vi.fn();
+        const inSpy = vi.fn();
+        setupFrom({
+            ai_recommendations: () => makeThenableBuilder([], eqSpy, inSpy),
+        });
+        await dbListRecommendations({ statusIn: [] });
+        const statusEqCalls = eqSpy.mock.calls.filter(([col]) => col === "status");
+        expect(statusEqCalls).toHaveLength(0);
+        expect(inSpy).not.toHaveBeenCalled();
+    });
+
+    it("statusIn varsa status field'ı yoksayılır (statusIn öncelikli)", async () => {
+        const eqSpy = vi.fn();
+        const inSpy = vi.fn();
+        setupFrom({
+            ai_recommendations: () => makeThenableBuilder([], eqSpy, inSpy),
+        });
+        await dbListRecommendations({
+            status: "suggested", // bu yoksayılmalı
+            statusIn: ["accepted", "edited"],
+        });
+        // .in çağrıldı
+        expect(inSpy).toHaveBeenCalledWith("status", ["accepted", "edited"]);
+        // .eq("status", "suggested") çağrılmadı
+        const statusEqCalls = eqSpy.mock.calls.filter(([col]) => col === "status");
+        expect(statusEqCalls).toHaveLength(0);
+    });
+
+    it("status verildi statusIn yok → eski davranış: .eq('status', ...)", async () => {
+        const eqSpy = vi.fn();
+        const inSpy = vi.fn();
+        setupFrom({
+            ai_recommendations: () => makeThenableBuilder([], eqSpy, inSpy),
+        });
+        await dbListRecommendations({ status: "suggested" });
+        expect(eqSpy).toHaveBeenCalledWith("status", "suggested");
+        expect(inSpy).not.toHaveBeenCalled();
     });
 });
 

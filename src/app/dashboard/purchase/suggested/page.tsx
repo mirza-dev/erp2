@@ -633,19 +633,34 @@ export default function PurchaseSuggestedPage() {
         }
     }, [isDemo]);
 
-    // Audit 4-5. tur: reorderSuggestions.length yerine set imzası.
+    // Audit 4-5-7. tur: imza set tabanlı (length yerine).
     // Aynı sayıda ama farklı ürün setleri veya stok/quote değişimi →
     // AI/recMap otomatik yenilensin.
     // Imza alanları: productId + available_now + min + dailyUsage + reserved + quoted
-    // (Audit 5. tur Fix 3: quoted eklendi — quote artarsa available_now sabit kalsa
-    // bile imza değişir, çünkü promisable=available_now-quoted değişti).
+    // (Audit 5. tur Fix 3: quoted eklendi).
+    // Audit 7. tur Fix 1: imza reorderSuggestions değil, displayProducts üzerinden
+    // hesaplanır → out-of-scope decided ürünlerin stok/quote değişimi de yakalanır
+    // (drift güncellenir, auto-reload tetiklenir).
+    // Not: displayProducts useMemo'su daha aşağıda tanımlı; bu state-derived
+    // memoization React tarafında bağlam bağımlılığı sorun değil — ileride
+    // hoisted edilebilir.
+    const signatureSource = useMemo(() => {
+        const seen = new Set(reorderSuggestions.map(p => p.id));
+        const outOfScope = products.filter(p => {
+            if (seen.has(p.id)) return false;
+            const status = recMap.get(p.id)?.status;
+            return status === "accepted" || status === "edited" || status === "rejected";
+        });
+        return [...reorderSuggestions, ...outOfScope];
+    }, [reorderSuggestions, products, recMap]);
+
     const reorderSignature = useMemo(() => {
-        if (reorderSuggestions.length === 0) return "";
-        return reorderSuggestions
+        if (signatureSource.length === 0) return "";
+        return signatureSource
             .map(p => `${p.id}:${p.available_now}:${p.minStockLevel}:${p.dailyUsage ?? "_"}:${p.reserved}:${p.quoted}`)
             .sort()
             .join("|");
-    }, [reorderSuggestions]);
+    }, [signatureSource]);
 
     useEffect(() => {
         if (!reorderSignature) return;
@@ -803,15 +818,9 @@ export default function PurchaseSuggestedPage() {
     // Audit 6. tur Fix 1: out-of-scope decided ürünler — needsPurchase=false
     // ama recMap'te kararı olan (accepted/edited/rejected). Bunlar
     // reorderSuggestions'da yok → drift rozetiyle görünmek için ayrıca eklenir.
-    const displayProducts = useMemo(() => {
-        const seen = new Set(reorderSuggestions.map(p => p.id));
-        const outOfScope = products.filter(p => {
-            if (seen.has(p.id)) return false;
-            const status = recMap.get(p.id)?.status;
-            return status === "accepted" || status === "edited" || status === "rejected";
-        });
-        return [...reorderSuggestions, ...outOfScope];
-    }, [reorderSuggestions, products, recMap]);
+    // Audit 7. tur: signatureSource ile aynı set; imza hesaplaması ve listeleme
+    // tek kavramdan türer (DRY).
+    const displayProducts = signatureSource;
 
     const sorted = useMemo(() => {
         const purchaseSearched = search.trim().toLowerCase();
