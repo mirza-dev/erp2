@@ -14,11 +14,12 @@ const mockDbGetQuotedQuantities = vi.fn();
 const mockDbGetIncomingQuantities = vi.fn();
 
 const mockDbListAllActiveProducts = vi.fn();
+const mockDbCreateProduct = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
     dbListProducts:           (...args: unknown[]) => mockDbListProducts(...args),
     dbListAllActiveProducts:  (...args: unknown[]) => mockDbListAllActiveProducts(...args),
-    dbCreateProduct:          vi.fn(),
+    dbCreateProduct:          (...args: unknown[]) => mockDbCreateProduct(...args),
     dbGetQuotedQuantities:    (...args: unknown[]) => mockDbGetQuotedQuantities(...args),
 }));
 
@@ -31,7 +32,7 @@ vi.mock("@/lib/supabase/purchase-commitments", () => ({
     dbCancelCommitment:      vi.fn(),
 }));
 
-import { GET } from "@/app/api/products/route";
+import { GET, POST } from "@/app/api/products/route";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -55,10 +56,10 @@ function makeProduct(id: string, on_hand: number, reserved: number) {
         is_active: true,
         product_type: "manufactured" as const,
         warehouse: null,
-        reorder_qty: null,
+        reorder_qty: null as number | null,
         preferred_vendor: null,
-        daily_usage: null,
-        lead_time_days: null,
+        daily_usage: null as number | null,
+        lead_time_days: null as number | null,
         created_at: "2024-01-01",
         updated_at: "2024-01-01",
         product_family: null,
@@ -324,5 +325,67 @@ describe("GET /api/products?all=1 — pagination'sız + filter-aware", () => {
         expect(filter.is_active).toBe(true);
         expect(filter.category).toBeUndefined();
         expect(filter.product_type).toBeUndefined();
+    });
+});
+
+// ─── Audit 6. tur Fix 5 — POST response enrichment ───────────────────────────
+
+describe("POST /api/products — response enriched (quoted/promisable/incoming)", () => {
+    function makePostRequest(body: Record<string, unknown>): NextRequest {
+        return new NextRequest("http://localhost/api/products", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+    }
+
+    beforeEach(() => {
+        mockDbCreateProduct.mockReset();
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map());
+        mockDbGetIncomingQuantities.mockResolvedValue(new Map());
+    });
+
+    it("response'ta quoted/promisable/incoming/forecasted alanları var", async () => {
+        const created = makeProduct("prod-new", 100, 0);
+        mockDbCreateProduct.mockResolvedValue(created);
+        const res = await POST(makePostRequest({ name: "Test", sku: "T-1", unit: "adet" }));
+        expect(res.status).toBe(201);
+        const data = await res.json();
+        expect(data.quoted).toBeDefined();
+        expect(data.promisable).toBeDefined();
+        expect(data.incoming).toBeDefined();
+        expect(data.forecasted).toBeDefined();
+        expect(data.quoted).toBe(0); // yeni ürün için quote yok
+        expect(data.promisable).toBe(100); // available_now - 0
+    });
+
+    it("response'ta stockoutDate/orderDeadline alanları var", async () => {
+        const created = makeProduct("prod-new", 100, 0);
+        // dailyUsage + leadTime mevcut → orderDeadline hesaplanır
+        created.daily_usage = 2;
+        created.lead_time_days = 10;
+        mockDbCreateProduct.mockResolvedValue(created);
+        const res = await POST(makePostRequest({ name: "Test", sku: "T-2", unit: "adet" }));
+        const data = await res.json();
+        expect(data.stockoutDate).toBeDefined();
+        expect(data.orderDeadline).toBeDefined();
+    });
+
+    it("dbGetQuotedQuantities ve dbGetIncomingQuantities POST'ta çağrılır (enrichment için)", async () => {
+        mockDbCreateProduct.mockResolvedValue(makeProduct("prod-new", 100, 0));
+        await POST(makePostRequest({ name: "Test", sku: "T-3", unit: "adet" }));
+        expect(mockDbGetQuotedQuantities).toHaveBeenCalled();
+        expect(mockDbGetIncomingQuantities).toHaveBeenCalled();
+    });
+
+    it("Mevcut quote varsa promisable doğru hesaplanır (mevcut SKU içeriği)", async () => {
+        const created = makeProduct("prod-existing", 100, 0);
+        mockDbCreateProduct.mockResolvedValue(created);
+        // Bu SKU için zaten 30 quote varmış (edge case — ürün gerçekte yeni yaratıldı,
+        // ama quoted helper diğer ürünleri de döner, bizimki yok)
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map([["prod-existing", 30]]));
+        const res = await POST(makePostRequest({ name: "T", sku: "T-4", unit: "adet" }));
+        const data = await res.json();
+        expect(data.promisable).toBe(70);
     });
 });

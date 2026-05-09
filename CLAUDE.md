@@ -3,7 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-09_
 
-**Son tamamlanan iş:** G11 audit 5. tur — 5 bulgu fix (UI promisable, refetch ?all=1, signature quoted, ?all=1 filter) (2026-05-09)
+**Son tamamlanan iş:** G11 audit 6. tur — 5 bulgu fix (decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich) (2026-05-09)
+
+**G11 audit 6. tur (1 commit, ~10 dosya):**
+- **Fix 1 (HIGH) — Decided rec drift kapsamı**: route `dbGetActiveRecommendationsForEntities` sadece needsPurchase ürünleri için decided rec çekiyordu → kullanıcı kabul + stok düzelmiş senaryosunda rec response/UI dışında kalıyor, drift rozeti hiç görünmüyordu. Yeni: `dbListRecommendations` ile tüm aktif decided rec'ler ayrıca yüklenir (7-gün window içinde); items dışı ürünler için drift hesabı `productMap` üzerinden güncel state'e göre yapılır. UI: `displayProducts = reorderSuggestions ∪ outOfScopeDecided` — decision filter `accepted/rejected` seçilince out-of-scope ürünler de listede görünür.
+- **Fix 2 (MEDIUM) — UI promisable<0 clamp**: `computeRowStock` ve `computeSuggestion` `Math.max(0, promisable)` ile clamp; urgency formula `Math.min(100, ...)` — over-quoted ürünlerde negatif gün/%>100 urgency önlenir. Yeni `pickStock(p)` helper export'u (sort/mostUrgent/drawer için tek source).
+- **Fix 3 (MEDIUM) — Sort/En Acil/AI drawer pickStock**: sort fallback (coverage/urgency), `mostUrgent`/`mostUrgentDays`, `aiDrawerCoverageDays`, drawer "Stok Durumu" gridi hep `pickStock` üzerinden — `(a|b|mostUrgent|aiDrawerProduct).available_now` doğrudan kullanım yok. Drawer "Açık" değeri `Math.max(0, min - drawerStock)` ile negatif görünmez.
+- **Fix 4 (MEDIUM) — Level değişiminde AI fail fallback**: `buildAiMetadata(item, fallbackMeta)` — AI fail/empty olunca eski rec metadata'sındaki `aiWhyNow`/`aiQuantityRationale`/`aiUrgencyLevel` korunur. Geçici network/parse hatası eski iyi metni silmez.
+- **Fix 5 (LOW) — POST /api/products enriched response**: yeni ürün yaratma response'u `enrichProducts` ile `quoted/promisable/incoming/forecasted/stockoutDate/orderDeadline` alanları içerir. DataContext ilk full refetch'e kadar tutarlı state.
+- **Yeni 2 test dosyası (16 yeni test):** `purchase-copilot-out-of-scope-decided.test.ts` (6), `purchase-suggested-pickstock-regression.test.ts` (5). `purchase-suggested-promisable-ui.test.ts` (+9 clamp + pickStock), `purchase-copilot-diff-merge.test.ts` (+3 AI fallback), `api-products-quoted.test.ts` (+4 POST enrich).
+- 154 dosya · 2396 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 5. tur — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter (2026-05-09; 2369 test)
 
 **G11 audit 5. tur (1 commit, ~9 dosya):**
 - **Fix 1 (HIGH) — DataContext promisable filter**: `reorderSuggestions` `shouldSuggestReorder({ available: p.available_now })` çağırıyordu → quote'lu siparişler hesaba katılmıyordu, UI öneriyi kaçırıyordu. Yeni: `available: p.promisable ?? p.available_now` — backend `purchase-copilot/route.ts:124` ile semantik eşleşme.

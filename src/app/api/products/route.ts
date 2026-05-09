@@ -132,7 +132,16 @@ export async function POST(req: NextRequest) {
 
         const product = await dbCreateProduct(body);
         revalidateTag("products", "max");
-        return NextResponse.json(product, { status: 201 });
+
+        // Audit 6. tur Fix 5: response'u quoted/promisable/incoming/forecasted/
+        // stockoutDate/orderDeadline ile enrich et — DataContext POST sonrası
+        // bu alanları görmesin diye ilk full refetch'e kadar boşluk olmasın.
+        const [quotedMap, incomingMap] = await Promise.all([
+            dbGetQuotedQuantities(),
+            dbGetIncomingQuantities(),
+        ]);
+        const enriched = enrichProducts([product], quotedMap, incomingMap)[0];
+        return NextResponse.json(enriched, { status: 201 });
     } catch (err: unknown) {
         // ConfigError (missing env) → 503 before anything else
         if (err instanceof ConfigError) return handleApiError(err, "POST /api/products");

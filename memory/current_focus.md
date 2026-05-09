@@ -5,8 +5,9 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 5. tur KAPALI (2026-05-09; 2369 test) — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter
-**Önceki:** G11 audit 4. tur KAPALI (2026-05-09; 2344 test) — promisable filter+hesaplar, UI full scan, auto-reload imzası
+**Son:** G11 audit 6. tur KAPALI (2026-05-09; 2396 test) — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich
+**Önceki:** G11 audit 5. tur KAPALI (2026-05-09; 2369 test) — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter
+**Önceki²:** G11 audit 4. tur KAPALI (2026-05-09; 2344 test) — promisable filter+hesaplar, UI full scan, auto-reload imzası
 **Önceki²:** G11 audit 3. tur KAPALI (2026-05-09; 2325 test) — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place
 **Önceki:** G11 audit 2. tur KAPALI (2026-05-09; 2312 test) — CSRF guard, defansif expire, boş list, lead-time aware, moq=0
 **Önceki²:** G11 audit 1. tur KAPALI (2026-05-09; 2286 test) — Vercel CRON GET, expire scope, SoT coverage-based, false-success toast
@@ -14,6 +15,35 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 6. Tur (2026-05-09) — KAPALI
+
+**Hedef:** 5. turdan sonra incelemeci 5 yeni bulgu çıkardı. En kritik: kullanıcı öneriyi kabul etti, sonra stok düzeldi → rec response'a girmiyor, drift rozeti hiç görünmüyor (G11'in decided drift hedefinde en büyük boşluk).
+
+**1 commit, ~10 dosya:**
+
+- **Fix 1 (HIGH) — Decided rec drift kapsamı**: `dbListRecommendations({entity_type, recommendation_type})` ile tüm aktif decided rec'ler yüklenir; 7-gün window dışı/items içi olanlar atlanır. Out-of-scope için drift hesabı `productMap` üzerinden güncel state ile yapılır (item bazlı değil). Response'taki `decidedRefs` artık `decidedRecMap.entries()` üzerinden — items'a bağımlı değil. UI `displayProducts = reorderSuggestions ∪ outOfScopeDecided` ile filter sayfasında out-of-scope ürünleri de gösterir.
+- **Fix 2 (MEDIUM) — UI clamp**: `computeRowStock`, `computeSuggestion` `Math.max(0, promisable)` (yeni `pickStock` helper). `urgency = Math.min(100, ...)`. Backend `route.ts:147` ile aynı semantik. Negatif gün/%>100 urgency UI'da imkansız.
+- **Fix 3 (MEDIUM) — Sort/Drawer pickStock**: 4 lokasyon (`sorted` fallback, `mostUrgent`, `aiDrawerCoverageDays`, drawer Stok grid + progress bar) `pickStock(p)` üzerinden. Drawer "Açık" `Math.max(0, min - drawerStock)`. Source-regression testi: `(a|b|mostUrgent|aiDrawerProduct).available_now` doğrudan kullanım yok.
+- **Fix 4 (MEDIUM) — AI fail fallback**: `buildAiMetadata(item, fallbackMeta?)` — AI null ise `fallbackMeta.aiWhyNow/aiQuantityRationale/aiUrgencyLevel` kullanılır. `levelChangedItems.map`'te `suggestedRecMap.get(productId)?.metadata` fallback geçilir. Geçici hata eski iyi AI metnini silmez.
+- **Fix 5 (LOW) — POST enrich**: `dbCreateProduct` sonrası `enrichProducts([product], quotedMap, incomingMap)[0]` döner — quoted/promisable/incoming/forecasted/stockoutDate/orderDeadline alanları yeni ürün için anında doludur (yeni ürün için 0/null değerler).
+
+**Test (16 yeni + 12 ek):**
+- `purchase-copilot-out-of-scope-decided.test.ts` (6): accepted/rejected out-of-scope, currentDrift hesabı, ürün silinmiş, in-scope regresyon, 7-gün window
+- `purchase-suggested-pickstock-regression.test.ts` (5): source-level pattern check
+- `purchase-suggested-promisable-ui.test.ts` (+9): clamp + pickStock
+- `purchase-copilot-diff-merge.test.ts` (+3): AI throw/empty/success metadata davranışı
+- `api-products-quoted.test.ts` (+4): POST response enrichment
+
+**Domain kuralı:**
+- Decided rec'ler items'dan bağımsız: stok düzelse bile kullanıcının önceki kararı UI'da takip edilebilir (drift rozetiyle), kullanıcı stok dengesini manuel doğrulayana kadar.
+- `Math.max(0, ...)` clamp UI hesaplarında bir invariant: stok asla negatif görünmez, urgency asla %100 üstüne çıkmaz; backend ile aynı semantik.
+- `buildAiMetadata` fallback: state-based update'lerde AI metni veri kaynağı olduğundan, AI fail = eski içerik kalır.
+- Mutation endpoint'leri (POST/PATCH) response'ları full enrichment ile dönmeli — ilk refetch'e kadar UI tutarsızlığı önlenir.
+
+**Test:** 154 dosya · 2396 test yeşil · TS clean · 0 lint hatası
 
 ---
 

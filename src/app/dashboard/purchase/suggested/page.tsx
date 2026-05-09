@@ -221,18 +221,16 @@ type DecisionFilter = "all" | "pending" | "accepted" | "rejected";
 /**
  * Compute suggestion for a single product row.
  *
- * Audit 5. tur Fix 2: hesap promisable (= available_now - quoted) üzerinden.
- * Backend purchase-copilot route'uyla aynı semantik:
- *   needed = max(0, target - promisable)
- * Quote'lu siparişler ayrılmış olarak — UI sayısı backend metadata.suggestQty
- * ile tutarlı kalır.
+ * Audit 5-6. tur: hesap promisable (= available_now - quoted) üzerinden;
+ * over-quoted durum için 0'a clamp. Backend purchase-copilot route'uyla
+ * aynı semantik: needed = max(0, target - max(0, promisable)).
  */
 export function computeSuggestion(p: Product) {
     const { target, formula, leadTimeDemand } = computeTargetStock(
         p.minStockLevel, p.dailyUsage ?? null, p.leadTimeDays ?? null
     );
     const moq = Math.max(1, p.reorderQty ?? p.minStockLevel);
-    const stock = p.promisable ?? p.available_now;
+    const stock = pickStock(p);
     const needed = Math.max(0, target - stock);
     const suggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
     return { suggestQty, target, formula, leadTimeDemand, moq };
@@ -242,14 +240,23 @@ export function computeSuggestion(p: Product) {
  * Audit 5. tur Fix 2: row-level UI hesapları için promisable bazlı stok değeri.
  * Mobil kart + masaüstü tablo bunu kullanır → urgency/coverage/stok rozeti
  * UI ile backend tutarlı olur.
+ *
+ * Audit 6. tur Fix 2: over-quoted (promisable<0) durumunda stok 0'a clamp,
+ * urgency en fazla 100. Backend `Math.max(0, promisable)` ile aynı semantik.
  */
+export function pickStock(p: Pick<Product, "promisable" | "available_now">): number {
+    return Math.max(0, p.promisable ?? p.available_now);
+}
+
 export function computeRowStock(p: Product): {
     stock: number;
     urgency: number;
     daysLeft: number | null;
 } {
-    const stock = p.promisable ?? p.available_now;
-    const urgency = p.minStockLevel > 0 ? Math.round((1 - stock / p.minStockLevel) * 100) : 100;
+    const stock = pickStock(p);
+    const urgency = p.minStockLevel > 0
+        ? Math.min(100, Math.round((1 - stock / p.minStockLevel) * 100))
+        : 100;
     const daysLeft = computeCoverageDays(stock, p.dailyUsage);
     return { stock, urgency, daysLeft };
 }
@@ -530,7 +537,7 @@ function RecActionCell({
 }
 
 export default function PurchaseSuggestedPage() {
-    const { reorderSuggestions, refetchAll } = useData();
+    const { reorderSuggestions, products, refetchAll } = useData();
     const [filter, setFilter] = useState<FilterType>("all");
     const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>("all");
     const [search, setSearch] = useState("");
@@ -793,9 +800,22 @@ export default function PurchaseSuggestedPage() {
     const manufacturedItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "manufactured"), [reorderSuggestions]);
     const commercialItems = useMemo(() => reorderSuggestions.filter(p => p.productType === "commercial"), [reorderSuggestions]);
 
+    // Audit 6. tur Fix 1: out-of-scope decided ürünler — needsPurchase=false
+    // ama recMap'te kararı olan (accepted/edited/rejected). Bunlar
+    // reorderSuggestions'da yok → drift rozetiyle görünmek için ayrıca eklenir.
+    const displayProducts = useMemo(() => {
+        const seen = new Set(reorderSuggestions.map(p => p.id));
+        const outOfScope = products.filter(p => {
+            if (seen.has(p.id)) return false;
+            const status = recMap.get(p.id)?.status;
+            return status === "accepted" || status === "edited" || status === "rejected";
+        });
+        return [...reorderSuggestions, ...outOfScope];
+    }, [reorderSuggestions, products, recMap]);
+
     const sorted = useMemo(() => {
         const purchaseSearched = search.trim().toLowerCase();
-        const base = (filter === "all" ? reorderSuggestions : reorderSuggestions.filter(p => p.productType === filter))
+        const base = (filter === "all" ? displayProducts : displayProducts.filter(p => p.productType === filter))
             .filter(p =>
                 !purchaseSearched ||
                 p.name.toLowerCase().includes(purchaseSearched) ||
@@ -810,13 +830,16 @@ export default function PurchaseSuggestedPage() {
             if (dlA !== null) return -1;
             if (dlB !== null) return 1;
             // Fallback: coverage days ascending (null last)
-            const daysA = computeCoverageDays(a.available_now, a.dailyUsage);
-            const daysB = computeCoverageDays(b.available_now, b.dailyUsage);
+            // Audit 6. tur Fix 3: promisable bazlı (UI satır hesaplarıyla aynı)
+            const stockA = pickStock(a);
+            const stockB = pickStock(b);
+            const daysA = computeCoverageDays(stockA, a.dailyUsage);
+            const daysB = computeCoverageDays(stockB, b.dailyUsage);
             if (daysA !== null && daysB !== null) return daysA - daysB;
             if (daysA !== null) return -1;
             if (daysB !== null) return 1;
-            const urgA = a.minStockLevel > 0 ? 1 - a.available_now / a.minStockLevel : 1;
-            const urgB = b.minStockLevel > 0 ? 1 - b.available_now / b.minStockLevel : 1;
+            const urgA = a.minStockLevel > 0 ? 1 - stockA / a.minStockLevel : 1;
+            const urgB = b.minStockLevel > 0 ? 1 - stockB / b.minStockLevel : 1;
             return urgB - urgA;
         }).filter(p => {
             if (decisionFilter === "all") return true;
@@ -825,7 +848,7 @@ export default function PurchaseSuggestedPage() {
             if (decisionFilter === "rejected") return st === "rejected";
             return !st || (st !== "accepted" && st !== "rejected");
         });
-    }, [reorderSuggestions, search, filter, decisionFilter, recMap]);
+    }, [displayProducts, search, filter, decisionFilter, recMap]);
 
     // Sprint C G4 + G8: costPrice ve price NULL ise satır toplama dahil edilmez.
     // Multi-currency: her currency ayrı toplanır; tek currency mevcut görünüm korunur.
@@ -847,12 +870,13 @@ export default function PurchaseSuggestedPage() {
         [reorderSuggestions, recMap]
     );
 
+    // Audit 6. tur Fix 3: en acil ürün de promisable bazlı seçilir
     const mostUrgent = [...reorderSuggestions]
         .filter(p => p.dailyUsage)
-        .sort((a, b) => (a.available_now / (a.dailyUsage ?? 1)) - (b.available_now / (b.dailyUsage ?? 1)))[0];
+        .sort((a, b) => (pickStock(a) / (a.dailyUsage ?? 1)) - (pickStock(b) / (b.dailyUsage ?? 1)))[0];
 
     const mostUrgentDays = mostUrgent
-        ? computeCoverageDays(mostUrgent.available_now, mostUrgent.dailyUsage)
+        ? computeCoverageDays(pickStock(mostUrgent), mostUrgent.dailyUsage)
         : null;
 
     const aiDrawerProduct = aiDrawerProductId
@@ -862,8 +886,9 @@ export default function PurchaseSuggestedPage() {
     const aiDrawerRecEntry = aiDrawerProductId ? recMap.get(aiDrawerProductId) : undefined;
     const aiDrawerSuggestion = aiDrawerProduct ? computeSuggestion(aiDrawerProduct) : null;
     const aiDrawerSuggestQty = aiDrawerSuggestion?.suggestQty ?? 1;
+    // Audit 6. tur Fix 3: AI drawer coverage da promisable bazlı
     const aiDrawerCoverageDays = aiDrawerProduct
-        ? computeCoverageDays(aiDrawerProduct.available_now, aiDrawerProduct.dailyUsage)
+        ? computeCoverageDays(pickStock(aiDrawerProduct), aiDrawerProduct.dailyUsage)
         : null;
 
     const tabs: { key: FilterType; label: string; count: number }[] = [
@@ -1516,11 +1541,16 @@ export default function PurchaseSuggestedPage() {
                                 Stok Durumu
                             </div>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "10px" }}>
-                                {[
-                                    { label: "Mevcut", value: `${aiDrawerProduct.available_now.toLocaleString("tr-TR")} ${aiDrawerProduct.unit}`, color: "var(--danger-text)" },
-                                    { label: "Minimum", value: `${aiDrawerProduct.minStockLevel.toLocaleString("tr-TR")} ${aiDrawerProduct.unit}`, color: "var(--text-secondary)" },
-                                    { label: "Açık", value: `-${(aiDrawerProduct.minStockLevel - aiDrawerProduct.available_now).toLocaleString("tr-TR")} ${aiDrawerProduct.unit}`, color: "var(--danger-text)" },
-                                ].map(item => (
+                                {(() => {
+                                    // Audit 6. tur Fix 3: drawer Stok Durumu da promisable bazlı
+                                    const drawerStock = pickStock(aiDrawerProduct);
+                                    const deficit = Math.max(0, aiDrawerProduct.minStockLevel - drawerStock);
+                                    return [
+                                        { label: "Mevcut", value: `${drawerStock.toLocaleString("tr-TR")} ${aiDrawerProduct.unit}`, color: "var(--danger-text)" },
+                                        { label: "Minimum", value: `${aiDrawerProduct.minStockLevel.toLocaleString("tr-TR")} ${aiDrawerProduct.unit}`, color: "var(--text-secondary)" },
+                                        { label: "Açık", value: deficit > 0 ? `-${deficit.toLocaleString("tr-TR")} ${aiDrawerProduct.unit}` : `0 ${aiDrawerProduct.unit}`, color: deficit > 0 ? "var(--danger-text)" : "var(--text-secondary)" },
+                                    ];
+                                })().map(item => (
                                     <div key={item.label}>
                                         <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{item.label}</div>
                                         <div style={{ fontSize: "12px", fontWeight: 600, color: item.color }}>{item.value}</div>
@@ -1529,7 +1559,7 @@ export default function PurchaseSuggestedPage() {
                             </div>
                             <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px", overflow: "hidden", marginBottom: "6px" }}>
                                 <div style={{
-                                    width: `${aiDrawerProduct.minStockLevel > 0 ? Math.min(100, Math.round((aiDrawerProduct.available_now / aiDrawerProduct.minStockLevel) * 100)) : 0}%`,
+                                    width: `${aiDrawerProduct.minStockLevel > 0 ? Math.min(100, Math.round((pickStock(aiDrawerProduct) / aiDrawerProduct.minStockLevel) * 100)) : 0}%`,
                                     height: "100%",
                                     background: "var(--danger)",
                                     borderRadius: "2px",

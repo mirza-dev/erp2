@@ -15,7 +15,7 @@ import type { Product } from "@/lib/mock-data";
 vi.mock("@/lib/data-context", () => ({ useData: () => ({ reorderSuggestions: [], refetchAll: () => {} }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => {} }) }));
 
-import { computeSuggestion, computeRowStock } from "@/app/dashboard/purchase/suggested/page";
+import { computeSuggestion, computeRowStock, pickStock } from "@/app/dashboard/purchase/suggested/page";
 
 function makeProduct(overrides: Partial<Product> = {}): Product {
     return {
@@ -74,11 +74,12 @@ describe("computeSuggestion — promisable bazlı hesaplama", () => {
         expect(result.suggestQty).toBe(40);
     });
 
-    it("promisable<0 (over-quoted) → needed=target, suggestQty target'ı karşılar", () => {
-        // available=10, quoted=15 → promisable=-5 → needed=max(0, 40-(-5))=45 → suggestQty=50
+    it("promisable<0 (over-quoted) → 0'a clamp, suggestQty target'ı karşılar", () => {
+        // Audit 6. tur Fix 2: stock = max(0, promisable) = 0
+        // available=10, quoted=15 → promisable=-5 → stock=0 → needed=max(0, 40-0)=40 → suggestQty=40
         const p = makeProduct({ available_now: 10, quoted: 15, promisable: -5, minStockLevel: 20, reorderQty: 10 });
         const result = computeSuggestion(p);
-        expect(result.suggestQty).toBe(50);
+        expect(result.suggestQty).toBe(40);
     });
 
     it("Backend hesabıyla aynı (regression to route.ts:138-145)", () => {
@@ -140,5 +141,61 @@ describe("computeRowStock — UI satır görüntülemesi promisable bazlı", () 
         const p = makeProduct({ available_now: 0, promisable: 0, minStockLevel: 0 });
         const r = computeRowStock(p);
         expect(r.urgency).toBe(100);
+    });
+
+    // ─── Audit 6. tur Fix 2 — over-quoted clamp ─────────────────────────────
+
+    it("promisable=-5 → stock 0'a clamp (negatif görünmez)", () => {
+        const p = makeProduct({ available_now: 10, quoted: 15, promisable: -5, minStockLevel: 20 });
+        const r = computeRowStock(p);
+        expect(r.stock).toBe(0);
+    });
+
+    it("promisable=-5, min=20 → urgency 100'e clamp (Math.min koruması)", () => {
+        // 1 - (-5)/20 = 1.25 → 125% — clamp olmadan; yeni davranış: 100
+        const p = makeProduct({ available_now: 10, quoted: 15, promisable: -5, minStockLevel: 20 });
+        const r = computeRowStock(p);
+        expect(r.urgency).toBe(100);
+    });
+
+    it("promisable=-5, dailyUsage=2 → daysLeft=0 (Math.max(0, stock) sayesinde)", () => {
+        // negatif stok için coverageDays sıfır
+        const p = makeProduct({ available_now: 10, quoted: 15, promisable: -5, dailyUsage: 2, minStockLevel: 20 });
+        const r = computeRowStock(p);
+        expect(r.daysLeft).toBe(0);
+    });
+
+    it("promisable=15, min=20 → urgency=25 (clamp aktifken pozitif değerler etkilenmez, regresyon)", () => {
+        // 1 - 15/20 = 0.25 → 25%
+        const p = makeProduct({ available_now: 50, quoted: 35, promisable: 15, minStockLevel: 20 });
+        const r = computeRowStock(p);
+        expect(r.urgency).toBe(25);
+    });
+});
+
+// ─── Audit 6. tur Fix 3 — pickStock helper (sort/mostUrgent/drawer için) ────────
+
+describe("pickStock — promisable bazlı stok seçici (clamp + fallback)", () => {
+    it("promisable null → fallback p.available_now", () => {
+        const p = { available_now: 100, promisable: undefined as unknown as number };
+        expect(pickStock(p)).toBe(100);
+    });
+
+    it("promisable=10, available_now=50 → 10 (promisable öncelikli)", () => {
+        expect(pickStock({ available_now: 50, promisable: 10 })).toBe(10);
+    });
+
+    it("promisable=-5 → 0 (over-quoted clamp)", () => {
+        expect(pickStock({ available_now: 10, promisable: -5 })).toBe(0);
+    });
+
+    it("promisable=0 → 0 (boundary)", () => {
+        expect(pickStock({ available_now: 50, promisable: 0 })).toBe(0);
+    });
+
+    it("available_now=-5 (anomali) + promisable null → 0 clamp", () => {
+        // Math.max(0, -5) = 0
+        const p = { available_now: -5, promisable: undefined as unknown as number };
+        expect(pickStock(p)).toBe(0);
     });
 });

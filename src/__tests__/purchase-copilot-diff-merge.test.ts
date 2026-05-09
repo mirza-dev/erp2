@@ -247,6 +247,118 @@ describe("G11 diff-merge — suggested rec + level changed", () => {
         await POST();
         expect(mockDbUpdateRecommendationMetadata).not.toHaveBeenCalled();
     });
+
+    // ─── Audit 6. tur Fix 4 — AI fail/empty durumunda eski metadata fallback ──
+
+    it("AI throw → eski rec metadata'daki aiWhyNow korunur (silinmez)", async () => {
+        // Eski rec metadata'sında aiWhyNow="Eski iyi metin"
+        mockDbGetActiveRecommendationsForEntities.mockResolvedValue([{
+            id: "rec-old",
+            entity_id: "p-1",
+            entity_type: "product",
+            recommendation_type: "purchase_suggestion",
+            status: "suggested",
+            metadata: {
+                urgencyLevel: "high",
+                coverageDays: 10,
+                suggestQty: 80,
+                aiWhyNow: "Eski iyi metin",
+                aiQuantityRationale: "Eski rationale",
+                aiUrgencyLevel: "high",
+            },
+            confidence: 0.7,
+            decided_at: null,
+            edited_metadata: null,
+            created_at: "2024-01-01T00:00:00Z",
+        }]);
+        // AI fail
+        mockAiEnrichPurchaseSuggestions.mockRejectedValue(new Error("network"));
+
+        await POST();
+
+        const [, patch] = mockDbUpdateSuggestedRecommendation.mock.calls[0];
+        // Yeni metadata'da aiWhyNow eski değeri korunur
+        expect(patch.metadata.aiWhyNow).toBe("Eski iyi metin");
+        expect(patch.metadata.aiQuantityRationale).toBe("Eski rationale");
+        expect(patch.metadata.aiUrgencyLevel).toBe("high");
+    });
+
+    it("AI empty enrichments → eski metadata fallback (graceful)", async () => {
+        mockDbGetActiveRecommendationsForEntities.mockResolvedValue([{
+            id: "rec-old",
+            entity_id: "p-1",
+            entity_type: "product",
+            recommendation_type: "purchase_suggestion",
+            status: "suggested",
+            metadata: {
+                urgencyLevel: "high",
+                coverageDays: 10,
+                suggestQty: 80,
+                aiWhyNow: "Eski açıklama",
+                aiQuantityRationale: "Eski qrationale",
+                aiUrgencyLevel: "moderate",
+            },
+            confidence: 0.6,
+            decided_at: null,
+            edited_metadata: null,
+            created_at: "2024-01-01T00:00:00Z",
+        }]);
+        // AI graceful empty
+        mockAiEnrichPurchaseSuggestions.mockResolvedValue({
+            enrichments: [],
+            generatedAt: new Date().toISOString(),
+            hadError: false,
+        });
+
+        await POST();
+
+        const [, patch] = mockDbUpdateSuggestedRecommendation.mock.calls[0];
+        expect(patch.metadata.aiWhyNow).toBe("Eski açıklama");
+        expect(patch.metadata.aiQuantityRationale).toBe("Eski qrationale");
+        expect(patch.metadata.aiUrgencyLevel).toBe("moderate");
+    });
+
+    it("AI başarılı (yeni enrichment) → eski metadata override edilir (regresyon)", async () => {
+        mockDbGetActiveRecommendationsForEntities.mockResolvedValue([{
+            id: "rec-old",
+            entity_id: "p-1",
+            entity_type: "product",
+            recommendation_type: "purchase_suggestion",
+            status: "suggested",
+            metadata: {
+                urgencyLevel: "high",
+                coverageDays: 10,
+                suggestQty: 80,
+                aiWhyNow: "Eski metin",
+                aiQuantityRationale: "Eski",
+                aiUrgencyLevel: "high",
+            },
+            confidence: 0.7,
+            decided_at: null,
+            edited_metadata: null,
+            created_at: "2024-01-01T00:00:00Z",
+        }]);
+        // AI yeni metin döner
+        mockAiEnrichPurchaseSuggestions.mockResolvedValue({
+            enrichments: [{
+                productId: "p-1",
+                whyNow: "Yeni AI yorumu",
+                quantityRationale: "Yeni",
+                urgencyLevel: "critical",
+                confidence: 0.85,
+            }],
+            generatedAt: new Date().toISOString(),
+            hadError: false,
+        });
+
+        await POST();
+
+        const [, patch] = mockDbUpdateSuggestedRecommendation.mock.calls[0];
+        // Yeni AI metni eski metadata'yı override eder
+        expect(patch.metadata.aiWhyNow).toBe("Yeni AI yorumu");
+        expect(patch.metadata.aiQuantityRationale).toBe("Yeni");
+        expect(patch.metadata.aiUrgencyLevel).toBe("critical");
+    });
 });
 
 // ─── Suggested rec metadata'da urgencyLevel eksik (eski sürüm rec) ───────────

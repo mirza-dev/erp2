@@ -16,6 +16,7 @@ import {
     dbExpireStaleRecommendations,
     dbExpireRecommendationsForMissingEntities,
     dbGetActiveRecommendationsForEntities,
+    dbListRecommendations,
     dbUpdateRecommendationMetadata,
     dbUpdateSuggestedRecommendation,
 } from "@/lib/supabase/recommendations";
@@ -175,6 +176,11 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     // ── G11: Mevcut aktif rec'leri yükle ve sınıflandır ──────────────────────
     // suggestedRecMap → diff-merge target (status='suggested')
     // decidedRecMap   → frozen, drift hesaplanır (accepted/edited/rejected)
+    //
+    // Audit 6. tur Fix 1: decided rec'ler items dışındaki ürünler için de yüklenir.
+    // Senaryo: kullanıcı öneriyi kabul etti → stok 5→200 → ürün artık needsPurchase
+    // değil → eski sürümde decided rec response'tan kayıp + drift rozeti kayıp.
+    // Yeni: tüm aktif decided rec'leri ayrıca yükle ve drift hesapla.
     const suggestedRecMap = new Map<string, AiRecommendationRow>();
     const decidedRecMap = new Map<string, AiRecommendationRow>();
     try {
@@ -187,6 +193,31 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         }
     } catch {
         // Non-fatal: if we can't load existing, treat all as needing fresh AI
+    }
+
+    // Out-of-scope decided rec'ler — tüm aktif decided rec'leri çek (purchase_suggestion);
+    // 7-günlük decided window ve orphan cleanup zaten upstream uygulanıyor.
+    try {
+        const allActiveRecs = await dbListRecommendations({
+            entity_type: "product",
+            recommendation_type: "purchase_suggestion",
+        });
+        const DECIDED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+        const now = Date.now();
+        const seen = new Set<string>([
+            ...suggestedRecMap.keys(),
+            ...decidedRecMap.keys(),
+        ]);
+        for (const r of allActiveRecs) {
+            if (r.status !== "accepted" && r.status !== "edited" && r.status !== "rejected") continue;
+            if (seen.has(r.entity_id)) continue;
+            const pivot = r.decided_at ?? r.created_at;
+            if (now - new Date(pivot).getTime() >= DECIDED_MAX_AGE_MS) continue;
+            decidedRecMap.set(r.entity_id, r);
+            seen.add(r.entity_id);
+        }
+    } catch {
+        // Non-fatal: out-of-scope drift göremesek bile ana akış devam eder
     }
 
     // ── G11 diff-merge: 'suggested' rec'leri level karşılaştırmasıyla böl ────
@@ -234,18 +265,45 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     }));
 
     // ── G11 decided drift detection ──────────────────────────────────────────
+    // Audit 6. tur Fix 1: drift hesabı items dışı decided rec'leri de kapsar.
+    // Stok düzelmiş ürün (needsPurchase=false) için de "Stok değişti" sinyali
+    // verilebilir — örn. accepted iken stok 5→200, kullanıcı görmeli.
     type Drift = { suggestQty: number; urgencyLevel: UrgencyLevel };
     const driftMap = new Map<string, Drift>();
-    for (const item of items) {
-        const decided = decidedRecMap.get(item.productId);
-        if (!decided) continue;
+    const itemMap = new Map(items.map(i => [i.productId, i]));
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    for (const [productId, decided] of decidedRecMap) {
+        // Önce items içinde varsa onun hazır hesaplarını kullan
+        const item = itemMap.get(productId);
+        let currentSuggestQty: number;
+        let currentLevel: UrgencyLevel;
+
+        if (item) {
+            currentSuggestQty = item.suggestQty;
+            currentLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
+        } else {
+            // Out-of-scope: ürünün güncel state'inden hesapla
+            const p = productMap.get(productId);
+            if (!p) continue; // ürün silinmiş — orphan cleanup ele alır
+            const dailyUsage = p.daily_usage ?? null;
+            const leadTimeDays = p.lead_time_days ?? null;
+            const promisable = p.available_now - (quotedMap.get(p.id) ?? 0);
+            const stock = Math.max(0, promisable);
+            const moq = Math.max(1, p.reorder_qty ?? p.min_stock_level);
+            const { target } = computeTargetStock(p.min_stock_level, dailyUsage, leadTimeDays);
+            const needed = Math.max(0, target - stock);
+            currentSuggestQty = needed === 0 ? moq : Math.max(moq, Math.ceil(needed / moq) * moq);
+            const coverageDays = computeCoverageDays(stock, dailyUsage);
+            currentLevel = computeUrgencyLevel(coverageDays, leadTimeDays);
+        }
+
         const meta = decided.metadata as Record<string, unknown> | null;
         const frozenSuggestQty = (meta?.suggestQty as number | undefined) ?? null;
         const frozenLevel = readUrgencyLevelFromMeta(meta);
-        const currentLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
-        if (frozenSuggestQty !== item.suggestQty || frozenLevel !== currentLevel) {
-            driftMap.set(item.productId, {
-                suggestQty: item.suggestQty,
+        if (frozenSuggestQty !== currentSuggestQty || frozenLevel !== currentLevel) {
+            driftMap.set(productId, {
+                suggestQty: currentSuggestQty,
                 urgencyLevel: currentLevel,
             });
         }
@@ -376,26 +434,44 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             ? dbExpireSuggestedRecommendations("product", activeProductIds, "purchase_suggestion")
             : dbExpireAllSuggestedRecommendations("product", "purchase_suggestion");
 
-        // Helper: AI sonrası metadata patch'i (insert ve update'te aynı şekil)
-        const buildAiMetadata = (item: PurchaseSuggestionItem) => {
+        // Helper: AI sonrası metadata patch'i (insert ve update'te aynı şekil).
+        // Audit 6. tur Fix 4: AI fail/empty ise eski metadata'daki AI metnine fallback
+        // (level değişimi metadata refresh demek; AI elde edilemediyse boş null
+        // overwrite'tan iyidir — eski AI yorumu kullanıcıya gösterilmeye devam).
+        const buildAiMetadata = (
+            item: PurchaseSuggestionItem,
+            fallbackMeta?: Record<string, unknown> | null,
+        ) => {
             const ai = freshAiMap.get(item.productId);
+            const fb = fallbackMeta ?? {};
+            const fbWhyNow = typeof fb.aiWhyNow === "string" ? fb.aiWhyNow : null;
+            const fbQuantityRationale = typeof fb.aiQuantityRationale === "string" ? fb.aiQuantityRationale : null;
+            const fbUrgencyLevel = (fb.aiUrgencyLevel === "critical" || fb.aiUrgencyLevel === "high" || fb.aiUrgencyLevel === "moderate")
+                ? fb.aiUrgencyLevel
+                : null;
+
+            const aiWhyNow = ai?.whyNow ?? fbWhyNow;
+            const aiQuantityRationale = ai?.quantityRationale ?? fbQuantityRationale;
+            const aiUrgencyLevel = ai?.urgencyLevel ?? fbUrgencyLevel;
+
             const urgencyPct = computeUrgencyPct(item.available, item.min);
             const urgencyLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
             const severity: "critical" | "warning" | "info" = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
             return {
                 ai,
+                aiWhyNow,
                 urgencyPct,
                 urgencyLevel,
                 severity,
-                body: ai?.whyNow ?? `Stok ${item.available}/${item.min}. Önerilen: ${item.suggestQty} ${item.unit}.`,
+                body: aiWhyNow ?? `Stok ${item.available}/${item.min}. Önerilen: ${item.suggestQty} ${item.unit}.`,
                 metadata: {
                     suggestQty: item.suggestQty,
                     moq: item.moq,
                     urgencyPct,
                     urgencyLevel,
-                    aiWhyNow: ai?.whyNow ?? null,
-                    aiQuantityRationale: ai?.quantityRationale ?? null,
-                    aiUrgencyLevel: ai?.urgencyLevel ?? null,
+                    aiWhyNow,
+                    aiQuantityRationale,
+                    aiUrgencyLevel,
                     coverageDays: item.coverageDays,
                     leadTimeDays: item.leadTimeDays,
                     targetStock: item.targetStock,
@@ -428,9 +504,11 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         // Audit 3. tur Fix 5: levelChangedItems → mevcut 'suggested' rec'i
         // in-place UPDATE et (expire+upsert dansını eler). Tek atomik UPDATE
         // ile body/severity/confidence/metadata yenilenir; rec ID stable kalır.
+        // Audit 6. tur Fix 4: AI fail durumunda eski metadata'yı fallback olarak geçir.
         const levelChangedPromises = levelChangedItems.map(async item => {
             const rec = suggestedRecMap.get(item.productId)!;
-            const m = buildAiMetadata(item);
+            const fallbackMeta = rec.metadata as Record<string, unknown> | null;
+            const m = buildAiMetadata(item, fallbackMeta);
             try {
                 const updated = await dbUpdateSuggestedRecommendation(rec.id, {
                     body: m.body,
@@ -459,20 +537,17 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             };
         });
 
-        // Decided rec'ler — frozen metadata + drift bilgisi
-        const decidedRefs: RecRef[] = items
-            .filter(item => decidedRecMap.has(item.productId))
-            .map(item => {
-                const rec = decidedRecMap.get(item.productId)!;
-                return {
-                    productId: item.productId,
-                    recommendationId: rec.id,
-                    status: rec.status,
-                    decidedAt: rec.decided_at,
-                    editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
-                    currentDrift: driftMap.get(item.productId) ?? null,
-                };
-            });
+        // Decided rec'ler — frozen metadata + drift bilgisi.
+        // Audit 6. tur Fix 1: items'a bağımlı değil — decidedRecMap tüm aktif
+        // decided rec'leri içeriyor (out-of-scope dahil), her biri response'a girer.
+        const decidedRefs: RecRef[] = Array.from(decidedRecMap.entries()).map(([productId, rec]) => ({
+            productId,
+            recommendationId: rec.id,
+            status: rec.status,
+            decidedAt: rec.decided_at,
+            editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
+            currentDrift: driftMap.get(productId) ?? null,
+        }));
 
         const [, upsertResults, levelChangedResults] = await Promise.all([
             expirePromise,
