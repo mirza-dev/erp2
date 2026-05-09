@@ -16,8 +16,9 @@ const mockDbListProducts = vi.fn();
 const mockDbGetAllActiveProductIds = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts: (...a: unknown[]) => mockDbListProducts(...a),
+    dbListAllActiveProducts: (...a: unknown[]) => mockDbListProducts(...a),
     dbGetAllActiveProductIds: (...a: unknown[]) => mockDbGetAllActiveProductIds(...a),
+    dbGetQuotedQuantities: vi.fn().mockResolvedValue(new Map()),
 }));
 
 vi.mock("@/lib/services/ai-service", () => ({

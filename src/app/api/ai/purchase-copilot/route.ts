@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { dbListProducts, dbGetAllActiveProductIds } from "@/lib/supabase/products";
+import { dbListAllActiveProducts, dbGetAllActiveProductIds, dbGetQuotedQuantities } from "@/lib/supabase/products";
 import {
     computeTargetStock,
     computeCoverageDays,
@@ -15,9 +15,9 @@ import {
     dbExpireAllSuggestedRecommendations,
     dbExpireStaleRecommendations,
     dbExpireRecommendationsForMissingEntities,
-    dbExpireEntityRecommendations,
     dbGetActiveRecommendationsForEntities,
     dbUpdateRecommendationMetadata,
+    dbUpdateSuggestedRecommendation,
 } from "@/lib/supabase/recommendations";
 import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
@@ -83,12 +83,24 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
     }
 
-    // Expire suggested recommendations that were never acted on after 48 hours.
-    try { await dbExpireStaleRecommendations(48); } catch { /* non-fatal */ }
+    // 48 saat TTL — sadece purchase_suggestion (audit 3. tur Fix 4):
+    // tip filtresi olmadan helper diğer rec tiplerini de etkilerdi.
+    try { await dbExpireStaleRecommendations(48, "purchase_suggestion"); } catch { /* non-fatal */ }
 
-    let products: Awaited<ReturnType<typeof dbListProducts>>;
+    // Audit 3. tur Fix 2: dbListAllActiveProducts pagination'sız tüm aktif
+    // ürünleri çeker. Önceki dbListProducts({pageSize:500}) 501. ürün için
+    // hem öneri üretmiyor hem cleanup'ta orphan sayıp valid rec'leri expire
+    // edebiliyordu.
+    let products: Awaited<ReturnType<typeof dbListAllActiveProducts>>;
+    let quotedMap: Map<string, number>;
     try {
-        products = await dbListProducts({ is_active: true, pageSize: 500 });
+        // Audit 3. tur Fix 1: quoted miktarları çekip promisable hesapla.
+        // /api/products route'uyla aynı semantik: draft+pending_approval
+        // siparişlerdeki açık quote'lar promisable'dan düşülür.
+        [products, quotedMap] = await Promise.all([
+            dbListAllActiveProducts(),
+            dbGetQuotedQuantities(),
+        ]);
     } catch (err) {
         return handleApiError(err, "Satın alma önerileri toplanamadı.");
     }
@@ -100,10 +112,15 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     } catch { /* non-fatal */ }
 
     const REORDER_DEADLINE_WINDOW_DAYS = 7;
+    // Audit 3. tur Fix 1: promisable = available_now - quoted (UI ile aynı).
+    const promisableMap = new Map<string, number>();
+    for (const p of products) {
+        promisableMap.set(p.id, p.available_now - (quotedMap.get(p.id) ?? 0));
+    }
     const needsPurchase = products.filter(p => {
         if (p.product_type === "manufactured") return false;
         if (p.available_now <= p.min_stock_level) return true;
-        const promisable = p.promisable ?? p.available_now;
+        const promisable = promisableMap.get(p.id) ?? p.available_now;
         const { orderDeadline } = computeOrderDeadline(promisable, p.daily_usage, p.lead_time_days);
         return !!(orderDeadline && dateDaysFromToday(orderDeadline) <= REORDER_DEADLINE_WINDOW_DAYS);
     });
@@ -186,11 +203,12 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         noRecItems.push(item);
     }
 
-    // Level değişen rec'leri expire et — yeni rec için unique index temizlensin.
-    // Yalnızca purchase_suggestion: aynı ürünün diğer rec türleri (varsa) korunur.
-    await Promise.all(levelChangedItems.map(item =>
-        dbExpireEntityRecommendations(item.productId, "product", "purchase_suggestion").catch(() => undefined)
-    ));
+    // Audit 3. tur Fix 5: levelChanged için "expire+upsert" dansı kaldırıldı.
+    // Eskiden: dbExpireEntityRecommendations sessiz fail'de upsert dedupe'a
+    // düşüyordu; yeni AI içeriği DB'ye yazılmıyor, her cron'da AI tekrar
+    // çağrılıyordu. Yeni akış: AI sonrası dbUpdateSuggestedRecommendation
+    // ile rec body/confidence/severity/metadata atomik tek UPDATE'le yenilenir
+    // (rec ID stable kalır, UI reference'ı bozulmaz).
 
     // Level-aynı rec'lerin metadata'sını sayısal alanlarla güncelle (best-effort)
     await Promise.all(levelSameItems.map(item => {
@@ -242,6 +260,10 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         try {
             const result = await aiEnrichPurchaseSuggestions(needsAiItems);
             freshEnrichments = result.enrichments;
+            // Audit 3. tur Fix 3: servis catch içinde graceful return ediyor
+            // (throw etmiyor). hadError flag'i "AI çağrıldı ama içerik üretilemedi"
+            // sinyali — UI banner'ı bu üzerinden gösterilir.
+            if (result.hadError) aiCallFailed = true;
         } catch {
             aiCallFailed = true;
         }
@@ -346,38 +368,72 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             ? dbExpireSuggestedRecommendations("product", activeProductIds, "purchase_suggestion")
             : dbExpireAllSuggestedRecommendations("product", "purchase_suggestion");
 
-        const upsertPromises = needsAiItems.map(async item => {
+        // Helper: AI sonrası metadata patch'i (insert ve update'te aynı şekil)
+        const buildAiMetadata = (item: PurchaseSuggestionItem) => {
             const ai = freshAiMap.get(item.productId);
             const urgencyPct = computeUrgencyPct(item.available, item.min);
             const urgencyLevel = computeUrgencyLevel(item.coverageDays, item.leadTimeDays);
-            // severity (DB sütunu) urgencyPct-based; urgencyLevel'dan bağımsız bir kavram
-            const severity = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
+            const severity: "critical" | "warning" | "info" = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
+            return {
+                ai,
+                urgencyPct,
+                urgencyLevel,
+                severity,
+                body: ai?.whyNow ?? `Stok ${item.available}/${item.min}. Önerilen: ${item.suggestQty} ${item.unit}.`,
+                metadata: {
+                    suggestQty: item.suggestQty,
+                    moq: item.moq,
+                    urgencyPct,
+                    urgencyLevel,
+                    aiWhyNow: ai?.whyNow ?? null,
+                    aiQuantityRationale: ai?.quantityRationale ?? null,
+                    aiUrgencyLevel: ai?.urgencyLevel ?? null,
+                    coverageDays: item.coverageDays,
+                    leadTimeDays: item.leadTimeDays,
+                    targetStock: item.targetStock,
+                    formula: item.formula,
+                },
+            };
+        };
+
+        // noRecItems → fresh upsert (insert)
+        const upsertPromises = noRecItems.map(async item => {
+            const m = buildAiMetadata(item);
             try {
                 const rec = await dbUpsertRecommendation({
                     entity_type: "product",
                     entity_id: item.productId,
                     recommendation_type: "purchase_suggestion",
                     title: `${item.productName} — Satın alma önerisi`,
-                    body: ai?.whyNow ?? `Stok ${item.available}/${item.min}. Önerilen: ${item.suggestQty} ${item.unit}.`,
-                    confidence: ai?.confidence ?? null,
-                    severity,
+                    body: m.body,
+                    confidence: m.ai?.confidence ?? null,
+                    severity: m.severity,
                     model_version: aiAvailable ? "purchase-copilot-v1" : null,
-                    metadata: {
-                        suggestQty: item.suggestQty,
-                        moq: item.moq,
-                        urgencyPct,
-                        urgencyLevel,
-                        aiWhyNow: ai?.whyNow ?? null,
-                        aiQuantityRationale: ai?.quantityRationale ?? null,
-                        aiUrgencyLevel: ai?.urgencyLevel ?? null,
-                        coverageDays: item.coverageDays,
-                        leadTimeDays: item.leadTimeDays,
-                        targetStock: item.targetStock,
-                        formula: item.formula,
-                    },
+                    metadata: m.metadata,
                 });
                 return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at, editedMetadata: null, currentDrift: null } as RecRef;
             } catch {
+                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null } as RecRef;
+            }
+        });
+
+        // Audit 3. tur Fix 5: levelChangedItems → mevcut 'suggested' rec'i
+        // in-place UPDATE et (expire+upsert dansını eler). Tek atomik UPDATE
+        // ile body/severity/confidence/metadata yenilenir; rec ID stable kalır.
+        const levelChangedPromises = levelChangedItems.map(async item => {
+            const rec = suggestedRecMap.get(item.productId)!;
+            const m = buildAiMetadata(item);
+            try {
+                const updated = await dbUpdateSuggestedRecommendation(rec.id, {
+                    body: m.body,
+                    confidence: m.ai?.confidence ?? null,
+                    severity: m.severity,
+                    model_version: aiAvailable ? "purchase-copilot-v1" : null,
+                    metadata: m.metadata,
+                });
+                return { productId: item.productId, recommendationId: updated.id, status: updated.status, decidedAt: updated.decided_at, editedMetadata: null, currentDrift: null } as RecRef;
+            } catch (err) {
+                console.error("[purchase-copilot] levelChanged update failed", item.productId, err);
                 return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null } as RecRef;
             }
         });
@@ -410,8 +466,12 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                 };
             });
 
-        const [, upsertResults] = await Promise.all([expirePromise, Promise.all(upsertPromises)]);
-        recommendations.push(...upsertResults, ...levelSameRefs, ...decidedRefs);
+        const [, upsertResults, levelChangedResults] = await Promise.all([
+            expirePromise,
+            Promise.all(upsertPromises),
+            Promise.all(levelChangedPromises),
+        ]);
+        recommendations.push(...upsertResults, ...levelChangedResults, ...levelSameRefs, ...decidedRefs);
     } catch {
         // Persistence errors must not affect the main response
     }

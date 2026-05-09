@@ -18,14 +18,13 @@ const mockIn = vi.fn();
 
 // Zincir factory: update → eq(entity_id) → eq(entity_type) → [eq(rec_type) + eq(status)]
 //                                                           [in(status)]
+//                                                          → select("id") → Promise<{data, error}>
 function buildChain() {
     const chain: Record<string, unknown> = {};
     chain.update = (...a: unknown[]) => { mockUpdate(...a); return chain; };
     chain.eq = (col: string, val: unknown) => { mockEq(col, val); return chain; };
     chain.in = (col: string, vals: unknown[]) => { mockIn(col, vals); return chain; };
-    chain.then = (resolve: (v: { data: null; error: null }) => void) => {
-        resolve({ data: null, error: null });
-    };
+    chain.select = () => Promise.resolve({ data: [], error: null });
     return chain;
 }
 

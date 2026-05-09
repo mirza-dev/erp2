@@ -210,23 +210,31 @@ export async function dbGetActiveRecommendationsForEntities(
 }
 
 /**
- * Expire all "suggested" recommendations that were created more than
+ * Expire "suggested" recommendations that were created more than
  * `olderThanHours` hours ago and have not yet been acted on.
+ *
+ * `recommendationType` opsiyonel:
+ *   - omit → tüm rec türlerinde stale 'suggested'lar expire edilir (global TTL)
+ *   - belirtildi → yalnızca o tipin stale 'suggested'ları (purchase cron'unun
+ *     diğer rec tiplerini etkilememesi için scope dar tutulur)
+ *
  * Call at the start of every copilot route run so stale suggestions
  * don't block re-generation indefinitely.
  */
 export async function dbExpireStaleRecommendations(
-    olderThanHours = 48
+    olderThanHours = 48,
+    recommendationType?: RecommendationType,
 ): Promise<number> {
     const supabase = createServiceClient();
     const cutoff = new Date(Date.now() - olderThanHours * 60 * 60 * 1000).toISOString();
     const now = new Date().toISOString();
-    const { data, error } = await supabase
+    let query = supabase
         .from("ai_recommendations")
         .update({ status: "expired", expired_at: now })
         .eq("status", "suggested")
-        .lt("created_at", cutoff)
-        .select("id");
+        .lt("created_at", cutoff);
+    if (recommendationType) query = query.eq("recommendation_type", recommendationType);
+    const { data, error } = await query.select("id");
     if (error) throw new Error(error.message);
     return data?.length ?? 0;
 }
@@ -351,12 +359,16 @@ export async function dbUpdateRecommendationMetadata(
  *   - belirtildi (G11 diff-merge: level değişimi) → o tipte SADECE 'suggested' expire edilir.
  *     Defansif: aynı entity için (invariant kırılırsa) bir decided rec varsa
  *     yanlışlıkla expire edilmez. "Decided rec frozen" kuralı korunur.
+ *
+ * Hata durumu: error throw edilir. Caller'lar best-effort cleanup için kendi
+ * try/catch'lerini kullanmalı; sessiz fail önceki sürümde yeni AI içeriğinin
+ * silent dedupe'a düşmesine yol açıyordu (audit 3. tur Fix 5).
  */
 export async function dbExpireEntityRecommendations(
     entityId: string,
     entityType: string,
     recommendationType?: RecommendationType,
-): Promise<void> {
+): Promise<number> {
     const supabase = createServiceClient();
     let query = supabase
         .from("ai_recommendations")
@@ -370,6 +382,52 @@ export async function dbExpireEntityRecommendations(
     } else {
         query = query.in("status", ["suggested", "accepted", "edited", "rejected"]);
     }
-    await query;
-    // error not thrown — best-effort; lazy cleanup via copilot route is the backup
+    const { data, error } = await query.select("id");
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+}
+
+/**
+ * G11 audit 3. tur Fix 5: mevcut bir 'suggested' rec'in tüm dynamic alanlarını
+ * (body, confidence, severity, model_version, metadata) atomik olarak günceller.
+ *
+ * Level-değişim akışında "expire eski + insert yeni" dansının çift çağrı +
+ * silent fail problemini çözer: tek UPDATE'le hem yeni AI metni hem yeni
+ * metadata hem severity/confidence yazılır. Rec ID stable kalır → UI'nın
+ * recommendationId reference'ı bozulmaz.
+ *
+ * Sadece status='suggested' rec'leri günceller (decided dokunulmaz, defansif).
+ */
+export async function dbUpdateSuggestedRecommendation(
+    id: string,
+    patch: {
+        body?: string | null;
+        confidence?: number | null;
+        severity?: "critical" | "warning" | "info";
+        model_version?: string | null;
+        metadata?: Record<string, unknown>;
+    },
+): Promise<AiRecommendationRow> {
+    const supabase = createServiceClient();
+    const updates: Record<string, unknown> = {};
+    if (patch.body !== undefined) updates.body = patch.body;
+    if (patch.confidence !== undefined) updates.confidence = patch.confidence;
+    if (patch.severity !== undefined) updates.severity = patch.severity;
+    if (patch.model_version !== undefined) updates.model_version = patch.model_version;
+    if (patch.metadata !== undefined) {
+        // Metadata mevcut ile JS-merge: caller'ın geçtiği key'ler overwrite,
+        // diğerleri korunur (JSONB tüm key'leri replace etmesin).
+        const current = await dbGetRecommendationById(id);
+        const existing = (current?.metadata as Record<string, unknown> | null) ?? {};
+        updates.metadata = { ...existing, ...patch.metadata };
+    }
+    const { data, error } = await supabase
+        .from("ai_recommendations")
+        .update(updates)
+        .eq("id", id)
+        .eq("status", "suggested")
+        .select("*")
+        .single();
+    if (error || !data) throw new Error(error?.message ?? `Recommendation ${id} update failed (no suggested row?)`);
+    return data;
 }

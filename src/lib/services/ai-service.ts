@@ -869,6 +869,16 @@ export interface PurchaseEnrichment {
 export interface PurchaseEnrichmentResult {
     enrichments: PurchaseEnrichment[];
     generatedAt: string;
+    /**
+     * G11 audit 3. tur Fix 3: Servis throw etmek yerine graceful degradation
+     * yapıyor (boş enrichments + log). Caller'ın "AI patladı mı?" sinyali için
+     * bu flag kullanılır — UI banner'ı bu flag üzerinden gösterilir.
+     *
+     * `false`: AI çağrısı başarılı (enrichments dolu) veya AI yapılandırılmamış
+     *          veya items boş (hata yok, sadece skip).
+     * `true`:  AI çağrısı yapıldı ama exception fırlattı (network, parse, vb.).
+     */
+    hadError: boolean;
 }
 
 const PURCHASE_COPILOT_SYSTEM = `Sen endüstriyel ERP satın alma asistanısın. B2B vana satışı yapan bir firmanın satın alma önerilerini zenginleştiriyorsun.
@@ -910,11 +920,11 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
     const now = new Date().toISOString();
 
     if (!isAIAvailable()) {
-        return { enrichments: [], generatedAt: now };
+        return { enrichments: [], generatedAt: now, hadError: false };
     }
 
     if (items.length === 0) {
-        return { enrichments: [], generatedAt: now };
+        return { enrichments: [], generatedAt: now, hadError: false };
     }
 
     const t0 = Date.now();
@@ -968,14 +978,16 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
                     latency_ms: Date.now() - t0,
                     model: MODEL,
                 });
-                return { enrichments, generatedAt: now };
+                return { enrichments, generatedAt: now, hadError: false };
             }
         }
 
-        return { enrichments: [], generatedAt: now };
+        // Parse fail (jsonMatch yok / enrichments array değil) — AI cevap verdi
+        // ama kullanılabilir içerik üretemedi. Caller için "AI patladı" sinyali.
+        return { enrichments: [], generatedAt: now, hadError: true };
     } catch (err) {
         console.error("[AI PurchaseCopilot] graceful degradation:", err);
-        return { enrichments: [], generatedAt: now };
+        return { enrichments: [], generatedAt: now, hadError: true };
     }
 }
 

@@ -18,6 +18,11 @@ const mockDbListProductsForStockRisk = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
     dbListProducts: (...args: unknown[]) => mockDbListProductsForStockRisk(...args),
+    // Purchase-copilot route artık dbListAllActiveProducts kullanıyor; aynı mock'u
+    // her iki route da paylaşır (stock-risk paginated, purchase-copilot full-scan).
+    dbListAllActiveProducts: (...args: unknown[]) => mockDbListProductsForStockRisk(...args),
+    dbGetAllActiveProductIds: vi.fn().mockResolvedValue([]),
+    dbGetQuotedQuantities: vi.fn().mockResolvedValue(new Map()),
 }));
 
 const mockAiAssessStockRisk = vi.fn();

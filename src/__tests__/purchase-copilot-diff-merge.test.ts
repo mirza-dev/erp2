@@ -13,8 +13,9 @@ const mockDbListProducts = vi.fn();
 const mockDbGetAllActiveProductIds = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts: (...a: unknown[]) => mockDbListProducts(...a),
+    dbListAllActiveProducts: (...a: unknown[]) => mockDbListProducts(...a),
     dbGetAllActiveProductIds: (...a: unknown[]) => mockDbGetAllActiveProductIds(...a),
+    dbGetQuotedQuantities: vi.fn().mockResolvedValue(new Map()),
 }));
 
 const mockAiEnrichPurchaseSuggestions = vi.fn();
@@ -30,9 +31,9 @@ const mockDbExpireSuggestedRecommendations = vi.fn();
 const mockDbExpireAllSuggestedRecommendations = vi.fn();
 const mockDbExpireStaleRecommendations = vi.fn();
 const mockDbExpireRecommendationsForMissingEntities = vi.fn();
-const mockDbExpireEntityRecommendations = vi.fn();
 const mockDbGetActiveRecommendationsForEntities = vi.fn();
 const mockDbUpdateRecommendationMetadata = vi.fn();
+const mockDbUpdateSuggestedRecommendation = vi.fn();
 
 vi.mock("@/lib/supabase/recommendations", () => ({
     dbUpsertRecommendation: (...a: unknown[]) => mockDbUpsertRecommendation(...a),
@@ -40,9 +41,9 @@ vi.mock("@/lib/supabase/recommendations", () => ({
     dbExpireAllSuggestedRecommendations: (...a: unknown[]) => mockDbExpireAllSuggestedRecommendations(...a),
     dbExpireStaleRecommendations: (...a: unknown[]) => mockDbExpireStaleRecommendations(...a),
     dbExpireRecommendationsForMissingEntities: (...a: unknown[]) => mockDbExpireRecommendationsForMissingEntities(...a),
-    dbExpireEntityRecommendations: (...a: unknown[]) => mockDbExpireEntityRecommendations(...a),
     dbGetActiveRecommendationsForEntities: (...a: unknown[]) => mockDbGetActiveRecommendationsForEntities(...a),
     dbUpdateRecommendationMetadata: (...a: unknown[]) => mockDbUpdateRecommendationMetadata(...a),
+    dbUpdateSuggestedRecommendation: (...a: unknown[]) => mockDbUpdateSuggestedRecommendation(...a),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -100,12 +101,14 @@ beforeEach(() => {
     mockDbExpireStaleRecommendations.mockResolvedValue(0);
     mockDbExpireRecommendationsForMissingEntities.mockReset();
     mockDbExpireRecommendationsForMissingEntities.mockResolvedValue(0);
-    mockDbExpireEntityRecommendations.mockReset();
-    mockDbExpireEntityRecommendations.mockResolvedValue(undefined);
     mockDbGetActiveRecommendationsForEntities.mockReset();
     mockDbGetActiveRecommendationsForEntities.mockResolvedValue([]);
     mockDbUpdateRecommendationMetadata.mockReset();
     mockDbUpdateRecommendationMetadata.mockResolvedValue(undefined);
+    mockDbUpdateSuggestedRecommendation.mockReset();
+    mockDbUpdateSuggestedRecommendation.mockResolvedValue({
+        id: "rec-old", status: "suggested", decided_at: null,
+    });
 });
 
 // ─── Suggested rec + level aynı: metadata refresh, AI atlanır ────────────────
@@ -157,9 +160,11 @@ describe("G11 diff-merge — suggested rec + level same", () => {
         expect(mockAiEnrichPurchaseSuggestions).not.toHaveBeenCalled();
     });
 
-    it("Eski rec expire EDİLMEZ", async () => {
+    it("Eski rec UPDATE EDİLMEZ (in-place metadata patch ile karıştırma — body değil)", async () => {
+        // Level-same: dbUpdateRecommendationMetadata sadece numeric metadata patch atar
+        // dbUpdateSuggestedRecommendation level-changed için (body+severity+confidence)
         await POST();
-        expect(mockDbExpireEntityRecommendations).not.toHaveBeenCalled();
+        expect(mockDbUpdateSuggestedRecommendation).not.toHaveBeenCalled();
     });
 
     it("response item AI metni mevcut rec metadata'sından gelir", async () => {
@@ -211,13 +216,18 @@ describe("G11 diff-merge — suggested rec + level changed", () => {
                 confidence: 0.8,
             }],
             generatedAt: new Date().toISOString(),
+            hadError: false,
         });
     });
 
-    it("Eski rec dbExpireEntityRecommendations ile expire edilir (sadece purchase_suggestion)", async () => {
+    it("Mevcut rec dbUpdateSuggestedRecommendation ile in-place UPDATE edilir", async () => {
+        // Audit 3. tur Fix 5: expire+upsert dansı kaldırıldı; tek atomik UPDATE.
         await POST();
-        // Recommendation_type filtresi: aynı ürünün diğer rec türlerini koru
-        expect(mockDbExpireEntityRecommendations).toHaveBeenCalledWith("p-1", "product", "purchase_suggestion");
+        expect(mockDbUpdateSuggestedRecommendation).toHaveBeenCalledTimes(1);
+        const [recId, patch] = mockDbUpdateSuggestedRecommendation.mock.calls[0];
+        expect(recId).toBe("rec-old");
+        expect(patch.metadata.urgencyLevel).toBe("critical");
+        expect(patch.body).toContain("Yeni AI yorumu");
     });
 
     it("AI yeniden çağrılır (level değişti)", async () => {
@@ -225,14 +235,15 @@ describe("G11 diff-merge — suggested rec + level changed", () => {
         expect(mockAiEnrichPurchaseSuggestions).toHaveBeenCalledTimes(1);
     });
 
-    it("Yeni rec upsert edilir, metadata'sı güncel level içerir", async () => {
+    it("dbUpsertRecommendation ÇAĞRILMAZ (level-changed = update, insert değil)", async () => {
+        // Önceki davranış: expire + dbUpsertRecommendation insert. Yeni: in-place update.
         await POST();
-        const [input] = mockDbUpsertRecommendation.mock.calls[0];
-        expect(input.entity_id).toBe("p-1");
-        expect(input.metadata.urgencyLevel).toBe("critical");
+        expect(mockDbUpsertRecommendation).not.toHaveBeenCalled();
     });
 
-    it("dbUpdateRecommendationMetadata çağrılmaz (level değişti, in-place değil)", async () => {
+    it("dbUpdateRecommendationMetadata çağrılmaz (level değişti, ayrı helper)", async () => {
+        // dbUpdateRecommendationMetadata level-same için (sadece metadata patch);
+        // level-changed dbUpdateSuggestedRecommendation kullanır (body+confidence+severity+metadata)
         await POST();
         expect(mockDbUpdateRecommendationMetadata).not.toHaveBeenCalled();
     });
@@ -285,10 +296,10 @@ describe("G11 diff-merge — eski sürüm metadata (urgencyLevel field eksik)", 
                 created_at: "2024-01-01T00:00:00Z",
             },
         ]);
-        mockAiEnrichPurchaseSuggestions.mockResolvedValue({ enrichments: [], generatedAt: new Date().toISOString() });
+        mockAiEnrichPurchaseSuggestions.mockResolvedValue({ enrichments: [], generatedAt: new Date().toISOString(), hadError: false });
         await POST();
-        // existingLevel null, currentLevel "critical" → değişti → expire + AI
-        expect(mockDbExpireEntityRecommendations).toHaveBeenCalled();
+        // existingLevel null, currentLevel "critical" → değişti → in-place update + AI
+        expect(mockDbUpdateSuggestedRecommendation).toHaveBeenCalled();
         expect(mockAiEnrichPurchaseSuggestions).toHaveBeenCalled();
     });
 });
@@ -344,11 +355,11 @@ describe("G11 drift — decided rec'lerde state karşılaştırması", () => {
         expect(rec.currentDrift).toEqual({ suggestQty: 60, urgencyLevel: "critical" });
     });
 
-    it("Decided rec metadata frozen kalır — dbUpdateRecommendationMetadata çağrılmaz", async () => {
+    it("Decided rec metadata frozen kalır — hiçbir update helper'ı çağrılmaz", async () => {
         setupDecided({ suggestQty: 999, urgencyLevel: "high", coverageDays: 10 });
         await POST();
         expect(mockDbUpdateRecommendationMetadata).not.toHaveBeenCalled();
-        expect(mockDbExpireEntityRecommendations).not.toHaveBeenCalled();
+        expect(mockDbUpdateSuggestedRecommendation).not.toHaveBeenCalled();
     });
 
     it("Decided rec için response status 'accepted' olarak gelir", async () => {

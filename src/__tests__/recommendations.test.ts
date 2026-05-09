@@ -51,6 +51,7 @@ import {
     dbExpireRecommendationsForMissingEntities,
     dbExpireStaleRecommendations,
     dbGetActiveRecommendationsForEntities,
+    dbUpdateSuggestedRecommendation,
 } from "@/lib/supabase/recommendations";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1066,6 +1067,61 @@ describe("dbExpireStaleRecommendations — marks old suggested rows as expired",
         const count = await dbExpireStaleRecommendations(48);
         expect(count).toBe(0);
     });
+
+    // Audit 3. tur Fix 4: recommendation_type opsiyonel filter
+    it("recommendationType belirtildi → ek .eq('recommendation_type', ...) zinciri", async () => {
+        const eqCalls: Array<[string, unknown]> = [];
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.update = () => ({
+                    eq: (col: string, val: unknown) => {
+                        eqCalls.push([col, val]);
+                        return {
+                            lt: () => ({
+                                eq: (col2: string, val2: unknown) => {
+                                    eqCalls.push([col2, val2]);
+                                    return {
+                                        select: async () => ({ data: [{ id: "r1" }], error: null }),
+                                    };
+                                },
+                            }),
+                        };
+                    },
+                });
+                return b;
+            },
+        });
+
+        const count = await dbExpireStaleRecommendations(48, "purchase_suggestion");
+        expect(count).toBe(1);
+        expect(eqCalls).toContainEqual(["status", "suggested"]);
+        expect(eqCalls).toContainEqual(["recommendation_type", "purchase_suggestion"]);
+    });
+
+    it("recommendationType belirtilmedi → recommendation_type filter eklenmiyor (regresyon)", async () => {
+        const eqCalls: Array<[string, unknown]> = [];
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.update = () => ({
+                    eq: (col: string, val: unknown) => {
+                        eqCalls.push([col, val]);
+                        return {
+                            lt: () => ({
+                                select: async () => ({ data: [], error: null }),
+                            }),
+                        };
+                    },
+                });
+                return b;
+            },
+        });
+
+        await dbExpireStaleRecommendations(48);
+        const types = eqCalls.filter(([c]) => c === "recommendation_type");
+        expect(types).toHaveLength(0);
+    });
 });
 
 // ─── dbGetActiveRecommendationsForEntities — 7-day decided window ─────────────
@@ -1114,6 +1170,105 @@ describe("dbGetActiveRecommendationsForEntities — accepted older than 7 days i
 
         const result = await dbGetActiveRecommendationsForEntities("product", ["prod-1"], "purchase_suggestion");
         expect(result).toHaveLength(0);
+    });
+});
+
+// ─── dbUpdateSuggestedRecommendation ─────────────────────────────────────────
+// Audit 3. tur Fix 5: levelChanged akışında expire+upsert dansı yerine in-place
+// UPDATE. Bu helper sadece status='suggested' olan rec'leri günceller.
+
+describe("dbUpdateSuggestedRecommendation — atomic content update", () => {
+    it("body + confidence + severity + metadata atomik UPDATE'le yazılır", async () => {
+        let updatePayload: Record<string, unknown> | null = null;
+        let eqStatus: string | null = null;
+        const existingRow = makeRow({
+            id: "rec-1", status: "suggested",
+            metadata: { existingKey: "preserved", suggestQty: 50 },
+        });
+
+        // İlk çağrı: dbGetRecommendationById (metadata merge için)
+        // İkinci çağrı: update().eq("id").eq("status","suggested").select().single()
+        let callCount = 0;
+        setupFrom({
+            ai_recommendations: () => {
+                callCount++;
+                if (callCount === 1) {
+                    const b: Record<string, unknown> = {};
+                    b.select = () => b;
+                    b.eq = () => b;
+                    b.single = async () => ({ data: existingRow, error: null });
+                    return b;
+                }
+                const b: Record<string, unknown> = {};
+                b.update = (data: Record<string, unknown>) => {
+                    updatePayload = data;
+                    return {
+                        eq: () => ({
+                            eq: (col2: string, val2: unknown) => {
+                                if (col2 === "status") eqStatus = String(val2);
+                                return {
+                                    select: () => ({
+                                        single: async () => ({ data: { ...existingRow, ...data }, error: null }),
+                                    }),
+                                };
+                            },
+                        }),
+                    };
+                };
+                return b;
+            },
+        });
+
+        const updated = await dbUpdateSuggestedRecommendation("rec-1", {
+            body: "Yeni AI metni",
+            confidence: 0.9,
+            severity: "critical",
+            metadata: { suggestQty: 80, urgencyLevel: "critical" },
+        });
+
+        expect(updated.id).toBe("rec-1");
+        expect(eqStatus).toBe("suggested"); // sadece suggested rec'ler güncellenir
+        expect(updatePayload).not.toBeNull();
+        const payload = updatePayload as Record<string, unknown>;
+        expect(payload.body).toBe("Yeni AI metni");
+        expect(payload.confidence).toBe(0.9);
+        expect(payload.severity).toBe("critical");
+        // Metadata JS-merge: existingKey korunur, suggestQty overwrite
+        const meta = payload.metadata as Record<string, unknown>;
+        expect(meta.existingKey).toBe("preserved");
+        expect(meta.suggestQty).toBe(80);
+        expect(meta.urgencyLevel).toBe("critical");
+    });
+
+    it("suggested rec yoksa (decided veya silinmiş) error throw eder", async () => {
+        let callCount = 0;
+        setupFrom({
+            ai_recommendations: () => {
+                callCount++;
+                if (callCount === 1) {
+                    const b: Record<string, unknown> = {};
+                    b.select = () => b;
+                    b.eq = () => b;
+                    b.single = async () => ({ data: null, error: null });
+                    return b;
+                }
+                const b: Record<string, unknown> = {};
+                b.update = () => ({
+                    eq: () => ({
+                        eq: () => ({
+                            select: () => ({
+                                single: async () => ({ data: null, error: { message: "no row" } }),
+                            }),
+                        }),
+                    }),
+                });
+                return b;
+            },
+        });
+
+        await expect(
+            dbUpdateSuggestedRecommendation("rec-missing", { body: "x" })
+        ).rejects.toThrow();
     });
 });
 

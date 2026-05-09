@@ -3,7 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-09_
 
-**Son tamamlanan iş:** G11 audit 2. tur — 5 bulgu fix (CSRF, expire scope defansif, empty list, lead-time, moq=0) (2026-05-09)
+**Son tamamlanan iş:** G11 audit 3. tur — 5 bulgu fix (promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place) (2026-05-09)
+
+**G11 audit 3. tur (1 commit, ~13 dosya):**
+- **Fix 1 (HIGH) — Promisable hesabı**: route ham `dbListProducts` çağırıp `p.promisable ?? p.available_now` fallback kullanıyordu; helper promisable üretmiyor → quote'lu siparişler hiç dikkate alınmıyordu. Yeni: `dbListAllActiveProducts` + `dbGetQuotedQuantities` paralel; `promisable = available_now - quoted` UI ile aynı semantikte.
+- **Fix 2 (HIGH) — pageSize:500 → full scan**: 501. ürün hem öneri için skip hem cleanup'ta orphan sayılıp yanlış expire ediliyordu. `dbListProducts({pageSize:500})` → `dbListAllActiveProducts()` (pagination yok).
+- **Fix 3 (MEDIUM) — AI hadError flag**: `aiEnrichPurchaseSuggestions` graceful catch içinde `enrichments:[]` dönüyordu ama route'un try/catch'i tetiklenmiyordu → production'da AI patlasa bile UI banner gösterilmiyordu. Servis result'ına `hadError: boolean` field'ı; route bunu okuyup `aiCallFailed` set eder.
+- **Fix 4 (MEDIUM) — Stale TTL scope**: `dbExpireStaleRecommendations(48)` recommendation_type filtrelemiyor → purchase cron'u diğer rec türlerinin (varsa) suggested'larını da expire ediyordu. Helper'a opsiyonel 2. param eklendi; copilot route `"purchase_suggestion"` geçer.
+- **Fix 5 (MEDIUM) — levelChanged in-place update**: expire+upsert dansı sessiz fail'de `dbUpsertRecommendation` mevcut suggested rec'i aynen döndürüyordu → yeni AI içeriği DB'ye yazılmıyor, her cron'da boşa AI çağrısı. Yeni `dbUpdateSuggestedRecommendation(id, {body, confidence, severity, model_version, metadata})` helper — tek atomik UPDATE'le rec içeriği yenilenir, ID stable kalır. `dbExpireEntityRecommendations` levelChanged flow'undan kaldırıldı (silme akışlarında hâlâ kullanılır + artık throw eder).
+- **Yeni 2 test dosyası (9 yeni test):** `purchase-copilot-promisable.test.ts` (5), `purchase-copilot-ai-error-flag.test.ts` (4). `recommendations.test.ts`'e `dbExpireStaleRecommendations` recType + `dbUpdateSuggestedRecommendation` testleri (4). Mevcut diff-merge testleri yeni in-place update flow'una göre güncellendi.
+- 147 dosya · 2325 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 2. tur — CSRF, expire scope defansif, empty list, lead-time, moq=0 (2026-05-09; 2312 test)
 
 **G11 audit 2. tur (1 commit, ~10 dosya):**
 - **Fix 1 (HIGH) — GET CSRF guard**: handler GET ile çağrıldığında session-cookie kabul ediyordu → `<img src>` ile yan etki tetiklenebilirdi. Yeni: GET sadece CRON_SECRET; POST hibrit (session VEYA Bearer). `checkAuth(request, method)` imzası, `GET/POST` ayrı arrow wrapper'larla export.

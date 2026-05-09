@@ -17,8 +17,9 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts: vi.fn().mockResolvedValue([]),
+    dbListAllActiveProducts: vi.fn().mockResolvedValue([]),
     dbGetAllActiveProductIds: vi.fn().mockResolvedValue([]),
+    dbGetQuotedQuantities: vi.fn().mockResolvedValue(new Map()),
 }));
 
 vi.mock("@/lib/supabase/recommendations", () => ({

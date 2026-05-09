@@ -14,8 +14,9 @@ const mockDbListProducts = vi.fn();
 const mockDbGetAllActiveProductIds = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts: (...args: unknown[]) => mockDbListProducts(...args),
+    dbListAllActiveProducts: (...args: unknown[]) => mockDbListProducts(...args),
     dbGetAllActiveProductIds: (...args: unknown[]) => mockDbGetAllActiveProductIds(...args),
+    dbGetQuotedQuantities: vi.fn().mockResolvedValue(new Map()),
 }));
 
 // ─── AI service mock ──────────────────────────────────────────────────────────
@@ -604,7 +605,7 @@ describe("POST /api/ai/purchase-copilot — §11.1 mutation prevention", () => {
         ]);
     });
 
-    it("route calls dbListProducts once", async () => {
+    it("route calls dbListAllActiveProducts once", async () => {
         await POST();
         expect(mockDbListProducts).toHaveBeenCalledTimes(1);
     });

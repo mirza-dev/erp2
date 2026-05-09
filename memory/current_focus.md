@@ -5,12 +5,41 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 2. tur KAPALI (2026-05-09; 2312 test) — CSRF guard, defansif expire, boş list, lead-time aware, moq=0
-**Önceki:** G11 audit 1. tur KAPALI (2026-05-09; 2286 test) — Vercel CRON GET, expire scope, SoT coverage-based, false-success toast
-**Önceki²:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
-**Önceki³:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
+**Son:** G11 audit 3. tur KAPALI (2026-05-09; 2325 test) — promisable, full-scan, AI hadError, stale TTL scope, levelChanged in-place
+**Önceki:** G11 audit 2. tur KAPALI (2026-05-09; 2312 test) — CSRF guard, defansif expire, boş list, lead-time aware, moq=0
+**Önceki²:** G11 audit 1. tur KAPALI (2026-05-09; 2286 test) — Vercel CRON GET, expire scope, SoT coverage-based, false-success toast
+**Önceki³:** G11 — AI öneri tutarlılığı KAPALI (2026-05-09; 2280 test) — hibrit diff-merge + 6h Vercel CRON + manuel yenile + decided drift rozeti
+**Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 3. Tur (2026-05-09) — KAPALI
+
+**Hedef:** 2. tur sonrası dış inceleme 5 yeni bulgu çıkardı. Promisable, full-scan, AI hadError sinyali, stale TTL global etki, levelChanged silent fail.
+
+**1 commit, ~13 dosya:**
+
+- **Fix 1 (HIGH) — Promisable**: Route ham `dbListProducts` çağırıp `p.promisable ?? p.available_now` fallback kullanıyordu — helper promisable üretmiyordu. UI quote'lu siparişlere göre proaktif öneri listeliyor ama AI route hesaplamadan eski sayılarla çalışıyordu. Çözüm: `dbListAllActiveProducts()` + `dbGetQuotedQuantities()` paralel; `promisable = available_now - quoted` (UI ile aynı). `/api/products` route'undaki pattern paraleli.
+- **Fix 2 (HIGH) — Full scan**: `dbListProducts({pageSize:500})` ilk 500 ürünle sınırlı. Cleanup'ta `activeProductIds` da bu listeden geliyordu → 501. ürün için yanlış expire / hiç öneri. `dbListAllActiveProducts()` pagination'sız tüm aktif ürünleri çeker.
+- **Fix 3 (MEDIUM) — AI hadError**: `aiEnrichPurchaseSuggestions` graceful catch içinde `enrichments:[]` dönüyordu, route'un try/catch'i tetiklenmiyordu → production'da AI patlasa bile `ai_call_failed=false` kalıyordu. Servis result'ına `hadError: boolean`; route okur. UI banner doğru tetiklenir.
+- **Fix 4 (MEDIUM) — Stale TTL scope**: `dbExpireStaleRecommendations(48)` `recommendation_type` filtrelemiyor → 6 saatte bir purchase cron'u global TTL worker'a dönüşüyordu (diğer rec tiplerinin suggested'larını da expire ediyordu). Helper'a opsiyonel 2. param; copilot route `"purchase_suggestion"` geçer.
+- **Fix 5 (MEDIUM) — levelChanged in-place**: Expire+upsert dansı sessiz fail'de `dbUpsertRecommendation` mevcut suggested rec'i aynen döndürüyor → yeni AI içeriği yazılmıyor, her cron'da boşa AI çağrısı. Yeni helper `dbUpdateSuggestedRecommendation(id, {body, confidence, severity, model_version, metadata})` — tek atomik UPDATE rec ID stable. `dbExpireEntityRecommendations` artık throw eder + levelChanged flow'undan kaldırıldı (silme akışlarında kalır).
+
+**Test (9 yeni + 6 ek):**
+- `purchase-copilot-promisable.test.ts` (5): no-quote pass, quote → öneri girişi, çift-call regresyon, helper çağrısı, available<=min bypass
+- `purchase-copilot-ai-error-flag.test.ts` (4): hadError true/false → ai_call_failed mapping, throw fallback, partial success defansif
+- `recommendations.test.ts`: dbExpireStaleRecommendations recType filter (2), dbUpdateSuggestedRecommendation (2)
+- `purchase-copilot-diff-merge.test.ts`: levelChanged testleri update-in-place flow'una göre yeniden yazıldı
+
+**Domain kuralı:**
+- Promisable hem `/api/products` UI'sı hem `/api/ai/purchase-copilot` AI'sı için ortak: `available_now - quoted`. İki taraf aynı semantiği paylaşmalı.
+- Background CRON helper'ları default olarak ilgili scope'a (recommendation_type) bağlanmalı; aksi halde "global TTL worker"a dönüşürler.
+- Graceful degradation yapan servisler caller için `hadError`/`ok` boolean sinyali döndürmeli — try/catch sadece exceptional path'i yakalar, expected hata path'leri için flag gerekli.
+- Aynı entity için içeriği yenilenecek bir aktif rec varsa "expire+insert" yerine in-place UPDATE daha güvenli: silent dedupe yan etkisi yok, rec ID stable.
+
+**Test:** 147 dosya · 2325 test yeşil · TS clean · 0 lint hatası
 
 ---
 

@@ -14,8 +14,9 @@ import type { ProductWithStock } from "@/lib/database.types";
 const mockDbListProducts = vi.fn();
 
 vi.mock("@/lib/supabase/products", () => ({
-    dbListProducts: (...a: unknown[]) => mockDbListProducts(...a),
+    dbListAllActiveProducts: (...a: unknown[]) => mockDbListProducts(...a),
     dbGetAllActiveProductIds: vi.fn().mockResolvedValue([]),
+    dbGetQuotedQuantities: vi.fn().mockResolvedValue(new Map()),
 }));
 
 vi.mock("@/lib/services/ai-service", () => ({

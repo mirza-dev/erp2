@@ -89,9 +89,9 @@ describe("aiEnrichPurchaseSuggestions — result shape contract", () => {
         mockCreate.mockResolvedValue(makeTextResponse(VALID_AI_RESPONSE));
     });
 
-    it("result has exactly: enrichments, generatedAt", async () => {
+    it("result has exactly: enrichments, generatedAt, hadError", async () => {
         const result = await aiEnrichPurchaseSuggestions([makePurchaseItem()]);
-        expect(Object.keys(result).sort()).toEqual(["enrichments", "generatedAt"]);
+        expect(Object.keys(result).sort()).toEqual(["enrichments", "generatedAt", "hadError"]);
     });
 
     it("enrichments is an array", async () => {
