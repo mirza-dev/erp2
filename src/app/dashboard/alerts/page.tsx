@@ -13,6 +13,7 @@ import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-u
 import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { AI_SUMMARY_LABELS } from "@/lib/ai-summary-labels";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
+import { PARASUT_SYNC_ALERT_ENTITY_IDS, PARASUT_ALERT_ENTITY_TYPES } from "@/lib/parasut-constants";
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -145,11 +146,16 @@ export default function AlertsPage() {
     const productGroups: ProductAlertGroup[] = useMemo(() => {
         const sysAlerts = activeAlerts.filter((a) => a.source !== "ai" && a.entity_id);
         // Sipariş bazlı alertları (quote_expired, overdue_shipment) + Paraşüt sync_issue
-        // alertlerini (entity_type='parasut') ürün gruplarından ayır.
-        // Faz 1: sync_issue alertleri kendi `systemAlerts` listesinde inline retry CTA ile gösterilir.
-        const productSysAlerts = sysAlerts.filter(
-            (a) => a.entity_type !== "sales_order" && a.entity_type !== "parasut",
-        );
+        // alertlerini ürün gruplarından ayır.
+        // Faz 1 (advisor P2): Paraşüt alertleri parasut + parasut_auth entity_type
+        // VEYA bilinen entity_id whitelist'i ile eşleşmeli (parasut-oauth.ts CAS
+        // çakışmasında 'parasut_auth' kullanıyor; entity_type listesi tek kaynak değil).
+        const productSysAlerts = sysAlerts.filter((a) => {
+            if (a.entity_type === "sales_order") return false;
+            if (PARASUT_ALERT_ENTITY_TYPES.has(a.entity_type ?? "")) return false;
+            if (a.entity_id && PARASUT_SYNC_ALERT_ENTITY_IDS.has(a.entity_id)) return false;
+            return true;
+        });
         const byProduct = new Map<string, AlertRow[]>();
         for (const alert of productSysAlerts) {
             const id = alert.entity_id!;
@@ -198,9 +204,16 @@ export default function AlertsPage() {
 
     const aiAlerts           = useMemo(() => activeAlerts.filter((a) => a.source === "ai"), [activeAlerts]);
     const orderAlerts        = useMemo(() => activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "sales_order"), [activeAlerts]);
-    // Faz 1: Paraşüt sync_issue alertleri ayrı sistem grubu — inline "Yeniden Dene" CTA ile gösterilir.
+    // Faz 1 (advisor P2): Paraşüt sync_issue alertleri ayrı sistem grubu — inline retry CTA.
+    // entity_type 'parasut' veya 'parasut_auth' (CAS çakışması) + bilinen entity_id whitelist.
+    // İki katmanlı kontrol (entity_type VEYA entity_id) sayesinde her iki tip kayıp olmaz.
     const systemAlerts       = useMemo(
-        () => activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "parasut" && a.type === "sync_issue"),
+        () => activeAlerts.filter((a) => {
+            if (a.source === "ai" || a.type !== "sync_issue") return false;
+            const typeMatch = PARASUT_ALERT_ENTITY_TYPES.has(a.entity_type ?? "");
+            const idMatch   = !!a.entity_id && PARASUT_SYNC_ALERT_ENTITY_IDS.has(a.entity_id);
+            return typeMatch || idMatch;
+        }),
         [activeAlerts],
     );
     const criticalCount      = useMemo(() => productGroups.filter((g) => g.topSeverity === "critical").length, [productGroups]);

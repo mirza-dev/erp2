@@ -21,7 +21,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetAlertById, dbUpdateAlertStatus } from "@/lib/supabase/alerts";
 import { serviceSyncAllPending } from "@/lib/services/parasut-service";
 import { serviceParasutOAuthRefresh } from "@/lib/services/parasut-oauth";
-import { ALERT_ENTITY_PARASUT_AUTH } from "@/lib/parasut-constants";
+import {
+    ALERT_ENTITY_PARASUT_AUTH,
+    PARASUT_SYNC_ALERT_ENTITY_IDS,
+    PARASUT_ALERT_ENTITY_TYPES,
+} from "@/lib/parasut-constants";
 import { handleApiError } from "@/lib/api-error";
 
 export async function POST(
@@ -37,6 +41,20 @@ export async function POST(
         if (alert.type !== "sync_issue") {
             return NextResponse.json(
                 { error: "Bu uyarı tipi için sync retry desteklenmiyor." },
+                { status: 400 },
+            );
+        }
+        // Faz 1 (advisor P3): "sync_issue" tipi gelecekte Paraşüt dışı kullanımlara
+        // genişlerse, bu endpoint sadece bilinen Paraşüt entity_id whitelist'iyle
+        // (entity_type parasut/parasut_auth) eşleşen alertleri kabul eder.
+        // Defense-in-depth: hem entity_type hem entity_id kontrolü.
+        const entityType = alert.entity_type ?? "";
+        const entityId   = alert.entity_id ?? "";
+        const isParasutEntityType = PARASUT_ALERT_ENTITY_TYPES.has(entityType);
+        const isKnownParasutId    = PARASUT_SYNC_ALERT_ENTITY_IDS.has(entityId);
+        if (!isParasutEntityType || !isKnownParasutId) {
+            return NextResponse.json(
+                { error: "Bu uyarı Paraşüt sync alanına ait değil; retry desteklenmiyor." },
                 { status: 400 },
             );
         }

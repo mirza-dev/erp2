@@ -75,7 +75,9 @@ describe("POST /api/alerts/[id]/sync-retry", () => {
 
     it("alert zaten resolved → 400, retry yapılmaz", async () => {
         mockDbGetAlertById.mockResolvedValue({
-            id: "a-1", type: "sync_issue", status: "resolved", entity_id: ALERT_ENTITY_PARASUT_AUTH,
+            id: "a-1", type: "sync_issue", status: "resolved",
+            entity_type: "parasut",
+            entity_id: ALERT_ENTITY_PARASUT_AUTH,
         });
         const res = await POST(makeReq(), makeParams("a-1"));
         expect(res.status).toBe(400);
@@ -84,7 +86,9 @@ describe("POST /api/alerts/[id]/sync-retry", () => {
 
     it("ALERT_ENTITY_PARASUT_AUTH → serviceParasutOAuthRefresh çağrılır + alert resolved", async () => {
         mockDbGetAlertById.mockResolvedValue({
-            id: "a-1", type: "sync_issue", status: "open", entity_id: ALERT_ENTITY_PARASUT_AUTH,
+            id: "a-1", type: "sync_issue", status: "open",
+            entity_type: "parasut",
+            entity_id: ALERT_ENTITY_PARASUT_AUTH,
         });
         mockServiceParasutOAuthRefresh.mockResolvedValue({
             success: true, expiresAt: "2099-01-01T00:00:00Z", tokenVersion: 2,
@@ -102,7 +106,9 @@ describe("POST /api/alerts/[id]/sync-retry", () => {
 
     it("OAuth refresh notConnected → 409, alert açık kalır", async () => {
         mockDbGetAlertById.mockResolvedValue({
-            id: "a-1", type: "sync_issue", status: "open", entity_id: ALERT_ENTITY_PARASUT_AUTH,
+            id: "a-1", type: "sync_issue", status: "open",
+            entity_type: "parasut",
+            entity_id: ALERT_ENTITY_PARASUT_AUTH,
         });
         mockServiceParasutOAuthRefresh.mockResolvedValue({ success: false, notConnected: true });
 
@@ -114,6 +120,7 @@ describe("POST /api/alerts/[id]/sync-retry", () => {
     it("Diğer parasut entity → serviceSyncAllPending çağrılır + alert resolved", async () => {
         mockDbGetAlertById.mockResolvedValue({
             id: "a-2", type: "sync_issue", status: "open",
+            entity_type: "parasut",
             entity_id: "00000000-0000-0000-0000-00000000a003", // ALERT_ENTITY_PARASUT_SHIPMENT
         });
         mockServiceSyncAllPending.mockResolvedValue({ synced: 3, failed: 0, errors: [] });
@@ -127,9 +134,63 @@ describe("POST /api/alerts/[id]/sync-retry", () => {
         expect(mockDbUpdateAlertStatus).toHaveBeenCalledWith("a-2", "resolved", "sync-retry-from-alert");
     });
 
+    it("P2: parasut_auth entity_type (CAS çakışma alerti) AUTH entity_id ile → oauth_refresh", async () => {
+        // parasut-oauth.ts:118 — token CAS çakışmasında entity_type='parasut_auth' yazılıyor.
+        // Endpoint hem entity_type listesi hem entity_id whitelist ile bunları kabul eder.
+        mockDbGetAlertById.mockResolvedValue({
+            id: "a-cas", type: "sync_issue", status: "open",
+            entity_type: "parasut_auth",
+            entity_id: ALERT_ENTITY_PARASUT_AUTH,
+        });
+        mockServiceParasutOAuthRefresh.mockResolvedValue({
+            success: true, expiresAt: "2099-01-01T00:00:00Z", tokenVersion: 3,
+        });
+
+        const res = await POST(makeReq(), makeParams("a-cas"));
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.action).toBe("oauth_refresh");
+        expect(mockServiceParasutOAuthRefresh).toHaveBeenCalledTimes(1);
+        expect(mockDbUpdateAlertStatus).toHaveBeenCalledWith("a-cas", "resolved", "sync-retry-from-alert");
+    });
+
+    it("P3: type=sync_issue ama Paraşüt entity_id whitelist DIŞINDA → 400, retry yapılmaz", async () => {
+        // Gelecekte sync_issue tipi başka entegrasyonlar için de kullanılırsa, bu endpoint
+        // bilinmeyen entity_id'lerde Paraşüt sync-all'i tetiklememeli (yan etki!).
+        mockDbGetAlertById.mockResolvedValue({
+            id: "a-x", type: "sync_issue", status: "open",
+            entity_type: "shopify",                                // Hipotetik gelecek entegrasyon
+            entity_id: "00000000-0000-0000-0000-000000000999",    // Whitelist'te yok
+        });
+
+        const res = await POST(makeReq(), makeParams("a-x"));
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/Paraşüt sync alanına ait değil/i);
+        expect(mockServiceSyncAllPending).not.toHaveBeenCalled();
+        expect(mockServiceParasutOAuthRefresh).not.toHaveBeenCalled();
+        expect(mockDbUpdateAlertStatus).not.toHaveBeenCalled();
+    });
+
+    it("P3: entity_type doğru ('parasut') ama entity_id whitelist dışı → 400 (defans katmanı)", async () => {
+        // Defense-in-depth: entity_type 'parasut' ama entity_id rastgele bir UUID
+        // (manuel insert / migration kalıntısı). Yine de retry yapma.
+        mockDbGetAlertById.mockResolvedValue({
+            id: "a-y", type: "sync_issue", status: "open",
+            entity_type: "parasut",
+            entity_id: "11111111-1111-1111-1111-111111111111",    // Whitelist'te yok
+        });
+
+        const res = await POST(makeReq(), makeParams("a-y"));
+        expect(res.status).toBe(400);
+        expect(mockServiceSyncAllPending).not.toHaveBeenCalled();
+        expect(mockDbUpdateAlertStatus).not.toHaveBeenCalled();
+    });
+
     it("syncAll tamamen başarısız (failed>0, synced=0) → 502, alert açık kalır", async () => {
         mockDbGetAlertById.mockResolvedValue({
             id: "a-3", type: "sync_issue", status: "open",
+            entity_type: "parasut",
             entity_id: "00000000-0000-0000-0000-00000000a003",
         });
         mockServiceSyncAllPending.mockResolvedValue({
@@ -158,7 +219,7 @@ const pageSource = readFileSync(
     "utf-8",
 );
 
-describe("actionFor (source-regression) — sync_issue case", () => {
+describe("actionFor + UI filter (source-regression) — sync_issue case", () => {
     it("actionFor switch'inde sync_issue case mevcut", () => {
         // Pattern: types.includes("sync_issue") ... href: "/dashboard/parasut"
         expect(pageSource).toMatch(
@@ -170,14 +231,28 @@ describe("actionFor (source-regression) — sync_issue case", () => {
         expect(pageSource).toMatch(/function SystemAlertCard\b/);
     });
 
-    it("systemAlerts useMemo Paraşüt tipini filtreliyor", () => {
-        // entity_type === 'parasut' && type === 'sync_issue' filter
-        expect(pageSource).toMatch(/a\.entity_type\s*===\s*["']parasut["']/);
-        expect(pageSource).toMatch(/a\.type\s*===\s*["']sync_issue["']/);
+    it("systemAlerts useMemo PARASUT_ALERT_ENTITY_TYPES VEYA PARASUT_SYNC_ALERT_ENTITY_IDS kullanıyor", () => {
+        // P2 fix: hem entity_type listesi hem entity_id whitelist kombinasyonu
+        expect(pageSource).toMatch(/PARASUT_ALERT_ENTITY_TYPES\.has/);
+        expect(pageSource).toMatch(/PARASUT_SYNC_ALERT_ENTITY_IDS\.has/);
+        // type === 'sync_issue' kontrolü hâlâ var
+        expect(pageSource).toMatch(/a\.type\s*!==\s*["']sync_issue["']/);
     });
 
-    it("productSysAlerts filter parasut alertlerini ürün gruplarından dışarıda tutuyor", () => {
-        // entity_type !== "sales_order" && entity_type !== "parasut"
-        expect(pageSource).toMatch(/entity_type\s*!==\s*["']parasut["']/);
+    it("productSysAlerts filter Paraşüt alertlerini whitelist üzerinden dışlıyor", () => {
+        // P2 fix: entity_type listesi + entity_id whitelist iki katmanlı dışlama
+        expect(pageSource).toMatch(/PARASUT_ALERT_ENTITY_TYPES\.has\(\s*a\.entity_type/);
+        expect(pageSource).toMatch(/PARASUT_SYNC_ALERT_ENTITY_IDS\.has\(\s*a\.entity_id/);
+    });
+
+    it("parasut-constants.ts whitelist sabitleri export ediyor (parasut_auth dahil)", () => {
+        const constantsSource = readFileSync(
+            resolve(process.cwd(), "src/lib/parasut-constants.ts"),
+            "utf-8",
+        );
+        // P2 fix: parasut_auth entity_type'ı whitelist'e dahil
+        expect(constantsSource).toMatch(/PARASUT_ALERT_ENTITY_TYPES[^=]*=\s*new Set\(\[[^\]]*["']parasut_auth["']/);
+        // 5 bilinen Paraşüt entity_id whitelist'te
+        expect(constantsSource).toMatch(/PARASUT_SYNC_ALERT_ENTITY_IDS[^=]*=\s*new Set\(\[/);
     });
 });

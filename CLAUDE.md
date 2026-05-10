@@ -3,7 +3,15 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-10_
 
-**Son tamamlanan iş:** Purchase&Alert plan Faz 1 — sync_issue alert inline retry (2026-05-10)
+**Son tamamlanan iş:** Purchase&Alert plan Faz 1 + advisor P2/P3 fix (2026-05-10; 2481 test)
+
+**Faz 1 advisor follow-up (1 commit, 4 dosya):**
+- **P2 (parasut_auth filter bug):** `parasut-oauth.ts` CAS çakışmasında `entity_type='parasut_auth'` (snake_case) yazıyordu; UI sadece `entity_type='parasut'` filtreliyordu → bu alertler "Silinmiş Ürün" olarak ürün gruplarına düşebiliyordu, inline retry CTA'sı ulaşmıyordu. Fix: `parasut-constants.ts`'e `PARASUT_ALERT_ENTITY_TYPES` (parasut + parasut_auth) ve `PARASUT_SYNC_ALERT_ENTITY_IDS` (5 bilinen Paraşüt UUID) Set'leri eklendi. UI'daki `systemAlerts` ve `productSysAlerts` filter'ları iki katmanlı kontrol kullanır (entity_type **VEYA** entity_id whitelist) → her iki kategori kayıp olmaz.
+- **P3 (endpoint type-only guard):** `/api/alerts/[id]/sync-retry` sadece `type === 'sync_issue'` kontrol ediyordu; gelecekte sync_issue başka entegrasyonlar için de yaratılırsa yanlışlıkla Paraşüt sync-all tetiklenebilirdi. Fix: defense-in-depth — `entity_type ∈ PARASUT_ALERT_ENTITY_TYPES` **VE** `entity_id ∈ PARASUT_SYNC_ALERT_ENTITY_IDS` guard. Bilinmeyen → 400 "Paraşüt sync alanına ait değil".
+- **Test (+4):** `parasut_auth` AUTH alert oauth refresh; bilinmeyen entity_type whitelist dışı → 400; entity_type=parasut ama entity_id rastgele → 400 (defansif); constants whitelist source-regression.
+- 158 dosya · 2481 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Purchase&Alert plan Faz 1 — sync_issue alert inline retry (2026-05-10)
 
 **Faz 1 (1 commit, ~7 dosya):**
 - **Yeni endpoint** `POST /api/alerts/[id]/sync-retry`: alert tipini doğrular, entity_id'ye göre dispatch eder. `ALERT_ENTITY_PARASUT_AUTH` → `serviceParasutOAuthRefresh` çağrılır; diğer Paraşüt entity'leri → `serviceSyncAllPending`. Başarılı her iki yolda alert `resolved` (reason='sync-retry-from-alert'). 404 (alert yok) / 400 (tip sync_issue değil ya da zaten resolved) / 409 (OAuth bağlantısı kurulmamış) / 502 (sync-all tamamen başarısız).
