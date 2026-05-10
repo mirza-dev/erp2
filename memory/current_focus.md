@@ -5,8 +5,9 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 9. tur KAPALI (2026-05-10; 2443 test) — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp
-**Önceki:** G11 audit 8. tur KAPALI (2026-05-09; 2432 test) — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter
+**Son:** G11 audit 10. tur KAPALI (2026-05-10; 2448 test) — legacy decided_at NULL defansif + initial fetch behavior testi
+**Önceki:** G11 audit 9. tur KAPALI (2026-05-10; 2443 test) — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp
+**Önceki²:** G11 audit 8. tur KAPALI (2026-05-09; 2432 test) — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter
 **Önceki²:** G11 audit 7. tur KAPALI (2026-05-09; 2411 test) — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper
 **Önceki²:** G11 audit 6. tur KAPALI (2026-05-09; 2396 test) — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich
 **Önceki²:** G11 audit 5. tur KAPALI (2026-05-09; 2369 test) — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter
@@ -18,6 +19,28 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 10. Tur (2026-05-10) — KAPALI
+
+**Hedef:** 9. turdan sonra incelemeci kritik/yüksek/orta seviye bulgu bulamadı; 2 düşük risk not vardı: (a) legacy `decided_at=null` rec'ler SQL `.gte` filter ile elenebilir; (b) initial fetch fix source-regex testle yapılmıştı, behavior testi çift sigorta sağlar.
+
+**1 commit, ~5 dosya:**
+
+- **Fix 1 (LOW) — Legacy `decided_at=null` defansif kapsama**: `dbListRecommendations.decidedAfter` artık `.or("decided_at.gte.X,decided_at.is.null")` kullanır → NULL kayıtları çekilir. Route JS-side fallback (`r.decided_at === null` ise `created_at` ile 7-gün kontrolü) gereksiz/old NULL'ları stale window'dan çıkarır. Yeni rec akışı bug değildi; legacy/test seed/manuel insert riski kapatıldı.
+- **Fix 2 (LOW) — Initial fetch behavior testi**: `shouldTriggerFetch(productsLen)` pure helper + 4 davranış testi. Effect'in fetch tetikleme koşulu (`products.length === 0 → bekle, else fetch`) davranış matrisiyle doğrulanır.
+
+**Test (5 yeni):**
+- `recommendations.test.ts`: 3 test (.or filter chain, statusIn ile birlikte, eski .gte regresyon)
+- `purchase-suggested-initial-fetch.test.ts`: 4 helper test (boundary 0/1, products>0, normal akış)
+- 1 mevcut testi `.gte` → `.or` davranışına göre güncellendi
+
+**Domain kuralı:**
+- TTL'siz tablolarda zaman cutoff filter'ları null-safe olmalı: `.or("decided_at.gte.X,decided_at.is.null")` legacy data'yı SQL'de kapsar; JS-side fallback küçük edge case'i son kalkan.
+- Source-regex testleri pratik düşük maliyetli, ama davranış matrisi pure helper testleri çift sigorta sağlar — özellikle React effect mantığı için.
+
+**Test:** 156 dosya · 2448 test yeşil · TS clean · 0 lint hatası
 
 ---
 

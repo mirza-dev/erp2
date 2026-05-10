@@ -116,7 +116,13 @@ export async function dbListRecommendations(
     } else if (filter.status) {
         query = query.eq("status", filter.status);
     }
-    if (filter.decidedAfter)       query = query.gte("decided_at", filter.decidedAfter);
+    if (filter.decidedAfter) {
+        // Audit 10. tur Fix 1: decided_at NULL legacy kayıtları da kapsa.
+        // .gte("decided_at", X) NULL'ları reddederdi → eski test seed/manuel insert
+        // ile decided_at=null gelen kararlar response'a hiç girmezdi. Yeni: NULL
+        // kayıtları da getir; route JS-side `created_at` fallback ile cutoff uygular.
+        query = query.or(`decided_at.gte.${filter.decidedAfter},decided_at.is.null`);
+    }
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);

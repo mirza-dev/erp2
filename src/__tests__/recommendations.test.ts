@@ -342,42 +342,43 @@ describe("dbListRecommendations — statusIn filter", () => {
     });
 });
 
-// ─── Audit 9. tur Fix 2 — decidedAfter filter (SQL gte) ─────────────────────
+// ─── Audit 9-10. tur — decidedAfter filter (SQL .or) ───────────────────────
 
 describe("dbListRecommendations — decidedAfter filter", () => {
-    function makeThenableWithGte(rows: unknown[], gteSpy: ReturnType<typeof vi.fn>) {
+    function makeThenableWithOr(rows: unknown[], orSpy: ReturnType<typeof vi.fn>) {
         const b: Record<string, unknown> = {};
         b.select = () => b;
         b.eq = () => b;
         b.in = () => b;
-        b.gte = (...args: unknown[]) => { gteSpy(...args); return b; };
+        b.or = (...args: unknown[]) => { orSpy(...args); return b; };
         b.order = () => b;
         b.then = (resolve: (v: unknown) => void, reject?: (e: unknown) => void) =>
             Promise.resolve({ data: rows, error: null }).then(resolve, reject);
         return b;
     }
 
-    it("decidedAfter geçildiğinde .gte('decided_at', cutoff) çağrılır", async () => {
-        const gteSpy = vi.fn();
+    it("decidedAfter geçildiğinde .or('decided_at.gte.X,decided_at.is.null') çağrılır", async () => {
+        // Audit 10. tur Fix 1: NULL legacy kayıtları kapsayan .or filter
+        const orSpy = vi.fn();
         setupFrom({
-            ai_recommendations: () => makeThenableWithGte([], gteSpy),
+            ai_recommendations: () => makeThenableWithOr([], orSpy),
         });
         const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
         await dbListRecommendations({ decidedAfter: cutoff });
-        expect(gteSpy).toHaveBeenCalledWith("decided_at", cutoff);
+        expect(orSpy).toHaveBeenCalledWith(`decided_at.gte.${cutoff},decided_at.is.null`);
     });
 
-    it("decidedAfter geçilmediyse .gte çağrılmaz (regresyon)", async () => {
-        const gteSpy = vi.fn();
+    it("decidedAfter geçilmediyse .or çağrılmaz (regresyon)", async () => {
+        const orSpy = vi.fn();
         setupFrom({
-            ai_recommendations: () => makeThenableWithGte([], gteSpy),
+            ai_recommendations: () => makeThenableWithOr([], orSpy),
         });
         await dbListRecommendations({ entity_type: "product" });
-        expect(gteSpy).not.toHaveBeenCalled();
+        expect(orSpy).not.toHaveBeenCalled();
     });
 
-    it("decidedAfter + statusIn birlikte: hem .gte hem .in çağrılır", async () => {
-        const gteSpy = vi.fn();
+    it("decidedAfter + statusIn birlikte: hem .or hem .in çağrılır", async () => {
+        const orSpy = vi.fn();
         const inSpy = vi.fn();
         setupFrom({
             ai_recommendations: () => {
@@ -385,7 +386,7 @@ describe("dbListRecommendations — decidedAfter filter", () => {
                 b.select = () => b;
                 b.eq = () => b;
                 b.in = (...args: unknown[]) => { inSpy(...args); return b; };
-                b.gte = (...args: unknown[]) => { gteSpy(...args); return b; };
+                b.or = (...args: unknown[]) => { orSpy(...args); return b; };
                 b.order = () => b;
                 b.then = (resolve: (v: unknown) => void) =>
                     Promise.resolve({ data: [], error: null }).then(resolve);
@@ -397,8 +398,34 @@ describe("dbListRecommendations — decidedAfter filter", () => {
             statusIn: ["accepted", "edited", "rejected"],
             decidedAfter: cutoff,
         });
-        expect(gteSpy).toHaveBeenCalledWith("decided_at", cutoff);
+        expect(orSpy).toHaveBeenCalledWith(`decided_at.gte.${cutoff},decided_at.is.null`);
         expect(inSpy).toHaveBeenCalledWith("status", ["accepted", "edited", "rejected"]);
+    });
+
+    // Audit 10. tur Fix 1: regresyon — eski .gte kullanılmamalı
+    it("decidedAfter geçildiğinde eski .gte('decided_at',...) çağrılmaz (yeni .or yolu)", async () => {
+        const gteSpy = vi.fn();
+        const orSpy = vi.fn();
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.select = () => b;
+                b.eq = () => b;
+                b.in = () => b;
+                b.gte = (...args: unknown[]) => { gteSpy(...args); return b; };
+                b.or = (...args: unknown[]) => { orSpy(...args); return b; };
+                b.order = () => b;
+                b.then = (resolve: (v: unknown) => void) =>
+                    Promise.resolve({ data: [], error: null }).then(resolve);
+                return b;
+            },
+        });
+        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        await dbListRecommendations({ decidedAfter: cutoff });
+        // Yeni davranış: .or kullanılır (NULL kayıtları da kapsar), .gte çağrılmaz
+        expect(orSpy).toHaveBeenCalled();
+        const gteOnDecidedAt = gteSpy.mock.calls.filter(([col]) => col === "decided_at");
+        expect(gteOnDecidedAt).toHaveLength(0);
     });
 });
 

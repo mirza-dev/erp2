@@ -212,7 +212,8 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     //   Eskiden tüm decided rec'ler çekiliyor, JS-side 7-gün filter uygulanıyordu;
     //   decided rec'ler TTL'siz olduğu için zamanla büyüyen tabloda gereksiz I/O.
     try {
-        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const cutoffMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const cutoff = new Date(cutoffMs).toISOString();
         const allDecidedRecs = await dbListRecommendations({
             entity_type: "product",
             recommendation_type: "purchase_suggestion",
@@ -225,6 +226,13 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         ]);
         for (const r of allDecidedRecs) {
             if (seen.has(r.entity_id)) continue;
+            // Audit 10. tur Fix 1: legacy decided_at=NULL durumunda created_at ile
+            // 7-gün cutoff fallback. SQL `.or(...)` NULL'ları çekti; JS-side
+            // 7-günlük stale filter created_at üzerinden uygulanır.
+            if (r.decided_at === null) {
+                const createdMs = new Date(r.created_at).getTime();
+                if (createdMs < cutoffMs) continue;
+            }
             decidedRecMap.set(r.entity_id, r);
             seen.add(r.entity_id);
         }

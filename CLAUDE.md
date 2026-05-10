@@ -3,7 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-10_
 
-**Son tamamlanan iş:** G11 audit 9. tur — 4 bulgu fix (initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp) (2026-05-10)
+**Son tamamlanan iş:** G11 audit 10. tur — 2 düşük risk fix (legacy decided_at NULL, initial fetch behavior testi) (2026-05-10)
+
+**G11 audit 10. tur (1 commit, ~5 dosya):**
+- **Fix 1 (LOW) — Legacy `decided_at = null` defansif**: `dbListRecommendations.decidedAfter` filter eskiden `.gte("decided_at", X)` ile NULL kayıtları reddediyordu → eski test seed/manuel insert'le `decided_at=null, status='accepted'` rec'ler out-of-scope drift response'una hiç girmezdi. Yeni: helper `.or("decided_at.gte.X,decided_at.is.null")` ile NULL'ları kapsa; route JS-side fallback `r.decided_at === null` durumunda `created_at` ile 7-gün cutoff kontrolü. Mevcut akış için bug yok (yeni rec'lerde `decided_at` her zaman set), defansif legacy data koruması.
+- **Fix 2 (LOW) — Initial fetch behavior testi**: Audit 9. tur Fix 1 source-regex testlere ek olarak `shouldTriggerFetch(productsLen)` pure helper testleri — fetch tetikleme koşulu (`products.length === 0 → return`) davranış matrisiyle çift sigorta. Mevcut testler de korundu.
+- 156 dosya · 2448 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 9. tur — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp (2026-05-10; 2443 test)
 
 **G11 audit 9. tur (1 commit, ~8 dosya):**
 - **Fix 1 (HIGH) — İlk yükleme out-of-scope decided fetch**: useEffect'in dependency'si sadece `reorderSignature` idi → ilk açılışta recMap boş + reorderSuggestions boş → signatureSource boş → imza "" → effect skip → route hiç çağrılmıyor → recMap dolmuyor (chicken-and-egg). Çözüm: `[reorderSignature, products.length, loadAiData]` dependency, `if (products.length === 0) return` early-return. Products yüklendiğinde bir kez fetch tetiklenir, recMap dolunca signatureSource genişler ve effect tekrar çalışır.
