@@ -4,9 +4,10 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 12. tur KAPALI (2026-05-10; 2466 test) — dbUpdateRecommendationMetadata yarış guard (status=suggested)
-**Önceki:** Lint warning temizliği KAPALI (2026-05-10; 2462 test, 0 warning) — config + dead code 30 → 0
+**Aktif:** Purchase & Alert plan uygulaması — Faz faz commit-by-commit. Plan: `/Users/mirzasaribiyik/Projects/erp2/purchase-aksiyon-plan.md`. Faz sırası: 1=alert sync_issue retry ✅, 2=vendors, 3=PO schema+RPC, 4=PO UI, 5=mal kabul (B1), 6=suggested→PO, 7=overdue ship inline, 8=AI feedback prompt (M4 bulk), 9=PDF, 10=order_shortage drawer.
+**Son:** Faz 1 KAPALI (2026-05-10; 2477 test) — sync_issue alert inline retry endpoint + SystemAlertCard UI + serviceParasutOAuthRefresh extract
+**Önceki:** G11 audit 12. tur KAPALI (2026-05-10; 2466 test) — dbUpdateRecommendationMetadata yarış guard (status=suggested)
+**Önceki²:** Lint warning temizliği KAPALI (2026-05-10; 2462 test, 0 warning) — config + dead code 30 → 0
 **Önceki²:** G11 audit 11. tur KAPALI (2026-05-10; 2462 test) — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı
 **Önceki²:** G11 audit 10. tur KAPALI (2026-05-10; 2448 test) — legacy decided_at NULL defansif + initial fetch behavior testi
 **Önceki²:** G11 audit 9. tur KAPALI (2026-05-10; 2443 test) — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp
@@ -22,6 +23,35 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## Purchase & Alert Plan — Faz 1 (2026-05-10) — KAPALI
+
+**Hedef:** Plan dosyasındaki (purchase-aksiyon-plan.md) en küçük + bağımsız + en yüksek faydalı iş: `sync_issue` alert'leri için kullanıcının "Yeniden Dene" CTA'sı ile inline retry (drawer'a sokmadan tepede).
+
+**1 commit, ~7 dosya:**
+
+- **Yeni endpoint `POST /api/alerts/[id]/sync-retry`**: tip + state validasyonu sonrası entity_id'ye göre dispatch.
+  - `ALERT_ENTITY_PARASUT_AUTH` → `serviceParasutOAuthRefresh` (token refresh).
+  - Diğerleri → `serviceSyncAllPending` (toplu sync).
+  - Başarılı her iki yolda alert `resolved` (reason='sync-retry-from-alert').
+- **`serviceParasutOAuthRefresh` helper extract** (`parasut-oauth.ts`): `/api/parasut/oauth/refresh` admin endpoint mantığı helper'a taşındı; Faz 1 sync-retry endpoint'i de aynı helper'ı kullanır (DRY). `getParasutAdapter` çağrısı helper içine alındı.
+- **`/dashboard/alerts` UI değişiklikleri:**
+  - `actionFor()` switch'inde sync_issue case (`/dashboard/parasut` defansif fallback).
+  - `productSysAlerts` filter `entity_type !== 'parasut'` (sync alertleri ürün gruplarından çıkarıldı, "Silinmiş Ürün" görünümü engellendi).
+  - Yeni `systemAlerts` useMemo (`entity_type === 'parasut' && type === 'sync_issue'`).
+  - Yeni `SystemAlertCard` component (PARAŞÜT badge + severity + retry CTA + Paraşüt sayfa linki + Yoksay).
+  - Sayfa üstünde "Paraşüt Sync Uyarıları" bölümü; tüm tab'larda görünür (sipariş tab'ları hariç).
+  - `retrySyncAlert` handler — optimistic resolve + toast; demo guard.
+- **Test (11 yeni, `alerts-sync-retry.test.ts`):** 7 endpoint + 4 source-regression.
+- **Mock fix:** `parasut-oauth-refresh.test.ts` `vi.importActual` ile partial mock (helper extract sonrası kırılma fix).
+
+**Domain kuralı:**
+- Alert pages "yönlendirici" değil "aksiyon alır" olmalı: kullanıcının link tıklamadan iş bitirebileceği inline CTA paterni (quote_expired drawer pattern; SystemAlertCard ana liste pattern).
+- Helper extract: aynı mantığı çağıran iki endpoint olduğunda servis katmanına taşı (DRY; B7 plan kararıyla tutarlı).
+
+**Toplam:** 158 dosya · 2477 test yeşil · TS clean · 0 lint warning · build OK.
 
 ---
 

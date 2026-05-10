@@ -51,9 +51,15 @@ vi.mock("@/lib/supabase/service", () => ({
     },
 }));
 
-vi.mock("@/lib/services/parasut-oauth", () => ({
-    getAccessToken: (...a: unknown[]) => mockGetAccessToken(...a),
-}));
+// Partial mock: serviceParasutOAuthRefresh gerçek (Faz 1'de extract edildi),
+// getAccessToken helper içinden çağrıldığında mock'lanır.
+vi.mock("@/lib/services/parasut-oauth", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/services/parasut-oauth")>("@/lib/services/parasut-oauth");
+    return {
+        ...actual,
+        getAccessToken: (...a: unknown[]) => mockGetAccessToken(...a),
+    };
+});
 
 vi.mock("@/lib/parasut", () => ({
     getParasutAdapter: () => ({}),

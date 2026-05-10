@@ -8,16 +8,14 @@
  *   3) yeni token CAS yazımı
  *
  * Notlar:
- *   - getAccessToken normalde EXPIRY_BUFFER kontrol eder; manuel akışta buffer'ı
- *     bypass etmek için expires_at'i geçmişe çekip getAccessToken'ı tetikliyoruz.
  *   - Demo mode middleware tarafından zaten 403'le bloklanır (POST).
+ *   - Asıl mantık `serviceParasutOAuthRefresh` içine extract edildi (Faz 1 — alert
+ *     sync-retry akışı da aynı helper'ı çağırır).
  */
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { handleApiError } from "@/lib/api-error";
-import { getAccessToken } from "@/lib/services/parasut-oauth";
-import { getParasutAdapter } from "@/lib/parasut";
+import { serviceParasutOAuthRefresh } from "@/lib/services/parasut-oauth";
 
 async function requireAdmin(): Promise<{ error: NextResponse } | null> {
     const supabase = await createClient();
@@ -37,51 +35,17 @@ export async function POST(): Promise<NextResponse> {
     if (guard) return guard.error;
 
     try {
-        const supabase = createServiceClient();
-
-        // Token kaydı var mı kontrol et
-        const { data: row, error: readErr } = await supabase
-            .from("parasut_oauth_tokens")
-            .select("id, expires_at")
-            .eq("singleton_key", "default")
-            .maybeSingle();
-        if (readErr) throw new Error(`Token okuma hatası: ${readErr.message}`);
-        if (!row) {
+        const result = await serviceParasutOAuthRefresh();
+        if (!result.success) {
             return NextResponse.json(
                 { error: "OAuth bağlantısı henüz kurulmamış. Önce 'Paraşüt'e bağlan' linki ile akışı başlatın." },
                 { status: 404 },
             );
         }
-
-        // Buffer'ı bypass et: expires_at'i geçmişe çek → getAccessToken refresh'i tetikleyecek.
-        const oldExpiresAt = row.expires_at as string;
-        const { error: updateErr } = await supabase
-            .from("parasut_oauth_tokens")
-            .update({ expires_at: new Date(0).toISOString() })
-            .eq("singleton_key", "default");
-        if (updateErr) throw new Error(`Token expiry güncelleme hatası: ${updateErr.message}`);
-
-        try {
-            await getAccessToken(getParasutAdapter());
-        } catch (err) {
-            // Refresh fail olursa eski expires_at'i geri yaz (false negative buffer'ı bozmamak için)
-            await supabase
-                .from("parasut_oauth_tokens")
-                .update({ expires_at: oldExpiresAt })
-                .eq("singleton_key", "default");
-            throw err;
-        }
-
-        const { data: fresh } = await supabase
-            .from("parasut_oauth_tokens")
-            .select("expires_at, token_version")
-            .eq("singleton_key", "default")
-            .maybeSingle();
-
         return NextResponse.json({
             success:      true,
-            expiresAt:    fresh?.expires_at ?? null,
-            tokenVersion: fresh?.token_version ?? null,
+            expiresAt:    result.expiresAt,
+            tokenVersion: result.tokenVersion,
         });
     } catch (err) {
         return handleApiError(err, "POST /api/parasut/oauth/refresh");

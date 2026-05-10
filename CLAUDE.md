@@ -3,7 +3,17 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-10_
 
-**Son tamamlanan iş:** G11 audit 12. tur — dbUpdateRecommendationMetadata yarış koruması (status=suggested guard) (2026-05-10)
+**Son tamamlanan iş:** Purchase&Alert plan Faz 1 — sync_issue alert inline retry (2026-05-10)
+
+**Faz 1 (1 commit, ~7 dosya):**
+- **Yeni endpoint** `POST /api/alerts/[id]/sync-retry`: alert tipini doğrular, entity_id'ye göre dispatch eder. `ALERT_ENTITY_PARASUT_AUTH` → `serviceParasutOAuthRefresh` çağrılır; diğer Paraşüt entity'leri → `serviceSyncAllPending`. Başarılı her iki yolda alert `resolved` (reason='sync-retry-from-alert'). 404 (alert yok) / 400 (tip sync_issue değil ya da zaten resolved) / 409 (OAuth bağlantısı kurulmamış) / 502 (sync-all tamamen başarısız).
+- **`serviceParasutOAuthRefresh` helper extract** (`parasut-oauth.ts`): `/api/parasut/oauth/refresh` admin endpoint'inin iç mantığı helper'a taşındı. Faz 1 sync-retry endpoint'i de aynı helper'ı kullanır → tek source-of-truth. `getParasutAdapter` çağrısı helper'ın içine alındı.
+- **`/dashboard/alerts` UI**: `actionFor()` switch'ine `sync_issue` case (defansif fallback `/dashboard/parasut`); `productSysAlerts` filter genişletildi (`entity_type !== 'parasut'`) → sync_issue alertleri ürün gruplarından ayrıldı; yeni `systemAlerts` listesi (`entity_type='parasut'` && `type='sync_issue'`); yeni `SystemAlertCard` component'i ("Yeniden Dene" CTA + Paraşüt sayfa linki + Yoksay); sayfa üstünde "Paraşüt Sync Uyarıları" bölümü. `retrySyncAlert` handler optimistic resolve + toast; demo guard.
+- **Test (11 yeni, `alerts-sync-retry.test.ts`):** 7 endpoint senaryo (404, tip 400, zaten resolved 400, AUTH→oauth refresh, notConnected→409, diğer→sync-all, sync-all fail→502) + 4 source-regression (actionFor case, SystemAlertCard, systemAlerts filter, productSysAlerts parasut exclusion).
+- **Eski test güncel:** `parasut-oauth-refresh.test.ts` mock factory `vi.importActual` ile partial mock'a dönüştürüldü (helper extract sonrası testler kırılmasın).
+- 158 dosya · 2477 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** G11 audit 12. tur — dbUpdateRecommendationMetadata yarış koruması (status=suggested guard) (2026-05-10; 2466 test)
 
 **G11 audit 12. tur (1 commit, ~3 dosya):**
 - **Fix (MEDIUM) — `dbUpdateRecommendationMetadata` race guard**: helper UPDATE'i `.eq("id", id)` ile filtre yapıyordu; status guard yoktu. Yarış: CRON levelSame metadata patch'i hesaplarken (rec suggested görüldü → `dbGetRecommendationById` → hesap → UPDATE) kullanıcı aynı rec'i kabul/red ederse, decided rec'in `metadata.suggestQty` (frozen miktar) CRON'un patch'i ile yenileniyordu → "decided rec frozen metadata" kuralı kırılıyor, UI'da yanlış miktar görünüyordu. `dbUpdateSuggestedRecommendation` zaten `.eq("status","suggested")` kullanıyordu — aynı disiplin metadata helper'a uygulandı: (1) `dbGetRecommendationById` sonrası `current.status !== "suggested"` ise erken return (defansif kısa devre), (2) UPDATE chain'ine `.eq("status","suggested")` SQL guard'ı (yarış pencerei kapatma).

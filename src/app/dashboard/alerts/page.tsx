@@ -42,9 +42,12 @@ interface ProductAlertGroup {
 
 function actionFor(alerts: AlertRow[]): { label: string; href: string } {
     const types = alerts.map((a) => a.type);
-    if (types.includes("order_shortage")) return { label: "Siparişleri incele", href: "/dashboard/orders" };
-    if (types.includes("stock_critical")) return { label: "Satın alma planla",  href: "/dashboard/purchase/suggested" };
-    if (types.includes("order_deadline")) return { label: "Satın alma planla",  href: "/dashboard/purchase/suggested" };
+    // Faz 1: sync_issue defansif fallback (normal akışta SystemAlertCard üzerinden inline retry yapılır,
+    // ürün gruplarından ayrı bölümde gösterilir; bu satır arşiv görünümü için yedek).
+    if (types.includes("sync_issue"))     return { label: "Paraşüt sayfasına git",  href: "/dashboard/parasut" };
+    if (types.includes("order_shortage")) return { label: "Siparişleri incele",     href: "/dashboard/orders" };
+    if (types.includes("stock_critical")) return { label: "Satın alma planla",      href: "/dashboard/purchase/suggested" };
+    if (types.includes("order_deadline")) return { label: "Satın alma planla",      href: "/dashboard/purchase/suggested" };
     return { label: "Stoku izle", href: "/dashboard/products" };
 }
 
@@ -141,8 +144,12 @@ export default function AlertsPage() {
 
     const productGroups: ProductAlertGroup[] = useMemo(() => {
         const sysAlerts = activeAlerts.filter((a) => a.source !== "ai" && a.entity_id);
-        // Sipariş bazlı alertları (quote_expired, overdue_shipment) ürün gruplarından ayır
-        const productSysAlerts = sysAlerts.filter((a) => a.entity_type !== "sales_order");
+        // Sipariş bazlı alertları (quote_expired, overdue_shipment) + Paraşüt sync_issue
+        // alertlerini (entity_type='parasut') ürün gruplarından ayır.
+        // Faz 1: sync_issue alertleri kendi `systemAlerts` listesinde inline retry CTA ile gösterilir.
+        const productSysAlerts = sysAlerts.filter(
+            (a) => a.entity_type !== "sales_order" && a.entity_type !== "parasut",
+        );
         const byProduct = new Map<string, AlertRow[]>();
         for (const alert of productSysAlerts) {
             const id = alert.entity_id!;
@@ -191,6 +198,11 @@ export default function AlertsPage() {
 
     const aiAlerts           = useMemo(() => activeAlerts.filter((a) => a.source === "ai"), [activeAlerts]);
     const orderAlerts        = useMemo(() => activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "sales_order"), [activeAlerts]);
+    // Faz 1: Paraşüt sync_issue alertleri ayrı sistem grubu — inline "Yeniden Dene" CTA ile gösterilir.
+    const systemAlerts       = useMemo(
+        () => activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "parasut" && a.type === "sync_issue"),
+        [activeAlerts],
+    );
     const criticalCount      = useMemo(() => productGroups.filter((g) => g.topSeverity === "critical").length, [productGroups]);
     const warningCount       = useMemo(() => productGroups.filter((g) => g.topSeverity === "warning").length, [productGroups]);
     const shortageCount      = useMemo(() => productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage")).length, [productGroups]);
@@ -360,6 +372,33 @@ export default function AlertsPage() {
             toast({ type: "success", message: "Uyarı kabul edildi" });
         } catch {
             toast({ type: "error", message: "İşlem başarısız" });
+        }
+    };
+
+    // Faz 1: sync_issue alert için Paraşüt retry tetikleme (oauth refresh veya sync-all dispatch'i
+    // backend'de). Başarı: alert'i optimistic resolved düşür + toast.
+    const [syncRetrying, setSyncRetrying] = useState<string | null>(null);
+    const retrySyncAlert = async (alertId: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (syncRetrying) return;
+        setSyncRetrying(alertId);
+        try {
+            const res = await fetch(`/api/alerts/${alertId}/sync-retry`, { method: "POST" });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+            }
+            setRawAlerts((prev) => prev.map((a) =>
+                a.id === alertId ? { ...a, status: "resolved" as const } : a
+            ));
+            toast({ type: "success", message: "Paraşüt yeniden senkronize edildi, uyarı kapatıldı." });
+        } catch (e) {
+            toast({
+                type: "error",
+                message: e instanceof Error ? e.message : "Yeniden deneme başarısız.",
+            });
+        } finally {
+            setSyncRetrying(null);
         }
     };
 
@@ -555,6 +594,44 @@ export default function AlertsPage() {
                     </div>
                 )}
             </div>
+
+            {/* ── System (Paraşüt) Alerts ── */}
+            {/* Faz 1: sync_issue alertleri tüm sekmelerde her zaman tepede görünür —
+                tıkla-tıkla retry'ı drawer'a sokmadan öne çıkarır. Yalnızca
+                showResolved=false durumunda 'open/acknowledged' alertleri filtrelenir
+                (activeAlerts zaten o filtreyi uyguluyor). */}
+            {!loading && systemAlerts.length > 0 && !isOrderAlertTab && (
+                <div style={{
+                    marginBottom: "20px",
+                    border: "0.5px solid var(--border-secondary)",
+                    borderRadius: "8px",
+                    background: "var(--bg-secondary)",
+                    overflow: "hidden",
+                }}>
+                    <div style={{
+                        padding: "10px 20px",
+                        background: "var(--bg-tertiary)",
+                        borderBottom: "0.5px solid var(--border-secondary)",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        color: "var(--text-tertiary)",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                    }}>
+                        Paraşüt Sync Uyarıları ({systemAlerts.length})
+                    </div>
+                    {systemAlerts.map((alert) => (
+                        <SystemAlertCard
+                            key={alert.id}
+                            alert={alert}
+                            isDemo={isDemo}
+                            retrying={syncRetrying === alert.id}
+                            onRetry={retrySyncAlert}
+                            onDismiss={dismissAlert}
+                        />
+                    ))}
+                </div>
+            )}
 
             {/* ── Product Alert Table ── */}
             {loading ? (
@@ -1004,6 +1081,110 @@ function OrderAlertRow({ alert, isDemo, onExtended, onOpenDrawer }: OrderAlertRo
                     )}
                 </div>
             )}
+        </div>
+    );
+}
+
+// ── SystemAlertCard ───────────────────────────────────────────
+// Faz 1: Paraşüt sync_issue alertleri için inline kart — "Yeniden Dene" CTA + hata
+// detayı + Paraşüt sayfa linki. quote_expired drawer-içi-form paterniyle paralel.
+
+interface SystemAlertCardProps {
+    alert: AlertRow;
+    isDemo: boolean;
+    retrying: boolean;
+    onRetry: (alertId: string) => void;
+    onDismiss: (alertId: string) => void;
+}
+
+function SystemAlertCard({ alert, isDemo, retrying, onRetry, onDismiss }: SystemAlertCardProps) {
+    const sev = SEV[alert.severity as Severity] ?? SEV.warning;
+    return (
+        <div style={{
+            padding: "14px 20px",
+            borderBottom: "0.5px solid var(--border-tertiary)",
+            display: "flex", flexDirection: "column", gap: "10px",
+        }}>
+            <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: "16px",
+            }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                        <span style={{
+                            display: "inline-block",
+                            fontSize: "10px", fontWeight: 700,
+                            padding: "1px 6px", borderRadius: "3px",
+                            background: sev.bg, color: sev.text,
+                            border: `0.5px solid ${sev.border}`,
+                            letterSpacing: "0.04em",
+                        }}>{sev.label}</span>
+                        <span style={{
+                            fontSize: "10px", fontWeight: 600,
+                            color: "var(--text-tertiary)", textTransform: "uppercase",
+                            letterSpacing: "0.04em",
+                        }}>PARAŞÜT</span>
+                    </div>
+                    <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
+                        {alert.title}
+                    </div>
+                    {alert.description && (
+                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                            {alert.description}
+                        </div>
+                    )}
+                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                        {formatRelTime(alert.created_at)}
+                    </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end", flexShrink: 0 }}>
+                    <button
+                        onClick={() => onRetry(alert.id)}
+                        disabled={isDemo || retrying}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Paraşüt senkronizasyonunu yeniden dene"}
+                        style={{
+                            fontSize: "12px", padding: "5px 11px",
+                            border: "0.5px solid var(--accent-border)",
+                            borderRadius: "4px", background: "var(--accent-bg)",
+                            color: "var(--accent-text)",
+                            cursor: (isDemo || retrying) ? "not-allowed" : "pointer",
+                            opacity: (isDemo || retrying) ? 0.6 : 1,
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {retrying ? "Deneniyor…" : "↻ Yeniden Dene"}
+                    </button>
+                    <Link
+                        href="/dashboard/parasut"
+                        style={{
+                            fontSize: "11px", padding: "4px 10px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "4px", background: "transparent",
+                            color: "var(--text-secondary)",
+                            textDecoration: "none", whiteSpace: "nowrap",
+                        }}
+                    >
+                        Paraşüt sayfasına git
+                    </Link>
+                    <button
+                        onClick={() => onDismiss(alert.id)}
+                        disabled={isDemo}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Bu uyarıyı yoksay"}
+                        style={{
+                            fontSize: "11px", padding: "4px 10px",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "4px", background: "transparent",
+                            color: "var(--text-tertiary)",
+                            cursor: isDemo ? "not-allowed" : "pointer",
+                            opacity: isDemo ? 0.6 : 1, whiteSpace: "nowrap",
+                        }}
+                    >
+                        Yoksay
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }
