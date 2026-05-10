@@ -5,8 +5,9 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 11. tur KAPALI (2026-05-10; 2462 test) — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı
-**Önceki:** G11 audit 10. tur KAPALI (2026-05-10; 2448 test) — legacy decided_at NULL defansif + initial fetch behavior testi
+**Son:** Lint warning temizliği KAPALI (2026-05-10; 2462 test, 0 warning) — config + dead code 30 → 0
+**Önceki:** G11 audit 11. tur KAPALI (2026-05-10; 2462 test) — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı
+**Önceki²:** G11 audit 10. tur KAPALI (2026-05-10; 2448 test) — legacy decided_at NULL defansif + initial fetch behavior testi
 **Önceki²:** G11 audit 9. tur KAPALI (2026-05-10; 2443 test) — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp
 **Önceki²:** G11 audit 8. tur KAPALI (2026-05-09; 2432 test) — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter
 **Önceki²:** G11 audit 7. tur KAPALI (2026-05-09; 2411 test) — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper
@@ -20,6 +21,29 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## Lint Warning Temizliği (2026-05-10) — KAPALI
+
+**Hedef:** `npm run lint` 30 warning → 0. Build/test/TS zaten temizdi; warning'ler ya tooling/config eksiği ya dead code.
+
+**1 commit, 13 dosya:**
+
+- **Config (`eslint.config.mjs`):**
+  - `globalIgnores`'a `coverage/**` (Vitest/c8 artifacts → vendor JS dosyaları unused eslint-disable directive üretiyordu) ve `tests/load/**` (k6 separate runtime; `import/no-anonymous-default-export` k6 standardı) eklendi.
+  - `@typescript-eslint/no-unused-vars` rule override: `argsIgnorePattern`, `varsIgnorePattern`, `caughtErrorsIgnorePattern` hepsi `"^_"` — TS/JS topluluk konvansiyonu meşrulaştırıldı.
+- **Test dead code (6 dosya, 7 warning):** parasut-* dosyalarında ölü import/var (beforeEach, mockGetUser, req, ParasutError ×2, result ×3).
+- **App/script dead code (3 warning):** seed-large.ts `tables`, alerts/page.tsx ilk `product` (yeniden atanıyor), orders/[id]/page.tsx ölü `err`.
+- **Next.js Image disable (1 warning):** QuoteDocument.tsx PDF/print `<img>` için inline disable yorumu (next/image PDF render'da yan etki yapabilir).
+- **Bonus:** quotes.ts:68 gereksiz `eslint-disable-next-line` kaldırıldı (yeni rule sayesinde `_` prefix zaten ignore).
+- **Test dokümantasyonu:** purchase-suggested-frozen-qty.test.ts:55 yanıltıcı başlık ("frozen 30" → "fallback computed 50") düzeltildi.
+
+**Domain kuralı:**
+- ESLint config tooling/runtime farklarını fark etmeli: vendor artifact (coverage/), separate runner (k6) klasörlerini globalIgnores ile dışarıda tut.
+- `_` prefix konvansiyonunu config'de etkinleştir; aksi halde mock/interface uyumu için bilinçli `_var` kullanımları warning üretir → konvansiyonu meşrulaştır.
+
+**Toplam:** 157 dosya · 2462 test yeşil · TS clean · 0 lint warning · 0 lint error · build OK.
 
 ---
 

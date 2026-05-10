@@ -175,7 +175,7 @@ describe("upsertShipment — idempotent skip", () => {
             parasut_shipment_document_id: "existing-ship-id",
         }));
 
-        const result = await serviceSyncOrderToParasut("order-1");
+        await serviceSyncOrderToParasut("order-1");
 
         expect(mockListRecentShipmentDocuments).not.toHaveBeenCalled();
         expect(mockCreateShipmentDocument).not.toHaveBeenCalled();
@@ -196,7 +196,7 @@ describe("upsertShipment — recovery pagination", () => {
             makeShipmentDoc("found-id", "ORD-2026-0042"),
         ]);
 
-        const result = await serviceSyncOrderToParasut("order-1");
+        await serviceSyncOrderToParasut("order-1");
 
         expect(mockCreateShipmentDocument).not.toHaveBeenCalled();
         const metaCall = mockUpdate.mock.calls.find(

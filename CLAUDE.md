@@ -3,7 +3,20 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-10_
 
-**Son tamamlanan iş:** G11 audit 11. tur — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı (2026-05-10)
+**Son tamamlanan iş:** Lint warning temizliği — 30 → 0 (config + dead code) (2026-05-10)
+
+**Lint cleanup (1 commit, 13 dosya):**
+- **Config-level fixes (16 warning):**
+  - `eslint.config.mjs` `globalIgnores`'a `coverage/**` (Vitest/c8 artifacts) ve `tests/load/**` (k6 ayrı runtime) eklendi.
+  - `@typescript-eslint/no-unused-vars` rule override: `argsIgnorePattern: "^_"`, `varsIgnorePattern: "^_"`, `caughtErrorsIgnorePattern: "^_"` — TS/JS topluluk konvansiyonu (parasut.ts mock adapter `_code/_input/_vkn`, voice-service.test.ts `_maxLen` zaten konvansiyon kullanıyordu, rule eksikti).
+- **Test dosyalarında dead kod (7 warning, 6 dosya):** `parasut-mock-adapter.test.ts` `beforeEach` import; `parasut-oauth-refresh.test.ts` `mockGetUser` decl.; `parasut-oauth.test.ts` `req` ataması; `parasut-service-faz5/6.test.ts` `ParasutError` import; `parasut-service-faz8.test.ts` 2× `const result =`; `parasut-service-faz9.test.ts` `const result =`.
+- **App/script dead atamalar (3 warning):** `seed-large.ts` ölü `tables` decl.; `alerts/page.tsx:149` ilk `const product = ...` (line 156'da yeniden atanıyor); `orders/[id]/page.tsx:1218` ölü `const err = isErrorOnStep(s)`.
+- **Next.js Image (1 warning):** `QuoteDocument.tsx:318` PDF/print `<img>` bilinçli tercih (`next/image` PDF render'da lazy-load + extra request sorunu); inline `eslint-disable-next-line @next/next/no-img-element` yorumu eklendi.
+- **Bonus:** Yeni rule sonrası `quotes.ts:68`'deki gereksiz `eslint-disable-next-line` kaldırıldı.
+- **Test dokümantasyonu:** `purchase-suggested-frozen-qty.test.ts:55` "frozen 30" yanıltıcı başlık → "fallback computed 50" (kod davranışı 50, test başlığı 30 diyordu — bug yok, sadece dokümantasyon yanıltıcı).
+- 157 dosya · 2462 test yeşil · TS clean · 0 lint warning · 0 lint error · build OK
+
+**Önceki:** G11 audit 11. tur — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı (2026-05-10; 2462 test)
 
 **G11 audit 11. tur (1 commit, ~5 dosya):**
 - **Fix 1 (MEDIUM) — `aiPending` metadata flag**: `buildAiMetadata` AI fail durumunda eski metni fallback yapıyordu (Audit 6 Fix 4) ama `metadata.urgencyLevel`'i her zaman güncel hesapla yazıyordu → bir sonraki cron'da `readUrgencyLevelFromMeta` aynı level'ı okuyup `levelSame` der → fresh AI bir daha denenmiyordu (geçici hata kalıcılaşıyordu). Yeni: `buildAiMetadata` her zaman `aiPending: !ai` yazar; diff-merge sinyali (`existingLevel === currentLevel && !aiPending`) ile pending durumda levelChanged'a düşürür ve fresh AI dener. JSONB JS-merge sayesinde levelSame patch'i `aiPending` içermez → korunur; AI başarılı patch'inde false olarak yazılır → eski true silinir.

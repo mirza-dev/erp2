@@ -81,14 +81,6 @@ async function batchInsert<T extends object>(table: string, rows: T[], batchSize
 async function cleanLoadTestData(): Promise<void> {
     console.log("🧹 LOAD- prefix'li test verisi temizleniyor...");
 
-    // FK sırasına göre sil
-    const tables = [
-        "order_lines",
-        "sales_orders",
-        "customers",
-        "products",
-    ];
-
     // order_lines: LOAD- sipariş ID'leri üzerinden sil
     const { data: loadOrders } = await supabase
         .from("sales_orders")

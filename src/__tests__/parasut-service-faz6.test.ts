@@ -4,7 +4,6 @@
  * findByCode (1/multi/0), TTL lease mutex.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ParasutError } from "@/lib/parasut-adapter";
 import type { ParasutProduct } from "@/lib/parasut-adapter";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

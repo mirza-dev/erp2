@@ -7,7 +7,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
-const mockGetUser      = vi.fn();
 const mockGetAccessToken = vi.fn();
 
 // Supabase client mock — her çağrıyı sırayla tüket

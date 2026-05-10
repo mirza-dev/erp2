@@ -12,7 +12,7 @@
  *   - Configurable error injection (setErrorMode)
  *   - reset() sonrası temiz slate
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { MockParasutAdapter } from "@/lib/parasut";
 import { ParasutError } from "@/lib/parasut-adapter";
 

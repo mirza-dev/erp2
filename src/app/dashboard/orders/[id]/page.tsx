@@ -1215,7 +1215,6 @@ function ParasutStepBadges({
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                 {order.map((s) => {
                     const c   = stepColor(colorFor(s));
-                    const err = isErrorOnStep(s);
                     const tip = tooltipFor(s);
                     const color = colorFor(s);
                     const canRetry =

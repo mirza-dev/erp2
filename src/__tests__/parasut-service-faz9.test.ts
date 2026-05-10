@@ -183,7 +183,7 @@ describe("upsertInvoice — idempotent skip", () => {
             parasut_invoice_id: "existing-inv-id",
         }));
 
-        const result = await serviceSyncOrderToParasut("order-1");
+        await serviceSyncOrderToParasut("order-1");
 
         expect(mockFindSalesInvoicesByNumber).not.toHaveBeenCalled();
         expect(mockCreateSalesInvoice).not.toHaveBeenCalled();

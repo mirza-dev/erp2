@@ -4,7 +4,6 @@
  * findByTax (1/multi/0), email fallback paths, race-condition guard.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ParasutError } from "@/lib/parasut-adapter";
 import type { ParasutContact } from "@/lib/parasut-adapter";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

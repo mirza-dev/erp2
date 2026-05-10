@@ -52,9 +52,11 @@ describe("selectDisplaySuggestQty", () => {
         expect(selectDisplaySuggestQty(rec, 50)).toBe(50);
     });
 
-    it("rec.status=edited, editedQty=null, frozenSuggestQty=30 → frozen 30 (edit başlamadı)", () => {
-        // editedQty null/undefined → editedQty branch'i atlanır, frozen kullanılır.
-        // Edge case: status=edited ama editedQty hiç set edilmemiş.
+    it("rec.status=edited, editedQty=undefined, frozenSuggestQty=30 → fallback computed 50", () => {
+        // editedQty undefined → ilk branch (status=edited && editedQty != null) atlanır;
+        // ikinci branch (status accepted/rejected) status=edited olduğu için yine atlanır;
+        // → fallback computedQty (50). frozenSuggestQty=30 burada kullanılmaz çünkü
+        // edited durumda kararı verdiği miktar editedQty olmalı; eksikliği boundary edge.
         const rec: Rec = { id: "r1", status: "edited", frozenSuggestQty: 30 };
         expect(selectDisplaySuggestQty(rec, 50)).toBe(50);
     });

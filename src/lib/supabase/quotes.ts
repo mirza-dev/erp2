@@ -65,7 +65,6 @@ export async function dbGetQuote(id: string): Promise<QuoteWithLines | null> {
     const lines = ((data.quote_line_items ?? []) as QuoteWithLines["lines"])
         .slice()
         .sort((a, b) => a.position - b.position);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { quote_line_items: _, ...rest } = data;
     return { ...rest, lines } as QuoteWithLines;
 }

@@ -480,7 +480,6 @@ describe("GET /api/parasut/oauth/callback", () => {
 
     it("returns 400 when code is missing", async () => {
         mockFromImpl = makeSeqMock({ 1: selectChain(null) });
-        const req = buildCallbackRequest("mystate", "");
         // Rebuild without code param
         const cookieVal = signState("nocode");
         const req2 = buildMockRequest(

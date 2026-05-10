@@ -146,7 +146,6 @@ export default function AlertsPage() {
         const byProduct = new Map<string, AlertRow[]>();
         for (const alert of productSysAlerts) {
             const id = alert.entity_id!;
-            const product = productMap.get(id);
             if (!byProduct.has(id)) byProduct.set(id, []);
             byProduct.get(id)!.push(alert);
         }
