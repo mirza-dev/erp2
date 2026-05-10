@@ -52,6 +52,7 @@ import {
     dbExpireStaleRecommendations,
     dbGetActiveRecommendationsForEntities,
     dbUpdateSuggestedRecommendation,
+    dbUpdateRecommendationMetadata,
 } from "@/lib/supabase/recommendations";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1416,6 +1417,164 @@ describe("dbUpdateSuggestedRecommendation — atomic content update", () => {
         await expect(
             dbUpdateSuggestedRecommendation("rec-missing", { body: "x" })
         ).rejects.toThrow();
+    });
+});
+
+// ─── dbUpdateRecommendationMetadata ──────────────────────────────────────────
+// Audit 12. tur: UPDATE'te status="suggested" guard'ı zorunlu — yarış senaryosunda
+// (CRON metadata patch'i hesaplarken kullanıcı kabul/red ederse) decided rec'in
+// frozen metadata'sının yenilenmesi engellenir.
+
+describe("dbUpdateRecommendationMetadata — status=suggested guard (race condition)", () => {
+    it("status=suggested rec için UPDATE çalışır + .eq('status','suggested') filtre uygulanır", async () => {
+        const eqCalls: Array<[string, unknown]> = [];
+        let updatePayload: Record<string, unknown> | null = null;
+        const existingRow = makeRow({
+            id: "rec-1", status: "suggested",
+            metadata: { aiWhyNow: "preserved", suggestQty: 50 },
+        });
+
+        let callCount = 0;
+        setupFrom({
+            ai_recommendations: () => {
+                callCount++;
+                if (callCount === 1) {
+                    // dbGetRecommendationById
+                    const b: Record<string, unknown> = {};
+                    b.select = () => b;
+                    b.eq = () => b;
+                    b.single = async () => ({ data: existingRow, error: null });
+                    return b;
+                }
+                // UPDATE
+                const b: Record<string, unknown> = {};
+                b.update = (data: Record<string, unknown>) => {
+                    updatePayload = data;
+                    const chain: Record<string, unknown> = {};
+                    chain.eq = (col: string, val: unknown) => {
+                        eqCalls.push([col, val]);
+                        return chain;
+                    };
+                    chain.then = (resolve: (v: unknown) => void) =>
+                        Promise.resolve({ data: null, error: null }).then(resolve);
+                    return chain;
+                };
+                return b;
+            },
+        });
+
+        await dbUpdateRecommendationMetadata("rec-1", {
+            suggestQty: 80,
+            urgencyLevel: "critical",
+        });
+
+        expect(updatePayload).not.toBeNull();
+        expect(eqCalls).toEqual([
+            ["id", "rec-1"],
+            ["status", "suggested"],
+        ]);
+        // Metadata JS-merge: aiWhyNow korunur, suggestQty overwrite
+        const meta = (updatePayload as Record<string, unknown>).metadata as Record<string, unknown>;
+        expect(meta.aiWhyNow).toBe("preserved");
+        expect(meta.suggestQty).toBe(80);
+        expect(meta.urgencyLevel).toBe("critical");
+    });
+
+    it("status=accepted rec için erken return (UPDATE hiç çağrılmaz)", async () => {
+        // Yarış senaryosu: rec CRON başlangıcında suggested'tı, GET sırasında
+        // kullanıcı kabul etti → mevcut row accepted dönüyor → UPDATE atılmamalı,
+        // decided rec'in frozen metadata'sı korunur.
+        let updateCalled = false;
+        const acceptedRow = makeRow({
+            id: "rec-1", status: "accepted",
+            metadata: { suggestQty: 50, aiWhyNow: "frozen" },
+            decided_at: "2026-05-10T10:00:00Z",
+        });
+
+        let callCount = 0;
+        setupFrom({
+            ai_recommendations: () => {
+                callCount++;
+                if (callCount === 1) {
+                    const b: Record<string, unknown> = {};
+                    b.select = () => b;
+                    b.eq = () => b;
+                    b.single = async () => ({ data: acceptedRow, error: null });
+                    return b;
+                }
+                const b: Record<string, unknown> = {};
+                b.update = () => {
+                    updateCalled = true;
+                    return {
+                        eq: () => ({
+                            eq: () => Promise.resolve({ data: null, error: null }),
+                        }),
+                    };
+                };
+                return b;
+            },
+        });
+
+        await dbUpdateRecommendationMetadata("rec-1", { suggestQty: 80 });
+
+        expect(updateCalled).toBe(false);
+    });
+
+    it("status=rejected rec için erken return (UPDATE hiç çağrılmaz)", async () => {
+        let updateCalled = false;
+        const rejectedRow = makeRow({
+            id: "rec-1", status: "rejected",
+            metadata: { suggestQty: 50 },
+        });
+
+        let callCount = 0;
+        setupFrom({
+            ai_recommendations: () => {
+                callCount++;
+                if (callCount === 1) {
+                    const b: Record<string, unknown> = {};
+                    b.select = () => b;
+                    b.eq = () => b;
+                    b.single = async () => ({ data: rejectedRow, error: null });
+                    return b;
+                }
+                const b: Record<string, unknown> = {};
+                b.update = () => {
+                    updateCalled = true;
+                    return { eq: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }) };
+                };
+                return b;
+            },
+        });
+
+        await dbUpdateRecommendationMetadata("rec-1", { suggestQty: 80 });
+        expect(updateCalled).toBe(false);
+    });
+
+    it("rec hiç bulunamazsa (null) UPDATE çağrılmaz", async () => {
+        let updateCalled = false;
+        let callCount = 0;
+        setupFrom({
+            ai_recommendations: () => {
+                callCount++;
+                if (callCount === 1) {
+                    const b: Record<string, unknown> = {};
+                    b.select = () => b;
+                    b.eq = () => b;
+                    b.single = async () => ({ data: null, error: null });
+                    return b;
+                }
+                const b: Record<string, unknown> = {};
+                b.update = () => {
+                    updateCalled = true;
+                    return { eq: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }) };
+                };
+                return b;
+            },
+        });
+
+        await dbUpdateRecommendationMetadata("rec-missing", { suggestQty: 80 });
+        expect(updateCalled).toBe(false);
     });
 });
 

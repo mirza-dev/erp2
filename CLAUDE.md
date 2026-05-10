@@ -3,7 +3,15 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-10_
 
-**Son tamamlanan iş:** Lint warning temizliği — 30 → 0 (config + dead code) (2026-05-10)
+**Son tamamlanan iş:** G11 audit 12. tur — dbUpdateRecommendationMetadata yarış koruması (status=suggested guard) (2026-05-10)
+
+**G11 audit 12. tur (1 commit, ~3 dosya):**
+- **Fix (MEDIUM) — `dbUpdateRecommendationMetadata` race guard**: helper UPDATE'i `.eq("id", id)` ile filtre yapıyordu; status guard yoktu. Yarış: CRON levelSame metadata patch'i hesaplarken (rec suggested görüldü → `dbGetRecommendationById` → hesap → UPDATE) kullanıcı aynı rec'i kabul/red ederse, decided rec'in `metadata.suggestQty` (frozen miktar) CRON'un patch'i ile yenileniyordu → "decided rec frozen metadata" kuralı kırılıyor, UI'da yanlış miktar görünüyordu. `dbUpdateSuggestedRecommendation` zaten `.eq("status","suggested")` kullanıyordu — aynı disiplin metadata helper'a uygulandı: (1) `dbGetRecommendationById` sonrası `current.status !== "suggested"` ise erken return (defansif kısa devre), (2) UPDATE chain'ine `.eq("status","suggested")` SQL guard'ı (yarış pencerei kapatma).
+- **route.ts:280** civarında yorum güncellendi (12. tur referansı).
+- **Test (4 yeni):** `recommendations.test.ts` `dbUpdateRecommendationMetadata` test grubu — (1) status=suggested → UPDATE çalışır + .eq filtreler doğru sırayla, (2) status=accepted → UPDATE atılmaz (early return), (3) status=rejected → UPDATE atılmaz, (4) rec yok → UPDATE atılmaz.
+- 157 dosya · 2466 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Lint warning temizliği — 30 → 0 (config + dead code) (2026-05-10; 2462 test, 0 warning)
 
 **Lint cleanup (1 commit, 13 dosya):**
 - **Config-level fixes (16 warning):**

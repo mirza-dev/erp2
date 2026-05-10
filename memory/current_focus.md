@@ -5,8 +5,9 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** Lint warning temizliği KAPALI (2026-05-10; 2462 test, 0 warning) — config + dead code 30 → 0
-**Önceki:** G11 audit 11. tur KAPALI (2026-05-10; 2462 test) — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı
+**Son:** G11 audit 12. tur KAPALI (2026-05-10; 2466 test) — dbUpdateRecommendationMetadata yarış guard (status=suggested)
+**Önceki:** Lint warning temizliği KAPALI (2026-05-10; 2462 test, 0 warning) — config + dead code 30 → 0
+**Önceki²:** G11 audit 11. tur KAPALI (2026-05-10; 2462 test) — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı
 **Önceki²:** G11 audit 10. tur KAPALI (2026-05-10; 2448 test) — legacy decided_at NULL defansif + initial fetch behavior testi
 **Önceki²:** G11 audit 9. tur KAPALI (2026-05-10; 2443 test) — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp
 **Önceki²:** G11 audit 8. tur KAPALI (2026-05-09; 2432 test) — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter
@@ -21,6 +22,24 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 12. Tur (2026-05-10) — KAPALI
+
+**Hedef:** İncelemeci ORTA seviye yarış senaryosu raporladı: `dbUpdateRecommendationMetadata` UPDATE'inde status guard yoktu. CRON levelSame metadata patch'i hesaplarken kullanıcı kabul/red ederse, decided rec'in `metadata.suggestQty` (frozen miktar) yenileniyor → "decided rec frozen metadata" kuralı kırılıyor.
+
+**1 commit, 3 dosya:**
+
+- **Fix (MEDIUM) — `dbUpdateRecommendationMetadata` race guard**: iki kademeli koruma. (1) JS-side: `dbGetRecommendationById` sonrası `current.status !== "suggested"` ise erken return — fazla I/O elenir. (2) SQL-side: UPDATE chain'ine `.eq("status", "suggested")` SQL filtresi — `dbGetRecommendationById` ile UPDATE arasında durum geçişi olsa bile yanlış satıra yazılmaz. `dbUpdateSuggestedRecommendation` aynı disipline sahipti, helper'lar artık tutarlı.
+- **`route.ts:280` yorum** 12. tur referansıyla güncellendi.
+- **Test (4):** `recommendations.test.ts`'e `dbUpdateRecommendationMetadata` test grubu — status=suggested doğru filtre + UPDATE çalışır; status=accepted/rejected → UPDATE atılmaz; rec yok → UPDATE atılmaz.
+
+**Domain kuralı:**
+- Concurrent erişimli helper'larda eq("id") **yetersiz**. Status invariant'ı SQL guard olarak ekle (`.eq("status", expected)`); JS-side erken kısa devre fazladan I/O'yu eler ama sürekli koruma SQL'de.
+- `dbUpdateSuggestedRecommendation` zaten doğru pattern — sister helper'lar aynı disipline çekilmeli.
+
+**Toplam:** 157 dosya · 2466 test yeşil · TS clean · 0 lint warning · build OK.
 
 ---
 

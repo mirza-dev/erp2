@@ -277,7 +277,10 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     // ile rec body/confidence/severity/metadata atomik tek UPDATE'le yenilenir
     // (rec ID stable kalır, UI reference'ı bozulmaz).
 
-    // Level-aynı rec'lerin metadata'sını sayısal alanlarla güncelle (best-effort)
+    // Level-aynı rec'lerin metadata'sını sayısal alanlarla güncelle (best-effort).
+    // Audit 12. tur: dbUpdateRecommendationMetadata UPDATE'i status=suggested guard'ı
+    // ile çalışır — kullanıcı eşzamanlı kabul/red ederse decided rec'in frozen
+    // metadata'sı korunur (yarış kapatıldı).
     await Promise.all(levelSameItems.map(item => {
         const rec = suggestedRecMap.get(item.productId)!;
         return dbUpdateRecommendationMetadata(rec.id, {

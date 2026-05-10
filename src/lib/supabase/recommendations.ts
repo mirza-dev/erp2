@@ -359,6 +359,13 @@ export async function dbExpireRecommendationsForMissingEntities(
  *
  * GET → JS-merge → UPDATE — JSONB tüm key'leri overwrite etmesin diye.
  * Best-effort: rec yoksa veya update fail olursa sessizce çıkar.
+ *
+ * Audit 12. tur: UPDATE'te `.eq("status", "suggested")` guard'ı zorunlu.
+ * Yarış senaryosu: CRON rec'i suggested olarak gördükten sonra kullanıcı
+ * kabul/red ederse, status filtre yoksa accepted/rejected rec'in
+ * `metadata.suggestQty` (frozen miktar) yenilenir → "decided rec frozen
+ * metadata" kuralı kırılır, UI'daki frozen değer bozulur. `dbUpdateSuggestedRecommendation`
+ * aynı koruma için status filter kullanıyor — burada da aynı disiplin.
  */
 export async function dbUpdateRecommendationMetadata(
     id: string,
@@ -367,6 +374,9 @@ export async function dbUpdateRecommendationMetadata(
     const supabase = createServiceClient();
     const current = await dbGetRecommendationById(id);
     if (!current) return;
+    // Defansif: rec daha mevcut metadata okurken decided'a geçtiyse update'i atla.
+    // SQL guard zaten 0 satır etkileyecek, ama erken kısa devre fazladan I/O'yu eler.
+    if (current.status !== "suggested") return;
     const merged = {
         ...((current.metadata as Record<string, unknown> | null) ?? {}),
         ...metadataPatch,
@@ -374,7 +384,8 @@ export async function dbUpdateRecommendationMetadata(
     await supabase
         .from("ai_recommendations")
         .update({ metadata: merged })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("status", "suggested");
 }
 
 /**
