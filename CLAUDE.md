@@ -1,9 +1,19 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-09_
+_Son güncelleme: 2026-05-10_
 
-**Son tamamlanan iş:** G11 audit 8. tur — 4 bulgu fix (in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter) (2026-05-09)
+**Son tamamlanan iş:** G11 audit 9. tur — 4 bulgu fix (initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp) (2026-05-10)
+
+**G11 audit 9. tur (1 commit, ~8 dosya):**
+- **Fix 1 (HIGH) — İlk yükleme out-of-scope decided fetch**: useEffect'in dependency'si sadece `reorderSignature` idi → ilk açılışta recMap boş + reorderSuggestions boş → signatureSource boş → imza "" → effect skip → route hiç çağrılmıyor → recMap dolmuyor (chicken-and-egg). Çözüm: `[reorderSignature, products.length, loadAiData]` dependency, `if (products.length === 0) return` early-return. Products yüklendiğinde bir kez fetch tetiklenir, recMap dolunca signatureSource genişler ve effect tekrar çalışır.
+- **Fix 2 (MEDIUM) — `decidedAfter` SQL filter**: route 7-gün cutoff'unu JS-side uyguluyordu (`for (r of allDecidedRecs) if (now - decided_at >= 7days) continue`). Decided rec'ler TTL'siz olduğu için ai_recommendations tablosu büyüdükçe gereksiz I/O. Helper'a `decidedAfter?: string` param + `.gte("decided_at", cutoff)` zinciri. Route ISO cutoff geçer; JS-side filter loop kaldırıldı.
+- **Fix 3 (MEDIUM) — Özet kart kırılımı reorderSuggestions üzerinden**: "Toplam Kritik" sayısı `reorderSuggestions.length` (in-scope satın alma ihtiyacı), ama alt kırılım `manufacturedItems.length`/`commercialItems.length` (displayProducts üzerinden) idi → 1 ana sayı, 2 kırılım toplamı. Yeni `inScopeManufacturedCount`/`inScopeCommercialCount` useMemo (reorderSuggestions üzerinden) — kart başlığı + kırılım hizalı. Tab count'ları displayProducts'ta kalır (görünür ürün sayısı).
+- **Fix 4 (LOW) — `available` clamped**: route items.map'inde `available: promisable` ham değer veriyordu — over-quoted (-5) durumunda AI prompt JSON içinde negatif görüyor, fallback body "Stok -5/20" yazıyordu. Yeni `available: stock` (= max(0, promisable)) — UI ile aynı görünüm.
+- **Yeni 1 test dosyası (3 yeni test):** `purchase-suggested-initial-fetch.test.ts` (Fix 1 source-regression). `recommendations.test.ts` (+3 decidedAfter filter), `purchase-copilot-out-of-scope-decided.test.ts` (1 testi update — JS-side 7-gün test'i artık SQL cutoff geçişini doğrular), `purchase-suggested-tab-counts.test.ts` (+3 in-scope kırılım), `purchase-copilot-promisable-deep.test.ts` (+2 response available clamp).
+- 156 dosya · 2443 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 8. tur — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter (2026-05-09; 2432 test)
 
 **G11 audit 8. tur (1 commit, ~9 dosya):**
 - **Fix 1 (HIGH) — Backend in-scope items clamp**: route `needed = max(0, target - promisable)` over-quoted ürünler için `suggestQty` şişiriyordu (UI 40, backend 50). Yeni: `stock = max(0, promisable)` + `needed = max(0, target - stock)` + `coverageDays = computeCoverageDays(stock, ...)`. Frontend `pickStock` paterniyle birebir → UI ile backend item.suggestQty eşit.

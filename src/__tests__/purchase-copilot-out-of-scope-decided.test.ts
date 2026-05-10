@@ -206,19 +206,23 @@ describe("Fix 1 — out-of-scope decided rec drift", () => {
         expect(rec.currentDrift).not.toBeNull();
     });
 
-    it("dbListRecommendations 7-gün sonrası decided'ları filter ediyor (stale)", async () => {
-        // Ürün stok düzelmiş, decided rec 8 gün önce
+    it("Audit 9. Fix 2: dbListRecommendations decidedAfter cutoff'u 7 gün önce ISO ile çağrılır", async () => {
+        // 7-gün filter artık SQL-side (DB query'de). Route helper'a doğru cutoff geçirmeli.
         mockDbListAllActiveProducts.mockResolvedValue([makeProduct()]);
-        const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
-        mockDbListRecommendations.mockResolvedValue([
-            makeDecidedRec({ decided_at: eightDaysAgo }),
-        ]);
+        mockDbListRecommendations.mockResolvedValue([]);
 
-        const res = await POST();
-        const body = await res.json();
-        const rec = body.recommendations.find((r: { productId: string }) => r.productId === "p-healthy");
-        // 7-gün window dışı → response'a girmez
-        expect(rec).toBeUndefined();
+        const before = Date.now();
+        await POST();
+        const after = Date.now();
+
+        const callArg = mockDbListRecommendations.mock.calls[0]?.[0];
+        expect(callArg).toBeDefined();
+        expect(callArg.decidedAfter).toBeDefined();
+        // ISO timestamp, ~7 gün önce
+        const cutoffMs = new Date(callArg.decidedAfter).getTime();
+        const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+        expect(cutoffMs).toBeGreaterThanOrEqual(before - sevenDaysMs - 1000);
+        expect(cutoffMs).toBeLessThanOrEqual(after - sevenDaysMs + 1000);
     });
 
     it("Audit 7. Fix 3: statusIn filter ile dbListRecommendations çağrılır", async () => {

@@ -156,8 +156,10 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             sku: p.sku,
             productType: p.product_type as "manufactured" | "commercial",
             unit: p.unit,
-            // available alanı UI'da "Stok" olarak gösterilir — promisable (satılabilir) yansıtılır
-            available: promisable,
+            // available alanı UI'da "Stok" olarak gösterilir — promisable (satılabilir) yansıtılır.
+            // Audit 9. tur Fix 4: clamped stok (max(0, promisable)) — over-quoted durumda
+            // AI prompt ve fallback body negatif değer görmesin (UI ile aynı görünüm).
+            available: stock,
             min: p.min_stock_level,
             dailyUsage,
             coverageDays,
@@ -204,25 +206,25 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     }
 
     // Out-of-scope decided rec'ler — sadece accepted/edited/rejected çek;
-    // 7-günlük decided window JS-side uygulanır.
-    // Audit 7. tur Fix 3: statusIn filter'ı SQL'e taşındı; büyük tabloda
-    // SELECT-then-JS-filter overhead'i engellenir.
+    // 7-günlük decided window SQL-side uygulanır.
+    // Audit 7. tur Fix 3: statusIn → SQL filter (in("status", [...]))
+    // Audit 9. tur Fix 2: decidedAfter → SQL filter (gte("decided_at", cutoff))
+    //   Eskiden tüm decided rec'ler çekiliyor, JS-side 7-gün filter uygulanıyordu;
+    //   decided rec'ler TTL'siz olduğu için zamanla büyüyen tabloda gereksiz I/O.
     try {
+        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
         const allDecidedRecs = await dbListRecommendations({
             entity_type: "product",
             recommendation_type: "purchase_suggestion",
             statusIn: ["accepted", "edited", "rejected"],
+            decidedAfter: cutoff,
         });
-        const DECIDED_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-        const now = Date.now();
         const seen = new Set<string>([
             ...suggestedRecMap.keys(),
             ...decidedRecMap.keys(),
         ]);
         for (const r of allDecidedRecs) {
             if (seen.has(r.entity_id)) continue;
-            const pivot = r.decided_at ?? r.created_at;
-            if (now - new Date(pivot).getTime() >= DECIDED_MAX_AGE_MS) continue;
             decidedRecMap.set(r.entity_id, r);
             seen.add(r.entity_id);
         }

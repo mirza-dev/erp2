@@ -30,6 +30,13 @@ export interface ListRecommendationsFilter {
      * SELECT-then-JS-filter overhead'ini engeller.
      */
     statusIn?: RecommendationStatus[];
+    /**
+     * Audit 9. tur Fix 2: decided_at'i belirli bir tarihten sonraya filtrele
+     * (ISO timestamp). Copilot route'un 7-gün cutoff'unu DB'ye indirir;
+     * decided rec'ler TTL'siz olduğu için zamanla büyüyen tabloda overhead'i
+     * engeller. `.gte("decided_at", cutoff)` zinciri.
+     */
+    decidedAfter?: string;
 }
 
 export interface UpdateRecommendationStatusOpts {
@@ -109,6 +116,7 @@ export async function dbListRecommendations(
     } else if (filter.status) {
         query = query.eq("status", filter.status);
     }
+    if (filter.decidedAfter)       query = query.gte("decided_at", filter.decidedAfter);
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);

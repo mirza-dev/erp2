@@ -5,8 +5,9 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 8. tur KAPALI (2026-05-09; 2432 test) — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter
-**Önceki:** G11 audit 7. tur KAPALI (2026-05-09; 2411 test) — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper
+**Son:** G11 audit 9. tur KAPALI (2026-05-10; 2443 test) — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp
+**Önceki:** G11 audit 8. tur KAPALI (2026-05-09; 2432 test) — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter
+**Önceki²:** G11 audit 7. tur KAPALI (2026-05-09; 2411 test) — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper
 **Önceki²:** G11 audit 6. tur KAPALI (2026-05-09; 2396 test) — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich
 **Önceki²:** G11 audit 5. tur KAPALI (2026-05-09; 2369 test) — UI promisable, refetch ?all=1, signature quoted, ?all=1 filter
 **Önceki²:** G11 audit 4. tur KAPALI (2026-05-09; 2344 test) — promisable filter+hesaplar, UI full scan, auto-reload imzası
@@ -17,6 +18,34 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 9. Tur (2026-05-10) — KAPALI
+
+**Hedef:** 8. turdan sonra incelemeci 4 yeni bulgu çıkardı: initial fetch chicken-and-egg (ilk yükleme out-of-scope decided görünmüyor), decidedAfter JS-side filter (CRON büyüyen tabloyu tarar), özet kart kırılımı 2 farklı evrenden, response.available negatif olabilir.
+
+**1 commit, ~8 dosya:**
+
+- **Fix 1 (HIGH) — Initial fetch**: `useEffect` dep'i `[reorderSignature, products.length, loadAiData]`; `if (products.length === 0) return`. Products yüklendiğinde bir kerelik fetch tetiklenir → recMap dolar → signatureSource genişler → effect tekrar çalışır.
+- **Fix 2 (MEDIUM) — decidedAfter SQL**: `dbListRecommendations.decidedAfter?: string` param + `.gte("decided_at", cutoff)`. Route 7-gün cutoff'u SQL'e indirdi; JS-side filter loop kaldırıldı.
+- **Fix 3 (MEDIUM) — Kart kırılımı**: yeni `inScopeManufacturedCount`/`inScopeCommercialCount` useMemo (reorderSuggestions üzerinden) — "Toplam Kritik" başlık + alt kırılım aynı evrenden hizalı. Tab count'ları displayProducts'ta kalır.
+- **Fix 4 (LOW) — `available` clamp**: items.map içinde `available: stock` (= max(0, promisable)). AI prompt + fallback body negatif değer görmez.
+
+**Test (11 yeni):**
+- `purchase-suggested-initial-fetch.test.ts` (3): source-regression `products.length` dep + `!reorderSignature` early-return kaldırıldı kontrolü
+- `recommendations.test.ts` (+3): decidedAfter `.gte("decided_at", ...)`, statusIn ile birlikte
+- `purchase-copilot-out-of-scope-decided.test.ts` (1 update): SQL cutoff ISO geçişi doğrulanır
+- `purchase-suggested-tab-counts.test.ts` (+3): in-scope kırılım hizalama
+- `purchase-copilot-promisable-deep.test.ts` (+2): response.available 0 clamp + pozitif regresyon
+
+**Domain kuralı:**
+- Etkili initial-fetch için `useEffect` dep'i state'e değil, mount-time deterministik bir veri (örn. `products.length`) içermeli; chicken-and-egg fetch zincirleri statik dependency ile kırılmalı.
+- TTL'siz tablolarda zaman cutoff filter'ları SQL-side olmalı; JS-side `for ... continue` döngüleri tablo büyüdükçe gereksiz I/O.
+- UI'da bir kavram (örn. "Toplam Kritik") tek evrenden hesaplanmalı; alt-bilgi farklı evrenden gelirse kullanıcı kafa karışıklığı.
+- Backend response field'ları UI'nın göstereceği gibi clamp'lenmeli; ham değer (negatif promisable) AI prompt'a sızdırılırsa yanlış metin üretilir.
+
+**Test:** 156 dosya · 2443 test yeşil · TS clean · 0 lint hatası
 
 ---
 

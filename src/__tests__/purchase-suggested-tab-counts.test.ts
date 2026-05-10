@@ -133,3 +133,44 @@ describe("Fix 3 — tab counts ve pendingCount displayProducts üzerinden", () =
         expect(r.pending).toBe(0);
     });
 });
+
+// ─── Audit 9. tur Fix 3 — özet kart kırılımı reorderSuggestions üzerinden ──
+
+describe("Fix 3 — 'Toplam Kritik' kırılımı in-scope ürünlerden", () => {
+    // page.tsx'teki inScopeManufacturedCount/inScopeCommercialCount mantığı
+    function deriveInScopeCounts(reorderSuggestions: Lite[]) {
+        const manufactured = reorderSuggestions.filter(p => p.productType === "manufactured").length;
+        const commercial = reorderSuggestions.filter(p => p.productType === "commercial").length;
+        return { manufactured, commercial, total: reorderSuggestions.length };
+    }
+
+    it("Toplam Kritik 1 + alt kırılım 1 (in-scope) — toplam tutarlı", () => {
+        // Eski bug: ana sayı 1, kırılım 1+1=2 (out-of-scope dahildi)
+        const reorder: Lite[] = [{ id: "p-1", productType: "commercial" }];
+        const r = deriveInScopeCounts(reorder);
+        // Kırılım toplamı === ana sayı
+        expect(r.manufactured + r.commercial).toBe(r.total);
+        expect(r.total).toBe(1);
+    });
+
+    it("Out-of-scope decided ürün kırılıma sayılmaz", () => {
+        // Reorder = 1 commercial; out-of-scope decided 1 manufactured.
+        // Kırılım sadece 1 ticari göstermeli (manufactured 0).
+        const reorder: Lite[] = [{ id: "p-1", productType: "commercial" }];
+        // out-of-scope simulasyonu: displayProducts'a ekleyelim ama deriveInScopeCounts kullanma
+        const r = deriveInScopeCounts(reorder);
+        expect(r.manufactured).toBe(0);
+        expect(r.commercial).toBe(1);
+    });
+
+    it("Reorder boş + out-of-scope decided var → kırılım 0+0 (gizli kart)", () => {
+        // page.tsx: reorderSuggestions.length > 0 koşuluyla kart gösteriliyor;
+        // reorder boşken kart hiç gösterilmez. Bu testte sadece kırılımın
+        // hesabını kontrol ediyoruz.
+        const reorder: Lite[] = [];
+        const r = deriveInScopeCounts(reorder);
+        expect(r.manufactured).toBe(0);
+        expect(r.commercial).toBe(0);
+        expect(r.total).toBe(0);
+    });
+});

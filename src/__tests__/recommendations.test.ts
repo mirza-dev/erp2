@@ -342,6 +342,66 @@ describe("dbListRecommendations — statusIn filter", () => {
     });
 });
 
+// ─── Audit 9. tur Fix 2 — decidedAfter filter (SQL gte) ─────────────────────
+
+describe("dbListRecommendations — decidedAfter filter", () => {
+    function makeThenableWithGte(rows: unknown[], gteSpy: ReturnType<typeof vi.fn>) {
+        const b: Record<string, unknown> = {};
+        b.select = () => b;
+        b.eq = () => b;
+        b.in = () => b;
+        b.gte = (...args: unknown[]) => { gteSpy(...args); return b; };
+        b.order = () => b;
+        b.then = (resolve: (v: unknown) => void, reject?: (e: unknown) => void) =>
+            Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+        return b;
+    }
+
+    it("decidedAfter geçildiğinde .gte('decided_at', cutoff) çağrılır", async () => {
+        const gteSpy = vi.fn();
+        setupFrom({
+            ai_recommendations: () => makeThenableWithGte([], gteSpy),
+        });
+        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        await dbListRecommendations({ decidedAfter: cutoff });
+        expect(gteSpy).toHaveBeenCalledWith("decided_at", cutoff);
+    });
+
+    it("decidedAfter geçilmediyse .gte çağrılmaz (regresyon)", async () => {
+        const gteSpy = vi.fn();
+        setupFrom({
+            ai_recommendations: () => makeThenableWithGte([], gteSpy),
+        });
+        await dbListRecommendations({ entity_type: "product" });
+        expect(gteSpy).not.toHaveBeenCalled();
+    });
+
+    it("decidedAfter + statusIn birlikte: hem .gte hem .in çağrılır", async () => {
+        const gteSpy = vi.fn();
+        const inSpy = vi.fn();
+        setupFrom({
+            ai_recommendations: () => {
+                const b: Record<string, unknown> = {};
+                b.select = () => b;
+                b.eq = () => b;
+                b.in = (...args: unknown[]) => { inSpy(...args); return b; };
+                b.gte = (...args: unknown[]) => { gteSpy(...args); return b; };
+                b.order = () => b;
+                b.then = (resolve: (v: unknown) => void) =>
+                    Promise.resolve({ data: [], error: null }).then(resolve);
+                return b;
+            },
+        });
+        const cutoff = "2026-01-01T00:00:00.000Z";
+        await dbListRecommendations({
+            statusIn: ["accepted", "edited", "rejected"],
+            decidedAfter: cutoff,
+        });
+        expect(gteSpy).toHaveBeenCalledWith("decided_at", cutoff);
+        expect(inSpy).toHaveBeenCalledWith("status", ["accepted", "edited", "rejected"]);
+    });
+});
+
 describe("dbListRecommendations — returns empty array when data is null", () => {
     it("applies data ?? [] fallback", async () => {
         const b: Record<string, unknown> = {};

@@ -210,4 +210,27 @@ describe("Audit 8 Fix 1 — backend in-scope items max(0, promisable) clamp", ()
         const body = await res.json();
         expect(body.counts.needs_purchase).toBe(0);
     });
+
+    // Audit 9. tur Fix 4: response.items[].available clamped (max(0, promisable))
+    it("Over-quoted: response.items[].available 0 (negatif değil)", async () => {
+        // available=10, quoted=15 → promisable=-5 → response available 0 olmalı
+        mockDbListAllActiveProducts.mockResolvedValue([
+            makeProduct({ available_now: 10, min_stock_level: 20 }),
+        ]);
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map([["p-1", 15]]));
+        const res = await POST();
+        const body = await res.json();
+        expect(body.items[0].available).toBe(0);
+    });
+
+    it("Pozitif promisable: response.items[].available promisable değeri (regresyon)", async () => {
+        // available=50, quoted=20 → promisable=30 → available 30
+        mockDbListAllActiveProducts.mockResolvedValue([
+            makeProduct({ available_now: 50, min_stock_level: 100 }), // min yüksek → öneriye gir
+        ]);
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map([["p-1", 20]]));
+        const res = await POST();
+        const body = await res.json();
+        expect(body.items[0].available).toBe(30);
+    });
 });

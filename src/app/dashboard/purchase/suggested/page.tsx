@@ -662,12 +662,19 @@ export default function PurchaseSuggestedPage() {
             .join("|");
     }, [signatureSource]);
 
+    // Audit 9. tur Fix 1: ilk yüklemede recMap boş + reorderSuggestions boş
+    // senaryosu → signatureSource boş → effect skip. Sonuç: out-of-scope decided
+    // ürünlerin drift bilgisi manuel "Yenile"ye veya CRON'a kadar UI'da yok
+    // (chicken-and-egg: route çağrılmadan recMap dolmaz). Çözüm: dependency'ye
+    // products.length ekle — products yüklendiğinde signature boş olsa bile
+    // route bir kez çağrılır, recMap dolunca signatureSource genişler ve effect
+    // tekrar tetiklenir.
     useEffect(() => {
-        if (!reorderSignature) return;
+        if (products.length === 0) return; // products henüz yüklenmedi → bekle
         const controller = new AbortController();
         loadAiData(controller.signal);
         return () => controller.abort();
-    }, [reorderSignature, loadAiData]);
+    }, [reorderSignature, products.length, loadAiData]);
 
     useEffect(() => () => clearTimeout(refetchTimerRef.current), []);
 
@@ -823,6 +830,19 @@ export default function PurchaseSuggestedPage() {
     // decided ürünler de sekme sayılarına ve "Tümü" toplamına yansır.
     const manufacturedItems = useMemo(() => displayProducts.filter(p => p.productType === "manufactured"), [displayProducts]);
     const commercialItems = useMemo(() => displayProducts.filter(p => p.productType === "commercial"), [displayProducts]);
+
+    // Audit 9. tur Fix 3: özet kart "Toplam Kritik" alt kırılımı için yalnızca
+    // satın alma ihtiyacı olan (in-scope) ürünleri kullan — kart başlığı
+    // "Toplam Kritik" reorderSuggestions.length göstermesiyle hizalı.
+    // Tab count'ları displayProducts'ta kalır (görünür ürün sayısı).
+    const inScopeManufacturedCount = useMemo(
+        () => reorderSuggestions.filter(p => p.productType === "manufactured").length,
+        [reorderSuggestions],
+    );
+    const inScopeCommercialCount = useMemo(
+        () => reorderSuggestions.filter(p => p.productType === "commercial").length,
+        [reorderSuggestions],
+    );
 
     const sorted = useMemo(() => {
         const purchaseSearched = search.trim().toLowerCase();
@@ -1029,7 +1049,7 @@ export default function PurchaseSuggestedPage() {
                             {reorderSuggestions.length}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                            {manufacturedItems.length} imalat · {commercialItems.length} ticari
+                            {inScopeManufacturedCount} imalat · {inScopeCommercialCount} ticari
                         </div>
                     </div>
 
