@@ -31,10 +31,12 @@ export interface ListRecommendationsFilter {
      */
     statusIn?: RecommendationStatus[];
     /**
-     * Audit 9. tur Fix 2: decided_at'i belirli bir tarihten sonraya filtrele
-     * (ISO timestamp). Copilot route'un 7-gün cutoff'unu DB'ye indirir;
-     * decided rec'ler TTL'siz olduğu için zamanla büyüyen tabloda overhead'i
-     * engeller. `.gte("decided_at", cutoff)` zinciri.
+     * Audit 9. tur Fix 2 + 10. tur Fix 1: decided_at'i belirli bir tarihten
+     * sonraya filtrele (ISO timestamp). Copilot route'un 7-gün cutoff'unu
+     * DB'ye indirir; decided rec'ler TTL'siz olduğu için zamanla büyüyen
+     * tabloda overhead'i engeller. `.or("decided_at.gte.X,decided_at.is.null")`
+     * zinciri — legacy `decided_at=null` kayıtları da kapsar; route JS-side
+     * `created_at` fallback ile cutoff uygular.
      */
     decidedAfter?: string;
 }

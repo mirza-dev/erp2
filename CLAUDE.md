@@ -3,7 +3,17 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-10_
 
-**Son tamamlanan iş:** G11 audit 10. tur — 2 düşük risk fix (legacy decided_at NULL, initial fetch behavior testi) (2026-05-10)
+**Son tamamlanan iş:** G11 audit 11. tur — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı (2026-05-10)
+
+**G11 audit 11. tur (1 commit, ~5 dosya):**
+- **Fix 1 (MEDIUM) — `aiPending` metadata flag**: `buildAiMetadata` AI fail durumunda eski metni fallback yapıyordu (Audit 6 Fix 4) ama `metadata.urgencyLevel`'i her zaman güncel hesapla yazıyordu → bir sonraki cron'da `readUrgencyLevelFromMeta` aynı level'ı okuyup `levelSame` der → fresh AI bir daha denenmiyordu (geçici hata kalıcılaşıyordu). Yeni: `buildAiMetadata` her zaman `aiPending: !ai` yazar; diff-merge sinyali (`existingLevel === currentLevel && !aiPending`) ile pending durumda levelChanged'a düşürür ve fresh AI dener. JSONB JS-merge sayesinde levelSame patch'i `aiPending` içermez → korunur; AI başarılı patch'inde false olarak yazılır → eski true silinir.
+- **Fix 2 (MEDIUM) — Frozen suggestQty UI**: backend `outOfScopeDecidedItems` için `metadata.suggestQty` (frozen) yayınlıyordu ama UI satır render'ı her render'da `computeSuggestion(p)` ile güncel hesap yapıyordu — accepted toplamı stok değişiminde değişebiliyordu. Yeni: `selectDisplaySuggestQty(rec, computedQty)` helper karar mantığını tek noktada toplar; backend `RecRef`'e `frozenSuggestQty` alanı (decided rec metadata.suggestQty'sinden); UI `RecEntry`'ye eklenir; tüm callsite'lar (mobil 1290, masaüstü 1416, computeOrderTotals input, drawer 946) helper kullanır.
+  - rec yok / suggested → güncel hesap; edited → editedQty; accepted/rejected → frozenSuggestQty; legacy fallback computed.
+- **Fix 3 (LOW) — Yorum güncelleme**: `recommendations.ts:34-37` JSDoc + `route.ts:211` yorum `.gte → .or(...)` davranışına göre güncel; 10. tur Fix 1 referansı eklendi.
+- **Yeni testler (14):** `purchase-copilot-ai-error-flag.test.ts` (+5 aiPending senaryosu); `purchase-suggested-frozen-qty.test.ts` (yeni dosya, 9 helper test).
+- 157 dosya · 2462 test yeşil · TS clean · 0 lint hatası
+
+**Önceki:** G11 audit 10. tur — 2 düşük risk fix (legacy decided_at NULL, initial fetch behavior testi) (2026-05-10; 2448 test)
 
 **G11 audit 10. tur (1 commit, ~5 dosya):**
 - **Fix 1 (LOW) — Legacy `decided_at = null` defansif**: `dbListRecommendations.decidedAfter` filter eskiden `.gte("decided_at", X)` ile NULL kayıtları reddediyordu → eski test seed/manuel insert'le `decided_at=null, status='accepted'` rec'ler out-of-scope drift response'una hiç girmezdi. Yeni: helper `.or("decided_at.gte.X,decided_at.is.null")` ile NULL'ları kapsa; route JS-side fallback `r.decided_at === null` durumunda `created_at` ile 7-gün cutoff kontrolü. Mevcut akış için bug yok (yeni rec'lerde `decided_at` her zaman set), defansif legacy data koruması.

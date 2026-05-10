@@ -208,7 +208,9 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     // Out-of-scope decided rec'ler — sadece accepted/edited/rejected çek;
     // 7-günlük decided window SQL-side uygulanır.
     // Audit 7. tur Fix 3: statusIn → SQL filter (in("status", [...]))
-    // Audit 9. tur Fix 2: decidedAfter → SQL filter (gte("decided_at", cutoff))
+    // Audit 9. tur Fix 2 + 10. tur Fix 1: decidedAfter → SQL filter
+    //   .or(decided_at.gte.X, decided_at.is.null) — legacy NULL kayıtlar dahil;
+    //   JS-side 7-gün filter sadece NULL kayıtlar için created_at üzerinden uygulanır.
     //   Eskiden tüm decided rec'ler çekiliyor, JS-side 7-gün filter uygulanıyordu;
     //   decided rec'ler TTL'siz olduğu için zamanla büyüyen tabloda gereksiz I/O.
     try {
@@ -255,7 +257,11 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             // tek source-of-truth, level karşılaştırması da onu kullansın.
             const currentLevel = item.urgencyLevel;
             const existingLevel = readUrgencyLevelFromMeta(meta);
-            if (existingLevel === currentLevel) levelSameItems.push(item);
+            // Audit 11. tur Fix 1: aiPending=true (önceki cron'da AI fail) → level
+            // aynı olsa bile fresh AI denenir. Aksi halde geçici AI hatasında eski
+            // boş AI metni level değişene kadar (saatler/günler) kalıcı olabilir.
+            const aiPending = meta?.aiPending === true;
+            if (existingLevel === currentLevel && !aiPending) levelSameItems.push(item);
             else levelChangedItems.push(item);
             continue;
         }
@@ -508,6 +514,11 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         decidedAt: string | null;
         editedMetadata: Record<string, unknown> | null;
         currentDrift: Drift | null;
+        // Audit 11. tur Fix 2: decided rec'lerin metadata'sında dondurulmuş
+        // suggestQty (kararı verilen miktar). UI accepted/rejected ürünlerde
+        // her render'da güncel computeSuggestion yerine bu değeri gösterir;
+        // backend "frozen" niyeti UI'a aktarılır. Suggested rec'lerde null.
+        frozenSuggestQty: number | null;
     };
     const recommendations: RecRef[] = [];
 
@@ -543,6 +554,10 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
             // Audit 8. tur Fix 2: item.urgencyLevel zaten pctFallback dahil — tek source
             const urgencyLevel = item.urgencyLevel;
             const severity: "critical" | "warning" | "info" = urgencyPct >= 80 ? "critical" : urgencyPct >= 50 ? "warning" : "info";
+            // Audit 11. tur Fix 1: AI fail (freshAiMap'te yok) → aiPending=true,
+            // sonraki cron'da diff-merge level aynı olsa bile levelChanged'a düşer.
+            // AI başarılı (ai mevcut) → aiPending=false; JS-merge eski true'yu temizler.
+            const aiPending = !ai;
             return {
                 ai,
                 aiWhyNow,
@@ -558,6 +573,7 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                     aiWhyNow,
                     aiQuantityRationale,
                     aiUrgencyLevel,
+                    aiPending,
                     coverageDays: item.coverageDays,
                     leadTimeDays: item.leadTimeDays,
                     targetStock: item.targetStock,
@@ -581,9 +597,9 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                     model_version: aiAvailable ? "purchase-copilot-v1" : null,
                     metadata: m.metadata,
                 });
-                return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at, editedMetadata: null, currentDrift: null } as RecRef;
+                return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at, editedMetadata: null, currentDrift: null, frozenSuggestQty: null } as RecRef;
             } catch {
-                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null } as RecRef;
+                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null, frozenSuggestQty: null } as RecRef;
             }
         });
 
@@ -603,10 +619,10 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                     model_version: aiAvailable ? "purchase-copilot-v1" : null,
                     metadata: m.metadata,
                 });
-                return { productId: item.productId, recommendationId: updated.id, status: updated.status, decidedAt: updated.decided_at, editedMetadata: null, currentDrift: null } as RecRef;
+                return { productId: item.productId, recommendationId: updated.id, status: updated.status, decidedAt: updated.decided_at, editedMetadata: null, currentDrift: null, frozenSuggestQty: null } as RecRef;
             } catch (err) {
                 console.error("[purchase-copilot] levelChanged update failed", item.productId, err);
-                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null } as RecRef;
+                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null, frozenSuggestQty: null } as RecRef;
             }
         });
 
@@ -620,6 +636,7 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                 decidedAt: rec.decided_at,
                 editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
                 currentDrift: null,
+                frozenSuggestQty: null,
             };
         });
 
@@ -628,16 +645,23 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         // decided rec'leri içeriyor (out-of-scope dahil), her biri response'a girer.
         // Audit 8. tur Fix 4: silinmiş ürün decided rec response'a girmesin
         // (orphan cleanup henüz tetiklenmediyse UI'da ölü kayıt görünmemeli).
+        // Audit 11. tur Fix 2: frozenSuggestQty meta.suggestQty'den çekilir →
+        // UI accepted/rejected satırlarda kararı verilen miktarı gösterir.
         const decidedRefs: RecRef[] = Array.from(decidedRecMap.entries())
             .filter(([productId]) => productMap.has(productId))
-            .map(([productId, rec]) => ({
-                productId,
-                recommendationId: rec.id,
-                status: rec.status,
-                decidedAt: rec.decided_at,
-                editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
-                currentDrift: driftMap.get(productId) ?? null,
-            }));
+            .map(([productId, rec]) => {
+                const meta = rec.metadata as Record<string, unknown> | null;
+                const frozen = typeof meta?.suggestQty === "number" ? (meta.suggestQty as number) : null;
+                return {
+                    productId,
+                    recommendationId: rec.id,
+                    status: rec.status,
+                    decidedAt: rec.decided_at,
+                    editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
+                    currentDrift: driftMap.get(productId) ?? null,
+                    frozenSuggestQty: frozen,
+                };
+            });
 
         const [, upsertResults, levelChangedResults] = await Promise.all([
             expirePromise,

@@ -10,7 +10,7 @@
 - [project_integrations.md](project_integrations.md) — Paraşüt Faz 1-10 ✅ (1914 test), Faz 11 sırada; AI kolon eşleştirme, Sentry ✅, k6, smoke 24
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Son: G11 audit 10. tur KAPALI (2448 test) — legacy decided_at NULL defansif + initial fetch behavior testi
+- [current_focus.md](current_focus.md) — Son: G11 audit 11. tur KAPALI (2462 test) — AI fail recovery (aiPending) + frozen suggestQty UI
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi: tüm turlar ✅ 1638 test; satır bazlı not, guard, _voiceHint, prompt final

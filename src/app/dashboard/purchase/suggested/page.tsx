@@ -28,6 +28,32 @@ interface RecEntry {
     /** G11: decided rec'lerde mevcut state ile dondurulan metadata arası fark.
      *  null ise drift yok; objeyse "Stok değişti" rozeti gösterilir. */
     currentDrift?: { suggestQty: number; urgencyLevel: UrgencyLevel } | null;
+    /** Audit 11. tur Fix 2: kararı verildiğinde dondurulan suggestQty.
+     *  accepted/rejected ürünlerde UI bu değeri gösterir; edited durumda
+     *  editedQty önceliklidir. Suggested ya da legacy rec'lerde null. */
+    frozenSuggestQty?: number | null;
+}
+
+/**
+ * Audit 11. tur Fix 2: decided rec'lerde "frozen" suggestQty UI'a yansımalı.
+ * Backend zaten metadata.suggestQty üretiyor; ama UI satır render'ı her zaman
+ * computeSuggestion(p) ile güncel hesap yapıyordu. Bu helper karar mantığını
+ * tek yerde tutar:
+ *   - rec yok / suggested → güncel hesap (computedQty)
+ *   - edited → editedQty (kullanıcının düzenlediği miktar)
+ *   - accepted / rejected → frozenSuggestQty (kararı verildiği andaki miktar)
+ *   - legacy (frozenSuggestQty undefined) → fallback computedQty
+ */
+export function selectDisplaySuggestQty(
+    rec: (RecEntry & { editedQty?: number }) | undefined,
+    computedQty: number,
+): number {
+    if (!rec) return computedQty;
+    if (rec.status === "edited" && rec.editedQty != null) return rec.editedQty;
+    if ((rec.status === "accepted" || rec.status === "rejected") && rec.frozenSuggestQty != null) {
+        return rec.frozenSuggestQty;
+    }
+    return computedQty;
 }
 
 const URGENCY_LABEL: Record<UrgencyLevel, string> = {
@@ -556,6 +582,7 @@ export default function PurchaseSuggestedPage() {
             decidedAt?: string | null;
             editedMetadata?: Record<string, unknown> | null;
             currentDrift?: { suggestQty: number; urgencyLevel: UrgencyLevel } | null;
+            frozenSuggestQty?: number | null;
         }>;
         generatedAt?: string;
     } | null>(null);
@@ -612,6 +639,7 @@ export default function PurchaseSuggestedPage() {
                                 status: r.status,
                                 decidedAt: r.decidedAt ?? null,
                                 currentDrift: r.currentDrift ?? null,
+                                frozenSuggestQty: r.frozenSuggestQty ?? null,
                                 ...(editedQty != null && { editedQty }),
                             });
                         }
@@ -887,12 +915,15 @@ export default function PurchaseSuggestedPage() {
         () => computeOrderTotals(
             reorderSuggestions.map(p => {
                 const rec = recMap.get(p.id);
+                // Audit 11. tur Fix 2: accepted/rejected toplamı frozen miktarla;
+                // edited editedQty; suggested güncel hesapla — selectDisplaySuggestQty
+                // tek karar noktası. Stok değiştiğinde accepted toplamı sabit kalır.
                 return {
                     id: p.id,
                     costPrice: p.costPrice || null,
                     price: p.price || null,
                     currency: p.currency,
-                    suggestQty: computeSuggestion(p).suggestQty,
+                    suggestQty: selectDisplaySuggestQty(rec, computeSuggestion(p).suggestQty),
                     decidedStatus: rec?.status,
                     decidedQty: rec?.editedQty,
                 };
@@ -916,7 +947,10 @@ export default function PurchaseSuggestedPage() {
     const aiDrawerEnrichment = aiDrawerProductId ? aiMap.get(aiDrawerProductId) : undefined;
     const aiDrawerRecEntry = aiDrawerProductId ? recMap.get(aiDrawerProductId) : undefined;
     const aiDrawerSuggestion = aiDrawerProduct ? computeSuggestion(aiDrawerProduct) : null;
-    const aiDrawerSuggestQty = aiDrawerSuggestion?.suggestQty ?? 1;
+    // Audit 11. tur Fix 2: drawer'daki "Önerilen miktar" da decided rec varsa frozen
+    const aiDrawerSuggestQty = aiDrawerSuggestion
+        ? selectDisplaySuggestQty(aiDrawerRecEntry, aiDrawerSuggestion.suggestQty)
+        : 1;
     // Audit 6. tur Fix 3: AI drawer coverage da promisable bazlı
     const aiDrawerCoverageDays = aiDrawerProduct
         ? computeCoverageDays(pickStock(aiDrawerProduct), aiDrawerProduct.dailyUsage)
@@ -1255,8 +1289,11 @@ export default function PurchaseSuggestedPage() {
                     {sorted.map(p => {
                         // Audit 5. tur Fix 2: stok = promisable, backend uyumlu
                         const { stock, urgency, daysLeft } = computeRowStock(p);
-                        const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
+                        const computed = computeSuggestion(p);
                         const recEntry = recMap.get(p.id);
+                        // Audit 11. tur Fix 2: accepted/rejected → frozen, edited → editedQty
+                        const suggestQty = selectDisplaySuggestQty(recEntry, computed.suggestQty);
+                        const { formula, leadTimeDemand } = computed;
                         const isRejected = recEntry?.status === "rejected";
                         return (
                             <div key={p.id} style={{
@@ -1413,8 +1450,11 @@ export default function PurchaseSuggestedPage() {
                                 const stockPct = p.minStockLevel > 0
                                     ? Math.min(100, Math.round((stock / p.minStockLevel) * 100))
                                     : 100;
-                                const { suggestQty, formula, leadTimeDemand } = computeSuggestion(p);
+                                const computed = computeSuggestion(p);
                                 const recEntry = recMap.get(p.id);
+                                // Audit 11. tur Fix 2: accepted/rejected → frozen, edited → editedQty
+                                const suggestQty = selectDisplaySuggestQty(recEntry, computed.suggestQty);
+                                const { formula, leadTimeDemand } = computed;
                                 const isRejected = recEntry?.status === "rejected";
                                 return (
                                     <tr key={p.id} style={{
@@ -1628,7 +1668,7 @@ export default function PurchaseSuggestedPage() {
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                                         <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Önerilen miktar</span>
                                         <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--text-primary)" }}>
-                                            {aiDrawerSuggestion.suggestQty.toLocaleString("tr-TR")} {aiDrawerProduct.unit}
+                                            {aiDrawerSuggestQty.toLocaleString("tr-TR")} {aiDrawerProduct.unit}
                                         </span>
                                     </div>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>

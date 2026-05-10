@@ -5,8 +5,9 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 **Aktif:** Sıradaki — Faz 12 (gerçek Paraşüt API) ve SMTP production deploy (kod hazır, env/migration/cron eksik)
-**Son:** G11 audit 10. tur KAPALI (2026-05-10; 2448 test) — legacy decided_at NULL defansif + initial fetch behavior testi
-**Önceki:** G11 audit 9. tur KAPALI (2026-05-10; 2443 test) — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp
+**Son:** G11 audit 11. tur KAPALI (2026-05-10; 2462 test) — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı
+**Önceki:** G11 audit 10. tur KAPALI (2026-05-10; 2448 test) — legacy decided_at NULL defansif + initial fetch behavior testi
+**Önceki²:** G11 audit 9. tur KAPALI (2026-05-10; 2443 test) — initial fetch chicken-and-egg, decidedAfter SQL, kart kırılımı, available clamp
 **Önceki²:** G11 audit 8. tur KAPALI (2026-05-09; 2432 test) — in-scope clamp, urgency pctFallback, tab counts, silinmiş ürün filter
 **Önceki²:** G11 audit 7. tur KAPALI (2026-05-09; 2411 test) — auto-reload imzası displayProducts, items'a out-of-scope, statusIn helper
 **Önceki²:** G11 audit 6. tur KAPALI (2026-05-09; 2396 test) — decided drift kapsamı, UI clamp, sort/drawer pickStock, AI fallback, POST enrich
@@ -19,6 +20,40 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **Önceki⁴:** SMTP/Resend e-posta altyapısı — kod commit edildi (2026-05-06; 2242 test), production deploy EKSİK
 **Önceki:** Settings audit 2. tur KAPALI (2026-05-05; 2215 test) — demo cookie geçiş + SVG kısıt + server validation
 **Önceki²:** Settings audit 1. tur KAPALI (2026-05-05; 2202 test) — avatar orphan + concurrent lock + type dedup
+
+---
+
+## G11 Audit 11. Tur (2026-05-10) — KAPALI
+
+**Hedef:** 10. tur sonrası incelemeci 3 bulgu raporladı (2 ORTA + 1 DÜŞÜK):
+
+1. AI fail sonrası yeniden deneme kilitlenebilir — `buildAiMetadata` AI hatasında eski metni fallback yapıyor ama `metadata.urgencyLevel`'i her zaman güncel hesapla yazıyor. `readUrgencyLevelFromMeta` aynı level'ı okuyup `levelSame` deyince fresh AI bir daha denenmiyor → eski boş AI metni level değişene kadar kalıcı olabilir.
+2. decided/frozen suggestQty UI'da güncel hesaba düşüyor — backend `outOfScopeDecidedItems` için `metadata.suggestQty` (frozen) yayınlıyor, UI satır render'ı her render'da `computeSuggestion(p)` ile yeniden hesaplıyor. Accepted toplamı stok değişiminde değişebiliyor.
+3. recommendations.ts:34-37 + route.ts:211 yorumları hâlâ eski `.gte("decided_at", cutoff)` davranışını söylüyor; gerçek kod `.or(...)` ile NULL fallback yapıyor.
+
+**1 commit, ~5 dosya:**
+
+- **Fix 1 (ORTA) — `aiPending` metadata flag**: `buildAiMetadata` her zaman `aiPending: !ai` yazıyor (AI başarısız → true, başarılı → false). Diff-merge sinyali (`route.ts` line ~258) `existingLevel === currentLevel && !aiPending` koşulu ile levelSame'i belirler — pending durumda levelChanged'a düşürüp fresh AI denemeye zorlar. JSONB JS-merge sayesinde:
+  - levelSame metadata refresh patch'i `aiPending` içermez → mevcut true korunur.
+  - levelChanged path AI fail → `aiPending: true` yazılır.
+  - levelChanged path AI başarılı → `aiPending: false` yazılır → JS-merge eski true'yu siler.
+  - noRecItems insert path → `aiPending` ilk değer olarak yazılır.
+- **Fix 2 (ORTA) — Frozen suggestQty UI**: `selectDisplaySuggestQty(rec, computedQty)` helper karar mantığını tek noktada tutar. `RecEntry`'ye `frozenSuggestQty?: number | null` alanı; backend `RecRef`'e de `frozenSuggestQty` (decided rec'lerin `metadata.suggestQty`'sinden). UI tüm callsite'lar (mobil kart 1290, masaüstü 1416, computeOrderTotals input ~915, drawer ~946) helper kullanır:
+  - rec yok / suggested → güncel hesap
+  - edited → editedQty (kullanıcı düzenlemesi)
+  - accepted/rejected → frozenSuggestQty (kararı verildiği miktar)
+  - legacy (frozenSuggestQty undefined/null) → computed fallback
+- **Fix 3 (DÜŞÜK) — Yorum güncelleme**: `recommendations.ts:34-37` JSDoc + `route.ts:211` yorum `.gte → .or(...)` davranışına göre güncel; 10. tur Fix 1 referansı eklendi.
+
+**Test (14 yeni):**
+- `purchase-copilot-ai-error-flag.test.ts`: 5 yeni aiPending senaryosu (noRecItems AI fail/success, levelSame aiPending=true → levelChanged'a düşer, levelSame aiPending=undefined → metadata-only refresh, levelChanged AI fail metadata).
+- `purchase-suggested-frozen-qty.test.ts`: 9 yeni helper test (no rec, suggested, accepted/rejected frozen, edited editedQty priority, legacy fallback, frozenSuggestQty=0 boundary).
+
+**Domain kuralı:**
+- AI fail durumunda metadata flag'i (örn. `aiPending`) ile fail state'i kalıcı olarak işaretlenmeli; deterministik state karşılaştırma yetersizdir (AI ile state ayrı boyutlarda).
+- Backend "frozen" niyeti UI'a payload field'ı olarak geçmelidir; UI tek render-time hesabıyla bu niyeti silebiliyor → tek source-of-truth helper (`selectDisplaySuggestQty`).
+
+**Toplam:** 157 dosya · 2462 test yeşil · TS clean · 0 lint hatası.
 
 ---
 
