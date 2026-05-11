@@ -7,7 +7,9 @@ export async function getCurrentUserRole(_req: NextRequest): Promise<Role> {
     const sb = await createClient();
     const { data: { user } } = await sb.auth.getUser();
     if (!user) return "viewer";
-    const role = user.user_metadata?.role;
+    // app_metadata: server-only (kullanıcı kendini admin yapamaz);
+    // user_metadata auth.updateUser ile kullanıcı tarafından yazılabilir → güvenli değil.
+    const role = user.app_metadata?.role;
     if (role === "admin" || role === "purchaser" || role === "viewer") return role as Role;
     return "purchaser";  // varsayılan
 }

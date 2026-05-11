@@ -237,6 +237,39 @@ describe("dbTransitionPurchaseOrder", () => {
     });
 });
 
+// ── dbTransitionPurchaseOrder — receive guard + CAS (P1.2 advisor fix) ──
+
+describe("dbTransitionPurchaseOrder — receive guard (P1.2)", () => {
+    it("→ partially_received → 'mal kabul akışından' fırlatır", async () => {
+        // confirmed → partially_received VALID_PO_TRANSITIONS'da var ama bu helper'da yasak
+        mockSingle.mockResolvedValueOnce({ data: { status: "confirmed" }, error: null });
+        await expect(dbTransitionPurchaseOrder("po-1", "partially_received"))
+            .rejects.toThrow("mal kabul akışından");
+    });
+
+    it("→ received → 'mal kabul akışından' fırlatır", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { status: "confirmed" }, error: null });
+        await expect(dbTransitionPurchaseOrder("po-1", "received"))
+            .rejects.toThrow("mal kabul akışından");
+    });
+});
+
+describe("dbTransitionPurchaseOrder — compare-and-set race (P1.2)", () => {
+    it("CAS başarılı (1 row updated) → resolves", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { status: "draft" }, error: null });
+        setListResult({ data: [{ id: "po-1" }], error: null });  // CAS updated 1 row
+        await expect(dbTransitionPurchaseOrder("po-1", "sent", { actor: "u-1" }))
+            .resolves.toBeUndefined();
+    });
+
+    it("CAS race kaybı (0 row updated) → 'yarış' fırlatır", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { status: "draft" }, error: null });
+        setListResult({ data: [], error: null });  // başka bir transition status'u değiştirdi
+        await expect(dbTransitionPurchaseOrder("po-1", "sent"))
+            .rejects.toThrow("yarış");
+    });
+});
+
 // ── dbPatchPurchaseOrder ──────────────────────────────────────
 
 describe("dbPatchPurchaseOrder", () => {

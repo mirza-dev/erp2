@@ -167,11 +167,23 @@ export async function dbUpdateVendor(id: string, patch: UpdateVendorInput): Prom
     return data;
 }
 
+const ACTIVE_PO_STATUSES = ["draft", "sent", "confirmed", "partially_received"];
+
 export async function dbDeactivateVendor(id: string): Promise<void> {
     const supabase = createServiceClient();
 
-    // Aktif PO varsa deactivate engellenir (Faz 3'te purchase_orders tablosu gelecek)
-    // Şimdilik sadece is_active=false set et; PO guard Faz 3'te eklenecek
+    // Aktif PO guard: vendor'a bağlı draft/sent/confirmed/partially_received PO varsa pasife alınamaz.
+    const { count, error: countErr } = await supabase
+        .from("purchase_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("vendor_id", id)
+        .in("status", ACTIVE_PO_STATUSES);
+
+    if (countErr) throw new Error(countErr.message);
+    if ((count ?? 0) > 0) {
+        throw new Error(`Tedarikçinin aktif PO'su var (${count}); pasife alınamaz.`);
+    }
+
     const { error } = await supabase
         .from("vendors")
         .update({ is_active: false })

@@ -20,6 +20,7 @@ export async function POST(
 
         const result = await serviceConfirmPO(id, actor);
         revalidateTag("purchase-orders", "max");
+        revalidateTag("products", "max");  // commitment seed → incoming/forecasted etkilenir
         return NextResponse.json(result);
     } catch (err) {
         if (err instanceof Error && (

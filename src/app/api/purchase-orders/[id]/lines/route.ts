@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGetPurchaseOrderById, dbReplacePurchaseOrderLines } from "@/lib/supabase/purchase-orders";
+import { dbGetPurchaseOrderById, dbReplacePurchaseOrderLines, validatePoLines } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 
@@ -26,9 +26,8 @@ export async function PUT(
 
         const body = parsed.data as Record<string, unknown>;
 
-        if (!body.lines || !Array.isArray(body.lines) || body.lines.length === 0) {
-            return NextResponse.json({ error: "En az 1 line gereklidir." }, { status: 400 });
-        }
+        const linesErr = validatePoLines(body.lines);
+        if (linesErr) return NextResponse.json({ error: linesErr }, { status: 400 });
 
         const actor = (body.actor as string | undefined) ?? "system";
 

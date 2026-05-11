@@ -3,7 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-11_
 
-**Son tamamlanan iş:** Purchase&Alert plan Faz 3 — Purchase Orders backend (2026-05-11; 2557 test)
+**Son tamamlanan iş:** Purchase&Alert Faz 3 advisor fix — P1+P2+P3 backend hardening (2026-05-11; 2571 test)
+
+**Faz 3 advisor fix (1 commit, ~9 dosya):**
+- **P1.1 (merge-blocker) — `role-guard.ts`**: `user.user_metadata?.role` → `user.app_metadata?.role`. Privilege escalation kapatıldı (Supabase'de `user_metadata` `auth.updateUser` ile kullanıcı tarafından yazılabilir; `app_metadata` sadece service_role ile yazılır).
+- **P1.2 (merge-blocker) — `dbTransitionPurchaseOrder`**: (a) `partially_received`/`received` direct UPDATE branch'inden çıkarıldı, throw "mal kabul akışından (receive_po_lines RPC) geçilir" (Faz 5 receive RPC bu state'leri kendi içinde set edecek). (b) sent/draft direct UPDATE artık compare-and-set ile şartlı: `.eq("id", id).eq("status", current).select("id")` — 0 satır dönerse "yarış" hatası. Paralel send+confirm artık ikinci transition'ı kaybeder.
+- **P2.1 (should-fix) — `dbDeactivateVendor`**: aktif PO guard eklendi. `purchase_orders` tablosundan `vendor_id=? AND status IN ('draft','sent','confirmed','partially_received')` count > 0 ise "aktif PO'su var" throw. DELETE route'un mevcut `aktif PO` regex'i 409'a map ediyor.
+- **P2.2 (should-fix) — Line validation helper**: `validatePoLines(raw)` `purchase-orders.ts`'e eklendi (export). POST `/api/purchase-orders` + PUT `/api/purchase-orders/[id]/lines` `body.lines`'ı JS-side validate eder: array kontrol + `quantity > 0` integer + `unit_price >= 0` + `discount_pct ∈ [0,100]` + `product_id` non-empty. Hata → 400 (DB CHECK fail → 500 yerine).
+- **P3 — cache invalidation**: confirm + cancel route'larına `revalidateTag("products", "max")` eklendi (`purchase-orders` revalidate'in yanına). `confirm_po` commitment seed → incoming/forecasted etkiler; `cancel_po` pending commitment cancel → incoming etkiler.
+- **Test (+14, 4 dosya):** `role-guard.test.ts` (yeni, 4: app_metadata admin/purchaser/role-yok-fallback/user-null-viewer); `vendors.test.ts` (+2: dbDeactivateVendor aktif PO var → throw, yok → UPDATE+audit); `purchase-orders.test.ts` (+4: receive guard partially_received/received + CAS başarılı/race kaybı); `purchase-orders-route.test.ts` (+4: quantity=0/unit_price=-1/discount_pct=150/product_id eksik → 400).
+- 163 dosya · 2571 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Purchase&Alert plan Faz 3 — Purchase Orders backend (2026-05-11; 2557 test)
 
 **Faz 3 (1 commit, ~15 dosya):**
 - **Migration 049** (`supabase/migrations/049_purchase_orders.sql`): `po_counters` tablosu + RLS (B6) + `generate_po_number()` RPC (B2) + `purchase_orders` tablosu (status: draft/sent/confirmed/partially_received/received/cancelled) + triggers (line_total, header totals, updated_at) + `purchase_order_lines` tablosu + `po_line_recommendations` junction tablosu (M2) + `create_purchase_order_with_lines` RPC (B3, B4 vendor active guard) + `replace_purchase_order_lines` RPC (B3). Tüm `audit_log` insert'leri `actor` kolonu kullanır (NOT `created_by`).

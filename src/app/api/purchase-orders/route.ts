@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbListPurchaseOrders, dbCreatePurchaseOrder } from "@/lib/supabase/purchase-orders";
+import { dbListPurchaseOrders, dbCreatePurchaseOrder, validatePoLines } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 
@@ -31,12 +31,11 @@ export async function POST(req: NextRequest) {
         if (!body.vendor_id) {
             return NextResponse.json({ error: "vendor_id zorunludur." }, { status: 400 });
         }
-        if (!body.lines || !Array.isArray(body.lines) || body.lines.length === 0) {
-            return NextResponse.json({ error: "En az 1 line gereklidir." }, { status: 400 });
-        }
         if (!body.currency) {
             return NextResponse.json({ error: "currency zorunludur." }, { status: 400 });
         }
+        const linesErr = validatePoLines(body.lines);
+        if (linesErr) return NextResponse.json({ error: linesErr }, { status: 400 });
 
         const result = await dbCreatePurchaseOrder({
             vendorId:     String(body.vendor_id),

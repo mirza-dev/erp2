@@ -44,17 +44,23 @@ const mockInsert = vi.fn();
 const mockUpdate = vi.fn();
 const mockSelect = vi.fn();
 const mockEq = vi.fn();
+const mockIn = vi.fn();
 const mockSingle = vi.fn();
 const mockOrder = vi.fn();
 const mockLimit = vi.fn();
 const mockMaybeSingle = vi.fn();
 
+// Configurable thenable result for terminal chain methods (.in/.eq when at end).
+let _terminalResult: { count?: number; error: unknown; data?: unknown } = { count: 0, error: null };
+function setTerminalResult(v: { count?: number; error: unknown; data?: unknown }) { _terminalResult = v; }
+
 const makeChain = () => {
     const chain: Record<string, unknown> = {};
     chain.insert = (_v: unknown) => { mockInsert(_v); return chain; };
     chain.update = (_v: unknown) => { mockUpdate(_v); return chain; };
-    chain.select = (_v?: unknown) => { mockSelect(_v); return chain; };
+    chain.select = (_v?: unknown, _o?: unknown) => { mockSelect(_v, _o); return chain; };
     chain.eq = (_k: unknown, _v: unknown) => { mockEq(_k, _v); return chain; };
+    chain.in = (_k: unknown, _v: unknown) => { mockIn(_k, _v); return _terminalResult; };  // terminal for count queries
     chain.order = (_v: unknown) => { mockOrder(_v); return chain; };
     chain.limit = (_v: unknown) => { mockLimit(_v); return chain; };
     chain.single = () => mockSingle();
@@ -151,6 +157,7 @@ beforeEach(() => {
     mockUpdate.mockReset();
     mockSelect.mockReset();
     mockEq.mockReset();
+    mockIn.mockReset();
     mockOrder.mockReset();
     mockSingle.mockReset();
     mockDbListVendors.mockReset();
@@ -158,6 +165,7 @@ beforeEach(() => {
     mockDbGetVendorById.mockReset();
     mockDbUpdateVendor.mockReset();
     mockDbDeactivateVendor.mockReset();
+    setTerminalResult({ count: 0, error: null });
 });
 
 // ── dbCreateVendor validation ─────────────────────────────────
@@ -357,5 +365,29 @@ describe("DELETE /api/vendors/[id]", () => {
         const body = await res.json();
         expect(body.success).toBe(true);
         expect(mockDbDeactivateVendor).toHaveBeenCalledWith("v-1");
+    });
+});
+
+// ── dbDeactivateVendor — active PO guard (P2.1) ───────────────
+
+describe("dbDeactivateVendor — active PO guard", () => {
+    it("aktif PO var → 'aktif PO'su var' fırlatır", async () => {
+        const { dbDeactivateVendor: realDeactivate } = await vi.importActual<typeof import("@/lib/supabase/vendors")>("@/lib/supabase/vendors");
+        setTerminalResult({ count: 2, error: null });
+        await expect(realDeactivate("v-1")).rejects.toThrow("aktif PO'su var");
+    });
+
+    it("aktif PO yok → UPDATE + audit_log çağrılır", async () => {
+        const { dbDeactivateVendor: realDeactivate } = await vi.importActual<typeof import("@/lib/supabase/vendors")>("@/lib/supabase/vendors");
+        setTerminalResult({ count: 0, error: null });
+        await realDeactivate("v-1");
+        // UPDATE: from("vendors") + update({ is_active: false })
+        expect(mockUpdate).toHaveBeenCalledWith({ is_active: false });
+        // audit_log INSERT
+        expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+            action: "vendor_deactivated",
+            entity_type: "vendor",
+            entity_id: "v-1",
+        }));
     });
 });

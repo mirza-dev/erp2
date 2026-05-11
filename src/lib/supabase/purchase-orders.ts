@@ -147,17 +147,28 @@ export async function dbTransitionPurchaseOrder(
         return;
     }
 
-    // sent, draft (M1 revize), partially_received, received → direct UPDATE
+    // partially_received/received: sadece receive_po_lines RPC (Faz 5) yazabilir;
+    // manuel transition akışında set edilmemeli.
+    if (next === "partially_received" || next === "received") {
+        throw new Error("Bu durum sadece mal kabul akışından (receive_po_lines RPC) geçilir.");
+    }
+
+    // sent, draft (M1 revize) → direct UPDATE + compare-and-set (race koruması)
     const updatePayload: Record<string, unknown> = { status: next };
     if (next === "sent") updatePayload.sent_at = new Date().toISOString();
     if (next === "draft" && current === "sent") updatePayload.sent_at = null;  // M1 revize
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
         .from("purchase_orders")
         .update(updatePayload)
-        .eq("id", id);
+        .eq("id", id)
+        .eq("status", current)        // CAS: durum bu sırada değişmediyse uygula
+        .select("id");
 
     if (error) throw new Error(error.message);
+    if (!updated || updated.length === 0) {
+        throw new Error("PO durum geçişi başarısız: durum bu sırada değişmiş (yarış).");
+    }
 
     await supabase.from("audit_log").insert({
         action:      next === "draft" ? "po_revised" : `po_${next}`,
@@ -167,6 +178,32 @@ export async function dbTransitionPurchaseOrder(
         source:      "ui",
         actor,
     });
+}
+
+/** JS-side line validation: DB CHECK hatalarını 500 yerine 400'e map etmek için.
+ * `quantity > 0` integer, `unit_price >= 0`, `discount_pct ∈ [0,100]`, `product_id` non-empty string.
+ * UUID format DB cast'a bırakılır. */
+export function validatePoLines(raw: unknown): string | null {
+    if (!Array.isArray(raw)) return "Line listesi geçerli değil.";
+    if (raw.length === 0) return "En az 1 line gereklidir.";
+    for (const [i, line] of raw.entries()) {
+        if (!line || typeof line !== "object") return `Line ${i + 1}: geçersiz nesne.`;
+        const l = line as Record<string, unknown>;
+        if (typeof l.product_id !== "string" || !l.product_id.trim())
+            return `Line ${i + 1}: product_id zorunludur.`;
+        const qty = Number(l.quantity);
+        if (!Number.isFinite(qty) || !Number.isInteger(qty) || qty <= 0)
+            return `Line ${i + 1}: miktar pozitif tam sayı olmalıdır.`;
+        const price = Number(l.unit_price);
+        if (!Number.isFinite(price) || price < 0)
+            return `Line ${i + 1}: birim fiyat negatif olamaz.`;
+        if (l.discount_pct !== undefined && l.discount_pct !== null) {
+            const d = Number(l.discount_pct);
+            if (!Number.isFinite(d) || d < 0 || d > 100)
+                return `Line ${i + 1}: iskonto 0-100 arası olmalıdır.`;
+        }
+    }
+    return null;
 }
 
 export async function dbPatchPurchaseOrder(

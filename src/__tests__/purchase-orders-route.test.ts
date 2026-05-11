@@ -163,6 +163,48 @@ describe("POST /api/purchase-orders", () => {
     });
 });
 
+// ── POST /api/purchase-orders — line validation (P2.2 advisor fix) ──
+
+describe("POST /api/purchase-orders — line validation", () => {
+    const baseBody = (lineOverride: Record<string, unknown>) => ({
+        vendor_id: "v-1",
+        currency: "TRY",
+        lines: [{ product_id: "p-1", quantity: 5, unit_price: 100, ...lineOverride }],
+    });
+
+    it("quantity=0 → 400 'pozitif tam sayı'", async () => {
+        const res = await listPOST(makeReq(baseBody({ quantity: 0 })) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/pozitif tam sayı/i);
+    });
+
+    it("unit_price=-1 → 400 'birim fiyat negatif'", async () => {
+        const res = await listPOST(makeReq(baseBody({ unit_price: -1 })) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/birim fiyat negatif/i);
+    });
+
+    it("discount_pct=150 → 400 'iskonto 0-100'", async () => {
+        const res = await listPOST(makeReq(baseBody({ discount_pct: 150 })) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/iskonto/i);
+    });
+
+    it("product_id eksik → 400 'product_id zorunludur'", async () => {
+        const res = await listPOST(makeReq({
+            vendor_id: "v-1",
+            currency: "TRY",
+            lines: [{ quantity: 5, unit_price: 100 }],
+        }) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/product_id zorunludur/i);
+    });
+});
+
 // ── GET /api/purchase-orders/[id] ────────────────────────────
 
 describe("GET /api/purchase-orders/[id]", () => {

@@ -38,6 +38,7 @@ export async function POST(
         const actor = (body.actor as string | undefined) ?? "system";
         const result = await serviceCancelPO(id, reason, actor);
         revalidateTag("purchase-orders", "max");
+        revalidateTag("products", "max");  // pending commitment cancel → incoming etkilenir
         return NextResponse.json(result);
     } catch (err) {
         if (err instanceof Error && err.message.includes("iptal edilemez")) {
