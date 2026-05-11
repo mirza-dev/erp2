@@ -4,8 +4,9 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Purchase & Alert plan uygulaması — Faz faz commit-by-commit. Plan: `/Users/mirzasaribiyik/Projects/erp2/purchase-aksiyon-plan.md`. Faz sırası: 1=alert sync_issue retry ✅, 2=vendors, 3=PO schema+RPC, 4=PO UI, 5=mal kabul (B1), 6=suggested→PO, 7=overdue ship inline, 8=AI feedback prompt (M4 bulk), 9=PDF, 10=order_shortage drawer.
-**Son:** Faz 1 + advisor P2/P3 fix KAPALI (2026-05-10; 2481 test) — parasut_auth entity_type whitelist + endpoint defense-in-depth (entity_type + entity_id whitelist)
+**Aktif:** Purchase & Alert plan uygulaması — Faz faz commit-by-commit. Plan: `/Users/mirzasaribiyik/Projects/erp2/purchase-aksiyon-plan.md`. Faz sırası: 1=alert sync_issue retry ✅, 2=vendors ✅, 3=PO schema+RPC, 4=PO UI, 5=mal kabul (B1), 6=suggested→PO, 7=overdue ship inline, 8=AI feedback prompt (M4 bulk), 9=PDF, 10=order_shortage drawer.
+**Son:** Faz 2 KAPALI (2026-05-10; 2498 test) — vendors entity: migration 048 + VendorRow type + vendors.ts helper + /api/vendors routes + /dashboard/vendors page + sidebar "Satın Alma" group
+**Önceki:** Faz 1 + advisor P2/P3 fix KAPALI (2026-05-10; 2481 test) — parasut_auth entity_type whitelist + endpoint defense-in-depth (entity_type + entity_id whitelist)
 **Önceki:** G11 audit 12. tur KAPALI (2026-05-10; 2466 test) — dbUpdateRecommendationMetadata yarış guard (status=suggested)
 **Önceki²:** Lint warning temizliği KAPALI (2026-05-10; 2462 test, 0 warning) — config + dead code 30 → 0
 **Önceki²:** G11 audit 11. tur KAPALI (2026-05-10; 2462 test) — AI fail recovery (aiPending flag) + frozen suggestQty UI + yorum bayatlığı

@@ -1441,3 +1441,49 @@ Her faz için **eksiksiz** olmalı:
 **Plan bütünlüğü:** 17 ana bölümde, 5 migration (048-052), ~25 yeni dosya, ~116 yeni test, 10 commit içeren uçtan uca implementasyon. Her satır kasıtlı; eksiklikler kapsam dışı bölümünde explicit. Kullanıcı **Faz 1**'den başlayarak commit-by-commit ilerleyebilir; her aşamada DoD checklist tamamlanır.
 
 **Onaylanmış kararlar (özet):** PO formatı `PO-2026-0001`, vendor para birimi default override edilebilir, e-posta sonraki sürüm, alert hepsi inline, AI feedback prompt'a beslenir (sanitize zorunlu), `/dashboard/vendors` yeni sayfa, B1-B7 blocker fix'leri schema + RPC seviyesinde işlendi, M1-M5 orta seviye iyileştirmeler dahil, faz sırası küçük-faydalı işten başlar.
+
+---
+
+## 18. Faz Tamamlama Raporlama Kuralı
+
+### 18.1 Kural
+
+**Her faz tamamlandıktan sonra, bir sonraki faza geçmeden önce bu bölüme ilgili fazın tamamlama raporu eklenmelidir.**
+
+Raporun amacı: Harici advisor'ın (veya farklı context'te devam eden Claude oturumunun) yalnızca bu raporu okuyarak "ne yapıldı, neden, neye dikkat et" sorusunu yanıtlayabilmesi. Advisor yeniden kod taramak zorunda kalmamalı.
+
+**Rapor şablonu:**
+
+```
+### FAZ N — [Faz Adı] TAMAMLAMA RAPORU
+**Tamamlanma tarihi:** YYYY-MM-DD
+**Test sayısı (faz öncesi → sonrası):** X → Y  (+Z yeni)
+**Dosya sayısı:** X → Y
+
+#### N.1 Kapsam & Teslimat
+- [bullet] Her başlık planlananla eşleşiyor mu — YENİ/DEĞİŞTİ/ERTELENDI/EKSTİR
+- Sapmalar varsa gerekçe
+
+#### N.2 Değiştirilen / Oluşturulan Dosyalar
+| Dosya | Durum | Özet |
+| --- | --- | --- |
+
+#### N.3 Plan-Gerçek Uyumu
+- Planlanan ama yapılmayan: liste (gerekçe)
+- Plana olmayan ama yapılan: liste (gerekçe)
+- Sayısal sapmalar (test sayısı, dosya sayısı)
+
+#### N.4 Implementasyon Kararları
+- Plan'da "nasıl yapılacağı" belirsiz kalan noktalar; seçilen yaklaşım ve gerekçe
+
+#### N.5 Bulunan Sorunlar & Çözümler
+- Her sorun: Tespit → Kök neden → Uygulanan fix
+
+#### N.6 Bilinen Eksiklikler & Ertelemeler
+- Scope dışı kalan ama gelecekte etkileyebilecek noktalar
+
+#### N.7 Advisor Odak Alanları
+- Soru işaretleri, riskler, ikinci göz gerektiren noktalar
+- Bir sonraki fazı etkileyebilecek sınır koşullar
+```
+

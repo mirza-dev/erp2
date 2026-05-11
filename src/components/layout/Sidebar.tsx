@@ -47,7 +47,13 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                 { label: "Teklifler", href: "/dashboard/quotes" },
                 { label: "Siparişler", href: "/dashboard/orders", count: pendingOrderCount || undefined },
                 { label: "Stok & Ürünler", href: "/dashboard/products" },
-                { label: "Satın Alma Önerileri", href: "/dashboard/purchase/suggested", count: reorderCount || undefined },
+            ],
+        },
+        {
+            label: "Satın Alma",
+            items: [
+                { label: "Öneriler", href: "/dashboard/purchase/suggested", count: reorderCount || undefined },
+                { label: "Tedarikçiler", href: "/dashboard/vendors" },
             ],
         },
         {

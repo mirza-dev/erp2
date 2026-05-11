@@ -33,6 +33,23 @@ export type ParasutEDocStatus = "running" | "done" | "error" | "skipped"
 
 // ── Row Types ────────────────────────────────────────────────
 
+export interface VendorRow {
+    id: string
+    name: string
+    contact_email: string | null
+    contact_phone: string | null
+    contact_person: string | null
+    tax_number: string | null
+    address: string | null
+    currency: string
+    payment_terms_days: number | null
+    lead_time_days: number | null
+    notes: string | null
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
+
 export interface CustomerRow {
     id: string
     name: string
@@ -78,6 +95,7 @@ export interface ProductRow {
     warehouse: string | null
     reorder_qty: number | null
     preferred_vendor: string | null
+    preferred_vendor_id: string | null
     daily_usage: number | null
     lead_time_days: number | null
     created_at: string

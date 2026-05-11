@@ -3,7 +3,20 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-10_
 
-**Son tamamlanan iş:** Purchase&Alert plan Faz 1 + advisor P2/P3 fix (2026-05-10; 2481 test)
+**Son tamamlanan iş:** Purchase&Alert plan Faz 2 — Vendor entity (2026-05-10; 2498 test)
+
+**Faz 2 (1 commit, ~8 dosya):**
+- **Migration 048** (`supabase/migrations/048_vendors.sql`): `CREATE EXTENSION IF NOT EXISTS pg_trgm` (B5) + `vendors` tablosu (id/name/contact_email/contact_phone/contact_person/tax_number/address/currency/payment_terms_days/lead_time_days/notes/is_active/created_at/updated_at) + `updated_at` trigger + RLS + trigram index (name search) + `products.preferred_vendor_id uuid FK` (ON DELETE SET NULL).
+- **DB Types** (`database.types.ts`): `VendorRow` interface eklendi; `ProductRow`'a `preferred_vendor_id: string | null` eklendi.
+- **`src/lib/supabase/vendors.ts`** (yeni): `dbListVendors` (filter: isActive, search) / `dbGetVendorById` / `dbCreateVendor` (validation: name, email, tax_number 10/11 hane, currency whitelist, lead_time_days≥0 + audit_log) / `dbUpdateVendor` (partial patch + audit_log) / `dbDeactivateVendor` (soft delete + audit_log).
+- **`/api/vendors`** GET (cache 60s, search/all param) + POST (validation error → 400).
+- **`/api/vendors/[id]`** GET (404 yok) + PATCH (404 yok, 400 validation) + DELETE soft (404 yok, 409 zaten pasif).
+- **`/dashboard/vendors/page.tsx`** (yeni): tablo (name, iletişim, currency, tedarik süresi, ödeme vadesi, durum) + search + pasif toggle + drawer form (tüm alanlar, aria-label/aria-live) + demo guard + deactivate confirm.
+- **Sidebar** (`Sidebar.tsx`): "Satın Alma Önerileri" tek linki → "Satın Alma" grup (Öneriler + Tedarikçiler) olarak yeniden düzenlendi.
+- **Test (17 yeni, `vendors.test.ts`):** 5 validation (name/email/tax/currency/lead_time), GET 200, POST 3 (name eksik 400, email 400, başarılı 201), GET/[id] 2 (404/200), PATCH/[id] 3 (404/email 400/200), DELETE/[id] 3 (404/zaten pasif 409/200).
+- 159 dosya · 2498 test yeşil · TS clean · 0 lint warning
+
+**Önceki:** Purchase&Alert plan Faz 1 + advisor P2/P3 fix (2026-05-10; 2481 test)
 
 **Faz 1 advisor follow-up (1 commit, 4 dosya):**
 - **P2 (parasut_auth filter bug):** `parasut-oauth.ts` CAS çakışmasında `entity_type='parasut_auth'` (snake_case) yazıyordu; UI sadece `entity_type='parasut'` filtreliyordu → bu alertler "Silinmiş Ürün" olarak ürün gruplarına düşebiliyordu, inline retry CTA'sı ulaşmıyordu. Fix: `parasut-constants.ts`'e `PARASUT_ALERT_ENTITY_TYPES` (parasut + parasut_auth) ve `PARASUT_SYNC_ALERT_ENTITY_IDS` (5 bilinen Paraşüt UUID) Set'leri eklendi. UI'daki `systemAlerts` ve `productSysAlerts` filter'ları iki katmanlı kontrol kullanır (entity_type **VEYA** entity_id whitelist) → her iki kategori kayıp olmaz.
