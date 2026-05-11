@@ -17,6 +17,7 @@ export interface CreateCommitmentInput {
     expected_date: string;  // "YYYY-MM-DD"
     supplier_name?: string;
     notes?: string;
+    po_line_id?: string | null;
 }
 
 // ── Queries ──────────────────────────────────────────────────
@@ -60,6 +61,7 @@ export async function dbCreateCommitment(input: CreateCommitmentInput): Promise<
             expected_date: input.expected_date,
             supplier_name: input.supplier_name ?? null,
             notes:         input.notes ?? null,
+            po_line_id:    input.po_line_id ?? null,
         })
         .select("*")
         .single();
@@ -90,17 +92,22 @@ export async function dbCancelCommitment(id: string): Promise<void> {
     if (!data || data.length === 0) throw new Error("Commitment bulunamadı veya zaten iptal edilmiş.");
 }
 
-/** Ürün bazlı bekleyen (pending) commitment toplamları */
+/** Ürün bazlı bekleyen (pending) commitment toplamları.
+ * B1: incoming = SUM(quantity - received_qty) WHERE status='pending'
+ * Kısmi kabulde received_qty artarken commitment pending kalır → çift sayım önlenir. */
 export async function dbGetIncomingQuantities(): Promise<Map<string, number>> {
     const supabase = createServiceClient();
     const { data, error } = await supabase
         .from("purchase_commitments")
-        .select("product_id, quantity")
+        .select("product_id, quantity, received_qty")
         .eq("status", "pending");
     if (error || !data) return new Map();
     const map = new Map<string, number>();
     for (const row of data) {
-        map.set(row.product_id, (map.get(row.product_id) ?? 0) + row.quantity);
+        const remaining = (row.quantity as number) - ((row.received_qty as number) ?? 0);
+        if (remaining > 0) {
+            map.set(row.product_id, (map.get(row.product_id) ?? 0) + remaining);
+        }
     }
     return map;
 }

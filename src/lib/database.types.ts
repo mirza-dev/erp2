@@ -26,6 +26,7 @@ export type RecommendationStatus = "suggested" | "accepted" | "edited" | "reject
 export type FeedbackType = "accepted" | "edited" | "rejected" | "note"
 export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "ops_summary" | "purchase_enrich" | "production_voice"
 export type PurchaseCommitmentStatus = "pending" | "received" | "cancelled"
+export type PurchaseOrderStatus = "draft" | "sent" | "confirmed" | "partially_received" | "received" | "cancelled"
 export type ParasutStep = "contact" | "product" | "shipment" | "invoice" | "edoc" | "done"
 export type ParasutErrorKind = "auth" | "validation" | "rate_limit" | "server" | "network" | "not_found"
 export type ParasutInvoiceType = "e_invoice" | "e_archive" | "manual"
@@ -146,6 +147,53 @@ export interface PurchaseCommitmentRow {
     status: PurchaseCommitmentStatus
     created_at: string
     received_at: string | null
+    po_line_id: string | null
+    received_qty: number
+}
+
+export interface PoCounterRow {
+    year: number
+    last_seq: number
+}
+
+export interface PurchaseOrderRow {
+    id: string
+    po_number: string
+    vendor_id: string
+    status: PurchaseOrderStatus
+    order_date: string           // "YYYY-MM-DD"
+    expected_date: string | null // "YYYY-MM-DD"
+    currency: string
+    subtotal: number
+    vat_rate: number
+    vat_total: number
+    grand_total: number
+    notes: string | null
+    sent_at: string | null
+    confirmed_at: string | null
+    cancelled_at: string | null
+    cancel_reason: string | null
+    created_by: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface PurchaseOrderLineRow {
+    id: string
+    po_id: string
+    product_id: string
+    quantity: number
+    unit_price: number
+    discount_pct: number
+    line_total: number
+    received_qty: number
+    notes: string | null
+}
+
+export interface PoLineRecommendationRow {
+    po_line_id: string
+    recommendation_id: string
+    created_at: string
 }
 
 export interface BillOfMaterialsRow {

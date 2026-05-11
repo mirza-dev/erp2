@@ -1,9 +1,24 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-10_
+_Son güncelleme: 2026-05-11_
 
-**Son tamamlanan iş:** Purchase&Alert plan Faz 2 — Vendor entity (2026-05-10; 2498 test)
+**Son tamamlanan iş:** Purchase&Alert plan Faz 3 — Purchase Orders backend (2026-05-11; 2557 test)
+
+**Faz 3 (1 commit, ~15 dosya):**
+- **Migration 049** (`supabase/migrations/049_purchase_orders.sql`): `po_counters` tablosu + RLS (B6) + `generate_po_number()` RPC (B2) + `purchase_orders` tablosu (status: draft/sent/confirmed/partially_received/received/cancelled) + triggers (line_total, header totals, updated_at) + `purchase_order_lines` tablosu + `po_line_recommendations` junction tablosu (M2) + `create_purchase_order_with_lines` RPC (B3, B4 vendor active guard) + `replace_purchase_order_lines` RPC (B3). Tüm `audit_log` insert'leri `actor` kolonu kullanır (NOT `created_by`).
+- **Migration 050** (`supabase/migrations/050_purchase_commitments_po_link.sql`): `purchase_commitments.po_line_id` FK + `received_qty` kolonu (B1) + `chk_pc_received_le_qty` constraint + `uniq_pc_active_po_line` partial unique index.
+- **Migration 052** (`supabase/migrations/052_po_confirm_commitment_seed.sql`): `confirm_po` RPC (B4: expected_date, boş PO, inactive vendor guard + commitment otomatik seed) + `cancel_po` RPC (terminal state guard + pending commitment cancel).
+- **DB Types** (`database.types.ts`): `PurchaseOrderStatus` type; `PurchaseOrderRow`, `PurchaseOrderLineRow`, `PoLineRecommendationRow`, `PoCounterRow` interface'leri; `PurchaseCommitmentRow`'a `po_line_id: string | null` ve `received_qty: number` eklendi.
+- **`purchase-commitments.ts`** güncellendi: `CreateCommitmentInput`'a `po_line_id` eklendi; `dbGetIncomingQuantities` B1 fix — `incoming = SUM(quantity - received_qty) WHERE pending` (kısmi kabulde çift sayım önlenir).
+- **`src/lib/auth/role-guard.ts`** (yeni): `getCurrentUserRole` (auth.users.user_metadata.role, fallback 'purchaser') + `requireRole` (admin/purchaser/viewer).
+- **`src/lib/supabase/purchase-orders.ts`** (yeni): `VALID_PO_TRANSITIONS` + `dbListPurchaseOrders` + `dbGetPurchaseOrderById` (+ lines) + `dbCreatePurchaseOrder` (→ RPC) + `dbReplacePurchaseOrderLines` (→ RPC) + `dbTransitionPurchaseOrder` (state machine: confirm→RPC, cancel→RPC, sent/draft/others→UPDATE) + `dbPatchPurchaseOrder`.
+- **`src/lib/services/purchase-order-service.ts`** (yeni): `serviceTransitionPO` + `serviceSendPO` + `serviceConfirmPO` + `serviceCancelPO` + `serviceRevisePO` (M1: sent→draft, sent_at=NULL).
+- **API routes (6 yeni):** `GET/POST /api/purchase-orders` + `GET/PATCH /api/purchase-orders/[id]` + `PUT /api/purchase-orders/[id]/lines` + `POST /api/purchase-orders/[id]/send` + `POST /api/purchase-orders/[id]/confirm` + `POST /api/purchase-orders/[id]/cancel` (admin only — B7).
+- **Test (50 yeni test, 3 dosya):** `purchase-orders.test.ts` (18) + `purchase-orders-route.test.ts` (14) + `purchase-order-service.test.ts` (12) + B1 incoming partial receive tests (2) + state machine terminal state tests.
+- 162 dosya · 2557 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Purchase&Alert plan Faz 2 — Vendor entity (2026-05-10; 2498 test)
 
 **Faz 2 (1 commit, ~8 dosya):**
 - **Migration 048** (`supabase/migrations/048_vendors.sql`): `CREATE EXTENSION IF NOT EXISTS pg_trgm` (B5) + `vendors` tablosu (id/name/contact_email/contact_phone/contact_person/tax_number/address/currency/payment_terms_days/lead_time_days/notes/is_active/created_at/updated_at) + `updated_at` trigger + RLS + trigram index (name search) + `products.preferred_vendor_id uuid FK` (ON DELETE SET NULL).
