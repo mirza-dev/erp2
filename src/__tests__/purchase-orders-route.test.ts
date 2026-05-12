@@ -53,8 +53,9 @@ vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
 }));
 
+const mockRevalidateTag = vi.fn();
 vi.mock("next/cache", () => ({
-    revalidateTag: vi.fn(),
+    revalidateTag: (...a: unknown[]) => mockRevalidateTag(...a),
     unstable_cache: (_fn: () => unknown) => _fn,
 }));
 
@@ -106,9 +107,13 @@ const samplePO = {
     lines: [],
 };
 
+// Valid UUID fixture (validatePoLines artık UUID format kontrol ediyor — P2 fix)
+const PID = "00000000-0000-4000-8000-000000000001";
+
 beforeEach(() => {
     vi.clearAllMocks();
     mockRequireRole.mockResolvedValue(null);  // admin by default
+    mockRevalidateTag.mockReset();
 });
 
 // ── GET /api/purchase-orders ──────────────────────────────────
@@ -143,7 +148,7 @@ describe("POST /api/purchase-orders", () => {
         const res = await listPOST(makeReq({
             vendor_id: "v-inactive",
             currency: "TRY",
-            lines: [{ product_id: "p-1", quantity: 1, unit_price: 100 }],
+            lines: [{ product_id: PID, quantity: 1, unit_price: 100 }],
         }) as unknown as Parameters<typeof listPOST>[0]);
         expect(res.status).toBe(400);
         const body = await res.json();
@@ -155,7 +160,7 @@ describe("POST /api/purchase-orders", () => {
         const res = await listPOST(makeReq({
             vendor_id: "v-1",
             currency: "TRY",
-            lines: [{ product_id: "p-1", quantity: 2, unit_price: 100 }],
+            lines: [{ product_id: PID, quantity: 2, unit_price: 100 }],
         }) as unknown as Parameters<typeof listPOST>[0]);
         expect(res.status).toBe(201);
         const body = await res.json();
@@ -169,7 +174,7 @@ describe("POST /api/purchase-orders — line validation", () => {
     const baseBody = (lineOverride: Record<string, unknown>) => ({
         vendor_id: "v-1",
         currency: "TRY",
-        lines: [{ product_id: "p-1", quantity: 5, unit_price: 100, ...lineOverride }],
+        lines: [{ product_id: PID, quantity: 5, unit_price: 100, ...lineOverride }],
     });
 
     it("quantity=0 → 400 'pozitif tam sayı'", async () => {
@@ -183,7 +188,7 @@ describe("POST /api/purchase-orders — line validation", () => {
         const res = await listPOST(makeReq(baseBody({ unit_price: -1 })) as unknown as Parameters<typeof listPOST>[0]);
         expect(res.status).toBe(400);
         const body = await res.json();
-        expect(body.error).toMatch(/birim fiyat negatif/i);
+        expect(body.error).toMatch(/birim fiyat.*negatif/i);
     });
 
     it("discount_pct=150 → 400 'iskonto 0-100'", async () => {
@@ -202,6 +207,44 @@ describe("POST /api/purchase-orders — line validation", () => {
         expect(res.status).toBe(400);
         const body = await res.json();
         expect(body.error).toMatch(/product_id zorunludur/i);
+    });
+
+    // P2 follow-up — Number(null)/Number("") silent 0 tuzakları + UUID + currency
+
+    it("unit_price=null → 400 'zorunludur' (Number(null)=0 silent fail kapatıldı)", async () => {
+        const res = await listPOST(makeReq(baseBody({ unit_price: null })) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/birim fiyat zorunludur/i);
+    });
+
+    it("unit_price='' (empty string) → 400 'zorunludur' (Number('')=0 silent fail kapatıldı)", async () => {
+        const res = await listPOST(makeReq(baseBody({ unit_price: "" })) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/birim fiyat zorunludur/i);
+    });
+
+    it("product_id geçersiz UUID → 400 'geçerli UUID' (DB cast 500'e düşmesin)", async () => {
+        const res = await listPOST(makeReq({
+            vendor_id: "v-1",
+            currency: "TRY",
+            lines: [{ product_id: "not-a-uuid", quantity: 1, unit_price: 100 }],
+        }) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/geçerli UUID/i);
+    });
+
+    it("currency='GBP' (whitelist dışı) → 400 'Geçersiz para birimi'", async () => {
+        const res = await listPOST(makeReq({
+            vendor_id: "v-1",
+            currency: "GBP",
+            lines: [{ product_id: PID, quantity: 1, unit_price: 100 }],
+        }) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/Geçersiz para birimi/i);
     });
 });
 
@@ -253,6 +296,17 @@ describe("PATCH /api/purchase-orders/[id]", () => {
         );
         expect(res.status).toBe(200);
     });
+
+    it("currency='GBP' (whitelist dışı) → 400", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValue(samplePO);
+        const res = await detailPATCH(
+            makeReq({ currency: "GBP" }) as unknown as Parameters<typeof detailPATCH>[0],
+            makeParams("po-1"),
+        );
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/Geçersiz para birimi/i);
+    });
 });
 
 // ── PUT /api/purchase-orders/[id]/lines ──────────────────────
@@ -261,7 +315,7 @@ describe("PUT /api/purchase-orders/[id]/lines", () => {
     it("PO yok → 404", async () => {
         mockDbGetPurchaseOrderById.mockResolvedValue(null);
         const res = await linesPUT(
-            makeReq({ lines: [{ product_id: "p-1", quantity: 1, unit_price: 50 }] }) as unknown as Parameters<typeof linesPUT>[0],
+            makeReq({ lines: [{ product_id: PID, quantity: 1, unit_price: 50 }] }) as unknown as Parameters<typeof linesPUT>[0],
             makeParams("po-99"),
         );
         expect(res.status).toBe(404);
@@ -270,7 +324,7 @@ describe("PUT /api/purchase-orders/[id]/lines", () => {
     it("draft değil → 409", async () => {
         mockDbGetPurchaseOrderById.mockResolvedValue({ ...samplePO, status: "sent" });
         const res = await linesPUT(
-            makeReq({ lines: [{ product_id: "p-1", quantity: 1, unit_price: 50 }] }) as unknown as Parameters<typeof linesPUT>[0],
+            makeReq({ lines: [{ product_id: PID, quantity: 1, unit_price: 50 }] }) as unknown as Parameters<typeof linesPUT>[0],
             makeParams("po-1"),
         );
         expect(res.status).toBe(409);
@@ -282,7 +336,7 @@ describe("PUT /api/purchase-orders/[id]/lines", () => {
             .mockResolvedValueOnce(samplePO);
         mockDbReplacePurchaseOrderLines.mockResolvedValue(undefined);
         const res = await linesPUT(
-            makeReq({ lines: [{ product_id: "p-1", quantity: 2, unit_price: 100 }] }) as unknown as Parameters<typeof linesPUT>[0],
+            makeReq({ lines: [{ product_id: PID, quantity: 2, unit_price: 100 }] }) as unknown as Parameters<typeof linesPUT>[0],
             makeParams("po-1"),
         );
         expect(res.status).toBe(200);
@@ -324,13 +378,16 @@ describe("POST /api/purchase-orders/[id]/confirm", () => {
         expect(res.status).toBe(409);
     });
 
-    it("başarılı → 200", async () => {
+    it("başarılı → 200 + products cache invalidate (P3 regression)", async () => {
         mockDbGetPurchaseOrderById.mockResolvedValue(samplePO);
         mockServiceConfirmPO.mockResolvedValue({ id: "po-1", status: "confirmed" });
         const res = await confirmPOST(makeReq({}) as unknown as Parameters<typeof confirmPOST>[0], makeParams("po-1"));
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.status).toBe("confirmed");
+        // confirm_po commitment seed eder → incoming/forecasted etkilenir
+        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
     });
 });
 
@@ -352,7 +409,7 @@ describe("POST /api/purchase-orders/[id]/cancel", () => {
         expect(res.status).toBe(400);
     });
 
-    it("başarılı → 200", async () => {
+    it("başarılı → 200 + products cache invalidate (P3 regression)", async () => {
         mockRequireRole.mockResolvedValue(null);
         mockDbGetPurchaseOrderById.mockResolvedValue(samplePO);
         mockServiceCancelPO.mockResolvedValue({ id: "po-1", status: "cancelled" });
@@ -363,5 +420,8 @@ describe("POST /api/purchase-orders/[id]/cancel", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.status).toBe("cancelled");
+        // cancel_po pending commitment cancel → incoming etkilenir
+        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
     });
 });

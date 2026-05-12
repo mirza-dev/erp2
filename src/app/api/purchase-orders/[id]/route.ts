@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     dbGetPurchaseOrderById,
     dbPatchPurchaseOrder,
+    isValidPoCurrency,
 } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
@@ -44,6 +45,13 @@ export async function PATCH(
         if (!parsed.ok) return parsed.response;
 
         const body = parsed.data as Record<string, unknown>;
+
+        if (body.currency !== undefined && !isValidPoCurrency(body.currency)) {
+            return NextResponse.json(
+                { error: "Geçersiz para birimi. Kabul edilenler: TRY, USD, EUR." },
+                { status: 400 },
+            );
+        }
 
         const updated = await dbPatchPurchaseOrder(id, {
             expected_date: body.expected_date as string | null | undefined,

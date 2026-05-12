@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbListPurchaseOrders, dbCreatePurchaseOrder, validatePoLines } from "@/lib/supabase/purchase-orders";
+import { dbListPurchaseOrders, dbCreatePurchaseOrder, validatePoLines, isValidPoCurrency } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 
@@ -31,8 +31,11 @@ export async function POST(req: NextRequest) {
         if (!body.vendor_id) {
             return NextResponse.json({ error: "vendor_id zorunludur." }, { status: 400 });
         }
-        if (!body.currency) {
-            return NextResponse.json({ error: "currency zorunludur." }, { status: 400 });
+        if (!isValidPoCurrency(body.currency)) {
+            return NextResponse.json(
+                { error: "Geçersiz para birimi. Kabul edilenler: TRY, USD, EUR." },
+                { status: 400 },
+            );
         }
         const linesErr = validatePoLines(body.lines);
         if (linesErr) return NextResponse.json({ error: linesErr }, { status: 400 });

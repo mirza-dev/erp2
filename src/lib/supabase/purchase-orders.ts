@@ -180,24 +180,45 @@ export async function dbTransitionPurchaseOrder(
     });
 }
 
-/** JS-side line validation: DB CHECK hatalarını 500 yerine 400'e map etmek için.
- * `quantity > 0` integer, `unit_price >= 0`, `discount_pct ∈ [0,100]`, `product_id` non-empty string.
- * UUID format DB cast'a bırakılır. */
+const PO_CURRENCY_WHITELIST = ["TRY", "USD", "EUR"] as const;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** PO currency whitelist guard. DB CHECK aynı listeyi enforce eder; bu helper 400'e map için. */
+export function isValidPoCurrency(c: unknown): c is typeof PO_CURRENCY_WHITELIST[number] {
+    return typeof c === "string" && (PO_CURRENCY_WHITELIST as readonly string[]).includes(c);
+}
+
+/** JS-side line validation: DB CHECK / cast hatalarını 500 yerine 400'e map etmek için.
+ * `product_id` non-empty + UUID format, `quantity > 0` integer, `unit_price >= 0`,
+ * `discount_pct ∈ [0,100]`. `Number(null)===0` ve `Number("")===0` tuzakları için
+ * sayısal alanlar null/undefined/empty string olamaz (silent 0'a düşüşü engeller). */
 export function validatePoLines(raw: unknown): string | null {
     if (!Array.isArray(raw)) return "Line listesi geçerli değil.";
     if (raw.length === 0) return "En az 1 line gereklidir.";
     for (const [i, line] of raw.entries()) {
         if (!line || typeof line !== "object") return `Line ${i + 1}: geçersiz nesne.`;
         const l = line as Record<string, unknown>;
+
         if (typeof l.product_id !== "string" || !l.product_id.trim())
             return `Line ${i + 1}: product_id zorunludur.`;
+        if (!UUID_RE.test(l.product_id.trim()))
+            return `Line ${i + 1}: product_id geçerli UUID olmalıdır.`;
+
+        if (l.quantity === undefined || l.quantity === null || l.quantity === "")
+            return `Line ${i + 1}: miktar zorunludur.`;
         const qty = Number(l.quantity);
         if (!Number.isFinite(qty) || !Number.isInteger(qty) || qty <= 0)
             return `Line ${i + 1}: miktar pozitif tam sayı olmalıdır.`;
+
+        if (l.unit_price === undefined || l.unit_price === null || l.unit_price === "")
+            return `Line ${i + 1}: birim fiyat zorunludur.`;
         const price = Number(l.unit_price);
         if (!Number.isFinite(price) || price < 0)
-            return `Line ${i + 1}: birim fiyat negatif olamaz.`;
+            return `Line ${i + 1}: birim fiyat geçersiz veya negatif olamaz.`;
+
         if (l.discount_pct !== undefined && l.discount_pct !== null) {
+            if (l.discount_pct === "")
+                return `Line ${i + 1}: iskonto geçersiz (boş bırakılamaz; alan tamamen kaldırılmalı).`;
             const d = Number(l.discount_pct);
             if (!Number.isFinite(d) || d < 0 || d > 100)
                 return `Line ${i + 1}: iskonto 0-100 arası olmalıdır.`;

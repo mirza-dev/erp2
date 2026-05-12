@@ -1,9 +1,18 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-11_
+_Son güncelleme: 2026-05-12_
 
-**Son tamamlanan iş:** Purchase&Alert Faz 3 advisor fix — P1+P2+P3 backend hardening (2026-05-11; 2571 test)
+**Son tamamlanan iş:** Purchase&Alert Faz 3 advisor 2. tur — P2 follow-up + P3 regression lock (2026-05-12; 2576 test)
+
+**Faz 3 advisor 2. tur (1 commit, ~5 dosya):**
+- **P2 follow-up — `validatePoLines` sıkılaştırma** (`purchase-orders.ts`): (a) `unit_price` ve `quantity` için `null`/`undefined`/`""` explicit reject (`Number(null)===0` ve `Number("")===0` silent 0 tuzakları kapatıldı; eksik fiyat → 0 TRY siparişi sızıyordu); (b) `product_id` için UUID regex kontrolü (DB cast hatası 500 yerine 400'e map); (c) `discount_pct === ""` artık reject ediliyor (alan tamamen omitted olmalı).
+- **P2 follow-up — Currency whitelist**: `isValidPoCurrency(c)` helper eklendi (`vendors.ts` paterniyle aynı). POST `/api/purchase-orders` ve PATCH `/api/purchase-orders/[id]` artık `currency`'yi whitelist'le doğruluyor (TRY/USD/EUR); whitelist dışı → 400 (önceden DB CHECK fail → 500).
+- **P3 — Test regression lock**: `purchase-orders-route.test.ts`'te `next/cache` mock'u `mockRevalidateTag` module-level fn'e dönüştürüldü. confirm + cancel başarı testlerine `expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max")` assertion eklendi — kod doğruydu, sadece regresyon kilidi zayıftı.
+- **Test (+5):** `purchase-orders-route.test.ts` — unit_price=null/"" (Number silent 0 tuzakları, 2), invalid UUID product_id (1), POST currency=GBP (1), PATCH currency=GBP (1) + confirm/cancel cache regression assert'leri mevcut testlere eklendi. Mevcut fixture'larda `product_id: "p-1"` → valid UUID `PID = "00000000-0000-4000-8000-000000000001"`.
+- 163 dosya · 2576 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Purchase&Alert Faz 3 advisor fix — P1+P2+P3 backend hardening (2026-05-11; 2571 test)
 
 **Faz 3 advisor fix (1 commit, ~9 dosya):**
 - **P1.1 (merge-blocker) — `role-guard.ts`**: `user.user_metadata?.role` → `user.app_metadata?.role`. Privilege escalation kapatıldı (Supabase'de `user_metadata` `auth.updateUser` ile kullanıcı tarafından yazılabilir; `app_metadata` sadece service_role ile yazılır).
