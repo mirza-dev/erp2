@@ -36,6 +36,7 @@ vi.mock("@/lib/supabase/purchase-orders", async () => {
 const mockServiceSendPO    = vi.fn();
 const mockServiceConfirmPO = vi.fn();
 const mockServiceCancelPO  = vi.fn();
+const mockServiceRevisePO  = vi.fn();
 
 vi.mock("@/lib/services/purchase-order-service", async () => {
     const actual = await vi.importActual("@/lib/services/purchase-order-service") as typeof import("@/lib/services/purchase-order-service");
@@ -44,6 +45,7 @@ vi.mock("@/lib/services/purchase-order-service", async () => {
         serviceSendPO:    (...a: unknown[]) => mockServiceSendPO(...a),
         serviceConfirmPO: (...a: unknown[]) => mockServiceConfirmPO(...a),
         serviceCancelPO:  (...a: unknown[]) => mockServiceCancelPO(...a),
+        serviceRevisePO:  (...a: unknown[]) => mockServiceRevisePO(...a),
     };
 });
 
@@ -66,6 +68,7 @@ import {
 } from "@/app/api/purchase-orders/[id]/route";
 import { PUT as linesPUT } from "@/app/api/purchase-orders/[id]/lines/route";
 import { POST as sendPOST } from "@/app/api/purchase-orders/[id]/send/route";
+import { POST as revisePOST } from "@/app/api/purchase-orders/[id]/revise/route";
 import { POST as confirmPOST } from "@/app/api/purchase-orders/[id]/confirm/route";
 import { POST as cancelPOST } from "@/app/api/purchase-orders/[id]/cancel/route";
 
@@ -439,5 +442,34 @@ describe("POST /api/purchase-orders/[id]/cancel", () => {
         // cancel_po pending commitment cancel → incoming etkilenir
         expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
         expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+    });
+});
+
+// ── POST /api/purchase-orders/[id]/revise — M1 (Faz 4 follow-up) ──────
+
+describe("POST /api/purchase-orders/[id]/revise", () => {
+    it("PO yok → 404", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValue(null);
+        const res = await revisePOST(makeReq() as unknown as Parameters<typeof revisePOST>[0], makeParams("po-99"));
+        expect(res.status).toBe(404);
+    });
+
+    it("confirmed PO → 409 'Geçersiz durum geçişi'", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValue({ ...samplePO, status: "confirmed" });
+        mockServiceRevisePO.mockRejectedValue(new Error("Geçersiz durum geçişi: confirmed → draft"));
+        const res = await revisePOST(makeReq({}) as unknown as Parameters<typeof revisePOST>[0], makeParams("po-1"));
+        expect(res.status).toBe(409);
+        const body = await res.json();
+        expect(body.error).toMatch(/Geçersiz durum geçişi/i);
+    });
+
+    it("başarılı (sent → draft) → 200 + revalidate", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValue({ ...samplePO, status: "sent" });
+        mockServiceRevisePO.mockResolvedValue({ id: "po-1", status: "draft" });
+        const res = await revisePOST(makeReq({}) as unknown as Parameters<typeof revisePOST>[0], makeParams("po-1"));
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.status).toBe("draft");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
     });
 });

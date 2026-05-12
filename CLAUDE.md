@@ -1,9 +1,24 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-12_
+_Son güncelleme: 2026-05-13_
 
-**Son tamamlanan iş:** Purchase&Alert Faz 4 — PO UI sayfaları + Faz 3 son advisor fix (source_recommendation_ids validation) (2026-05-12; 2582 test)
+**Son tamamlanan iş:** Purchase&Alert Faz 4 follow-up — UI gap'leri + Suspense fix (Vercel build kritik) (2026-05-13; 2599 test)
+
+**Faz 4 follow-up (1 commit, ~10 dosya):**
+- **CRITICAL Vercel build fix — `useSearchParams` Suspense wrap**: `new` page'e eklediğim `useSearchParams()` Next.js'in static prerender hatası vermesine sebep oluyordu (`Missing Suspense Boundary`). `NewPurchaseOrderPageInner` extract edildi + üstte `<Suspense>` wrapper. **Bu, May 6'dan beri Vercel build'lerinin de aynı tipte hata almasının kök nedeni olma ihtimali yüksek (kullanıcı Vercel CLI logu paylaşırsa kesin doğrulanır).** Mevcut `/dashboard/orders/page.tsx` ve `/dashboard/orders/new/page.tsx` zaten aynı pattern'i kullanıyor.
+- **P2.1 fromDraft preload** (`new/page.tsx`): `useSearchParams.get("fromDraft")` ile gelen ID için `GET /api/purchase-orders/[id]` çağrısı + tüm form state'in (vendor, currency, expected_date, notes, lines) doldurulması. `expectedDateDirty=true` set edilerek preload'lanan tarih korunur.
+- **P2.2 Revize endpoint + UI** (`[id]/revise/route.ts` yeni + detail page): `POST /api/purchase-orders/[id]/revise` → `serviceRevisePO` → sent→draft (CAS'lı UPDATE + sent_at=NULL). Detail UI'da `isSent` koşulunda "Revize Et" butonu (native confirm + transition).
+- **P2.3 Audit timeline** (yeni `audit-log.ts` helper + `/api/audit-log` endpoint + detail UI): `dbListAuditLog(entityType, entityId)` chronological audit_log fetch. Generic GET endpoint: `?entity_type=...&entity_id=...`. Detail'de notes paneli altında dikey liste, `ACTION_LABELS` ile Türkçeleştirilmiş eventler (po_created/sent/confirmed/partially_received/received/cancelled/revised/lines_replaced). aria-label="Sipariş aktivite geçmişi".
+- **P3.2 Vendor değişiminde stale expected_date** — `expectedDateDirty` flag pattern. Kullanıcı tarih değiştirirse korunur; vendor seçilirse otomatik fill.
+- **P3.3 Double cancel toast fix** — `handleCancel`'de 403 dalı tek toast'a indirgendi (`const msg = ... ? ... : ...; toast({...msg})`).
+- **Pure helper extraction** (`new/page.tsx`): `lineFromDraft(line) → LineDraft` ve `computeExpectedDate(leadTime, baseDate) → ISO` test-edilebilir helper'lar olarak export edildi.
+- **Test (+17):** `audit-log.test.ts` yeni (4) + `purchase-orders-route.test.ts` revise endpoint (+3) + `purchase-orders-ui.test.ts` (+10): smoke (4) + lineFromDraft (2) + computeExpectedDate (3) + source-regex (5: Revize render condition, audit timeline mevcudiyeti + ACTION_LABELS, cancel 403 tek toast, fromDraft preload pattern, expectedDateDirty pattern).
+- 165 dosya · 2599 test yeşil · TS clean · 0 lint warning · build OK
+
+**Vercel deploy durumu (acil):** Son başarılı deploy 2026-05-06 (sha `d1ef1cd`). Sonraki Vercel deploy'ları `failure` (kullanıcı dashboard'dan `vercel.link/3Fpeeb1` log'unu paylaşırsa kök neden netleşir). Bu commit'le birlikte `useSearchParams` Suspense fix push edilince Vercel build'inin de geçme ihtimali yüksek — push sonrası `gh api repos/mirza-dev/erp2/commits/HEAD/statuses --jq '.[]|select(.context=="Vercel")'` kontrol edilmeli. Hâlâ fail ise kullanıcı `npm i -g vercel && vercel login && vercel inspect erp2-sigma.vercel.app --logs` çalıştırıp log'u paylaşmalı.
+
+**Önceki:** Purchase&Alert Faz 4 — PO UI sayfaları + Faz 3 son advisor fix (source_recommendation_ids validation) (2026-05-12; 2582 test)
 
 **Faz 4 (1 commit, ~6 dosya):**
 - **Faz 3 cleanup — `source_recommendation_ids` validation gap kapatıldı**: `validatePoLines` artık opsiyonel `source_recommendation_ids` alanı için array + UUID regex check yapıyor. Defense-in-depth — Faz 6 service'i server-generated UUID kullanacak ama API boundary'de doğrulanır. +2 test (array değil → 400, geçersiz UUID → 400).

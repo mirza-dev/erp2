@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import type { VendorRow, ProductRow } from "@/lib/database.types";
+import type { VendorRow, ProductRow, PurchaseOrderRow, PurchaseOrderLineRow } from "@/lib/database.types";
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px", padding: "6px 10px",
@@ -28,8 +28,40 @@ const emptyLine: LineDraft = { product_id: "", quantity: "1", unit_price: "0", d
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
+/** Test edilebilir pure helper: PO line satırını UI draft state'ine çevirir.
+ * fromDraft preload akışı bunu kullanır. */
+export function lineFromDraft(line: PurchaseOrderLineRow): LineDraft {
+    return {
+        product_id:   line.product_id,
+        quantity:     String(line.quantity),
+        unit_price:   String(line.unit_price),
+        discount_pct: String(line.discount_pct),
+        notes:        line.notes ?? "",
+    };
+}
+
+/** Test edilebilir pure helper: vendor lead_time_days'e göre expected_date hesaplar.
+ * Vendor değişimi akışında dirty=false ise çağrılır. */
+export function computeExpectedDate(leadTimeDays: number | null | undefined, baseDate: Date = new Date()): string {
+    const lead = leadTimeDays ?? 14;
+    const d = new Date(baseDate);
+    d.setDate(d.getDate() + lead);
+    return d.toISOString().slice(0, 10);
+}
+
 export default function NewPurchaseOrderPage() {
+    // Next.js: useSearchParams Suspense boundary'si gerektirir (prerender).
+    return (
+        <Suspense fallback={<div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>Yükleniyor...</div>}>
+            <NewPurchaseOrderPageInner />
+        </Suspense>
+    );
+}
+
+function NewPurchaseOrderPageInner() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const fromDraftId = searchParams.get("fromDraft");
     const { toast } = useToast();
     const isDemo = useIsDemo();
 
@@ -38,6 +70,7 @@ export default function NewPurchaseOrderPage() {
     const [vendorId, setVendorId] = useState<string>("");
     const [currency, setCurrency] = useState<string>("TRY");
     const [expectedDate, setExpectedDate] = useState<string>("");
+    const [expectedDateDirty, setExpectedDateDirty] = useState(false);
     const [notes, setNotes] = useState<string>("");
     const [lines, setLines] = useState<LineDraft[]>([{ ...emptyLine }]);
     const [saving, setSaving] = useState(false);
@@ -58,20 +91,42 @@ export default function NewPurchaseOrderPage() {
         })();
     }, [toast]);
 
+    // fromDraft preload: detail'deki "Düzenle" → ?fromDraft=<id> ile gelen taslağı yükle
+    useEffect(() => {
+        if (!fromDraftId) return;
+        void (async () => {
+            try {
+                const res = await fetch(`/api/purchase-orders/${fromDraftId}`);
+                if (!res.ok) {
+                    toast({ type: "error", message: "Taslak yüklenemedi." });
+                    return;
+                }
+                const draft = await res.json() as PurchaseOrderRow & { lines: PurchaseOrderLineRow[] };
+                setVendorId(draft.vendor_id);
+                setCurrency(draft.currency);
+                setExpectedDate(draft.expected_date ?? "");
+                setExpectedDateDirty(true);  // preload sonrası vendor değişimi tarihi ezmesin
+                setNotes(draft.notes ?? "");
+                setLines(draft.lines.length > 0 ? draft.lines.map(lineFromDraft) : [{ ...emptyLine }]);
+                toast({ type: "info", message: `${draft.po_number} satırları yüklendi. Yeni taslak oluşturulacak.` });
+            } catch {
+                toast({ type: "error", message: "Taslak yüklenirken hata oluştu." });
+            }
+        })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fromDraftId]);
+
     const selectedVendor = useMemo(() => vendors.find(v => v.id === vendorId), [vendors, vendorId]);
 
-    // Vendor seçildiğinde defaults set et: currency + expected_date
+    // Vendor seçildiğinde defaults set et: currency + expected_date.
+    // expected_date kullanıcı manuel düzenlemediyse (dirty=false) yeni vendor lead_time'ı ile auto-fill.
     useEffect(() => {
         if (!selectedVendor) return;
         setCurrency(selectedVendor.currency);
-        if (!expectedDate) {
-            const lead = selectedVendor.lead_time_days ?? 14;
-            const d = new Date();
-            d.setDate(d.getDate() + lead);
-            setExpectedDate(d.toISOString().slice(0, 10));
+        if (!expectedDateDirty) {
+            setExpectedDate(computeExpectedDate(selectedVendor.lead_time_days));
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedVendor]);
+    }, [selectedVendor, expectedDateDirty]);
 
     const updateLine = (idx: number, patch: Partial<LineDraft>) => {
         setLines(prev => prev.map((l, i) => i === idx ? { ...l, ...patch } : l));
@@ -165,7 +220,8 @@ export default function NewPurchaseOrderPage() {
                 <div>
                     <label style={labelStyle} htmlFor="po-expected">Beklenen Tarih *</label>
                     <input id="po-expected" type="date" min={TODAY} value={expectedDate}
-                        onChange={e => setExpectedDate(e.target.value)} aria-label="Beklenen tarih"
+                        onChange={e => { setExpectedDate(e.target.value); setExpectedDateDirty(true); }}
+                        aria-label="Beklenen tarih"
                         style={inputStyle} />
                 </div>
             </div>

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { PurchaseOrderRow, PurchaseOrderLineRow, PurchaseOrderStatus, VendorRow, ProductRow } from "@/lib/database.types";
+import type { AuditEntry } from "@/lib/supabase/audit-log";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left", padding: "10px 14px", fontSize: "12px", fontWeight: 500,
@@ -29,6 +30,17 @@ const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
     partially_received: "Kısmi Kabul", received: "Tamamlandı", cancelled: "İptal",
 };
 
+const ACTION_LABELS: Record<string, string> = {
+    po_created:             "Sipariş oluşturuldu",
+    po_sent:                "Tedarikçiye gönderildi",
+    po_confirmed:           "Onaylandı",
+    po_partially_received:  "Kısmi mal kabul",
+    po_received:            "Tamamen alındı",
+    po_cancelled:           "İptal edildi",
+    po_revised:             "Taslağa geri alındı (revize)",
+    po_lines_replaced:      "Satırlar güncellendi",
+};
+
 interface POWithLines extends PurchaseOrderRow {
     lines: PurchaseOrderLineRow[];
 }
@@ -47,6 +59,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     const [po, setPo] = useState<POWithLines | null>(null);
     const [vendor, setVendor] = useState<VendorRow | null>(null);
     const [productMap, setProductMap] = useState<Map<string, ProductRow>>(new Map());
+    const [auditEntries, setAuditEntries] = useState<AuditEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionBusy, setActionBusy] = useState<string | null>(null);
     const [cancelOpen, setCancelOpen] = useState(false);
@@ -64,9 +77,10 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
             const data: POWithLines = await res.json();
             setPo(data);
 
-            const [vRes, pRes] = await Promise.all([
+            const [vRes, pRes, audRes] = await Promise.all([
                 fetch(`/api/vendors/${data.vendor_id}`),
                 fetch(`/api/products?all=1`),
+                fetch(`/api/audit-log?entity_type=purchase_order&entity_id=${id}`),
             ]);
             if (vRes.ok) setVendor(await vRes.json());
             if (pRes.ok) {
@@ -75,6 +89,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 for (const p of prods) m.set(p.id, p);
                 setProductMap(m);
             }
+            if (audRes.ok) setAuditEntries(await audRes.json());
         } catch {
             toast({ type: "error", message: "Sipariş yüklenemedi." });
         } finally {
@@ -84,20 +99,13 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
 
     useEffect(() => { void loadPO(); }, [loadPO]);
 
-    const doTransition = async (action: "send" | "confirm" | "revise", successMsg: string) => {
+    const doTransition = async (action: "send" | "confirm" | "revise", successMsg: string, confirmMsg?: string) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (actionBusy) return;
+        if (confirmMsg && !confirm(confirmMsg)) return;
         setActionBusy(action);
         try {
-            // "revise" sent → draft için PATCH ile status değişmiyor — özel endpoint yok, helper'dan transition
-            // Faz 4 scope: send/confirm dedicated endpoint var; revise için PATCH yerine direct UI'da uygulanmıyor (Faz 5'te eklenecek).
-            // Şu an "revise" çağrısı yok; UI butonu sadece sent durumunda görünür ve placeholder.
-            const endpoint = action === "send"
-                ? `/api/purchase-orders/${id}/send`
-                : action === "confirm"
-                ? `/api/purchase-orders/${id}/confirm`
-                : null;
-            if (!endpoint) { toast({ type: "info", message: "Revize akışı yakında." }); return; }
+            const endpoint = `/api/purchase-orders/${id}/${action}`;
             const res = await fetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -126,8 +134,10 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
             });
             const data = await res.json();
             if (!res.ok) {
-                toast({ type: "error", message: data.error ?? "İptal başarısız." });
-                if (res.status === 403) toast({ type: "error", message: "Sadece admin kullanıcılar iptal edebilir." });
+                const msg = res.status === 403
+                    ? "Sadece admin kullanıcılar iptal edebilir."
+                    : data.error ?? "İptal başarısız.";
+                toast({ type: "error", message: msg });
                 return;
             }
             toast({ type: "success", message: "Sipariş iptal edildi." });
@@ -194,6 +204,13 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                             disabled={isDemo || actionBusy !== null}
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             style={btnPrimary(isDemo || actionBusy !== null)}>Onayla</button>
+                    )}
+                    {isSent && (
+                        <button onClick={() => doTransition("revise", "Sipariş taslağa geri alındı.",
+                            "Bu sipariş 'Taslak' durumuna geri alınacak. Devam edilsin mi?")}
+                            disabled={isDemo || actionBusy !== null}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sent → Draft (M1 revize)"}
+                            style={btnSecondary(isDemo || actionBusy !== null)}>Revize Et</button>
                     )}
                     {isDraft && (
                         <button onClick={() => router.push(`/dashboard/purchase/orders/new?fromDraft=${id}`)}
@@ -285,6 +302,46 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 }}>
                     <div style={{ fontSize: "11px", color: "var(--danger-text)", marginBottom: "4px" }}>İptal Gerekçesi</div>
                     <div style={{ fontSize: "13px", color: "var(--danger-text)" }}>{po.cancel_reason}</div>
+                </div>
+            )}
+
+            {/* Audit timeline */}
+            {auditEntries.length > 0 && (
+                <div style={{
+                    background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)",
+                    borderRadius: "8px", overflow: "hidden", marginBottom: "16px",
+                }}>
+                    <div style={{
+                        padding: "12px 14px", borderBottom: "0.5px solid var(--border-tertiary)",
+                        background: "var(--bg-secondary)",
+                    }}>
+                        <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>
+                            Aktivite ({auditEntries.length})
+                        </strong>
+                    </div>
+                    <ol aria-label="Sipariş aktivite geçmişi" style={{
+                        listStyle: "none", margin: 0, padding: "8px 16px",
+                    }}>
+                        {auditEntries.map(e => (
+                            <li key={e.id} style={{
+                                display: "flex", gap: "12px", padding: "6px 0",
+                                fontSize: "12px", alignItems: "baseline",
+                                borderBottom: "0.5px solid var(--border-tertiary)",
+                            }}>
+                                <span style={{ color: "var(--text-tertiary)", minWidth: "150px", fontVariantNumeric: "tabular-nums" }}>
+                                    {new Date(e.occurred_at).toLocaleString("tr-TR")}
+                                </span>
+                                <span style={{ color: "var(--text-primary)" }}>
+                                    {ACTION_LABELS[e.action] ?? e.action}
+                                </span>
+                                {e.actor && (
+                                    <span style={{ color: "var(--text-tertiary)", marginLeft: "auto", fontSize: "11px" }}>
+                                        {e.actor}
+                                    </span>
+                                )}
+                            </li>
+                        ))}
+                    </ol>
                 </div>
             )}
 
