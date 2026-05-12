@@ -3,7 +3,19 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-12_
 
-**Son tamamlanan iş:** Purchase&Alert Faz 3 advisor 2. tur — P2 follow-up + P3 regression lock (2026-05-12; 2576 test)
+**Son tamamlanan iş:** Purchase&Alert Faz 4 — PO UI sayfaları + Faz 3 son advisor fix (source_recommendation_ids validation) (2026-05-12; 2582 test)
+
+**Faz 4 (1 commit, ~6 dosya):**
+- **Faz 3 cleanup — `source_recommendation_ids` validation gap kapatıldı**: `validatePoLines` artık opsiyonel `source_recommendation_ids` alanı için array + UUID regex check yapıyor. Defense-in-depth — Faz 6 service'i server-generated UUID kullanacak ama API boundary'de doğrulanır. +2 test (array değil → 400, geçersiz UUID → 400).
+- **Sidebar** (`Sidebar.tsx`): "Satın Alma" grubuna "Siparişler" linki eklendi (Öneriler + Siparişler + Tedarikçiler).
+- **`/dashboard/purchase/orders` (yeni)**: PO list sayfası. Status tab'ları (Tümü/Taslak/Gönderildi/Onaylandı/Kısmi Kabul/Tamamlandı/İptal), PO no + tedarikçi arama, durum badge, beklenen tarih, toplam (currency-aware), oluşturma tarihi. Row click → detail.
+- **`/dashboard/purchase/orders/new` (yeni)**: PO oluşturma formu. Vendor select (vendor seçilince currency + expected_date `lead_time_days` ile auto-fill), satır ekleme/silme (product/qty/unit_price/discount_pct/notes), notlar, real-time KDV dahil toplam. JS-side validation (boş alan, qty/price tip), POST sonrası detail'e yönlendirme.
+- **`/dashboard/purchase/orders/[id]` (yeni)**: PO detail. Header (PO no + status badge + vendor + expected_date), durum bazlı CTA'lar (Gönder/Onayla/İptal Et + Düzenle placeholder), summary cards (vendor, currency, ara toplam, KDV, genel toplam), lines table (ürün + qty + alındı/qty + birim fiyat + iskonto + satır toplamı; received_qty rengi kabul yüzdesine göre), notes paneli, cancel modal (reason zorunlu + admin uyarısı). NOT: mal kabul UI'ı Faz 5'te eklenecek.
+- **Demo + a11y disiplini**: tüm mutasyon buton/inputları `useIsDemo` + `DEMO_BLOCK_TOAST` + `disabled` + `title`, form alanları `aria-label`, modal `role="dialog" aria-modal`, error mesajları `role="alert" aria-live`. Inline style + CSS variables (Tailwind kullanılmadı).
+- **Smoke test (4 yeni, `purchase-orders-ui.test.ts`)**: 3 page module load + default export type check + Sidebar source contains "Siparişler" link regex check.
+- 164 dosya · 2582 test yeşil · TS clean · 0 lint warning · build OK (3 yeni route: list/new/[id])
+
+**Önceki:** Purchase&Alert Faz 3 advisor 2. tur — P2 follow-up + P3 regression lock (2026-05-12; 2576 test)
 
 **Faz 3 advisor 2. tur (1 commit, ~5 dosya):**
 - **P2 follow-up — `validatePoLines` sıkılaştırma** (`purchase-orders.ts`): (a) `unit_price` ve `quantity` için `null`/`undefined`/`""` explicit reject (`Number(null)===0` ve `Number("")===0` silent 0 tuzakları kapatıldı; eksik fiyat → 0 TRY siparişi sızıyordu); (b) `product_id` için UUID regex kontrolü (DB cast hatası 500 yerine 400'e map); (c) `discount_pct === ""` artık reject ediliyor (alan tamamen omitted olmalı).

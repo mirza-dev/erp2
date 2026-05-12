@@ -53,6 +53,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
             label: "Satın Alma",
             items: [
                 { label: "Öneriler", href: "/dashboard/purchase/suggested", count: reorderCount || undefined },
+                { label: "Siparişler", href: "/dashboard/purchase/orders" },
                 { label: "Tedarikçiler", href: "/dashboard/vendors" },
             ],
         },

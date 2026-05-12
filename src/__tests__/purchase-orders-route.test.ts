@@ -246,6 +246,22 @@ describe("POST /api/purchase-orders — line validation", () => {
         const body = await res.json();
         expect(body.error).toMatch(/Geçersiz para birimi/i);
     });
+
+    it("source_recommendation_ids array değil → 400", async () => {
+        const res = await listPOST(makeReq(baseBody({ source_recommendation_ids: "not-array" })) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/array olmalıdır/i);
+    });
+
+    it("source_recommendation_ids geçersiz UUID → 400", async () => {
+        const res = await listPOST(makeReq(baseBody({
+            source_recommendation_ids: ["00000000-0000-4000-8000-000000000001", "bad-uuid"],
+        })) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/source_recommendation_ids\[1\] geçerli UUID/i);
+    });
 });
 
 // ── GET /api/purchase-orders/[id] ────────────────────────────

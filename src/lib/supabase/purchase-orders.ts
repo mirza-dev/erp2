@@ -223,6 +223,17 @@ export function validatePoLines(raw: unknown): string | null {
             if (!Number.isFinite(d) || d < 0 || d > 100)
                 return `Line ${i + 1}: iskonto 0-100 arası olmalıdır.`;
         }
+
+        // Faz 6 zemini: source_recommendation_ids opsiyonel; verildiyse array of UUID olmalı.
+        // Defense-in-depth — Faz 6 service'i server-generated UUID kullanır ama API boundary'de her şey doğrulanır.
+        if (l.source_recommendation_ids !== undefined && l.source_recommendation_ids !== null) {
+            if (!Array.isArray(l.source_recommendation_ids))
+                return `Line ${i + 1}: source_recommendation_ids array olmalıdır.`;
+            for (const [j, rid] of l.source_recommendation_ids.entries()) {
+                if (typeof rid !== "string" || !UUID_RE.test(rid))
+                    return `Line ${i + 1}: source_recommendation_ids[${j}] geçerli UUID olmalıdır.`;
+            }
+        }
     }
     return null;
 }
