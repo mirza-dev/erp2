@@ -124,6 +124,32 @@ Env değişkenlerini ve tablo/migration varlığını kontrol eder.
 
 ---
 
+## Deployment (Coolify)
+
+Production sürümü self-hosted Coolify üzerinde çalışır (Hetzner/Vargonen VPS).
+Vercel'den **2026-05'te** taşındı (cron limit sorunu).
+
+**Mimari:**
+- **Runtime:** Coolify → Docker (Dockerfile multi-stage, Next.js standalone)
+- **Cron:** GitHub Actions (`.github/workflows/crons.yml`) — 6h ve 1h schedule
+- **Source map:** GitHub Actions (`sentry-release.yml`) build sonrası Sentry'e upload
+- **Auto-deploy:** `main` branch push → Coolify webhook → Docker build → swap
+
+**Gerekli GitHub Secrets** (Settings → Secrets → Actions):
+- `APP_URL` — production URL (cron için)
+- `CRON_SECRET` — Coolify env ile aynı
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SENTRY_DSN` — sentry-release build için
+- `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` — source map upload
+
+**Local Docker test:**
+```bash
+npm run docker:build && npm run docker:run    # http://localhost:3000
+```
+
+**Rollback:** Coolify dashboard → Deployments → eski commit'e "Redeploy"
+
+---
+
 ## API Hata Kodları
 
 | HTTP | `code` alanı | Anlam |

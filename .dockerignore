@@ -1,0 +1,41 @@
+.git
+.gitignore
+.next
+node_modules
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+!.env.example
+
+# Test artifacts
+src/__tests__
+coverage
+tests
+playwright-report
+test-results
+*.test.ts
+*.spec.ts
+
+# Vercel artifacts
+.vercel
+
+# Docs (build için gerekli değil)
+README.md
+CLAUDE.md
+domain-rules.md
+*.md
+
+# IDE
+.vscode
+.idea
+.cursor
+
+# OS
+.DS_Store
+*.swp
+
+# Other
+.github
+.claude

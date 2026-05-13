@@ -3,7 +3,31 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-13_
 
-**Son tamamlanan iş:** Purchase&Alert Faz 4 follow-up — UI gap'leri + Suspense fix (Vercel build kritik) (2026-05-13; 2599 test)
+**Son tamamlanan iş:** Vercel → Coolify migration Faz A (kod scaffolding) (2026-05-13; 2599 test)
+
+**Faz A — Coolify migration scaffolding (1 commit, ~10 dosya):**
+- **Kök sorun:** Vercel Hobby tier cron sıklık limiti (minimum 1 day interval) `vercel.json`'daki `0 */6 * * *`'i reddediyor → 2026-05-09'dan beri tüm deploy'lar fail. Vercel CLI'sız log alınamadı; `vercel.link/3Fpeeb1` redirect'i cron pricing doc'una gidiyor (kanıt).
+- **Çözüm yönü:** Coolify (self-hosted Docker PaaS, Hetzner/Vargonen VPS, ~€5/ay) + GitHub Actions cron (ücretsiz, sınırsız). Vercel paralel canlı tutulup risksiz cutover.
+- **next.config.ts:** `output: "standalone"` + `images.unoptimized: true` (Next/image PDF yerinde, intentional `<img>`); CSP/HSTS header'lar aynı.
+- **sentry.*.config.ts (3 dosya):** `environment: SENTRY_ENVIRONMENT ?? NODE_ENV` (staging/prod ayrımı için). Client tarafında `NEXT_PUBLIC_SENTRY_ENVIRONMENT`.
+- **Dockerfile** (yeni, multi-stage, secret-free): deps → builder → runner. Sadece `NEXT_PUBLIC_*` build args (bundle'a yazılır). Server secret'ları (`SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `CRON_SECRET`, `PARASUT_*`, `RESEND_API_KEY`) Coolify runtime env'inden enjekte. **SENTRY_AUTH_TOKEN Dockerfile'a hiç girmiyor** (advisor P1.3 — Docker secret yönergesi: build arg layer'a yazılır, leak riski). Source map upload ayrı GH Actions workflow'unda yapılır.
+- **`.dockerignore`** (yeni): test artifact'ları, .env, dokümanlar, .vercel, .next dışlanır.
+- **`.github/workflows/crons.yml`** (yeni): 8 endpoint envanteri (advisor P1.1 — eksikti `quotes/expire`). Her step `continue-on-error: true` + `curl --retry 3 --retry-delay 20 --max-time 60` + step `timeout-minutes: 5` (fail-isolation + retry). Off-peak dakika `7,37` (advisor P2.1 — top-of-hour drift'ten kaçınma). `workflow_dispatch` ile manuel tetikleme (job=all/six-hourly/hourly choice). Endpoint'ler: 6h → ai-suggest/alerts-scan/purchase-copilot/parasut sync-all/orders expire-quotes/quotes expire/check-shipments. 1h → email retry/parasut poll-e-documents.
+- **`.github/workflows/sentry-release.yml`** (yeni): main push veya manual dispatch. GH Actions runner'da `npm ci && npm run build` çalıştırır; `SENTRY_AUTH_TOKEN`+`SENTRY_ORG`+`SENTRY_PROJECT` env ile `withSentryConfig` source map auto-upload yapar. Build iki kere yapılır (Coolify'da + GH Actions runner'da source map için); GH Actions free tier 2000 dk/ay, bu workflow ~30-50 dk/ay kullanır.
+- **`.env.example`**: `SENTRY_ENVIRONMENT`/`NEXT_PUBLIC_SENTRY_ENVIRONMENT` notları; `NEXT_PUBLIC_APP_URL` Coolify URL'lerine güncellendi; `ADMIN_EMAILS` ek not; Coolify deployment GitHub Secrets gereksinimleri belgelendi.
+- **package.json**: `docker:build` ve `docker:run` script'leri (local test için).
+- **README.md**: yeni "Deployment (Coolify)" bölümü — mimari özet + secret listesi + local Docker test komutu.
+- **vercel.json korunur** — Faz E cutover sonrası silinir (`chore(deploy): Coolify migration complete` commit'i).
+- **`npm run build`** standalone output üretti (`.next/standalone/server.js` doğrulandı), 165 dosya · 2599 test yeşil · TS clean · 0 lint warning.
+
+**Sıradaki adımlar (kullanıcı tarafında — Faz B-F):**
+- **Faz B:** VPS al (Vargonen İstanbul önerili / Hetzner FSN1 alternatif) + Coolify install (`curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash`)
+- **Faz C:** Coolify'da `erp2-staging` Resource → GitHub bağla → env vars (staging için `PARASUT_ENABLED=false`, `RESEND_API_KEY=""`, advisor P1.2)
+- **Faz D:** `erp-staging.kokpit.app` üzerinde 13 maddelik smoke test
+- **Faz E:** DNS cutover `erp.kokpit.app` → Hetzner IP + GitHub Actions cron secret'ları set + Vercel pause
+- **Faz F:** UptimeRobot health monitoring + Hetzner/Vargonen snapshot backup
+
+**Önceki:** Purchase&Alert Faz 4 follow-up — UI gap'leri + Suspense fix (Vercel build kritik) (2026-05-13; 2599 test)
 
 **Faz 4 follow-up (1 commit, ~10 dosya):**
 - **CRITICAL Vercel build fix — `useSearchParams` Suspense wrap**: `new` page'e eklediğim `useSearchParams()` Next.js'in static prerender hatası vermesine sebep oluyordu (`Missing Suspense Boundary`). `NewPurchaseOrderPageInner` extract edildi + üstte `<Suspense>` wrapper. **Bu, May 6'dan beri Vercel build'lerinin de aynı tipte hata almasının kök nedeni olma ihtimali yüksek (kullanıcı Vercel CLI logu paylaşırsa kesin doğrulanır).** Mevcut `/dashboard/orders/page.tsx` ve `/dashboard/orders/new/page.tsx` zaten aynı pattern'i kullanıyor.

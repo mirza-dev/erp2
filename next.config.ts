@@ -2,6 +2,11 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+    // Coolify/Docker self-hosting için minimal Node server üretir (.next/standalone/)
+    output: "standalone",
+    // Self-hosted'da Vercel Image Optimization CDN yok; next/image tek yerde
+    // (QuoteDocument.tsx PDF render — intentional <img>), unoptimize güvenli.
+    images: { unoptimized: true },
     async headers() {
         return [
             {
