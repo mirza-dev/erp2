@@ -2,13 +2,13 @@ name: Production Crons
 
 # Coolify cutover sonrası Vercel cron yerine kullanılır.
 # Secrets gerekli: APP_URL (https://erp.kokpit.app), CRON_SECRET (Coolify env ile aynı).
-# Off-peak dakikalar (`7,37`) — top-of-hour drift'ten kaçınmak için.
+# Off-peak dakika `7` — GH Actions top-of-hour drift'ten kaçınmak için.
 
 on:
   schedule:
-    # 6 saatte bir: TR 03:07, 09:07, 15:07, 21:07 (± GH Actions drift 5-15 dk)
-    - cron: "7,37 0,6,12,18 * * *"
-    # Saatte bir: XX:07
+    # 6 saatte bir = günde 4 invocation (UTC 00:07/06:07/12:07/18:07 → TR 03:07/09:07/15:07/21:07)
+    - cron: "7 0,6,12,18 * * *"
+    # Saatte bir = günde 24 invocation (XX:07)
     - cron: "7 * * * *"
   workflow_dispatch:
     inputs:
@@ -25,7 +25,7 @@ concurrency:
 jobs:
   six-hourly:
     if: |
-      github.event.schedule == '7,37 0,6,12,18 * * *' ||
+      github.event.schedule == '7 0,6,12,18 * * *' ||
       (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'six-hourly'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -34,6 +34,7 @@ jobs:
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
       - name: AI alert suggest
+        id: ai_suggest
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -42,6 +43,7 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
 
       - name: Alert scan
+        id: alerts_scan
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -50,6 +52,7 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
 
       - name: Purchase copilot (AI öneriler)
+        id: purchase_copilot
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -58,6 +61,7 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
 
       - name: Paraşüt sync-all
+        id: parasut_sync_all
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -66,6 +70,7 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
 
       - name: Orders — expire quotes
+        id: orders_expire_quotes
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -74,6 +79,7 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
 
       - name: Quotes — expire (standalone)
+        id: quotes_expire
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -82,6 +88,7 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
 
       - name: Check shipments (overdue)
+        id: check_shipments
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -89,9 +96,26 @@ jobs:
             -X POST "$APP_URL/api/orders/check-shipments" \
             -H "Authorization: Bearer $CRON_SECRET"
 
-      - name: Summary
+      - name: Summary (fail job if any step failed)
         if: always()
-        run: echo "::notice ::6h crons tamamlandı. Bireysel step durumları yukarıda."
+        env:
+          OUTCOMES: |
+            ai_suggest=${{ steps.ai_suggest.outcome }}
+            alerts_scan=${{ steps.alerts_scan.outcome }}
+            purchase_copilot=${{ steps.purchase_copilot.outcome }}
+            parasut_sync_all=${{ steps.parasut_sync_all.outcome }}
+            orders_expire_quotes=${{ steps.orders_expire_quotes.outcome }}
+            quotes_expire=${{ steps.quotes_expire.outcome }}
+            check_shipments=${{ steps.check_shipments.outcome }}
+        run: |
+          echo "$OUTCOMES"
+          fails=$(echo "$OUTCOMES" | grep -c "=failure" || true)
+          total=$(echo "$OUTCOMES" | grep -c "=" || true)
+          if [ "$fails" -gt 0 ]; then
+            echo "::error ::$fails/$total six-hourly cron step(s) failed — workflow marked failure"
+            exit 1
+          fi
+          echo "::notice ::All $total six-hourly cron steps succeeded"
 
   hourly:
     if: |
@@ -104,6 +128,7 @@ jobs:
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
     steps:
       - name: Email — retry failed
+        id: email_retry
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -112,6 +137,7 @@ jobs:
             -H "Authorization: Bearer $CRON_SECRET"
 
       - name: Paraşüt — poll e-documents
+        id: parasut_poll
         continue-on-error: true
         timeout-minutes: 5
         run: |
@@ -119,6 +145,18 @@ jobs:
             -X POST "$APP_URL/api/parasut/poll-e-documents" \
             -H "Authorization: Bearer $CRON_SECRET"
 
-      - name: Summary
+      - name: Summary (fail job if any step failed)
         if: always()
-        run: echo "::notice ::1h crons tamamlandı."
+        env:
+          OUTCOMES: |
+            email_retry=${{ steps.email_retry.outcome }}
+            parasut_poll=${{ steps.parasut_poll.outcome }}
+        run: |
+          echo "$OUTCOMES"
+          fails=$(echo "$OUTCOMES" | grep -c "=failure" || true)
+          total=$(echo "$OUTCOMES" | grep -c "=" || true)
+          if [ "$fails" -gt 0 ]; then
+            echo "::error ::$fails/$total hourly cron step(s) failed — workflow marked failure"
+            exit 1
+          fi
+          echo "::notice ::All $total hourly cron steps succeeded"

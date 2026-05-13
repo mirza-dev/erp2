@@ -3,7 +3,12 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-13_
 
-**Son tamamlanan iş:** Vercel → Coolify migration Faz A (kod scaffolding) (2026-05-13; 2599 test)
+**Son tamamlanan iş:** Vercel → Coolify migration Faz A + cron workflow advisor fix (2026-05-13; 2599 test)
+
+**Faz A advisor follow-up (1 commit, 1 dosya):**
+- **P1 — Hidden green fail kapatıldı:** `crons.yml` step'lerine `id` eklendi; her job'ın Summary step'i `steps.<id>.outcome` aggregate yapıp 1+ failure varsa `exit 1` ile workflow'u doğru fail eder. Eski hâl: tüm step'ler `continue-on-error:true` olduğundan tüm endpoint'ler 401/500 verse bile workflow yeşil görünüyordu.
+- **P2 — Cron 8 invocation → 4 düzeltildi:** `7,37 0,6,12,18 * * *` (her hedef saatte iki kez = günde 8) → `7 0,6,12,18 * * *` (her hedef saatte bir kez = günde 4). Plan yorumu ile cron string artık tutarlı (TR 03:07/09:07/15:07/21:07).
+
 
 **Faz A — Coolify migration scaffolding (1 commit, ~10 dosya):**
 - **Kök sorun:** Vercel Hobby tier cron sıklık limiti (minimum 1 day interval) `vercel.json`'daki `0 */6 * * *`'i reddediyor → 2026-05-09'dan beri tüm deploy'lar fail. Vercel CLI'sız log alınamadı; `vercel.link/3Fpeeb1` redirect'i cron pricing doc'una gidiyor (kanıt).
