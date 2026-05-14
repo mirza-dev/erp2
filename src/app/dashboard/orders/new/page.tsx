@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, safeRandomUUID } from "@/lib/utils";
 import { type Customer, type Product, type OrderLineItem } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
 import Button from "@/components/ui/Button";
@@ -20,7 +20,7 @@ interface OrderLine {
 }
 
 function newLine(): OrderLine {
-    return { id: crypto.randomUUID(), product: null, quantity: 1, unitPrice: 0, discountPct: 0 };
+    return { id: safeRandomUUID(), product: null, quantity: 1, unitPrice: 0, discountPct: 0 };
 }
 
 const thStyle: React.CSSProperties = {
@@ -156,7 +156,7 @@ function NewOrderForm() {
             const orderLines: OrderLineItem[] = lines
                 .filter(l => l.product !== null)
                 .map(l => ({
-                    id: crypto.randomUUID(),
+                    id: safeRandomUUID(),
                     productId: l.product!.id,
                     productName: l.product!.name,
                     productSku: l.product!.sku,

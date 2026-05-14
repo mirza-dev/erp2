@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useData } from "@/lib/data-context";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, safeRandomUUID } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -19,7 +19,7 @@ interface FormLine {
 }
 
 function newLine(): FormLine {
-    return { id: crypto.randomUUID(), productId: "", adet: "", notlar: "" };
+    return { id: safeRandomUUID(), productId: "", adet: "", notlar: "" };
 }
 
 const today = () => {
@@ -86,7 +86,7 @@ export default function ProductionPage() {
         setVoiceTranscript(data.text);
 
         const newLines = data.entries.map(entry => ({
-            id: crypto.randomUUID(),
+            id: safeRandomUUID(),
             productId: entry.productId ?? "",
             adet: entry.quantity > 0 ? String(entry.quantity) : "",
             notlar: entry.note || data.sessionNote,
