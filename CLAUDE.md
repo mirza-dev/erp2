@@ -3,7 +3,28 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-13_
 
-**Son tamamlanan iş:** Vercel → Coolify migration Faz A + cron workflow advisor fix (2026-05-13; 2599 test)
+**Son tamamlanan iş:** Coolify Faz D smoke fix — reverse-proxy redirect bug (3 endpoint) (2026-05-14; 2599 test)
+
+**Faz D smoke fix (1 commit, 4 dosya):**
+- Staging Coolify deploy yeşil çalışıyor (`http://erp2.138.199.204.138.sslip.io`). Smoke testlerde 2 sorun yakalandı:
+- **Coolify Traefik X-Forwarded-Host pass-through eksik** → `new URL("/path", request.url)` veya `request.nextUrl.origin` container internal hostname'i (`0.0.0.0:3000`) veriyor → Location header public URL'e yönlendirmiyor. 3 endpoint etkileniyordu:
+  - `/api/auth/demo` (Demo Gez → /dashboard)
+  - `/api/parasut/oauth/start` (mock mode internal redirect)
+  - `/api/parasut/oauth/callback` (success → /dashboard/settings)
+- **Çözüm:** Same-origin redirect'ler için **relative Location header** kullanıldı (browser zaten same-origin'de follow eder; reverse proxy host header'ına ihtiyaç yok). `NextResponse.redirect(absoluteURL)` → `new NextResponse(null, { status: 307, headers: { Location: "/path" } })`. Bu Coolify/Traefik konfig değişikliği gerektirmez, code-side temiz.
+- Test güncellemesi: `parasut-oauth.test.ts` `new URL(location, "http://localhost")` ile base URL eklendi (relative URL parse).
+- 165 dosya · 2599 test yeşil · TS clean · 0 lint warning
+
+**Devam eden — Faz D smoke checklist:**
+- ✅ /api/health 200 OK
+- ✅ /login 200 public
+- ✅ /dashboard auth gate (307 → /login)
+- ✅ /api/products auth zorunlu (401)
+- ✅ CSP/HSTS/Permissions-Policy header'lar
+- ⚠️ **CRON_SECRET env Coolify'da set edilmedi/yanlış** — pure Bearer endpoint'ler hâlâ 401 (kullanıcı doğrulayacak)
+- ⏳ Browser smoke: login + dashboard + vendors + purchase orders + products (kullanıcı tarafında)
+
+**Önceki:** Vercel → Coolify migration Faz A + cron workflow advisor fix (2026-05-13; 2599 test)
 
 **Faz A advisor follow-up (1 commit, 1 dosya):**
 - **P1 — Hidden green fail kapatıldı:** `crons.yml` step'lerine `id` eklendi; her job'ın Summary step'i `steps.<id>.outcome` aggregate yapıp 1+ failure varsa `exit 1` ile workflow'u doğru fail eder. Eski hâl: tüm step'ler `continue-on-error:true` olduğundan tüm endpoint'ler 401/500 verse bile workflow yeşil görünüyordu.

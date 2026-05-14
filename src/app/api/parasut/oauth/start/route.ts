@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import crypto, { createHmac } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,20 +21,21 @@ function signState(state: string): string {
     return `${state}.${sig}`;
 }
 
-export async function GET(request: NextRequest): Promise<NextResponse> {
+export async function GET(): Promise<NextResponse> {
     const guard = await requireAdmin();
     if (guard) return guard.error;
 
     const state      = crypto.randomBytes(32).toString("hex");
     const cookieVal  = signState(state);
 
-    let redirectTarget: URL;
+    let redirectLocation: string;
 
     if (process.env.PARASUT_USE_MOCK !== "false") {
-        // Mock mode: skip real OAuth, go directly to callback with a fake code
-        redirectTarget = new URL("/api/parasut/oauth/callback", request.nextUrl.origin);
-        redirectTarget.searchParams.set("code",  "mock_code");
-        redirectTarget.searchParams.set("state", state);
+        // Mock mode: skip real OAuth, relative same-origin redirect.
+        // request.nextUrl.origin reverse-proxy ardında container internal host'u
+        // (0.0.0.0:3000) verebiliyor; relative Location header güvenli.
+        const params = new URLSearchParams({ code: "mock_code", state });
+        redirectLocation = `/api/parasut/oauth/callback?${params.toString()}`;
     } else {
         const authorizeUrl = process.env.PARASUT_AUTHORIZE_URL;
         const clientId     = process.env.PARASUT_CLIENT_ID;
@@ -47,14 +48,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
             );
         }
 
-        redirectTarget = new URL(authorizeUrl);
-        redirectTarget.searchParams.set("client_id",     clientId);
-        redirectTarget.searchParams.set("redirect_uri",  redirectUri);
-        redirectTarget.searchParams.set("response_type", "code");
-        redirectTarget.searchParams.set("state",         state);
+        const target = new URL(authorizeUrl);
+        target.searchParams.set("client_id",     clientId);
+        target.searchParams.set("redirect_uri",  redirectUri);
+        target.searchParams.set("response_type", "code");
+        target.searchParams.set("state",         state);
+        redirectLocation = target.toString();
     }
 
-    const response = NextResponse.redirect(redirectTarget);
+    const response = new NextResponse(null, {
+        status: 307,
+        headers: { Location: redirectLocation },
+    });
     response.cookies.set("parasut_oauth_state", cookieVal, {
         httpOnly: true,
         secure:   process.env.NODE_ENV === "production",

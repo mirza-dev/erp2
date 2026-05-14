@@ -111,8 +111,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ error: `Token kaydedilemedi: ${upsertError.message}` }, { status: 500 });
     }
 
-    const successUrl = new URL("/dashboard/settings?parasut=connected", request.nextUrl.origin);
-    const response   = NextResponse.redirect(successUrl);
+    // Relative Location — same-origin redirect; reverse proxy (Coolify Traefik)
+    // X-Forwarded-Host pass-through gerektirmez, request.nextUrl.origin container
+    // internal host'u (0.0.0.0:3000) verebiliyor.
+    const response = new NextResponse(null, {
+        status: 307,
+        headers: { Location: "/dashboard/settings?parasut=connected" },
+    });
     response.cookies.set("parasut_oauth_state", "", { maxAge: 0, path: "/" });
     return response;
 }

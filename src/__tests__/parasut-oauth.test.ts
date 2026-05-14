@@ -398,7 +398,8 @@ describe("GET /api/parasut/oauth/start", () => {
         const location = res.headers.get("location") ?? "";
         expect(location).toContain("/api/parasut/oauth/callback");
         expect(location).toContain("code=mock_code");
-        const locationUrl = new URL(location);
+        // Location relative ("/api/...?code=...&state=..."); base URL ile parse et
+        const locationUrl = new URL(location, "http://localhost");
         const stateParam = locationUrl.searchParams.get("state") ?? "";
         expect(stateParam).toBeTruthy();
 
