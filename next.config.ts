@@ -35,9 +35,12 @@ const nextConfig: NextConfig = {
                         value: "max-age=63072000; includeSubDomains; preload",
                     },
                     // L-1: Permissions-Policy
+                    // microphone=(self) — sesli üretim girişi (/dashboard/production) için
+                    // mikrofon kendi origin'imize açık; 3rd-party iframe'lere izin verilmez.
+                    // camera ve geolocation kapalı (bu uygulamada kullanılmıyor).
                     {
                         key: "Permissions-Policy",
-                        value: "camera=(), microphone=(), geolocation=()",
+                        value: "camera=(), microphone=(self), geolocation=()",
                     },
                 ],
             },
