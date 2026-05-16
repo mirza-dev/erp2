@@ -1,5 +1,0 @@
-{
-    "crons": [
-        { "path": "/api/ai/purchase-copilot", "schedule": "0 */6 * * *" }
-    ]
-}

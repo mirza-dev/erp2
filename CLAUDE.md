@@ -1,12 +1,25 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-13_
+_Son güncelleme: 2026-05-16_
 
-**Son tamamlanan iş:** Coolify Faz D smoke fix — reverse-proxy redirect bug (3 endpoint) (2026-05-14; 2599 test)
+**Son tamamlanan iş:** Coolify Faz D smoke — tüm otomatik kontroller yeşil (2026-05-16; 2599 test)
+
+**Faz D smoke tam durum:**
+- Staging URL: `https://erp.getmedspace.com` (sslip.io değil — Coolify'da yapılandırılan gerçek domain)
+- `/api/health` → 200 `{"status":"ok"}` ✅
+- `/login` → 200 ✅
+- `/dashboard` auth gate → 307 ✅
+- `/api/products` → 401 ✅
+- CSP / HSTS / Permissions-Policy / X-Frame-Options tüm header'lar ✅
+- `CRON_SECRET` set (değer: `kokpit-pmt-2026`) — 8 CRON endpoint 200 ✅
+- `/api/health?detail=true` — tüm required env + migration kontrolleri OK ✅ (`PARASUT_CLIENT_ID` optional, bekleniyor)
+- ⏳ Browser smoke: login + dashboard + vendors + purchase orders + products (kullanıcı tarafında)
+
+**Önceki:** Coolify Faz D smoke fix — reverse-proxy redirect bug (3 endpoint) (2026-05-14; 2599 test)
 
 **Faz D smoke fix (1 commit, 4 dosya):**
-- Staging Coolify deploy yeşil çalışıyor (`http://erp2.138.199.204.138.sslip.io`). Smoke testlerde 2 sorun yakalandı:
+- Staging Coolify deploy yeşil çalışıyor. Smoke testlerde 2 sorun yakalandı:
 - **Coolify Traefik X-Forwarded-Host pass-through eksik** → `new URL("/path", request.url)` veya `request.nextUrl.origin` container internal hostname'i (`0.0.0.0:3000`) veriyor → Location header public URL'e yönlendirmiyor. 3 endpoint etkileniyordu:
   - `/api/auth/demo` (Demo Gez → /dashboard)
   - `/api/parasut/oauth/start` (mock mode internal redirect)
@@ -21,7 +34,8 @@ _Son güncelleme: 2026-05-13_
 - ✅ /dashboard auth gate (307 → /login)
 - ✅ /api/products auth zorunlu (401)
 - ✅ CSP/HSTS/Permissions-Policy header'lar
-- ⚠️ **CRON_SECRET env Coolify'da set edilmedi/yanlış** — pure Bearer endpoint'ler hâlâ 401 (kullanıcı doğrulayacak)
+- ✅ CRON_SECRET set + 8 CRON endpoint 200 OK
+- ✅ /api/health?detail=true — tüm required checks OK
 - ⏳ Browser smoke: login + dashboard + vendors + purchase orders + products (kullanıcı tarafında)
 
 **Önceki:** Vercel → Coolify migration Faz A + cron workflow advisor fix (2026-05-13; 2599 test)
