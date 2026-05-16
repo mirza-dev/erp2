@@ -3,7 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-16_
 
-**Son tamamlanan iş:** Coolify Faz D smoke — tüm otomatik kontroller yeşil (2026-05-16; 2599 test)
+**Son tamamlanan iş:** Purchase&Alert Faz 5 — PO Mal Kabul (2026-05-16; 2610 test)
+
+**Faz 5 (1 commit, 6 dosya):**
+- **Migration 051** (`supabase/migrations/051_po_receive_rpc.sql`): `receive_po_lines(p_po_id, p_lines jsonb, p_actor)` RPC — `FOR UPDATE` lock (aşırı kabul önleme), her line için `received_qty` artış + `on_hand` artış + `inventory_movements` ('purchase_order' referans tipi) + `purchase_commitments.received_qty` senkronu (B1). PO header status auto-update: `partially_received` / `received`. `audit_log` her geçiş için. ROLLBACK SQL bloğu yorum olarak eklendi.
+- **`dbReceivePurchaseOrderLines`** (`purchase-orders.ts`): `ReceivePOLine` interface + `receive_po_lines` RPC wrapper helper.
+- **`serviceReceivePOLines`** (`purchase-order-service.ts`): RPC çağrısı + best-effort `POST /api/alerts/scan` fire-and-forget (mal kabul sonrası stok alertları güncellenir).
+- **`POST /api/purchase-orders/[id]/receive/route.ts`** (yeni): `requireRole(req, ['admin','purchaser'])` (B7); demo guard; body validation (line_id UUID regex, qty > 0 integer); 409 (wrong status), 404 (PO yok), 400 (validation), 200; `revalidateTag("purchase-orders", "max")` + `revalidateTag("products", "max")`.
+- **PO detail UI** (`/dashboard/purchase/orders/[id]/page.tsx`): `receiveMode` state + `handleReceive` handler. "Mal Kabul" butonu `confirmed | partially_received` durumlarında görünür. Her satır için kalan miktar input'u (max=remaining, "Tümü" toggle), aria-label, aria-live. Demo guard.
+- **Test (11 yeni, `po-receive.test.ts`):** helper RPC argümanları + hata propagation (2); route viewer→403, 404, 409 (draft status), qty=0→400, UUID→400, purchaser→200, revalidateTag (7); B1 kısmi/tam kabul çift sayım önleme (2).
+- 166 dosya · 2610 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Coolify Faz D smoke — tüm otomatik kontroller yeşil (2026-05-16; 2599 test)
 
 **Faz D smoke tam durum:**
 - Staging URL: `https://erp.getmedspace.com` (sslip.io değil — Coolify'da yapılandırılan gerçek domain)

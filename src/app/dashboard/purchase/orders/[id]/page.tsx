@@ -64,6 +64,9 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     const [actionBusy, setActionBusy] = useState<string | null>(null);
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState("");
+    const [receiveMode, setReceiveMode] = useState(false);
+    // line_id → qty to receive
+    const [receiveQtys, setReceiveQtys] = useState<Record<string, string>>({});
 
     const loadPO = useCallback(async () => {
         setLoading(true);
@@ -151,6 +154,42 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
         }
     };
 
+    const handleReceive = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!po) return;
+        const lines = po.lines
+            .map(l => ({ line_id: l.id, qty: parseInt(receiveQtys[l.id] ?? "0", 10) }))
+            .filter(l => l.qty > 0);
+        if (lines.length === 0) {
+            toast({ type: "error", message: "En az 1 satır için miktar giriniz." });
+            return;
+        }
+        setActionBusy("receive");
+        try {
+            const res = await fetch(`/api/purchase-orders/${id}/receive`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ lines }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const msg = res.status === 403
+                    ? "Mal kabul için admin veya satın alma yetkilisi gerekir."
+                    : data.error ?? "Mal kabul başarısız.";
+                toast({ type: "error", message: msg });
+                return;
+            }
+            toast({ type: "success", message: "Mal kabul kaydedildi." });
+            setReceiveMode(false);
+            setReceiveQtys({});
+            await loadPO();
+        } catch {
+            toast({ type: "error", message: "Beklenmeyen hata." });
+        } finally {
+            setActionBusy(null);
+        }
+    };
+
     if (loading) {
         return <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
             Yükleniyor...
@@ -166,6 +205,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     const isDraft = po.status === "draft";
     const isSent = po.status === "sent";
     const isCancelable = !["received", "cancelled"].includes(po.status);
+    const isReceivable = po.status === "confirmed" || po.status === "partially_received";
 
     return (
         <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
@@ -218,6 +258,21 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : "Bu siparişin satırlarını kopyalayarak yeni taslak"}
                             style={btnSecondary(isDemo)}>Düzenle</button>
                     )}
+                    {isReceivable && !receiveMode && (
+                        <button onClick={() => {
+                            setReceiveMode(true);
+                            // kalan miktarları varsayılan olarak doldur
+                            const defaults: Record<string, string> = {};
+                            for (const l of po.lines) {
+                                const rem = l.quantity - l.received_qty;
+                                if (rem > 0) defaults[l.id] = String(rem);
+                            }
+                            setReceiveQtys(defaults);
+                        }}
+                            disabled={isDemo || actionBusy !== null}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Mal kabul girişi"}
+                            style={btnPrimary(isDemo || actionBusy !== null)}>Mal Kabul</button>
+                    )}
                     {isCancelable && (
                         <button onClick={() => setCancelOpen(true)} disabled={isDemo}
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sipariş iptal (admin)"}
@@ -234,6 +289,77 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 <SummaryCard label="KDV" value={formatCurrency(po.vat_total, po.currency)} />
                 <SummaryCard label="Genel Toplam" value={formatCurrency(po.grand_total, po.currency)} highlight />
             </div>
+
+            {/* Mal Kabul modu */}
+            {receiveMode && (
+                <div role="region" aria-label="Mal kabul girişi" style={{
+                    background: "var(--bg-primary)", border: "0.5px solid var(--warning-border)",
+                    borderRadius: "8px", padding: "16px", marginBottom: "16px",
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                        <strong style={{ fontSize: "13px", color: "var(--warning-text)" }}>Mal Kabul Girişi</strong>
+                        <button onClick={() => { setReceiveMode(false); setReceiveQtys({}); }}
+                            style={btnSecondary(false)}>Vazgeç</button>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
+                        {po.lines.map(l => {
+                            const prod = productMap.get(l.product_id);
+                            const remaining = l.quantity - l.received_qty;
+                            if (remaining <= 0) return null;
+                            return (
+                                <div key={l.id} style={{
+                                    display: "flex", alignItems: "center", gap: "12px",
+                                    padding: "8px 10px", background: "var(--bg-secondary)",
+                                    borderRadius: "6px", border: "0.5px solid var(--border-tertiary)",
+                                }}>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                            {prod?.name ?? l.product_id}
+                                        </div>
+                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                            Kalan: {remaining} / Toplam: {l.quantity}
+                                        </div>
+                                    </div>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                        <label htmlFor={`recv-${l.id}`} style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                            Alınan:
+                                        </label>
+                                        <input
+                                            id={`recv-${l.id}`}
+                                            type="number"
+                                            min={0}
+                                            max={remaining}
+                                            value={receiveQtys[l.id] ?? ""}
+                                            onChange={e => setReceiveQtys(prev => ({ ...prev, [l.id]: e.target.value }))}
+                                            aria-label={`${prod?.name ?? "Satır"} alınan miktar`}
+                                            style={{
+                                                width: "80px", padding: "4px 8px", fontSize: "13px",
+                                                border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
+                                                background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                outline: "none", fontVariantNumeric: "tabular-nums",
+                                            }}
+                                        />
+                                        <button
+                                            onClick={() => setReceiveQtys(prev => ({ ...prev, [l.id]: String(remaining) }))}
+                                            style={{ fontSize: "11px", padding: "3px 8px", background: "transparent",
+                                                color: "var(--accent-text)", border: "0.5px solid var(--accent-border)",
+                                                borderRadius: "4px", cursor: "pointer" }}>
+                                            Tümü
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div aria-live="polite" />
+                    <button onClick={handleReceive}
+                        disabled={isDemo || actionBusy !== null}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        style={btnPrimary(isDemo || actionBusy !== null)}>
+                        {actionBusy === "receive" ? "Kaydediliyor..." : "Kabulü Kaydet"}
+                    </button>
+                </div>
+            )}
 
             {/* Lines table */}
             <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden", marginBottom: "16px" }}>

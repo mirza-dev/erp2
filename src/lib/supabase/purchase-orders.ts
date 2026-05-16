@@ -238,6 +238,26 @@ export function validatePoLines(raw: unknown): string | null {
     return null;
 }
 
+export interface ReceivePOLine {
+    line_id: string;
+    qty: number;
+}
+
+/** PO mal kabul — receive_po_lines RPC'ye delege (B1 senkronu, FOR UPDATE lock). */
+export async function dbReceivePurchaseOrderLines(
+    poId: string,
+    lines: ReceivePOLine[],
+    actor: string,
+): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase.rpc("receive_po_lines", {
+        p_po_id:  poId,
+        p_lines:  lines,
+        p_actor:  actor,
+    });
+    if (error) throw new Error(error.message);
+}
+
 export async function dbPatchPurchaseOrder(
     id: string,
     patch: { expected_date?: string | null; notes?: string | null; currency?: string },
