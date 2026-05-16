@@ -239,6 +239,8 @@ export interface SalesOrderRow {
     original_order_number: string | null
     quote_valid_until: string | null
     shipped_at: string | null
+    shipment_tracking_number: string | null
+    shipment_carrier: string | null
     parasut_invoice_series: string | null
     parasut_invoice_number_int: number | null
     parasut_invoice_no: string | null

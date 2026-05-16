@@ -45,10 +45,11 @@ function actionFor(alerts: AlertRow[]): { label: string; href: string } {
     const types = alerts.map((a) => a.type);
     // Faz 1: sync_issue defansif fallback (normal akışta SystemAlertCard üzerinden inline retry yapılır,
     // ürün gruplarından ayrı bölümde gösterilir; bu satır arşiv görünümü için yedek).
-    if (types.includes("sync_issue"))     return { label: "Paraşüt sayfasına git",  href: "/dashboard/parasut" };
-    if (types.includes("order_shortage")) return { label: "Siparişleri incele",     href: "/dashboard/orders" };
-    if (types.includes("stock_critical")) return { label: "Satın alma planla",      href: "/dashboard/purchase/suggested" };
-    if (types.includes("order_deadline")) return { label: "Satın alma planla",      href: "/dashboard/purchase/suggested" };
+    if (types.includes("sync_issue"))         return { label: "Paraşüt sayfasına git",  href: "/dashboard/parasut" };
+    if (types.includes("order_shortage"))     return { label: "Siparişleri incele",     href: "/dashboard/orders" };
+    if (types.includes("overdue_shipment"))   return { label: "Sevkiyatı yönet",        href: "/dashboard/orders" };
+    if (types.includes("stock_critical"))     return { label: "Satın alma planla",      href: "/dashboard/purchase/suggested" };
+    if (types.includes("order_deadline"))     return { label: "Satın alma planla",      href: "/dashboard/purchase/suggested" };
     return { label: "Stoku izle", href: "/dashboard/products" };
 }
 
@@ -896,6 +897,13 @@ export default function AlertsPage() {
                         ));
                         setDrawerOrderAlert(null);
                         toast({ type: "success", message: "Teklif süresi güncellendi ve uyarı kapatıldı." });
+                    }}
+                    onShipped={() => {
+                        setRawAlerts((prev) => prev.map((a) =>
+                            a.id === drawerOrderAlert.id ? { ...a, status: "resolved" as const } : a
+                        ));
+                        setDrawerOrderAlert(null);
+                        toast({ type: "success", message: "Sevkiyat kaydedildi ve uyarı kapatıldı." });
                     }}
                 />
             )}
@@ -1918,20 +1926,26 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
 }
 
 // ── OrderAlertDrawer (G6) ─────────────────────────────────────────────────────
-// Sipariş uyarısı detay paneli; quote_expired için "Süreyi Uzat" inline form
-// "ÖNERİLEN AKSİYON" bölümünde, diğer tiplerde sipariş linki gösterir.
+// Sipariş uyarısı detay paneli.
+// quote_expired → "Süreyi Uzat" inline form
+// overdue_shipment → inline ship form (Faz 7)
+// diğer tipler → sipariş linki
 
 interface OrderAlertDrawerProps {
     alert: AlertRow;
     isDemo: boolean;
     onClose: () => void;
     onExtended: () => void;
+    onShipped: () => void;
 }
 
-function OrderAlertDrawer({ alert, isDemo, onClose, onExtended }: OrderAlertDrawerProps) {
+function OrderAlertDrawer({ alert, isDemo, onClose, onExtended, onShipped }: OrderAlertDrawerProps) {
     const panelRef = useRef<HTMLDivElement>(null);
-    const isQuoteExpired = alert.type === "quote_expired";
+    const isQuoteExpired     = alert.type === "quote_expired";
+    const isOverdueShipment  = alert.type === "overdue_shipment";
     const todayStr = new Date().toISOString().slice(0, 10);
+
+    // quote_expired state
     const [newDate, setNewDate] = useState(() => {
         const d = new Date();
         d.setDate(d.getDate() + 30);
@@ -1939,6 +1953,13 @@ function OrderAlertDrawer({ alert, isDemo, onClose, onExtended }: OrderAlertDraw
     });
     const [extending, setExtending] = useState(false);
     const [extError, setExtError] = useState<string | null>(null);
+
+    // overdue_shipment state
+    const [shipDate, setShipDate]           = useState(todayStr);
+    const [trackingNumber, setTrackingNumber] = useState("");
+    const [carrier, setCarrier]             = useState("");
+    const [shipping, setShipping]           = useState(false);
+    const [shipError, setShipError]         = useState<string | null>(null);
 
     useEffect(() => {
         function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -1966,6 +1987,38 @@ function OrderAlertDrawer({ alert, isDemo, onClose, onExtended }: OrderAlertDraw
             setExtError(e instanceof Error ? e.message : "Süre uzatılamadı.");
         } finally {
             setExtending(false);
+        }
+    };
+
+    const handleShip = async () => {
+        if (isDemo || shipping) return;
+        if (!shipDate) { setShipError("Sevkiyat tarihi zorunludur."); return; }
+        setShipping(true);
+        setShipError(null);
+        try {
+            const body: Record<string, unknown> = { shipDate };
+            if (trackingNumber.trim()) body.trackingNumber = trackingNumber.trim();
+            if (carrier.trim()) body.carrier = carrier.trim();
+            const res = await fetch(`/api/orders/${alert.entity_id}/ship`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json.error || `HTTP ${res.status}`);
+            }
+            // Resolve alert (best-effort; drawer closing shows success regardless)
+            await fetch(`/api/alerts/${alert.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "resolved" }),
+            }).catch(() => undefined);
+            onShipped();
+        } catch (e) {
+            setShipError(e instanceof Error ? e.message : "Sevkiyat kaydedilemedi.");
+        } finally {
+            setShipping(false);
         }
     };
 
@@ -2044,7 +2097,7 @@ function OrderAlertDrawer({ alert, isDemo, onClose, onExtended }: OrderAlertDraw
                                         }}
                                     />
                                     {extError && (
-                                        <span style={{ fontSize: "11px", color: "var(--danger-text)" }}>{extError}</span>
+                                        <span role="alert" aria-live="polite" style={{ fontSize: "11px", color: "var(--danger-text)" }}>{extError}</span>
                                     )}
                                     <button
                                         onClick={handleExtend}
@@ -2060,6 +2113,106 @@ function OrderAlertDrawer({ alert, isDemo, onClose, onExtended }: OrderAlertDraw
                                         }}
                                     >
                                         {extending ? "Uzatılıyor..." : "Süreyi Uzat"}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : isOverdueShipment ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                                    Sevkiyat bilgilerini girerek bu siparişi sevk edilmiş olarak işaretleyebilirsiniz.
+                                </p>
+                                <div style={{
+                                    padding: "12px 14px", background: "var(--bg-secondary)",
+                                    border: "0.5px solid var(--border-tertiary)", borderRadius: "6px",
+                                    display: "flex", flexDirection: "column", gap: "10px",
+                                }}>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                        <label
+                                            htmlFor="drawer-ship-date"
+                                            style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}
+                                        >
+                                            SEVKİYAT TARİHİ
+                                        </label>
+                                        <input
+                                            id="drawer-ship-date"
+                                            type="date"
+                                            aria-label="Sevkiyat tarihi"
+                                            value={shipDate}
+                                            onChange={e => { setShipDate(e.target.value); setShipError(null); }}
+                                            disabled={isDemo || shipping}
+                                            style={{
+                                                fontSize: "13px", padding: "7px 10px",
+                                                border: "0.5px solid var(--border-secondary)",
+                                                borderRadius: "4px", background: "var(--bg-primary)",
+                                                color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
+                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                        <label
+                                            htmlFor="drawer-tracking"
+                                            style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}
+                                        >
+                                            TAKİP NUMARASI <span style={{ fontWeight: 400 }}>(opsiyonel)</span>
+                                        </label>
+                                        <input
+                                            id="drawer-tracking"
+                                            type="text"
+                                            aria-label="Takip numarası"
+                                            placeholder="ör. 1Z999AA10123456784"
+                                            value={trackingNumber}
+                                            onChange={e => { setTrackingNumber(e.target.value); setShipError(null); }}
+                                            disabled={isDemo || shipping}
+                                            maxLength={100}
+                                            style={{
+                                                fontSize: "13px", padding: "7px 10px",
+                                                border: "0.5px solid var(--border-secondary)",
+                                                borderRadius: "4px", background: "var(--bg-primary)",
+                                                color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
+                                            }}
+                                        />
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                        <label
+                                            htmlFor="drawer-carrier"
+                                            style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}
+                                        >
+                                            KARGO FİRMASI <span style={{ fontWeight: 400 }}>(opsiyonel)</span>
+                                        </label>
+                                        <input
+                                            id="drawer-carrier"
+                                            type="text"
+                                            aria-label="Kargo firması"
+                                            placeholder="ör. UPS, DHL, MNG Kargo"
+                                            value={carrier}
+                                            onChange={e => { setCarrier(e.target.value); setShipError(null); }}
+                                            disabled={isDemo || shipping}
+                                            maxLength={100}
+                                            style={{
+                                                fontSize: "13px", padding: "7px 10px",
+                                                border: "0.5px solid var(--border-secondary)",
+                                                borderRadius: "4px", background: "var(--bg-primary)",
+                                                color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
+                                            }}
+                                        />
+                                    </div>
+                                    {shipError && (
+                                        <span role="alert" aria-live="polite" style={{ fontSize: "11px", color: "var(--danger-text)" }}>{shipError}</span>
+                                    )}
+                                    <button
+                                        onClick={handleShip}
+                                        disabled={isDemo || shipping}
+                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                                        style={{
+                                            fontSize: "13px", fontWeight: 600, padding: "8px 14px",
+                                            border: "0.5px solid var(--accent-border)",
+                                            borderRadius: "5px", background: "var(--accent-bg)",
+                                            color: "var(--accent-text)",
+                                            cursor: (isDemo || shipping) ? "not-allowed" : "pointer",
+                                            opacity: (isDemo || shipping) ? 0.6 : 1,
+                                        }}
+                                    >
+                                        {shipping ? "Kaydediliyor..." : "Sevk Et"}
                                     </button>
                                 </div>
                             </div>

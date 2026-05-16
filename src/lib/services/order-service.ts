@@ -33,6 +33,12 @@ import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 
 export type OrderTransition = CommercialStatus | "shipped";
 
+export interface ShipMeta {
+    shipDate?: string;           // ISO "YYYY-MM-DD"; verilmezse new Date()
+    trackingNumber?: string | null;
+    carrier?: string | null;
+}
+
 export interface ShortageInfo {
     product_name: string;
     requested: number;
@@ -179,7 +185,8 @@ export async function preflightShipment(order: OrderWithLines): Promise<Prefligh
 
 export async function serviceTransitionOrder(
     orderId: string,
-    transition: OrderTransition
+    transition: OrderTransition,
+    shipMeta?: ShipMeta,
 ): Promise<TransitionResult> {
 
     // ── draft → pending_approval (simple status update, no stock effect) ──
@@ -243,11 +250,18 @@ export async function serviceTransitionOrder(
         const result = await dbShipOrderFull(orderId);
         if (result.success) {
             // shipped_at her zaman yazılır (Paraşüt'ten bağımsız — sevk tarihi kanonik kaynak).
+            // shipMeta varsa kullanıcının seçtiği tarih; yoksa now().
             // parasut_step='contact' yalnızca Paraşüt aktifken (sync başlangıç durumu).
             // Hata yutulmaz: stok hareketi yapılmış olsa da bu yazım başarısızsa Paraşüt sync
             // doğru başlangıç state'ine gelemez → caller'a explicit error iletilir.
             const supabase = createServiceClient();
-            const patch: Record<string, unknown> = { shipped_at: new Date().toISOString() };
+            const patch: Record<string, unknown> = {
+                shipped_at: shipMeta?.shipDate
+                    ? new Date(`${shipMeta.shipDate}T12:00:00Z`).toISOString()
+                    : new Date().toISOString(),
+                shipment_tracking_number: shipMeta?.trackingNumber ?? null,
+                shipment_carrier:         shipMeta?.carrier        ?? null,
+            };
             if (process.env.PARASUT_ENABLED === "true") {
                 patch.parasut_step = "contact";
             }

@@ -3,7 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-16_
 
-**Son tamamlanan iş:** Faz 6 Kapanış — unit_price=0 bug fix + linkedPOs shape regression testleri (2026-05-16; 2629 test)
+**Son tamamlanan iş:** Faz 7 — overdue_shipment alert inline ship form (2026-05-16; 2641 test)
+
+**Faz 7 (1 commit, 6 dosya + 1 migration):**
+- **Migration 053** (`supabase/migrations/053_orders_ship_meta.sql`): `sales_orders.shipment_tracking_number TEXT NULL` + `shipment_carrier TEXT NULL`. Idempotent, ROLLBACK SQL yorum bloğu.
+- **`database.types.ts`**: `SalesOrderRow`'a 2 yeni alan.
+- **`ShipMeta` interface + `serviceTransitionOrder` genişletme** (`order-service.ts`): 3. opsiyonel param `shipMeta?: { shipDate?, trackingNumber?, carrier? }`. Shipped branch patch'i: `shipped_at` override + `shipment_tracking_number` + `shipment_carrier` persist. Geriye uyumlu (mevcut callers shipMeta undefined → eski davranış).
+- **Yeni `POST /api/orders/[id]/ship`** endpoint (`src/app/api/orders/[id]/ship/route.ts`): body validation (shipDate ISO format zorunlu; trackingNumber/carrier max 100 char opsiyonel); `serviceTransitionOrder(id, "shipped", shipMeta)` çağrısı; Paraşüt sync + email notification fire-and-forget; `revalidateTag("products","max")`.
+- **`/dashboard/alerts` güncellemesi** (`page.tsx`): `actionFor()` `overdue_shipment` case eklendi (plan §9.4.1 — "Sevkiyatı yönet" + "/dashboard/orders"). `OrderAlertDrawer`: `onShipped` callback prop, `isOverdueShipment` branch, inline ship form (shipDate/trackingNumber/carrier state, `handleShip` handler, demo guard, `aria-label` + `role="alert"` error, "Sevk Et" butonu). Best-effort alert PATCH resolve.
+- **Test (`alerts-overdue-ship.test.ts`, 12 test):** 8 endpoint testi (shipDate eksik/geçersiz/trackingNumber uzun/carrier uzun/sipariş yok/approved değil/happy path + ShipMeta/Paraşüt sync) + 4 source-regression (actionFor case + drawer markup + onShipped prop).
+- 168 dosya · 2641 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 6 Kapanış — unit_price=0 bug fix + linkedPOs shape regression testleri (2026-05-16; 2629 test)
 
 **Faz 6 Kapanış (1 commit, 4 dosya):**
 - **P2 BUG FIX — unit_price=0 Modal bypass kapatıldı**: `PurchaseOrderModal.tsx` + `from-recommendations/route.ts` + `validatePoLines` içindeki `price < 0` guard'ları `price <= 0` yapıldı. Modal `Number("")=0` dönüştürmesi ile 0 TRY siparişi DB'ye yazılabiliyordu; backend artık 0'ı da reddediyor.
