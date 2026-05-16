@@ -258,6 +258,47 @@ export async function dbReceivePurchaseOrderLines(
     if (error) throw new Error(error.message);
 }
 
+export interface LinkedPO {
+    id: string;
+    po_number: string;
+    status: PurchaseOrderStatus;
+}
+
+export async function dbGetPOsByRecommendationIds(
+    recIds: string[],
+): Promise<Map<string, LinkedPO[]>> {
+    if (recIds.length === 0) return new Map();
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("po_line_recommendations")
+        .select("recommendation_id, purchase_order_lines!inner(purchase_orders!inner(id, po_number, status))")
+        .in("recommendation_id", recIds);
+    if (error) throw new Error(error.message);
+    const map = new Map<string, LinkedPO[]>();
+    for (const row of (data ?? []) as unknown as Array<{
+        recommendation_id: string;
+        // PostgREST many-to-one: FK direction → singular object at runtime, but TS types say array
+        purchase_order_lines:
+            | { purchase_orders: LinkedPO | LinkedPO[] }
+            | Array<{ purchase_orders: LinkedPO | LinkedPO[] }>
+            | null;
+    }>) {
+        const polArr = Array.isArray(row.purchase_order_lines)
+            ? row.purchase_order_lines
+            : row.purchase_order_lines ? [row.purchase_order_lines] : [];
+        for (const pol of polArr) {
+            const poVal = pol?.purchase_orders;
+            const pos: LinkedPO[] = Array.isArray(poVal) ? poVal : poVal ? [poVal] : [];
+            for (const po of pos) {
+                const list = map.get(row.recommendation_id) ?? [];
+                if (!list.some(p => p.id === po.id)) list.push(po);
+                map.set(row.recommendation_id, list);
+            }
+        }
+    }
+    return map;
+}
+
 export async function dbPatchPurchaseOrder(
     id: string,
     patch: { expected_date?: string | null; notes?: string | null; currency?: string },

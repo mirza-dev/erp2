@@ -34,6 +34,7 @@ export interface Product {
     warehouse: string;
     reorderQty?: number;
     preferredVendor?: string;
+    preferredVendorId?: string | null;
     dailyUsage?: number;
     leadTimeDays?: number;
     productFamily?: string;

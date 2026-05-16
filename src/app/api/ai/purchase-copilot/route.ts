@@ -20,6 +20,7 @@ import {
     dbUpdateRecommendationMetadata,
     dbUpdateSuggestedRecommendation,
 } from "@/lib/supabase/recommendations";
+import { dbGetPOsByRecommendationIds, type LinkedPO } from "@/lib/supabase/purchase-orders";
 import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
@@ -522,8 +523,24 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         // her render'da güncel computeSuggestion yerine bu değeri gösterir;
         // backend "frozen" niyeti UI'a aktarılır. Suggested rec'lerde null.
         frozenSuggestQty: number | null;
+        // Faz 6 M2: bu rec'e bağlı PO'lar (junction üzerinden reverse lookup).
+        linkedPOs: LinkedPO[];
     };
     const recommendations: RecRef[] = [];
+
+    // Faz 6: junction reverse lookup — tüm aktif rec ID'leri için PO bağlantısı.
+    let linkedPOMap = new Map<string, LinkedPO[]>();
+    try {
+        const allRecIds = [
+            ...Array.from(suggestedRecMap.values()).map(r => r.id),
+            ...Array.from(decidedRecMap.values()).map(r => r.id),
+        ];
+        if (allRecIds.length > 0) {
+            linkedPOMap = await dbGetPOsByRecommendationIds(allRecIds);
+        }
+    } catch {
+        // non-fatal — reverse link eksik kalır ama ana akış etkilenmez
+    }
 
     try {
         // Tüm ürünler stok üstüne çıkıp activeProductIds=[] olursa
@@ -600,9 +617,9 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                     model_version: aiAvailable ? "purchase-copilot-v1" : null,
                     metadata: m.metadata,
                 });
-                return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at, editedMetadata: null, currentDrift: null, frozenSuggestQty: null } as RecRef;
+                return { productId: item.productId, recommendationId: rec.id, status: rec.status, decidedAt: rec.decided_at, editedMetadata: null, currentDrift: null, frozenSuggestQty: null, linkedPOs: linkedPOMap.get(rec.id) ?? [] } as RecRef;
             } catch {
-                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null, frozenSuggestQty: null } as RecRef;
+                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null, frozenSuggestQty: null, linkedPOs: [] } as RecRef;
             }
         });
 
@@ -622,10 +639,10 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                     model_version: aiAvailable ? "purchase-copilot-v1" : null,
                     metadata: m.metadata,
                 });
-                return { productId: item.productId, recommendationId: updated.id, status: updated.status, decidedAt: updated.decided_at, editedMetadata: null, currentDrift: null, frozenSuggestQty: null } as RecRef;
+                return { productId: item.productId, recommendationId: updated.id, status: updated.status, decidedAt: updated.decided_at, editedMetadata: null, currentDrift: null, frozenSuggestQty: null, linkedPOs: linkedPOMap.get(updated.id) ?? [] } as RecRef;
             } catch (err) {
                 console.error("[purchase-copilot] levelChanged update failed", item.productId, err);
-                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null, frozenSuggestQty: null } as RecRef;
+                return { productId: item.productId, recommendationId: null, status: "error", decidedAt: null, editedMetadata: null, currentDrift: null, frozenSuggestQty: null, linkedPOs: [] } as RecRef;
             }
         });
 
@@ -640,6 +657,7 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                 editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
                 currentDrift: null,
                 frozenSuggestQty: null,
+                linkedPOs: linkedPOMap.get(rec.id) ?? [],
             };
         });
 
@@ -663,6 +681,7 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
                     editedMetadata: rec.edited_metadata as Record<string, unknown> | null,
                     currentDrift: driftMap.get(productId) ?? null,
                     frozenSuggestQty: frozen,
+                    linkedPOs: linkedPOMap.get(rec.id) ?? [],
                 };
             });
 

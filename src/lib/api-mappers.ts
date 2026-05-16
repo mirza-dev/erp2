@@ -56,6 +56,7 @@ export function mapProduct(row: ProductWithStock): Product {
     warehouse: row.warehouse ?? "",
     reorderQty: row.reorder_qty ?? undefined,
     preferredVendor: row.preferred_vendor ?? undefined,
+    preferredVendorId: row.preferred_vendor_id ?? null,
     dailyUsage: row.daily_usage ?? undefined,
     leadTimeDays: row.lead_time_days ?? undefined,
     productFamily: row.product_family ?? undefined,

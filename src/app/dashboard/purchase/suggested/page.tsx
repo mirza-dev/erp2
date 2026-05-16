@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import { formatCurrency } from "@/lib/utils";
 import { computeOrderTotals, scheduleRefetchAfterMutation, shouldSkipAiFetch } from "@/lib/purchase-utils";
+import PurchaseOrderModal, { type ModalItem, type VendorOption, type PoModalMode } from "@/components/purchase/PurchaseOrderModal";
+import type { LinkedPO } from "@/lib/supabase/purchase-orders";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -32,6 +34,8 @@ interface RecEntry {
      *  accepted/rejected ürünlerde UI bu değeri gösterir; edited durumda
      *  editedQty önceliklidir. Suggested ya da legacy rec'lerde null. */
     frozenSuggestQty?: number | null;
+    /** Faz 6: junction üzerinden reverse lookup — bu rec'e bağlı PO'lar. */
+    linkedPOs?: LinkedPO[];
 }
 
 /**
@@ -60,6 +64,15 @@ const URGENCY_LABEL: Record<UrgencyLevel, string> = {
     critical: "Kritik",
     high: "Yüksek",
     moderate: "Orta",
+};
+
+const PO_STATUS_LABELS: Record<string, string> = {
+    draft: "Taslak",
+    sent: "Gönderildi",
+    confirmed: "Onaylandı",
+    partially_received: "Kısmi Kabul",
+    received: "Tamamlandı",
+    cancelled: "İptal",
 };
 
 /** G11: Decided rec'lerde stok/aciliyet drift'i varsa gösterilen rozet. */
@@ -327,6 +340,7 @@ function RecActionCell({
     onReject,
     onEdit,
     onUndo,
+    onOpenPoModal,
     isDemo,
 }: {
     productId: string;
@@ -337,6 +351,7 @@ function RecActionCell({
     onReject: (productId: string, feedbackNote?: string) => void;
     onEdit: (productId: string, qty: number, unit: string) => void;
     onUndo: (productId: string) => void;
+    onOpenPoModal?: (productId: string) => void;
     isDemo?: boolean;
 }) {
     const [editMode, setEditMode] = useState(false);
@@ -366,6 +381,49 @@ function RecActionCell({
     const drift = recEntry?.currentDrift ?? null;
     const driftBadge = drift ? <StaleDriftBadge drift={drift} unit={unit} /> : null;
 
+    const linkedPOs = recEntry?.linkedPOs ?? [];
+    const linkedPosEl = linkedPOs.length > 0 ? (
+        <div style={{ marginTop: "4px" }}>
+            {linkedPOs.map(po => (
+                <a
+                    key={po.id}
+                    href={`/dashboard/purchase/orders/${po.id}`}
+                    style={{ display: "block", fontSize: "11px", color: "var(--accent-text)", textDecoration: "underline", marginTop: "2px" }}
+                >
+                    PO #{po.po_number} ({PO_STATUS_LABELS[po.status] ?? po.status})
+                </a>
+            ))}
+        </div>
+    ) : null;
+
+    const hasActivePO = linkedPOs.some(po => po.status !== "cancelled");
+    const openPoButton = onOpenPoModal ? (
+        <button
+            onClick={() => onOpenPoModal(productId)}
+            disabled={isDemo || hasActivePO}
+            title={
+                isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın."
+                : hasActivePO ? "Zaten aktif siparişe bağlı — yeniden sipariş için mevcut siparişi iptal edin."
+                : "Bu öneriden satın alma siparişi oluştur"
+            }
+            style={{
+                display: "block",
+                marginTop: "4px",
+                fontSize: "10px",
+                color: "var(--accent-text)",
+                background: "none",
+                border: "none",
+                cursor: (isDemo || hasActivePO) ? "not-allowed" : "pointer",
+                textDecoration: "underline",
+                padding: 0,
+                opacity: (isDemo || hasActivePO) ? 0.5 : 1,
+            }}
+            aria-label="Satın alma siparişi oluştur"
+        >
+            📋 Sipariş Aç
+        </button>
+    ) : null;
+
     if (status === "accepted") {
         return (
             <div>
@@ -377,6 +435,8 @@ function RecActionCell({
                     ✓ Kabul Edildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
                 </span>
                 {driftBadge}
+                {linkedPosEl}
+                {openPoButton}
                 {undoButton}
             </div>
         );
@@ -394,6 +454,8 @@ function RecActionCell({
                     ✎ Düzenlendi{editedQty != null ? `: ${editedQty} ${unit}` : ""}{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
                 </span>
                 {driftBadge}
+                {linkedPosEl}
+                {openPoButton}
                 {undoButton}
             </div>
         );
@@ -409,6 +471,7 @@ function RecActionCell({
                     ✕ Reddedildi{decidedTime && <span style={{ fontWeight: 400, opacity: 0.7, marginLeft: "4px" }}>{decidedTime}</span>}
                 </span>
                 {driftBadge}
+                {linkedPosEl}
                 {undoButton}
             </div>
         );
@@ -558,6 +621,22 @@ function RecActionCell({
             >
                 Reddet
             </button>
+            {onOpenPoModal && (
+                <button
+                    onClick={() => onOpenPoModal(productId)}
+                    disabled={isDemo}
+                    title={isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın." : "Bu öneriden satın alma siparişi oluştur"}
+                    style={{
+                        fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
+                        background: "var(--bg-secondary)", color: "var(--text-secondary)",
+                        border: "0.5px solid var(--border-secondary)", cursor: isDemo ? "not-allowed" : "pointer",
+                        opacity: isDemo ? 0.5 : 1,
+                    }}
+                    aria-label="Satın alma siparişi oluştur"
+                >
+                    📋 Sipariş Aç
+                </button>
+            )}
         </div>
     );
 }
@@ -583,6 +662,7 @@ export default function PurchaseSuggestedPage() {
             editedMetadata?: Record<string, unknown> | null;
             currentDrift?: { suggestQty: number; urgencyLevel: UrgencyLevel } | null;
             frozenSuggestQty?: number | null;
+            linkedPOs?: LinkedPO[];
         }>;
         generatedAt?: string;
     } | null>(null);
@@ -607,6 +687,34 @@ export default function PurchaseSuggestedPage() {
             .catch(() => { /* best-effort: hata → 0 default */ });
         return () => ctrl.abort();
     }, []);
+
+    const [vendors, setVendors] = useState<VendorOption[]>([]);
+    useEffect(() => {
+        fetch("/api/vendors?isActive=true")
+            .then(r => r.ok ? r.json() : [])
+            .then((data: Array<Record<string, unknown>>) => setVendors(
+                Array.isArray(data) ? data.map(v => ({
+                    id: v.id as string,
+                    name: v.name as string,
+                    currency: (v.currency as string) ?? "TRY",
+                    lead_time_days: v.lead_time_days as number | null | undefined,
+                })) : []
+            ))
+            .catch(() => {});
+    }, []);
+
+    const [poModalState, setPoModalState] = useState<{
+        open: boolean;
+        mode: PoModalMode;
+        items: ModalItem[];
+        lockedVendorId?: string;
+    }>({ open: false, mode: "single", items: [] });
+
+    const [_bulkQueue, setBulkQueue] = useState<Array<{
+        mode: PoModalMode;
+        items: ModalItem[];
+        lockedVendorId?: string;
+    }>>([]);
 
     const loadAiData = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
         // Sprint C G7: demo modda AI POST yapma — middleware 403 dönüyor ve sessiz
@@ -640,6 +748,7 @@ export default function PurchaseSuggestedPage() {
                                 decidedAt: r.decidedAt ?? null,
                                 currentDrift: r.currentDrift ?? null,
                                 frozenSuggestQty: r.frozenSuggestQty ?? null,
+                                linkedPOs: r.linkedPOs ?? [],
                                 ...(editedQty != null && { editedQty }),
                             });
                         }
@@ -976,6 +1085,91 @@ export default function PurchaseSuggestedPage() {
         return !st || st === "suggested";
     }).length;
 
+    // PO'lanmış rec'ler (aktif PO'su olan) bulk akışından dışlanır — duplicate PO önleme
+    const acceptedAndEditedCount = [...recMap.entries()].filter(
+        ([id, r]) =>
+            displayIds.has(id) &&
+            (r.status === "accepted" || r.status === "edited") &&
+            !(r.linkedPOs ?? []).some(po => po.status !== "cancelled")
+    ).length;
+
+    const handleOpenPoModal = useCallback((productId: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        const p = products.find(prod => prod.id === productId);
+        const rec = recMap.get(productId);
+        if (!p || !rec) return;
+        const suggestQty = selectDisplaySuggestQty(rec, computeSuggestion(p).suggestQty);
+        setPoModalState({
+            open: true,
+            mode: "single",
+            items: [{
+                productId,
+                recommendationId: rec.id,
+                productName: p.name,
+                sku: p.sku,
+                unit: p.unit,
+                suggestQty,
+                unitPrice: p.costPrice ?? p.price ?? 0,
+                leadTimeDays: p.leadTimeDays ?? null,
+                preferredVendorId: p.preferredVendorId ?? null,
+            }],
+        });
+    }, [products, recMap, isDemo, toast]);
+
+    const advanceBulkQueue = useCallback(() => {
+        setBulkQueue(q => {
+            if (q.length === 0) return q;
+            const [next, ...rest] = q;
+            setPoModalState({ open: true, mode: next.mode, items: next.items, lockedVendorId: next.lockedVendorId });
+            return rest;
+        });
+    }, []);
+
+    const handleBulkPo = useCallback(() => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        const acceptedAndEdited = [...recMap.entries()].filter(
+            ([id, r]) =>
+                displayIds.has(id) &&
+                (r.status === "accepted" || r.status === "edited") &&
+                !(r.linkedPOs ?? []).some(po => po.status !== "cancelled")
+        );
+        if (acceptedAndEdited.length === 0) return;
+
+        const vendorGroups = new Map<string | null, ModalItem[]>();
+        for (const [productId, rec] of acceptedAndEdited) {
+            const p = products.find(prod => prod.id === productId);
+            if (!p) continue;
+            const suggestQty = selectDisplaySuggestQty(rec, computeSuggestion(p).suggestQty);
+            const item: ModalItem = {
+                productId,
+                recommendationId: rec.id,
+                productName: p.name,
+                sku: p.sku,
+                unit: p.unit,
+                suggestQty,
+                unitPrice: p.costPrice ?? p.price ?? 0,
+                leadTimeDays: p.leadTimeDays ?? null,
+                preferredVendorId: p.preferredVendorId ?? null,
+            };
+            const vendorKey = p.preferredVendorId ?? null;
+            const group = vendorGroups.get(vendorKey) ?? [];
+            group.push(item);
+            vendorGroups.set(vendorKey, group);
+        }
+
+        const queue: Array<{ mode: PoModalMode; items: ModalItem[]; lockedVendorId?: string }> = [];
+        for (const [vendorId, items] of vendorGroups.entries()) {
+            if (vendorId !== null) queue.push({ mode: "bulk-vendor", items, lockedVendorId: vendorId });
+        }
+        const orphans = vendorGroups.get(null);
+        if (orphans && orphans.length > 0) queue.push({ mode: "bulk-orphan", items: orphans });
+
+        if (queue.length === 0) return;
+        const [first, ...rest] = queue;
+        setPoModalState({ open: true, mode: first.mode, items: first.items, lockedVendorId: first.lockedVendorId });
+        setBulkQueue(rest);
+    }, [isDemo, toast, recMap, displayIds, products]);
+
     return (
         <div style={{ padding: "24px 32px" }}>
             {/* Header */}
@@ -1208,6 +1402,46 @@ export default function PurchaseSuggestedPage() {
                 </div>
             )}
 
+            {/* Faz 6: Bulk CTA — kabul/düzenlenen öneri varsa tek tıkla siparişe çevir */}
+            {acceptedAndEditedCount > 0 && (
+                <div style={{
+                    marginTop: "16px",
+                    padding: "10px 16px",
+                    background: "var(--accent-bg)",
+                    border: "0.5px solid var(--accent-border)",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                }}>
+                    <span style={{ fontSize: "13px", color: "var(--accent-text)" }}>
+                        {acceptedAndEditedCount} kabul/düzenlenen öneri siparişe dönüştürülmeyi bekliyor.
+                    </span>
+                    <button
+                        onClick={handleBulkPo}
+                        disabled={isDemo}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Kabul/düzenlenen tüm önerileri siparişe çevir"}
+                        aria-label={`${acceptedAndEditedCount} öneriyi siparişe çevir`}
+                        style={{
+                            padding: "6px 14px",
+                            fontSize: "12px",
+                            fontWeight: 600,
+                            background: isDemo ? "var(--bg-secondary)" : "var(--accent)",
+                            color: isDemo ? "var(--text-tertiary)" : "#fff",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: isDemo ? "not-allowed" : "pointer",
+                            opacity: isDemo ? 0.5 : 1,
+                            flexShrink: 0,
+                        }}
+                    >
+                        📋 Siparişe Çevir ({acceptedAndEditedCount})
+                    </button>
+                </div>
+            )}
+
             {/* Filter tabs + Arama */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "20px", flexWrap: "wrap" }}>
                 <input
@@ -1391,6 +1625,7 @@ export default function PurchaseSuggestedPage() {
                                         onReject={handleReject}
                                         onEdit={handleEdit}
                                         onUndo={handleUndo}
+                                        onOpenPoModal={handleOpenPoModal}
                                         isDemo={isDemo}
                                     />
                                 </div>
@@ -1586,6 +1821,7 @@ export default function PurchaseSuggestedPage() {
                                                 onReject={handleReject}
                                                 onEdit={handleEdit}
                                                 onUndo={handleUndo}
+                                                onOpenPoModal={handleOpenPoModal}
                                                 isDemo={isDemo}
                                             />
                                         </td>
@@ -1762,6 +1998,7 @@ export default function PurchaseSuggestedPage() {
                                     onReject={handleReject}
                                     onEdit={handleEdit}
                                     onUndo={handleUndo}
+                                    onOpenPoModal={handleOpenPoModal}
                                     isDemo={isDemo}
                                 />
                             </div>
@@ -1773,6 +2010,28 @@ export default function PurchaseSuggestedPage() {
                     </div>
                 )}
             </AIDetailDrawer>
+
+            {/* Faz 6: PO oluşturma modalı — tek satır + bulk akışı */}
+            {poModalState.open && (
+                <PurchaseOrderModal
+                    open
+                    onClose={() => setPoModalState(s => ({ ...s, open: false }))}
+                    mode={poModalState.mode}
+                    initialItems={poModalState.items}
+                    vendors={vendors}
+                    lockedVendorId={poModalState.lockedVendorId}
+                    onSuccess={(poId, poNumber) => {
+                        toast({
+                            type: "success",
+                            message: `Sipariş oluşturuldu: ${poNumber}`,
+                            action: { label: "Siparişe git", href: `/dashboard/purchase/orders/${poId}` },
+                        });
+                        setPoModalState(s => ({ ...s, open: false }));
+                        void loadAiData();
+                        advanceBulkQueue();
+                    }}
+                />
+            )}
         </div>
     );
 }

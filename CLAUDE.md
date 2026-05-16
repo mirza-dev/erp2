@@ -3,7 +3,30 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-16_
 
-**Son tamamlanan iş:** Purchase&Alert Faz 5 — PO Mal Kabul (2026-05-16; 2610 test)
+**Son tamamlanan iş:** Purchase&Alert Faz 6 Bulgular 1. Tur — duplicate guard + shape normalize + silent zero + UX (2026-05-16; 2626 test)
+
+**Faz 6 Bulgular 1. Tur (1 commit, 6 dosya):**
+- **P2.1 Duplicate PO guard** — 3 katmanlı: (1) service-side (`serviceCreatePOFromRecommendations`'da `dbGetPOsByRecommendationIds` kontrolü; cancelled PO bypass; "aktif siparişe bağlı" throw), (2) UI-side (`RecActionCell` `hasActivePO` guard; `disabled={isDemo || hasActivePO}`; tooltip), (3) bulk filter (`acceptedAndEditedCount` + `handleBulkPo` aktif PO'lu rec'leri dışlar).
+- **P2.2 Response shape normalize** (`dbGetPOsByRecommendationIds`): PostgREST many-to-one select object veya array dönebilir; her iki shape defensive handle edildi (polArr + pos array normalization). Canlı sessiz boş Map riski kapatıldı.
+- **P2.3 Silent zero reject** (`from-recommendations/route.ts`): `quantity` ve `unit_price` için `null`/`undefined`/`""` explicit reject eklendi (`Number(null)===0` tuzağı). `discount_pct === ""` reject. Catch block'a `"aktif siparişe bağlı"` → 400 eklendi.
+- **P3.4 Service direkt testler** (3): `vi.importActual` ile gerçek `serviceCreatePOFromRecommendations`; `@/lib/supabase/recommendations` modül mock'u eklendi (`mockDbListRecs`, `mockDbUpdateRecStatus`). qty=suggestQty→accepted, qty≠suggestQty→edited, aktif PO→throw.
+- **P3.4 Silent zero test coverage** (2): `unit_price: null → 400`, `unit_price: "" → 400`.
+- **P3.4 Toast action prop** (`Toast.tsx`): opsiyonel `action?: { label: string; href: string }` alanı; render'da link. Geriye uyumlu.
+- **P3.4 "Siparişe git" toast action** (`suggested/page.tsx` `onSuccess`): başarılı PO toast'ına `action: { label: "Siparişe git", href: /dashboard/purchase/orders/${poId} }`.
+- 167 dosya · 2626 test yeşil · TS clean · 0 lint warning · build OK
+
+**Faz 6 (1 commit, 9 dosya):**
+- **`dbGetPOsByRecommendationIds`** (`purchase-orders.ts`): `LinkedPO` interface + junction reverse lookup helper (`po_line_recommendations → purchase_order_lines → purchase_orders`; single `.in()` query, JS-side PO dedup). Type cast `unknown` ile Supabase nested array uyumu sağlandı.
+- **`serviceCreatePOFromRecommendations`** (`purchase-order-service.ts`): rec doğrulama (statusIn: suggested/accepted/edited, rec type=purchase_suggestion, entity_type=product) + `dbCreatePurchaseOrder` RPC çağrısı (`source_recommendation_ids: [recId]` ile junction atomik insert) + best-effort suggested→accepted/edited status patch (try/catch; PO atomik, patch fail izlenebilir).
+- **`POST /api/purchase-orders/from-recommendations`** (yeni route): `requireRole(["admin","purchaser"])`, vendor_id UUID validation, currency whitelist (TRY/USD/EUR), lines array validation (recommendation_id UUID, qty pozitif integer, price≥0, discount_pct 0–100), `revalidateTag("purchase-orders","max")` + `revalidateTag("products","max")`, hata mapping (bulunamadı/pasif/purchase_suggestion/ürün ile ilişkili → 400).
+- **`purchase-copilot/route.ts`** güncellendi: `LinkedPO` import + tüm rec ID'leri için `dbGetPOsByRecommendationIds` reverse lookup (try/catch non-fatal) + RecRef'e `linkedPOs: LinkedPO[]` alanı (4 return site).
+- **`PurchaseOrderModal.tsx`** (yeni component): drawer-style modal (right-side fixed, z-index 201, backdrop). Props: `open, onClose, mode("single"|"bulk-vendor"|"bulk-orphan"), initialItems: ModalItem[], vendors: VendorOption[], onSuccess, lockedVendorId?`. Vendor auto-fill → currency + expectedDate. Submit → `POST /api/purchase-orders/from-recommendations` → onSuccess. Demo guard + a11y (role="dialog", aria-modal, aria-label tüm inputlarda, error role="alert" aria-live).
+- **`mock-data.ts` + `api-mappers.ts`**: `Product.preferredVendorId?: string | null` eklendi; `preferred_vendor_id` uuid FK mapped.
+- **`suggested/page.tsx`** güncellendi: `RecEntry.linkedPOs?: LinkedPO[]`; `loadAiData` linkedPOs mapping; vendors state + fetch; `poModalState` + `_bulkQueue` state; `handleOpenPoModal` / `handleBulkPo` / `advanceBulkQueue` handlers; `acceptedAndEditedCount` computed; Bulk CTA bar (acceptedAndEditedCount>0); RecActionCell `onOpenPoModal` prop + `linkedPOs` display + "📋 Sipariş Aç" button (suggested/accepted/edited); PurchaseOrderModal mount.
+- **`po-from-recommendations.test.ts`** (yeni, 11 test): helper boş/dolu/dedup (3) + route viewer→403 + geçersiz UUID→400 + service throw→400 + vendor pasif→400 + başarı 201 + revalidateTag (2) + doğru argümanlar + currency whitelist.
+- 167 dosya · 2621 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Purchase&Alert Faz 5 — PO Mal Kabul (2026-05-16; 2610 test)
 
 **Faz 5 (1 commit, 6 dosya):**
 - **Migration 051** (`supabase/migrations/051_po_receive_rpc.sql`): `receive_po_lines(p_po_id, p_lines jsonb, p_actor)` RPC — `FOR UPDATE` lock (aşırı kabul önleme), her line için `received_qty` artış + `on_hand` artış + `inventory_movements` ('purchase_order' referans tipi) + `purchase_commitments.received_qty` senkronu (B1). PO header status auto-update: `partially_received` / `received`. `audit_log` her geçiş için. ROLLBACK SQL bloğu yorum olarak eklendi.
