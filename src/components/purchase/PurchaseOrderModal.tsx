@@ -159,8 +159,8 @@ export default function PurchaseOrderModal({
                 return;
             }
             const price = Number(ln.unit_price);
-            if (!Number.isFinite(price) || price < 0) {
-                setError(`Satır ${i + 1} (${ln.productName}): birim fiyat geçersiz.`);
+            if (!Number.isFinite(price) || price <= 0) {
+                setError(`Satır ${i + 1} (${ln.productName}): birim fiyat geçersiz veya sıfır olamaz.`);
                 return;
             }
             const disc = Number(ln.discount_pct || "0");

@@ -3,7 +3,15 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-16_
 
-**Son tamamlanan iş:** Purchase&Alert Faz 6 Bulgular 1. Tur — duplicate guard + shape normalize + silent zero + UX (2026-05-16; 2626 test)
+**Son tamamlanan iş:** Faz 6 Kapanış — unit_price=0 bug fix + linkedPOs shape regression testleri (2026-05-16; 2629 test)
+
+**Faz 6 Kapanış (1 commit, 4 dosya):**
+- **P2 BUG FIX — unit_price=0 Modal bypass kapatıldı**: `PurchaseOrderModal.tsx` + `from-recommendations/route.ts` + `validatePoLines` içindeki `price < 0` guard'ları `price <= 0` yapıldı. Modal `Number("")=0` dönüştürmesi ile 0 TRY siparişi DB'ye yazılabiliyordu; backend artık 0'ı da reddediyor.
+- **P3a — linkedPOs shape regression testleri (2 yeni)**: `dbGetPOsByRecommendationIds` PostgREST object-vs-array normalize kodu artık doğrudan test edildi — `purchase_order_lines` object shape + `purchase_orders` object shape edge case'leri.
+- **P3b (vendor fallback)** ve **P3c (PO→öneri link)** plan kapsamı dışı — Faz 6 kapatıldı.
+- 167 dosya · 2629 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Purchase&Alert Faz 6 Bulgular 1. Tur — duplicate guard + shape normalize + silent zero + UX (2026-05-16; 2626 test)
 
 **Faz 6 Bulgular 1. Tur (1 commit, 6 dosya):**
 - **P2.1 Duplicate PO guard** — 3 katmanlı: (1) service-side (`serviceCreatePOFromRecommendations`'da `dbGetPOsByRecommendationIds` kontrolü; cancelled PO bypass; "aktif siparişe bağlı" throw), (2) UI-side (`RecActionCell` `hasActivePO` guard; `disabled={isDemo || hasActivePO}`; tooltip), (3) bulk filter (`acceptedAndEditedCount` + `handleBulkPo` aktif PO'lu rec'leri dışlar).

@@ -166,6 +166,38 @@ describe("dbGetPOsByRecommendationIds", () => {
         const pos = result.get(REC_ID)!;
         expect(pos).toHaveLength(1); // dedup
     });
+
+    it("purchase_order_lines PostgREST object shape (array değil) normalize", async () => {
+        _chainResult = {
+            data: [{
+                recommendation_id: REC_ID,
+                // PostgREST bazen object döner (array yerine)
+                purchase_order_lines: {
+                    purchase_orders: { id: PO_ID, po_number: "PO-2026-0001", status: "draft" },
+                },
+            }],
+            error: null,
+        };
+        const result = await dbGetPOsByRecommendationIds([REC_ID]);
+        expect(result.get(REC_ID)).toHaveLength(1);
+        expect(result.get(REC_ID)![0].id).toBe(PO_ID);
+    });
+
+    it("purchase_orders PostgREST object shape (array değil) normalize", async () => {
+        _chainResult = {
+            data: [{
+                recommendation_id: REC_ID,
+                purchase_order_lines: [{
+                    // purchase_orders object (array yerine) — PostgREST many-to-one
+                    purchase_orders: { id: PO_ID, po_number: "PO-2026-0001", status: "draft" },
+                }],
+            }],
+            error: null,
+        };
+        const result = await dbGetPOsByRecommendationIds([REC_ID]);
+        expect(result.get(REC_ID)).toHaveLength(1);
+        expect(result.get(REC_ID)![0].id).toBe(PO_ID);
+    });
 });
 
 // ── Route tests ───────────────────────────────────────────────
@@ -267,6 +299,16 @@ describe("route — unit_price silent zero reject", () => {
         const res = await POST(makeRequest({
             ...validBody,
             lines: [{ recommendation_id: REC_ID, quantity: 10, unit_price: "" }],
+        }));
+        expect(res.status).toBe(400);
+        const data = await res.json();
+        expect(data.error).toMatch(/unit_price/);
+    });
+
+    it("unit_price: 0 → 400 (sıfır fiyat kabul edilmez)", async () => {
+        const res = await POST(makeRequest({
+            ...validBody,
+            lines: [{ recommendation_id: REC_ID, quantity: 10, unit_price: 0 }],
         }));
         expect(res.status).toBe(400);
         const data = await res.json();

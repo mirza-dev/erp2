@@ -213,8 +213,8 @@ export function validatePoLines(raw: unknown): string | null {
         if (l.unit_price === undefined || l.unit_price === null || l.unit_price === "")
             return `Line ${i + 1}: birim fiyat zorunludur.`;
         const price = Number(l.unit_price);
-        if (!Number.isFinite(price) || price < 0)
-            return `Line ${i + 1}: birim fiyat geçersiz veya negatif olamaz.`;
+        if (!Number.isFinite(price) || price <= 0)
+            return `Line ${i + 1}: birim fiyat geçersiz, sıfır veya negatif olamaz.`;
 
         if (l.discount_pct !== undefined && l.discount_pct !== null) {
             if (l.discount_pct === "")

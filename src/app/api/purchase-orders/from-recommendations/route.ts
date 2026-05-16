@@ -51,9 +51,9 @@ export async function POST(req: NextRequest) {
                     { status: 400 },
                 );
             const price = Number(ln.unit_price);
-            if (!Number.isFinite(price) || price < 0)
+            if (!Number.isFinite(price) || price <= 0)
                 return NextResponse.json(
-                    { error: `Satır ${i + 1}: unit_price geçersiz veya negatif olamaz.` },
+                    { error: `Satır ${i + 1}: unit_price geçersiz, sıfır veya negatif olamaz.` },
                     { status: 400 },
                 );
             if (ln.discount_pct !== undefined && ln.discount_pct !== null && ln.discount_pct === "")

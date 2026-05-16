@@ -4,7 +4,8 @@ description: Aktif sprint, son tamamlanan işler ve sonraki adımlar
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
-**Aktif:** Purchase & Alert plan — Faz 7 sırada (overdue_shipment ship form veya sonraki)
+**Aktif:** Purchase & Alert plan — Faz 7 sırada (overdue_shipment ship form veya sonraki); Faz 6 TAMAMEN KAPALI
+**Önceki:** Faz 6 Kapanış KAPALI (2026-05-16; 2629 test) — P2 unit_price=0 Modal bypass fix (3 dosya, `price <= 0`), P3a linkedPOs shape regression testleri (object-vs-array normalize, 2 test). P3b vendor fallback + P3c PO→öneri link plan dışı. 4 dosya.
 **Önceki:** Faz 6 Bulgular 1. Tur KAPALI (2026-05-16; 2626 test) — P2.1 duplicate PO guard (service+UI button+bulk; cancelled bypass), P2.2 shape normalize (object/array defensive), P2.3 silent zero reject (unit_price null/""), P3.4 service direkt testler (3, vi.importActual), silent zero testler (2), Toast action prop, "Siparişe git" link. 167 dosya.
 **Önceki:** Faz 6 KAPALI (2026-05-16; 2621 test) — Suggested → PO Köprüsü: dbGetPOsByRecommendationIds (junction reverse lookup), serviceCreatePOFromRecommendations (rec doğrulama + RPC + best-effort status patch), POST /api/purchase-orders/from-recommendations (yeni endpoint), purchase-copilot linkedPOs alanı, PurchaseOrderModal component (single/bulk-vendor/bulk-orphan), suggested page (RecActionCell onOpenPoModal + linkedPOs display, bulk CTA bar, vendors fetch, poModalState/bulkQueue), mock-data.ts preferredVendorId. 11 yeni test. 167 dosya.
 **Önceki:** Faz 5 KAPALI (2026-05-16; 2610 test) — PO Mal Kabul: migration 051 (receive_po_lines RPC, FOR UPDATE, B1 commitment senkronu, inventory_movements 'purchase_order'), dbReceivePurchaseOrderLines helper, serviceReceivePOLines (best-effort alert scan), POST /api/purchase-orders/[id]/receive (B7 guard), UI mal kabul paneli (receiveMode, per-line input, Tümü toggle). 11 test (helper+route+B1). 166 dosya.

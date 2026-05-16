@@ -2,12 +2,16 @@
 name: KokpitERP — Stack ve Kodlama Kuralları
 description: Teknoloji stack, kritik kodlama kuralları, klasör yapısı ve veri modelleri
 type: project
+originSessionId: f81399bb-e89a-4404-bdd5-9b4a0afc0d53
 ---
-
 **Çalışma dizini:** `/Users/mirzasaribiyik/Projects/erp2`
 **GitHub:** `mirza-dev/erp2` (public repo)
-**Production URL:** `https://erp2-hj5u0tlp1-mirza-dev-6592s-projects.vercel.app`
-**Deploy:** Vercel — push → otomatik deploy
+**Production URL:** `https://erp.getmedspace.com` (Coolify + Hetzner VPS; Vercel artık kullanılmıyor)
+**Deploy:** Coolify (Docker standalone) + GitHub Actions cron (8 endpoint)
+
+**Claude Code Skills:** `~/.claude/skills/erp2-*/SKILL.md` (6 skill, local — git'ten bağımsız, her oturumda otomatik aktif)
+- `erp2-phase-planner` · `erp2-domain-guard` · `erp2-supabase-rpc-migration`
+- `erp2-api-route-builder` · `erp2-dashboard-ui-builder` · `erp2-test-review-lock`
 
 **Stack:** Next.js 15 · TypeScript · Supabase (15+ tablo, 38 migration) · Tailwind kurulu ama kullanılmıyor · Sentry (`@sentry/nextjs`) tam kurulu ✅ (DSN .env.local + GitHub Secrets'ta)
 **Font:** `geist` npm paketi (`geist/font/sans`, `geist/font/mono`) — `next/font/google` değil; build sırasında ağ bağımlılığı yok
