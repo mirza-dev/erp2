@@ -389,18 +389,26 @@ export async function serviceUpdateAlertStatus(
 // ── Overdue Shipment Scan ────────────────────────────────────
 
 /** Creates overdue_shipment alerts for approved orders past their planned ship
- *  date (or 7+ days since creation if no date set). Deduplicates active alerts. */
-export async function serviceCheckOverdueShipments(): Promise<{ alerted: number }> {
-    const orders = await dbListOverdueShipments();
-    if (orders.length === 0) return { alerted: 0 };
+ *  date (or 7+ days since creation if no date set). Deduplicates active alerts.
+ *  Also resolves stale overdue_shipment alerts for orders that are no longer overdue
+ *  (shipped, cancelled, etc.) — safety-net for ship endpoint alert resolve failures. */
+export async function serviceCheckOverdueShipments(): Promise<{ alerted: number; resolved: number }> {
+    const [orders, activeAlerts] = await Promise.all([
+        dbListOverdueShipments(),
+        dbListActiveAlerts(),
+    ]);
 
-    const activeAlerts = await dbListActiveAlerts();
-    const activeSet = new Set(
-        activeAlerts
-            .filter(a => a.type === "overdue_shipment")
-            .map(a => a.entity_id)
-    );
+    const overdueAlerts = activeAlerts.filter(a => a.type === "overdue_shipment");
+    const overdueOrderIds = new Set(orders.map(o => o.id));
 
+    // Resolve stale alerts: active overdue_shipment alerts whose orders are no longer overdue
+    const toResolve: BatchResolveEntry[] = overdueAlerts
+        .filter(a => a.entity_id !== null && !overdueOrderIds.has(a.entity_id))
+        .map(a => ({ type: "overdue_shipment", entityId: a.entity_id as string, reason: "order_shipped" }));
+    const resolved = toResolve.length > 0 ? await dbBatchResolveAlerts(toResolve) : 0;
+
+    // Create new alerts for overdue orders without an active alert
+    const activeSet = new Set(overdueAlerts.map(a => a.entity_id));
     let alerted = 0;
     for (const order of orders) {
         if (activeSet.has(order.id)) continue;
@@ -416,5 +424,5 @@ export async function serviceCheckOverdueShipments(): Promise<{ alerted: number 
         });
         alerted++;
     }
-    return { alerted };
+    return { alerted, resolved };
 }

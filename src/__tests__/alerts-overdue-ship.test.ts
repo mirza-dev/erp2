@@ -5,10 +5,12 @@
  *   POST /api/orders/[id]/ship
  *     - shipDate eksik → 400
  *     - shipDate geçersiz format → 400
+ *     - shipDate takvim overflow (2026-02-31, 2026-99-99) → 400 (P2 fix)
  *     - trackingNumber 101 karakter → 400 (length validation)
  *     - sipariş yok (service error pass-through) → 400
  *     - sipariş approved değil → 400
  *     - happy path → 200, revalidateTag("products","max") çağrıldı
+ *     - happy path → dbBatchResolveAlerts overdue_shipment fire-and-forget (P3 fix)
  *
  *   source-regression:
  *     - actionFor overdue_shipment case → "Sevkiyatı yönet" + "/dashboard/orders"
@@ -26,6 +28,7 @@ const mockServiceGetOrder        = vi.fn();
 const mockServiceSyncOrder       = vi.fn();
 const mockNotifyUsers            = vi.fn();
 const mockRevalidateTag          = vi.fn();
+const mockDbBatchResolveAlerts   = vi.fn();
 
 vi.mock("@/lib/services/order-service", () => ({
     serviceTransitionOrder: (...a: unknown[]) => mockServiceTransitionOrder(...a),
@@ -38,6 +41,10 @@ vi.mock("@/lib/services/parasut-service", () => ({
 
 vi.mock("@/lib/services/email-service", () => ({
     notifyUsersByEmail: (...a: unknown[]) => mockNotifyUsers(...a),
+}));
+
+vi.mock("@/lib/supabase/alerts", () => ({
+    dbBatchResolveAlerts: (...a: unknown[]) => mockDbBatchResolveAlerts(...a),
 }));
 
 vi.mock("next/cache", () => ({
@@ -86,6 +93,7 @@ beforeEach(() => {
     mockServiceSyncOrder.mockReset().mockResolvedValue(undefined);
     mockNotifyUsers.mockReset().mockResolvedValue(undefined);
     mockRevalidateTag.mockReset();
+    mockDbBatchResolveAlerts.mockReset().mockResolvedValue(1);
 });
 
 // ── Endpoint tests ────────────────────────────────────────────
@@ -104,6 +112,22 @@ describe("POST /api/orders/[id]/ship", () => {
         expect(res.status).toBe(400);
         const body = await res.json();
         expect(body.error).toMatch(/shipDate/);
+        expect(mockServiceTransitionOrder).not.toHaveBeenCalled();
+    });
+
+    it("shipDate olmayan gün (2026-02-31) → 400 (takvim normalizasyon koruması)", async () => {
+        const res = await POST(makeReq({ shipDate: "2026-02-31" }), makeParams());
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/takvim|geçersiz/);
+        expect(mockServiceTransitionOrder).not.toHaveBeenCalled();
+    });
+
+    it("shipDate geçersiz ay/gün (2026-99-99) → 400 (RangeError öncesi guard)", async () => {
+        const res = await POST(makeReq({ shipDate: "2026-99-99" }), makeParams());
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/takvim|geçersiz/);
         expect(mockServiceTransitionOrder).not.toHaveBeenCalled();
     });
 
@@ -195,6 +219,14 @@ describe("POST /api/orders/[id]/ship", () => {
         mockServiceTransitionOrder.mockResolvedValue({ success: true });
         await POST(makeReq(validBody), makeParams());
         expect(mockServiceSyncOrder).toHaveBeenCalledWith(ORDER_ID);
+    });
+
+    it("happy path → dbBatchResolveAlerts overdue_shipment fire-and-forget çağrılır (P3)", async () => {
+        mockServiceTransitionOrder.mockResolvedValue({ success: true });
+        await POST(makeReq(validBody), makeParams());
+        expect(mockDbBatchResolveAlerts).toHaveBeenCalledWith([
+            expect.objectContaining({ type: "overdue_shipment", entityId: ORDER_ID }),
+        ]);
     });
 });
 

@@ -8,6 +8,7 @@ import {
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_FIELD_LEN = 100;
@@ -30,6 +31,15 @@ export async function POST(
         if (typeof body.shipDate !== "string" || !ISO_DATE_RE.test(body.shipDate))
             return NextResponse.json(
                 { error: "shipDate zorunludur ve YYYY-MM-DD formatında olmalıdır." },
+                { status: 400 },
+            );
+
+        // Strict calendar check — rejects 2026-02-31 (normalizes) and 2026-99-99 (NaN).
+        // Must run before serviceTransitionOrder; dbShipOrderFull commits atomically.
+        const _parsedShipDate = new Date(`${body.shipDate}T12:00:00Z`);
+        if (isNaN(_parsedShipDate.getTime()) || _parsedShipDate.toISOString().slice(0, 10) !== body.shipDate)
+            return NextResponse.json(
+                { error: "shipDate geçersiz takvim tarihi (ör. 2026-02-31 kabul edilmez)." },
                 { status: 400 },
             );
 
@@ -65,6 +75,11 @@ export async function POST(
             const status = result.error?.includes("bulunamadı") ? 404 : 400;
             return NextResponse.json({ error: result.error }, { status });
         }
+
+        // Resolve overdue_shipment alert — awaited so 200 only returns after resolve completes.
+        // Failure is non-fatal (ship committed); CRON check-shipments is the safety-net cleanup.
+        await dbBatchResolveAlerts([{ type: "overdue_shipment", entityId: id, reason: "order_shipped" }])
+            .catch(err => console.error("[alert resolve ship]:", err));
 
         // Paraşüt sync — await like PATCH endpoint (subsequent read returns up-to-date state)
         await serviceSyncOrderToParasut(id).catch(err =>

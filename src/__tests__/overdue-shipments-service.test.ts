@@ -5,6 +5,7 @@
  * - planned_shipment_date in the past → alert
  * - no planned_shipment_date, created 7+ days ago → alert
  * - dedup: active alert exists → skip
+ * - stale alert cleanup: active overdue_shipment alert for shipped order → resolve (P3 safety net)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -19,6 +20,8 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbListOrders: vi.fn(),
 }));
 
+const mockDbBatchResolveAlerts = vi.fn();
+
 vi.mock("@/lib/supabase/alerts", () => ({
     dbListAlerts:           vi.fn(),
     dbGetAlertById:         vi.fn(),
@@ -27,7 +30,7 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbDismissAlertsBySource: vi.fn(),
     dbListActiveAlerts:     (...args: unknown[]) => mockDbListActiveAlerts(...args),
     dbListRecentlyDismissed: vi.fn().mockResolvedValue([]),
-    dbBatchResolveAlerts:   vi.fn(),
+    dbBatchResolveAlerts:   (...args: unknown[]) => mockDbBatchResolveAlerts(...args),
 }));
 
 vi.mock("@/lib/supabase/products", () => ({
@@ -75,15 +78,17 @@ describe("serviceCheckOverdueShipments", () => {
         vi.clearAllMocks();
         mockDbListActiveAlerts.mockResolvedValue([]);
         mockDbCreateAlert.mockResolvedValue(undefined);
+        mockDbBatchResolveAlerts.mockResolvedValue(0);
     });
 
-    it("1. overdue sipariş yok → { alerted: 0 }, alert yaratılmaz", async () => {
+    it("1. overdue sipariş yok, aktif alert yok → { alerted: 0, resolved: 0 }", async () => {
         mockDbListOverdueShipments.mockResolvedValue([]);
 
         const result = await serviceCheckOverdueShipments();
 
-        expect(result).toEqual({ alerted: 0 });
+        expect(result).toEqual({ alerted: 0, resolved: 0 });
         expect(mockDbCreateAlert).not.toHaveBeenCalled();
+        expect(mockDbBatchResolveAlerts).not.toHaveBeenCalled();
     });
 
     it("2. planned_shipment_date geçmiş → alert, description tarihi içerir", async () => {
@@ -98,7 +103,7 @@ describe("serviceCheckOverdueShipments", () => {
                 description: expect.stringContaining(PAST_DATE),
             })
         );
-        expect(result).toEqual({ alerted: 1 });
+        expect(result).toEqual({ alerted: 1, resolved: 0 });
     });
 
     it("3. planned_shipment_date null, 8 gün önce oluşturulmuş → alert, description '7+' içerir", async () => {
@@ -113,7 +118,7 @@ describe("serviceCheckOverdueShipments", () => {
                 description: expect.stringContaining("7+"),
             })
         );
-        expect(result).toEqual({ alerted: 1 });
+        expect(result).toEqual({ alerted: 1, resolved: 0 });
     });
 
     it("4. aktif overdue_shipment alert zaten var → dedup, alerted artmaz", async () => {
@@ -125,10 +130,10 @@ describe("serviceCheckOverdueShipments", () => {
         const result = await serviceCheckOverdueShipments();
 
         expect(mockDbCreateAlert).not.toHaveBeenCalled();
-        expect(result).toEqual({ alerted: 0 });
+        expect(result).toEqual({ alerted: 0, resolved: 0 });
     });
 
-    it("5. mix: 2 overdue, 1'i zaten alerted → { alerted: 1 }", async () => {
+    it("5. mix: 2 overdue, 1'i zaten alerted → { alerted: 1, resolved: 0 }", async () => {
         mockDbListOverdueShipments.mockResolvedValue([orderWithDate, orderWithoutDate]);
         mockDbListActiveAlerts.mockResolvedValue([
             { type: "overdue_shipment", entity_id: "order-1" },
@@ -140,6 +145,42 @@ describe("serviceCheckOverdueShipments", () => {
         expect(mockDbCreateAlert).toHaveBeenCalledWith(
             expect.objectContaining({ entity_id: "order-2" })
         );
-        expect(result).toEqual({ alerted: 1 });
+        expect(result).toEqual({ alerted: 1, resolved: 0 });
+    });
+
+    it("6. sevk edilmiş siparişin stale alertı → dbBatchResolveAlerts ile resolve edilir", async () => {
+        // order-1 artık overdue listesinde değil (sevk edildi), ama aktif alertı var
+        mockDbListOverdueShipments.mockResolvedValue([]);
+        mockDbListActiveAlerts.mockResolvedValue([
+            { type: "overdue_shipment", entity_id: "order-1" },
+        ]);
+        mockDbBatchResolveAlerts.mockResolvedValue(1);
+
+        const result = await serviceCheckOverdueShipments();
+
+        expect(mockDbBatchResolveAlerts).toHaveBeenCalledWith([
+            expect.objectContaining({ type: "overdue_shipment", entityId: "order-1" }),
+        ]);
+        expect(mockDbCreateAlert).not.toHaveBeenCalled();
+        expect(result).toEqual({ alerted: 0, resolved: 1 });
+    });
+
+    it("7. stale alert + yeni overdue sipariş → resolve + create, her ikisi de işlenir", async () => {
+        // order-1 sevk edildi (stale alert), order-2 hâlâ overdue (yeni alert gerekiyor)
+        mockDbListOverdueShipments.mockResolvedValue([orderWithoutDate]); // order-2
+        mockDbListActiveAlerts.mockResolvedValue([
+            { type: "overdue_shipment", entity_id: "order-1" }, // stale
+        ]);
+        mockDbBatchResolveAlerts.mockResolvedValue(1);
+
+        const result = await serviceCheckOverdueShipments();
+
+        expect(mockDbBatchResolveAlerts).toHaveBeenCalledWith([
+            expect.objectContaining({ type: "overdue_shipment", entityId: "order-1" }),
+        ]);
+        expect(mockDbCreateAlert).toHaveBeenCalledWith(
+            expect.objectContaining({ entity_id: "order-2" })
+        );
+        expect(result).toEqual({ alerted: 1, resolved: 1 });
     });
 });

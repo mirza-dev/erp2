@@ -2008,12 +2008,6 @@ function OrderAlertDrawer({ alert, isDemo, onClose, onExtended, onShipped }: Ord
                 const json = await res.json().catch(() => ({}));
                 throw new Error(json.error || `HTTP ${res.status}`);
             }
-            // Resolve alert (best-effort; drawer closing shows success regardless)
-            await fetch(`/api/alerts/${alert.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "resolved" }),
-            }).catch(() => undefined);
             onShipped();
         } catch (e) {
             setShipError(e instanceof Error ? e.message : "Sevkiyat kaydedilemedi.");
