@@ -9,6 +9,7 @@ import {
     dateDaysFromToday,
 } from "@/lib/stock-utils";
 import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem } from "@/lib/services/ai-service";
+import { dbGetRecentRejectionsForProducts } from "@/lib/supabase/ai-feedback";
 import {
     dbUpsertRecommendation,
     dbExpireSuggestedRecommendations,
@@ -362,6 +363,26 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     let aiCallFailed = false;
 
     if (aiAvailable && needsAiItems.length > 0) {
+        // Faz 8: Bulk-fetch recent rejection notes per product (max 3, 90-day window).
+        // Sanitize edilmiş notlar item'lara enjekte edilir; empty array → alan
+        // yazılmaz (token tasarrufu). RPC fail non-fatal — AI çağrısı rejection
+        // olmadan devam eder (graceful degradation, mevcut pattern).
+        let rejMap: Map<string, string[]> = new Map();
+        try {
+            rejMap = await dbGetRecentRejectionsForProducts(
+                needsAiItems.map(i => i.productId),
+                3,
+            );
+        } catch (err) {
+            console.error("[purchase-copilot] rejection fetch failed (non-fatal):", err);
+        }
+        for (const item of needsAiItems) {
+            const notes = rejMap.get(item.productId);
+            if (notes && notes.length > 0) {
+                item.recentRejections = notes;
+            }
+        }
+
         try {
             const result = await aiEnrichPurchaseSuggestions(needsAiItems);
             freshEnrichments = result.enrichments;

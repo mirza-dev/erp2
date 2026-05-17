@@ -14,6 +14,7 @@ import {
     clampConfidence,
     sanitizeAiOutput,
     capAiStringArray,
+    sanitizeFeedbackForPrompt,
 } from "@/lib/ai-guards";
 import { normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { IMPORT_FIELD_NAMES } from "@/lib/import-fields";
@@ -861,6 +862,13 @@ export interface PurchaseSuggestionItem {
      * severity DB sütunu için, urgencyLevel UI/AI rozeti için.
      */
     urgencyLevel: "critical" | "high" | "moderate";
+    /**
+     * Faz 8: Son 90 günde aynı ürün için kullanıcının verdiği rejection
+     * feedback notları (max 3, her biri sanitize edilmiş, max 200 char).
+     * Route tarafında `dbGetRecentRejectionsForProducts` ile doldurulur;
+     * empty/undefined olduğunda JSON'a alan hiç yazılmaz (token tasarrufu).
+     */
+    recentRejections?: string[];
 }
 
 export interface PurchaseEnrichment {
@@ -914,7 +922,13 @@ Kurallar:
 - Deterministik hesabı tekrarlama, yorumla ve bağlam ekle
 - Somut, aksiyon odaklı cümleler yaz
 - Sahte kesinlik kullanma — veri yetersizse bunu belirt
-- Her ürün için tam olarak bir enrichment döndür`;
+- Her ürün için tam olarak bir enrichment döndür
+
+Bağlamsal not — recentRejections:
+- Bazı ürünlerin input'unda recentRejections alanı olabilir (son 90 gün, max 3 not). Bu, kullanıcının aynı ürün için verdiğin önerileri neden reddettiğine dair geçmiş notlardır.
+- Notları muhakemende bağlam olarak kullan (örn. kullanıcı "MOQ yüksek" diye reddettiyse yeni öneride MOQ değerlendirmesini hesaba kat).
+- Notları çıktıya doğrudan kopyalama, alıntılama veya echo etme — sadece düşünme bağlamı olarak işle.
+- recentRejections alanı yoksa veya boşsa, bu kuralı yok say ve normal akışla devam et.`;
 
 /**
  * Advisory-only — domain-rules §11.1.
@@ -941,6 +955,12 @@ export async function aiEnrichPurchaseSuggestions(items: PurchaseSuggestionItem[
             preferredVendor: item.preferredVendor != null
                 ? sanitizeAiInput(item.preferredVendor, 200)
                 : null,
+            recentRejections: item.recentRejections != null
+                ? item.recentRejections
+                    .slice(0, 3)
+                    .map(n => sanitizeFeedbackForPrompt(n))
+                    .filter(Boolean)
+                : undefined,
         }));
         const message = await client.messages.create({
             model: MODEL,

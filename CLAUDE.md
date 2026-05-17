@@ -1,9 +1,39 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-16_
+_Son güncelleme: 2026-05-17_
 
-**Son tamamlanan iş:** Faz 7 — overdue_shipment alert inline ship form (2026-05-16; 2641 test)
+**Son tamamlanan iş:** Faz 8 Review Bulgular — 5 bulgu + payload/slice testleri (2026-05-17–18; 2672 test)
+
+**Faz 8 Review Bulgular (5 dosya + 2 migration güncelleme):**
+- **P2 KAPANDI — zero-width/bidi bypass** (`src/lib/ai-guards.ts`): `sanitizeFeedbackForPrompt`'a step 1a eklendi: `ZERO_WIDTH_AND_BIDI_RE` → empty — `syste​m:` → `system:` → step 3 yakalar. +2 test (U+200B bypass + BOM/bidi).
+- **P2 KAPANDI — PostgreSQL PUBLIC execute** (`supabase/migrations/054` + `055`): Migration 054'e `REVOKE ALL FROM public, anon, authenticated` eklendi (039 pattern). Migration 055 `public, anon, authenticated` üçünü revoke edecek şekilde genişletildi (önceki: sadece `authenticated`).
+- **P3-001 KAPANDI — Plan-migration hizalandı**: `purchase-aksiyon-plan.md` line 261'deki `af.created_at >= now()` cutoff → `ar.decided_at >= now()`.
+- **P3-003 KAPANDI — C0 kontrol karakterleri kaldırıldı**: `purchase-aksiyon-plan.md` line 1587'deki NUL (0x00) + Unit Separator (0x1F) → U+0000/U+001F escape sequence. `rg` artık dosyayı binary görmez.
+- **P3-004 KAPANDI — Defense-in-depth re-sanitize** (`src/lib/services/ai-service.ts`): `sanitizedItems` map'inde `recentRejections` artık `sanitizeFeedbackForPrompt` ile yeniden geçiriliyor. Import eklendi.
+- 172 dosya · 2672 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 8 — AI rejection feedback prompt entegrasyonu (2026-05-17; 2665 test)
+
+**Faz 8 (1 commit, 6 dosya + 1 migration):**
+- **Migration 054** (`supabase/migrations/054_ai_feedback_recent_rejections_rpc.sql`): `get_recent_rejections_for_products(p_product_ids uuid[], p_limit int)` RPC — `ROW_NUMBER PARTITION BY entity_id` ile her ürün için son N (default 3) rejection notunu döner. SQL-side filtreler: `entity_type='product'`, `recommendation_type='purchase_suggestion'`, `feedback_type='rejected'`, `feedback_note IS NOT NULL AND <> ''`, `decided_at >= NOW() - INTERVAL '90 days'`. `STABLE` + `SECURITY DEFINER` + `REVOKE ALL FROM public, anon, authenticated` + `GRANT EXECUTE TO service_role`. Idempotent + ROLLBACK SQL.
+- **`src/lib/ai-guards.ts`**: yeni `sanitizeFeedbackForPrompt(raw)` export — 5-katmanlı sanitize (C0+DEL+U+2028/U+2029 → boşluk, triple-backtick → `''`, role marker (system/assistant/user):* strip case-insensitive, whitespace normalize, 200-char cap + `…`). Mevcut `sanitizeAiInput`/`sanitizeAiOutput` regex'leri de `new RegExp(...)` constructor pattern'ine taşındı — kaynak dosyaya yanlışlıkla binary kontrol karakter sızması/destrüktif Write riskine karşı sağlamlaştırma.
+- **`src/lib/supabase/ai-feedback.ts`** (yeni): `dbGetRecentRejectionsForProducts(productIds, limit=3): Promise<Map<string, string[]>>` — RPC çağrısı + per-row sanitize + boş sanitize sonuçları drop. Empty input → boş Map (RPC çağrılmaz).
+- **`src/lib/services/ai-service.ts`**: `PurchaseSuggestionItem`'a opsiyonel `recentRejections?: string[]` alanı; `PURCHASE_COPILOT_SYSTEM` prompt'una "Bağlamsal not — recentRejections" clause'u (notları muhakemede kullan, çıktıya echo etme, alan yoksa kuralı yok say). `sanitizedItems` map'inde `recentRejections` `sanitizeFeedbackForPrompt` ile yeniden sanitize edilir (defense-in-depth; boş sonuçlar filter ile atılır).
+- **`src/app/api/ai/purchase-copilot/route.ts`**: `aiEnrichPurchaseSuggestions(needsAiItems)` çağrısından önce `dbGetRecentRejectionsForProducts(needsAiItems.map(i=>i.productId), 3)` — try/catch içinde, başarısızlık non-fatal (graceful degradation, mevcut pattern). Map'ten alınan notlar items'a inject edilir; `notes.length > 0` koşulu — empty array durumunda alan JSON'a hiç yazılmaz (token tasarrufu).
+- **+19 yeni test (3 dosya):** `ai-feedback-sanitize.test.ts` (9: 8 saldırı vektörü + 1 defansif join), `ai-feedback-bulk-fetch.test.ts` (6: empty/single/50-bulk/error/sanitize-drop/multi-note), `ai-feedback-prompt-integration.test.ts` (4: 0-rejection/3-rejection/RPC-throw-degrade/output-contract).
+- 171 dosya · 2665 test (review + payload + slice testleri sonrası 2672) yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 7 Kapanış — P2 takvim validasyonu + P3 server-side alert resolve (tam) (2026-05-17; 2646 test)
+
+**Faz 7 Kapanış (1 commit, 5 dosya):**
+- **P2 BUG FIX — Strict takvim validasyonu** (`src/app/api/orders/[id]/ship/route.ts`): `shipDate` için regex check'ten sonra Date roundtrip guard eklendi — `2026-02-31` (JS normalizasyonu → Mar 3) ve `2026-99-99` (RangeError) artık `dbShipOrderFull` RPC çalışmadan 400 döner.
+- **P3 GÜVENİLİRLİK — İki katmanlı alert resolve:** (1) `route.ts`: `dbBatchResolveAlerts` fire-and-forget → `await .catch(log)` — normal başarı yolunda 200 dönmeden önce alert resolve garantili. (2) `alert-service.ts` `serviceCheckOverdueShipments`: güvenlik ağı eklendi — `dbListOverdueShipments` listesinde artık olmayan siparişlerin aktif `overdue_shipment` alertleri CRON'da toplu resolve edilir (Promise.all paralel fetch, `toResolve: BatchResolveEntry[]` liste). `{ alerted, resolved }` dönüş tipi. Ship endpoint başarısız olsa bile en geç 6 saatte temizlenir.
+- Client-side `PATCH /api/alerts/${alert.id}` bloğu `alerts/page.tsx` `handleShip`'ten kaldırıldı.
+- **+5 test:** `alerts-overdue-ship.test.ts` (+3: takvim overflow × 2, P3 resolved assert), `overdue-shipments-service.test.ts` (+2: stale alert resolve, stale+yeni mix) + mock güncelleme + 5 mevcut test `resolved` alanı için güncellendi.
+- 168 dosya · 2646 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 7 — overdue_shipment alert inline ship form (2026-05-16; 2641 test)
 
 **Faz 7 (1 commit, 6 dosya + 1 migration):**
 - **Migration 053** (`supabase/migrations/053_orders_ship_meta.sql`): `sales_orders.shipment_tracking_number TEXT NULL` + `shipment_carrier TEXT NULL`. Idempotent, ROLLBACK SQL yorum bloğu.

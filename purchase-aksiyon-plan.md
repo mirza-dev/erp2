@@ -258,7 +258,7 @@ Faz 11 roadmap notu: "production-from-shortage inline form" (`yuksek-etki.md`'ye
 //       AND ar.status = 'rejected'
 //       AND af.feedback_note IS NOT NULL
 //       AND length(trim(af.feedback_note)) > 0
-//       AND af.created_at >= now() - interval '90 days'
+//       AND ar.decided_at >= now() - interval '90 days'
 // ) t WHERE t.rn <= $2
 // ORDER BY t.entity_id, t.created_at DESC
 // JS-side Map<entity_id, sanitized_note[]>
@@ -1544,3 +1544,68 @@ Raporun amacı: Harici advisor'ın (veya farklı context'te devam eden Claude ot
 - **`inventory_movements` constraint:** Migration 051, `'purchase_order'` referans tipini ekliyor. Mevcut check constraint replace edildiği için mevcut `'order','production_entry','import','manual'` değerleri korunmalı. SQL'de `DROP CONSTRAINT + ADD CONSTRAINT` pattern'i kullanıldı — idempotent.
 - **Faz 6 köprüsü (Suggested → PO):** Faz 6'da `po_line_recommendations` junction'ı kullanmak için `from-recommendations` endpoint'i eklenecek. Mevcut `validatePoLines` zaten `source_recommendation_ids` UUID array validation yapıyor; junction insert RPC içinde.
 
+---
+
+### FAZ 8 — AI Rejection Feedback Prompt Entegrasyonu TAMAMLAMA RAPORU
+**Tamamlanma tarihi:** 2026-05-17
+**Test sayısı (faz öncesi → sonrası):** 2646 → 2665  (+19 yeni)
+**Dosya sayısı:** 168 → 171 dosya
+
+#### 8.1 Kapsam & Teslimat
+
+- Migration 054 (`supabase/migrations/054_ai_feedback_recent_rejections_rpc.sql`) — YENİ ✅
+- `sanitizeFeedbackForPrompt` helper (`src/lib/ai-guards.ts`) — YENİ ✅
+- `dbGetRecentRejectionsForProducts` helper (`src/lib/supabase/ai-feedback.ts`) — YENİ ✅
+- `PurchaseSuggestionItem.recentRejections` opsiyonel alan (`ai-service.ts`) — GÜNCELLENDİ ✅
+- `PURCHASE_COPILOT_SYSTEM` prompt clause (`ai-service.ts`) — GÜNCELLENDİ ✅
+- `purchase-copilot/route.ts` RPC çağrısı + item enjekte — GÜNCELLENDİ ✅
+- 3 yeni test dosyası (sanitize 9 + bulk-fetch 6 + integration 4 = 19 test) — YENİ ✅
+
+#### 8.2 Değiştirilen / Oluşturulan Dosyalar
+
+| Dosya | Durum | Özet |
+| --- | --- | --- |
+| `supabase/migrations/054_ai_feedback_recent_rejections_rpc.sql` | YENİ | `get_recent_rejections_for_products(uuid[], int)` RPC, ROW_NUMBER PARTITION BY entity_id, 90-gün cutoff, SECURITY DEFINER + STABLE, idempotent, ROLLBACK SQL |
+| `src/lib/ai-guards.ts` | GÜNCELLE | `sanitizeFeedbackForPrompt` export (5-katmanlı); mevcut `sanitizeAiInput`/`sanitizeAiOutput` regex'leri `new RegExp(...)` constructor pattern'ine taşındı (U+2028/U+2029 + destrüktif Write koruması) |
+| `src/lib/supabase/ai-feedback.ts` | YENİ | `dbGetRecentRejectionsForProducts(productIds, limit=3)` — RPC + per-row sanitize + boş sonuç drop |
+| `src/lib/services/ai-service.ts` | GÜNCELLE | `PurchaseSuggestionItem.recentRejections?: string[]`; `PURCHASE_COPILOT_SYSTEM` prompt'una "Bağlamsal not — recentRejections" clause |
+| `src/app/api/ai/purchase-copilot/route.ts` | GÜNCELLE | `dbGetRecentRejectionsForProducts` import + try/catch içinde RPC çağrısı + `notes.length > 0` koşulu (boş array → alan yazılmaz) |
+| `src/__tests__/ai-feedback-sanitize.test.ts` | YENİ | 9 test (8 saldırı vektörü + 1 defansif join) |
+| `src/__tests__/ai-feedback-bulk-fetch.test.ts` | YENİ | 6 test (empty/single/50-bulk/error/sanitize-drop/multi-note) |
+| `src/__tests__/ai-feedback-prompt-integration.test.ts` | YENİ | 4 test (0-rejection/3-rejection/RPC-throw-degrade/output-contract) |
+
+#### 8.3 Plan-Gerçek Uyumu
+
+- Plan §11.1: ai-feedback test'leri için "sanitize 8 + integration 4 + bulk 4 = 16 test" hedeflenmişti. Gerçekleşen: 19 test (sanitize +1 defansif syste\x00m: testi, bulk-fetch +2: error throw + sanitize-drop), kapsam genişletildi.
+- Plan §10.1 "0 rejection → 'RECENT REJECTIONS' bölümü yok" → JSON path'inde "alan hiç yazılmaz" şeklinde uygulandı (mimari karar, plan §10 vs. §7.5 illustrative comment uyumsuzluğu doğrulandı).
+- Plan §7.4 `dbGetRecentRejectionsForProducts` imzası bire bir uygulandı (`Map<string, string[]>` dönüş, `limitPerProduct=3` default).
+- Plan §7.7 `sanitizeFeedbackForPrompt` 5 adım + 200 char cap bire bir uygulandı.
+
+#### 8.4 Implementasyon Kararları
+
+- **JSON path mı text path mı?** Mevcut `aiEnrichPurchaseSuggestions` items'ı `JSON.stringify` ile gönderiyor (`ai-service.ts:949`). Plan §7.5'teki "Recent user rejections for this product..." text format **illustrative comment** — gerçek implementasyon JSON path'inde. `PurchaseSuggestionItem.recentRejections` opsiyonel alan eklendi; system prompt'a yorumlama clause'u yazıldı. AI çıktı parse'ı (whyNow/quantityRationale/urgencyLevel/confidence) dokunulmadı (plan §10.3 test 3).
+- **RegExp constructor pattern (önemli):** Faz 8 sırasında `ai-guards.ts`'in literal regex'leri (`\u0000-\u001F` aralığı + U+2028/U+2029) destrüktif bir Write sonrası `[ -- ]` (space-to-dash aralığı) olarak bozulup `-` karakterini stripleyen bir bug üretti. Tüm sanitize regex'leri `new RegExp("\\u0000-...", "g")` constructor'a taşındı; bu kaynak dosyaya binary kontrol karakterin yanlışlıkla yazılma riskini ortadan kaldırır ve U+2028/U+2029'un regex literal'i terminate etme tehlikesini önler.
+- **Empty array optimizasyonu (advisor talebi):** `notes.length > 0` koşulu — boş array `recentRejections` alanı olarak JSON'a yazılmaz (token tasarrufu, sistem prompt clause "alan yoksa kuralı yok say" diyor).
+- **Graceful degradation:** RPC fail durumu try/catch içinde — AI çağrısı recentRejections olmadan devam eder (mevcut "graceful degradation" pattern; G11 Audit 11. tur aiPending flag ile uyumlu).
+- **Existing test isolation:** Mevcut `purchase-copilot-*.test.ts` dosyalarına `vi.mock("@/lib/supabase/ai-feedback")` eklemeye gerek kalmadı çünkü route'taki try/catch sayesinde unmocked RPC çağrısı silently fail oluyor (171 dosya / 2665 test yeşil — explicit mock olmadan da geçiyor). Advisor önerisi "may need" şeklindeydi; pratikte gereksiz çıktı.
+
+#### 8.5 Bulunan Sorunlar & Çözümler
+
+- **Sorun:** İlk Write turunda `ai-guards.ts`'in `sanitizeAiInput`/`sanitizeAiOutput` regex'lerindeki literal C0 control karakterleri yanlışlıkla `[ -- ]` (SPACE-to-DASH aralığı) ile değiştirildi → "p-1" gibi dash içeren productId'ler "p1" oldu → ai-purchase-copilot.test.ts'te 3 test fail.
+- **Çözüm:** Tüm regex'ler `new RegExp("...", "g")` constructor'a taşındı (`ZERO_WIDTH_AND_BIDI_RE`, `C0_CONTROL_RE`, `FEEDBACK_STEP1_RE` module-level sabitler). Source-encoding bağımsız hale getirildi; U+2028/U+2029'un regex literal terminator sorunu da bu yolla bypass edildi.
+- **Sorun:** Prompt integration test'te `body.items.find(i => i.product_id === "p-1")` snake_case bekleyip undefined döndü.
+- **Çözüm:** Route response shape camelCase (`productId`, `aiWhyNow`, vb.); test snake_case → camelCase'e çekildi.
+
+#### 8.6 Bilinen Eksiklikler & Ertelemeler
+
+- AI'ın çıktıyı echo edip etmediği canlı E2E manuel doğrulamada test edilmeli (test ortamında AI mock'lu). Echo gözlenirse system prompt clause sıkılaştırılır.
+- `feedback_note` üzerinde rate limit / kötüye kullanım analitiği yok (Faz 8 kapsamında değil).
+- Suggested page UI'da kullanıcıya "Geçmiş notlarınız AI'a iletildi" görsel ipucu yok (transparency); ileri faz UX iyileştirmesi.
+
+#### 8.7 Advisor Odak Alanları
+
+- **RPC predikatları:** Migration 054'te `entity_type='product'` + `recommendation_type='purchase_suggestion'` + `feedback_type='rejected'` + 90-gün cutoff + `ROW_NUMBER ≤ p_limit` — cross-entity bleed engellenmiş. Manuel SQL doğrulaması staging'te yapılmalı.
+- **Sanitize regex line 22 (`FEEDBACK_STEP1_RE`):** U+2028/U+2029 + C0 + DEL hepsi escape sequence ile string olarak yazıldı; `new RegExp` constructor sayesinde regex literal terminator hatasına bağışık.
+- **Prompt clause:** AI'a "notları çıktıya echo etme" talimatı verildi; LLM'in bu kurala uyup uymadığı modellere bağlı. Anthropic Claude için talimat uyumu yüksek olsa da E2E manuel kontrol edilmeli.
+- **Token bütçesi:** `recentRejections` alanı max 3 not × 200 char = ~600 char/ürün; needsAiItems ortalama 5-10 ürün → ~3-6KB ek prompt. AI bütçesi 2048 max_tokens olduğundan input tarafında bu artış sorun değil.
+- **CRON path:** `purchase-copilot` 6 saatte bir çalışıyor; rejection notları otomatik prompt'a giriyor — kullanıcının ekstra aksiyonu gerekmiyor.
