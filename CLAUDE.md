@@ -3,7 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-18_
 
-**Son tamamlanan iş:** Faz 10 — order_shortage drawer (M3: bilgi yoğunluğu + iki yönlendirme) (2026-05-18; 2755 test)
+**Son tamamlanan iş:** Faz 10 Review Bulgu — DB hata yutma kapatıldı (2026-05-18; 2755 test)
+
+**Faz 10 Review (P2 reliability, 2 dosya):**
+- **P2 KAPANDI — `dbGetOpenShortagesByProductId` hata yutma**: `if (error || !data) return []` → Supabase DB/permission/query hatası sessizce boş array dönüyordu; route 200 `{ items: [] }` üretiyor, drawer "Açık shortage kalmadı (uyarı yakında otomatik kapanacak)" empty branch'ine düşüp kullanıcıyı yanıltıyordu. **Düzeltme:** `if (error) throw new Error(...); if (!data) return [];` — error explicit throw, defensive `data=null` (beklenmeyen durum) için empty kalır. handleApiError zaten 500 maps; drawer `shortageError` set → "Açık shortage kalmadı" branch'i tetiklenmez ("eksik yok" ≠ "DB hatası").
+- **Test güncellemesi**: `products-shortages-helper.test.ts` "supabase error → empty array" testi "supabase error → throw" olarak değiştirildi (`rejects.toThrow(/db fail/)`).
+- 177 dosya · 2755 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 10 — order_shortage drawer (M3: bilgi yoğunluğu + iki yönlendirme) (2026-05-18; 2755 test)
 
 **Faz 10 (6 dosya: 4 yeni + 2 modifiye):**
 - **`src/lib/supabase/products.ts`** (yeni helper): `dbGetOpenShortagesByProductId(productId): Promise<OpenShortageDetailRow[]>` — `shortages` + `sales_orders!inner` JOIN; filtreler: `status='open'`, `commercial_status='approved'`, `product_id=$1`. Sıralama: `createdAt DESC` (en yeni shortage üstte). PostgREST many-to-one ARRAY shape defensive normalize (`sales_orders` object|array hep tek nesne). `OpenShortageDetailRow` interface: `shortageId/orderId/orderNumber/customerId/customerName/requestedQty/availableQty/shortageQty/createdAt`.

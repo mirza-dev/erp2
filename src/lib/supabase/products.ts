@@ -357,7 +357,12 @@ export async function dbGetOpenShortagesByProductId(
         .eq("product_id", productId)
         .eq("status", "open")
         .eq("sales_orders.commercial_status", "approved");
-    if (error || !data) return [];
+    // Faz 10 review: DB/permission/query hatasını yutma — route 500 dönsün ki
+    // drawer "Açık shortage kalmadı" empty branch'ine düşüp kullanıcıyı
+    // yanıltmasın. PostgREST data null olmaz (empty result → [] döner);
+    // defensive [] sadece beklenmedik durum için.
+    if (error) throw new Error(`dbGetOpenShortagesByProductId: ${error.message}`);
+    if (!data) return [];
 
     const rows: OpenShortageDetailRow[] = [];
     for (const raw of data as unknown as Array<{

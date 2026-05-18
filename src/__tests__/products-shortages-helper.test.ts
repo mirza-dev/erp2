@@ -43,13 +43,12 @@ describe("dbGetOpenShortagesByProductId", () => {
         expect(mockFrom).toHaveBeenCalledWith("shortages");
     });
 
-    it("supabase error → empty array (defensive — drawer crash etmesin)", async () => {
+    it("supabase error → throw (Faz 10 review: hata yutmayı kapatmak — drawer 'eksik yok' ile 'DB hatası' arasında karışıklık yapmasın)", async () => {
         setResult({ data: null, error: { message: "db fail" } });
-        const result = await dbGetOpenShortagesByProductId("p-1");
-        expect(result).toEqual([]);
+        await expect(dbGetOpenShortagesByProductId("p-1")).rejects.toThrow(/db fail/);
     });
 
-    it("data null → empty array", async () => {
+    it("data null (error yok) → empty array (defensive)", async () => {
         setResult({ data: null, error: null });
         const result = await dbGetOpenShortagesByProductId("p-1");
         expect(result).toEqual([]);
