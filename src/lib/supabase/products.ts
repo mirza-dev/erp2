@@ -92,6 +92,29 @@ export async function dbGetAllActiveProductIds(): Promise<string[]> {
     return (data ?? []).map(r => r.id);
 }
 
+/**
+ * Bulk fetch of minimal product fields for print/PDF documents.
+ * Only id/sku/name/unit — sensitive fields (cost_price, parasut_*, on_hand, reserved,
+ * product_notes, ...) MUST NOT cross the server→client boundary in print payloads.
+ */
+export interface ProductRef {
+    id: string;
+    sku: string;
+    name: string;
+    unit: string;
+}
+
+export async function dbGetProductRefsByIds(ids: string[]): Promise<ProductRef[]> {
+    if (ids.length === 0) return [];
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("products")
+        .select("id, sku, name, unit")
+        .in("id", ids);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}
+
 export async function dbListProducts(filter: ListProductsFilter = {}): Promise<ProductWithStock[]> {
     const supabase = createServiceClient();
     const { page = 1, pageSize = 100, category, product_type, is_active } = filter;

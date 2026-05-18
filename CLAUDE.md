@@ -1,9 +1,27 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-17_
+_Son güncelleme: 2026-05-18_
 
-**Son tamamlanan iş:** Faz 8 Review Bulgular — 5 bulgu + payload/slice testleri (2026-05-17–18; 2672 test)
+**Son tamamlanan iş:** Faz 9 Review Bulgular — P2 veri minimizasyonu + P3 gerçek render testi (2026-05-18; 2721 test)
+
+**Faz 9 Review Bulgular (4 dosya):**
+- **P2 KAPANDI — Veri minimizasyonu (gizlilik)**: `print/page.tsx` `dbListAllActiveProducts()` çağırıyordu — tüm aktif ürün kataloğu (35 alanlı `ProductRow`: `cost_price`, `parasut_*`, `on_hand`, `reserved`, `product_notes`, `daily_usage`, ...) RSC payload'ı üzerinden client'a serialize ediliyordu. Belge yalnızca PO satırlarındaki ürünlerin `id/sku/name/unit` 4 alanını kullanıyor. **Düzeltme:** `products.ts`'e yeni `dbGetProductRefsByIds(ids: string[]): Promise<ProductRef[]>` helper'ı eklendi (`.select("id, sku, name, unit").in("id", ids)`); empty ids → `[]` early return. `PurchaseOrderDocument` prop tipi `ProductRow[]` → `ProductRef[]` daraltıldı. `print/page.tsx` `dbListAllActiveProducts()` çağrısı `dbGetProductRefsByIds(Array.from(new Set(po.lines.map(l => l.product_id))))` ile değiştirildi (Set ile dedup; aynı ürün birden fazla satırda olabilir).
+- **P3 KAPANDI — Gerçek render smoke testi (renderToStaticMarkup)**: Önceki testler source-regex'e dayanıyordu, JSX/DOM bug'ları, conditional render kırılmaları, leak regression'ları yakalamıyordu. **Düzeltme:** `react-dom/server.renderToStaticMarkup` kullanılarak vitest `environment: "node"` ortamında jsdom-free real render testleri eklendi (dep gerektirmez, mevcut Next.js dep'i yeterli). Test paterni: `vi.mock("next/link")` plain `<a>` stub + fixture helper'ları (`makePoFixture`/`makeVendorFixture`/`makeCompanyFixture`/`makeProductRefs`) + `renderDoc()` async helper'ı. Test grupları: (a) **render content** — po_number/vendor/SKU'lar/totaller HTML'de; (b) **conditional branches** — cancelled vs default (İPTAL EDİLDİ badge), cancel_reason var/yok, notes dolu/null, logo dolu/null/company null, vendor null; (c) **toolbar print-gizleme** — `po-no-print` class + window.print() button + Siparişe Dön href; (d) **leak absence (defense-in-depth)** — `secret-user-uuid-leakage-test`, `VENDOR_INTERNAL_NOTES_SHOULD_NOT_LEAK`, `received_qty`, `cost_price`, `parasut_product_id`, `on_hand`, `reserved`, `product_notes`, `daily_usage` substring'lerinin rendered HTML'de bulunmadığı assert edilir.
+- **`purchase-order-print-page.test.ts`** — source-regex güncellendi: `dbListAllActiveProducts` import edilmemeli (P2 leak fix lock); `po.lines.map(l => l.product_id)` + `new Set` dedup pattern'i mevcut.
+- **+24 yeni test:** Real render: PO bilgisi/vendor/satırlar (5), conditional branches (10), toolbar print-gizleme (3), leak absence (4) + paralel fetch + dedup source-regex (2).
+- 173 dosya · 2721 test yeşil · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 9 — PO PDF Render (server-side HTML print) (2026-05-18; 2697 test)
+
+**Faz 9 (4 dosya: 3 yeni + 1 düzenleme):**
+- **`src/components/purchase/PurchaseOrderDocument.tsx`** (YENİ, client component): A4 portrait print belgesi. Header (logo + şirket adı + V.D./VKN + adres + iletişim) → title band ("SATIN ALMA SİPARİŞİ") → meta grid (PO no/tarih/beklenen/durum/currency + tedarikçi adı/iletişim/VKN/ödeme vadesi) → lines tablosu (# / SKU / ürün / adet+unit / birim fiyat / iskonto / satır toplamı) → totals (ara toplam/KDV/genel toplam, currency-aware Intl) → notlar (po.notes varsa) → cancel sebebi (cancelled durumunda). `@page A4 portrait` + `@media print` CSS `dangerouslySetInnerHTML` ile. Logo: `<img>` (next/image yerine bilinçli — `QuoteDocument` paterniyle aynı, eslint-disable yorumu). Toolbar: "← Siparişe Dön" Link + "📄 Yazdır / PDF Olarak Kaydet" button (`window.print()`); print'te `.po-no-print` ile gizlenir. **Güvenlik (§12):** `po.created_by`, `audit_log`, `lines[].received_qty`, `vendor.notes`, `vendor.is_active` DOM'a yazılmaz. Cancelled PO: `İPTAL EDİLDİ` badge prominently + `cancel_reason` küçük not. Export'lu pure helper: `formatPoCurrency(amount, currency)` (Intl tr-TR + fallback) + `formatPoDate(iso)` (DD.MM.YYYY).
+- **`src/app/dashboard/purchase/orders/[id]/print/page.tsx`** (YENİ, RSC): Server component. `dbGetPurchaseOrderById(id)` → null ise `notFound()`. Sonra `Promise.all([dbGetVendorById, dbGetCompanySettings, dbGetProductRefsByIds])` paralel fetch → `<PurchaseOrderDocument>` mount. `export const dynamic = "force-dynamic"`. Tek server round-trip.
+- **`src/app/dashboard/purchase/orders/[id]/page.tsx`**: action button satırına Link butonu (📄 Yazdır / PDF, target=_blank, demo izinli).
+- **+25 test (2 dosya):** module load + formatPoCurrency/formatPoDate pure + source-regex print CSS/status labels/conditional render/güvenlik (Faz 9 Review ile +24 gerçek render = toplam 49 yeni test).
+- Migration yok. Yeni route: `/dashboard/purchase/orders/[id]/print`
+
+**Önceki:** Faz 8 Review Bulgular — 5 bulgu + payload/slice testleri (2026-05-17–18; 2672 test)
 
 **Faz 8 Review Bulgular (5 dosya + 2 migration güncelleme):**
 - **P2 KAPANDI — zero-width/bidi bypass** (`src/lib/ai-guards.ts`): `sanitizeFeedbackForPrompt`'a step 1a eklendi: `ZERO_WIDTH_AND_BIDI_RE` → empty — `syste​m:` → `system:` → step 3 yakalar. +2 test (U+200B bypass + BOM/bidi).

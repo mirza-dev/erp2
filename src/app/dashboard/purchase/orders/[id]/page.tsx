@@ -278,6 +278,14 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sipariş iptal (admin)"}
                             style={btnDanger(isDemo)}>İptal Et</button>
                     )}
+                    <Link
+                        href={`/dashboard/purchase/orders/${po.id}/print`}
+                        target="_blank"
+                        rel="noopener"
+                        title="Sipariş belgesini yazdır veya PDF olarak kaydet"
+                        aria-label="Sipariş belgesini yazdır veya PDF olarak kaydet"
+                        style={{ ...btnSecondary(false), textDecoration: "none", display: "inline-block" }}
+                    >📄 Yazdır / PDF</Link>
                 </div>
             </div>
 
