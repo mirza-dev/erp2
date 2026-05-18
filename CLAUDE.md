@@ -3,7 +3,23 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-18_
 
-**Son tamamlanan iş:** Faz 9 Review Bulgular — P2 veri minimizasyonu + P3 gerçek render testi (2026-05-18; 2721 test)
+**Son tamamlanan iş:** Faz 10 — order_shortage drawer (M3: bilgi yoğunluğu + iki yönlendirme) (2026-05-18; 2755 test)
+
+**Faz 10 (6 dosya: 4 yeni + 2 modifiye):**
+- **`src/lib/supabase/products.ts`** (yeni helper): `dbGetOpenShortagesByProductId(productId): Promise<OpenShortageDetailRow[]>` — `shortages` + `sales_orders!inner` JOIN; filtreler: `status='open'`, `commercial_status='approved'`, `product_id=$1`. Sıralama: `createdAt DESC` (en yeni shortage üstte). PostgREST many-to-one ARRAY shape defensive normalize (`sales_orders` object|array hep tek nesne). `OpenShortageDetailRow` interface: `shortageId/orderId/orderNumber/customerId/customerName/requestedQty/availableQty/shortageQty/createdAt`.
+- **`src/app/api/products/[id]/shortages/route.ts`** (YENİ): `GET` endpoint — helper'ı çağırır, `{ items, totalShortage }` döner. Auth: middleware `/api/**`; demo modda GET izinli (read-only). `handleApiError` mapping.
+- **`src/app/dashboard/alerts/page.tsx`** (3 değişiklik):
+  - **`drawerActionLinks` order_shortage güncellemesi:** Plan §9.4.4 — "Üretim emri başlat (yeni sekmede)" primary CTA → `/dashboard/production?productId={entityId}&qty={extractShortageQty}` + `newTab: true`. "Satın alma planla" secondary. Eski "Siparişleri incele" primary kaldırıldı. Link tipine `newTab?: boolean` eklendi.
+  - **`AlertDetailDrawer` yeni İLGİLİ SİPARİŞLER bölümü** (yalnız `hasOrderShortage && !group.isOrphaned`): drawer açıldığında `fetch /api/products/{entityId}/shortages` (void async IIFE — `react-hooks/set-state-in-effect` kuralı için proje paterni; `cancelled` flag ile cleanup). 4 dal: loading → error (role=alert, aria-live) → empty (race) → list. Liste satırları: `order_number` (monospace) + `customer_name` + `{shortageQty} {unit} eksik` (danger color) + "İhtiyaç: X · Mevcut: Y →" alt satır + tüm satır clickable Link → `/dashboard/orders/{orderId}` (aria-label: `{orderNumber} siparişine git (eksik X)`). DoD: drawer "tek başına yeterli bilgi" — kullanıcı linke tıklamadan kararını verebilir.
+  - **actionLink render:** `link.newTab` → `target="_blank"` + `rel="noopener"` + "↗" işareti (varsayılan "→").
+- **`src/app/dashboard/production/page.tsx`** (Suspense wrapper + prefill):
+  - Pure helper export: `prefillLineFromQuery(productId, qty, activeIds)` — productId aktif değilse veya yoksa `null`; qty pozitif int/decimal değilse `""` fallback; 0/negatif/alfa reddedilir.
+  - `ProductionPage` → `ProductionPageInner` rename; default export Suspense wrapper (`useSearchParams` Next.js 15 requirement).
+  - `useSearchParams` ile `?productId=...&qty=...` parse; `prefilledRef` guard ile tek seferlik prefill; products yüklendiğinde useEffect tetiklenir; ilk satır boşsa override, doluysa prepend; toast bilgilendirmesi.
+- **+34 yeni test (4 dosya):** `products-shortages-helper.test.ts` (7: empty/error/null/DESC sıralama/PostgREST array shape/sales_orders null skip/alan mapping), `products-shortages-route.test.ts` (4: happy 2-row/empty/throw→500/totalShortage hesaplama), `alerts-order-shortage-drawer.test.ts` (9: drawerActionLinks order_shortage/eski Siparişleri incele kaldırıldı/hasOrderShortage state/fetch /api/products/X/shortages/İLGİLİ SİPARİŞLER conditional render/4 dal/list satır içeriği/aria-label/newTab target rel/orphan guard), `production-prefill.test.ts` (14: prefillLineFromQuery 7 pure helper davranış + production page 7 source-regex Suspense wrapper/useSearchParams/prefilledRef guard/products.length=0 erken return/firstEmpty pattern).
+- 177 dosya · 2755 test yeşil · TS clean · 0 lint warning · build OK · yeni route: `GET /api/products/[id]/shortages` + `/dashboard/production?productId&qty` deep link
+
+**Önceki:** Faz 9 Review Bulgular — P2 veri minimizasyonu + P3 gerçek render testi (2026-05-18; 2721 test)
 
 **Faz 9 Review Bulgular (4 dosya):**
 - **P2 KAPANDI — Veri minimizasyonu (gizlilik)**: `print/page.tsx` `dbListAllActiveProducts()` çağırıyordu — tüm aktif ürün kataloğu (35 alanlı `ProductRow`: `cost_price`, `parasut_*`, `on_hand`, `reserved`, `product_notes`, `daily_usage`, ...) RSC payload'ı üzerinden client'a serialize ediliyordu. Belge yalnızca PO satırlarındaki ürünlerin `id/sku/name/unit` 4 alanını kullanıyor. **Düzeltme:** `products.ts`'e yeni `dbGetProductRefsByIds(ids: string[]): Promise<ProductRef[]>` helper'ı eklendi (`.select("id, sku, name, unit").in("id", ids)`); empty ids → `[]` early return. `PurchaseOrderDocument` prop tipi `ProductRow[]` → `ProductRef[]` daraltıldı. `print/page.tsx` `dbListAllActiveProducts()` çağrısı `dbGetProductRefsByIds(Array.from(new Set(po.lines.map(l => l.product_id))))` ile değiştirildi (Set ile dedup; aynı ürün birden fazla satırda olabilir).

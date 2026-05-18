@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { computeCoverageDays, daysColor } from "@/lib/stock-utils";
 import { EmptyState, LoadingState } from "@/components/ui/StateViews";
 import type { AlertRow } from "@/lib/database.types";
+import type { OpenShortageDetailRow } from "@/lib/supabase/products";
 import { extractShortageQty, shortReason, shortImpact } from "@/lib/alert-ui-helpers";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
@@ -1512,12 +1513,24 @@ function drawerDetailedImpact(group: ProductAlertGroup): string {
     return "Stok minimum seviyenin altında. Yeni siparişler tam karşılanamayabilir.";
 }
 
-function drawerActionLinks(group: ProductAlertGroup): Array<{ label: string; href: string; primary: boolean }> {
+function drawerActionLinks(group: ProductAlertGroup): Array<{ label: string; href: string; primary: boolean; newTab?: boolean }> {
     const types = group.alerts.map((a) => a.type);
-    if (types.includes("order_shortage")) return [
-        { label: "Siparişleri incele",     href: "/dashboard/orders",              primary: true  },
-        { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: false },
-    ];
+    if (types.includes("order_shortage")) {
+        // Faz 10 §9.4.4: iki yönlendirme — üretim emri (yeni sekme) + satın alma.
+        // "Kısmi sevk planla" inline değil — İLGİLİ SİPARİŞLER bölümünde her sipariş
+        // ayrı "Siparişe git" link'i ile sunulur (drawer "tek başına yeterli bilgi" DoD).
+        const qty = extractShortageQty(group.alerts);
+        const qtyParam = qty != null && qty > 0 ? `&qty=${qty}` : "";
+        return [
+            {
+                label: "Üretim emri başlat (yeni sekmede)",
+                href: `/dashboard/production?productId=${group.entityId}${qtyParam}`,
+                primary: true,
+                newTab: true,
+            },
+            { label: "Satın alma planla", href: "/dashboard/purchase/suggested", primary: false },
+        ];
+    }
     if (types.includes("stock_critical")) return [
         { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: true  },
         { label: "Siparişleri incele",      href: "/dashboard/orders",              primary: false },
@@ -1574,6 +1587,37 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
     const closeBtnRef = useRef<HTMLButtonElement>(null);
     const sev         = SEV[group.topSeverity];
     const covDays     = group.coverageDays;
+
+    // Faz 10 §9.4.4 — order_shortage bilgi paneli: ürün için açık shortage'ları
+    // sipariş bağlamıyla fetch eder, drawer "tek başına yeterli bilgi" sağlar.
+    const hasOrderShortage = group.alerts.some((a) => a.type === "order_shortage");
+    const [shortageDetails, setShortageDetails]   = useState<OpenShortageDetailRow[] | null>(null);
+    const [shortageLoading, setShortageLoading]   = useState(false);
+    const [shortageError,   setShortageError]     = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!hasOrderShortage || group.isOrphaned) return;
+        let cancelled = false;
+        // void (async IIFE) — react-hooks/set-state-in-effect kuralından kaçınma
+        // (proje paterni: src/app/dashboard/purchase/orders/new/page.tsx fromDraft fetch'i).
+        void (async () => {
+            setShortageLoading(true);
+            setShortageError(null);
+            try {
+                const res = await fetch(`/api/products/${group.entityId}/shortages`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json() as { items: OpenShortageDetailRow[] };
+                if (!cancelled) setShortageDetails(data.items ?? []);
+            } catch (e) {
+                if (!cancelled) {
+                    setShortageError(e instanceof Error ? e.message : "Sipariş detayı yüklenemedi.");
+                }
+            } finally {
+                if (!cancelled) setShortageLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [hasOrderShortage, group.isOrphaned, group.entityId]);
 
     // ESC + Tab focus trap
     useEffect(() => {
@@ -1768,6 +1812,74 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                         </DrawerSection>
                     )}
 
+                    {/* ── 3.5 İlgili Siparişler (sadece order_shortage) — Faz 10 §9.4.4 ── */}
+                    {hasOrderShortage && !group.isOrphaned && (
+                        <DrawerSection title="İLGİLİ SİPARİŞLER">
+                            {shortageLoading && (
+                                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-tertiary)" }}>
+                                    Yükleniyor…
+                                </p>
+                            )}
+                            {shortageError && (
+                                <p role="alert" aria-live="polite" style={{ margin: 0, fontSize: "12px", color: "var(--danger-text)" }}>
+                                    {shortageError}
+                                </p>
+                            )}
+                            {!shortageLoading && !shortageError && shortageDetails && shortageDetails.length === 0 && (
+                                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-tertiary)" }}>
+                                    Açık shortage kalmadı (uyarı yakında otomatik kapanacak).
+                                </p>
+                            )}
+                            {!shortageLoading && !shortageError && shortageDetails && shortageDetails.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {shortageDetails.map((row) => (
+                                        <Link
+                                            key={row.shortageId}
+                                            href={`/dashboard/orders/${row.orderId}`}
+                                            aria-label={`${row.orderNumber} siparişine git (eksik ${row.shortageQty} ${group.unit})`}
+                                            style={{
+                                                display: "grid",
+                                                gridTemplateColumns: "1fr auto",
+                                                gap: "6px 12px",
+                                                padding: "10px 12px",
+                                                background: "var(--bg-secondary)",
+                                                border: "0.5px solid var(--border-tertiary)",
+                                                borderRadius: "5px",
+                                                textDecoration: "none",
+                                                color: "var(--text-primary)",
+                                            }}
+                                        >
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
+                                                <span style={{
+                                                    fontSize: "12px", fontWeight: 600, color: "var(--text-primary)",
+                                                    fontFamily: "monospace",
+                                                }}>
+                                                    {row.orderNumber}
+                                                </span>
+                                                <span style={{
+                                                    fontSize: "11px", color: "var(--text-secondary)",
+                                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                                }}>
+                                                    {row.customerName}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
+                                                <span style={{
+                                                    fontSize: "12px", fontWeight: 700, color: "var(--danger-text)",
+                                                }}>
+                                                    {row.shortageQty} {group.unit} eksik
+                                                </span>
+                                                <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
+                                                    İhtiyaç: {row.requestedQty} · Mevcut: {row.availableQty} →
+                                                </span>
+                                            </div>
+                                        </Link>
+                                    ))}
+                                </div>
+                            )}
+                        </DrawerSection>
+                    )}
+
                     {/* ── 4. Önerilen Aksiyon ── */}
                     <DrawerSection title="ÖNERİLEN AKSİYON">
                         <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
@@ -1775,6 +1887,8 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                                 <Link
                                     key={link.href}
                                     href={link.href}
+                                    target={link.newTab ? "_blank" : undefined}
+                                    rel={link.newTab ? "noopener" : undefined}
                                     style={{
                                         display: "flex",
                                         alignItems: "center",
@@ -1790,7 +1904,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                                     }}
                                 >
                                     <span>{link.label}</span>
-                                    <span>→</span>
+                                    <span>{link.newTab ? "↗" : "→"}</span>
                                 </Link>
                             ))}
                         </div>

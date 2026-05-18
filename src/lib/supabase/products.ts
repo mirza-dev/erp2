@@ -303,6 +303,89 @@ export async function dbGetOpenShortagesByProduct(): Promise<Map<string, number>
     return map;
 }
 
+// ── Open Shortage Detail by Product ──────────────────────────
+
+export interface OpenShortageDetailRow {
+    shortageId: string;
+    orderId: string;
+    orderNumber: string;
+    customerId: string;
+    customerName: string;
+    requestedQty: number;
+    availableQty: number;
+    shortageQty: number;
+    createdAt: string;
+}
+
+type SalesOrderShortageJoin = {
+    id: string;
+    order_number: string;
+    commercial_status: string;
+    customer_id: string;
+    customer_name: string;
+};
+
+/**
+ * Bir ürünün açık (status='open') shortage kayıtlarını sipariş + müşteri
+ * bilgileriyle döner. Yalnızca commercial_status='approved' siparişlerdeki
+ * shortage'lar — order_shortage alert'inin source of truth'u.
+ * Sıralama: en yeni shortage üstte (createdAt DESC).
+ *
+ * Plan §9.4.4 (Faz 10): drawer "tek başına yeterli bilgi" — kullanıcı linki
+ * tıklamadan ürün eksik miktarı + ilgili sipariş(ler)i tam görür.
+ */
+export async function dbGetOpenShortagesByProductId(
+    productId: string
+): Promise<OpenShortageDetailRow[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("shortages")
+        .select(`
+            id,
+            requested_qty,
+            available_qty,
+            shortage_qty,
+            created_at,
+            sales_orders!inner (
+                id,
+                order_number,
+                commercial_status,
+                customer_id,
+                customer_name
+            )
+        `)
+        .eq("product_id", productId)
+        .eq("status", "open")
+        .eq("sales_orders.commercial_status", "approved");
+    if (error || !data) return [];
+
+    const rows: OpenShortageDetailRow[] = [];
+    for (const raw of data as unknown as Array<{
+        id: string;
+        requested_qty: number;
+        available_qty: number;
+        shortage_qty: number;
+        created_at: string;
+        sales_orders: SalesOrderShortageJoin | SalesOrderShortageJoin[];
+    }>) {
+        const so = Array.isArray(raw.sales_orders) ? raw.sales_orders[0] : raw.sales_orders;
+        if (!so) continue;
+        rows.push({
+            shortageId: raw.id,
+            orderId: so.id,
+            orderNumber: so.order_number,
+            customerId: so.customer_id,
+            customerName: so.customer_name,
+            requestedQty: raw.requested_qty,
+            availableQty: raw.available_qty,
+            shortageQty: raw.shortage_qty,
+            createdAt: raw.created_at,
+        });
+    }
+    rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return rows;
+}
+
 /**
  * Returns a map of product_id → total quoted quantity across all active
  * draft and pending_approval orders. Used to compute `promisable` stock.

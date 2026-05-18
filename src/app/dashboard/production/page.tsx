@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { Suspense, useState, useCallback, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { formatNumber, safeRandomUUID } from "@/lib/utils";
 import Button from "@/components/ui/Button";
@@ -20,6 +21,26 @@ interface FormLine {
 
 function newLine(): FormLine {
     return { id: safeRandomUUID(), productId: "", adet: "", notlar: "" };
+}
+
+/**
+ * Pure helper — parses ?productId=...&qty=... into a prefill FormLine.
+ * Returns null if productId is missing or not in the active product set.
+ * qty is accepted only if it is a positive number; non-numeric values fall back to "".
+ * Faz 10 §9.4.4 — order_shortage drawer "Üretim emri başlat (yeni sekmede)" link.
+ */
+export function prefillLineFromQuery(
+    rawProductId: string | null,
+    rawQty: string | null,
+    activeProductIds: Set<string>,
+): FormLine | null {
+    if (!rawProductId) return null;
+    if (!activeProductIds.has(rawProductId)) return null;
+    let qtyStr = "";
+    if (rawQty && /^\d+(\.\d+)?$/.test(rawQty) && Number(rawQty) > 0) {
+        qtyStr = rawQty;
+    }
+    return { id: safeRandomUUID(), productId: rawProductId, adet: qtyStr, notlar: "" };
 }
 
 const today = () => {
@@ -60,10 +81,11 @@ const tdStyle: React.CSSProperties = {
     color: "var(--text-primary)",
 };
 
-export default function ProductionPage() {
+function ProductionPageInner() {
     const { products, uretimKayitlari, addUretimKaydi, deleteUretimKaydi, loadError } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const searchParams = useSearchParams();
     const [tarih, setTarih] = useState(today());
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
     const [isSaving, setIsSaving] = useState(false);
@@ -73,6 +95,32 @@ export default function ProductionPage() {
     const todayLogs = uretimKayitlari.filter(k => k.tarih === todayStr);
     const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
     const transcriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Faz 10 §9.4.4 — ?productId=...&qty=... prefill (order_shortage drawer "Üretim emri başlat")
+    // Tek seferlik: ürün aktif listede yoksa veya prefill zaten uygulandıysa skip.
+    const prefilledRef = useRef(false);
+    useEffect(() => {
+        if (prefilledRef.current) return;
+        if (products.length === 0) return; // products henüz yüklenmedi
+        const activeIds = new Set(products.map(p => p.id));
+        const newLineEntry = prefillLineFromQuery(
+            searchParams.get("productId"),
+            searchParams.get("qty"),
+            activeIds,
+        );
+        if (!newLineEntry) return;
+        prefilledRef.current = true;
+        setLines(prev => {
+            const firstEmpty = prev.length === 1 && !prev[0].productId && !prev[0].adet;
+            return firstEmpty ? [newLineEntry] : [newLineEntry, ...prev];
+        });
+        toast({
+            type: "info",
+            message: newLineEntry.adet
+                ? `Eksik stok için ${newLineEntry.adet} adet üretim önerildi — kaydetmek için "Kaydet"e basın.`
+                : "Eksik stok için üretim önerildi — adet girip kaydedin.",
+        });
+    }, [searchParams, products, toast]);
 
     const handleVoiceResult = useCallback(async ({ blob, filename }: VoiceRecorderResult) => {
         const formData = new FormData();
@@ -591,5 +639,13 @@ export default function ProductionPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function ProductionPage() {
+    return (
+        <Suspense fallback={<div style={{ padding: 20, color: "var(--text-secondary)" }}>Yükleniyor…</div>}>
+            <ProductionPageInner />
+        </Suspense>
     );
 }
