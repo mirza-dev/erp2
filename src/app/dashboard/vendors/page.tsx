@@ -3,6 +3,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/ui/Pagination";
 import type { VendorRow } from "@/lib/database.types";
 
 // ── Styles ────────────────────────────────────────────────────
@@ -161,6 +163,9 @@ export default function VendorsPage() {
             (v.contact_email ?? "").toLowerCase().includes(q),
         );
     }, [vendors, search]);
+
+    const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
+        usePagination(filtered, { resetKey: `${search}|${showAll}` });
 
     const setField = (key: keyof FormState) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -335,7 +340,7 @@ export default function VendorsPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map(v => (
+                            {pagedItems.map(v => (
                                 <tr key={v.id} style={{ transition: "background 0.08s" }}
                                     onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-secondary)")}
                                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
@@ -448,6 +453,16 @@ export default function VendorsPage() {
                             ))}
                         </tbody>
                     </table>
+                )}
+                {!loading && filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        itemLabel="tedarikçi"
+                    />
                 )}
             </div>
 

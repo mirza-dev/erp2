@@ -12,6 +12,8 @@ import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { dateDaysFromToday } from "@/lib/stock-utils";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/ui/Pagination";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral" },
@@ -173,6 +175,11 @@ function OrdersList() {
         if (currencyFilter && o.currency !== currencyFilter) return false;
         return true;
     }), [mockOrders, search, customerIdFilter, activeTab, dateFrom, dateTo, currencyFilter]);
+
+    const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
+        usePagination(filtered, {
+            resetKey: `${activeTab}|${search}|${customerIdFilter ?? ""}|${dateFrom}|${dateTo}|${currencyFilter}`,
+        });
 
     const getCount = (tab: FilterTab) =>
         tab === "ALL" ? mockOrders.length : mockOrders.filter(o => matchesTab(o, tab)).length;
@@ -385,7 +392,7 @@ function OrdersList() {
                                 </td>
                             </tr>
                         ) : (
-                            filtered.map((order) => {
+                            pagedItems.map((order) => {
                                 const commercial = commercialStatusConfig[order.commercial_status];
                                 const fulfillment = fulfillmentStatusConfig[order.fulfillment_status];
                                 return (
@@ -515,6 +522,16 @@ function OrdersList() {
                         )}
                     </tbody>
                 </table>
+                {filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        itemLabel="sipariş"
+                    />
+                )}
             </div>
         </div>
     );

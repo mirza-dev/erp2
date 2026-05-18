@@ -3,7 +3,23 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-18_
 
-**Son tamamlanan iş:** Faz 10 Review Bulgu — DB hata yutma kapatıldı (2026-05-18; 2755 test)
+**Son tamamlanan iş:** Genel Pagination — 6 liste sayfasına sayfa başına 50 kayıt + numaralı sayfalama (2026-05-18; 2794 test)
+
+**Genel Pagination (8 dosya: 3 yeni + 5 modifiye + 1 + integration test):**
+- **`src/hooks/usePagination.ts`** (YENİ): `PAGE_SIZE=50` sabit + generic `usePagination<T>(items, { pageSize?, resetKey? })` hook. Pure helper'lar export edilir: `computeTotalPages`, `clampPage`, `slicePage` (test edilebilir). `resetKey` değişince render-time "Adjusting state based on prop change" paterniyle page=1'e döner (React 19 `set-state-in-effect` kuralı için useEffect kullanılmıyor — `prevResetKey` state ile karşılaştırma). Filtre daraldığında `safePage = clampPage(currentPage, totalPages)` derived clamp (state yazımı yok).
+- **`src/components/ui/Pagination.tsx`** (YENİ, client): A11y-first numaralı sayfalama UI. Pure helper export: `buildPageWindow(current, total): (number | "…")[]` — `total<=7 → tüm sayfalar`; aksi halde `1, current±2, total` + gap'lerde `"…"`. `totalPages<=1 → null` (auto-hide). Info text (sol): `{X}-{Y} / {total} {itemLabel}`. Kontroller (sağ): `‹ Önceki` · windowed numbers · `Sonraki ›` (prev/next disabled state). Aktif sayfa: `aria-current="page"` + `var(--accent-bg)`. Ellipsis: `<span aria-hidden>` (button değil). `<nav aria-label="Sayfalama">` wrapper. Inline CSS + CSS variables (proje paterni).
+- **6 liste sayfasına entegrasyon** (kanonik 3-satır değişiklik: import + `usePagination` çağrısı + `filtered.map` → `pagedItems.map` + Pagination component'i `</table>` sonrasına):
+  - `vendors/page.tsx` — `resetKey: search|showAll`, `itemLabel="tedarikçi"`
+  - `purchase/orders/page.tsx` — `resetKey: search|activeTab`, `itemLabel="sipariş"`
+  - `quotes/page.tsx` — `resetKey: activeTab|search|currencyFilter|dateFrom|dateTo`, `itemLabel="teklif"`
+  - `customers/page.tsx` — `mockCustomers.filter(...)` inline çağrı `useMemo` ile sarmalandı (referans stabilitesi); `resetKey: activeFilter|search`, `itemLabel="müşteri"`
+  - `orders/page.tsx` — `resetKey: activeTab|search|customerIdFilter|dateFrom|dateTo|currencyFilter`, `itemLabel="sipariş"`
+  - `products/page.tsx` — multi-filter `resetKey: search|alertFilter|selectedCategories|filterManufactured|filterCommercial`, `itemLabel="ürün"`. Üst sayaçlar (kritik/risk/uyarı counts) `mockProducts` toplamlarından — sayfa başına değil, doğru UX.
+- **+39 yeni test (3 dosya):** `use-pagination.test.ts` (16: PAGE_SIZE export + pure helper'lar — computeTotalPages 5, clampPage 4, slicePage 5), `pagination-component.test.ts` (17: module load 1 + buildPageWindow 5 + renderToStaticMarkup smoke 11 — null render, info text 4 varyant, a11y nav/aria-current/aria-label, prev/next disabled, ellipsis span), `pagination-integration.test.ts` (6: tüm liste sayfalarında `usePagination` + `Pagination` import + `pagedItems.map(...)` + `filtered.map(...)` regression lock + itemLabel kontrol).
+- 180 dosya · **2794 test yeşil** · TS clean · 0 lint warning · build OK · Migration yok, API yok — sadece frontend client-side slicing
+- **Karar — Client-side pagination:** DataContext zaten tüm aktif veriyi `?all=1` ile çekiyor; filtre/arama in-memory yapılıyor → pagination da in-memory. API/backend dokunulmadı. Hook generic return shape sayesinde server-side'a migrate edilirse UI değişmez.
+
+**Önceki:** Faz 10 Review Bulgu — DB hata yutma kapatıldı (2026-05-18; 2755 test)
 
 **Faz 10 Review (P2 reliability, 2 dosya):**
 - **P2 KAPANDI — `dbGetOpenShortagesByProductId` hata yutma**: `if (error || !data) return []` → Supabase DB/permission/query hatası sessizce boş array dönüyordu; route 200 `{ items: [] }` üretiyor, drawer "Açık shortage kalmadı (uyarı yakında otomatik kapanacak)" empty branch'ine düşüp kullanıcıyı yanıltıyordu. **Düzeltme:** `if (error) throw new Error(...); if (!data) return [];` — error explicit throw, defensive `data=null` (beklenmeyen durum) için empty kalır. handleApiError zaten 500 maps; drawer `shortageError` set → "Açık shortage kalmadı" branch'i tetiklenmez ("eksik yok" ≠ "DB hatası").

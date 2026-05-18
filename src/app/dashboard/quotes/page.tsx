@@ -9,6 +9,8 @@ import Button from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/ui/Pagination";
 import { getValidUntilBadge, canDeleteQuote } from "./_utils/quote-display";
 
 type QuoteStatus = QuoteSummary["status"];
@@ -120,6 +122,11 @@ function QuotesList() {
         if (dateTo && d > dateTo) return false;
         return true;
     }), [quotes, activeTab, search, currencyFilter, dateFrom, dateTo]);
+
+    const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
+        usePagination(filtered, {
+            resetKey: `${activeTab}|${search}|${currencyFilter}|${dateFrom}|${dateTo}`,
+        });
 
     const getCount = (tab: FilterTab) =>
         tab === "ALL" ? quotes.length : quotes.filter(q => q.status === tab).length;
@@ -338,7 +345,7 @@ function QuotesList() {
                                 </td>
                             </tr>
                         ) : (
-                            filtered.map((q) => {
+                            pagedItems.map((q) => {
                                 const statusCfg = quoteStatusConfig[q.status];
                                 const badge = (q.status === "draft" || q.status === "sent")
                                     ? getValidUntilBadge(q.validUntil)
@@ -458,6 +465,16 @@ function QuotesList() {
                         )}
                     </tbody>
                 </table>
+                {filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        itemLabel="teklif"
+                    />
+                )}
             </div>
         </div>
     );

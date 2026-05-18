@@ -9,6 +9,8 @@ import { useToast } from "@/components/ui/Toast";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { dateDaysFromToday } from "@/lib/stock-utils";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/ui/Pagination";
 
 
 interface RiskItem {
@@ -444,6 +446,11 @@ export default function ProductsPage() {
             (filterManufactured && filterCommercial && (p.productType === "manufactured" || p.productType === "commercial"));
         return matchSearch && matchCategory && matchSignal && matchUsage;
     }), [mockProducts, search, selectedCategories, riskData, recMap, alertFilter, productsWithAlerts, filterManufactured, filterCommercial]);
+
+    const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
+        usePagination(filtered, {
+            resetKey: `${search}|${alertFilter}|${selectedCategories.join(",")}|${filterManufactured ? "M" : ""}|${filterCommercial ? "C" : ""}`,
+        });
 
     const criticalCount = mockProducts.filter(p => p.promisable <= p.minStockLevel).length;
 
@@ -921,7 +928,7 @@ export default function ProductsPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {filtered.map((product) => {
+                        {pagedItems.map((product) => {
                             const risk = riskData.get(product.id);
                             const isCritical = product.promisable <= product.minStockLevel;
                             const hasAlert = productsWithAlerts.has(product.id);
@@ -1138,6 +1145,17 @@ export default function ProductsPage() {
                         })}
                     </tbody>
                 </table>
+
+                {filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        itemLabel="ürün"
+                    />
+                )}
 
                 {filtered.length === 0 && (
                     <div style={{

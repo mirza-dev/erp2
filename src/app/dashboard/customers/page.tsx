@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { formatCurrency } from "@/lib/utils";
 import { type Customer } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
@@ -8,6 +8,8 @@ import CustomerDetailPanel from "@/components/customers/CustomerDetailPanel";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/ui/Pagination";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -103,12 +105,15 @@ export default function CustomersPage() {
     const activeCount = mockCustomers.filter(c => c.isActive).length;
     const passiveCount = mockCustomers.filter(c => !c.isActive).length;
 
-    const filtered = mockCustomers.filter((c) => {
+    const filtered = useMemo(() => mockCustomers.filter((c) => {
         if (activeFilter === "active" && !c.isActive) return false;
         if (activeFilter === "passive" && c.isActive) return false;
         const q = search.toLowerCase();
         return c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q) || c.country.toLowerCase().includes(q);
-    });
+    }), [mockCustomers, activeFilter, search]);
+
+    const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
+        usePagination(filtered, { resetKey: `${activeFilter}|${search}` });
 
     return (
         <>
@@ -224,7 +229,7 @@ export default function CustomersPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map((customer) => (
+                            {pagedItems.map((customer) => (
                                 <tr
                                     key={customer.id}
                                     style={{ cursor: "pointer" }}
@@ -362,6 +367,16 @@ export default function CustomersPage() {
                             ))}
                         </tbody>
                     </table>
+                    {filtered.length > 0 && (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={totalItems}
+                            pageSize={pageSize}
+                            onPageChange={setCurrentPage}
+                            itemLabel="müşteri"
+                        />
+                    )}
                 </div>
             </div>
 

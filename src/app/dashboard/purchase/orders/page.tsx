@@ -4,6 +4,8 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
+import { usePagination } from "@/hooks/usePagination";
+import Pagination from "@/components/ui/Pagination";
 import type { PurchaseOrderRow, PurchaseOrderStatus, VendorRow } from "@/lib/database.types";
 
 const thStyle: React.CSSProperties = {
@@ -92,6 +94,9 @@ export default function PurchaseOrdersPage() {
             (vendorMap.get(o.vendor_id) ?? "").toLowerCase().includes(q),
         );
     }, [orders, search, vendorMap]);
+
+    const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
+        usePagination(filtered, { resetKey: `${search}|${activeTab}` });
 
     return (
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
@@ -187,7 +192,7 @@ export default function PurchaseOrdersPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filtered.map(o => (
+                            {pagedItems.map(o => (
                                 <tr key={o.id}
                                     style={{ transition: "background 0.08s", cursor: "pointer" }}
                                     onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-secondary)")}
@@ -226,6 +231,16 @@ export default function PurchaseOrdersPage() {
                             ))}
                         </tbody>
                     </table>
+                )}
+                {!loading && filtered.length > 0 && (
+                    <Pagination
+                        currentPage={currentPage}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={setCurrentPage}
+                        itemLabel="sipariş"
+                    />
                 )}
             </div>
         </div>
