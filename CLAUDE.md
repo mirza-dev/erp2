@@ -3,7 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 2d Review P3-007 — Demo guard davranış testleri (2026-05-19; 3119 test)
+**Son tamamlanan iş:** Faz 2e İPTAL — Parti tablosu ve UI tamamen silindi (2026-05-19; 3098 test)
+
+- **Karar:** PMT ölçeğinde parti (heat lot / FIFO) iş gereksinimi yok; sertifika `product_attachments` ile zaten ürüne bağlı.
+- **Silinenler:** Migration 060 (DROP product_batches CASCADE) + product-batches.ts helper + 2 route + ProductBatchRow type + detay sayfası partiler tabı (7→6 sekme) + 2 test dosyası.
+- **Geri alma:** 059 migration + helper Faz 2a commit `b7c0227` git history'de.
+- 8 dosya · **3098 test yeşil** (-21 batch test) · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 2d Review P3-007 — Demo guard davranış testleri (2026-05-19; 3119 test) · commit `05cc81e`
 
 - **P3-007 KAPANDI:** `vi.stubEnv` + `@supabase/ssr` mock + gerçek `middleware(NextRequest)` koşumu ile 10 davranış testi. env true/false × demo cookie × auth user matrisi: 401 trigger doğru path'lerde, scope sızıntısı yok, default off, authenticated kullanıcı etkilenmez, literal "true" comparison.
 - 1 dosya · **3119 test yeşil** (+10 davranış) · TS clean · 0 lint warning · build OK

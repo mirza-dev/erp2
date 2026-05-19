@@ -16,7 +16,7 @@ import { DynamicFieldEdit, FieldEdit } from "@/components/products/DynamicFieldE
 // Source of truth: src/lib/supabase/product-attachments.ts ALLOWED_MIME.
 const ATTACHMENT_ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
 
-type TabKey = "genel" | "teknik" | "stok" | "tedarik" | "ticari" | "ekler" | "partiler";
+type TabKey = "genel" | "teknik" | "stok" | "tedarik" | "ticari" | "ekler";
 
 interface ProductTypeWithFields extends ProductTypeRow {
     fields: ProductTypeFieldRow[];
@@ -792,7 +792,6 @@ export default function ProductDetailPage() {
         { key: "tedarik", label: "Tedarik", locked: false },
         { key: "ticari", label: "Ticari", locked: false },
         { key: "ekler", label: "Ekler", locked: false },
-        { key: "partiler", label: "Partiler", locked: true, lockedNote: "Faz 2e'de gelecek" },
     ];
 
     return (
@@ -1598,14 +1597,6 @@ export default function ProductDetailPage() {
                     </div>
                 )}
 
-                {activeTab === "partiler" && (
-                    <div style={cardStyle}>
-                        <div style={sectionTitleStyle}>Partiler</div>
-                        <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                            🔒 Bu sekme Faz 2e&apos;de gelecek — heat_no/tarih/miktar CRUD + sertifika linki burada olacak.
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* Type change confirm modal */}

@@ -168,19 +168,6 @@ export interface ProductAttachmentRow {
     uploaded_by: string | null
 }
 
-export interface ProductBatchRow {
-    id: string
-    product_id: string
-    heat_no: string
-    batch_date: string | null
-    initial_qty: number
-    remaining_qty: number
-    certificate_attachment_id: string | null
-    notes: string | null
-    created_at: string
-    updated_at: string
-}
-
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */
 export interface ProductWithStock extends ProductRow {
     available_now: number

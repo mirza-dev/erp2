@@ -7,6 +7,24 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
+**Faz 2e İPTAL — Parti tablosu ve UI tamamen silindi (3098 test)**
+
+- **Karar:** PMT ölçeğinde parti (heat lot / FIFO izlenebilirlik) iş gereksinimi yok. Sertifika dosyaları `product_attachments` (kind=certificate) ile zaten ürüne bağlanıyor; ayrı `product_batches` tablosu bakım yükü oluşturuyordu.
+- **Silinenler:**
+  - Migration 060: `DROP TABLE product_batches CASCADE` + index/trigger/policy/function temizliği
+  - `src/lib/supabase/product-batches.ts` helper
+  - `/api/products/[id]/batches/route.ts` + `/[batchId]/route.ts`
+  - `database.types.ts` `ProductBatchRow` interface
+  - Detay sayfası: TabKey'den `partiler` çıkarıldı, tab tanımı + placeholder render silindi (7 sekme → 6 sekme)
+  - 2 test dosyası (`product-batches-helper.test.ts`, `product-batches-route.test.ts`)
+- **Güncellenenler:** `product-detail-page.test.ts` — "6 tab key" + "no tabs are locked" assertion'ları
+- **Geri alma:** 059 migration + helper Faz 2a commit `b7c0227` git history'de — ileride istenirse oradan restore.
+- 8 dosya silindi/değişti · **3098 test yeşil** (-21 batch test) · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 2d Review P3-007 (3119 test, commit `05cc81e`)
+
 **Faz 2d Review P3-007 — Demo guard davranış testleri (3119 test)**
 
 - **P3-007 KAPANDI** (middleware guard'ın gerçek koşumu): Mevcut source-regex testlerinin yanına 10 davranış testi eklendi — `@supabase/ssr` mock'lu, gerçek `middleware()` + `NextRequest` ile env true/false × demo cookie × auth user kombinasyonları:

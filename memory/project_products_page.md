@@ -20,8 +20,8 @@ Drawer'a ait tüm state'ler (`selectedProductId`, `drawerEditMode`, `drawerSavin
 
 `src/app/dashboard/products/[id]/page.tsx` — client component, 7-sekme yapısı.
 
-**Aktif sekmeler:** Genel / Stok / Tedarik / Ticari  
-**Placeholder sekmeler:** Teknik 🔒 (Faz 2c) / Ekler 🔒 (Faz 2d) / Partiler 🔒 (Faz 2e)
+**Aktif sekmeler (6):** Genel / Teknik / Stok / Tedarik / Ticari / Ekler
+**Faz 2e (Partiler) iptal edildi (2026-05-19):** parti/heat_no izlenebilirlik iş gereksinimi olmadığı için tab + product_batches tablosu + helper/route'lar tamamen silindi. Sertifika `product_attachments` kind=certificate ile ürüne bağlı. Geri alma: commit `b7c0227` (Faz 2a) git history'de.
 
 **fetchProduct:** `GET /api/products/${productId}` → zenginleştirilmiş response (quoted/incoming/promisable/forecasted dahil) → `mapProduct(data)`.
 

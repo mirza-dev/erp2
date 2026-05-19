@@ -41,19 +41,16 @@ describe("Faz 2b — product detail page source", () => {
         expect(SOURCE).toMatch(/fetch\(\s*`\/api\/products\/\$\{productId\}`/);
     });
 
-    it("declares all 7 tab keys", () => {
-        for (const key of ["genel", "teknik", "stok", "tedarik", "ticari", "ekler", "partiler"]) {
+    it("declares all 6 tab keys (partiler removed — Faz 2e iptal)", () => {
+        for (const key of ["genel", "teknik", "stok", "tedarik", "ticari", "ekler"]) {
             expect(SOURCE).toContain(`"${key}"`);
         }
+        expect(SOURCE).not.toContain('"partiler"');
     });
 
-    it("locks Partiler with Faz 2e placeholder (Teknik unlocked in Faz 2c, Ekler unlocked in Faz 2d)", () => {
-        expect(SOURCE).toMatch(/Faz 2e&apos;de gelecek/);
-        expect(SOURCE).toMatch(/locked:\s*true/);
-        // Teknik tab is no longer locked — Faz 2c implemented dynamic field rendering
-        expect(SOURCE).not.toMatch(/key:\s*"teknik".*locked:\s*true/);
-        // Ekler tab is no longer locked — Faz 2d implemented attachments UI
-        expect(SOURCE).not.toMatch(/key:\s*"ekler".*locked:\s*true/);
+    it("no tabs are locked (Teknik unlocked in Faz 2c, Ekler unlocked in Faz 2d, Partiler removed)", () => {
+        expect(SOURCE).not.toMatch(/locked:\s*true/);
+        expect(SOURCE).not.toMatch(/Faz 2e/);
     });
 
     it("save handler PATCHes /api/products/[id]", () => {

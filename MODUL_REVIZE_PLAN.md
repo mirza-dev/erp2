@@ -1,5 +1,7 @@
 # Modül Revize Planı — Ürün / AI Import / Teklif
 
+> **Faz 2e İPTAL (2026-05-19):** Parti (heat_no/FIFO) izlenebilirliği PMT ölçeğinde iş gereksinimi olmadığı için tamamen kaldırıldı. Aşağıdaki Partiler sekmesi/`product_batches` tablosu/Faz 2e referansları **artık geçerli değil** — sertifika fonksiyonalitesi `product_attachments` (kind=certificate) ile Ekler sekmesinde karşılanıyor. Detay: `migration 060_drop_product_batches.sql`. Geri alma: commit `b7c0227` (Faz 2a) git history.
+
 ## 🎯 Progress Tracker
 
 **Son güncelleme:** 2026-05-19
