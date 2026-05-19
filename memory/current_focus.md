@@ -7,7 +7,18 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
-**Modül Revize Faz 1 — Dinamik Ürün Tipi Altyapısı (2855 test)**
+**Faz 1 Review — 3 bulgu kapatma (2873 test)**
+
+Kullanıcı Faz 1 commit'ini (`67708d1`) review etti, 3 açık bulgu buldu:
+- **P2:** field add/update/delete sistem kilidini düşürmüyordu (header edit düşürüyordu, field tarafı yok) → 3 helper'a parent fetch + `is_system=false` UPDATE eklendi
+- **P3 (route):** `[id]/fields/[fieldId]` route'u `id`'yi destructure etmiyordu → cross-tenant açığı vardı (`/typeA/fields/fieldOfTypeB` çalışırdı). Helper'lara opsiyonel `expectedTypeId` parametresi, route'tan geçiriliyor → uyumsuz → "Alan bu tipe ait değil" 404
+- **P3 (products):** `CreateProductInput` `product_type_id`/`attributes` içermiyordu; `dbCreateProduct` insert payload bu alanları yazmıyordu → write yolu yarımdı → tip + insert güncellendi, default null/{}
+- +18 test (helper 6 + route 4 + yeni products-attributes-write-read.test.ts 8)
+- 184 dosya · 2873 test · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Modül Revize Faz 1 (2026-05-19; 2855 test)
 
 ### Bağlam
 Kullanıcı 35 soruluk Q&A ile 3 modülün revizesini kararlaştırdı:

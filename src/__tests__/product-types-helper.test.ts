@@ -213,3 +213,115 @@ describe("dbDeleteProductType", () => {
         await expect(dbDeleteProductType("t-x")).rejects.toThrow("Tip bulunamadı.");
     });
 });
+
+// ── P2 — Field CRUD'larında is_system kilidi düşürme (source-regex regression lock) ─────
+
+describe("P2 — Field CRUD is_system kilidini düşürür (source-regex)", () => {
+    it("dbAddProductTypeField parent.is_system kontrolü + UPDATE is_system:false", async () => {
+        const fs = await import("fs/promises");
+        const src = await fs.readFile("src/lib/supabase/product-types.ts", "utf-8");
+
+        // dbAddProductTypeField içinde parent fetch is_system seçer
+        const addFnStart = src.indexOf("export async function dbAddProductTypeField");
+        const addFnEnd = src.indexOf("export async function dbUpdateProductTypeField");
+        const addBody = src.slice(addFnStart, addFnEnd);
+
+        expect(addBody).toContain('.select("id, is_system")');
+        expect(addBody).toContain("if (parent.is_system)");
+        expect(addBody).toMatch(/\.update\(\{\s*is_system:\s*false\s*\}\)/);
+    });
+
+    it("dbUpdateProductTypeField parent fetch + system kilidini düşürür", async () => {
+        const fs = await import("fs/promises");
+        const src = await fs.readFile("src/lib/supabase/product-types.ts", "utf-8");
+
+        const upStart = src.indexOf("export async function dbUpdateProductTypeField");
+        const upEnd = src.indexOf("export async function dbDeleteProductTypeField");
+        const upBody = src.slice(upStart, upEnd);
+
+        expect(upBody).toContain('.select("id, is_system")');
+        expect(upBody).toContain("if (parent?.is_system)");
+        expect(upBody).toMatch(/\.update\(\{\s*is_system:\s*false\s*\}\)/);
+    });
+
+    it("dbDeleteProductTypeField parent fetch + system kilidini düşürür", async () => {
+        const fs = await import("fs/promises");
+        const src = await fs.readFile("src/lib/supabase/product-types.ts", "utf-8");
+
+        const delStart = src.indexOf("export async function dbDeleteProductTypeField");
+        const delEnd = src.indexOf("export async function dbReorderProductTypeFields");
+        const delBody = src.slice(delStart, delEnd);
+
+        expect(delBody).toContain('.select("id, is_system")');
+        expect(delBody).toContain("if (parent?.is_system)");
+        expect(delBody).toMatch(/\.update\(\{\s*is_system:\s*false\s*\}\)/);
+    });
+});
+
+// ── P3 — Field PATCH/DELETE expectedTypeId guard (behavioral) ───
+
+describe("P3 — Field cross-tenant koruması", () => {
+    it("dbUpdateProductTypeField: existing.product_type_id != expectedTypeId → 'Alan bu tipe ait değil'", async () => {
+        const { dbUpdateProductTypeField } = await vi.importActual<typeof import("@/lib/supabase/product-types")>("@/lib/supabase/product-types");
+        // 1. single → existing field, product_type_id="typeA"
+        mockSingle.mockResolvedValueOnce({
+            data: {
+                id: "f-1",
+                product_type_id: "typeA",
+                field_key: "dn",
+                label_tr: "DN",
+                field_type: "number",
+                required: false,
+            },
+            error: null,
+        });
+        await expect(
+            dbUpdateProductTypeField("f-1", { label_tr: "Çap" }, "typeB"),
+        ).rejects.toThrow("Alan bu tipe ait değil");
+    });
+
+    it("dbUpdateProductTypeField: expectedTypeId verilmezse cross-check atlanır", async () => {
+        const { dbUpdateProductTypeField } = await vi.importActual<typeof import("@/lib/supabase/product-types")>("@/lib/supabase/product-types");
+        // existing field
+        mockSingle.mockResolvedValueOnce({
+            data: {
+                id: "f-1",
+                product_type_id: "typeA",
+                field_key: "dn",
+                label_tr: "DN",
+                field_type: "number",
+                required: false,
+            },
+            error: null,
+        });
+        // parent fetch (is_system: false → no UPDATE side effect)
+        mockSingle.mockResolvedValueOnce({
+            data: { id: "typeA", is_system: false },
+            error: null,
+        });
+        // update result
+        mockSingle.mockResolvedValueOnce({
+            data: { id: "f-1", product_type_id: "typeA", field_key: "dn", label_tr: "Çap", field_type: "number", required: false },
+            error: null,
+        });
+        // expectedTypeId yok → cross-check skipped, çağrı geçer
+        await expect(
+            dbUpdateProductTypeField("f-1", { label_tr: "Çap" }),
+        ).resolves.toBeDefined();
+    });
+
+    it("dbDeleteProductTypeField: existing.product_type_id != expectedTypeId → 'Alan bu tipe ait değil'", async () => {
+        const { dbDeleteProductTypeField } = await vi.importActual<typeof import("@/lib/supabase/product-types")>("@/lib/supabase/product-types");
+        mockSingle.mockResolvedValueOnce({
+            data: {
+                id: "f-1",
+                product_type_id: "typeA",
+                field_key: "dn",
+            },
+            error: null,
+        });
+        await expect(
+            dbDeleteProductTypeField("f-1", "typeB"),
+        ).rejects.toThrow("Alan bu tipe ait değil");
+    });
+});

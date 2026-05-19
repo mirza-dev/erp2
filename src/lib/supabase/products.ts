@@ -32,6 +32,10 @@ export interface CreateProductInput {
     standards?: string;
     certifications?: string;
     product_notes?: string;
+    /** Faz 1 review — dinamik tip altyapısı: hangi ürün tipine ait (nullable). */
+    product_type_id?: string | null;
+    /** Faz 1 review — dinamik tip altyapısı: tipe özgü alanlar JSON. */
+    attributes?: Record<string, unknown>;
 }
 
 export interface ListProductsFilter {
@@ -170,6 +174,8 @@ export async function dbCreateProduct(input: CreateProductInput): Promise<Produc
             standards: input.standards ?? null,
             certifications: input.certifications ?? null,
             product_notes: input.product_notes ?? null,
+            product_type_id: input.product_type_id ?? null,
+            attributes: input.attributes ?? {},
         })
         .select("*")
         .single();

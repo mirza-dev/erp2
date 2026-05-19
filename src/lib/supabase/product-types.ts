@@ -286,9 +286,9 @@ export async function dbAddProductTypeField(input: CreateProductTypeFieldInput):
 
     const supabase = createServiceClient();
 
-    // Parent tip var mı?
+    // Parent tip var mı? (is_system bilgisi de gerekiyor — field düzenlenince system kilidi düşer)
     const { data: parent } = await supabase
-        .from("product_types").select("id").eq("id", input.product_type_id).single();
+        .from("product_types").select("id, is_system").eq("id", input.product_type_id).single();
     if (!parent) throw new Error("Üst tip bulunamadı.");
 
     const { data, error } = await supabase
@@ -315,18 +315,33 @@ export async function dbAddProductTypeField(input: CreateProductTypeFieldInput):
     }
     if (!data) throw new Error("Alan oluşturulamadı.");
 
+    // System tipi field eklenince kullanıcı tipi sayılır → kilidi düşür (header edit ile aynı semantik).
+    if (parent.is_system) {
+        await supabase.from("product_types").update({ is_system: false }).eq("id", input.product_type_id);
+    }
+
     await supabase.from("audit_log").insert({
         action: "product_type_field_added",
         entity_type: "product_type",
         entity_id: input.product_type_id,
-        after_state: { field_key: data.field_key, field_type: data.field_type, required: data.required },
+        before_state: parent.is_system ? { is_system: true } : null,
+        after_state: {
+            field_key: data.field_key,
+            field_type: data.field_type,
+            required: data.required,
+            ...(parent.is_system ? { is_system: false } : {}),
+        },
         source: "ui",
     });
 
     return data;
 }
 
-export async function dbUpdateProductTypeField(id: string, patch: UpdateProductTypeFieldInput): Promise<ProductTypeFieldRow> {
+export async function dbUpdateProductTypeField(
+    id: string,
+    patch: UpdateProductTypeFieldInput,
+    expectedTypeId?: string,
+): Promise<ProductTypeFieldRow> {
     const err = validateFieldInput(patch);
     if (err) throw new Error(err);
 
@@ -335,6 +350,15 @@ export async function dbUpdateProductTypeField(id: string, patch: UpdateProductT
     const { data: existing } = await supabase
         .from("product_type_fields").select("*").eq("id", id).single();
     if (!existing) throw new Error("Alan bulunamadı.");
+
+    // Nested route scope: parent type ile uyumsuz field → cross-tenant koruması.
+    if (expectedTypeId !== undefined && existing.product_type_id !== expectedTypeId) {
+        throw new Error("Alan bu tipe ait değil.");
+    }
+
+    // Parent type'ın is_system durumunu çek (system tipi field düzenlenince kilidi düşer).
+    const { data: parent } = await supabase
+        .from("product_types").select("id, is_system").eq("id", existing.product_type_id).single();
 
     const updatePayload: Record<string, unknown> = {};
     if (patch.label_tr !== undefined) updatePayload.label_tr = patch.label_tr.trim();
@@ -357,33 +381,65 @@ export async function dbUpdateProductTypeField(id: string, patch: UpdateProductT
     if (error) throw new Error(error.message);
     if (!data) throw new Error("Alan bulunamadı.");
 
+    // System tipi field düzenlenince kullanıcı tipi sayılır → kilidi düşür.
+    if (parent?.is_system) {
+        await supabase.from("product_types").update({ is_system: false }).eq("id", existing.product_type_id);
+    }
+
     await supabase.from("audit_log").insert({
         action: "product_type_field_updated",
         entity_type: "product_type",
         entity_id: existing.product_type_id,
-        before_state: { field_key: existing.field_key, field_type: existing.field_type, required: existing.required },
-        after_state: updatePayload,
+        before_state: {
+            field_key: existing.field_key,
+            field_type: existing.field_type,
+            required: existing.required,
+            ...(parent?.is_system ? { is_system: true } : {}),
+        },
+        after_state: {
+            ...updatePayload,
+            ...(parent?.is_system ? { is_system: false } : {}),
+        },
         source: "ui",
     });
 
     return data;
 }
 
-export async function dbDeleteProductTypeField(id: string): Promise<void> {
+export async function dbDeleteProductTypeField(id: string, expectedTypeId?: string): Promise<void> {
     const supabase = createServiceClient();
 
     const { data: existing } = await supabase
         .from("product_type_fields").select("*").eq("id", id).single();
     if (!existing) throw new Error("Alan bulunamadı.");
 
+    // Nested route scope: parent type ile uyumsuz field → cross-tenant koruması.
+    if (expectedTypeId !== undefined && existing.product_type_id !== expectedTypeId) {
+        throw new Error("Alan bu tipe ait değil.");
+    }
+
+    // Parent type'ın is_system durumunu çek (system tipi field silinince kilidi düşer).
+    const { data: parent } = await supabase
+        .from("product_types").select("id, is_system").eq("id", existing.product_type_id).single();
+
     const { error } = await supabase.from("product_type_fields").delete().eq("id", id);
     if (error) throw new Error(error.message);
+
+    // System tipi field silinince kullanıcı tipi sayılır → kilidi düşür.
+    if (parent?.is_system) {
+        await supabase.from("product_types").update({ is_system: false }).eq("id", existing.product_type_id);
+    }
 
     await supabase.from("audit_log").insert({
         action: "product_type_field_deleted",
         entity_type: "product_type",
         entity_id: existing.product_type_id,
-        before_state: { field_key: existing.field_key, field_type: existing.field_type },
+        before_state: {
+            field_key: existing.field_key,
+            field_type: existing.field_type,
+            ...(parent?.is_system ? { is_system: true } : {}),
+        },
+        after_state: parent?.is_system ? { is_system: false } : null,
         source: "ui",
     });
 }

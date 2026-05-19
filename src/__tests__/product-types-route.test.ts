@@ -389,6 +389,25 @@ describe("PATCH /api/product-types/[id]/fields/[fieldId]", () => {
         const res = await fieldIdPATCH(makeReq({ required: false }, "PATCH") as unknown as Parameters<typeof fieldIdPATCH>[0], makeParams({ id: "t-1", fieldId: "f-1" }));
         expect(res.status).toBe(200);
     });
+
+    it("cross-tenant: parent type ile uyumsuz field → 404 'Alan bu tipe ait değil'", async () => {
+        mockDbUpdateProductTypeField.mockRejectedValue(new Error("Alan bu tipe ait değil."));
+        const res = await fieldIdPATCH(makeReq({ required: false }, "PATCH") as unknown as Parameters<typeof fieldIdPATCH>[0], makeParams({ id: "typeB", fieldId: "fieldOfTypeA" }));
+        expect(res.status).toBe(404);
+        const body = await res.json();
+        expect(body.error).toContain("bu tipe ait değil");
+    });
+
+    it("route helper'a expectedTypeId (params.id) geçer", async () => {
+        mockDbUpdateProductTypeField.mockResolvedValue({ ...sampleField, required: false });
+        await fieldIdPATCH(makeReq({ required: false }, "PATCH") as unknown as Parameters<typeof fieldIdPATCH>[0], makeParams({ id: "type-XYZ", fieldId: "f-1" }));
+        // 3. parametre olarak "type-XYZ" geçirilmiş olmalı
+        expect(mockDbUpdateProductTypeField).toHaveBeenCalledWith(
+            "f-1",
+            expect.any(Object),
+            "type-XYZ",
+        );
+    });
 });
 
 describe("DELETE /api/product-types/[id]/fields/[fieldId]", () => {
@@ -408,5 +427,19 @@ describe("DELETE /api/product-types/[id]/fields/[fieldId]", () => {
         mockDbDeleteProductTypeField.mockResolvedValue(undefined);
         const res = await fieldIdDELETE(makeReq(undefined, "DELETE") as unknown as Parameters<typeof fieldIdDELETE>[0], makeParams({ id: "t-1", fieldId: "f-1" }));
         expect(res.status).toBe(200);
+    });
+
+    it("cross-tenant: parent type ile uyumsuz field → 404 'Alan bu tipe ait değil'", async () => {
+        mockDbDeleteProductTypeField.mockRejectedValue(new Error("Alan bu tipe ait değil."));
+        const res = await fieldIdDELETE(makeReq(undefined, "DELETE") as unknown as Parameters<typeof fieldIdDELETE>[0], makeParams({ id: "typeB", fieldId: "fieldOfTypeA" }));
+        expect(res.status).toBe(404);
+        const body = await res.json();
+        expect(body.error).toContain("bu tipe ait değil");
+    });
+
+    it("route helper'a expectedTypeId (params.id) geçer", async () => {
+        mockDbDeleteProductTypeField.mockResolvedValue(undefined);
+        await fieldIdDELETE(makeReq(undefined, "DELETE") as unknown as Parameters<typeof fieldIdDELETE>[0], makeParams({ id: "type-XYZ", fieldId: "f-1" }));
+        expect(mockDbDeleteProductTypeField).toHaveBeenCalledWith("f-1", "type-XYZ");
     });
 });

@@ -17,7 +17,7 @@ export async function PATCH(
     if (forbidden) return forbidden;
 
     try {
-        const { fieldId } = await params;
+        const { id, fieldId } = await params;
 
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
@@ -40,7 +40,7 @@ export async function PATCH(
             placeholder: body.placeholder as string | null | undefined,
             help_text: body.help_text as string | null | undefined,
             sort_order: body.sort_order != null ? Number(body.sort_order) : undefined,
-        });
+        }, id);
 
         revalidateTag("product-types", "max");
         return NextResponse.json(field);
@@ -55,7 +55,10 @@ export async function PATCH(
         )) {
             return NextResponse.json({ error: err.message }, { status: 400 });
         }
-        if (err instanceof Error && err.message.includes("bulunamadı")) {
+        if (err instanceof Error && (
+            err.message.includes("bulunamadı") ||
+            err.message.includes("bu tipe ait değil")
+        )) {
             return NextResponse.json({ error: err.message }, { status: 404 });
         }
         return handleApiError(err, "PATCH /api/product-types/[id]/fields/[fieldId]");
@@ -71,13 +74,16 @@ export async function DELETE(
     if (forbidden) return forbidden;
 
     try {
-        const { fieldId } = await params;
+        const { id, fieldId } = await params;
 
-        await dbDeleteProductTypeField(fieldId);
+        await dbDeleteProductTypeField(fieldId, id);
         revalidateTag("product-types", "max");
         return NextResponse.json({ success: true });
     } catch (err) {
-        if (err instanceof Error && err.message.includes("bulunamadı")) {
+        if (err instanceof Error && (
+            err.message.includes("bulunamadı") ||
+            err.message.includes("bu tipe ait değil")
+        )) {
             return NextResponse.json({ error: err.message }, { status: 404 });
         }
         return handleApiError(err, "DELETE /api/product-types/[id]/fields/[fieldId]");
