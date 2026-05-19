@@ -55,8 +55,8 @@ describe("Faz 2d — Ekler tab source regression locks", () => {
         expect(SOURCE).toMatch(/aria-label="Ana görsel yok"/);
     });
 
-    it("header renders primary image via signedUrl when present (conditional)", () => {
-        expect(SOURCE).toMatch(/attachments\.find\(a => a\.isPrimaryImage && a\.signedUrl\)/);
+    it("header renders primary image via signedUrl when present (uses helper)", () => {
+        expect(SOURCE).toMatch(/findPrimaryImageWithUrl\(attachments\)/);
         expect(SOURCE).toMatch(/setLightboxAttachment\(primary\)/);
     });
 
@@ -116,5 +116,72 @@ describe("Faz 2d — Ekler tab source regression locks", () => {
         expect(SOURCE).toMatch(/fd\.append\("file", uploadFile\)/);
         expect(SOURCE).toMatch(/fd\.append\("kind", uploadKind\)/);
         expect(SOURCE).toMatch(/method: "POST"/);
+    });
+});
+
+// ── P3-001: signed URL onError refresh ───────────────────────────────────────
+
+describe("Faz 2d Review P3-001 — signed URL refresh on img onError", () => {
+    it("defines refreshSignedUrl callback that hits /url endpoint", () => {
+        expect(SOURCE).toMatch(/const refreshSignedUrl = useCallback/);
+        expect(SOURCE).toMatch(/\/api\/products\/\$\{productId\}\/attachments\/\$\{attId\}\/url/);
+    });
+
+    it("refreshSignedUrl updates attachments state AND active lightbox", () => {
+        expect(SOURCE).toMatch(/setAttachments\(prev => prev\.map/);
+        expect(SOURCE).toMatch(/setLightboxAttachment\(prev =>/);
+    });
+
+    it("header img has onError handler wired to refreshSignedUrl", () => {
+        expect(SOURCE).toMatch(/onError=\{\(\) => refreshSignedUrl\(primary\.id\)\}/);
+    });
+
+    it("grid img has onError handler wired to refreshSignedUrl", () => {
+        expect(SOURCE).toMatch(/onError=\{\(\) => refreshSignedUrl\(img\.id\)\}/);
+    });
+
+    it("lightbox img has onError handler wired to refreshSignedUrl", () => {
+        expect(SOURCE).toMatch(/onError=\{\(\) => refreshSignedUrl\(lightboxAttachment\.id\)\}/);
+    });
+});
+
+// ── P3-002: fetch error banner ───────────────────────────────────────────────
+
+describe("Faz 2d Review P3-002 — attachments load error banner", () => {
+    it("declares attachmentsError state", () => {
+        expect(SOURCE).toMatch(/const \[attachmentsError, setAttachmentsError\] = useState<string \| null>/);
+    });
+
+    it("fetchAttachments sets error on !res.ok and on catch", () => {
+        expect(SOURCE).toMatch(/setAttachmentsError\("Ekler yüklenemedi/);
+        expect(SOURCE).toMatch(/setAttachmentsError\(null\)/);
+    });
+
+    it("renders error banner with role=alert + 'Yeniden dene' button", () => {
+        expect(SOURCE).toMatch(/attachmentsError &&/);
+        expect(SOURCE).toMatch(/role="alert"/);
+        expect(SOURCE).toMatch(/Yeniden dene/);
+    });
+
+    it("empty state is hidden when an error is active (no false 'no files' message)", () => {
+        expect(SOURCE).toMatch(/attachments\.length === 0 && !attachmentsLoading && !attachmentsError/);
+    });
+
+    it("uses parseAttachmentsResponse helper (defensive shape handling)", () => {
+        expect(SOURCE).toMatch(/parseAttachmentsResponse\(data\)/);
+    });
+});
+
+// ── P3-004: pure helper exports ──────────────────────────────────────────────
+
+describe("Faz 2d Review P3-004 — new pure helpers exported for testing", () => {
+    it("exports parseAttachmentsResponse and findPrimaryImageWithUrl", () => {
+        expect(SOURCE).toMatch(/export function parseAttachmentsResponse/);
+        expect(SOURCE).toMatch(/export function findPrimaryImageWithUrl/);
+    });
+
+    it("header uses findPrimaryImageWithUrl helper instead of inline find", () => {
+        expect(SOURCE).toMatch(/const primary = findPrimaryImageWithUrl\(attachments\)/);
+        expect(SOURCE).not.toMatch(/attachments\.find\(a => a\.isPrimaryImage && a\.signedUrl\)/);
     });
 });

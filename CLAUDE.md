@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 2d — Ekler sekmesi UI + signed URL endpoint (2026-05-19; 3059 test)
+**Son tamamlanan iş:** Faz 2d Review — 5 P3 bulgu kapatıldı (2026-05-19; 3084 test)
+
+- **P3-001:** `refreshSignedUrl` useCallback + header/grid/lightbox img `onError` → 1h TTL aşıldığında fresh signed URL alır, state günceller.
+- **P3-002:** `attachmentsError` state + role=alert banner + "Yeniden dene" button; empty state error varken gizlenir.
+- **P3-003:** `?kind=bad` → 400 (fail-closed), helper çağrılmadan reddedilir.
+- **P3-004:** `parseAttachmentsResponse` + `findPrimaryImageWithUrl` pure helper export'ları + 25 yeni davranış/regression testi.
+- **P3-005:** `/url` route'a SECURITY NOTE — demo + signed URL politika kararı dokümante edildi.
+- 6 dosya · **3084 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 2d — Ekler sekmesi UI + signed URL endpoint (2026-05-19; 3059 test) · commit `99f3027`
 
 - **Backend:** `dbGetSignedUrl` + `dbGetSignedUrlsForRows` (bulk `createSignedUrls`, N+1 önler) + `mapProductAttachment` mapper (file_path expose etmez; signedUrl opsiyonel 2. arg) + `ProductAttachment`/`ProductAttachmentKind` interface (`mock-data.ts`).
 - **GET shape değişimi:** `/api/products/[id]/attachments` artık `{ items, expires_in: 3600 }` döner (eskiden raw array). Her item bulk signed URL ile enriched. `dynamic="force-dynamic"`.

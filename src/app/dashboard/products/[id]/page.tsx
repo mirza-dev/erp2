@@ -240,6 +240,19 @@ export function groupAttachments(list: ProductAttachment[]): {
     return { images, documents };
 }
 
+// Parses GET /attachments response (defensive shape handling for runtime drift).
+export function parseAttachmentsResponse(data: unknown): ProductAttachment[] {
+    if (!data || typeof data !== "object") return [];
+    const items = (data as { items?: unknown }).items;
+    if (!Array.isArray(items)) return [];
+    return items as ProductAttachment[];
+}
+
+// Returns the primary image that ALSO has a non-empty signedUrl (renderable).
+export function findPrimaryImageWithUrl(list: ProductAttachment[]): ProductAttachment | undefined {
+    return list.find(a => a.isPrimaryImage && a.kind === "image" && !!a.signedUrl);
+}
+
 // Format an attribute value for read-only display
 export function formatAttributeValue(field: ProductTypeFieldRow, value: unknown): string {
     if (value === null || value === undefined || value === "") return "—";
@@ -301,6 +314,7 @@ export default function ProductDetailPage() {
     // Faz 2d — attachments + upload + lightbox
     const [attachments, setAttachments] = useState<ProductAttachment[]>([]);
     const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+    const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
     const [uploadKind, setUploadKind] = useState<ProductAttachmentKind>("image");
     const [uploadFile, setUploadFile] = useState<File | null>(null);
     const [uploading, setUploading] = useState(false);
@@ -502,16 +516,33 @@ export default function ProductDetailPage() {
         setAttachmentsLoading(true);
         try {
             const res = await fetch(`/api/products/${productId}/attachments`);
-            if (res.ok) {
-                const data = await res.json();
-                const items = Array.isArray(data?.items) ? (data.items as ProductAttachment[]) : [];
-                setAttachments(items);
+            if (!res.ok) {
+                setAttachmentsError("Ekler yüklenemedi. Lütfen tekrar deneyin.");
+                return;
             }
+            const data = await res.json();
+            setAttachments(parseAttachmentsResponse(data));
+            setAttachmentsError(null);
         } catch {
-            /* swallow — non-critical */
+            setAttachmentsError("Ekler yüklenemedi. Lütfen tekrar deneyin.");
         } finally {
             setAttachmentsLoading(false);
         }
+    }, [productId]);
+
+    // Faz 2d Review P3-001: signed URL TTL=1h; uzun açık kalan sayfada
+    // expire olursa img onError ile tek bir attachment için fresh URL çek.
+    const refreshSignedUrl = useCallback(async (attId: string) => {
+        if (!productId) return;
+        try {
+            const res = await fetch(`/api/products/${productId}/attachments/${attId}/url`);
+            if (!res.ok) return;
+            const data = await res.json() as { url?: string };
+            if (typeof data.url !== "string" || !data.url) return;
+            const fresh = data.url;
+            setAttachments(prev => prev.map(a => a.id === attId ? { ...a, signedUrl: fresh } : a));
+            setLightboxAttachment(prev => prev && prev.id === attId ? { ...prev, signedUrl: fresh } : prev);
+        } catch { /* swallow */ }
     }, [productId]);
 
     useEffect(() => {
@@ -731,7 +762,7 @@ export default function ProductDetailPage() {
             <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", flexWrap: "wrap" }}>
                 {/* Primary image (Faz 2d) */}
                 {(() => {
-                    const primary = attachments.find(a => a.isPrimaryImage && a.signedUrl);
+                    const primary = findPrimaryImageWithUrl(attachments);
                     if (primary?.signedUrl) {
                         return (
                             <button
@@ -754,6 +785,7 @@ export default function ProductDetailPage() {
                                 <img
                                     src={primary.signedUrl}
                                     alt={product.name}
+                                    onError={() => refreshSignedUrl(primary.id)}
                                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                                 />
                             </button>
@@ -1266,6 +1298,43 @@ export default function ProductDetailPage() {
                     <div style={cardStyle}>
                         <div style={sectionTitleStyle}>Ekler</div>
 
+                        {/* Faz 2d Review P3-002: load error banner */}
+                        {attachmentsError && (
+                            <div
+                                role="alert"
+                                style={{
+                                    marginBottom: "12px",
+                                    padding: "8px 12px",
+                                    background: "var(--danger-bg)",
+                                    border: "0.5px solid var(--danger-border)",
+                                    borderRadius: "5px",
+                                    color: "var(--danger-text)",
+                                    fontSize: "12px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    gap: "8px",
+                                }}
+                            >
+                                <span>⚠ {attachmentsError}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => fetchAttachments()}
+                                    style={{
+                                        fontSize: "12px",
+                                        padding: "4px 10px",
+                                        background: "transparent",
+                                        color: "var(--danger-text)",
+                                        border: "0.5px solid var(--danger-border)",
+                                        borderRadius: "4px",
+                                        cursor: "pointer",
+                                    }}
+                                >
+                                    Yeniden dene
+                                </button>
+                            </div>
+                        )}
+
                         {/* Upload bar */}
                         <div
                             style={{
@@ -1317,7 +1386,7 @@ export default function ProductDetailPage() {
                         {/* Attachments groups */}
                         {(() => {
                             const { images, documents } = groupAttachments(attachments);
-                            if (attachments.length === 0 && !attachmentsLoading) {
+                            if (attachments.length === 0 && !attachmentsLoading && !attachmentsError) {
                                 return (
                                     <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                                         Henüz ek dosya yok. Yukarıdan görsel veya belge yükleyin.
@@ -1358,6 +1427,7 @@ export default function ProductDetailPage() {
                                                                 <img
                                                                     src={img.signedUrl}
                                                                     alt={img.fileName}
+                                                                    onError={() => refreshSignedUrl(img.id)}
                                                                     style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                                                                 />
                                                             ) : (
@@ -1568,6 +1638,7 @@ export default function ProductDetailPage() {
                         src={lightboxAttachment.signedUrl}
                         alt={lightboxAttachment.fileName}
                         onClick={e => e.stopPropagation()}
+                        onError={() => refreshSignedUrl(lightboxAttachment.id)}
                         style={{
                             maxWidth: "92vw",
                             maxHeight: "92vh",

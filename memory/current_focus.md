@@ -7,6 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
+**Faz 2d Review — 5 P3 bulgu kapatıldı (3084 test)**
+
+- **P3-001 KAPANDI** (signed URL refresh): `refreshSignedUrl(attId)` useCallback `/url` endpoint'i çağırır; header img + grid img + lightbox img `onError={() => refreshSignedUrl(...)}` ile fresh URL alır. State'te attachment + aktif lightbox güncellenir. 1h TTL aşıldıktan sonra UI kendi kendini iyileştirir.
+- **P3-002 KAPANDI** (sessiz fetch hatası): `attachmentsError` state + role="alert" banner + "Yeniden dene" button. fetchAttachments `!res.ok` ve catch dallarında hata set ediliyor; başarıda null'a sıfırlanır. Empty state koşulu `&& !attachmentsError` ile genişletildi — "Henüz ek dosya yok" yanılsaması yok.
+- **P3-003 KAPANDI** (fail-open invalid kind): `?kind=bad` artık 400 döner; helper çağrılmadan reddedilir (fail-closed). `kindParam !== null` ise whitelist kontrolü zorunlu.
+- **P3-004 KAPANDI** (source-regex ağırlıklı testler): 2 yeni pure helper export — `parseAttachmentsResponse` (defensive shape) + `findPrimaryImageWithUrl` (header logic + non-image defense). +10 helper davranış testi + 3 url-route invalid-kind testi + 16 page-ekler P3 regression lock.
+- **P3-005 KAPANDI** (demo + signed URL politika kararı): `/url` route'a SECURITY NOTE yorumu — demo bucket SADECE seed/fake data ise risk yok; prod ile paylaşılırsa `requireAuthenticatedUser` guard eklenmeli.
+- 6 dosya · **3084 test yeşil** (+25 P3 review) · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 2d (3059 test, commit `99f3027`)
+
 **Faz 2d — Ekler sekmesi UI + signed URL endpoint (3059 test)**
 
 - **Backend (3 dosya):** `dbGetSignedUrl` + `dbGetSignedUrlsForRows` (bulk `createSignedUrls`, N+1 önler) + yeni `mapProductAttachment` (file_path expose etmez, signedUrl opsiyonel 2. arg) + yeni `ProductAttachment`/`ProductAttachmentKind` interface (`mock-data.ts`).

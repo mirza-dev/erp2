@@ -32,9 +32,15 @@ export async function GET(
             return NextResponse.json({ error: "Geçersiz ürün id." }, { status: 400 });
         }
         const kindParam = new URL(req.url).searchParams.get("kind");
-        const kind = kindParam && isValidAttachmentKind(kindParam)
-            ? (kindParam as ProductAttachmentKind)
-            : undefined;
+        let kind: ProductAttachmentKind | undefined;
+        if (kindParam !== null) {
+            // Faz 2d Review P3-003: kindParam VARSA whitelist'te olmalı; aksi halde
+            // sessizce tüm ekler dönüyordu (fail-open). Geçersiz değer → 400.
+            if (!isValidAttachmentKind(kindParam)) {
+                return NextResponse.json({ error: "Geçersiz kind parametresi." }, { status: 400 });
+            }
+            kind = kindParam as ProductAttachmentKind;
+        }
         const rows = await dbListAttachmentsByProduct(id, kind);
         const urlMap = await dbGetSignedUrlsForRows(rows, SIGNED_URL_TTL);
         const items = rows.map(row => mapProductAttachment(row, urlMap.get(row.file_path) ?? null));

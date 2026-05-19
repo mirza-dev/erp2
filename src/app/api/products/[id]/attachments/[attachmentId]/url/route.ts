@@ -9,6 +9,13 @@ export const dynamic = "force-dynamic";
 
 // GET /api/products/[id]/attachments/[attachmentId]/url
 // Response: { url, expires_in }
+//
+// SECURITY NOTE (Faz 2d Review P3-005):
+// middleware.ts demo cookie + GET /api/* anonymous read'e izin verir. Bu endpoint
+// authenticated kullanıcı OLMADAN da private bucket için signed URL üretebilir.
+// Mevcut politika: demo bucket SADECE seed/fake data içerdiğinden risk yok.
+// Eğer ileride demo ile prod aynı Supabase bucket'ını paylaşırsa, bu route'a
+// (ve liste GET'ine) `requireAuthenticatedUser` guard'ı eklenmeli.
 export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string; attachmentId: string }> },

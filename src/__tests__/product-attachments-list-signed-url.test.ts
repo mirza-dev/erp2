@@ -117,4 +117,36 @@ describe("GET /api/products/[id]/attachments — list response shape", () => {
         expect(mockDbGetBulk).toHaveBeenCalledTimes(1);
         expect(mockDbGetBulk).toHaveBeenCalledWith(rows, 3600);
     });
+
+    // ── Faz 2d Review P3-003: invalid kind → 400 ──────────────────────────
+
+    it("returns 400 when ?kind=bad (invalid whitelist value)", async () => {
+        const req = new NextRequest(new URL(`http://localhost/api/products/${PRODUCT_ID}/attachments?kind=bad`));
+        const { GET } = await import("@/app/api/products/[id]/attachments/route");
+        const res = await GET(req, { params: Promise.resolve({ id: PRODUCT_ID }) });
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toMatch(/kind/i);
+        // CRITICAL: dbListAttachmentsByProduct should NOT be called (fail-closed)
+        expect(mockDbList).not.toHaveBeenCalled();
+    });
+
+    it("accepts valid kind and passes it to the helper", async () => {
+        mockDbList.mockResolvedValueOnce([]);
+        mockDbGetBulk.mockResolvedValueOnce(new Map());
+        const req = new NextRequest(new URL(`http://localhost/api/products/${PRODUCT_ID}/attachments?kind=image`));
+        const { GET } = await import("@/app/api/products/[id]/attachments/route");
+        const res = await GET(req, { params: Promise.resolve({ id: PRODUCT_ID }) });
+        expect(res.status).toBe(200);
+        expect(mockDbList).toHaveBeenCalledWith(PRODUCT_ID, "image");
+    });
+
+    it("treats missing kind as 'no filter' (legacy behavior preserved)", async () => {
+        mockDbList.mockResolvedValueOnce([]);
+        mockDbGetBulk.mockResolvedValueOnce(new Map());
+        const { GET } = await import("@/app/api/products/[id]/attachments/route");
+        const res = await GET(makeReq(), { params: Promise.resolve({ id: PRODUCT_ID }) });
+        expect(res.status).toBe(200);
+        expect(mockDbList).toHaveBeenCalledWith(PRODUCT_ID, undefined);
+    });
 });

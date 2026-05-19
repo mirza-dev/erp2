@@ -15,6 +15,8 @@ import {
     getKindIcon,
     pickInitialKind,
     groupAttachments,
+    parseAttachmentsResponse,
+    findPrimaryImageWithUrl,
 } from "@/app/dashboard/products/[id]/page";
 import type { ProductAttachment, ProductAttachmentKind } from "@/lib/mock-data";
 
@@ -160,5 +162,75 @@ describe("groupAttachments", () => {
         const { images, documents } = groupAttachments(items);
         expect(images.map(i => i.id)).toEqual(["a", "c"]);
         expect(documents.map(d => d.id)).toEqual(["b", "d"]);
+    });
+});
+
+// ── parseAttachmentsResponse (P3-004 — defensive shape handling) ─────────────
+
+describe("parseAttachmentsResponse", () => {
+    it("returns the items array when response is { items: [...] }", () => {
+        const items = [makeAtt({ id: "a" }), makeAtt({ id: "b" })];
+        expect(parseAttachmentsResponse({ items, expires_in: 3600 })).toEqual(items);
+    });
+
+    it("returns empty array when response is null/undefined", () => {
+        expect(parseAttachmentsResponse(null)).toEqual([]);
+        expect(parseAttachmentsResponse(undefined)).toEqual([]);
+    });
+
+    it("returns empty array when response shape lacks items", () => {
+        expect(parseAttachmentsResponse({})).toEqual([]);
+        expect(parseAttachmentsResponse({ expires_in: 3600 })).toEqual([]);
+    });
+
+    it("returns empty array when items is not an array (defense)", () => {
+        expect(parseAttachmentsResponse({ items: "not-array" })).toEqual([]);
+        expect(parseAttachmentsResponse({ items: 42 })).toEqual([]);
+        expect(parseAttachmentsResponse({ items: null })).toEqual([]);
+    });
+
+    it("returns empty array when response is a primitive", () => {
+        expect(parseAttachmentsResponse("string")).toEqual([]);
+        expect(parseAttachmentsResponse(42)).toEqual([]);
+    });
+});
+
+// ── findPrimaryImageWithUrl (P3-004 — header logic) ──────────────────────────
+
+describe("findPrimaryImageWithUrl", () => {
+    it("returns undefined for empty list", () => {
+        expect(findPrimaryImageWithUrl([])).toBeUndefined();
+    });
+
+    it("returns undefined when there is no primary image", () => {
+        const list = [
+            makeAtt({ id: "a", kind: "image", isPrimaryImage: false, signedUrl: "u" }),
+            makeAtt({ id: "b", kind: "datasheet", signedUrl: "v" }),
+        ];
+        expect(findPrimaryImageWithUrl(list)).toBeUndefined();
+    });
+
+    it("returns undefined when primary exists but has no signedUrl (cannot render)", () => {
+        const list = [
+            makeAtt({ id: "a", kind: "image", isPrimaryImage: true, signedUrl: null }),
+        ];
+        expect(findPrimaryImageWithUrl(list)).toBeUndefined();
+    });
+
+    it("returns the primary image when it has a signedUrl", () => {
+        const primary = makeAtt({ id: "p", kind: "image", isPrimaryImage: true, signedUrl: "https://x" });
+        const list = [
+            makeAtt({ id: "a", kind: "image", isPrimaryImage: false, signedUrl: "u" }),
+            primary,
+        ];
+        expect(findPrimaryImageWithUrl(list)).toBe(primary);
+    });
+
+    it("ignores non-image kinds even if isPrimaryImage=true (defense against DB drift)", () => {
+        // DB partial index zaten engelliyor ama defansif: kind=image değilse atla.
+        const list = [
+            makeAtt({ id: "a", kind: "datasheet", isPrimaryImage: true, signedUrl: "u" }),
+        ];
+        expect(findPrimaryImageWithUrl(list)).toBeUndefined();
     });
 });
