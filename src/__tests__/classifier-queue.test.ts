@@ -16,6 +16,8 @@ import {
     formatLanguage,
     confidenceColor,
     classifierResultBadge,
+    selectClassifyCandidates,
+    type ConcurrencySelectableItem,
 } from "@/components/import/ClassifierQueue";
 import type { DocumentType } from "@/lib/database.types";
 
@@ -95,5 +97,85 @@ describe("confidenceColor + classifierResultBadge", () => {
         });
         expect(low.color).toBe("var(--danger-text)");
         expect(low.background).toBe("var(--danger-bg)");
+    });
+});
+
+// ── selectClassifyCandidates — concurrency state machine (P3-010 follow-up) ──
+
+function makeItem(id: string, overrides: Partial<ConcurrencySelectableItem> = {}): ConcurrencySelectableItem {
+    return {
+        id,
+        started: false,
+        status: "uploading",
+        ...overrides,
+    };
+}
+
+describe("selectClassifyCandidates", () => {
+    it("returns empty when cap <= 0", () => {
+        const queue = [makeItem("a")];
+        expect(selectClassifyCandidates(queue, 0)).toEqual([]);
+        expect(selectClassifyCandidates(queue, -1)).toEqual([]);
+    });
+
+    it("returns empty when queue is empty", () => {
+        expect(selectClassifyCandidates([], 3)).toEqual([]);
+    });
+
+    it("returns up to `cap` uploading + !started items", () => {
+        const queue = [makeItem("a"), makeItem("b"), makeItem("c"), makeItem("d"), makeItem("e")];
+        const r = selectClassifyCandidates(queue, 3);
+        expect(r.map(x => x.id)).toEqual(["a", "b", "c"]);
+    });
+
+    it("excludes items where started=true (duplicate fetch koruma)", () => {
+        const queue = [
+            makeItem("a", { started: true }),
+            makeItem("b"),
+            makeItem("c"),
+        ];
+        const r = selectClassifyCandidates(queue, 3);
+        expect(r.map(x => x.id)).toEqual(["b", "c"]);
+    });
+
+    it("excludes non-uploading status (classified/error/classifying)", () => {
+        const queue = [
+            makeItem("a", { status: "classified" }),
+            makeItem("b", { status: "error" }),
+            makeItem("c", { status: "classifying" }),
+            makeItem("d"),
+        ];
+        const r = selectClassifyCandidates(queue, 3);
+        expect(r.map(x => x.id)).toEqual(["d"]);
+    });
+
+    it("counts classifying as in-flight; reduces available slots", () => {
+        // 2 zaten classifying, cap=3 → 1 slot kalır
+        const queue = [
+            makeItem("a", { started: true, status: "classifying" }),
+            makeItem("b", { started: true, status: "classifying" }),
+            makeItem("c"),
+            makeItem("d"),
+            makeItem("e"),
+        ];
+        const r = selectClassifyCandidates(queue, 3);
+        expect(r.map(x => x.id)).toEqual(["c"]);
+    });
+
+    it("returns empty when all slots are full (cap == in-flight)", () => {
+        const queue = [
+            makeItem("a", { started: true, status: "classifying" }),
+            makeItem("b", { started: true, status: "classifying" }),
+            makeItem("c", { started: true, status: "classifying" }),
+            makeItem("d"),
+        ];
+        const r = selectClassifyCandidates(queue, 3);
+        expect(r).toEqual([]);
+    });
+
+    it("strict slice — returns AT MOST cap items regardless of queue size (5 uploading, cap 3 → 3)", () => {
+        const queue = Array.from({ length: 5 }, (_, i) => makeItem(`f${i}`));
+        const r = selectClassifyCandidates(queue, 3);
+        expect(r.length).toBe(3);
     });
 });

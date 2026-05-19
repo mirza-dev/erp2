@@ -403,7 +403,15 @@ Yüklenen dosyayı incele ve tipini tespit et:
 ```
 
 ### Çoklu Dosya
-- Drag-drop'a 10 dosya bırak → her biri SIRALI işlenir
+- Drag-drop'a 10 dosya bırak → **bounded parallel (concurrency cap 3)** işlenir
+  - Karar (Faz 3a kapanış, 2026-05-19): saf sıralı (1'er 1'er) yerine cap 3.
+  - Gerekçe: Anthropic Haiku 50 req/min limiti içinde güvenli; 10 dosya sıralı
+    ~30-50s sürer (UI uzun durur), cap 3 ile ~10-17s. AI cost aynı (her dosya
+    bir kez işlenir).
+  - Implementation: `ClassifierQueue.tsx` `CONCURRENCY = 3` + per-item `started`
+    flag (duplicate fetch koruma) + cancellation-safe cleanup.
+  - Sonuç sırası: kullanıcı için belirleyici değil — her kart bağımsız tamamlanır;
+    apply aşamasında (3c) kullanıcı sıralayabilir.
 - Her dosya için ayrı onay ekranı (kullanıcı isterse "tümünü atla" / "tümünü onayla" )
 
 ### Versiyonlama Uygulaması

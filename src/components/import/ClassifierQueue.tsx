@@ -10,7 +10,7 @@
  * Pure helpers exported: classifierResultBadge, formatLanguage,
  * documentTypeLabel, documentTypeIcon, confidenceColor, chunkBy.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DocumentType, DocumentClassification, ImportDocumentRow } from "@/lib/database.types";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import Button from "@/components/ui/Button";
@@ -25,6 +25,32 @@ export function chunkBy<T>(arr: T[], size: number): T[][] {
         out.push(arr.slice(i, i + size));
     }
     return out;
+}
+
+// Generic queue-item shape — `started` + `status` ile concurrency state machine
+// Component'in concurrency driver useEffect'inde kullanılan selection mantığını
+// pure function olarak test edebilmek için extract edildi.
+export interface ConcurrencySelectableItem {
+    id: string;
+    started: boolean;
+    status: "uploading" | "classifying" | "classified" | "error";
+}
+
+/**
+ * Concurrency cap'i aşmadan, henüz fetch ateşlenmemiş ("started=false") ve
+ * "uploading" durumundaki adayları döner. Returned slice <= cap.
+ *
+ * Pure — useEffect tarafından kullanılır; test edilebilmesi için ayrı export.
+ */
+export function selectClassifyCandidates<T extends ConcurrencySelectableItem>(
+    queue: T[],
+    cap: number,
+): T[] {
+    if (cap <= 0) return [];
+    const inFlight = queue.filter(q => q.status === "classifying").length;
+    const free = Math.max(0, cap - inFlight);
+    if (free === 0) return [];
+    return queue.filter(q => !q.started && q.status === "uploading").slice(0, free);
 }
 
 const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
@@ -151,68 +177,90 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
 
     const [queue, setQueue] = useState<QueuedFile[]>([]);
 
-    // Render-time queue sync. Yeni File referanslarını queue'ya ekler.
-    // Dedup: queue içindeki File object identity'sine bakılır (Set of File refs).
-    // Bu bloğun çalışması idempotent — files prop değişse de aynı dosya iki kez eklenmez.
-    {
-        const existing = new Set(queue.map(q => q.file));
-        const additions: QueuedFile[] = [];
-        for (const f of files) {
-            if (existing.has(f)) continue;
-            existing.add(f);
-            const v = validateClassifyUpload(f);
-            if (!v.ok) {
+    // mountedRef — fetch.then() callback'lerinin unmount sonrası setQueue
+    // çağırmasını engeller. Cleanup'ı SADECE unmount'ta çalışan ayrı bir
+    // useEffect ile yapıyoruz; queue-dep effect içindeki cleanup KULLANILMAZ
+    // çünkü setQueue patch'i queue'yu değiştirir → effect re-run → cleanup
+    // tetiklenir → tüm in-flight fetch'ler iptal olur (Faz 3a Review 2 bug).
+    const mountedRef = useRef(true);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => { mountedRef.current = false; };
+    }, []);
+
+    // Queue sync — yeni File referanslarını queue'ya ekler. Side-effect (state
+    // mutation) olduğu için useEffect içinde; lint kuralı
+    // react-hooks/set-state-in-effect "synchronous cascading render" konusunda
+    // uyarır — burada bilinçli kabul: setState yalnız yeni dosya VARSA çağrılır
+    // (idempotent guard) → cascade durur. Render-phase'de çalışmaz: bu önemli
+    // çünkü Strict Mode'da render iki kez çalışır ve fetch tetiklenirse
+    // duplicate POST/storage row/AI cost olur.
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- bilinçli: idempotent guard (yeni dosya yoksa setState atılmaz); render-phase fetch'i önlemek için useEffect içinde olmak ZORUNDA (Strict Mode safety)
+        setQueue(prev => {
+            const existing = new Set(prev.map(q => q.file));
+            const additions: QueuedFile[] = [];
+            for (const f of files) {
+                if (existing.has(f)) continue;
+                existing.add(f);
+                const v = validateClassifyUpload(f);
+                if (!v.ok) {
+                    additions.push({
+                        id: newId(), file: f, status: "error", started: true,
+                        classification: null, documentId: null,
+                        errorMessage: v.reason ?? "Dosya reddedildi.",
+                    });
+                    continue;
+                }
                 additions.push({
-                    id: newId(), file: f, status: "error", started: true,
-                    classification: null, documentId: null,
-                    errorMessage: v.reason ?? "Dosya reddedildi.",
+                    id: newId(), file: f, status: "uploading", started: false,
+                    classification: null, documentId: null, errorMessage: null,
                 });
-                continue;
             }
-            additions.push({
-                id: newId(), file: f, status: "uploading", started: false,
-                classification: null, documentId: null, errorMessage: null,
+            return additions.length > 0 ? [...prev, ...additions] : prev;
+        });
+    }, [files]);
+
+    // Concurrency driver — fetch tetiklemesi yalnız useEffect içinde olmalı
+    // (Strict Mode double-render güvenliği + render-phase side-effect yasağı).
+    // `started: boolean` flag ile dedup; setQueue 'classifying' patch'i
+    // başlatılan adayları işaretler, fetch sonucu .then içinde tek setQueue
+    // çağrısı ile sonuçlanır. Cleanup: component unmount sonrası gelen
+    // result'lar `cancelled` ref ile yutulur.
+    useEffect(() => {
+        if (isDemo) return;
+
+        const candidates = selectClassifyCandidates(queue, CONCURRENCY);
+        if (candidates.length === 0) return;
+
+        const candidateIds = new Set(candidates.map(c => c.id));
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- bilinçli: classifying patch dedup için; fetch tetiklenecek adayları işaretler, kural yalın setter çağrılarını uyarır, burada yan etki tetiklemesinin parçası
+        setQueue(prev => prev.map(q =>
+            candidateIds.has(q.id) ? { ...q, status: "classifying", started: true } : q,
+        ));
+
+        for (const c of candidates) {
+            uploadAndClassify(c.file).then(result => {
+                // mountedRef yalnız UNMOUNT'ta false olur — re-render/queue patch
+                // bu callback'i iptal etmez.
+                if (!mountedRef.current) return;
+                setQueue(prev => prev.map(q => {
+                    if (q.id !== c.id) return q;
+                    if (result.ok) {
+                        return {
+                            ...q,
+                            status: "classified",
+                            classification: (result.document.classification ?? null) as DocumentClassification | null,
+                            documentId: result.document.id,
+                            errorMessage: null,
+                        };
+                    }
+                    return { ...q, status: "error", errorMessage: result.error };
+                }));
             });
         }
-        if (additions.length > 0) {
-            setQueue(prev => [...prev, ...additions]);
-        }
-    }
-
-    // Concurrency driver (render-time). queue içindeki `started` flag'i ile
-    // duplicate fetch önlenir. setQueue render içinde çağrılır (Adjusting state
-    // based on prop change pattern); set sonrası render yeniden tetiklenir,
-    // bu blok tekrar çalışır ama `started=true` olduğu için fetch tetiklenmez.
-    if (!isDemo) {
-        const inFlight = queue.filter(q => q.status === "classifying").length;
-        const free = Math.max(0, CONCURRENCY - inFlight);
-        if (free > 0) {
-            const candidates = queue.filter(q => !q.started && q.status === "uploading").slice(0, free);
-            if (candidates.length > 0) {
-                const candidateIds = new Set(candidates.map(c => c.id));
-                setQueue(prev => prev.map(q =>
-                    candidateIds.has(q.id) ? { ...q, status: "classifying", started: true } : q,
-                ));
-                for (const c of candidates) {
-                    uploadAndClassify(c.file).then(result => {
-                        setQueue(prev => prev.map(q => {
-                            if (q.id !== c.id) return q;
-                            if (result.ok) {
-                                return {
-                                    ...q,
-                                    status: "classified",
-                                    classification: (result.document.classification ?? null) as DocumentClassification | null,
-                                    documentId: result.document.id,
-                                    errorMessage: null,
-                                };
-                            }
-                            return { ...q, status: "error", errorMessage: result.error };
-                        }));
-                    });
-                }
-            }
-        }
-    }
+        // NOT: cleanup return YOK — bkz. mountedRef comment'i.
+    }, [queue, isDemo]);
 
     const retry = (id: string) => {
         setQueue(prev => prev.map(q => {
@@ -223,6 +271,14 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
 
     const remove = (id: string) => {
         setQueue(prev => prev.filter(q => q.id !== id));
+    };
+
+    const clearAll = () => {
+        // P3-008: parent'a haber ver (files prop'unu boşaltır) AMA internal queue
+        // de manuel temizlenir; aksi halde files=[] olmasına rağmen mevcut
+        // queue item'ları useEffect dep array'inde tetiklenmediği için kalır.
+        setQueue([]);
+        onClear?.();
     };
 
     if (queue.length === 0) {
@@ -243,7 +299,7 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
                 {onClear && (
                     <button
                         type="button"
-                        onClick={onClear}
+                        onClick={clearAll}
                         style={{
                             fontSize: "11px", padding: "3px 8px",
                             background: "transparent", border: "0.5px solid var(--border-secondary)",

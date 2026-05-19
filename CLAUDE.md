@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 3a — AI Import drop-anywhere UI + multimodal classifier (2026-05-19; 3175 test)
+**Son tamamlanan iş:** Faz 3a Review — 4 bulgu kapatıldı + cancelled-flag bug fix (2026-05-19; 3188 test)
+
+- **P2 (render-phase fetch):** queue sync + concurrency driver useEffect içine taşındı; Strict Mode safety.
+- **P2 yeni bug (cancelled-flag):** P2 fix sırasında useEffect cleanup `cancelled=true` her queue patch'inde in-flight fetch'leri iptal ediyordu (prod'u da kırıyordu) → `mountedRef = useRef(true)` paterni + unmount-only cleanup.
+- **P3-008 ("Listeyi Temizle"):** `clearAll` handler internal `setQueue([])` + parent `onClear?.()`.
+- **P3-009 (plan ↔ implementation):** `MODUL_REVIZE_PLAN.md` "sıralı" satırı bounded-parallel cap 3 olarak güncellendi.
+- **P3-010 (UI interaction):** `@testing-library/react` + `jsdom` kuruldu; 5 RTL interaction testi (happy/Strict Mode/retry/remove/clear) + 7 `selectClassifyCandidates` pure helper testi (concurrency state machine extract).
+- 6 dosya · +13 test · **3188 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3a — AI Import drop-anywhere UI + multimodal classifier (2026-05-19; 3175 test) · commit `3757e48`
 
 - **Alt-faz şeması:** Faz 3 → 3a (bu), 3b (extraction+matching), 3c (review+apply), 3d (klasik mod toggle).
 - **Backend:** Migration 061 `import_documents` + helper (`dbCreateImportDocument` 3-step orphan-safe) + `aiClassifyDocument` multimodal (PDF document block, image content block, Excel text-first) + `POST /api/import/classify` (multipart, requireRole admin|purchaser).

@@ -7,6 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
+**Faz 3a Review — 4 P2/P3 bulgu kapatıldı + cancelled-flag bug fix (3188 test)**
+
+- **P2 KAPANDI** (render-phase fetch): `ClassifierQueue` queue sync + concurrency driver useEffect içine alındı; render-phase'de network çağrısı yok → Strict Mode/concurrent render güvenliği.
+- **P2 yeni bug (cancelled-flag)** — P2 fix sırasında ortaya çıktı + KAPANDI: useEffect cleanup `cancelled = true` her queue patch'inde re-run sonrası tüm in-flight fetch.then()'leri iptal ediyordu → state `classifying`'de takılı kalıyordu (prod'u da kırıyordu). **Çözüm:** `mountedRef = useRef(true)` paterni + ayrı unmount-only cleanup useEffect; queue-dep effect cleanup'sız (re-render iptal etmesin diye).
+- **P3-008 KAPANDI** ("Listeyi Temizle"): `clearAll` handler internal `setQueue([])` + parent `onClear?.()`; kullanıcı listeyi temizlediğini sanıp kartların kalmasını engellendi.
+- **P3-009 KAPANDI** (plan ↔ implementation çelişkisi): `MODUL_REVIZE_PLAN.md` "SIRALI işlenir" satırı bounded-parallel cap 3 olarak güncellendi (gerekçe: Anthropic Haiku 50 req/min güvenli; UX kayba değmez).
+- **P3-010 KAPANDI** (UI interaction testleri): `@testing-library/react` + `jsdom` kuruldu; `vitest.config.ts` `.test.tsx` glob eklendi; `cleanup()` afterEach pattern (RTL v15+ Vitest auto-cleanup yok). 5 RTL interaction testi (happy/Strict Mode/retry/remove/clear) + 7 `selectClassifyCandidates` pure helper testi (concurrency state machine inline mantığı extract edildi).
+- **+13 test** (5 RTL + 7 selectClassifyCandidates + 1 küçük) · 3188 test yeşil · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 3a — AI Import drop-anywhere UI + multimodal classifier (3175 test, commit `3757e48`)
+
 **Faz 3a — AI Import drop-anywhere UI + multimodal document classifier (3175 test)**
 
 - **Alt-faz şeması:** Faz 3 → 3a (drop-anywhere + classifier — bu), 3b (type-aware extraction + matching), 3c (review + apply pipeline), 3d (klasik mod toggle + cleanup).
