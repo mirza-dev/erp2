@@ -156,16 +156,17 @@ describe("Faz 2c — product detail page source", () => {
         expect(SOURCE).toMatch(/Tip değiştiriliyor/);
     });
 
-    it("DynamicFieldEdit handles all 7 field_type variants", () => {
-        expect(SOURCE).toMatch(/field_type === "boolean"/);
-        expect(SOURCE).toMatch(/field_type === "select"/);
-        expect(SOURCE).toMatch(/field_type === "multiselect"/);
-        expect(SOURCE).toMatch(/field_type === "longtext"/);
-        expect(SOURCE).toMatch(/field_type === "number"/);
-        expect(SOURCE).toMatch(/field_type === "date"/);
+    it("DynamicFieldEdit is imported from shared component", () => {
+        expect(SOURCE).toMatch(/from "@\/components\/products\/DynamicFieldEdit"/);
+        expect(SOURCE).toMatch(/DynamicFieldEdit/);
     });
 
     it("setAttribute deletes empty values from attributes object", () => {
         expect(SOURCE).toMatch(/delete next\[key\]/);
+    });
+
+    it("handleTypeChange('') routes through pendingTypeChange when attributes exist (P2-002)", () => {
+        expect(SOURCE).toMatch(/lostKeys\.length > 0/);
+        expect(SOURCE).toMatch(/setPendingTypeChange.*newTypeId.*""/s);
     });
 });

@@ -12,6 +12,8 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
+import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
+import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 
 
 interface RiskItem {
@@ -94,13 +96,18 @@ export default function ProductsPage() {
         materialQuality: string; originCountry: string; productionSite: string;
         useCases: string; industries: string; standards: string;
         certifications: string; productNotes: string;
+        productTypeId: string; attributes: Record<string, unknown>;
     }>({
         name: "", sku: "", category: "", unit: "adet",
         price: 0, currency: "USD", on_hand: 0, minStockLevel: 0,
         productType: "manufactured", warehouse: "Sevkiyat Deposu",
         materialQuality: "", originCountry: "", productionSite: "",
         useCases: "", industries: "", standards: "", certifications: "", productNotes: "",
+        productTypeId: "", attributes: {},
     });
+    const [createProductTypes, setCreateProductTypes] = useState<ProductTypeRow[]>([]);
+    const [createTypeFields, setCreateTypeFields] = useState<ProductTypeFieldRow[]>([]);
+    const [createTypeFieldsLoading, setCreateTypeFieldsLoading] = useState(false);
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [windowWidth, setWindowWidth] = useState<number>(
         typeof window !== "undefined" ? window.innerWidth : 1200
@@ -128,6 +135,20 @@ export default function ProductsPage() {
     }, []);
 
     useEffect(() => { refetch(); }, [refetch]);
+
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/product-types");
+                if (!cancelled && res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) setCreateProductTypes(data);
+                }
+            } catch { /* graceful */ }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     const handleRefresh = async () => {
         if (refreshing) return;
@@ -302,6 +323,22 @@ export default function ProductsPage() {
         await refetch();
     };
 
+    const handleCreateTypeChange = async (newTypeId: string) => {
+        setCreateForm(f => ({ ...f, productTypeId: newTypeId, attributes: {} }));
+        setCreateTypeFields([]);
+        if (!newTypeId) return;
+        setCreateTypeFieldsLoading(true);
+        try {
+            const res = await fetch(`/api/product-types/${newTypeId}?withFields=1`);
+            if (res.ok) {
+                const data = await res.json();
+                setCreateTypeFields(Array.isArray(data.fields) ? data.fields : []);
+            }
+        } catch { /* graceful */ } finally {
+            setCreateTypeFieldsLoading(false);
+        }
+    };
+
     const handleCreate = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!createForm.name.trim() || !createForm.sku.trim()) return;
@@ -320,6 +357,8 @@ export default function ProductsPage() {
                 standards: createForm.standards || undefined,
                 certifications: createForm.certifications || undefined,
                 product_notes: createForm.productNotes || undefined,
+                product_type_id: createForm.productTypeId || undefined,
+                attributes: Object.keys(createForm.attributes).length > 0 ? createForm.attributes : undefined,
             };
             const res = await fetch("/api/products", {
                 method: "POST",
@@ -335,7 +374,9 @@ export default function ProductsPage() {
                 productType: "manufactured" as const, warehouse: "Sevkiyat Deposu",
                 materialQuality: "", originCountry: "", productionSite: "",
                 useCases: "", industries: "", standards: "", certifications: "", productNotes: "",
+                productTypeId: "", attributes: {},
             });
+            setCreateTypeFields([]);
             toast({ type: "success", message: `${createForm.name} ürün olarak eklendi` });
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Ürün eklenemedi. Lütfen tekrar deneyin.";
@@ -438,7 +479,7 @@ export default function ProductsPage() {
                             textDecoration: "none", whiteSpace: "nowrap",
                         }}
                     >Eskime Raporu →</Link>
-                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "" }); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
+                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", productTypeId: "", attributes: {} }); setCreateTypeFields([]); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
                 </div>
             </div>
 
@@ -1220,6 +1261,48 @@ export default function ProductsPage() {
                                         placeholder="Özel kullanım notları, uyarılar..."
                                     />
                                 </FormField>
+                            </div>
+
+                            {/* Tip Şablonu + Dinamik Teknik Alanlar */}
+                            <div style={{
+                                borderTop: "0.5px solid var(--border-tertiary)",
+                                paddingTop: "12px",
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "10px",
+                            }}>
+                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                    Tip Şablonu <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(isteğe bağlı)</span>
+                                </div>
+                                <FormField label="Tip Şablonu">
+                                    <select
+                                        style={modalInputStyle}
+                                        value={createForm.productTypeId}
+                                        onChange={e => handleCreateTypeChange(e.target.value)}
+                                        aria-label="Tip şablonu"
+                                    >
+                                        <option value="">— seçiniz —</option>
+                                        {createProductTypes.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                </FormField>
+                                {createTypeFieldsLoading && (
+                                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Alanlar yükleniyor…</div>
+                                )}
+                                {createTypeFields.map(f => (
+                                    <DynamicFieldEdit
+                                        key={f.id}
+                                        field={f}
+                                        value={createForm.attributes[f.field_key]}
+                                        onChange={v => setCreateForm(prev => {
+                                            const next = { ...prev.attributes };
+                                            if (v === "" || v === null || v === undefined) delete next[f.field_key];
+                                            else next[f.field_key] = v;
+                                            return { ...prev, attributes: next };
+                                        })}
+                                    />
+                                ))}
                             </div>
                         </div>
 

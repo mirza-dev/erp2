@@ -10,6 +10,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
+import { DynamicFieldEdit, FieldEdit } from "@/components/products/DynamicFieldEdit";
 
 type TabKey = "genel" | "teknik" | "stok" | "tedarik" | "ticari" | "ekler" | "partiler";
 
@@ -182,176 +183,12 @@ export function formatAttributeValue(field: ProductTypeFieldRow, value: unknown)
     return String(value);
 }
 
-function DynamicFieldEdit({
-    field,
-    value,
-    onChange,
-}: {
-    field: ProductTypeFieldRow;
-    value: unknown;
-    onChange: (v: unknown) => void;
-}) {
-    const label = `${field.label_tr}${field.required ? " *" : ""}`;
-    const ariaLabel = field.label_tr;
-    const help = field.help_text || field.placeholder || undefined;
-
-    if (field.field_type === "boolean") {
-        return (
-            <FieldEdit label={label}>
-                <input
-                    type="checkbox"
-                    checked={value === true}
-                    onChange={e => onChange(e.target.checked)}
-                    aria-label={ariaLabel}
-                    style={{ width: "16px", height: "16px", accentColor: "var(--accent)", cursor: "pointer" }}
-                />
-                {help && <span style={{ fontSize: "11px", color: "var(--text-tertiary)", marginLeft: "8px" }}>{help}</span>}
-            </FieldEdit>
-        );
-    }
-
-    if (field.field_type === "select") {
-        return (
-            <FieldEdit label={label}>
-                <select
-                    value={typeof value === "string" ? value : ""}
-                    onChange={e => onChange(e.target.value)}
-                    aria-label={ariaLabel}
-                    style={inputStyle}
-                >
-                    <option value="">— seçiniz —</option>
-                    {(field.options ?? []).map(opt => (
-                        <option key={opt} value={opt}>{opt}</option>
-                    ))}
-                </select>
-            </FieldEdit>
-        );
-    }
-
-    if (field.field_type === "multiselect") {
-        const selected: string[] = Array.isArray(value) ? value.map(String) : [];
-        const toggle = (opt: string) => {
-            if (selected.includes(opt)) onChange(selected.filter(s => s !== opt));
-            else onChange([...selected, opt]);
-        };
-        return (
-            <FieldEdit label={label}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }} role="group" aria-label={ariaLabel}>
-                    {(field.options ?? []).map(opt => {
-                        const isOn = selected.includes(opt);
-                        return (
-                            <button
-                                key={opt}
-                                type="button"
-                                onClick={() => toggle(opt)}
-                                aria-pressed={isOn}
-                                style={{
-                                    fontSize: "11px",
-                                    padding: "3px 10px",
-                                    border: `0.5px solid ${isOn ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                                    borderRadius: "12px",
-                                    background: isOn ? "var(--accent-bg)" : "transparent",
-                                    color: isOn ? "var(--accent-text)" : "var(--text-secondary)",
-                                    cursor: "pointer",
-                                    fontWeight: isOn ? 600 : 400,
-                                }}
-                            >
-                                {opt}
-                            </button>
-                        );
-                    })}
-                </div>
-            </FieldEdit>
-        );
-    }
-
-    if (field.field_type === "longtext") {
-        return (
-            <FieldEdit label={label}>
-                <textarea
-                    value={typeof value === "string" ? value : ""}
-                    onChange={e => onChange(e.target.value)}
-                    aria-label={ariaLabel}
-                    placeholder={field.placeholder ?? undefined}
-                    rows={3}
-                    style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" }}
-                />
-            </FieldEdit>
-        );
-    }
-
-    if (field.field_type === "number") {
-        return (
-            <FieldEdit label={label}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <input
-                        type="number"
-                        value={value == null || value === "" ? "" : String(value)}
-                        onChange={e => onChange(e.target.value === "" ? "" : Number(e.target.value))}
-                        aria-label={ariaLabel}
-                        placeholder={field.placeholder ?? undefined}
-                        style={inputStyle}
-                    />
-                    {field.unit && (
-                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
-                            {field.unit}
-                        </span>
-                    )}
-                </div>
-            </FieldEdit>
-        );
-    }
-
-    if (field.field_type === "date") {
-        return (
-            <FieldEdit label={label}>
-                <input
-                    type="date"
-                    value={typeof value === "string" ? value : ""}
-                    onChange={e => onChange(e.target.value)}
-                    aria-label={ariaLabel}
-                    style={inputStyle}
-                />
-            </FieldEdit>
-        );
-    }
-
-    // Default: text
-    return (
-        <FieldEdit label={label}>
-            <input
-                type="text"
-                value={typeof value === "string" ? value : value == null ? "" : String(value)}
-                onChange={e => onChange(e.target.value)}
-                aria-label={ariaLabel}
-                placeholder={field.placeholder ?? undefined}
-                style={inputStyle}
-            />
-        </FieldEdit>
-    );
-}
-
 function FieldView({ label, value }: { label: string; value: string | number | null | undefined }) {
     const display = value === null || value === undefined || value === "" ? "—" : String(value);
     return (
         <div style={fieldRowStyle}>
             <span style={labelStyle}>{label}</span>
             <span style={{ fontSize: "13px", color: "var(--text-primary)" }}>{display}</span>
-        </div>
-    );
-}
-
-function FieldEdit({
-    label,
-    children,
-}: {
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div style={fieldRowStyle}>
-            <span style={labelStyle}>{label}</span>
-            <div>{children}</div>
         </div>
     );
 }
@@ -509,9 +346,14 @@ export default function ProductDetailPage() {
         if (!editForm) return;
         const currentTypeId = editForm.productTypeId;
         if (newTypeId === currentTypeId) return;
-        // Clearing the type: keep attributes (admin may switch back), just nullify type
+        // Clearing the type: if attributes exist, warn before dropping them
         if (!newTypeId) {
-            setEditForm(f => f && ({ ...f, productTypeId: "" }));
+            const lostKeys = Object.keys(editForm.attributes ?? {});
+            if (lostKeys.length > 0) {
+                setPendingTypeChange({ newTypeId: "", newFields: [], lostKeys });
+            } else {
+                setEditForm(f => f && ({ ...f, productTypeId: "" }));
+            }
             return;
         }
         try {
