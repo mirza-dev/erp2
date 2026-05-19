@@ -45,16 +45,21 @@ export async function PATCH(
         revalidateTag("products", "max");
         return NextResponse.json(updated);
     } catch (err) {
-        if (err instanceof Error && (
-            err.message.includes("zorunludur") ||
-            err.message.includes("pozitif") ||
-            err.message.includes("büyük olamaz") ||
-            err.message.includes("formatında") ||
-            err.message.includes("bulunamadı") ||
-            err.message.toLowerCase().includes("geçersiz")
-        )) {
-            const status = err.message.includes("bulunamadı") ? 404 : 400;
-            return NextResponse.json({ error: err.message }, { status });
+        if (err instanceof Error) {
+            if (err.message.includes("bulunamadı")) {
+                return NextResponse.json({ error: err.message }, { status: 404 });
+            }
+            if (
+                err.message.includes("zorunludur") ||
+                err.message.includes("pozitif") ||
+                err.message.includes("büyük olamaz") ||
+                err.message.includes("formatında") ||
+                err.message.includes("ait değil") ||
+                err.message.includes("türünde olmalıdır") ||
+                err.message.toLowerCase().includes("geçersiz")
+            ) {
+                return NextResponse.json({ error: err.message }, { status: 400 });
+            }
         }
         return handleApiError(err, "PATCH /api/products/[id]/batches/[batchId]");
     }

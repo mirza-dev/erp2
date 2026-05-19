@@ -67,14 +67,21 @@ export async function POST(
         revalidateTag("products", "max");
         return NextResponse.json(batch, { status: 201 });
     } catch (err) {
-        if (err instanceof Error && (
-            err.message.includes("zorunludur") ||
-            err.message.includes("pozitif") ||
-            err.message.includes("büyük olamaz") ||
-            err.message.includes("formatında") ||
-            err.message.toLowerCase().includes("geçersiz")
-        )) {
-            return NextResponse.json({ error: err.message }, { status: 400 });
+        if (err instanceof Error) {
+            if (err.message.includes("bulunamadı")) {
+                return NextResponse.json({ error: err.message }, { status: 404 });
+            }
+            if (
+                err.message.includes("zorunludur") ||
+                err.message.includes("pozitif") ||
+                err.message.includes("büyük olamaz") ||
+                err.message.includes("formatında") ||
+                err.message.includes("ait değil") ||
+                err.message.includes("türünde olmalıdır") ||
+                err.message.toLowerCase().includes("geçersiz")
+            ) {
+                return NextResponse.json({ error: err.message }, { status: 400 });
+            }
         }
         return handleApiError(err, "POST /api/products/[id]/batches");
     }

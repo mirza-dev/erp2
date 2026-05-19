@@ -4,7 +4,12 @@
  * Covers:
  *   POST viewer → 403
  *   POST geçersiz body (heat_no boş) → 400
+ *   POST sertifika eki bulunamadı → 404
+ *   POST sertifika eki başka ürüne ait → 400
+ *   POST sertifika eki yanlış kind → 400
  *   POST happy → 201 + revalidateTag("products")
+ *   PATCH sertifika eki başka ürüne ait → 400
+ *   PATCH sertifika eki yanlış kind → 400
  *   DELETE happy → 204
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -17,13 +22,14 @@ const BATCH_ID   = "00000000-0000-4000-8000-000000000002";
 const mockDbCreateBatch = vi.fn();
 const mockDbGetBatch    = vi.fn();
 const mockDbDeleteBatch = vi.fn();
+const mockDbUpdateBatch = vi.fn();
 const mockDbListBatches = vi.fn();
 
 vi.mock("@/lib/supabase/product-batches", () => ({
     dbCreateBatch:  (...a: unknown[]) => mockDbCreateBatch(...a),
     dbGetBatch:     (...a: unknown[]) => mockDbGetBatch(...a),
     dbDeleteBatch:  (...a: unknown[]) => mockDbDeleteBatch(...a),
-    dbUpdateBatch:  vi.fn(),
+    dbUpdateBatch:  (...a: unknown[]) => mockDbUpdateBatch(...a),
     dbListBatchesByProduct: (...a: unknown[]) => mockDbListBatches(...a),
 }));
 
@@ -48,6 +54,7 @@ beforeEach(() => {
     mockDbCreateBatch.mockReset();
     mockDbGetBatch.mockReset();
     mockDbDeleteBatch.mockReset();
+    mockDbUpdateBatch.mockReset();
     mockDbListBatches.mockReset();
     mockRequireRole.mockReset();
     mockRevalidateTag.mockReset();
@@ -83,6 +90,43 @@ describe("POST /api/products/[id]/batches", () => {
         expect(res.status).toBe(400);
     });
 
+    it("sertifika eki bulunamadı → 404", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockDbCreateBatch.mockRejectedValueOnce(new Error("Sertifika eki bulunamadı."));
+        const { POST } = await import("@/app/api/products/[id]/batches/route");
+        const res = await POST(
+            makeRequest(`/api/products/${PRODUCT_ID}/batches`, { heat_no: "H-1", initial_qty: 50, certificate_attachment_id: "00000000-0000-4000-8000-000000000099" }),
+            { params: Promise.resolve({ id: PRODUCT_ID }) },
+        );
+        expect(res.status).toBe(404);
+    });
+
+    it("sertifika eki başka ürüne ait → 400", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockDbCreateBatch.mockRejectedValueOnce(new Error("Sertifika eki bu ürüne ait değil."));
+        const { POST } = await import("@/app/api/products/[id]/batches/route");
+        const res = await POST(
+            makeRequest(`/api/products/${PRODUCT_ID}/batches`, { heat_no: "H-1", initial_qty: 50, certificate_attachment_id: "00000000-0000-4000-8000-000000000099" }),
+            { params: Promise.resolve({ id: PRODUCT_ID }) },
+        );
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toContain("ait değil");
+    });
+
+    it("sertifika eki yanlış kind → 400", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockDbCreateBatch.mockRejectedValueOnce(new Error("Sertifika eki 'certificate' türünde olmalıdır."));
+        const { POST } = await import("@/app/api/products/[id]/batches/route");
+        const res = await POST(
+            makeRequest(`/api/products/${PRODUCT_ID}/batches`, { heat_no: "H-1", initial_qty: 50, certificate_attachment_id: "00000000-0000-4000-8000-000000000099" }),
+            { params: Promise.resolve({ id: PRODUCT_ID }) },
+        );
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toContain("türünde olmalıdır");
+    });
+
     it("happy path → 201 + revalidateTag products", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
         mockDbCreateBatch.mockResolvedValueOnce({
@@ -104,6 +148,36 @@ describe("POST /api/products/[id]/batches", () => {
         );
         expect(res.status).toBe(201);
         expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+    });
+});
+
+describe("PATCH /api/products/[id]/batches/[batchId]", () => {
+    it("sertifika eki başka ürüne ait → 400", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockDbGetBatch.mockResolvedValueOnce({ id: BATCH_ID, product_id: PRODUCT_ID });
+        mockDbUpdateBatch.mockRejectedValueOnce(new Error("Sertifika eki bu ürüne ait değil."));
+        const { PATCH } = await import("@/app/api/products/[id]/batches/[batchId]/route");
+        const res = await PATCH(
+            makeRequest(`/api/products/${PRODUCT_ID}/batches/${BATCH_ID}`, { certificate_attachment_id: "00000000-0000-4000-8000-000000000099" }),
+            { params: Promise.resolve({ id: PRODUCT_ID, batchId: BATCH_ID }) },
+        );
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toContain("ait değil");
+    });
+
+    it("sertifika eki yanlış kind → 400", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockDbGetBatch.mockResolvedValueOnce({ id: BATCH_ID, product_id: PRODUCT_ID });
+        mockDbUpdateBatch.mockRejectedValueOnce(new Error("Sertifika eki 'certificate' türünde olmalıdır."));
+        const { PATCH } = await import("@/app/api/products/[id]/batches/[batchId]/route");
+        const res = await PATCH(
+            makeRequest(`/api/products/${PRODUCT_ID}/batches/${BATCH_ID}`, { certificate_attachment_id: "00000000-0000-4000-8000-000000000099" }),
+            { params: Promise.resolve({ id: PRODUCT_ID, batchId: BATCH_ID }) },
+        );
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body.error).toContain("türünde olmalıdır");
     });
 });
 
