@@ -253,6 +253,33 @@ export function findPrimaryImageWithUrl(list: ProductAttachment[]): ProductAttac
     return list.find(a => a.isPrimaryImage && a.kind === "image" && !!a.signedUrl);
 }
 
+// Builds the multipart body sent by handleUpload.
+export function buildUploadFormData(file: File, kind: ProductAttachmentKind): FormData {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("kind", kind);
+    return fd;
+}
+
+// Reads { error: "..." } from a non-ok Response body; falls back to a default message.
+export async function parseAttachmentApiError(res: Response, fallback: string): Promise<string> {
+    try {
+        const body = await res.json() as { error?: unknown };
+        if (typeof body?.error === "string" && body.error.length > 0) return body.error;
+    } catch { /* not JSON */ }
+    return fallback;
+}
+
+// Returns true on success; opens the URL in a new tab (caller passes a `windowOpen` fn for testability).
+export function openSignedUrlInNewTab(
+    url: string | null | undefined,
+    windowOpen: (u: string, target: string, features: string) => unknown,
+): boolean {
+    if (typeof url !== "string" || url.length === 0) return false;
+    windowOpen(url, "_blank", "noopener,noreferrer");
+    return true;
+}
+
 // Format an attribute value for read-only display
 export function formatAttributeValue(field: ProductTypeFieldRow, value: unknown): string {
     if (value === null || value === undefined || value === "") return "—";
@@ -556,16 +583,12 @@ export default function ProductDetailPage() {
         if (!uploadFile) return;
         setUploading(true);
         try {
-            const fd = new FormData();
-            fd.append("file", uploadFile);
-            fd.append("kind", uploadKind);
             const res = await fetch(`/api/products/${product.id}/attachments`, {
                 method: "POST",
-                body: fd,
+                body: buildUploadFormData(uploadFile, uploadKind),
             });
             if (!res.ok) {
-                const body = await res.json().catch(() => ({} as { error?: string }));
-                toast({ type: "error", message: body.error ?? "Dosya yüklenemedi." });
+                toast({ type: "error", message: await parseAttachmentApiError(res, "Dosya yüklenemedi.") });
                 return;
             }
             toast({ type: "success", message: "Dosya yüklendi." });
@@ -587,8 +610,7 @@ export default function ProductDetailPage() {
                 body: JSON.stringify({ is_primary_image: true }),
             });
             if (!res.ok) {
-                const body = await res.json().catch(() => ({} as { error?: string }));
-                toast({ type: "error", message: body.error ?? "Ana görsel ayarlanamadı." });
+                toast({ type: "error", message: await parseAttachmentApiError(res, "Ana görsel ayarlanamadı.") });
                 return;
             }
             toast({ type: "success", message: "Ana görsel güncellendi." });
@@ -607,14 +629,38 @@ export default function ProductDetailPage() {
                 method: "DELETE",
             });
             if (!res.ok && res.status !== 204) {
-                const body = await res.json().catch(() => ({} as { error?: string }));
-                toast({ type: "error", message: body.error ?? "Dosya silinemedi." });
+                toast({ type: "error", message: await parseAttachmentApiError(res, "Dosya silinemedi.") });
                 return;
             }
             toast({ type: "success", message: "Dosya silindi." });
             await fetchAttachments();
         } catch {
             toast({ type: "error", message: "Dosya silinemedi." });
+        }
+    };
+
+    // Faz 2d Review P3-006: belge "İndir" linki click time'da /url endpoint'ten
+    // fresh signed URL alır → 1h TTL aşılsa bile çalışır.
+    const handleDownloadDocument = async (attId: string) => {
+        if (!product) return;
+        try {
+            const res = await fetch(`/api/products/${product.id}/attachments/${attId}/url`);
+            if (!res.ok) {
+                toast({ type: "error", message: "İndirme bağlantısı alınamadı." });
+                return;
+            }
+            const data = await res.json() as { url?: string };
+            if (!openSignedUrlInNewTab(data.url, window.open.bind(window))) {
+                toast({ type: "error", message: "İndirme bağlantısı geçersiz." });
+                return;
+            }
+            // Liste state'ini de tazeleyelim ki sonraki tıklama da geçerli URL'i gösterir.
+            if (typeof data.url === "string") {
+                const fresh = data.url;
+                setAttachments(prev => prev.map(a => a.id === attId ? { ...a, signedUrl: fresh } : a));
+            }
+        } catch {
+            toast({ type: "error", message: "İndirme bağlantısı alınamadı." });
         }
     };
 
@@ -1510,21 +1556,20 @@ export default function ProductDetailPage() {
                                                                 {getKindLabel(doc.kind)} · {formatFileSize(doc.fileSize)}
                                                             </div>
                                                         </div>
-                                                        {doc.signedUrl && (
-                                                            <a
-                                                                href={doc.signedUrl}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                aria-label={`${doc.fileName} indir`}
-                                                                style={{
-                                                                    fontSize: "12px", color: "var(--accent-text)",
-                                                                    textDecoration: "none", padding: "4px 8px",
-                                                                    border: "0.5px solid var(--accent-border)", borderRadius: "4px",
-                                                                }}
-                                                            >
-                                                                İndir
-                                                            </a>
-                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDownloadDocument(doc.id)}
+                                                            aria-label={`${doc.fileName} indir`}
+                                                            style={{
+                                                                fontSize: "12px", color: "var(--accent-text)",
+                                                                background: "transparent",
+                                                                padding: "4px 8px",
+                                                                border: "0.5px solid var(--accent-border)", borderRadius: "4px",
+                                                                cursor: "pointer",
+                                                            }}
+                                                        >
+                                                            İndir
+                                                        </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => handleDeleteAttachment(doc.id, doc.fileName)}

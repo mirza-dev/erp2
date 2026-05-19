@@ -79,6 +79,20 @@ export async function middleware(request: NextRequest) {
         const isDemoMode = request.cookies.get("demo_mode")?.value === "1";
 
         if (isDemoMode) {
+            // Faz 2d Review P3-005: ENV opt-in guard.
+            // ATTACHMENTS_BLOCK_DEMO_ANON=true ise demo cookie ile anonim kullanıcı
+            // private bucket signed URL endpoint'lerine erişemez. Default kapalı —
+            // demo bucket SADECE seed/fake data içeriyorsa risksiz. Prod ile aynı
+            // bucket'ı paylaşan dağıtımlarda env true yapılmalı.
+            if (
+                process.env.ATTACHMENTS_BLOCK_DEMO_ANON === "true" &&
+                /^\/api\/products\/[^/]+\/attachments/.test(pathname)
+            ) {
+                return NextResponse.json(
+                    { error: "Bu kaynak için kimlik doğrulama gerekiyor." },
+                    { status: 401 }
+                );
+            }
             // Dashboard sayfaları → izin ver
             if (pathname.startsWith("/dashboard")) {
                 return NextResponse.next();

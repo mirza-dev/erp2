@@ -7,6 +7,18 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
+**Faz 2d Review 2. tur — 3 residual kapatıldı (3109 test)**
+
+- **P3-006 KAPANDI** (PDF/belge linki refresh): `<a href={doc.signedUrl}>` → `<button onClick={handleDownloadDocument(id)}>`. Handler `/url` endpoint'ten fresh URL alır + `openSignedUrlInNewTab` (window.open `noopener,noreferrer`) ile yeni sekmede açar; başarıdan sonra liste state'i de güncellenir (sonraki tıklama için cache). 1h TTL aşılsa da çalışır.
+- **P3-005 KAPANDI** (ENV opt-in demo guard): `ATTACHMENTS_BLOCK_DEMO_ANON=true` env flag — middleware'de demo cookie + `/api/products/[id]/attachments**` path'i = 401. Default false (geriye uyumlu, demo turunu kırmaz). `.env.example` + `/url` route SECURITY NOTE güncellendi.
+- **P3-004 KAPANDI** (handler logic davranış testleri): 3 yeni pure helper export — `buildUploadFormData(file, kind)`, `parseAttachmentApiError(res, fallback)`, `openSignedUrlInNewTab(url, windowOpen)`. handleUpload/handleSetPrimary/handleDelete bu helper'ları çağırıyor; testler gerçek davranışı doğruluyor (FormData içeriği, JSON error parse 5 vaka, window.open args 4 vaka). Page-ekler regression lock'ları helper kullanımına yöneldi.
+- **+25 test** (helper davranış 13 + page-ekler P3 lock 6 + demo guard 6)
+- 7 dosya · **3109 test yeşil** · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 2d Review 1. tur (3084 test, commit `2b4dd0a`)
+
 **Faz 2d Review — 5 P3 bulgu kapatıldı (3084 test)**
 
 - **P3-001 KAPANDI** (signed URL refresh): `refreshSignedUrl(attId)` useCallback `/url` endpoint'i çağırır; header img + grid img + lightbox img `onError={() => refreshSignedUrl(...)}` ile fresh URL alır. State'te attachment + aktif lightbox güncellenir. 1h TTL aşıldıktan sonra UI kendi kendini iyileştirir.

@@ -74,10 +74,11 @@ describe("Faz 2d — Ekler tab source regression locks", () => {
         expect(SOURCE).toMatch(/Belgeler \(/);
     });
 
-    it("documents list opens signed URL in new tab with rel noopener", () => {
-        expect(SOURCE).toMatch(/target="_blank"/);
-        expect(SOURCE).toMatch(/rel="noopener noreferrer"/);
-        expect(SOURCE).toMatch(/href=\{doc\.signedUrl\}/);
+    it("documents list opens via handleDownloadDocument with noopener,noreferrer features", () => {
+        // P3-006 refactor: <a href={doc.signedUrl}> kaldırıldı → click time fresh URL.
+        // openSignedUrlInNewTab helper'ı "noopener,noreferrer" feature string'ini geçer.
+        expect(SOURCE).toMatch(/onClick=\{\(\) => handleDownloadDocument\(doc\.id\)\}/);
+        expect(SOURCE).toMatch(/"noopener,noreferrer"/);
     });
 
     it("renders lightbox modal with role=dialog + aria-modal + aria-label", () => {
@@ -111,11 +112,11 @@ describe("Faz 2d — Ekler tab source regression locks", () => {
         expect(SOURCE).toMatch(/export function groupAttachments/);
     });
 
-    it("upload POST sends multipart FormData with file + kind to attachments endpoint", () => {
-        expect(SOURCE).toMatch(/new FormData\(\)/);
-        expect(SOURCE).toMatch(/fd\.append\("file", uploadFile\)/);
-        expect(SOURCE).toMatch(/fd\.append\("kind", uploadKind\)/);
+    it("upload POST sends multipart FormData (via buildUploadFormData helper) to attachments endpoint", () => {
         expect(SOURCE).toMatch(/method: "POST"/);
+        expect(SOURCE).toMatch(/buildUploadFormData\(uploadFile,\s*uploadKind\)/);
+        // FormData construction lives in the pure helper now; behavior covered in
+        // product-attachment-helpers.test.ts (buildUploadFormData describe block).
     });
 });
 
@@ -180,8 +181,50 @@ describe("Faz 2d Review P3-004 — new pure helpers exported for testing", () =>
         expect(SOURCE).toMatch(/export function findPrimaryImageWithUrl/);
     });
 
+    it("exports handler-logic helpers (buildUploadFormData / parseAttachmentApiError / openSignedUrlInNewTab)", () => {
+        expect(SOURCE).toMatch(/export function buildUploadFormData/);
+        expect(SOURCE).toMatch(/export async function parseAttachmentApiError/);
+        expect(SOURCE).toMatch(/export function openSignedUrlInNewTab/);
+    });
+
     it("header uses findPrimaryImageWithUrl helper instead of inline find", () => {
         expect(SOURCE).toMatch(/const primary = findPrimaryImageWithUrl\(attachments\)/);
         expect(SOURCE).not.toMatch(/attachments\.find\(a => a\.isPrimaryImage && a\.signedUrl\)/);
+    });
+
+    it("handleUpload uses buildUploadFormData helper (no inline FormData mutation)", () => {
+        expect(SOURCE).toMatch(/body:\s*buildUploadFormData\(uploadFile,\s*uploadKind\)/);
+    });
+
+    it("error toasts call parseAttachmentApiError with a fallback message", () => {
+        expect(SOURCE).toMatch(/parseAttachmentApiError\(res,\s*"Dosya yüklenemedi\."\)/);
+        expect(SOURCE).toMatch(/parseAttachmentApiError\(res,\s*"Ana görsel ayarlanamadı\."\)/);
+        expect(SOURCE).toMatch(/parseAttachmentApiError\(res,\s*"Dosya silinemedi\."\)/);
+    });
+});
+
+// ── P3-006: document download refresh via /url ───────────────────────────────
+
+describe("Faz 2d Review P3-006 — document download uses /url endpoint", () => {
+    it("defines handleDownloadDocument handler", () => {
+        expect(SOURCE).toMatch(/const handleDownloadDocument = async \(attId/);
+    });
+
+    it("handler fetches the /url endpoint before opening the link", () => {
+        expect(SOURCE).toMatch(/handleDownloadDocument[\s\S]{0,400}?\/api\/products\/\$\{product\.id\}\/attachments\/\$\{attId\}\/url/);
+    });
+
+    it("handler routes through openSignedUrlInNewTab (which sets noopener,noreferrer)", () => {
+        expect(SOURCE).toMatch(/openSignedUrlInNewTab\(data\.url,\s*window\.open\.bind\(window\)\)/);
+    });
+
+    it("documents list renders a BUTTON (not <a href={doc.signedUrl}>)", () => {
+        // 1h TTL sonrası direkt href çalışmıyor; click-time refresh için button gerekli.
+        expect(SOURCE).not.toMatch(/href=\{doc\.signedUrl\}/);
+        expect(SOURCE).toMatch(/onClick=\{\(\) => handleDownloadDocument\(doc\.id\)\}/);
+    });
+
+    it("handler updates attachment signedUrl in state so subsequent clicks reuse fresh URL", () => {
+        expect(SOURCE).toMatch(/handleDownloadDocument[\s\S]{0,800}?setAttachments\(prev => prev\.map/);
     });
 });

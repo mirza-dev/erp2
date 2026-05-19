@@ -3,7 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 2d Review — 5 P3 bulgu kapatıldı (2026-05-19; 3084 test)
+**Son tamamlanan iş:** Faz 2d Review 2. tur — 3 residual kapatıldı (2026-05-19; 3109 test)
+
+- **P3-006:** PDF/belge linki click-time refresh → `handleDownloadDocument` + `openSignedUrlInNewTab` helper; 1h TTL aşılsa da çalışır.
+- **P3-005:** `ATTACHMENTS_BLOCK_DEMO_ANON` env flag — true ise middleware demo cookie + `/api/products/[id]/attachments**` 401. Default false (geriye uyumlu).
+- **P3-004:** 3 yeni pure helper export (buildUploadFormData/parseAttachmentApiError/openSignedUrlInNewTab) + 13 davranış testi. Handler'lar artık extracted helper'ları çağırıyor — source-regex'ten çok güçlü.
+- 7 dosya · **3109 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 2d Review — 5 P3 bulgu kapatıldı (2026-05-19; 3084 test)
 
 - **P3-001:** `refreshSignedUrl` useCallback + header/grid/lightbox img `onError` → 1h TTL aşıldığında fresh signed URL alır, state günceller.
 - **P3-002:** `attachmentsError` state + role=alert banner + "Yeniden dene" button; empty state error varken gizlenir.

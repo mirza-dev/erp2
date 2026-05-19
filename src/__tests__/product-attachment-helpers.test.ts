@@ -8,7 +8,7 @@
  *   - pickInitialKind
  *   - groupAttachments
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
     formatFileSize,
     getKindLabel,
@@ -17,6 +17,9 @@ import {
     groupAttachments,
     parseAttachmentsResponse,
     findPrimaryImageWithUrl,
+    buildUploadFormData,
+    parseAttachmentApiError,
+    openSignedUrlInNewTab,
 } from "@/app/dashboard/products/[id]/page";
 import type { ProductAttachment, ProductAttachmentKind } from "@/lib/mock-data";
 
@@ -232,5 +235,90 @@ describe("findPrimaryImageWithUrl", () => {
             makeAtt({ id: "a", kind: "datasheet", isPrimaryImage: true, signedUrl: "u" }),
         ];
         expect(findPrimaryImageWithUrl(list)).toBeUndefined();
+    });
+});
+
+// ── buildUploadFormData (P3-004 handler logic — behavior) ────────────────────
+
+describe("buildUploadFormData", () => {
+    it("appends 'file' and 'kind' to a FormData", () => {
+        const file = new File(["abc"], "x.png", { type: "image/png" });
+        const fd = buildUploadFormData(file, "image");
+        expect(fd.get("file")).toBe(file);
+        expect(fd.get("kind")).toBe("image");
+    });
+
+    it("respects the kind argument verbatim (datasheet/certificate/...)", () => {
+        const file = new File(["pdf"], "x.pdf", { type: "application/pdf" });
+        expect(buildUploadFormData(file, "datasheet").get("kind")).toBe("datasheet");
+        expect(buildUploadFormData(file, "certificate").get("kind")).toBe("certificate");
+        expect(buildUploadFormData(file, "other").get("kind")).toBe("other");
+    });
+});
+
+// ── parseAttachmentApiError (P3-004 handler logic — behavior) ────────────────
+
+describe("parseAttachmentApiError", () => {
+    function makeRes(body: unknown): Response {
+        return new Response(JSON.stringify(body), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+        });
+    }
+
+    it("returns the body.error when present and a non-empty string", async () => {
+        const res = makeRes({ error: "Dosya çok büyük." });
+        expect(await parseAttachmentApiError(res, "fallback")).toBe("Dosya çok büyük.");
+    });
+
+    it("returns the fallback when body.error is missing", async () => {
+        const res = makeRes({ ok: true });
+        expect(await parseAttachmentApiError(res, "fallback")).toBe("fallback");
+    });
+
+    it("returns the fallback when body.error is empty string", async () => {
+        const res = makeRes({ error: "" });
+        expect(await parseAttachmentApiError(res, "fallback")).toBe("fallback");
+    });
+
+    it("returns the fallback when body.error is a non-string (e.g. object)", async () => {
+        const res = makeRes({ error: { code: 500 } });
+        expect(await parseAttachmentApiError(res, "fallback")).toBe("fallback");
+    });
+
+    it("returns the fallback when the body is not JSON", async () => {
+        const res = new Response("not json", { status: 500 });
+        expect(await parseAttachmentApiError(res, "fallback")).toBe("fallback");
+    });
+});
+
+// ── openSignedUrlInNewTab (P3-004 handler logic — behavior) ──────────────────
+
+describe("openSignedUrlInNewTab", () => {
+    it("calls the windowOpen fn with target '_blank' + noopener,noreferrer features when URL is valid", () => {
+        const open = vi.fn();
+        const ok = openSignedUrlInNewTab("https://x.example/y", open);
+        expect(ok).toBe(true);
+        expect(open).toHaveBeenCalledWith("https://x.example/y", "_blank", "noopener,noreferrer");
+    });
+
+    it("returns false and does NOT call windowOpen when URL is null/undefined", () => {
+        const open = vi.fn();
+        expect(openSignedUrlInNewTab(null, open)).toBe(false);
+        expect(openSignedUrlInNewTab(undefined, open)).toBe(false);
+        expect(open).not.toHaveBeenCalled();
+    });
+
+    it("returns false and does NOT call windowOpen when URL is empty string", () => {
+        const open = vi.fn();
+        expect(openSignedUrlInNewTab("", open)).toBe(false);
+        expect(open).not.toHaveBeenCalled();
+    });
+
+    it("returns false for non-string input (defensive)", () => {
+        const open = vi.fn();
+        // @ts-expect-error runtime guard
+        expect(openSignedUrlInNewTab(42, open)).toBe(false);
+        expect(open).not.toHaveBeenCalled();
     });
 });
