@@ -3,14 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 2b Review — 3 bulgu kapatma (2026-05-19; 2935 test) · commit `96d8371`
+**Son tamamlanan iş:** Faz 2c Review — P2-001 + P2-002 kapanış (2026-05-19; 2990 test) · commit `0c4cf39`
 
-- **P2-001 KAPANDI:** `GET /api/products/[id]` artık `dbGetQuotedQuantities` + `dbGetIncomingQuantities` ile zenginleştirilmiş `quoted/incoming/promisable/forecasted` dönüyor. Stok sekmesi kartları gerçek veriyi gösteriyor.
-- **P2-002 KAPANDI:** `handleSave` body'sinde clearable nullable string alanlar `|| null`, nullable number alanlar `? ... : null` olarak güncellendi — alan temizlenince DB güncelleniyor.
-- **P3-003 KAPANDI:** `product-detail-page.test.ts`'e +5 regresyon kilidi eklendi.
-- 190 dosya · **2935 test yeşil** · TS clean · 0 lint warning · build OK
+- **P2-001 KAPANDI:** Create drawer'a Tip Şablonu selector + `DynamicFieldEdit` dinamik alanlar eklendi; `handleCreate` body `product_type_id` + `attributes` içeriyor. Plan kriteri: tip seç → alanlar gelir → kaydet ✅
+- **P2-002 KAPANDI:** `handleTypeChange("")` artık attributes varsa `pendingTypeChange` modal'ına yönlendiriyor; onayda `attributes: {}` ile birlikte temizleniyor (eskiden stale attributes DB'ye yazılıyordu).
+- **Refactor:** `DynamicFieldEdit` + `FieldEdit` shared component: `src/components/products/DynamicFieldEdit.tsx`
+- 5 dosya · **2990 test yeşil** · TS clean · 0 lint warning · build OK
 
-**Önceki:** Faz 2b — Tam ekran ürün detay sayfası + drawer kaldırma (2026-05-19; 2930 test) · commit `9003044`
+**Önceki:** Faz 2c — Teknik sekmesi dinamik alan rendering (2026-05-19; 2974 test) · commit `6846584`
+
+**Önceki:** Faz 2b Review — 3 bulgu kapatma (2026-05-19; 2935 test) · commit `96d8371`
+
+**Önceki önceki:** Faz 2b — Tam ekran ürün detay sayfası + drawer kaldırma (2026-05-19; 2930 test) · commit `9003044`
 
 **Modül Revize Faz 1 (14 dosya: 2 migration + 2 yeni helper/route paketi + admin paneli + 3 test):**
 - **Migration 056** (`supabase/migrations/056_product_types.sql`): `product_types` tablosu (id/name/description/icon/sort_order/is_system) + `product_type_fields` tablosu (id/product_type_id FK CASCADE/field_key regex CHECK/label_tr/label_en/field_type 7-enum CHECK/unit/options jsonb/required/placeholder/help_text/sort_order). RLS service_role + `updated_at` triggers. `products` ALTER: `product_type_id uuid FK ON DELETE SET NULL` (nullable, geriye uyumlu) + `attributes jsonb NOT NULL DEFAULT '{}'`. GIN index attributes üzerinde. Idempotent + ROLLBACK SQL bloğu.

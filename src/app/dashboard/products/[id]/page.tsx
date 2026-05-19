@@ -109,7 +109,23 @@ function buildEditForm(p: Product): EditForm {
     };
 }
 
-// Pure helper — exported for testing.
+// Pure helpers — exported for testing.
+
+export function getMissingRequiredAttributes(
+    fields: ProductTypeFieldRow[],
+    attributes: Record<string, unknown>,
+): string[] {
+    return fields
+        .filter(f => f.required)
+        .filter(f => {
+            const v = attributes[f.field_key];
+            if (v === undefined || v === null || v === "") return true;
+            if (Array.isArray(v) && v.length === 0) return true;
+            return false;
+        })
+        .map(f => f.label_tr);
+}
+
 // Returns the set of attribute keys that will be lost if user switches from
 // `oldFields` to `newFields`. A key is "lost" if it's present in current
 // attributes and not in the new type's field schema.
@@ -418,6 +434,11 @@ export default function ProductDetailPage() {
     const handleSave = async () => {
         if (!editForm || !product) return;
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        const missingRequired = getMissingRequiredAttributes(activeTypeFields, editForm.attributes ?? {});
+        if (missingRequired.length > 0) {
+            toast({ type: "error", message: `Zorunlu alanlar eksik: ${missingRequired.join(", ")}` });
+            return;
+        }
         setSaving(true);
         try {
             const body: Record<string, unknown> = {

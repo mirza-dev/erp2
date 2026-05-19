@@ -1,11 +1,14 @@
 /**
  * Faz 2c — Teknik sekmesi dinamik alan rendering + tip seçici + attributes JSONB.
+ * P3-003 — getMissingRequiredAttributes: handleSave zorunlu alan validasyonu.
  *
  * Coverage:
  *   - computeLostAttributeKeys pure helper
  *   - formatAttributeValue pure helper (display formatting per field type)
+ *   - getMissingRequiredAttributes pure helper
  *   - Source-regex regression locks: type selector, dynamic Teknik render,
- *     PATCH body includes product_type_id + attributes, confirm modal
+ *     PATCH body includes product_type_id + attributes, confirm modal,
+ *     handleSave required validation
  */
 import { describe, it, expect } from "vitest";
 import fs from "fs";
@@ -13,6 +16,7 @@ import path from "path";
 import {
     computeLostAttributeKeys,
     formatAttributeValue,
+    getMissingRequiredAttributes,
 } from "@/app/dashboard/products/[id]/page";
 import type { ProductTypeFieldRow } from "@/lib/database.types";
 
@@ -168,5 +172,59 @@ describe("Faz 2c — product detail page source", () => {
     it("handleTypeChange('') routes through pendingTypeChange when attributes exist (P2-002)", () => {
         expect(SOURCE).toMatch(/lostKeys\.length > 0/);
         expect(SOURCE).toMatch(/setPendingTypeChange.*newTypeId.*""/s);
+    });
+});
+
+// ── P3-003: getMissingRequiredAttributes — edit page ─────────────────────────
+
+describe("getMissingRequiredAttributes — product detail page", () => {
+    it("returns empty when no required fields", () => {
+        const fields = [makeField({ required: false })];
+        expect(getMissingRequiredAttributes(fields, { dn: 50 })).toEqual([]);
+    });
+
+    it("returns label when required field is missing", () => {
+        const fields = [makeField({ required: true })];
+        expect(getMissingRequiredAttributes(fields, {})).toEqual(["DN"]);
+    });
+
+    it("returns label when required field value is empty string", () => {
+        const fields = [makeField({ required: true })];
+        expect(getMissingRequiredAttributes(fields, { dn: "" })).toEqual(["DN"]);
+    });
+
+    it("returns label when required multiselect is empty array", () => {
+        const fields = [makeField({ required: true, field_type: "multiselect" })];
+        expect(getMissingRequiredAttributes(fields, { dn: [] })).toEqual(["DN"]);
+    });
+
+    it("accepts non-empty multiselect as filled", () => {
+        const fields = [makeField({ required: true, field_type: "multiselect" })];
+        expect(getMissingRequiredAttributes(fields, { dn: ["API 6D"] })).toEqual([]);
+    });
+
+    it("returns all missing required labels", () => {
+        const fields = [
+            makeField({ field_key: "dn", label_tr: "DN", required: true }),
+            makeField({ field_key: "pn", label_tr: "PN Sınıfı", required: true }),
+        ];
+        expect(getMissingRequiredAttributes(fields, {}).sort()).toEqual(["DN", "PN Sınıfı"]);
+    });
+});
+
+// ── P3-003: handleSave validation source-regex ────────────────────────────────
+
+describe("P3-003 — handleSave required attribute validation (source)", () => {
+    it("exports getMissingRequiredAttributes from detail page", () => {
+        expect(SOURCE).toMatch(/export function getMissingRequiredAttributes/);
+    });
+
+    it("handleSave calls getMissingRequiredAttributes with activeTypeFields", () => {
+        expect(SOURCE).toMatch(/getMissingRequiredAttributes\(activeTypeFields,/);
+    });
+
+    it("handleSave shows toast with missing field names when required fields are empty", () => {
+        expect(SOURCE).toMatch(/Zorunlu alanlar eksik/);
+        expect(SOURCE).toMatch(/missingRequired\.join/);
     });
 });

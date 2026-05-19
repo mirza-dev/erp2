@@ -7,17 +7,24 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
-**Faz 2c — Teknik sekmesi dinamik alan rendering + tip seçici (2974 test) · commit `6846584`**
+**Faz 2c Review — Tüm P3 bulgular kapatıldı (3015 test)**
+
+- **MR-F2C-P3-003 ✅ KAPANDI:** `getMissingRequiredAttributes(fields, attributes)` pure helper eklendi (her iki page dosyasında export). `handleCreate` (create drawer) + `handleSave` (detay edit) her ikisi de kaydetmeden önce zorunlu alanları kontrol ediyor; eksikse `"Zorunlu alanlar eksik: X, Y"` toast'ı.
+- **MR-F2C-P3-004 ✅ KAPANDI:** Testler source-regex'ten gerçek mantık testlerine geçirildi. `getMissingRequiredAttributes` için 9+6 pure helper test (8 senaryo: undefined/null/empty string/empty array/multiselect/multi-missing). Source-regex lock'ları korundu.
+- **MR-F2C-P3-005 ✅ KAPANDI:** `createTypeFieldsError` state eklendi. `handleCreateTypeChange`'de `!res.ok` ve `catch` dalları `"Alan şablonu yüklenemedi…"` set ediyor; yeni tip seçilince `null` ile temizleniyor. JSX'te `role="alert"` banner render'ı.
+- **+25 test** (product-create-type-selector.test.ts: +15 yeni, product-detail-page-faz2c.test.ts: +10 yeni)
+- **3015 test yeşil · TS clean · 0 lint warning · Faz 2c tamamen kapalı**
+
+---
+
+## Önceki — Faz 2c — Teknik sekmesi dinamik alan rendering + tip seçici (2974 test) · commit `6846584`
 
 - Genel sekmesinde "Tip Şablonu" selector (`/api/product-types` listesinden, edit mode)
 - Teknik sekmesi aktif: seçili tipin `product_type_fields` alanları `withFields=1` ile fetch, alan tipine göre render
 - `DynamicFieldEdit` component'i: 7 field_type variant (text/number/select/multiselect/boolean/date/longtext) + unit suffix/pill toggle/checkbox/textarea
 - `handleSave` body'sine `product_type_id` + `attributes` JSONB eklendi
 - Tip değişiminde `computeLostAttributeKeys` ile yeni tipte olmayan attribute key'leri tespit edilir → uyarı modalı; onaylanınca filtre uygulanır
-- Pure helper exports: `computeLostAttributeKeys`, `formatAttributeValue` (display formatter)
-- `setAttribute`: boş değerlerde key silinir (storage temizliği)
-- +20 test (faz2c suite: lostKeys 4 + formatAttributeValue 7 + source-regex 9 = yeni dosya 20)
-- 3 dosya · **2974 test yeşil** · TS clean · 0 lint warning · build OK
+- +20 test · 2974 test yeşil
 
 ---
 

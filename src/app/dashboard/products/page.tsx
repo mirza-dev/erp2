@@ -75,6 +75,21 @@ function FormField({ label, required, children }: { label: string; required?: bo
     );
 }
 
+export function getMissingRequiredAttributes(
+    fields: ProductTypeFieldRow[],
+    attributes: Record<string, unknown>,
+): string[] {
+    return fields
+        .filter(f => f.required)
+        .filter(f => {
+            const v = attributes[f.field_key];
+            if (v === undefined || v === null || v === "") return true;
+            if (Array.isArray(v) && v.length === 0) return true;
+            return false;
+        })
+        .map(f => f.label_tr);
+}
+
 export default function ProductsPage() {
     const router = useRouter();
     const { toast } = useToast();
@@ -108,6 +123,7 @@ export default function ProductsPage() {
     const [createProductTypes, setCreateProductTypes] = useState<ProductTypeRow[]>([]);
     const [createTypeFields, setCreateTypeFields] = useState<ProductTypeFieldRow[]>([]);
     const [createTypeFieldsLoading, setCreateTypeFieldsLoading] = useState(false);
+    const [createTypeFieldsError, setCreateTypeFieldsError] = useState<string | null>(null);
     const [createSubmitting, setCreateSubmitting] = useState(false);
     const [windowWidth, setWindowWidth] = useState<number>(
         typeof window !== "undefined" ? window.innerWidth : 1200
@@ -326,6 +342,7 @@ export default function ProductsPage() {
     const handleCreateTypeChange = async (newTypeId: string) => {
         setCreateForm(f => ({ ...f, productTypeId: newTypeId, attributes: {} }));
         setCreateTypeFields([]);
+        setCreateTypeFieldsError(null);
         if (!newTypeId) return;
         setCreateTypeFieldsLoading(true);
         try {
@@ -333,8 +350,12 @@ export default function ProductsPage() {
             if (res.ok) {
                 const data = await res.json();
                 setCreateTypeFields(Array.isArray(data.fields) ? data.fields : []);
+            } else {
+                setCreateTypeFieldsError("Alan şablonu yüklenemedi. Lütfen tekrar deneyin.");
             }
-        } catch { /* graceful */ } finally {
+        } catch {
+            setCreateTypeFieldsError("Alan şablonu yüklenemedi. Lütfen tekrar deneyin.");
+        } finally {
             setCreateTypeFieldsLoading(false);
         }
     };
@@ -342,6 +363,11 @@ export default function ProductsPage() {
     const handleCreate = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!createForm.name.trim() || !createForm.sku.trim()) return;
+        const missingRequired = getMissingRequiredAttributes(createTypeFields, createForm.attributes);
+        if (missingRequired.length > 0) {
+            toast({ type: "error", message: `Zorunlu alanlar eksik: ${missingRequired.join(", ")}` });
+            return;
+        }
         setCreateSubmitting(true);
         try {
             const body = {
@@ -1289,6 +1315,11 @@ export default function ProductsPage() {
                                 </FormField>
                                 {createTypeFieldsLoading && (
                                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Alanlar yükleniyor…</div>
+                                )}
+                                {createTypeFieldsError && (
+                                    <div role="alert" style={{ fontSize: "12px", color: "var(--danger-text)", padding: "6px 8px", background: "var(--danger-bg)", borderRadius: "4px", border: "0.5px solid var(--danger-border)" }}>
+                                        ⚠ {createTypeFieldsError}
+                                    </div>
                                 )}
                                 {createTypeFields.map(f => (
                                     <DynamicFieldEdit
