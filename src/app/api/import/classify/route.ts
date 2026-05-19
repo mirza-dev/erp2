@@ -129,6 +129,13 @@ export async function POST(req: NextRequest) {
 
         // P3 (Review 3.d) — Pre-write guard: auth.getUser() async; bu pencerede
         // abort olursa DB+storage write hâlâ olabilir. Final kontrol.
+        //
+        // P3 (Review 3.e) — COMMIT POINT: Bu noktadan sonra `dbCreateImportDocument`
+        // 3-step orphan-safe transaction'ını başlatır (INSERT pending → upload →
+        // UPDATE classified). Abort sinyali helper'a yayılmaz; helper kendi
+        // try/catch'i ile transaction'ı tamamlar veya rollback eder. Helper
+        // başladıktan sonra orphan ihtimali 3c'deki 30-gün storage cron'una
+        // bırakılmıştır.
         if (req.signal.aborted) {
             return new NextResponse(null, { status: 499 });
         }

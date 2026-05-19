@@ -3,11 +3,17 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3a Review 3.d — Pre-write abort guard (auth.getUser race) (2026-05-20; 3200 test)
+**Son tamamlanan iş:** Faz 3a Review 3.e — Commit-point semantik netleştirme (2026-05-20; 3200 test)
 
-- **P3 (pre-write guard):** 3.c post-AI guard'dan sonra `createClient()` + `auth.getUser()` async; bu pencerede client koparsa DB+storage write yine olabiliyordu. `dbCreateImportDocument` hemen öncesi 4. signal guard eklendi → 499. Hard cancel garantisi 4 katmana çıktı: pre-AI, in-AI catch, post-AI, pre-write.
-- **+1 test:** `mockGetUser` module-level fn'e dönüştürüldü; getUser implementasyonu içinde `ctl.abort()` ile race simüle → status 499 + mockCreateDoc not called.
+- **P3 (commit point):** Hard cancel garantisi `dbCreateImportDocument` çağrısına KADAR geçerli. Helper başladıktan sonra 3-step orphan-safe transaction (INSERT pending → upload → UPDATE classified) kendi try/catch'i ile tamamlanır veya rollback eder; signal helper'a yayılmaz. Helper sonrası nadir orphan ihtimali 3c'deki 30-gün storage cron cleanup'ına bırakılmıştır.
+- **Karar gerekçesi:** Helper'a signal yaymak ~5-10 satır + 2-3 test gerektirir ama storage cleanup async olduğu için race penceresini sıfırlamaz, sadece daraltır. Commit point semantiği daha temiz ve test yüzeyi küçük.
+- **Dokümantasyon:** `dbCreateImportDocument` JSDoc'una commit-point note + `route.ts` pre-write guard yorumuna semantik açıklama. Kod davranışı değişmedi.
 - 3 dosya · **3200 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3a Review 3.d — Pre-write abort guard (auth.getUser race) (2026-05-20; 3200 test)
+
+- **P3 (pre-write guard):** 3.c post-AI guard'dan sonra `createClient()` + `auth.getUser()` async; bu pencerede client koparsa DB+storage write yine olabiliyordu. `dbCreateImportDocument` hemen öncesi 4. signal guard eklendi → 499. Hard cancel 4 katman: pre-AI, in-AI catch, post-AI, pre-write.
+- +1 test (`mockGetUser` getUser sırasında `ctl.abort()` → 499 + mockCreateDoc not called)
 
 **Önceki:** Faz 3a Review 3.c — Server-side hard cancel (P3) + doc hijyen (2026-05-20; 3199 test)
 

@@ -62,6 +62,16 @@ export interface CreateImportDocumentInput {
     createdBy?: string | null;
 }
 
+/**
+ * 3-step orphan-safe create: INSERT pending → storage upload → UPDATE classified.
+ *
+ * **Commit point semantics (Faz 3a Review 3.d/3.e):** Route'un hard-cancel guard'ı
+ * bu helper'ı çağırmadan ÖNCE iş görür (`req.signal.aborted` → 499). Helper
+ * çağrıldıktan sonra abort sinyali helper'a yayılmaz; transaction kendi
+ * try/catch'i içinde tamamlanır veya rollback olur (insert→upload fail → row sil).
+ * Helper başladıktan sonra orphan ihtimali için 3c'deki 30-gün storage cron
+ * cleanup'ı plan dahilindedir.
+ */
 export async function dbCreateImportDocument(
     input: CreateImportDocumentInput,
 ): Promise<ImportDocumentRow> {

@@ -7,6 +7,16 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-20
 
+**Faz 3a Review 3.e — Commit-point semantik netleştirme (3200 test)**
+
+- **P3 KAPANDI** (commit point): Hard cancel garantisi `dbCreateImportDocument` çağrısına KADAR. Helper başladıktan sonra 3-step orphan-safe transaction (INSERT pending → upload → UPDATE classified) kendi try/catch'i ile tamamlanır; signal helper'a yayılmaz. Nadir orphan 3c'deki 30-gün cron'a bırakıldı.
+- **Karar:** Helper'a signal yaymak storage cleanup async olduğu için race penceresini sıfırlamaz, sadece daraltır. Commit point semantiği temiz; doc'a netleştirildi (`dbCreateImportDocument` JSDoc + route.ts pre-write yorum). Kod davranışı değişmedi.
+- 3 dosya · **3200 test yeşil** · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 3a Review 3.d (3200 test)
+
 **Faz 3a Review 3.d — Pre-write abort guard (auth.getUser race) (3200 test)**
 
 - **P3 KAPANDI** (pre-write guard): 3.c post-AI guard'dan sonra `createClient()` + `auth.getUser()` async; bu pencerede client koparsa DB+storage write yine olabiliyordu. `dbCreateImportDocument` hemen öncesi 4. signal guard eklendi → 499. Hard cancel garantisi 4 katmana çıktı (pre-AI / in-AI / post-AI / pre-write).
