@@ -3,8 +3,10 @@ import {
     dbGetProductById,
     dbUpdateProduct,
     dbDeleteProduct,
+    dbGetQuotedQuantities,
     type CreateProductInput,
 } from "@/lib/supabase/products";
+import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
 import { dbExpireEntityRecommendations } from "@/lib/supabase/recommendations";
 import type { AlertType } from "@/lib/database.types";
@@ -32,7 +34,19 @@ export async function GET(
         if (!product) {
             return NextResponse.json({ error: "Ürün bulunamadı." }, { status: 404 });
         }
-        return NextResponse.json(product);
+        const [quotedMap, incomingMap] = await Promise.all([
+            dbGetQuotedQuantities(),
+            dbGetIncomingQuantities(),
+        ]);
+        const quoted   = quotedMap.get(id)   ?? 0;
+        const incoming = incomingMap.get(id) ?? 0;
+        return NextResponse.json({
+            ...product,
+            quoted,
+            incoming,
+            promisable: product.available_now - quoted,
+            forecasted: product.available_now + incoming - quoted,
+        });
     } catch (err) {
         return handleApiError(err, "GET /api/products/[id]");
     }

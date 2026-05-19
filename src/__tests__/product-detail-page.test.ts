@@ -12,10 +12,17 @@
  *   - Demo guard
  *   - Operational subsections (Bekleyen Teslimatlar + Aktif Teklifler)
  *   - Header (image placeholder + SKU mono + active/inactive badge)
+ *
+ * Faz 2b Review (P3-003):
+ *   - Route enrichment: dbGetQuotedQuantities + dbGetIncomingQuantities called in GET
+ *   - handleSave null pattern: clearable fields use || null (not || undefined)
+ *   - mapProduct: enriched quoted/incoming/promisable/forecasted mapping
  */
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
+import { mapProduct } from "@/lib/api-mappers";
+import type { ProductWithStock } from "@/lib/database.types";
 
 const SOURCE = fs.readFileSync(
     path.join(process.cwd(), "src/app/dashboard/products/[id]/page.tsx"),
@@ -87,5 +94,96 @@ describe("Faz 2b — product detail page source", () => {
         expect(SOURCE).toMatch(/role="tab"/);
         expect(SOURCE).toMatch(/aria-selected/);
         expect(SOURCE).toMatch(/aria-controls/);
+    });
+});
+
+// ── Faz 2b Review — P3-003 regression locks ──────────────────────────────
+
+const ROUTE_SOURCE = fs.readFileSync(
+    path.join(process.cwd(), "src/app/api/products/[id]/route.ts"),
+    "utf8",
+);
+
+describe("Faz 2b Review — GET /api/products/[id] enrichment (P2-001)", () => {
+    it("route imports dbGetQuotedQuantities and calls it in GET handler", () => {
+        expect(ROUTE_SOURCE).toMatch(/dbGetQuotedQuantities/);
+        expect(ROUTE_SOURCE).toMatch(/quotedMap\.get\(id\)/);
+    });
+
+    it("route imports dbGetIncomingQuantities and computes incoming/forecasted", () => {
+        expect(ROUTE_SOURCE).toMatch(/dbGetIncomingQuantities/);
+        expect(ROUTE_SOURCE).toMatch(/incomingMap\.get\(id\)/);
+        expect(ROUTE_SOURCE).toMatch(/forecasted:/);
+    });
+});
+
+describe("Faz 2b Review — handleSave null pattern (P2-002)", () => {
+    it("clearable optional fields use || null (not || undefined) in handleSave", () => {
+        expect(SOURCE).toMatch(/preferred_vendor:.*\|\| null/);
+        expect(SOURCE).toMatch(/product_notes:.*\|\| null/);
+        expect(SOURCE).toMatch(/warehouse:.*\|\| null/);
+    });
+
+    it("clearable number fields use null fallback in handleSave", () => {
+        expect(SOURCE).toMatch(/lead_time_days:.*:\s*null/);
+        expect(SOURCE).toMatch(/cost_price:.*:\s*null/);
+        expect(SOURCE).toMatch(/daily_usage:.*:\s*null/);
+    });
+});
+
+describe("Faz 2b Review — mapProduct enriched fields (P3-003)", () => {
+    it("mapProduct correctly maps quoted/incoming/promisable/forecasted from enriched response", () => {
+        const row = {
+            id: "test-id",
+            name: "Test",
+            sku: "TEST-001",
+            category: null,
+            unit: "adet",
+            price: 100,
+            currency: "USD",
+            on_hand: 100,
+            reserved: 20,
+            available_now: 80,
+            quoted: 30,
+            incoming: 50,
+            promisable: 50,
+            forecasted: 100,
+            min_stock_level: 10,
+            is_active: true,
+            product_type: "manufactured" as const,
+            warehouse: null,
+            reorder_qty: null,
+            preferred_vendor: null,
+            preferred_vendor_id: null,
+            daily_usage: null,
+            lead_time_days: null,
+            created_at: "2026-01-01",
+            updated_at: "2026-01-01",
+            product_family: null,
+            sub_category: null,
+            sector_compatibility: null,
+            cost_price: null,
+            weight_kg: null,
+            material_quality: null,
+            origin_country: null,
+            production_site: null,
+            use_cases: null,
+            industries: null,
+            standards: null,
+            certifications: null,
+            product_notes: null,
+            parasut_product_id: null,
+            parasut_synced_at: null,
+            parasut_product_creating_until: null,
+            parasut_product_creating_owner: null,
+            product_type_id: null,
+            attributes: {},
+        } satisfies ProductWithStock;
+
+        const mapped = mapProduct(row);
+        expect(mapped.quoted).toBe(30);
+        expect(mapped.incoming).toBe(50);
+        expect(mapped.promisable).toBe(50);
+        expect(mapped.forecasted).toBe(100);
     });
 });
