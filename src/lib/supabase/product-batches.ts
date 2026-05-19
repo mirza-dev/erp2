@@ -20,6 +20,18 @@ export interface UpdateBatchInput {
     notes?: string | null;
 }
 
+async function validateCertificateAttachment(productId: string, attachmentId: string): Promise<void> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("product_attachments")
+        .select("id, product_id, kind")
+        .eq("id", attachmentId)
+        .single();
+    if (error || !data) throw new Error("Sertifika eki bulunamadı.");
+    if ((data as { product_id: string }).product_id !== productId) throw new Error("Sertifika eki bu ürüne ait değil.");
+    if ((data as { kind: string }).kind !== "certificate") throw new Error("Sertifika eki 'certificate' türünde olmalıdır.");
+}
+
 function validateBatchInput(input: CreateBatchInput | UpdateBatchInput): string | null {
     if ("heat_no" in input && input.heat_no !== undefined) {
         if (!input.heat_no || input.heat_no.trim().length === 0) return "Parti numarası (heat_no) zorunludur.";
@@ -75,6 +87,10 @@ export async function dbCreateBatch(input: CreateBatchInput): Promise<ProductBat
     if (!input.heat_no || input.heat_no.trim().length === 0) throw new Error("Parti numarası (heat_no) zorunludur.");
     if (input.initial_qty === undefined) throw new Error("Başlangıç miktarı zorunludur.");
 
+    if (input.certificate_attachment_id) {
+        await validateCertificateAttachment(input.product_id, input.certificate_attachment_id);
+    }
+
     const supabase = createServiceClient();
     const { data, error } = await supabase
         .from("product_batches")
@@ -100,7 +116,7 @@ export async function dbUpdateBatch(id: string, patch: UpdateBatchInput): Promis
 
     // initial/remaining cross-check için mevcut satır gerekli (patch tek alan getirebilir)
     let existing: ProductBatchRow | null = null;
-    if (patch.initial_qty !== undefined || patch.remaining_qty !== undefined) {
+    if (patch.initial_qty !== undefined || patch.remaining_qty !== undefined || patch.certificate_attachment_id) {
         existing = await dbGetBatch(id);
         if (!existing) throw new Error("Parti bulunamadı.");
     }
@@ -112,6 +128,10 @@ export async function dbUpdateBatch(id: string, patch: UpdateBatchInput): Promis
         remaining_qty: finalRemaining as number | undefined,
     });
     if (err) throw new Error(err);
+
+    if (patch.certificate_attachment_id && existing) {
+        await validateCertificateAttachment(existing.product_id, patch.certificate_attachment_id);
+    }
 
     const updatePayload: Record<string, unknown> = {};
     if (patch.heat_no !== undefined) updatePayload.heat_no = patch.heat_no.trim();

@@ -49,13 +49,18 @@ export async function POST(
             ? Number(body.remaining_qty)
             : undefined;
 
+        const certAttachId = (body.certificate_attachment_id as string | null | undefined) ?? null;
+        if (certAttachId !== null && !UUID_RE.test(certAttachId)) {
+            return NextResponse.json({ error: "Geçersiz sertifika eki id." }, { status: 400 });
+        }
+
         const batch = await dbCreateBatch({
             product_id: id,
             heat_no: String(body.heat_no ?? "").trim(),
             batch_date: (body.batch_date as string | null | undefined) ?? null,
             initial_qty: initialQty,
             remaining_qty: remainingQty,
-            certificate_attachment_id: (body.certificate_attachment_id as string | null | undefined) ?? null,
+            certificate_attachment_id: certAttachId,
             notes: (body.notes as string | null | undefined) ?? null,
         });
 

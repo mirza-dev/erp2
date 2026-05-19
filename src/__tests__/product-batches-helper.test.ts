@@ -134,6 +134,47 @@ describe("dbUpdateBatch validation", () => {
     });
 });
 
+describe("validateCertificateAttachment (dbCreateBatch üzerinden)", () => {
+    it("certificate_attachment_id başka ürüne ait → throw", async () => {
+        const { dbCreateBatch } = await vi.importActual<typeof import("@/lib/supabase/product-batches")>("@/lib/supabase/product-batches");
+        mockSingle.mockResolvedValueOnce({
+            data: { id: "att-1", product_id: "00000000-0000-4000-8000-000000000099", kind: "certificate" },
+            error: null,
+        });
+        await expect(dbCreateBatch({
+            product_id: PRODUCT_ID,
+            heat_no: "H-001",
+            initial_qty: 50,
+            certificate_attachment_id: "att-1",
+        })).rejects.toThrow("bu ürüne ait değil");
+    });
+
+    it("certificate_attachment_id kind=image → throw", async () => {
+        const { dbCreateBatch } = await vi.importActual<typeof import("@/lib/supabase/product-batches")>("@/lib/supabase/product-batches");
+        mockSingle.mockResolvedValueOnce({
+            data: { id: "att-2", product_id: PRODUCT_ID, kind: "image" },
+            error: null,
+        });
+        await expect(dbCreateBatch({
+            product_id: PRODUCT_ID,
+            heat_no: "H-001",
+            initial_qty: 50,
+            certificate_attachment_id: "att-2",
+        })).rejects.toThrow("türünde olmalıdır");
+    });
+
+    it("certificate_attachment_id bulunamadı → throw", async () => {
+        const { dbCreateBatch } = await vi.importActual<typeof import("@/lib/supabase/product-batches")>("@/lib/supabase/product-batches");
+        mockSingle.mockResolvedValueOnce({ data: null, error: { message: "not found" } });
+        await expect(dbCreateBatch({
+            product_id: PRODUCT_ID,
+            heat_no: "H-001",
+            initial_qty: 50,
+            certificate_attachment_id: "att-missing",
+        })).rejects.toThrow("bulunamadı");
+    });
+});
+
 describe("dbListBatchesByProduct sıralama", () => {
     it("batch_date DESC NULLS LAST + created_at DESC ile sıralanır", async () => {
         const { dbListBatchesByProduct } = await vi.importActual<typeof import("@/lib/supabase/product-batches")>("@/lib/supabase/product-batches");

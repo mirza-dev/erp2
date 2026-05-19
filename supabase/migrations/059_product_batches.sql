@@ -27,6 +27,7 @@ CREATE INDEX IF NOT EXISTS idx_batches_product_date
 
 ALTER TABLE product_batches ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "service_product_batches_all" ON product_batches;
 CREATE POLICY "service_product_batches_all" ON product_batches
     FOR ALL USING (auth.role() = 'service_role');
 

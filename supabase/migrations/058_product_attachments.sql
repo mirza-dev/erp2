@@ -36,6 +36,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_attachments_primary_image
 
 ALTER TABLE product_attachments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "service_product_attachments_all" ON product_attachments;
 CREATE POLICY "service_product_attachments_all" ON product_attachments
     FOR ALL USING (auth.role() = 'service_role');
 
@@ -52,6 +53,7 @@ VALUES (
 )
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "product_files_service_all" ON storage.objects;
 CREATE POLICY "product_files_service_all" ON storage.objects
     FOR ALL
     USING (bucket_id = 'product-files' AND auth.role() = 'service_role');
