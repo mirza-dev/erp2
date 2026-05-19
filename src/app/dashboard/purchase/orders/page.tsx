@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
+import { useSelection } from "@/hooks/useSelection";
 import type { PurchaseOrderRow, PurchaseOrderStatus, VendorRow } from "@/lib/database.types";
 
 const thStyle: React.CSSProperties = {
@@ -56,6 +57,8 @@ export default function PurchaseOrdersPage() {
     const [activeTab, setActiveTab] = useState<StatusFilter>("all");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
+    const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
+    const [bulkCancelling, setBulkCancelling] = useState(false);
 
     const loadOrders = useCallback(async () => {
         setLoading(true);
@@ -97,6 +100,31 @@ export default function PurchaseOrdersPage() {
 
     const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
         usePagination(filtered, { resetKey: `${search}|${activeTab}` });
+
+    const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
+        useSelection(`${search}|${activeTab}`);
+    const pageIds = pagedItems.map(o => o.id);
+
+    const handleBulkCancel = async () => {
+        if (isDemo) { toast({ type: "info", message: "Demo modda bu işlem yapılamaz." }); return; }
+        setBulkCancelling(true);
+        const ids = Array.from(selectedIds);
+        const results = await Promise.allSettled(
+            ids.map(id => fetch(`/api/purchase-orders/${id}/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason: "Toplu iptal" }),
+            })),
+        );
+        const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
+        const succeeded = ids.length - failed;
+        if (succeeded > 0) toast({ type: "success", message: `${succeeded} sipariş iptal edildi.` });
+        if (failed > 0) toast({ type: "error", message: `${failed} sipariş iptal edilemedi.` });
+        clearAll();
+        setBulkCancelConfirm(false);
+        setBulkCancelling(false);
+        void loadOrders();
+    };
 
     return (
         <div style={{ maxWidth: "1200px", margin: "0 auto" }}>
@@ -169,6 +197,44 @@ export default function PurchaseOrdersPage() {
                 />
             </div>
 
+            {/* Bulk action bar */}
+            {selectedIds.size > 0 && (
+                <div style={{
+                    display: "flex", alignItems: "center", gap: "10px",
+                    padding: "10px 14px",
+                    background: "var(--accent-bg)",
+                    border: "0.5px solid var(--accent-border)",
+                    borderRadius: "6px",
+                    fontSize: "13px",
+                }}>
+                    <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
+                        {selectedIds.size} sipariş seçildi
+                    </span>
+                    <button
+                        onClick={() => setBulkCancelConfirm(true)}
+                        disabled={bulkCancelling}
+                        style={{
+                            fontSize: "12px", padding: "4px 12px",
+                            border: "0.5px solid var(--danger-border)",
+                            borderRadius: "5px", background: "var(--danger-bg)",
+                            color: "var(--danger-text)", cursor: bulkCancelling ? "not-allowed" : "pointer",
+                            opacity: bulkCancelling ? 0.6 : 1,
+                        }}
+                    >
+                        {bulkCancelling ? "İptal ediliyor…" : "İptal Et"}
+                    </button>
+                    <button
+                        onClick={clearAll}
+                        style={{
+                            fontSize: "12px", padding: "4px 10px", border: "none",
+                            background: "transparent", color: "var(--accent-text)", cursor: "pointer",
+                        }}
+                    >
+                        Seçimi Temizle
+                    </button>
+                </div>
+            )}
+
             {/* Table */}
             <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>
                 {loading ? (
@@ -183,6 +249,17 @@ export default function PurchaseOrdersPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
+                                <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={isPageAllSelected(pageIds)}
+                                        ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
+                                        onChange={() => toggleAll(pageIds)}
+                                        onClick={e => e.stopPropagation()}
+                                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                        aria-label="Sayfadaki tüm siparişleri seç"
+                                    />
+                                </th>
                                 <th style={thStyle}>PO No</th>
                                 <th style={thStyle}>Tedarikçi</th>
                                 <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
@@ -199,6 +276,19 @@ export default function PurchaseOrdersPage() {
                                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                                     onClick={() => { window.location.href = `/dashboard/purchase/orders/${o.id}`; }}
                                 >
+                                    <td
+                                        style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(o.id)}
+                                            onChange={() => toggleOne(o.id)}
+                                            onClick={e => e.stopPropagation()}
+                                            style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                            aria-label={`${o.po_number} seç`}
+                                        />
+                                    </td>
                                     <td style={tdStyle}>
                                         <Link
                                             href={`/dashboard/purchase/orders/${o.id}`}
@@ -243,6 +333,53 @@ export default function PurchaseOrdersPage() {
                     />
                 )}
             </div>
+            {/* Bulk cancel confirm modal */}
+            {bulkCancelConfirm && (
+                <>
+                    <div
+                        onClick={() => !bulkCancelling && setBulkCancelConfirm(false)}
+                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)" }}
+                    />
+                    <div style={{
+                        position: "fixed", top: "50%", left: "50%",
+                        transform: "translate(-50%, -50%)", zIndex: 101,
+                        background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                        borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                    }}>
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
+                            {selectedIds.size} siparişi iptal et
+                        </div>
+                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
+                            Seçili siparişleri iptal etmek istediğinizden emin misiniz?
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                            <button
+                                onClick={() => setBulkCancelConfirm(false)}
+                                disabled={bulkCancelling}
+                                style={{
+                                    fontSize: "13px", padding: "6px 16px",
+                                    border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
+                                    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
+                                }}
+                            >
+                                Vazgeç
+                            </button>
+                            <button
+                                onClick={handleBulkCancel}
+                                disabled={bulkCancelling}
+                                style={{
+                                    fontSize: "13px", padding: "6px 16px",
+                                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
+                                    background: "var(--danger-bg)", color: "var(--danger-text)",
+                                    cursor: bulkCancelling ? "not-allowed" : "pointer", opacity: bulkCancelling ? 0.6 : 1,
+                                }}
+                            >
+                                {bulkCancelling ? "İptal ediliyor…" : "İptal Et"}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }

@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
+import { useSelection } from "@/hooks/useSelection";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -64,6 +65,8 @@ export default function CustomersPage() {
     const [isAdding, setIsAdding] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
+    const [bulkDeleting, setBulkDeleting] = useState(false);
 
     const setField = (key: keyof typeof newCustomerInitial) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -114,6 +117,26 @@ export default function CustomersPage() {
 
     const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
         usePagination(filtered, { resetKey: `${activeFilter}|${search}` });
+
+    const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
+        useSelection(`${activeFilter}|${search}`);
+    const pageIds = pagedItems.map(c => c.id);
+
+    const handleBulkDelete = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setBulkDeleting(true);
+        const ids = Array.from(selectedIds);
+        const results = await Promise.allSettled(
+            ids.map(id => fetch(`/api/customers/${id}`, { method: "DELETE" })),
+        );
+        const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
+        const succeeded = ids.length - failed;
+        if (succeeded > 0) toast({ type: "success", message: `${succeeded} müşteri silindi.` });
+        if (failed > 0) toast({ type: "error", message: `${failed} müşteri silinemedi.` });
+        clearAll();
+        setBulkDeleteConfirm(false);
+        setBulkDeleting(false);
+    };
 
     return (
         <>
@@ -206,6 +229,44 @@ export default function CustomersPage() {
                     </span>
                 </div>
 
+                {/* Bulk action bar */}
+                {selectedIds.size > 0 && (
+                    <div style={{
+                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "10px 14px",
+                        background: "var(--accent-bg)",
+                        border: "0.5px solid var(--accent-border)",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                    }}>
+                        <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
+                            {selectedIds.size} müşteri seçildi
+                        </span>
+                        <button
+                            onClick={() => setBulkDeleteConfirm(true)}
+                            disabled={bulkDeleting}
+                            style={{
+                                fontSize: "12px", padding: "4px 12px",
+                                border: "0.5px solid var(--danger-border)",
+                                borderRadius: "5px", background: "var(--danger-bg)",
+                                color: "var(--danger-text)", cursor: bulkDeleting ? "not-allowed" : "pointer",
+                                opacity: bulkDeleting ? 0.6 : 1,
+                            }}
+                        >
+                            {bulkDeleting ? "Siliniyor…" : "Sil"}
+                        </button>
+                        <button
+                            onClick={clearAll}
+                            style={{
+                                fontSize: "12px", padding: "4px 10px", border: "none",
+                                background: "transparent", color: "var(--accent-text)", cursor: "pointer",
+                            }}
+                        >
+                            Seçimi Temizle
+                        </button>
+                    </div>
+                )}
+
                 {/* Table */}
                 <div
                     style={{
@@ -218,6 +279,17 @@ export default function CustomersPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "700px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
+                                <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={isPageAllSelected(pageIds)}
+                                        ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
+                                        onChange={() => toggleAll(pageIds)}
+                                        onClick={e => e.stopPropagation()}
+                                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                        aria-label="Sayfadaki tüm müşterileri seç"
+                                    />
+                                </th>
                                 <th style={thStyle}>Müşteri</th>
                                 <th style={thStyle}>Ülke</th>
                                 <th style={thStyle}>E-posta</th>
@@ -241,6 +313,19 @@ export default function CustomersPage() {
                                         e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "transparent"));
                                     }}
                                 >
+                                    <td
+                                        style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
+                                        onClick={e => e.stopPropagation()}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedIds.has(customer.id)}
+                                            onChange={() => toggleOne(customer.id)}
+                                            onClick={e => e.stopPropagation()}
+                                            style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                            aria-label={`${customer.name} seç`}
+                                        />
+                                    </td>
                                     <td style={{ ...tdStyle, fontWeight: 500 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                             <div
@@ -384,6 +469,54 @@ export default function CustomersPage() {
                 customer={selectedCustomer}
                 onClose={() => setSelectedCustomer(null)}
             />
+
+            {/* Bulk delete confirm modal */}
+            {bulkDeleteConfirm && (
+                <>
+                    <div
+                        onClick={() => !bulkDeleting && setBulkDeleteConfirm(false)}
+                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)" }}
+                    />
+                    <div style={{
+                        position: "fixed", top: "50%", left: "50%",
+                        transform: "translate(-50%, -50%)", zIndex: 101,
+                        background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                        borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                    }}>
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
+                            {selectedIds.size} müşteriyi sil
+                        </div>
+                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
+                            Seçili müşterileri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                            <button
+                                onClick={() => setBulkDeleteConfirm(false)}
+                                disabled={bulkDeleting}
+                                style={{
+                                    fontSize: "13px", padding: "6px 16px",
+                                    border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
+                                    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
+                                }}
+                            >
+                                İptal
+                            </button>
+                            <button
+                                onClick={handleBulkDelete}
+                                disabled={bulkDeleting}
+                                style={{
+                                    fontSize: "13px", padding: "6px 16px",
+                                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
+                                    background: "var(--danger-bg)", color: "var(--danger-text)",
+                                    cursor: bulkDeleting ? "not-allowed" : "pointer", opacity: bulkDeleting ? 0.6 : 1,
+                                }}
+                            >
+                                {bulkDeleting ? "Siliniyor…" : "Sil"}
+                            </button>
+                        </div>
+                    </div>
+                </>
+            )}
 
             {/* Yeni Müşteri Modalı */}
             {showAddModal && (
