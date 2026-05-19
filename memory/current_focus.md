@@ -7,14 +7,69 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
-**Faz 1 Review — 3 bulgu kapatma (2873 test)**
+**Faz 2b Review — 3 bulgu kapatma (2935 test)**
+
+- **MR-F2B-P2-001 KAPANDI:** `GET /api/products/[id]` artık `dbGetQuotedQuantities` + `dbGetIncomingQuantities` çağırarak `quoted/incoming/promisable/forecasted` alanlarını zenginleştirilmiş response'a ekliyor. Stok sekmesindeki "Teklifte" ve "Bekleniyor" kartları artık gerçek veriyi gösteriyor.
+- **MR-F2B-P2-002 KAPANDI:** `handleSave` body'sindeki clearable nullable string alanlar `|| undefined` → `|| null`, nullable number alanlar `? ... : undefined` → `? ... : null` olarak güncellendi. Kullanıcı bir alanı temizleyip kaydettiğinde DB gerçekten güncelleniyor.
+- **MR-F2B-P3-003 KAPANDI:** `product-detail-page.test.ts`'e +5 regression kilit testi eklendi: route enrichment source-regex (2), handleSave null pattern (2), mapProduct enriched mapping unit testi (1).
+- 3 dosya · **2935 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Sıradaki:** Faz 2c — Teknik sekmesi dinamik alan rendering + tip seç + attributes JSONB write/read + tip değiştirme uyarısı.
+
+---
+
+## Önceki — Faz 2b — Tam ekran ürün detay sayfası + drawer kaldırma (2930 test)
+
+- **Yeni sayfa `/dashboard/products/[id]`:** Client component, 7-sekme yapısı. 4 aktif sekme (Genel/Stok/Tedarik/Ticari) + 3 placeholder 🔒 (Teknik→Faz 2c, Ekler→Faz 2d, Partiler→Faz 2e). Header: 80×80 görsel placeholder + ürün adı + SKU mono + Aktif/Pasif + Manufactured/Commercial rozetleri. Düzenle/Devre Dışı Bırak butonları (demo guard). Save handler PATCH /api/products/[id] (24 alan: name/category/subCategory/productFamily/productType/sector/industries/useCases/material/origin/site/standards/certifications/unit/warehouse/preferredVendor/leadTimeDays/weightKg/price/currency/costPrice/productNotes/minStockLevel/dailyUsage/reorderQty). Deactivate handler `is_active:false` → router.push liste. Stok sekmesinde 6 metric card + Bekleyen Teslimatlar tablosu + Aktif Uyarılar banner; Ticari sekmesinde Aktif Teklifler tablosu (order linkleri). role="tablist"/tab + aria-selected/controls + 404 + loading branch'leri.
+- **Liste sayfası `page.tsx`:** AIDetailDrawer + tüm drawer state'leri (selectedProductId/drawerEditMode/drawerSaving/drawerEditForm/rejectMode/rejectNote/drawerAlerts/commitments/showCommitmentForm/commitmentForm/quotes/extendingId) + drawer-only useEffect'leri (commitments/quotes/alerts fetch) + handleDrawerSave/handleAccept/handleReject/extendQuote handler'ları kaldırıldı (~1115 satır net azalma). Tablo 6 sabit kolona indirildi: SKU/Ad/Stok/Satılabilir/Fiyat/Min stok. Eski Kategori/Kapsam/Son Tarih/Sinyal kolonları kaldırıldı. Satır onClick `router.push(/dashboard/products/{id})`.
+- **aging/page.tsx:** ESLint için `<a href="/dashboard/products">` → `<Link>` (yeni `[id]` route eklenince Next.js shadowing tetiklenmiş; lint hatası giderildi).
+- **+19 test:** `product-detail-page.test.ts` (11: module load + useParams/Router/fetch + 7 sekme key + 3 placeholder + PATCH wiring + deactivate + loading/404 + demo + ops sections + header + ARIA), `products-page-drawer-removed.test.ts` (8: drawer regresyon kilidi — AIDetailDrawer yok, drawer state'leri yok, handleDrawerSave yok, selectedProductId yok, router.push paterni, 6 kolon header'lar, eski kolonlar kaldırılmış, useRouter import).
+- 5 dosya · **2930 test yeşil** · TS clean · 0 lint warning · build OK · commit `9003044`
+
+**Sıradaki:** Faz 2c — Teknik sekmesi dinamik alan rendering + tip seç + attributes JSONB write/read + tip değiştirme uyarısı.
+
+---
+
+## Önceki — Faz 2a Review — Tüm Bulgular Kapandı (2026-05-19; 2911 test)
+
+- **MR-F2A-P2-001 KAPANDI:** `dbCreateBatch`/`dbUpdateBatch` `certificate_attachment_id` sahiplik + kind kontrolü. +3 test. commit `4977603`
+- **MR-F2A-P3-002 KAPANDI:** 058+059 migration policy create'leri `DROP POLICY IF EXISTS` guard'lı. commit `4977603`
+- **MR-F2A-P3-003 KAPANDI:** POST + PATCH catch blokları "bulunamadı"→404, "ait değil"/"türünde olmalıdır"→400 olarak eşlendi (önceden 500'e düşüyordu). +5 route testi. commit `5743bd1`
+
+---
+
+## Önceki — Faz 2a — Batches + Attachments DB Foundation (2903 test)
+
+Faz 2 (ürün bilgileri sayfası) alt-fazlara bölündü: 2a (DB+backend, BU), 2b (sayfa skeleton), 2c (Teknik dinamik form), 2d (Ekler UI), 2e (Partiler UI).
+
+**2a kapsamı (13 dosya):**
+- **Migration 058:** `product_attachments` tablosu (kind enum: image/datasheet/certificate/manual/drawing/other; versiyonlama `superseded_by`; `is_primary_image` unique partial index — ürün başına 1 primary) + `storage.buckets product-files` (private, 10MB, image+PDF whitelist) + RLS service_role.
+- **Migration 059:** `product_batches` (heat_no/batch_date/initial_qty/remaining_qty + `certificate_attachment_id` → attachments FK) + CHECK `remaining_qty <= initial_qty` + updated_at trigger.
+- **DB types:** `ProductAttachmentRow` + `ProductBatchRow` + `ProductAttachmentKind` enum.
+- **Helper `product-attachments.ts`:** `dbListAttachmentsByProduct(productId, kind?)` (superseded_by NULL filter), `dbGetAttachment`, `dbCreateAttachment` (atomik DB insert → storage upload `{productId}/{id}.{ext}` → fail ise DB row sil; avatar paterni), `dbDeleteAttachment` (DB sil → storage best-effort cleanup), `dbSetPrimaryImage` (clear-all then set-one). Export: `ALLOWED_MIME` (png/jpeg/webp/pdf), `MAX_FILE_SIZE = 10MB`, `isValidAttachmentKind`, `isAllowedMime`.
+- **Helper `product-batches.ts`:** CRUD + validation (heat_no non-empty, initial_qty > 0, remaining_qty ≥ 0, remaining ≤ initial, batch_date YYYY-MM-DD).
+- **API routes (4 dosya):** `/api/products/[id]/{attachments,batches}` ailesi — GET (auth) + POST/PATCH/DELETE (admin|purchaser via requireRole). Attachments POST multipart/form-data; PATCH `{is_primary_image:true}` (sadece image kind). Cross-tenant guard (batch/attachment.product_id !== url.id → 404). `revalidateTag("products","max")`.
+- **+29 yeni test (4 dosya):** product-attachments-helper (9: pure validators 3 + dbCreate validation 3 + dbSetPrimary 1 + dbDelete 1 + isAllowedMime 1), product-attachments-route (7: viewer/MIME/size/kind/happy/PATCH primary+image/PATCH non-image), product-batches-helper (8: validation 5 + sıralama 1 + update validation 2), product-batches-route (5: viewer/heat_no boş/happy/DELETE/cross-product 404).
+- 197 dosya · **2903 test yeşil** · TS clean · 0 lint warning · build OK · commit `b7c0227`
+
+**Sıradaki:** Faz 2b — Tam ekran `/dashboard/products/[id]` skeleton + 4 statik sekme (Genel/Stok/Tedarik/Ticari) + eski drawer kaldırma. Liste sayfası satır click → tam sayfa.
+
+---
+
+## Önceki — Faz 1 Review P2 Tam Kapanış (2026-05-19; 2874 test)
+
+`dbReorderProductTypeFields` reorder sırasında parent `is_system=true` ise `is_system=false` UPDATE + audit_log yazmıyordu → eklendi. +1 source-regex test. MR-F1-P2-001 kapatıldı.
+- 184 dosya · 2874 test · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 1 Review — 3 bulgu kapatma (2026-05-19; 2873 test)
 
 Kullanıcı Faz 1 commit'ini (`67708d1`) review etti, 3 açık bulgu buldu:
-- **P2:** field add/update/delete sistem kilidini düşürmüyordu (header edit düşürüyordu, field tarafı yok) → 3 helper'a parent fetch + `is_system=false` UPDATE eklendi
-- **P3 (route):** `[id]/fields/[fieldId]` route'u `id`'yi destructure etmiyordu → cross-tenant açığı vardı (`/typeA/fields/fieldOfTypeB` çalışırdı). Helper'lara opsiyonel `expectedTypeId` parametresi, route'tan geçiriliyor → uyumsuz → "Alan bu tipe ait değil" 404
-- **P3 (products):** `CreateProductInput` `product_type_id`/`attributes` içermiyordu; `dbCreateProduct` insert payload bu alanları yazmıyordu → write yolu yarımdı → tip + insert güncellendi, default null/{}
-- +18 test (helper 6 + route 4 + yeni products-attributes-write-read.test.ts 8)
-- 184 dosya · 2873 test · TS clean · 0 lint warning · build OK
+- **P2 (kısmi):** field add/update/delete sistem kilidini düşürmüyordu → 3 helper'a parent fetch + `is_system=false` UPDATE eklendi
+- **P3 (route):** `[id]/fields/[fieldId]` route'u `id`'yi destructure etmiyordu → cross-tenant açığı vardı. Helper'lara opsiyonel `expectedTypeId` parametresi eklendi.
+- **P3 (products):** `CreateProductInput` `product_type_id`/`attributes` içermiyordu → tip + insert güncellendi
+- +18 test · 2873 test · TS clean · 0 lint warning · build OK
 
 ---
 
