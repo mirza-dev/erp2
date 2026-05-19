@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     dbListAttachmentsByProduct,
     dbCreateAttachment,
+    dbGetSignedUrlsForRows,
     ALLOWED_MIME,
     MAX_FILE_SIZE,
     isValidAttachmentKind,
@@ -10,12 +11,17 @@ import {
 import { requireRole } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
+import { mapProductAttachment } from "@/lib/api-mappers";
 import { revalidateTag } from "next/cache";
 import type { ProductAttachmentKind } from "@/lib/database.types";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SIGNED_URL_TTL = 3600;
+
+export const dynamic = "force-dynamic";
 
 // GET /api/products/[id]/attachments?kind=image|datasheet|...
+// Response: { items: ProductAttachment[], expires_in: number }
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
@@ -29,8 +35,10 @@ export async function GET(
         const kind = kindParam && isValidAttachmentKind(kindParam)
             ? (kindParam as ProductAttachmentKind)
             : undefined;
-        const items = await dbListAttachmentsByProduct(id, kind);
-        return NextResponse.json(items);
+        const rows = await dbListAttachmentsByProduct(id, kind);
+        const urlMap = await dbGetSignedUrlsForRows(rows, SIGNED_URL_TTL);
+        const items = rows.map(row => mapProductAttachment(row, urlMap.get(row.file_path) ?? null));
+        return NextResponse.json({ items, expires_in: SIGNED_URL_TTL });
     } catch (err) {
         return handleApiError(err, "GET /api/products/[id]/attachments");
     }

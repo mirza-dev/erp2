@@ -97,6 +97,23 @@ export interface ProductTypeWithFields extends ProductType {
     fields: ProductTypeField[];
 }
 
+export type ProductAttachmentKind =
+    | "image" | "datasheet" | "certificate" | "manual" | "drawing" | "other";
+
+export interface ProductAttachment {
+    id: string;
+    productId: string;
+    fileName: string;
+    fileSize: number;
+    mimeType: string;
+    kind: ProductAttachmentKind;
+    isPrimaryImage: boolean;
+    version: number;
+    uploadedAt: string;
+    uploadedBy: string | null;
+    signedUrl: string | null;
+}
+
 export interface Customer {
     id: string;
     name: string;

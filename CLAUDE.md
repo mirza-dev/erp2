@@ -3,12 +3,24 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 2c Review — P2-001 + P2-002 kapanış (2026-05-19; 2990 test) · commit `0c4cf39`
+**Son tamamlanan iş:** Faz 2d — Ekler sekmesi UI + signed URL endpoint (2026-05-19; 3059 test)
 
-- **P2-001 KAPANDI:** Create drawer'a Tip Şablonu selector + `DynamicFieldEdit` dinamik alanlar eklendi; `handleCreate` body `product_type_id` + `attributes` içeriyor. Plan kriteri: tip seç → alanlar gelir → kaydet ✅
-- **P2-002 KAPANDI:** `handleTypeChange("")` artık attributes varsa `pendingTypeChange` modal'ına yönlendiriyor; onayda `attributes: {}` ile birlikte temizleniyor (eskiden stale attributes DB'ye yazılıyordu).
-- **Refactor:** `DynamicFieldEdit` + `FieldEdit` shared component: `src/components/products/DynamicFieldEdit.tsx`
-- 5 dosya · **2990 test yeşil** · TS clean · 0 lint warning · build OK
+- **Backend:** `dbGetSignedUrl` + `dbGetSignedUrlsForRows` (bulk `createSignedUrls`, N+1 önler) + `mapProductAttachment` mapper (file_path expose etmez; signedUrl opsiyonel 2. arg) + `ProductAttachment`/`ProductAttachmentKind` interface (`mock-data.ts`).
+- **GET shape değişimi:** `/api/products/[id]/attachments` artık `{ items, expires_in: 3600 }` döner (eskiden raw array). Her item bulk signed URL ile enriched. `dynamic="force-dynamic"`.
+- **Yeni endpoint:** `GET /api/products/[id]/attachments/[attachmentId]/url` — tekil signed URL (header img refresh için). 400/404/500 mapping.
+- **Detay sayfası UI:** 5 pure helper export (formatFileSize/getKindLabel/getKindIcon/pickInitialKind/groupAttachments) + 6 state + fetchAttachments + header 80×80 görsel (primary varsa img, yoksa "Görsel yok") + Ekler tab (upload bar / images grid 140×140 thumbnails star+× / documents list İndir+Sil) + lightbox modal (role=dialog aria-modal, ESC + backdrop + scroll lock + focus return) + 3 demo guard'lı handler. Tab `locked: false`. `ATTACHMENT_ACCEPT` client-safe constant (server-only `ALLOWED_MIME` import EDİLMEDİ).
+- **MIME→kind otomatik öneri:** file seçilince `pickInitialKind(f.type)` kind state'i override eder.
+- **Versiyonlama Faz 3'e ertelendi:** helper `is("superseded_by", null)` zaten filtreliyor.
+- **+44 test (5 dosya):** mapper (5) + helpers (18) + url-route (7) + list-signed-url (3) + page-ekler (14).
+- 8 dosya · **3059 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 2c Review — Tüm P3 bulgular kapatıldı (2026-05-19; 3015 test) · commit `e23baab`
+
+- **P3-003 KAPANDI:** `getMissingRequiredAttributes` pure helper → `handleCreate` + `handleSave` zorunlu alan validasyonu (eksikse Türkçe toast).
+- **P3-005 KAPANDI:** `createTypeFieldsError` state — fetch başarısız olursa `role="alert"` banner.
+- **P3-004 KAPANDI:** Source-regex ağırlıklı testler → 15 gerçek mantık testi (undefined/null/empty/multiselect senaryoları).
+
+**Önceki:** Faz 2c Review — P2-001 + P2-002 kapanış (2026-05-19; 2990 test) · commit `0c4cf39`
 
 **Önceki:** Faz 2c — Teknik sekmesi dinamik alan rendering (2026-05-19; 2974 test) · commit `6846584`
 

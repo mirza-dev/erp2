@@ -145,6 +145,33 @@ export async function dbDeleteAttachment(id: string): Promise<void> {
     }
 }
 
+export async function dbGetSignedUrl(filePath: string, expiresIn = 3600): Promise<string | null> {
+    if (!filePath) return null;
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrl(filePath, expiresIn);
+    if (error || !data?.signedUrl) return null;
+    return data.signedUrl;
+}
+
+export async function dbGetSignedUrlsForRows(
+    rows: Pick<ProductAttachmentRow, "file_path">[],
+    expiresIn = 3600,
+): Promise<Map<string, string>> {
+    const paths = rows.map(r => r.file_path).filter((p): p is string => !!p);
+    if (paths.length === 0) return new Map();
+    const supabase = createServiceClient();
+    const { data } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .createSignedUrls(paths, expiresIn);
+    const map = new Map<string, string>();
+    (data ?? []).forEach((d, i) => {
+        if (d?.signedUrl) map.set(paths[i], d.signedUrl);
+    });
+    return map;
+}
+
 export async function dbSetPrimaryImage(productId: string, attachmentId: string): Promise<void> {
     const supabase = createServiceClient();
 

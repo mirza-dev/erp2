@@ -7,7 +7,24 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
-**Faz 2c Review — Tüm P3 bulgular kapatıldı (3015 test)**
+**Faz 2d — Ekler sekmesi UI + signed URL endpoint (3059 test)**
+
+- **Backend (3 dosya):** `dbGetSignedUrl` + `dbGetSignedUrlsForRows` (bulk `createSignedUrls`, N+1 önler) + yeni `mapProductAttachment` (file_path expose etmez, signedUrl opsiyonel 2. arg) + yeni `ProductAttachment`/`ProductAttachmentKind` interface (`mock-data.ts`).
+- **GET /attachments shape değişimi:** raw array → `{ items, expires_in: 3600 }` (her item enriched signedUrl ile, bulk fetch). `export const dynamic = "force-dynamic"` defansif.
+- **Yeni endpoint:** `GET /api/products/[id]/attachments/[attachmentId]/url` → tekil signed URL (header img refresh için). 400/404 (ek yok / cross-product / file_path boş) / 500 (createSignedUrl null).
+- **Detay sayfası UI (`[id]/page.tsx`):** 5 pure helper export (formatFileSize/getKindLabel/getKindIcon/pickInitialKind/groupAttachments) + 6 state + fetchAttachments useEffect + header 80×80 görsel (primary image varsa img, yoksa "Görsel yok" placeholder) + Ekler tab içeriği (upload bar kind+file+button / images grid 140×140 thumbnails star+× / documents list İndir+Sil) + lightbox modal (role="dialog" aria-modal aria-label, ESC + backdrop + scroll lock + focus return) + 3 handler (upload/setPrimary/deleteAttachment, hepsi demo guard'lı). Tab `locked: false` (artık tıklanabilir). `ATTACHMENT_ACCEPT` client-safe constant (server-only `ALLOWED_MIME` import edilmedi).
+- **MIME→kind otomatik öneri:** file seçilince `pickInitialKind(f.type)` ile kind state'i override edilir; kullanıcı dropdown'dan değiştirebilir.
+- **Lightbox PDF için kullanılmaz:** PDF "İndir" link'i `target=_blank rel=noopener` ile yeni sekmede açılır.
+- **Versiyonlama Faz 3'e ertelendi:** helper `is("superseded_by", null)` zaten filtreliyor; 2d UI yalnız aktif version'ı görür.
+- **+44 test (5 dosya):** mapper (5) + helpers (18) + url-route (7) + list-signed-url (3) + page-ekler (14)
+- **Eski test güncellemesi:** `product-detail-page.test.ts` "Faz 2d placeholder" assert'i kaldırıldı (Ekler artık aktif).
+- 8 dosya · **3059 test yeşil** · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 2c Review P3 (3015 test)
+
+**Faz 2c Review — Tüm P3 bulgular kapatıldı**
 
 - **MR-F2C-P3-003 ✅ KAPANDI:** `getMissingRequiredAttributes(fields, attributes)` pure helper eklendi (her iki page dosyasında export). `handleCreate` (create drawer) + `handleSave` (detay edit) her ikisi de kaydetmeden önce zorunlu alanları kontrol ediyor; eksikse `"Zorunlu alanlar eksik: X, Y"` toast'ı.
 - **MR-F2C-P3-004 ✅ KAPANDI:** Testler source-regex'ten gerçek mantık testlerine geçirildi. `getMissingRequiredAttributes` için 9+6 pure helper test (8 senaryo: undefined/null/empty string/empty array/multiselect/multi-missing). Source-regex lock'ları korundu.

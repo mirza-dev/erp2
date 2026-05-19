@@ -1,16 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 import { mapProduct } from "@/lib/api-mappers";
-import type { Product } from "@/lib/mock-data";
+import type { Product, ProductAttachment, ProductAttachmentKind } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { DynamicFieldEdit, FieldEdit } from "@/components/products/DynamicFieldEdit";
+
+// Mirror of server-side ALLOWED_MIME — client-safe (no server module imports).
+// Source of truth: src/lib/supabase/product-attachments.ts ALLOWED_MIME.
+const ATTACHMENT_ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
 
 type TabKey = "genel" | "teknik" | "stok" | "tedarik" | "ticari" | "ekler" | "partiler";
 
@@ -181,6 +185,61 @@ const cardStyle: React.CSSProperties = {
     padding: "12px 14px",
 };
 
+// ── Faz 2d: Attachment helpers (exported for testing) ────────────────────────
+
+export function formatFileSize(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes < 0) return "—";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+const KIND_LABELS_TR: Record<ProductAttachmentKind, string> = {
+    image: "Görsel",
+    datasheet: "Veri Sayfası",
+    certificate: "Sertifika",
+    manual: "Manuel",
+    drawing: "Çizim",
+    other: "Diğer",
+};
+
+export function getKindLabel(kind: ProductAttachmentKind): string {
+    return KIND_LABELS_TR[kind] ?? "Diğer";
+}
+
+const KIND_ICONS: Record<ProductAttachmentKind, string> = {
+    image: "🖼️",
+    datasheet: "📄",
+    certificate: "📜",
+    manual: "📘",
+    drawing: "📐",
+    other: "📎",
+};
+
+export function getKindIcon(kind: ProductAttachmentKind): string {
+    return KIND_ICONS[kind] ?? "📎";
+}
+
+export function pickInitialKind(mimeType: string): ProductAttachmentKind {
+    if (typeof mimeType !== "string") return "other";
+    if (mimeType.startsWith("image/")) return "image";
+    if (mimeType === "application/pdf") return "datasheet";
+    return "other";
+}
+
+export function groupAttachments(list: ProductAttachment[]): {
+    images: ProductAttachment[];
+    documents: ProductAttachment[];
+} {
+    const images: ProductAttachment[] = [];
+    const documents: ProductAttachment[] = [];
+    for (const a of list) {
+        if (a.kind === "image") images.push(a);
+        else documents.push(a);
+    }
+    return { images, documents };
+}
+
 // Format an attribute value for read-only display
 export function formatAttributeValue(field: ProductTypeFieldRow, value: unknown): string {
     if (value === null || value === undefined || value === "") return "—";
@@ -238,6 +297,17 @@ export default function ProductDetailPage() {
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
     const [commitments, setCommitments] = useState<CommitmentRow[]>([]);
     const [quotes, setQuotes] = useState<QuotedItem[]>([]);
+
+    // Faz 2d — attachments + upload + lightbox
+    const [attachments, setAttachments] = useState<ProductAttachment[]>([]);
+    const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+    const [uploadKind, setUploadKind] = useState<ProductAttachmentKind>("image");
+    const [uploadFile, setUploadFile] = useState<File | null>(null);
+    const [uploading, setUploading] = useState(false);
+    const [lightboxAttachment, setLightboxAttachment] = useState<ProductAttachment | null>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+    const lightboxCloseBtnRef = useRef<HTMLButtonElement | null>(null);
+    const uploadInputRef = useRef<HTMLInputElement | null>(null);
 
     const fetchProduct = useCallback(async () => {
         if (!productId) return;
@@ -426,6 +496,115 @@ export default function ProductDetailPage() {
         setEditMode(true);
     };
 
+    // Faz 2d — Attachments fetch + handlers
+    const fetchAttachments = useCallback(async () => {
+        if (!productId) return;
+        setAttachmentsLoading(true);
+        try {
+            const res = await fetch(`/api/products/${productId}/attachments`);
+            if (res.ok) {
+                const data = await res.json();
+                const items = Array.isArray(data?.items) ? (data.items as ProductAttachment[]) : [];
+                setAttachments(items);
+            }
+        } catch {
+            /* swallow — non-critical */
+        } finally {
+            setAttachmentsLoading(false);
+        }
+    }, [productId]);
+
+    useEffect(() => {
+        if (!product) return;
+        fetchAttachments();
+    }, [product, fetchAttachments]);
+
+    const handleUpload = async () => {
+        if (!product) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!uploadFile) return;
+        setUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("file", uploadFile);
+            fd.append("kind", uploadKind);
+            const res = await fetch(`/api/products/${product.id}/attachments`, {
+                method: "POST",
+                body: fd,
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({} as { error?: string }));
+                toast({ type: "error", message: body.error ?? "Dosya yüklenemedi." });
+                return;
+            }
+            toast({ type: "success", message: "Dosya yüklendi." });
+            setUploadFile(null);
+            if (uploadInputRef.current) uploadInputRef.current.value = "";
+            await fetchAttachments();
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleSetPrimary = async (attId: string) => {
+        if (!product) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        try {
+            const res = await fetch(`/api/products/${product.id}/attachments/${attId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_primary_image: true }),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({} as { error?: string }));
+                toast({ type: "error", message: body.error ?? "Ana görsel ayarlanamadı." });
+                return;
+            }
+            toast({ type: "success", message: "Ana görsel güncellendi." });
+            await fetchAttachments();
+        } catch {
+            toast({ type: "error", message: "Ana görsel ayarlanamadı." });
+        }
+    };
+
+    const handleDeleteAttachment = async (attId: string, fileName: string) => {
+        if (!product) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!window.confirm(`"${fileName}" dosyası silinecek. Onaylıyor musun?`)) return;
+        try {
+            const res = await fetch(`/api/products/${product.id}/attachments/${attId}`, {
+                method: "DELETE",
+            });
+            if (!res.ok && res.status !== 204) {
+                const body = await res.json().catch(() => ({} as { error?: string }));
+                toast({ type: "error", message: body.error ?? "Dosya silinemedi." });
+                return;
+            }
+            toast({ type: "success", message: "Dosya silindi." });
+            await fetchAttachments();
+        } catch {
+            toast({ type: "error", message: "Dosya silinemedi." });
+        }
+    };
+
+    // Lightbox focus management + ESC
+    useEffect(() => {
+        if (!lightboxAttachment) return;
+        previousFocusRef.current = (document.activeElement as HTMLElement) ?? null;
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        lightboxCloseBtnRef.current?.focus();
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === "Escape") setLightboxAttachment(null);
+        };
+        window.addEventListener("keydown", onKey);
+        return () => {
+            window.removeEventListener("keydown", onKey);
+            document.body.style.overflow = prevOverflow;
+            previousFocusRef.current?.focus();
+        };
+    }, [lightboxAttachment]);
+
     const handleCancelEdit = () => {
         setEditMode(false);
         setEditForm(null);
@@ -535,7 +714,7 @@ export default function ProductDetailPage() {
         { key: "stok", label: "Stok", locked: false },
         { key: "tedarik", label: "Tedarik", locked: false },
         { key: "ticari", label: "Ticari", locked: false },
-        { key: "ekler", label: "Ekler", locked: true, lockedNote: "Faz 2d'de gelecek" },
+        { key: "ekler", label: "Ekler", locked: false },
         { key: "partiler", label: "Partiler", locked: true, lockedNote: "Faz 2e'de gelecek" },
     ];
 
@@ -550,30 +729,62 @@ export default function ProductDetailPage() {
 
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", flexWrap: "wrap" }}>
-                {/* Image placeholder */}
-                <div
-                    aria-label="Ana görsel (Faz 2d'de eklenecek)"
-                    style={{
-                        width: "80px",
-                        height: "80px",
-                        flexShrink: 0,
-                        background: "var(--bg-tertiary)",
-                        border: "0.5px dashed var(--border-secondary)",
-                        borderRadius: "6px",
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "var(--text-tertiary)",
-                        fontSize: "9px",
-                        fontWeight: 600,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                    }}
-                >
-                    <span style={{ fontSize: "16px" }}>🔒</span>
-                    <span style={{ marginTop: "3px" }}>Faz 2d</span>
-                </div>
+                {/* Primary image (Faz 2d) */}
+                {(() => {
+                    const primary = attachments.find(a => a.isPrimaryImage && a.signedUrl);
+                    if (primary?.signedUrl) {
+                        return (
+                            <button
+                                type="button"
+                                onClick={() => setLightboxAttachment(primary)}
+                                aria-label={`${primary.fileName} — büyük göster`}
+                                style={{
+                                    width: "80px",
+                                    height: "80px",
+                                    flexShrink: 0,
+                                    padding: 0,
+                                    border: "0.5px solid var(--border-secondary)",
+                                    borderRadius: "6px",
+                                    overflow: "hidden",
+                                    cursor: "pointer",
+                                    background: "var(--bg-tertiary)",
+                                }}
+                            >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={primary.signedUrl}
+                                    alt={product.name}
+                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                />
+                            </button>
+                        );
+                    }
+                    return (
+                        <div
+                            aria-label="Ana görsel yok"
+                            style={{
+                                width: "80px",
+                                height: "80px",
+                                flexShrink: 0,
+                                background: "var(--bg-tertiary)",
+                                border: "0.5px dashed var(--border-secondary)",
+                                borderRadius: "6px",
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "var(--text-tertiary)",
+                                fontSize: "9px",
+                                fontWeight: 600,
+                                letterSpacing: "0.06em",
+                                textTransform: "uppercase",
+                            }}
+                        >
+                            <span style={{ fontSize: "16px" }}>🖼️</span>
+                            <span style={{ marginTop: "3px" }}>Görsel yok</span>
+                        </div>
+                    );
+                })()}
 
                 {/* Title + meta */}
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
@@ -1054,9 +1265,221 @@ export default function ProductDetailPage() {
                 {activeTab === "ekler" && (
                     <div style={cardStyle}>
                         <div style={sectionTitleStyle}>Ekler</div>
-                        <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                            🔒 Bu sekme Faz 2d&apos;de gelecek — görsel/datasheet/sertifika/manuel upload + galeri burada olacak.
+
+                        {/* Upload bar */}
+                        <div
+                            style={{
+                                display: "flex",
+                                gap: "8px",
+                                alignItems: "center",
+                                marginBottom: "16px",
+                                padding: "12px",
+                                background: "var(--bg-tertiary)",
+                                borderRadius: "6px",
+                                flexWrap: "wrap",
+                            }}
+                        >
+                            <select
+                                value={uploadKind}
+                                onChange={e => setUploadKind(e.target.value as ProductAttachmentKind)}
+                                aria-label="Dosya kategorisi"
+                                disabled={isDemo || uploading}
+                                style={{ ...inputStyle, width: "auto", minWidth: "160px" }}
+                            >
+                                {(["image", "datasheet", "certificate", "manual", "drawing", "other"] as const).map(k => (
+                                    <option key={k} value={k}>{getKindIcon(k)} {getKindLabel(k)}</option>
+                                ))}
+                            </select>
+                            <input
+                                ref={uploadInputRef}
+                                type="file"
+                                accept={ATTACHMENT_ACCEPT}
+                                onChange={e => {
+                                    const f = e.target.files?.[0] ?? null;
+                                    setUploadFile(f);
+                                    if (f) setUploadKind(pickInitialKind(f.type));
+                                }}
+                                aria-label="Dosya seç"
+                                disabled={isDemo || uploading}
+                                style={{ fontSize: "12px", color: "var(--text-secondary)", flex: 1, minWidth: "200px" }}
+                            />
+                            <Button
+                                variant="primary"
+                                onClick={handleUpload}
+                                loading={uploading}
+                                disabled={!uploadFile || uploading || isDemo}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                            >
+                                {uploading ? "Yükleniyor…" : "Yükle"}
+                            </Button>
                         </div>
+
+                        {/* Attachments groups */}
+                        {(() => {
+                            const { images, documents } = groupAttachments(attachments);
+                            if (attachments.length === 0 && !attachmentsLoading) {
+                                return (
+                                    <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                                        Henüz ek dosya yok. Yukarıdan görsel veya belge yükleyin.
+                                    </div>
+                                );
+                            }
+                            return (
+                                <>
+                                    {images.length > 0 && (
+                                        <div style={{ marginBottom: "20px" }}>
+                                            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px" }}>
+                                                Görseller ({images.length})
+                                            </div>
+                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px" }}>
+                                                {images.map(img => (
+                                                    <div
+                                                        key={img.id}
+                                                        style={{
+                                                            position: "relative",
+                                                            border: "0.5px solid var(--border-tertiary)",
+                                                            borderRadius: "6px",
+                                                            overflow: "hidden",
+                                                            background: "var(--bg-tertiary)",
+                                                        }}
+                                                    >
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => img.signedUrl && setLightboxAttachment(img)}
+                                                            aria-label={`${img.fileName} — büyük göster`}
+                                                            style={{
+                                                                width: "100%", height: "140px", padding: 0, border: "none",
+                                                                background: "transparent", cursor: img.signedUrl ? "pointer" : "default",
+                                                                display: "block",
+                                                            }}
+                                                        >
+                                                            {img.signedUrl ? (
+                                                                /* eslint-disable-next-line @next/next/no-img-element */
+                                                                <img
+                                                                    src={img.signedUrl}
+                                                                    alt={img.fileName}
+                                                                    style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                                                                />
+                                                            ) : (
+                                                                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-tertiary)", fontSize: "11px" }}>
+                                                                    Görsel yüklenemedi
+                                                                </div>
+                                                            )}
+                                                        </button>
+                                                        <div style={{
+                                                            position: "absolute", top: "4px", left: "4px", right: "4px",
+                                                            display: "flex", justifyContent: "space-between", alignItems: "flex-start",
+                                                        }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleSetPrimary(img.id)}
+                                                                aria-label={img.isPrimaryImage ? "Ana görsel" : "Ana görsel yap"}
+                                                                title={img.isPrimaryImage ? "Ana görsel" : "Ana görsel yap"}
+                                                                disabled={isDemo || img.isPrimaryImage}
+                                                                style={{
+                                                                    background: "rgba(0,0,0,0.6)", border: "none",
+                                                                    color: img.isPrimaryImage ? "#FFD700" : "#FFF",
+                                                                    padding: "3px 6px", borderRadius: "4px", cursor: img.isPrimaryImage || isDemo ? "default" : "pointer",
+                                                                    fontSize: "13px",
+                                                                }}
+                                                            >
+                                                                {img.isPrimaryImage ? "★" : "☆"}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteAttachment(img.id, img.fileName)}
+                                                                aria-label={`${img.fileName} dosyasını sil`}
+                                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sil"}
+                                                                disabled={isDemo}
+                                                                style={{
+                                                                    background: "rgba(0,0,0,0.6)", border: "none",
+                                                                    color: "#FFF", padding: "3px 6px", borderRadius: "4px",
+                                                                    cursor: isDemo ? "not-allowed" : "pointer", fontSize: "13px", lineHeight: 1,
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                        </div>
+                                                        <div style={{ padding: "6px 8px", fontSize: "11px", color: "var(--text-secondary)", borderTop: "0.5px solid var(--border-tertiary)" }}>
+                                                            <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={img.fileName}>
+                                                                {img.fileName}
+                                                            </div>
+                                                            <div style={{ color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                                                {formatFileSize(img.fileSize)}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {documents.length > 0 && (
+                                        <div>
+                                            <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "8px" }}>
+                                                Belgeler ({documents.length})
+                                            </div>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                                {documents.map(doc => (
+                                                    <div
+                                                        key={doc.id}
+                                                        style={{
+                                                            display: "flex", alignItems: "center", gap: "10px",
+                                                            padding: "8px 10px",
+                                                            background: "var(--bg-tertiary)",
+                                                            border: "0.5px solid var(--border-tertiary)",
+                                                            borderRadius: "5px",
+                                                        }}
+                                                    >
+                                                        <span aria-hidden style={{ fontSize: "16px" }}>{getKindIcon(doc.kind)}</span>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ fontSize: "13px", color: "var(--text-primary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={doc.fileName}>
+                                                                {doc.fileName}
+                                                            </div>
+                                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                                                {getKindLabel(doc.kind)} · {formatFileSize(doc.fileSize)}
+                                                            </div>
+                                                        </div>
+                                                        {doc.signedUrl && (
+                                                            <a
+                                                                href={doc.signedUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                aria-label={`${doc.fileName} indir`}
+                                                                style={{
+                                                                    fontSize: "12px", color: "var(--accent-text)",
+                                                                    textDecoration: "none", padding: "4px 8px",
+                                                                    border: "0.5px solid var(--accent-border)", borderRadius: "4px",
+                                                                }}
+                                                            >
+                                                                İndir
+                                                            </a>
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDeleteAttachment(doc.id, doc.fileName)}
+                                                            aria-label={`${doc.fileName} dosyasını sil`}
+                                                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sil"}
+                                                            disabled={isDemo}
+                                                            style={{
+                                                                fontSize: "13px", padding: "4px 8px",
+                                                                background: "transparent",
+                                                                color: "var(--danger-text)",
+                                                                border: "0.5px solid var(--danger-border)",
+                                                                borderRadius: "4px",
+                                                                cursor: isDemo ? "not-allowed" : "pointer",
+                                                            }}
+                                                        >
+                                                            Sil
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        })()}
                     </div>
                 )}
 
@@ -1119,6 +1542,61 @@ export default function ProductDetailPage() {
                             <Button variant="danger" onClick={confirmTypeChange}>Tipi Değiştir</Button>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Faz 2d — Lightbox modal (image preview) */}
+            {lightboxAttachment?.signedUrl && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`${lightboxAttachment.fileName} büyük görünüm`}
+                    onClick={() => setLightboxAttachment(null)}
+                    style={{
+                        position: "fixed",
+                        inset: 0,
+                        zIndex: 400,
+                        background: "rgba(0,0,0,0.85)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: "24px",
+                    }}
+                >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                        src={lightboxAttachment.signedUrl}
+                        alt={lightboxAttachment.fileName}
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            maxWidth: "92vw",
+                            maxHeight: "92vh",
+                            objectFit: "contain",
+                            boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+                            borderRadius: "4px",
+                        }}
+                    />
+                    <button
+                        ref={lightboxCloseBtnRef}
+                        type="button"
+                        onClick={() => setLightboxAttachment(null)}
+                        aria-label="Kapat"
+                        style={{
+                            position: "absolute",
+                            top: "16px",
+                            right: "16px",
+                            padding: "6px 12px",
+                            background: "rgba(255,255,255,0.92)",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            color: "#000",
+                        }}
+                    >
+                        ✕ Kapat
+                    </button>
                 </div>
             )}
 

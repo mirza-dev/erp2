@@ -19,6 +19,7 @@ import type {
   QuoteWithLines,
   ProductTypeRow,
   ProductTypeFieldRow,
+  ProductAttachmentRow,
 } from "./database.types";
 
 import type {
@@ -34,6 +35,7 @@ import type {
   QuoteDetail,
   ProductType,
   ProductTypeField,
+  ProductAttachment,
 } from "./mock-data";
 
 // ── Product ───────────────────────────────────────────────
@@ -114,6 +116,25 @@ export function mapProductTypeField(row: ProductTypeFieldRow): ProductTypeField 
     sortOrder: row.sort_order,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export function mapProductAttachment(
+  row: ProductAttachmentRow,
+  signedUrl: string | null = null,
+): ProductAttachment {
+  return {
+    id: row.id,
+    productId: row.product_id,
+    fileName: row.file_name,
+    fileSize: row.file_size,
+    mimeType: row.mime_type,
+    kind: row.kind,
+    isPrimaryImage: row.is_primary_image,
+    version: row.version,
+    uploadedAt: row.uploaded_at,
+    uploadedBy: row.uploaded_by,
+    signedUrl,
   };
 }
 
