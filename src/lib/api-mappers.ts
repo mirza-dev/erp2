@@ -17,6 +17,8 @@ import type {
   QuoteRow,
   QuoteLineItemRow,
   QuoteWithLines,
+  ProductTypeRow,
+  ProductTypeFieldRow,
 } from "./database.types";
 
 import type {
@@ -30,6 +32,8 @@ import type {
   QuoteLineItem,
   QuoteSummary,
   QuoteDetail,
+  ProductType,
+  ProductTypeField,
 } from "./mock-data";
 
 // ── Product ───────────────────────────────────────────────
@@ -74,6 +78,42 @@ export function mapProduct(row: ProductWithStock): Product {
     productNotes: row.product_notes ?? undefined,
     stockoutDate: row.stockoutDate ?? null,
     orderDeadline: row.orderDeadline ?? null,
+    productTypeId: row.product_type_id ?? null,
+    attributes: row.attributes ?? {},
+  };
+}
+
+// ── Product Type ──────────────────────────────────────────
+
+export function mapProductType(row: ProductTypeRow): ProductType {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    icon: row.icon,
+    sortOrder: row.sort_order,
+    isSystem: row.is_system,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function mapProductTypeField(row: ProductTypeFieldRow): ProductTypeField {
+  return {
+    id: row.id,
+    productTypeId: row.product_type_id,
+    fieldKey: row.field_key,
+    labelTr: row.label_tr,
+    labelEn: row.label_en,
+    fieldType: row.field_type,
+    unit: row.unit,
+    options: row.options,
+    required: row.required,
+    placeholder: row.placeholder,
+    helpText: row.help_text,
+    sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 

@@ -1,9 +1,25 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-18_
+_Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Genel Pagination — 6 liste sayfasına sayfa başına 50 kayıt + numaralı sayfalama (2026-05-18; 2794 test)
+**Son tamamlanan iş:** Modül Revize Faz 1 — Dinamik Ürün Tipi Altyapısı (2026-05-19; 2855 test)
+
+**Modül Revize Faz 1 (14 dosya: 2 migration + 2 yeni helper/route paketi + admin paneli + 3 test):**
+- **Migration 056** (`supabase/migrations/056_product_types.sql`): `product_types` tablosu (id/name/description/icon/sort_order/is_system) + `product_type_fields` tablosu (id/product_type_id FK CASCADE/field_key regex CHECK/label_tr/label_en/field_type 7-enum CHECK/unit/options jsonb/required/placeholder/help_text/sort_order). RLS service_role + `updated_at` triggers. `products` ALTER: `product_type_id uuid FK ON DELETE SET NULL` (nullable, geriye uyumlu) + `attributes jsonb NOT NULL DEFAULT '{}'`. GIN index attributes üzerinde. Idempotent + ROLLBACK SQL bloğu.
+- **Migration 057** (`supabase/migrations/057_seed_product_types.sql`): 8 hazır tip insert (Vana/Conta/Flans/Fitting/Bağlantı Elemanı/Enstrüman/Sızdırmazlık Malzemesi/Diğer) — deterministik UUID'ler `00000000-0000-4000-8000-00000000000{1..8}`. Vana 16 alan, Conta 13, Flans 9, Fitting 7, Bağlantı Elemanı 8, Enstrüman 8, Sızdırmazlık Malzemesi 7, Diğer boş. PN/sınıf select options (PN6-160, 150LB-4500LB), valve_type/flange_type/face_type/fitting_type select listeleri, approvals/standards multiselect listeleri. Idempotent `ON CONFLICT DO NOTHING`.
+- **Database tipleri** (`src/lib/database.types.ts`): `ProductFieldType` enum + `ProductTypeRow` + `ProductTypeFieldRow` interface'leri eklendi. `ProductRow`'a `product_type_id: string | null` ve `attributes: Record<string, unknown>` alanları eklendi.
+- **Frontend tipleri** (`src/lib/mock-data.ts`): `ProductType`, `ProductTypeField`, `ProductTypeWithFields` + `Product.productTypeId/attributes` alanları.
+- **API-mappers** (`src/lib/api-mappers.ts`): `mapProductType()`, `mapProductTypeField()` fonksiyonları + `mapProduct()` extension (productTypeId, attributes).
+- **Helper** (`src/lib/supabase/product-types.ts`): `dbListProductTypes`, `dbGetProductType`, `dbGetProductTypeWithFields`, `dbListProductTypeFields`, `dbCreateProductType`, `dbUpdateProductType`, `dbDeleteProductType` (sistem tipi + bağlı ürün guard'ları), `dbAddProductTypeField`, `dbUpdateProductTypeField`, `dbDeleteProductTypeField`, `dbReorderProductTypeFields`, `dbReorderProductTypes`. Validation: `isValidFieldKey` regex (`/^[a-z][a-z0-9_]*$/`), `isValidFieldType` (7 enum), options array check, name max 100 char. Audit log her CRUD'da. Sistem tipi düzenlenince `is_system=false` kilidi düşer.
+- **API routes** (`/api/product-types/*`): GET liste (60s cache), POST/PUT admin, `[id]` GET (withFields=1 destekli) + PATCH + DELETE admin, `[id]/fields` GET+POST+PUT(reorder) admin, `[id]/fields/[fieldId]` PATCH+DELETE admin. `requireRole(["admin"])` mutasyon guard'ları, `handleApiError` mapping, 404/409/400 status'lar (sistem tipi → 409, bağlı ürün → 409, validation → 400).
+- **Admin paneli** (`/dashboard/settings/product-types`): Liste sayfası — kart görünümü (icon + ad + alan sayısı + SİSTEM rozeti + açıklama), "Yeni Tip Ekle" modal'ı (ad + icon + açıklama). Detay sayfası — tip başlığı düzenleme + alanlar tablosu (anahtar/etiket TR-EN/tip/birim/zorunlu/yukarı-aşağı-sil işlemleri) + yeni alan ekle formu (dinamik: number → unit input, select/multiselect → options textarea). Demo guard + a11y (role="dialog"/aria-modal/aria-label/aria-live). Sidebar'a "Ürün Tipleri" linki.
+- **+61 yeni test (3 dosya):** `product-types-helper.test.ts` (16: pure helpers 8 + create/field validation 5 + reorder 2 + delete guards 2), `product-types-route.test.ts` (33: GET 1 + POST 4 + PUT 4 + GET/[id] 2 + PATCH/[id] 3 + DELETE/[id] 4 + GET fields 2 + POST fields 5 + PUT fields 4 + PATCH field 3 + DELETE field 3), `product-types-seed.test.ts` (12: schema 4 + 8 hazır tip 6 — Vana/Conta/Flans/Fitting/Enstrüman alan setleri + idempotent guard).
+- 183 dosya · **2855 test yeşil** · TS clean · 0 lint warning · build OK
+- **Faz 1 hedefi:** Dinamik şema altyapısı — Faz 2 (ürün sayfası), Faz 3 (AI Import yenileme), Faz 4 (teklif modülü revize) bu altyapı üzerine inşa edilir.
+- **Kalıcı plan dosyası:** `MODUL_REVIZE_PLAN.md` — Faz 2-4 detay şeması burada (DB tabloları, alan listeleri, akış diyagramları, kabul kriterleri).
+
+**Önceki:** Genel Pagination — 6 liste sayfasına sayfa başına 50 kayıt + numaralı sayfalama (2026-05-18; 2794 test)
 
 **Genel Pagination (8 dosya: 3 yeni + 5 modifiye + 1 + integration test):**
 - **`src/hooks/usePagination.ts`** (YENİ): `PAGE_SIZE=50` sabit + generic `usePagination<T>(items, { pageSize?, resetKey? })` hook. Pure helper'lar export edilir: `computeTotalPages`, `clampPage`, `slicePage` (test edilebilir). `resetKey` değişince render-time "Adjusting state based on prop change" paterniyle page=1'e döner (React 19 `set-state-in-effect` kuralı için useEffect kullanılmıyor — `prevResetKey` state ile karşılaştırma). Filtre daraldığında `safePage = clampPage(currentPage, totalPages)` derived clamp (state yazımı yok).

@@ -31,8 +31,37 @@ export type ParasutStep = "contact" | "product" | "shipment" | "invoice" | "edoc
 export type ParasutErrorKind = "auth" | "validation" | "rate_limit" | "server" | "network" | "not_found"
 export type ParasutInvoiceType = "e_invoice" | "e_archive" | "manual"
 export type ParasutEDocStatus = "running" | "done" | "error" | "skipped"
+export type ProductFieldType = "text" | "number" | "select" | "multiselect" | "date" | "boolean" | "longtext"
 
 // ── Row Types ────────────────────────────────────────────────
+
+export interface ProductTypeRow {
+    id: string
+    name: string
+    description: string | null
+    icon: string | null
+    sort_order: number
+    is_system: boolean
+    created_at: string
+    updated_at: string
+}
+
+export interface ProductTypeFieldRow {
+    id: string
+    product_type_id: string
+    field_key: string
+    label_tr: string
+    label_en: string | null
+    field_type: ProductFieldType
+    unit: string | null
+    options: string[] | null
+    required: boolean
+    placeholder: string | null
+    help_text: string | null
+    sort_order: number
+    created_at: string
+    updated_at: string
+}
 
 export interface VendorRow {
     id: string
@@ -118,6 +147,8 @@ export interface ProductRow {
     parasut_synced_at: string | null
     parasut_product_creating_until: string | null
     parasut_product_creating_owner: string | null
+    product_type_id: string | null
+    attributes: Record<string, unknown>
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */

@@ -52,6 +52,49 @@ export interface Product {
     productNotes?: string;
     stockoutDate?:  string | null;   // ISO date: stok tükenme tahmini
     orderDeadline?: string | null;   // ISO date: siparişin en geç verileceği tarih
+    productTypeId?: string | null;
+    attributes?: Record<string, unknown>;
+}
+
+export type ProductFieldType =
+    | "text"
+    | "number"
+    | "select"
+    | "multiselect"
+    | "date"
+    | "boolean"
+    | "longtext";
+
+export interface ProductType {
+    id: string;
+    name: string;
+    description: string | null;
+    icon: string | null;
+    sortOrder: number;
+    isSystem: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ProductTypeField {
+    id: string;
+    productTypeId: string;
+    fieldKey: string;
+    labelTr: string;
+    labelEn: string | null;
+    fieldType: ProductFieldType;
+    unit: string | null;
+    options: string[] | null;
+    required: boolean;
+    placeholder: string | null;
+    helpText: string | null;
+    sortOrder: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ProductTypeWithFields extends ProductType {
+    fields: ProductTypeField[];
 }
 
 export interface Customer {
