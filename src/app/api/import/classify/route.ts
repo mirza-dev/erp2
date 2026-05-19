@@ -127,6 +127,12 @@ export async function POST(req: NextRequest) {
         const sb = await createClient();
         const { data: { user } } = await sb.auth.getUser();
 
+        // P3 (Review 3.d) — Pre-write guard: auth.getUser() async; bu pencerede
+        // abort olursa DB+storage write hâlâ olabilir. Final kontrol.
+        if (req.signal.aborted) {
+            return new NextResponse(null, { status: 499 });
+        }
+
         const row = await dbCreateImportDocument({
             batchId,
             file: buffer,

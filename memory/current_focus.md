@@ -7,6 +7,16 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-20
 
+**Faz 3a Review 3.d — Pre-write abort guard (auth.getUser race) (3200 test)**
+
+- **P3 KAPANDI** (pre-write guard): 3.c post-AI guard'dan sonra `createClient()` + `auth.getUser()` async; bu pencerede client koparsa DB+storage write yine olabiliyordu. `dbCreateImportDocument` hemen öncesi 4. signal guard eklendi → 499. Hard cancel garantisi 4 katmana çıktı (pre-AI / in-AI / post-AI / pre-write).
+- **+1 test:** `mockGetUser` module-level fn'e dönüştürüldü; getUser içinde `ctl.abort()` ile race simüle.
+- 3 dosya · **3200 test yeşil** · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 3a Review 3.c (3199 test)
+
 **Faz 3a Review 3.c — Server-side hard cancel (P3) + doc hijyen (3199 test)**
 
 - **P3 KAPANDI** (server-side hard cancel): Client `AbortController` (3.b) sadece best-effort — request route'a girdiyse AI hâlâ çalışıyordu (orphan row + token yakımı). 3 katmanlı koruma: (1) `route.ts` pre-AI `req.signal.aborted` → 499; (2) `aiClassifyDocument(input, signal?)` → Anthropic SDK `client.messages.create(params, {signal})` (v0.80.0 RequestOptions); abort durumunda graceful fallback DEĞİL, AbortError re-throw; (3) `route.ts` post-AI guard → DB write skip. HTTP 499 (Client Closed Request) — log/telemetry için.

@@ -44,9 +44,10 @@ vi.mock("@/lib/supabase/product-types", () => ({
     dbListProductTypes: () => mockListProductTypes(),
 }));
 
+const mockGetUser = vi.fn(() => Promise.resolve({ data: { user: { id: "user-1" } } }));
 vi.mock("@/lib/supabase/server", () => ({
     createClient: () => Promise.resolve({
-        auth: { getUser: () => Promise.resolve({ data: { user: { id: "user-1" } } }) },
+        auth: { getUser: () => mockGetUser() },
     }),
 }));
 
@@ -62,6 +63,8 @@ beforeEach(() => {
     mockCreateDoc.mockReset();
     mockListProductTypes.mockReset();
     mockListProductTypes.mockResolvedValue([{ id: "00000000-0000-4000-8000-000000000001", name: "Vana" }]);
+    mockGetUser.mockReset();
+    mockGetUser.mockImplementation(() => Promise.resolve({ data: { user: { id: "user-1" } } }));
 });
 
 function makeFormRequest(formData: FormData): NextRequest {
@@ -265,6 +268,30 @@ describe("POST /api/import/classify — abort signal (Review 3.c P3)", () => {
         const res = await POST(req);
         expect(res.status).toBe(499);
         expect(mockClassify).toHaveBeenCalledTimes(1);
+        expect(mockCreateDoc).not.toHaveBeenCalled();
+    });
+
+    it("aborts DURING auth.getUser (pre-write guard) → 499, DB not written (Review 3.d)", async () => {
+        mockClassify.mockResolvedValueOnce({
+            document_type: "product_catalog", confidence: 0.9, language: "tr",
+            summary: "x", suggested_product_type_id: null,
+        });
+        const ctl = new AbortController();
+        mockGetUser.mockImplementationOnce(() => {
+            // Race: AI bitti, auth fetch'i sırasında client gitti
+            ctl.abort();
+            return Promise.resolve({ data: { user: { id: "user-1" } } });
+        });
+        const fd = new FormData();
+        fd.append("file", makeFile("a.pdf", "application/pdf", 100));
+        const req = new NextRequest(new URL("http://localhost/api/import/classify"), {
+            method: "POST", body: fd, signal: ctl.signal,
+        });
+        const { POST } = await import("@/app/api/import/classify/route");
+        const res = await POST(req);
+        expect(res.status).toBe(499);
+        expect(mockClassify).toHaveBeenCalledTimes(1);
+        expect(mockGetUser).toHaveBeenCalledTimes(1);
         expect(mockCreateDoc).not.toHaveBeenCalled();
     });
 

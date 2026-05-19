@@ -3,16 +3,21 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3a Review 3.c — Server-side hard cancel (P3) + doc hijyen (2026-05-20)
+**Son tamamlanan iş:** Faz 3a Review 3.d — Pre-write abort guard (auth.getUser race) (2026-05-20; 3200 test)
 
-- **P3 (server-side hard cancel):** Client `AbortController` (3.b) sadece best-effort idi — request route'a girdiyse AI çağrılır + token yakılır + DB/storage row yazılırdı. 3 katmanlı koruma eklendi:
+- **P3 (pre-write guard):** 3.c post-AI guard'dan sonra `createClient()` + `auth.getUser()` async; bu pencerede client koparsa DB+storage write yine olabiliyordu. `dbCreateImportDocument` hemen öncesi 4. signal guard eklendi → 499. Hard cancel garantisi 4 katmana çıktı: pre-AI, in-AI catch, post-AI, pre-write.
+- **+1 test:** `mockGetUser` module-level fn'e dönüştürüldü; getUser implementasyonu içinde `ctl.abort()` ile race simüle → status 499 + mockCreateDoc not called.
+- 3 dosya · **3200 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3a Review 3.c — Server-side hard cancel (P3) + doc hijyen (2026-05-20; 3199 test)
+
+- **P3 (server-side hard cancel):** Client `AbortController` (3.b) sadece best-effort idi — request route'a girdiyse AI çağrılır + token yakılır + DB/storage row yazılırdı. 3 katmanlı koruma:
   1. `route.ts` pre-AI guard: `req.signal.aborted` → 499, AI hiç çağrılmaz.
   2. `aiClassifyDocument(input, signal?)` → Anthropic SDK `client.messages.create(params, { signal })` (v0.80.0 RequestOptions); abort durumunda graceful fallback DEĞİL, AbortError re-throw.
   3. `route.ts` post-AI guard: AI bitti ama client gittiyse 499, `dbCreateImportDocument` çağrılmaz → orphan row yok.
-- **HTTP 499** ("Client Closed Request") nginx convention; client zaten response'u dinlemiyor, sadece log/telemetry için.
-- **+7 test** (4 route: pre-AI/in-AI/post-AI/signal pass-through + 3 ai-service: SDK signal forward, AbortError re-throw, signal yok generic graceful korunur)
-- **CLAUDE.md tarih hijyeni:** `_Son güncelleme: 2026-05-19_` → `2026-05-20`.
-- 4 dosya · **3199 test yeşil** · TS clean · 0 lint warning · build OK
+- HTTP 499 ("Client Closed Request") nginx convention; client zaten response'u dinlemiyor, sadece log/telemetry için.
+- +7 test (4 route + 3 ai-service)
+- CLAUDE.md tarih hijyeni: `_Son güncelleme: 2026-05-19_` → `2026-05-20`.
 
 **Önceki:** Faz 3a Review 3.b — In-flight fetch abort (P3) (2026-05-20; 3192 test)
 
