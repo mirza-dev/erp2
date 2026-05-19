@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 2e İPTAL — Parti tablosu ve UI tamamen silindi (2026-05-19; 3098 test)
+**Son tamamlanan iş:** Faz 3a — AI Import drop-anywhere UI + multimodal classifier (2026-05-19; 3175 test)
+
+- **Alt-faz şeması:** Faz 3 → 3a (bu), 3b (extraction+matching), 3c (review+apply), 3d (klasik mod toggle).
+- **Backend:** Migration 061 `import_documents` + helper (`dbCreateImportDocument` 3-step orphan-safe) + `aiClassifyDocument` multimodal (PDF document block, image content block, Excel text-first) + `POST /api/import/classify` (multipart, requireRole admin|purchaser).
+- **Frontend:** `DropZone` + `ClassifierQueue` (concurrency cap 3, render-time scheduling — `started: boolean` flag + File identity dedup) + import sayfası tab toggle "AI ile Aktar" (default) / "Klasik Mod" (mevcut 7-adım korunur).
+- **AiFeature** union'a `import_classify` (database.types + ai-runs sync). +6 pure helper export'u.
+- **+77 yeni test (8 dosya, gerçek davranış — 2d Review dersi):** aiClassifyDocument (11) + pickContentBlockForMime (7) + validateClassifyUpload (10) + import-documents-helper (12) + classify-route (12) + classifier-queue (13) + dropzone-component (7) + import-documents-migration (9).
+- 13 dosya · **3175 test yeşil** · TS clean · 0 lint · build OK
+
+**Önceki:** Faz 2e İPTAL — Parti tablosu ve UI tamamen silindi (2026-05-19; 3098 test) · commit `4401d66`
 
 - **Karar:** PMT ölçeğinde parti (heat lot / FIFO) iş gereksinimi yok; sertifika `product_attachments` ile zaten ürüne bağlı.
 - **Silinenler:** Migration 060 (DROP product_batches CASCADE) + product-batches.ts helper + 2 route + ProductBatchRow type + detay sayfası partiler tabı (7→6 sekme) + 2 test dosyası.

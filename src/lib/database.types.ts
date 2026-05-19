@@ -19,12 +19,33 @@ export type AlertSeverity = "critical" | "warning" | "info"
 export type AlertStatus = "open" | "acknowledged" | "resolved" | "dismissed"
 export type ImportBatchStatus = "pending" | "processing" | "review" | "confirming" | "confirmed" | "failed"
 export type ImportDraftStatus = "pending" | "confirmed" | "rejected" | "merged"
+export type ImportDocumentStatus = "pending" | "classifying" | "classified" | "error" | "applied"
+
+export type DocumentType =
+    | "product_catalog"
+    | "product_datasheet"
+    | "material_certificate"
+    | "compliance_doc"
+    | "test_report"
+    | "msds"
+    | "vendor_profile"
+    | "product_photo"
+    | "migration_excel"
+    | "unknown"
+
+export interface DocumentClassification {
+    document_type: DocumentType
+    confidence: number
+    language: string
+    summary: string
+    suggested_product_type_id: string | null
+}
 export type SyncStatus = "success" | "error" | "pending" | "retrying"
 export type AuditSource = "ui" | "system" | "ai" | "integration"
 export type RecommendationType = "purchase_suggestion" | "stock_risk" | "order_risk"
 export type RecommendationStatus = "suggested" | "accepted" | "edited" | "rejected" | "expired"
 export type FeedbackType = "accepted" | "edited" | "rejected" | "note"
-export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "ops_summary" | "purchase_enrich" | "production_voice"
+export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "import_classify" | "ops_summary" | "purchase_enrich" | "production_voice"
 export type PurchaseCommitmentStatus = "pending" | "received" | "cancelled"
 export type PurchaseOrderStatus = "draft" | "sent" | "confirmed" | "partially_received" | "received" | "cancelled"
 export type ParasutStep = "contact" | "product" | "shipment" | "invoice" | "edoc" | "done"
@@ -502,6 +523,21 @@ export interface PaymentRow {
     currency: string
     payment_method: string | null
     notes: string | null
+    created_at: string
+}
+
+export interface ImportDocumentRow {
+    id: string
+    batch_id: string | null
+    file_path: string
+    file_name: string
+    file_size: number
+    mime_type: string
+    classification: DocumentClassification | null
+    status: ImportDocumentStatus
+    error_message: string | null
+    classified_at: string | null
+    created_by: string | null
     created_at: string
 }
 

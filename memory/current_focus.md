@@ -7,6 +7,28 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
+**Faz 3a — AI Import drop-anywhere UI + multimodal document classifier (3175 test)**
+
+- **Alt-faz şeması:** Faz 3 → 3a (drop-anywhere + classifier — bu), 3b (type-aware extraction + matching), 3c (review + apply pipeline), 3d (klasik mod toggle + cleanup).
+- **Kararlar:** Tam multimodal (PDF document block + image content block + Excel text-first), eski 7-adım "Klasik Mod" toggle altında, mevcut `product-files` bucket reuse (yeni bucket yok), inline base64 (Files API 3b'ye ertelendi).
+- **Backend:**
+  - Migration 061: `import_documents` tablo (batch_id NULL'a izinli, classification jsonb, status enum: pending/classifying/classified/error/applied, file_size>0 CHECK, idx batch + idx status+created, RLS service_role).
+  - Helper `src/lib/supabase/import-documents.ts`: `CLASSIFIER_ALLOWED_MIME` (Excel/CSV genişletmesi), 3-step orphan-safe `dbCreateImportDocument` (insert → upload → patch, fail → DB+storage cleanup), `dbGetImportDocument`/`dbListImportDocumentsByBatch`/`dbUpdateImportDocumentClassification`/`dbMarkImportDocumentError`.
+  - AI service: `aiClassifyDocument` (multimodal, graceful fail), `pickContentBlockForMime` pure helper export, `parseClassifierResponse` pure helper. System prompt: 10 doc_type + product_types context + JSON-only. `logAiRun` feature="import_classify".
+  - Route `POST /api/import/classify`: multipart, `requireRole(["admin","purchaser"])`, validate (size/MIME), Excel için `extractExcelTextSample` server-side parse, AI graceful fail → status='classified' + document_type='unknown'.
+- **Frontend:**
+  - `src/components/import/DropZone.tsx`: drop-scope sınırlı, multi-file, accept whitelist, drag-over visual, `validateClassifyUpload`/`pickAcceptForMime`/`formatBytes` pure helpers.
+  - `src/components/import/ClassifierQueue.tsx`: render-time queue sync (Adjusting state based on prop change paterni — lint kuralı için `started: boolean` flag + File identity dedup), concurrency cap 3, kart UI (kind ikonu, confidence/language/suggested_type rozetleri, summary, "Devam Et" disabled 3b'ye), retry/remove, `chunkBy`/`documentTypeLabel`/`documentTypeIcon`/`formatLanguage`/`confidenceColor`/`classifierResultBadge` pure helpers.
+  - Import sayfası `/dashboard/import`: tab toggle "AI ile Aktar" (default) / "Klasik Mod" (mevcut 7-adım korunur). Product types `dbListProductTypes` ile mount'ta cache (badge labels için).
+- **Type'lar:** `AiFeature` union'a `import_classify` (database.types.ts + ai-runs.ts sync), `DocumentType` (10 kind), `DocumentClassification`, `ImportDocumentStatus`, `ImportDocumentRow`.
+- **+77 yeni test (8 dosya):** aiClassifyDocument davranış (11) + pickContentBlockForMime (7) + validateClassifyUpload (10) + import-documents-helper (12) + classify-route (12) + classifier-queue (13) + dropzone-component (7) + import-documents-migration (9).
+- 13 dosya · **3175 test yeşil** (+77 yeni) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 3b — type-aware extraction + matching (büyük scope).
+
+---
+
+## Önceki — Faz 2e İPTAL (3098 test, commit `4401d66`)
+
 **Faz 2e İPTAL — Parti tablosu ve UI tamamen silindi (3098 test)**
 
 - **Karar:** PMT ölçeğinde parti (heat lot / FIFO izlenebilirlik) iş gereksinimi yok. Sertifika dosyaları `product_attachments` (kind=certificate) ile zaten ürüne bağlanıyor; ayrı `product_batches` tablosu bakım yükü oluşturuyordu.

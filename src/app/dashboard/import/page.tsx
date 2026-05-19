@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
 import * as XLSX from "xlsx";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useToast } from "@/components/ui/Toast";
 import { IMPORT_FIELDS, REQUIRED_FIELDS } from "@/lib/import-fields";
+import DropZone from "@/components/import/DropZone";
+import ClassifierQueue from "@/components/import/ClassifierQueue";
+import type { ProductTypeRow } from "@/lib/database.types";
+
+type ImportMode = "ai" | "classic";
 
 type ImportState = "idle" | "analyzing" | "sheet_select" | "column_mapping" | "preview" | "importing" | "done";
 
@@ -107,6 +112,26 @@ export default function ImportPage() {
     const { refetchAll } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    // Faz 3a — AI tab toggle (default ai, classic = eski 7-adım wizard)
+    const [mode, setMode] = useState<ImportMode>("ai");
+    const [aiFiles, setAiFiles] = useState<File[]>([]);
+    const [aiSuggestedTypes, setAiSuggestedTypes] = useState<Array<{ id: string; name: string }>>([]);
+
+    // Load product types once for AI badge labels
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/product-types");
+                if (!cancelled && res.ok) {
+                    const data = (await res.json()) as ProductTypeRow[];
+                    setAiSuggestedTypes(data.map(t => ({ id: t.id, name: t.name })));
+                }
+            } catch { /* graceful */ }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
     const [state, setState] = useState<ImportState>("idle");
     const [fileName, setFileName] = useState<string | null>(null);
     const [dragOver, setDragOver] = useState(false);
@@ -451,10 +476,12 @@ export default function ImportPage() {
                         Veri İçe Aktarım
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        Excel dosyasını yükle — kolon eşleştirme, önizleme ve içe aktarım
+                        {mode === "ai"
+                            ? "Belge bırak, AI sınıflandırsın — tip-aware extraction ve onay (Faz 3a: sınıflandırma)"
+                            : "Excel dosyasını yükle — kolon eşleştirme, önizleme ve içe aktarım"}
                     </div>
                 </div>
-                {(state !== "idle" && state !== "analyzing") && (
+                {mode === "classic" && (state !== "idle" && state !== "analyzing") && (
                     <button onClick={reset} style={{
                         fontSize: "12px", padding: "5px 12px",
                         border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
@@ -462,6 +489,62 @@ export default function ImportPage() {
                     }}>Yeni Dosya</button>
                 )}
             </div>
+
+            {/* Faz 3a — Mode toggle (AI / Klasik) */}
+            <div role="tablist" aria-label="İçe aktarım modu" style={{
+                display: "inline-flex", padding: "3px", borderRadius: "8px",
+                background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)",
+                alignSelf: "flex-start", gap: "2px",
+            }}>
+                <button
+                    role="tab"
+                    aria-selected={mode === "ai"}
+                    onClick={() => setMode("ai")}
+                    style={{
+                        fontSize: "12px", padding: "6px 14px", borderRadius: "6px",
+                        background: mode === "ai" ? "var(--bg-primary)" : "transparent",
+                        color: mode === "ai" ? "var(--text-primary)" : "var(--text-tertiary)",
+                        fontWeight: mode === "ai" ? 600 : 500,
+                        border: "none", cursor: "pointer",
+                    }}
+                >
+                    ✨ AI ile Aktar
+                </button>
+                <button
+                    role="tab"
+                    aria-selected={mode === "classic"}
+                    onClick={() => setMode("classic")}
+                    style={{
+                        fontSize: "12px", padding: "6px 14px", borderRadius: "6px",
+                        background: mode === "classic" ? "var(--bg-primary)" : "transparent",
+                        color: mode === "classic" ? "var(--text-primary)" : "var(--text-tertiary)",
+                        fontWeight: mode === "classic" ? 600 : 500,
+                        border: "none", cursor: "pointer",
+                    }}
+                >
+                    Klasik Mod
+                </button>
+            </div>
+
+            {/* Faz 3a — AI tab content */}
+            {mode === "ai" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    <DropZone
+                        onFiles={files => setAiFiles(prev => [...prev, ...files])}
+                        disabled={isDemo}
+                        disabledTooltip={DEMO_DISABLED_TOOLTIP}
+                    />
+                    <ClassifierQueue
+                        files={aiFiles}
+                        suggestedProductTypes={aiSuggestedTypes}
+                        onClear={() => setAiFiles([])}
+                    />
+                </div>
+            )}
+
+            {mode === "classic" && (
+            <>
+            {/* Klasik mod — eski 7-adım wizard */}
 
             {/* Step indicator */}
             {state !== "idle" && (
@@ -1063,6 +1146,8 @@ export default function ImportPage() {
                         <button onClick={reset} style={{ fontSize: "12px", padding: "6px 16px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>Yeni Dosya Yükle</button>
                     </div>
                 </div>
+            )}
+            </>
             )}
         </div>
     );

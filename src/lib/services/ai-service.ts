@@ -1087,3 +1087,217 @@ export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
         return { confidence: 0, risk_level: "medium", reason: "AI scoring unavailable" };
     }
 }
+
+// ── Faz 3a — Document Classifier ──────────────────────────────
+
+import type { DocumentType, DocumentClassification } from "@/lib/database.types";
+
+export interface ProductTypeContext {
+    id: string;
+    name: string;
+}
+
+export interface ClassifyDocumentInput {
+    buffer: Buffer;
+    mimeType: string;
+    fileName: string;
+    /** Server-side xlsx/csv parse'tan gelen text (sadece Excel/CSV için) */
+    excelTextSample?: string;
+    /** dbListProductTypes ile çekilen tip listesi — prompt context */
+    productTypes: ProductTypeContext[];
+}
+
+const DOCUMENT_TYPES: readonly DocumentType[] = [
+    "product_catalog", "product_datasheet", "material_certificate",
+    "compliance_doc", "test_report", "msds",
+    "vendor_profile", "product_photo", "migration_excel", "unknown",
+];
+
+function isValidDocumentType(v: unknown): v is DocumentType {
+    return typeof v === "string" && (DOCUMENT_TYPES as readonly string[]).includes(v);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Content block builder — pure helper export for testability.
+export type ClassifierContentBlock =
+    | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } }
+    | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+    | { type: "text"; text: string };
+
+export function pickContentBlockForMime(
+    mime: string,
+    buffer: Buffer,
+    excelTextSample?: string,
+): ClassifierContentBlock {
+    if (mime === "application/pdf") {
+        return {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: buffer.toString("base64") },
+        };
+    }
+    if (mime.startsWith("image/")) {
+        // Supported types per Anthropic: png/jpeg/webp/gif. Pass through verbatim.
+        return {
+            type: "image",
+            source: { type: "base64", media_type: mime, data: buffer.toString("base64") },
+        };
+    }
+    if (
+        mime === "text/csv" ||
+        mime === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+        mime === "application/vnd.ms-excel"
+    ) {
+        const text = (excelTextSample ?? "").slice(0, 8000);
+        return { type: "text", text };
+    }
+    throw new Error(`Unsupported MIME for classifier: ${mime}`);
+}
+
+function buildClassifierSystemPrompt(productTypes: ProductTypeContext[]): string {
+    const typeList = productTypes
+        .map(t => `- ${t.name} (id: ${t.id})`)
+        .join("\n");
+    return `Sen bir endüstriyel ekipman ERP sistemi için belge analiz asistanısın.
+Yüklenen dosyayı incele ve aşağıdaki tiplerden BİRİNE sınıflandır:
+
+- product_catalog: çoklu ürün listesi (üretici/tedarikçi kataloğu)
+- product_datasheet: tekil ürün teknik veri sayfası
+- material_certificate: belirli parti için sertifika (3.1, EN 10204)
+- compliance_doc: CE, PED, ATEX uygunluk belgesi
+- test_report: basınç, sızdırmazlık, hidrostatik test sonucu
+- msds: malzeme güvenlik bilgi formu
+- vendor_profile: tedarikçi tanıtım/bilgi belgesi
+- product_photo: ürün fotoğrafı (vision)
+- migration_excel: eski sistem migration verisi (Excel/CSV)
+- unknown: belirsiz
+
+Mevcut ürün tipleri (önerebilirsin):
+${typeList}
+
+Çıktı YALNIZCA aşağıdaki JSON formatında olmalı (başka metin yok):
+{
+  "document_type": "<yukarıdaki listeden biri>",
+  "confidence": <0.0-1.0 arası float>,
+  "language": "<ISO-639-1: tr / en / de / ... veya 'unknown'>",
+  "summary": "<1-2 cümle Türkçe özet, max 300 karakter>",
+  "suggested_product_type_id": "<yukarıdaki ürün tipi UUID'lerinden biri veya null>"
+}`;
+}
+
+/**
+ * Advisory-only — domain-rules §11.1.
+ * Multimodal classifier: PDF document block, image content block, Excel text block.
+ * AI fail → graceful degrade ('unknown' result, never throws).
+ */
+export async function aiClassifyDocument(
+    input: ClassifyDocumentInput,
+): Promise<DocumentClassification> {
+    const fallback: DocumentClassification = {
+        document_type: "unknown",
+        confidence: 0,
+        language: "unknown",
+        summary: "AI servisi yanıt veremedi.",
+        suggested_product_type_id: null,
+    };
+
+    if (!isAIAvailable()) {
+        return { ...fallback, summary: "AI servisi yapılandırılmamış." };
+    }
+
+    const t0 = Date.now();
+    try {
+        const contentBlock = pickContentBlockForMime(input.mimeType, input.buffer, input.excelTextSample);
+        const systemPrompt = buildClassifierSystemPrompt(input.productTypes);
+
+        const userBlocks: ClassifierContentBlock[] = [
+            contentBlock,
+            { type: "text", text: `Dosya adı: ${sanitizeAiInput(input.fileName, 200)}` },
+        ];
+
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 512,
+            system: systemPrompt,
+            // SDK content types accept these block shapes
+            messages: [{ role: "user", content: userBlocks as unknown as Anthropic.MessageParam["content"] }],
+        });
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const result = parseClassifierResponse(text, input.productTypes);
+
+        void logAiRun({
+            feature: "import_classify",
+            entity_id: null,
+            input_hash: hashInput(`${input.mimeType}:${input.fileName}:${input.buffer.length}`),
+            confidence: result.confidence,
+            latency_ms: Date.now() - t0,
+            model: MODEL,
+        });
+
+        return result;
+    } catch (err) {
+        console.error("[AI Classify] graceful degradation:", err);
+        return fallback;
+    }
+}
+
+// Pure helper export — testability.
+export function parseClassifierResponse(
+    text: string,
+    productTypes: ProductTypeContext[],
+): DocumentClassification {
+    const validTypeIds = new Set(productTypes.map(t => t.id));
+
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+        return {
+            document_type: "unknown",
+            confidence: 0,
+            language: "unknown",
+            summary: "AI yanıtı geçersiz format.",
+            suggested_product_type_id: null,
+        };
+    }
+
+    let raw: Record<string, unknown> = {};
+    try {
+        raw = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    } catch {
+        return {
+            document_type: "unknown",
+            confidence: 0,
+            language: "unknown",
+            summary: "AI yanıtı parse edilemedi.",
+            suggested_product_type_id: null,
+        };
+    }
+
+    const document_type: DocumentType = isValidDocumentType(raw.document_type)
+        ? raw.document_type
+        : "unknown";
+
+    const confidenceRaw = typeof raw.confidence === "number" ? raw.confidence : 0;
+    const confidence = clampConfidence(confidenceRaw);
+
+    const language = typeof raw.language === "string" && raw.language.length > 0
+        ? sanitizeAiOutput(raw.language, 20)
+        : "unknown";
+
+    const summary = typeof raw.summary === "string"
+        ? sanitizeAiOutput(raw.summary, 300)
+        : "";
+
+    const suggestedRaw = raw.suggested_product_type_id;
+    const suggested_product_type_id = typeof suggestedRaw === "string"
+        && UUID_RE.test(suggestedRaw)
+        && validTypeIds.has(suggestedRaw)
+        ? suggestedRaw
+        : null;
+
+    return { document_type, confidence, language, summary, suggested_product_type_id };
+}
