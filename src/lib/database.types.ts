@@ -32,6 +32,7 @@ export type ParasutErrorKind = "auth" | "validation" | "rate_limit" | "server" |
 export type ParasutInvoiceType = "e_invoice" | "e_archive" | "manual"
 export type ParasutEDocStatus = "running" | "done" | "error" | "skipped"
 export type ProductFieldType = "text" | "number" | "select" | "multiselect" | "date" | "boolean" | "longtext"
+export type ProductAttachmentKind = "image" | "datasheet" | "certificate" | "manual" | "drawing" | "other"
 
 // ── Row Types ────────────────────────────────────────────────
 
@@ -149,6 +150,35 @@ export interface ProductRow {
     parasut_product_creating_owner: string | null
     product_type_id: string | null
     attributes: Record<string, unknown>
+}
+
+export interface ProductAttachmentRow {
+    id: string
+    product_id: string
+    file_path: string
+    file_name: string
+    file_size: number
+    mime_type: string
+    kind: ProductAttachmentKind
+    is_primary_image: boolean
+    version: number
+    superseded_by: string | null
+    metadata: Json | null
+    uploaded_at: string
+    uploaded_by: string | null
+}
+
+export interface ProductBatchRow {
+    id: string
+    product_id: string
+    heat_no: string
+    batch_date: string | null
+    initial_qty: number
+    remaining_qty: number
+    certificate_attachment_id: string | null
+    notes: string | null
+    created_at: string
+    updated_at: string
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */
