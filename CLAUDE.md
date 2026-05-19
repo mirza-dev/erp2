@@ -3,7 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 3a Review — 4 bulgu kapatıldı + cancelled-flag bug fix (2026-05-19; 3188 test)
+**Son tamamlanan iş:** Faz 3a Review 3. tur — Stale file re-fetch (P2) + plan dokümanı drift (P3) (2026-05-19; 3190 test)
+
+- **P2 (stale file re-fetch):** `ClassifierQueue.remove(id)` sadece internal queue'yu filtreliyor, parent `aiFiles` append-only. Kart × → yeni dosya ekleme → stale File parent'tan geri geliyor → duplicate POST + AI token + DB row. **Çözüm:** opsiyonel `onRemove?: (file: File) => void` prop; page.tsx `onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}`. File identity korunduğu için `!==` filter güvenli.
+- **P3 (plan dokümanı drift):** `MODUL_REVIZE_PLAN.md` line 398 prompt taslağı `"confidence": 0-100` → `<0.0-1.0 float>`; `suggested_product_type` → `suggested_product_type_id` (gerçek prompt ai-service.ts:1181 ile aligned). Kod tutarlıydı, sadece doc drift.
+- **+2 test** (parent-wrapper RTL: A kaldır → B ekle → fetch count 2; A geri dönmemeli + onRemove opsiyonel backward-compat)
+- 4 dosya · **3190 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3a Review 2. tur — 4 bulgu kapatıldı + cancelled-flag bug fix (2026-05-19; 3188 test)
 
 - **P2 (render-phase fetch):** queue sync + concurrency driver useEffect içine taşındı; Strict Mode safety.
 - **P2 yeni bug (cancelled-flag):** P2 fix sırasında useEffect cleanup `cancelled=true` her queue patch'inde in-flight fetch'leri iptal ediyordu (prod'u da kırıyordu) → `mountedRef = useRef(true)` paterni + unmount-only cleanup.

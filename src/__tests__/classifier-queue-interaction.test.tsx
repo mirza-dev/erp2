@@ -16,7 +16,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, act, waitFor, cleanup } from "@testing-library/react";
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import ClassifierQueue from "@/components/import/ClassifierQueue";
 
 vi.mock("@/lib/demo-utils", () => ({
@@ -166,5 +166,74 @@ describe("ClassifierQueue — remove + clear (P3-008 fix)", () => {
             expect(screen.queryByText(/Sınıflandırma kuyruğu/)).toBeNull();
         });
         expect(onClear).toHaveBeenCalledTimes(1);
+    });
+});
+
+// ── Faz 3a Review 3. tur — P2: onRemove parent senkronu ──────────────────────
+
+describe("ClassifierQueue — onRemove parent sync (Review 3 P2)", () => {
+    it("remove → parent'a haber verir; aynı File yeniden eklense bile re-fetch atılmaz", async () => {
+        const fetchSpy = vi.fn(async () => okResponse("doc-x"));
+        vi.stubGlobal("fetch", fetchSpy);
+
+        const fileA = makeFile("a.pdf");
+        const fileB = makeFile("b.pdf");
+
+        // Parent wrapper — page.tsx davranışı simüle edilir
+        function Parent() {
+            const [files, setFiles] = useState<File[]>([fileA]);
+            return (
+                <>
+                    <button onClick={() => setFiles(prev => [...prev, fileB])}>add-b</button>
+                    <ClassifierQueue
+                        files={files}
+                        suggestedProductTypes={[PT]}
+                        onRemove={file => setFiles(prev => prev.filter(f => f !== file))}
+                    />
+                </>
+            );
+        }
+
+        render(<Parent />);
+        await screen.findByText(/Ürün Kataloğu/, {}, { timeout: 3000 });
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+        // A'yı kaldır → parent state'inden de düşer (onRemove)
+        await act(async () => {
+            fireEvent.click(screen.getAllByRole("button", { name: /Kuyruktan kaldır/ })[0]);
+        });
+
+        // Kuyruk boş → component null render eder
+        await waitFor(() => {
+            expect(screen.queryByText(/Sınıflandırma kuyruğu/)).toBeNull();
+        });
+
+        // B ekle → parent yeni files=[B] gönderir (A onRemove ile düştü)
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /add-b/ }));
+        });
+
+        // B classify olmalı — A geri gelmemeli
+        await waitFor(() => {
+            // Toplam 2 fetch: a.pdf (ilk render) + b.pdf (ekleme). A geri gelirse 3 olur.
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    it("onRemove yoksa (opsiyonel) eski davranış korunur — internal queue filter ZATEN çalışır", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => okResponse("doc-y")));
+        // onRemove geçilmedi — sadece internal queue temizlenir
+        render(<ClassifierQueue files={[makeFile("a.pdf"), makeFile("b.pdf")]} suggestedProductTypes={[PT]} />);
+
+        await screen.findByText(/Sınıflandırma kuyruğu \(2\)/, {}, { timeout: 3000 });
+
+        await act(async () => {
+            fireEvent.click(screen.getAllByRole("button", { name: /Kuyruktan kaldır/ })[0]);
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText(/Sınıflandırma kuyruğu \(1\)/)).toBeTruthy();
+        });
+        // Test fail vermez = onRemove opsiyonel, geriye uyumlu
     });
 });

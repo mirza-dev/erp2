@@ -7,6 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
+**Faz 3a Review 3. tur — Stale file re-fetch (P2) + plan dokümanı drift (P3) (3190 test)**
+
+- **P2 KAPANDI** (stale file re-fetch): `ClassifierQueue.remove(id)` sadece internal queue'yu filtreliyor, parent `aiFiles` state'inden düşürmüyordu → kullanıcı bir kartı × ile kaldırdıktan sonra yeni dosya ekleyince stale File referansı parent'tan gelip useEffect'te yeniden "uploading" item olarak ekleniyor → duplicate POST `/api/import/classify` + AI token + `import_documents` row. **Çözüm:** `onRemove?: (file: File) => void` opsiyonel prop; `remove()` handler önce File ref'i bulup parent'a bildirir; page.tsx `onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}`. File identity (referans eşitliği) korunduğu için `!==` filter güvenli.
+- **P3 KAPANDI** (plan dokümanı drift): `MODUL_REVIZE_PLAN.md` line 398 `"confidence": 0-100` → `<0.0-1.0 float>`; `suggested_product_type` → `suggested_product_type_id` (gerçek prompt `ai-service.ts:1181` ile aligned). Kod tutarlıydı, sadece 3b/3c yazımını yanıltacak dokümantasyon.
+- **+2 test**: parent-wrapper RTL (A kaldır → B ekle → fetch sayısı 2; A geri dönmemeli) + onRemove opsiyonel backward-compat
+- 4 dosya · **3190 test yeşil** (+2) · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 3a Review 2. tur (3188 test)
+
 **Faz 3a Review — 4 P2/P3 bulgu kapatıldı + cancelled-flag bug fix (3188 test)**
 
 - **P2 KAPANDI** (render-phase fetch): `ClassifierQueue` queue sync + concurrency driver useEffect içine alındı; render-phase'de network çağrısı yok → Strict Mode/concurrent render güvenliği.

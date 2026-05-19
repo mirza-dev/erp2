@@ -538,6 +538,7 @@ export default function ImportPage() {
                         files={aiFiles}
                         suggestedProductTypes={aiSuggestedTypes}
                         onClear={() => setAiFiles([])}
+                        onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}
                     />
                 </div>
             )}

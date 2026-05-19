@@ -148,6 +148,12 @@ export interface ClassifierQueueProps {
     files: File[];
     suggestedProductTypes?: QueuedSuggestedType[];
     onClear?: () => void;
+    /**
+     * Tekil kart × kaldırıldığında parent'a haber verir.
+     * Parent aiFiles state'inden de düşürmezse stale File referansı useEffect'te
+     * yeniden "uploading" item olarak eklenir → duplicate POST/AI cost (Faz 3a Review 3 bug).
+     */
+    onRemove?: (file: File) => void;
 }
 
 const CONCURRENCY = 3;
@@ -172,7 +178,7 @@ async function uploadAndClassify(file: File): Promise<{ ok: true; document: Impo
     }
 }
 
-export default function ClassifierQueue({ files, suggestedProductTypes = [], onClear }: ClassifierQueueProps) {
+export default function ClassifierQueue({ files, suggestedProductTypes = [], onClear, onRemove }: ClassifierQueueProps) {
     const isDemo = useIsDemo();
 
     const [queue, setQueue] = useState<QueuedFile[]>([]);
@@ -270,7 +276,12 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
     };
 
     const remove = (id: string) => {
+        // P2 (Review 3): parent aiFiles state'inden de düş — aksi halde aynı File
+        // referansı yeni dosya eklendiğinde useEffect'te yeniden "uploading" olarak
+        // eklenir ve duplicate POST/AI tokens harcanır.
+        const item = queue.find(q => q.id === id);
         setQueue(prev => prev.filter(q => q.id !== id));
+        if (item) onRemove?.(item.file);
     };
 
     const clearAll = () => {

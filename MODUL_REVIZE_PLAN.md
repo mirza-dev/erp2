@@ -395,10 +395,10 @@ Yüklenen dosyayı incele ve tipini tespit et:
 Çıktı JSON:
 {
   "document_type": "...",
-  "confidence": 0-100,
+  "confidence": <0.0-1.0 float>,
   "language": "...",
   "summary": "kısa açıklama",
-  "suggested_product_type": "vana/conta/flans/..." (varsa)
+  "suggested_product_type_id": "<product_type UUID veya null>"
 }
 ```
 
