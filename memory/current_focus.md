@@ -7,14 +7,22 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
-**Faz 2b Review — 3 bulgu kapatma (2935 test)**
+**Toplu Seçme ve Silme — Tüm 6 Liste Sayfası (2954 test) · commit `c043636`**
 
-- **MR-F2B-P2-001 KAPANDI:** `GET /api/products/[id]` artık `dbGetQuotedQuantities` + `dbGetIncomingQuantities` çağırarak `quoted/incoming/promisable/forecasted` alanlarını zenginleştirilmiş response'a ekliyor. Stok sekmesindeki "Teklifte" ve "Bekleniyor" kartları artık gerçek veriyi gösteriyor.
-- **MR-F2B-P2-002 KAPANDI:** `handleSave` body'sindeki clearable nullable string alanlar `|| undefined` → `|| null`, nullable number alanlar `? ... : undefined` → `? ... : null` olarak güncellendi. Kullanıcı bir alanı temizleyip kaydettiğinde DB gerçekten güncelleniyor.
-- **MR-F2B-P3-003 KAPANDI:** `product-detail-page.test.ts`'e +5 regression kilit testi eklendi: route enrichment source-regex (2), handleSave null pattern (2), mapProduct enriched mapping unit testi (1).
-- 3 dosya · **2935 test yeşil** · TS clean · 0 lint warning · build OK
+- Yeni `src/hooks/useSelection.ts`: resetKey render-phase sıfırlama, 4 pure helper export, UseSelectionResult interface
+- 6 sayfa: products / orders / customers / vendors / quotes / purchase/orders
+- Her tabloya checkbox kolonu (select-all + indeterminate + per-row)
+- Bulk action bar: seçilen count + işlem butonu + Seçimi Temizle
+- Inline confirm modal: her sayfada bağımsız `bulkDeleteConfirm` state
+- Products/Orders/Customers/Quotes → DELETE endpoint
+- Vendors → DELETE (soft deactivate, "Pasife Al", warning rengi)
+- Purchase Orders → POST cancel `{ reason: "Toplu iptal" }`, "İptal Et" etiketi
+- +19 test (use-selection.test.ts)
+- 8 dosya · **2954 test yeşil** · TS clean · 0 lint warning
 
-**Sıradaki:** Faz 2c — Teknik sekmesi dinamik alan rendering + tip seç + attributes JSONB write/read + tip değiştirme uyarısı.
+---
+
+## Önceki — Faz 2b Review — 3 bulgu kapatma (2935 test)
 
 ---
 

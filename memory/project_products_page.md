@@ -1,62 +1,53 @@
 ---
 name: KokpitERP — Products Page Mimarisi
-description: products/page.tsx veri akışı, drawer edit modu, kategori yönetimi ve önemli pattern'ler
+description: products/page.tsx veri akışı, tam ekran detay sayfası, kategori yönetimi ve önemli pattern'ler
 type: project
+originSessionId: 7a43eaa4-1c39-4659-9d1b-98c8a329ce4f
 ---
-
-## Veri Akışı (2026-04-15 refactor sonrası)
+## Veri Akışı
 
 - `products/page.tsx` DataContext'e bağımlı değil; kendi `/api/products` fetch'ini yapıyor
 - `const [mockProducts, setMockProducts] = useState<Product[]>([])` + `refetch` useCallback
 - "Yenile" butonu → `refetch()` → liste güncellenir
 - `mapProduct` from `@/lib/api-mappers` kullanılır
 
+## Drawer Kaldırıldı (Faz 2b — 2026-05-19)
+
+Sağ `AIDetailDrawer` tamamen kaldırıldı. Satır tıklaması artık `router.push(/dashboard/products/${id})` yapıyor.
+Drawer'a ait tüm state'ler (`selectedProductId`, `drawerEditMode`, `drawerSaving`, `drawerEditForm`, `commitments`, `quotes` vb.) ve `handleDrawerSave` handler'ı silindi (~1115 satır azalma).
+
+## Tam Ekran Detay Sayfası — /dashboard/products/[id]
+
+`src/app/dashboard/products/[id]/page.tsx` — client component, 7-sekme yapısı.
+
+**Aktif sekmeler:** Genel / Stok / Tedarik / Ticari  
+**Placeholder sekmeler:** Teknik 🔒 (Faz 2c) / Ekler 🔒 (Faz 2d) / Partiler 🔒 (Faz 2e)
+
+**fetchProduct:** `GET /api/products/${productId}` → zenginleştirilmiş response (quoted/incoming/promisable/forecasted dahil) → `mapProduct(data)`.
+
+**handleSave:** `PATCH /api/products/${product.id}` — clearable nullable alanlar `|| null` / `? ... : null` pattern (NOT NULL alanlar `|| undefined` kalır: name/unit/product_type/currency).
+
+**Stok sekmesi kartları:** on_hand / promisable (satılabilir) / reserved / min_stock_level / quoted (teklifte) / incoming (bekleniyor). Hepsi GET response'tan geliyor (P2-001 fix).
+
+## Liste Sayfası — 6 Sabit Kolon
+
+SKU / Ürün Adı / Stok / Satılabilir / Fiyat / Min stok. Eski Kategori/Kapsam/Son Tarih/Sinyal kolonları kaldırıldı.
+
 ## Kategori Yönetimi
 
-- **Hardcoded array YOK** — `categories` artık component içinde useMemo ile türetiliyor:
+- **Hardcoded array YOK** — `categories` useMemo ile türetiliyor:
   ```tsx
   const categories = useMemo(
       () => ["Tümü", ...Array.from(new Set(mockProducts.map(p => p.category).filter(Boolean))).sort()],
       [mockProducts]
   );
   ```
-- Create form: `<input type="text" list="product-categories-list">` + `<datalist>` → yeni kategori yazılabilir
-- Import sonrası yeni kategoriler otomatik filtre seçeneklerine eklenir
-
-## Drawer — Block 1 "Ürün Kimliği" Edit Modu
-
-**State:** `drawerEditMode`, `drawerSaving`, `drawerEditForm` — component içinde
-**Reset:** `selectedProductId` değişince `useEffect` ile sıfırlanır
-
-**"Düzenle" butonu:** Block 1 başlığının sağında, `!drawerEditMode && !isDemo` koşuluyla gösterilir
-
-**Editable alanlar:** ad, ürün tipi, kategori, alt kategori, ürün ailesi, sektör uygunluğu, sektörler, kullanım, malzeme, menşei, üretim tesisi, standartlar, sertifikalar, birim, depo, tedarikçi, tedarik süresi, ağırlık, satış fiyatı, maliyet, para birimi, notlar
-
-**Kasıtlı düzenlenemeyen:** SKU — import dedup key olduğu için dışarıda bırakıldı
-
-**Kaydet akışı:** `PATCH /api/products/{id}` → camelCase → snake_case dönüşümü → `await refetch()` → toast
-
-**`drawerInputStyle`:** Modül seviyesinde sabit (12px, 4px 8px padding, border-secondary) — `modalInputStyle`'dan (13px, 6px 10px) farklı çünkü drawer daha dar
-
-## Drawer — "Nerede Kullanılıyor?" Kaldırıldı
-
-2026-04-15'te silindi. DB'de özel tablo yoktu, sadece hesaplanan frontend koduydu.
+- Create form: `<input type="text" list="product-categories-list">` + `<datalist>`
 
 ## Scan Lock
 
-Alerts sayfasındaki "Tara" butonu ve DemoTab seed sonrası scan: `?force=true` parametresi kullanıyor — takılı kalan advisory lock'u zorla açar.
+Alerts sayfasındaki "Tara" butonu: `?force=true` parametresi kullanıyor — takılı kalan advisory lock'u zorla açar.
 
-## Mount Tarama Davranışı (2026-04-17 değişti)
+## Mount Tarama Davranışı
 
-- **Products page:** Artık mount'ta `POST /api/alerts/scan` YAPMAZ. Sadece `GET /api/alerts` çeker. Scan → sadece `handleRefresh()` butonuyla tetiklenir.
-  - **Why:** Her sayfa açılışında tam alert scan RPC çalışıyordu → freeze ve gecikme.
-- **Diğer sayfalar:** Benzer şekilde useMemo ile filter/sort hesapları optimize edildi.
-
-## Performance Optimizasyonları (2026-04-17)
-
-`React.memo` ile sarılan componentler: Sidebar, Topbar, StatsCards, RecentOrders, AIAlerts, StockDataGrid.
-
-`useMemo` ile sarılan hesaplamalar: Sidebar'daki navGroups + count'lar; products, orders, alerts, purchase/suggested sayfalarındaki `filtered`/`sorted` array'leri.
-
-**Why:** Bu pattern'ler yeni bir session'da hızlıca hatırlanması gereken mimari kararlar.
-**How to apply:** products/page.tsx'e dokunurken DataContext bağımlılığı arama; drawer edit modu state'leri component içinde. Mount'ta scan yok — handleRefresh'e bak.
+- **Products page:** Mount'ta `POST /api/alerts/scan` YAPMAZ. Sadece `GET /api/alerts` çeker. Scan → sadece `handleRefresh()` butonuyla tetiklenir.
