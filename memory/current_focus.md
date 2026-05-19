@@ -7,7 +7,21 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
-**Toplu Seçme ve Silme — Tüm 6 Liste Sayfası (2954 test) · commit `c043636`**
+**Faz 2c — Teknik sekmesi dinamik alan rendering + tip seçici (2974 test) · commit `6846584`**
+
+- Genel sekmesinde "Tip Şablonu" selector (`/api/product-types` listesinden, edit mode)
+- Teknik sekmesi aktif: seçili tipin `product_type_fields` alanları `withFields=1` ile fetch, alan tipine göre render
+- `DynamicFieldEdit` component'i: 7 field_type variant (text/number/select/multiselect/boolean/date/longtext) + unit suffix/pill toggle/checkbox/textarea
+- `handleSave` body'sine `product_type_id` + `attributes` JSONB eklendi
+- Tip değişiminde `computeLostAttributeKeys` ile yeni tipte olmayan attribute key'leri tespit edilir → uyarı modalı; onaylanınca filtre uygulanır
+- Pure helper exports: `computeLostAttributeKeys`, `formatAttributeValue` (display formatter)
+- `setAttribute`: boş değerlerde key silinir (storage temizliği)
+- +20 test (faz2c suite: lostKeys 4 + formatAttributeValue 7 + source-regex 9 = yeni dosya 20)
+- 3 dosya · **2974 test yeşil** · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Toplu Seçme ve Silme — Tüm 6 Liste Sayfası (2954 test) · commit `c043636`
 
 - Yeni `src/hooks/useSelection.ts`: resetKey render-phase sıfırlama, 4 pure helper export, UseSelectionResult interface
 - 6 sayfa: products / orders / customers / vendors / quotes / purchase/orders
