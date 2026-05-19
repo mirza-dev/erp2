@@ -466,6 +466,9 @@ export async function dbReorderProductTypeFields(
         }
     }
 
+    const { data: parent } = await supabase
+        .from("product_types").select("id, is_system").eq("id", productTypeId).single();
+
     // Her birini sırayla güncelle. Tek tek update — sayı az (tipik 5-20 alan).
     for (let i = 0; i < fieldIdsInOrder.length; i++) {
         const { error } = await supabase
@@ -474,6 +477,18 @@ export async function dbReorderProductTypeFields(
             .eq("id", fieldIdsInOrder[i])
             .eq("product_type_id", productTypeId);
         if (error) throw new Error(error.message);
+    }
+
+    if (parent?.is_system) {
+        await supabase.from("product_types").update({ is_system: false }).eq("id", productTypeId);
+        await supabase.from("audit_log").insert({
+            action: "product_type_updated",
+            entity_type: "product_type",
+            entity_id: productTypeId,
+            before_state: { is_system: true },
+            after_state: { is_system: false },
+            source: "ui",
+        });
     }
 }
 

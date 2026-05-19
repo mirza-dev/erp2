@@ -256,6 +256,19 @@ describe("P2 — Field CRUD is_system kilidini düşürür (source-regex)", () =
         expect(delBody).toContain("if (parent?.is_system)");
         expect(delBody).toMatch(/\.update\(\{\s*is_system:\s*false\s*\}\)/);
     });
+
+    it("dbReorderProductTypeFields parent.is_system kontrolü + UPDATE is_system:false", async () => {
+        const fs = await import("fs/promises");
+        const src = await fs.readFile("src/lib/supabase/product-types.ts", "utf-8");
+
+        const fnStart = src.indexOf("export async function dbReorderProductTypeFields");
+        const fnEnd = src.indexOf("export async function dbReorderProductTypes");
+        const fnBody = src.slice(fnStart, fnEnd);
+
+        expect(fnBody).toContain('.select("id, is_system")');
+        expect(fnBody).toContain("if (parent?.is_system)");
+        expect(fnBody).toMatch(/\.update\(\{\s*is_system:\s*false\s*\}\)/);
+    });
 });
 
 // ── P3 — Field PATCH/DELETE expectedTypeId guard (behavioral) ───
