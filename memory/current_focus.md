@@ -5,7 +5,17 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-19
+## Son Tamamlanan İş — 2026-05-20
+
+**Faz 3a Review 3.b — In-flight fetch abort (P3) (3192 test)**
+
+- **P3 KAPANDI** (in-flight fetch abort): `ClassifierQueue` `uploadAndClassify` fetch'e `AbortSignal` geçmiyordu → kullanıcı classifying durumundaki kartı kaldırırsa (× veya "Listeyi Temizle") `/api/import/classify` request'i devam ediyor, AI çalışıyor, `import_documents` row + storage file yazıyordu. UI'da dönüş yolu yok → orphan kayıt + boşa AI cost. **Çözüm:** per-item `AbortController` Map (`abortControllersRef`); fetch `signal` parametresi alır; `remove`/`clearAll`/unmount cleanup'ta `ctl.abort()` + Map'ten temizle. `uploadAndClassify` `signal.aborted` ise `{ ok: false, aborted: true }` döner; effect handler aborted result'ı erken return ile yutar (UI'a hata yansımaz, kart zaten state'ten silindi).
+- **+2 test**: classifying sırasında remove → signal.aborted=true; clearAll → tüm signals abort
+- 2 dosya · **3192 test yeşil** (+2) · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 3a Review 3. tur (3190 test, commit `444dced`)
 
 **Faz 3a Review 3. tur — Stale file re-fetch (P2) + plan dokümanı drift (P3) (3190 test)**
 

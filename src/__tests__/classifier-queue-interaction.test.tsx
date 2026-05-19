@@ -220,6 +220,58 @@ describe("ClassifierQueue — onRemove parent sync (Review 3 P2)", () => {
         });
     });
 
+    it("classifying sırasında remove → in-flight fetch abort edilir (P3 Review 3.b)", async () => {
+        let capturedSignal: AbortSignal | undefined;
+        const fetchSpy = vi.fn((_url: string, init?: RequestInit) => {
+            capturedSignal = init?.signal ?? undefined;
+            // Hiç resolve olmayan promise — fetch hâlâ in-flight
+            return new Promise<Response>(() => {});
+        });
+        vi.stubGlobal("fetch", fetchSpy);
+
+        render(<ClassifierQueue files={[makeFile("a.pdf")]} suggestedProductTypes={[PT]} />);
+
+        await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+        expect(capturedSignal).toBeDefined();
+        expect(capturedSignal?.aborted).toBe(false);
+
+        // Kart classifying durumundayken × tıkla
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /Kuyruktan kaldır/ }));
+        });
+
+        // Signal abort edilmiş olmalı → server'da AI çağrısı kesilir (best-effort);
+        // Promise .then() içindeki setQueue/error yansıma yok (aborted=true erken return)
+        expect(capturedSignal?.aborted).toBe(true);
+    });
+
+    it("Listeyi Temizle classifying durumundayken TÜM in-flight fetch'leri abort eder", async () => {
+        const signals: AbortSignal[] = [];
+        const fetchSpy = vi.fn((_url: string, init?: RequestInit) => {
+            if (init?.signal) signals.push(init.signal);
+            return new Promise<Response>(() => {});
+        });
+        vi.stubGlobal("fetch", fetchSpy);
+
+        render(
+            <ClassifierQueue
+                files={[makeFile("a.pdf"), makeFile("b.pdf")]}
+                suggestedProductTypes={[PT]}
+                onClear={() => {}}
+            />,
+        );
+
+        await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+        expect(signals.length).toBe(2);
+        expect(signals.every(s => !s.aborted)).toBe(true);
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /Listeyi Temizle/ }));
+        });
+
+        expect(signals.every(s => s.aborted)).toBe(true);
+    });
+
     it("onRemove yoksa (opsiyonel) eski davranış korunur — internal queue filter ZATEN çalışır", async () => {
         vi.stubGlobal("fetch", vi.fn(async () => okResponse("doc-y")));
         // onRemove geçilmedi — sadece internal queue temizlenir

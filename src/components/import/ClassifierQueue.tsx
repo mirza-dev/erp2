@@ -162,11 +162,14 @@ function newId(): string {
     return Math.random().toString(36).slice(2);
 }
 
-async function uploadAndClassify(file: File): Promise<{ ok: true; document: ImportDocumentRow } | { ok: false; error: string }> {
+async function uploadAndClassify(
+    file: File,
+    signal?: AbortSignal,
+): Promise<{ ok: true; document: ImportDocumentRow } | { ok: false; error: string; aborted?: boolean }> {
     const fd = new FormData();
     fd.append("file", file);
     try {
-        const res = await fetch("/api/import/classify", { method: "POST", body: fd });
+        const res = await fetch("/api/import/classify", { method: "POST", body: fd, signal });
         if (!res.ok) {
             const body = (await res.json().catch(() => ({}))) as { error?: string };
             return { ok: false, error: body.error ?? `HTTP ${res.status}` };
@@ -174,6 +177,9 @@ async function uploadAndClassify(file: File): Promise<{ ok: true; document: Impo
         const body = await res.json() as { ok: true; document: ImportDocumentRow };
         return body;
     } catch (e) {
+        // P3 (Review 3.b): kullanıcı remove/clear ile in-flight isteği iptal ettiyse
+        // setQueue'ya error yansıması yapma — kart zaten state'ten silindi.
+        if (signal?.aborted) return { ok: false, error: "İptal edildi", aborted: true };
         return { ok: false, error: e instanceof Error ? e.message : "Ağ hatası" };
     }
 }
@@ -192,6 +198,19 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
     useEffect(() => {
         mountedRef.current = true;
         return () => { mountedRef.current = false; };
+    }, []);
+
+    // P3 (Review 3.b): per-item AbortController — remove/clear/unmount sırasında
+    // in-flight /api/import/classify fetch'leri iptal edilir. Aksi halde kullanıcı
+    // classifying durumundaki bir kartı kaldırsa bile route AI çalıştırır +
+    // import_documents row + storage file yaratır; UI'da artık dönüş yolu yok.
+    const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+    useEffect(() => {
+        const controllers = abortControllersRef.current;
+        return () => {
+            for (const ctl of controllers.values()) ctl.abort();
+            controllers.clear();
+        };
     }, []);
 
     // Queue sync — yeni File referanslarını queue'ya ekler. Side-effect (state
@@ -246,7 +265,12 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
         ));
 
         for (const c of candidates) {
-            uploadAndClassify(c.file).then(result => {
+            const ctl = new AbortController();
+            abortControllersRef.current.set(c.id, ctl);
+            uploadAndClassify(c.file, ctl.signal).then(result => {
+                abortControllersRef.current.delete(c.id);
+                // Abort edildiyse (remove/clear/unmount): UI'a yansıma yok
+                if (result.ok === false && result.aborted) return;
                 // mountedRef yalnız UNMOUNT'ta false olur — re-render/queue patch
                 // bu callback'i iptal etmez.
                 if (!mountedRef.current) return;
@@ -269,6 +293,9 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
     }, [queue, isDemo]);
 
     const retry = (id: string) => {
+        // Önceki başarısız fetch için kalmış olabilecek controller'ı temizle
+        // (zaten settle olmuştu ama defansif).
+        abortControllersRef.current.delete(id);
         setQueue(prev => prev.map(q => {
             if (q.id !== id) return q;
             return { ...q, status: "uploading", started: false, errorMessage: null };
@@ -276,6 +303,13 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
     };
 
     const remove = (id: string) => {
+        // P3 (Review 3.b): in-flight fetch'i iptal et — orphan import_documents
+        // row + storage file + AI cost önlenir; UI'da artık dönüş yolu yok.
+        const ctl = abortControllersRef.current.get(id);
+        if (ctl) {
+            ctl.abort();
+            abortControllersRef.current.delete(id);
+        }
         // P2 (Review 3): parent aiFiles state'inden de düş — aksi halde aynı File
         // referansı yeni dosya eklendiğinde useEffect'te yeniden "uploading" olarak
         // eklenir ve duplicate POST/AI tokens harcanır.
@@ -285,6 +319,10 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
     };
 
     const clearAll = () => {
+        // P3 (Review 3.b): tüm in-flight fetch'leri iptal et — `remove` ile aynı
+        // gerekçe; "Listeyi Temizle" bulk versiyonu.
+        for (const ctl of abortControllersRef.current.values()) ctl.abort();
+        abortControllersRef.current.clear();
         // P3-008: parent'a haber ver (files prop'unu boşaltır) AMA internal queue
         // de manuel temizlenir; aksi halde files=[] olmasına rağmen mevcut
         // queue item'ları useEffect dep array'inde tetiklenmediği için kalır.
