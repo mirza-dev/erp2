@@ -9,8 +9,13 @@ import type { Product } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 
 type TabKey = "genel" | "teknik" | "stok" | "tedarik" | "ticari" | "ekler" | "partiler";
+
+interface ProductTypeWithFields extends ProductTypeRow {
+    fields: ProductTypeFieldRow[];
+}
 
 interface AlertItem {
     id: string;
@@ -67,6 +72,8 @@ interface EditForm {
     minStockLevel: string;
     dailyUsage: string;
     reorderQty: string;
+    productTypeId: string;
+    attributes: Record<string, unknown>;
 }
 
 function buildEditForm(p: Product): EditForm {
@@ -96,7 +103,21 @@ function buildEditForm(p: Product): EditForm {
         minStockLevel: p.minStockLevel?.toString() ?? "0",
         dailyUsage: p.dailyUsage?.toString() ?? "",
         reorderQty: p.reorderQty?.toString() ?? "",
+        productTypeId: p.productTypeId ?? "",
+        attributes: { ...(p.attributes ?? {}) },
     };
+}
+
+// Pure helper — exported for testing.
+// Returns the set of attribute keys that will be lost if user switches from
+// `oldFields` to `newFields`. A key is "lost" if it's present in current
+// attributes and not in the new type's field schema.
+export function computeLostAttributeKeys(
+    currentAttributes: Record<string, unknown>,
+    newFields: ProductTypeFieldRow[],
+): string[] {
+    const newKeys = new Set(newFields.map(f => f.field_key));
+    return Object.keys(currentAttributes).filter(k => !newKeys.has(k));
 }
 
 const inputStyle: React.CSSProperties = {
@@ -143,6 +164,173 @@ const cardStyle: React.CSSProperties = {
     padding: "12px 14px",
 };
 
+// Format an attribute value for read-only display
+export function formatAttributeValue(field: ProductTypeFieldRow, value: unknown): string {
+    if (value === null || value === undefined || value === "") return "—";
+    if (field.field_type === "boolean") return value ? "Evet" : "Hayır";
+    if (field.field_type === "multiselect") {
+        const arr = Array.isArray(value) ? value : [];
+        if (arr.length === 0) return "—";
+        return arr.map(String).join(", ");
+    }
+    if (field.field_type === "number") {
+        const n = typeof value === "number" ? value : Number(value);
+        if (Number.isNaN(n)) return String(value);
+        const formatted = n.toLocaleString("tr-TR");
+        return field.unit ? `${formatted} ${field.unit}` : formatted;
+    }
+    return String(value);
+}
+
+function DynamicFieldEdit({
+    field,
+    value,
+    onChange,
+}: {
+    field: ProductTypeFieldRow;
+    value: unknown;
+    onChange: (v: unknown) => void;
+}) {
+    const label = `${field.label_tr}${field.required ? " *" : ""}`;
+    const ariaLabel = field.label_tr;
+    const help = field.help_text || field.placeholder || undefined;
+
+    if (field.field_type === "boolean") {
+        return (
+            <FieldEdit label={label}>
+                <input
+                    type="checkbox"
+                    checked={value === true}
+                    onChange={e => onChange(e.target.checked)}
+                    aria-label={ariaLabel}
+                    style={{ width: "16px", height: "16px", accentColor: "var(--accent)", cursor: "pointer" }}
+                />
+                {help && <span style={{ fontSize: "11px", color: "var(--text-tertiary)", marginLeft: "8px" }}>{help}</span>}
+            </FieldEdit>
+        );
+    }
+
+    if (field.field_type === "select") {
+        return (
+            <FieldEdit label={label}>
+                <select
+                    value={typeof value === "string" ? value : ""}
+                    onChange={e => onChange(e.target.value)}
+                    aria-label={ariaLabel}
+                    style={inputStyle}
+                >
+                    <option value="">— seçiniz —</option>
+                    {(field.options ?? []).map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                </select>
+            </FieldEdit>
+        );
+    }
+
+    if (field.field_type === "multiselect") {
+        const selected: string[] = Array.isArray(value) ? value.map(String) : [];
+        const toggle = (opt: string) => {
+            if (selected.includes(opt)) onChange(selected.filter(s => s !== opt));
+            else onChange([...selected, opt]);
+        };
+        return (
+            <FieldEdit label={label}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }} role="group" aria-label={ariaLabel}>
+                    {(field.options ?? []).map(opt => {
+                        const isOn = selected.includes(opt);
+                        return (
+                            <button
+                                key={opt}
+                                type="button"
+                                onClick={() => toggle(opt)}
+                                aria-pressed={isOn}
+                                style={{
+                                    fontSize: "11px",
+                                    padding: "3px 10px",
+                                    border: `0.5px solid ${isOn ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                    borderRadius: "12px",
+                                    background: isOn ? "var(--accent-bg)" : "transparent",
+                                    color: isOn ? "var(--accent-text)" : "var(--text-secondary)",
+                                    cursor: "pointer",
+                                    fontWeight: isOn ? 600 : 400,
+                                }}
+                            >
+                                {opt}
+                            </button>
+                        );
+                    })}
+                </div>
+            </FieldEdit>
+        );
+    }
+
+    if (field.field_type === "longtext") {
+        return (
+            <FieldEdit label={label}>
+                <textarea
+                    value={typeof value === "string" ? value : ""}
+                    onChange={e => onChange(e.target.value)}
+                    aria-label={ariaLabel}
+                    placeholder={field.placeholder ?? undefined}
+                    rows={3}
+                    style={{ ...inputStyle, fontFamily: "inherit", resize: "vertical" }}
+                />
+            </FieldEdit>
+        );
+    }
+
+    if (field.field_type === "number") {
+        return (
+            <FieldEdit label={label}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <input
+                        type="number"
+                        value={value == null || value === "" ? "" : String(value)}
+                        onChange={e => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+                        aria-label={ariaLabel}
+                        placeholder={field.placeholder ?? undefined}
+                        style={inputStyle}
+                    />
+                    {field.unit && (
+                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
+                            {field.unit}
+                        </span>
+                    )}
+                </div>
+            </FieldEdit>
+        );
+    }
+
+    if (field.field_type === "date") {
+        return (
+            <FieldEdit label={label}>
+                <input
+                    type="date"
+                    value={typeof value === "string" ? value : ""}
+                    onChange={e => onChange(e.target.value)}
+                    aria-label={ariaLabel}
+                    style={inputStyle}
+                />
+            </FieldEdit>
+        );
+    }
+
+    // Default: text
+    return (
+        <FieldEdit label={label}>
+            <input
+                type="text"
+                value={typeof value === "string" ? value : value == null ? "" : String(value)}
+                onChange={e => onChange(e.target.value)}
+                aria-label={ariaLabel}
+                placeholder={field.placeholder ?? undefined}
+                style={inputStyle}
+            />
+        </FieldEdit>
+    );
+}
+
 function FieldView({ label, value }: { label: string; value: string | number | null | undefined }) {
     const display = value === null || value === undefined || value === "" ? "—" : String(value);
     return (
@@ -187,6 +375,12 @@ export default function ProductDetailPage() {
     const [confirmDeactivate, setConfirmDeactivate] = useState(false);
     const [deactivating, setDeactivating] = useState(false);
 
+    // Product types (for type selector + dynamic Teknik tab)
+    const [productTypes, setProductTypes] = useState<ProductTypeRow[]>([]);
+    const [activeTypeFields, setActiveTypeFields] = useState<ProductTypeFieldRow[]>([]);
+    const [typeFieldsLoading, setTypeFieldsLoading] = useState(false);
+    const [pendingTypeChange, setPendingTypeChange] = useState<{ newTypeId: string; newFields: ProductTypeFieldRow[]; lostKeys: string[] } | null>(null);
+
     // Contextual sections
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
     const [commitments, setCommitments] = useState<CommitmentRow[]>([]);
@@ -221,6 +415,49 @@ export default function ProductDetailPage() {
     useEffect(() => {
         fetchProduct();
     }, [fetchProduct]);
+
+    // Load product types list once on mount
+    useEffect(() => {
+        let cancelled = false;
+        (async () => {
+            try {
+                const res = await fetch("/api/product-types");
+                if (!cancelled && res.ok) {
+                    const data = await res.json();
+                    if (Array.isArray(data)) setProductTypes(data);
+                }
+            } catch { /* graceful */ }
+        })();
+        return () => { cancelled = true; };
+    }, []);
+
+    // Load active type's fields whenever product.productTypeId (or edited type) changes
+    const activeTypeId: string | null =
+        editMode && editForm
+            ? (editForm.productTypeId || null)
+            : (product?.productTypeId ?? null);
+
+    useEffect(() => {
+        if (!activeTypeId) { setActiveTypeFields([]); return; }
+        let cancelled = false;
+        setTypeFieldsLoading(true);
+        (async () => {
+            try {
+                const res = await fetch(`/api/product-types/${activeTypeId}?withFields=1`);
+                if (!cancelled && res.ok) {
+                    const data: ProductTypeWithFields = await res.json();
+                    setActiveTypeFields(Array.isArray(data.fields) ? data.fields : []);
+                } else if (!cancelled) {
+                    setActiveTypeFields([]);
+                }
+            } catch {
+                if (!cancelled) setActiveTypeFields([]);
+            } finally {
+                if (!cancelled) setTypeFieldsLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [activeTypeId]);
 
     // Fetch contextual sections (alerts/commitments/quotes) once product is loaded
     useEffect(() => {
@@ -266,6 +503,64 @@ export default function ProductDetailPage() {
         return () => controller.abort();
     }, [product]);
 
+    // Handle type selection — if changing to a different type, check if any
+    // attribute keys would be lost. If so, open confirm modal; otherwise apply.
+    const handleTypeChange = async (newTypeId: string) => {
+        if (!editForm) return;
+        const currentTypeId = editForm.productTypeId;
+        if (newTypeId === currentTypeId) return;
+        // Clearing the type: keep attributes (admin may switch back), just nullify type
+        if (!newTypeId) {
+            setEditForm(f => f && ({ ...f, productTypeId: "" }));
+            return;
+        }
+        try {
+            const res = await fetch(`/api/product-types/${newTypeId}?withFields=1`);
+            if (!res.ok) {
+                toast({ type: "error", message: "Tip alanları yüklenemedi." });
+                return;
+            }
+            const data: ProductTypeWithFields = await res.json();
+            const newFields = Array.isArray(data.fields) ? data.fields : [];
+            const lostKeys = computeLostAttributeKeys(editForm.attributes ?? {}, newFields);
+            if (lostKeys.length === 0) {
+                setEditForm(f => f && ({ ...f, productTypeId: newTypeId }));
+            } else {
+                setPendingTypeChange({ newTypeId, newFields, lostKeys });
+            }
+        } catch {
+            toast({ type: "error", message: "Tip değişimi başarısız." });
+        }
+    };
+
+    const confirmTypeChange = () => {
+        if (!pendingTypeChange || !editForm) return;
+        const { newTypeId, newFields } = pendingTypeChange;
+        const newKeys = new Set(newFields.map(f => f.field_key));
+        const filtered: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(editForm.attributes ?? {})) {
+            if (newKeys.has(k)) filtered[k] = v;
+        }
+        setEditForm(f => f && ({ ...f, productTypeId: newTypeId, attributes: filtered }));
+        setPendingTypeChange(null);
+    };
+
+    const cancelTypeChange = () => setPendingTypeChange(null);
+
+    // Set a single attribute value (for Teknik tab)
+    const setAttribute = (key: string, value: unknown) => {
+        setEditForm(f => {
+            if (!f) return f;
+            const next = { ...(f.attributes ?? {}) };
+            if (value === "" || value === null || value === undefined) {
+                delete next[key];
+            } else {
+                next[key] = value;
+            }
+            return { ...f, attributes: next };
+        });
+    };
+
     const handleEditClick = () => {
         if (!product) return;
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -309,6 +604,8 @@ export default function ProductDetailPage() {
                 min_stock_level: editForm.minStockLevel !== "" ? Number(editForm.minStockLevel) : 0,
                 daily_usage: editForm.dailyUsage ? Number(editForm.dailyUsage) : null,
                 reorder_qty: editForm.reorderQty ? Number(editForm.reorderQty) : null,
+                product_type_id: editForm.productTypeId || null,
+                attributes: editForm.attributes ?? {},
             };
             const res = await fetch(`/api/products/${product.id}`, {
                 method: "PATCH",
@@ -371,7 +668,7 @@ export default function ProductDetailPage() {
 
     const tabs: { key: TabKey; label: string; locked: boolean; lockedNote?: string }[] = [
         { key: "genel", label: "Genel", locked: false },
-        { key: "teknik", label: "Teknik", locked: true, lockedNote: "Faz 2c'de gelecek" },
+        { key: "teknik", label: "Teknik", locked: false },
         { key: "stok", label: "Stok", locked: false },
         { key: "tedarik", label: "Tedarik", locked: false },
         { key: "ticari", label: "Ticari", locked: false },
@@ -572,6 +869,19 @@ export default function ProductDetailPage() {
                                         <option value="commercial">Ticari</option>
                                     </select>
                                 </FieldEdit>
+                                <FieldEdit label="Tip Şablonu">
+                                    <select
+                                        value={form.productTypeId}
+                                        onChange={e => handleTypeChange(e.target.value)}
+                                        style={inputStyle}
+                                        aria-label="Tip şablonu"
+                                    >
+                                        <option value="">— Tip seçili değil —</option>
+                                        {productTypes.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                </FieldEdit>
                                 <FieldEdit label="Kategori">
                                     <input value={form.category} onChange={e => setEditForm(f => f && ({ ...f, category: e.target.value }))} style={inputStyle} aria-label="Kategori" />
                                 </FieldEdit>
@@ -616,6 +926,7 @@ export default function ProductDetailPage() {
                             <>
                                 <FieldView label="Ürün Adı" value={product.name} />
                                 <FieldView label="Ürün Tipi" value={product.productType === "manufactured" ? "İmalat" : "Ticari"} />
+                                <FieldView label="Tip Şablonu" value={productTypes.find(t => t.id === product.productTypeId)?.name ?? null} />
                                 <FieldView label="Kategori" value={product.category} />
                                 <FieldView label="Alt Kategori" value={product.subCategory} />
                                 <FieldView label="Ürün Ailesi" value={product.productFamily} />
@@ -637,9 +948,43 @@ export default function ProductDetailPage() {
                 {activeTab === "teknik" && (
                     <div style={cardStyle}>
                         <div style={sectionTitleStyle}>Teknik Özellikler</div>
-                        <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                            🔒 Bu sekme Faz 2c&apos;de gelecek — dinamik tip alanları (vana, conta, flans, vb.) burada gösterilecek.
-                        </div>
+                        {!activeTypeId ? (
+                            <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                                Bu ürün için tip şablonu seçilmemiş. Genel sekmesinden bir tip seç ki tipin teknik alanları burada görünsün.
+                            </div>
+                        ) : typeFieldsLoading ? (
+                            <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                                Alanlar yükleniyor…
+                            </div>
+                        ) : activeTypeFields.length === 0 ? (
+                            <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                                Bu tip için tanımlı alan yok.{" "}
+                                <Link href={`/dashboard/settings/product-types/${activeTypeId}`} style={{ color: "var(--accent-text)" }}>
+                                    Tip ayarlarından alan ekle →
+                                </Link>
+                            </div>
+                        ) : editMode && form ? (
+                            <>
+                                {activeTypeFields.map(f => (
+                                    <DynamicFieldEdit
+                                        key={f.id}
+                                        field={f}
+                                        value={(form.attributes ?? {})[f.field_key]}
+                                        onChange={v => setAttribute(f.field_key, v)}
+                                    />
+                                ))}
+                            </>
+                        ) : (
+                            <>
+                                {activeTypeFields.map(f => (
+                                    <FieldView
+                                        key={f.id}
+                                        label={f.label_tr}
+                                        value={formatAttributeValue(f, (product.attributes ?? {})[f.field_key])}
+                                    />
+                                ))}
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -861,6 +1206,58 @@ export default function ProductDetailPage() {
                     </div>
                 )}
             </div>
+
+            {/* Type change confirm modal */}
+            {pendingTypeChange && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Tip değişimi onayı"
+                    style={{
+                        position: "fixed", inset: 0, zIndex: 300,
+                        background: "rgba(0,0,0,0.45)",
+                        display: "flex", alignItems: "center", justifyContent: "center", padding: "20px",
+                    }}
+                    onClick={cancelTypeChange}
+                >
+                    <div
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            background: "var(--bg-primary)",
+                            border: "0.5px solid var(--border-secondary)",
+                            borderRadius: "8px",
+                            padding: "20px",
+                            maxWidth: "440px",
+                            width: "100%",
+                        }}
+                    >
+                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
+                            Tip değiştiriliyor — bazı alanlar kaybolacak
+                        </div>
+                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "12px" }}>
+                            Yeni tipte bulunmayan {pendingTypeChange.lostKeys.length} alan değeri silinecek:
+                        </div>
+                        <div style={{
+                            fontSize: "12px",
+                            background: "var(--warning-bg)",
+                            border: "0.5px solid var(--warning-border)",
+                            borderRadius: "6px",
+                            padding: "8px 10px",
+                            marginBottom: "16px",
+                            color: "var(--warning-text)",
+                            fontFamily: "var(--font-mono)",
+                            maxHeight: "120px",
+                            overflowY: "auto",
+                        }}>
+                            {pendingTypeChange.lostKeys.join(", ")}
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+                            <Button variant="secondary" onClick={cancelTypeChange}>Vazgeç</Button>
+                            <Button variant="danger" onClick={confirmTypeChange}>Tipi Değiştir</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Deactivate confirm modal */}
             {confirmDeactivate && (

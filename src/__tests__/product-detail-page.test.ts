@@ -47,11 +47,12 @@ describe("Faz 2b — product detail page source", () => {
         }
     });
 
-    it("locks Teknik/Ekler/Partiler with Faz 2c/2d/2e placeholders", () => {
-        expect(SOURCE).toMatch(/Faz 2c&apos;de gelecek/);
+    it("locks Ekler/Partiler with Faz 2d/2e placeholders (Teknik unlocked in Faz 2c)", () => {
         expect(SOURCE).toMatch(/Faz 2d&apos;de gelecek/);
         expect(SOURCE).toMatch(/Faz 2e&apos;de gelecek/);
         expect(SOURCE).toMatch(/locked:\s*true/);
+        // Teknik tab is no longer locked — Faz 2c implemented dynamic field rendering
+        expect(SOURCE).not.toMatch(/key:\s*"teknik".*locked:\s*true/);
     });
 
     it("save handler PATCHes /api/products/[id]", () => {
