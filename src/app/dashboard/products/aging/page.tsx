@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { formatCurrency } from "@/lib/utils";
 import type { AgingCategory, AgingRow } from "@/lib/supabase/aging";
 
@@ -138,7 +139,7 @@ export default function AgingPage() {
                         Stokta bekleyen ürünler · bağlanan sermaye
                     </div>
                 </div>
-                <a
+                <Link
                     href="/dashboard/products"
                     style={{
                         fontSize: "12px", fontWeight: 500, padding: "6px 12px",
@@ -146,7 +147,7 @@ export default function AgingPage() {
                         background: "transparent", color: "var(--text-secondary)",
                         textDecoration: "none", cursor: "pointer",
                     }}
-                >← Ürünler</a>
+                >← Ürünler</Link>
             </div>
 
             {/* Report Type Tabs */}
