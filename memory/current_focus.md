@@ -7,6 +7,25 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-19
 
+**Faz 2d Review P3-007 — Demo guard davranış testleri (3119 test)**
+
+- **P3-007 KAPANDI** (middleware guard'ın gerçek koşumu): Mevcut source-regex testlerinin yanına 10 davranış testi eklendi — `@supabase/ssr` mock'lu, gerçek `middleware()` + `NextRequest` ile env true/false × demo cookie × auth user kombinasyonları:
+  - env=true + demo + GET attachments list → **401**
+  - env=true + demo + GET `/url` endpoint → **401**
+  - env=true + demo + GET `/attachments/{id}` PATCH path → **401** (regex subtree)
+  - env=true + demo + GET `/api/products` (unrelated) → **200** (scope sızıntısı yok)
+  - env=true + demo + GET `/api/orders` → **200** (sadece attachments)
+  - env=true + authenticated + GET attachments → **200** (auth wins, demo branch skip)
+  - env=true + authenticated + demo cookie + GET attachments → **200** (auth branch'ine düşmeden 401 dönmüyor)
+  - env UNSET + demo + GET attachments → **200** (default off)
+  - env="false" + demo + GET attachments → **200** (literal "true" karşılaştırması)
+  - env="1" + demo + GET attachments → **200** (sadece "true" literal'i tetikler)
+- 1 dosya · **3119 test yeşil** (+10 davranış) · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 2d Review 2. tur (3109 test, commit `6272759`)
+
 **Faz 2d Review 2. tur — 3 residual kapatıldı (3109 test)**
 
 - **P3-006 KAPANDI** (PDF/belge linki refresh): `<a href={doc.signedUrl}>` → `<button onClick={handleDownloadDocument(id)}>`. Handler `/url` endpoint'ten fresh URL alır + `openSignedUrlInNewTab` (window.open `noopener,noreferrer`) ile yeni sekmede açar; başarıdan sonra liste state'i de güncellenir (sonraki tıklama için cache). 1h TTL aşılsa da çalışır.

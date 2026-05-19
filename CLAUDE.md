@@ -3,7 +3,12 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 2d Review 2. tur — 3 residual kapatıldı (2026-05-19; 3109 test)
+**Son tamamlanan iş:** Faz 2d Review P3-007 — Demo guard davranış testleri (2026-05-19; 3119 test)
+
+- **P3-007 KAPANDI:** `vi.stubEnv` + `@supabase/ssr` mock + gerçek `middleware(NextRequest)` koşumu ile 10 davranış testi. env true/false × demo cookie × auth user matrisi: 401 trigger doğru path'lerde, scope sızıntısı yok, default off, authenticated kullanıcı etkilenmez, literal "true" comparison.
+- 1 dosya · **3119 test yeşil** (+10 davranış) · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 2d Review 2. tur — 3 residual kapatıldı (2026-05-19; 3109 test) · commit `6272759`
 
 - **P3-006:** PDF/belge linki click-time refresh → `handleDownloadDocument` + `openSignedUrlInNewTab` helper; 1h TTL aşılsa da çalışır.
 - **P3-005:** `ATTACHMENTS_BLOCK_DEMO_ANON` env flag — true ise middleware demo cookie + `/api/products/[id]/attachments**` 401. Default false (geriye uyumlu).
