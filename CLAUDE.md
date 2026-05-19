@@ -1,13 +1,22 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-19_
+_Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3a Review 3.b — In-flight fetch abort (P3) (2026-05-20; 3192 test)
+**Son tamamlanan iş:** Faz 3a Review 3.c — Server-side hard cancel (P3) + doc hijyen (2026-05-20)
 
-- **P3 (in-flight fetch abort):** `ClassifierQueue` fetch'e `AbortSignal` geçmiyordu → classifying durumundaki kart kaldırılsa bile request devam ediyor, AI çalışıyor, `import_documents` + storage file yazılıyordu (orphan + boşa cost). **Çözüm:** per-item `AbortController` Map (`abortControllersRef`); `remove`/`clearAll`/unmount cleanup `ctl.abort()`. `uploadAndClassify` `signal.aborted` ise `{aborted:true}` döner, effect handler erken return ile yutar (UI'a hata yansımaz).
-- **+2 test** (classifying sırasında remove → signal.aborted=true; clearAll → tüm signals abort)
-- 2 dosya · **3192 test yeşil** · TS clean · 0 lint warning · build OK
+- **P3 (server-side hard cancel):** Client `AbortController` (3.b) sadece best-effort idi — request route'a girdiyse AI çağrılır + token yakılır + DB/storage row yazılırdı. 3 katmanlı koruma eklendi:
+  1. `route.ts` pre-AI guard: `req.signal.aborted` → 499, AI hiç çağrılmaz.
+  2. `aiClassifyDocument(input, signal?)` → Anthropic SDK `client.messages.create(params, { signal })` (v0.80.0 RequestOptions); abort durumunda graceful fallback DEĞİL, AbortError re-throw.
+  3. `route.ts` post-AI guard: AI bitti ama client gittiyse 499, `dbCreateImportDocument` çağrılmaz → orphan row yok.
+- **HTTP 499** ("Client Closed Request") nginx convention; client zaten response'u dinlemiyor, sadece log/telemetry için.
+- **+7 test** (4 route: pre-AI/in-AI/post-AI/signal pass-through + 3 ai-service: SDK signal forward, AbortError re-throw, signal yok generic graceful korunur)
+- **CLAUDE.md tarih hijyeni:** `_Son güncelleme: 2026-05-19_` → `2026-05-20`.
+- 4 dosya · **3199 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3a Review 3.b — In-flight fetch abort (P3) (2026-05-20; 3192 test)
+
+- **P3 (in-flight fetch abort, client):** `ClassifierQueue` fetch'e `AbortSignal` geçmiyordu → classifying durumundaki kart kaldırılsa bile request devam ediyor, AI çalışıyor, `import_documents` + storage file yazılıyordu. **Çözüm (client kısmı):** per-item `AbortController` Map (`abortControllersRef`); `remove`/`clearAll`/unmount cleanup `ctl.abort()`. `uploadAndClassify` `signal.aborted` ise `{aborted:true}` döner, effect handler erken return ile yutar (UI'a hata yansımaz). Server tarafı 3.c'de tamamlandı.
 
 **Önceki:** Faz 3a Review 3. tur — Stale file re-fetch (P2) + plan dokümanı drift (P3) (2026-05-19; 3190 test) · commit `444dced`
 

@@ -1189,9 +1189,14 @@ ${typeList}
  * Advisory-only — domain-rules §11.1.
  * Multimodal classifier: PDF document block, image content block, Excel text block.
  * AI fail → graceful degrade ('unknown' result, never throws).
+ *
+ * `signal` (opsiyonel): Anthropic SDK'ya forward edilir → server-side hard
+ * cancel. Abort durumunda graceful fallback DEĞİL, AbortError re-throw — route
+ * orphan DB/storage row yazmamak için karar verir.
  */
 export async function aiClassifyDocument(
     input: ClassifyDocumentInput,
+    signal?: AbortSignal,
 ): Promise<DocumentClassification> {
     const fallback: DocumentClassification = {
         document_type: "unknown",
@@ -1215,13 +1220,16 @@ export async function aiClassifyDocument(
             { type: "text", text: `Dosya adı: ${sanitizeAiInput(input.fileName, 200)}` },
         ];
 
-        const message = await client.messages.create({
-            model: MODEL,
-            max_tokens: 512,
-            system: systemPrompt,
-            // SDK content types accept these block shapes
-            messages: [{ role: "user", content: userBlocks as unknown as Anthropic.MessageParam["content"] }],
-        });
+        const message = await client.messages.create(
+            {
+                model: MODEL,
+                max_tokens: 512,
+                system: systemPrompt,
+                // SDK content types accept these block shapes
+                messages: [{ role: "user", content: userBlocks as unknown as Anthropic.MessageParam["content"] }],
+            },
+            { signal },
+        );
 
         const text = message.content
             .filter(c => c.type === "text")
@@ -1241,6 +1249,11 @@ export async function aiClassifyDocument(
 
         return result;
     } catch (err) {
+        // P3 (Review 3.c): abort'u graceful fallback yutmaz — route'a delege
+        // edilir (DB write atlanır, orphan row önlenir).
+        if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
+            throw err;
+        }
         console.error("[AI Classify] graceful degradation:", err);
         return fallback;
     }

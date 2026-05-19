@@ -206,3 +206,86 @@ describe("POST /api/import/classify — happy path + Excel + graceful AI", () =>
         expect(res.status).toBe(500);
     });
 });
+
+// ── Faz 3a Review 3.c — Server-side hard cancel (P3) ─────────────────────────
+
+describe("POST /api/import/classify — abort signal (Review 3.c P3)", () => {
+    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+
+    it("aborts BEFORE AI call → 499, AI not called, DB not written", async () => {
+        const fd = new FormData();
+        fd.append("file", makeFile("a.pdf", "application/pdf", 100));
+
+        const ctl = new AbortController();
+        ctl.abort(); // pre-flight abort
+        const req = new NextRequest(new URL("http://localhost/api/import/classify"), {
+            method: "POST", body: fd, signal: ctl.signal,
+        });
+        const { POST } = await import("@/app/api/import/classify/route");
+        const res = await POST(req);
+        expect(res.status).toBe(499);
+        expect(mockClassify).not.toHaveBeenCalled();
+        expect(mockCreateDoc).not.toHaveBeenCalled();
+    });
+
+    it("aborts DURING AI (AbortError) → 499, DB not written", async () => {
+        mockClassify.mockImplementationOnce(async () => {
+            const err = new Error("Request was aborted");
+            (err as Error & { name: string }).name = "AbortError";
+            throw err;
+        });
+        const fd = new FormData();
+        fd.append("file", makeFile("a.pdf", "application/pdf", 100));
+        const ctl = new AbortController();
+        const req = new NextRequest(new URL("http://localhost/api/import/classify"), {
+            method: "POST", body: fd, signal: ctl.signal,
+        });
+        const { POST } = await import("@/app/api/import/classify/route");
+        const res = await POST(req);
+        expect(res.status).toBe(499);
+        expect(mockCreateDoc).not.toHaveBeenCalled();
+    });
+
+    it("aborts AFTER AI (post-write guard) → 499, DB not written", async () => {
+        const ctl = new AbortController();
+        mockClassify.mockImplementationOnce(async () => {
+            // Race: AI bitti, response yazmadan client gitti
+            ctl.abort();
+            return {
+                document_type: "product_catalog", confidence: 0.9, language: "tr",
+                summary: "x", suggested_product_type_id: null,
+            };
+        });
+        const fd = new FormData();
+        fd.append("file", makeFile("a.pdf", "application/pdf", 100));
+        const req = new NextRequest(new URL("http://localhost/api/import/classify"), {
+            method: "POST", body: fd, signal: ctl.signal,
+        });
+        const { POST } = await import("@/app/api/import/classify/route");
+        const res = await POST(req);
+        expect(res.status).toBe(499);
+        expect(mockClassify).toHaveBeenCalledTimes(1);
+        expect(mockCreateDoc).not.toHaveBeenCalled();
+    });
+
+    it("passes req.signal to aiClassifyDocument", async () => {
+        mockClassify.mockResolvedValueOnce({
+            document_type: "unknown", confidence: 0, language: "unknown",
+            summary: "x", suggested_product_type_id: null,
+        });
+        mockCreateDoc.mockResolvedValueOnce({ id: "doc-x" });
+        const fd = new FormData();
+        fd.append("file", makeFile("a.pdf", "application/pdf", 100));
+        const ctl = new AbortController();
+        const req = new NextRequest(new URL("http://localhost/api/import/classify"), {
+            method: "POST", body: fd, signal: ctl.signal,
+        });
+        const { POST } = await import("@/app/api/import/classify/route");
+        await POST(req);
+        expect(mockClassify).toHaveBeenCalledTimes(1);
+        const passedSignal = mockClassify.mock.calls[0]?.[1];
+        expect(passedSignal).toBeInstanceOf(AbortSignal);
+        // Not: NextRequest signal'i mirror'layabilir, referans eşitliği garanti
+        // değil; AbortSignal type'ı + downstream abort propagation yeterli kanıt.
+    });
+});

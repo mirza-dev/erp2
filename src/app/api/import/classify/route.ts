@@ -93,14 +93,35 @@ export async function POST(req: NextRequest) {
         // Load product types for AI context
         const productTypes = await dbListProductTypes().catch(() => []);
 
-        // Classify (graceful — never throws)
-        const classification = await aiClassifyDocument({
-            buffer,
-            mimeType: file.type,
-            fileName: file.name,
-            excelTextSample,
-            productTypes: productTypes.map(t => ({ id: t.id, name: t.name })),
-        });
+        // P3 (Review 3.c) — Pre-AI guard: client zaten gittiyse AI'yi hiç çağırma
+        if (req.signal.aborted) {
+            return new NextResponse(null, { status: 499 });
+        }
+
+        // Classify (graceful — never throws, EXCEPT for abort which re-throws)
+        let classification;
+        try {
+            classification = await aiClassifyDocument(
+                {
+                    buffer,
+                    mimeType: file.type,
+                    fileName: file.name,
+                    excelTextSample,
+                    productTypes: productTypes.map(t => ({ id: t.id, name: t.name })),
+                },
+                req.signal,
+            );
+        } catch (err) {
+            if (req.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+                return new NextResponse(null, { status: 499 });
+            }
+            throw err;
+        }
+
+        // P3 (Review 3.c) — Post-AI guard: AI bitti ama client gittiyse DB/storage'a yazma
+        if (req.signal.aborted) {
+            return new NextResponse(null, { status: 499 });
+        }
 
         // Resolve uploader (auth user — may be null in edge cases)
         const sb = await createClient();

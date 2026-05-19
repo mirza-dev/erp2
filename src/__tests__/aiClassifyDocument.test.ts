@@ -215,3 +215,59 @@ describe("aiClassifyDocument — validation + logging", () => {
         vi.unstubAllEnvs();
     });
 });
+
+// ── Faz 3a Review 3.c — Server-side hard cancel (P3) ─────────────────────────
+
+describe("aiClassifyDocument — abort signal forwarding (Review 3.c P3)", () => {
+    it("forwards signal to Anthropic SDK messages.create as RequestOptions.signal", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockResolvedValueOnce(aiResponse({
+            document_type: "unknown", confidence: 0, language: "unknown",
+            summary: "x", suggested_product_type_id: null,
+        }));
+        const { aiClassifyDocument } = await import("@/lib/services/ai-service");
+        const ctl = new AbortController();
+        await aiClassifyDocument({
+            buffer: Buffer.from("x"), mimeType: "application/pdf",
+            fileName: "x.pdf", productTypes,
+        }, ctl.signal);
+        // SDK call: (params, options); options.signal === ctl.signal
+        const opts = mockMessagesCreate.mock.calls[0]?.[1] as { signal?: AbortSignal };
+        expect(opts).toBeDefined();
+        expect(opts.signal).toBe(ctl.signal);
+        vi.unstubAllEnvs();
+    });
+
+    it("re-throws AbortError instead of graceful fallback (route delegates DB skip)", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockImplementationOnce(async () => {
+            const err = new Error("Request was aborted");
+            (err as Error & { name: string }).name = "AbortError";
+            throw err;
+        });
+        const { aiClassifyDocument } = await import("@/lib/services/ai-service");
+        const ctl = new AbortController();
+        ctl.abort();
+        await expect(
+            aiClassifyDocument({
+                buffer: Buffer.from("x"), mimeType: "application/pdf",
+                fileName: "x.pdf", productTypes,
+            }, ctl.signal),
+        ).rejects.toThrow(/abort/i);
+        vi.unstubAllEnvs();
+    });
+
+    it("without signal, abort path inert — graceful fallback for generic errors continues", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockRejectedValueOnce(new Error("network unreachable"));
+        const { aiClassifyDocument } = await import("@/lib/services/ai-service");
+        // signal yok → AbortError DEĞİL → eski graceful fallback davranışı korunur
+        const result = await aiClassifyDocument({
+            buffer: Buffer.from("x"), mimeType: "application/pdf",
+            fileName: "x.pdf", productTypes,
+        });
+        expect(result.document_type).toBe("unknown");
+        expect(result.confidence).toBe(0);
+        vi.unstubAllEnvs();
+    });
+});
