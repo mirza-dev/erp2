@@ -3,16 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-19_
 
-**Son tamamlanan iş:** Faz 1 Review — 3 bulgu kapatma (2026-05-19; 2873 test)
+**Son tamamlanan iş:** Faz 2b Review — 3 bulgu kapatma (2026-05-19; 2935 test) · commit `96d8371`
 
-**Faz 1 Review (5 dosya):**
-- **P2 KAPANDI — Field CRUD'da is_system kilidi düşürme** (`product-types.ts`): `dbAddProductTypeField`, `dbUpdateProductTypeField`, `dbDeleteProductTypeField` artık parent type'ı `id, is_system` ile fetch eder; field ekle/düzenle/sil işleminden sonra `parent.is_system === true` ise `product_types.is_system = false` UPDATE'i yapılır. Plan §UI kuralı (`MODUL_REVIZE_PLAN.md:226`) artık tüm field operasyonlarında geçerli — daha önce sadece header edit'te (`dbUpdateProductType`) düşüyordu. Audit log her birinde `before_state.is_system: true` + `after_state.is_system: false` kaydeder.
-- **P3 KAPANDI — Field PATCH/DELETE parent type scope** (`route.ts` + `product-types.ts`): Route artık `id` parametresini de destructure ediyor ve helper'a 3. argüman olarak (`expectedTypeId`) geçiyor. Helper'da: `dbUpdateProductTypeField(id, patch, expectedTypeId?)` + `dbDeleteProductTypeField(id, expectedTypeId?)` — `existing.product_type_id !== expectedTypeId` ise "Alan bu tipe ait değil" throw, route 404 mapping. Cross-tenant koruması: `/api/product-types/typeA/fields/fieldOfTypeB` artık 404 döner (önceden field başka tipe ait olsa bile update/delete ediyordu).
-- **P3 KAPANDI — `products.attributes` + `product_type_id` write yolu** (`products.ts`): `CreateProductInput`'a `product_type_id?: string | null` ve `attributes?: Record<string, unknown>` eklendi (JSDoc ile "Faz 1 review" işaretli). `dbCreateProduct` insert payload'ında bu iki alan `?? null` / `?? {}` defaultlarıyla yazılır. `dbUpdateProduct` `Partial<CreateProductInput>` kullandığı için patch yolu zaten kapsar — read tarafı `mapProduct` (Faz 1'de eklenmişti) çalışıyor. Plan §Kabul Kriterleri (`MODUL_REVIZE_PLAN.md:233`) "products attributes write/read" testi artık kilitli.
-- **+18 yeni test:** `product-types-helper.test.ts` (+6: P2 source-regex 3 + P3 cross-tenant 3), `product-types-route.test.ts` (+4: PATCH cross-tenant 2 + DELETE cross-tenant 2), `products-attributes-write-read.test.ts` (yeni dosya, 8: dbCreateProduct insert payload 2 + dbUpdateProduct patch 2 + mapProduct mapping 2 + source-regex 2).
-- 184 dosya · **2873 test yeşil** · TS clean · 0 lint warning · build OK
+- **P2-001 KAPANDI:** `GET /api/products/[id]` artık `dbGetQuotedQuantities` + `dbGetIncomingQuantities` ile zenginleştirilmiş `quoted/incoming/promisable/forecasted` dönüyor. Stok sekmesi kartları gerçek veriyi gösteriyor.
+- **P2-002 KAPANDI:** `handleSave` body'sinde clearable nullable string alanlar `|| null`, nullable number alanlar `? ... : null` olarak güncellendi — alan temizlenince DB güncelleniyor.
+- **P3-003 KAPANDI:** `product-detail-page.test.ts`'e +5 regresyon kilidi eklendi.
+- 190 dosya · **2935 test yeşil** · TS clean · 0 lint warning · build OK
 
-**Önceki:** Modül Revize Faz 1 — Dinamik Ürün Tipi Altyapısı (2026-05-19; 2855 test)
+**Önceki:** Faz 2b — Tam ekran ürün detay sayfası + drawer kaldırma (2026-05-19; 2930 test) · commit `9003044`
 
 **Modül Revize Faz 1 (14 dosya: 2 migration + 2 yeni helper/route paketi + admin paneli + 3 test):**
 - **Migration 056** (`supabase/migrations/056_product_types.sql`): `product_types` tablosu (id/name/description/icon/sort_order/is_system) + `product_type_fields` tablosu (id/product_type_id FK CASCADE/field_key regex CHECK/label_tr/label_en/field_type 7-enum CHECK/unit/options jsonb/required/placeholder/help_text/sort_order). RLS service_role + `updated_at` triggers. `products` ALTER: `product_type_id uuid FK ON DELETE SET NULL` (nullable, geriye uyumlu) + `attributes jsonb NOT NULL DEFAULT '{}'`. GIN index attributes üzerinde. Idempotent + ROLLBACK SQL bloğu.
