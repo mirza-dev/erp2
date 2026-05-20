@@ -38,9 +38,14 @@ export interface ExtractedRowInput {
 const AUTO_MATCH_THRESHOLD = 85;
 const REVIEW_THRESHOLD = 60;
 
-// Key attributes that boost confidence when matching (DN + class are
-// the strongest disambiguators for valves — PMT's primary product).
-const KEY_ATTR_KEYS = ["dn", "nominal_diameter", "pn_class", "pressure_class"];
+// Key attribute GROUPS — DN ve PN ayrı eksenler; her gruptan bir key
+// eşleşirse +20 puan. İki grup birden eşleşirse +40 (auto-link garantili
+// olabilsin diye). Eski "flat list +20 bir kez" semantiği plan'ın
+// "DN + sınıf + isim tam → auto" tarifini karşılamıyordu (Review 3b P2-B).
+export const KEY_ATTR_GROUPS: ReadonlyArray<{ name: string; keys: ReadonlyArray<string> }> = [
+    { name: "dn", keys: ["dn", "nominal_diameter"] },
+    { name: "pn", keys: ["pn_class", "pressure_class"] },
+];
 
 export function decideMatchAction(score: number): Exclude<ImportDocumentLineMatchAction, "reviewed"> {
     if (score >= AUTO_MATCH_THRESHOLD) return "matched";
@@ -97,7 +102,7 @@ export function scoreProductMatch(
     let score = 0;
     const reasons: string[] = [];
 
-    // SKU exact (case-insensitive)
+    // SKU exact (case-insensitive) — +40
     if (input.sku && product.sku) {
         if (product.sku.toLowerCase().trim() === input.sku.toLowerCase().trim()) {
             score += 40;
@@ -105,27 +110,31 @@ export function scoreProductMatch(
         }
     }
 
-    // Name similarity
+    // Name similarity — high +45 / partial +15 (Review 3b P2-B weight bump
+    // 30→45 so that SKU+name=85 reaches auto-link threshold for cert flow)
     if (input.name && product.name) {
         const sim = trigramSimilarity(input.name, product.name);
         if (sim >= 0.8) {
-            score += 30;
+            score += 45;
             reasons.push("name_high");
         } else if (sim >= 0.4) {
-            score += 10;
+            score += 15;
             reasons.push("name_partial");
         }
     }
 
-    // Key attributes match (boolean: any key matches → +20 once)
+    // Key attribute GROUPS — her grup'tan bir eşleşme +20 (max +40 toplam).
+    // Plan tarifi: "DN + sınıf + isim tam eşleşme → auto-link" → 45+20+20=85.
     if (input.attributes && product.attributes) {
-        for (const key of KEY_ATTR_KEYS) {
-            const inV = normalizeAttrValue(input.attributes[key]);
-            const prV = normalizeAttrValue(product.attributes[key]);
-            if (inV && prV && inV === prV) {
-                score += 20;
-                reasons.push("attr_match");
-                break;
+        for (const group of KEY_ATTR_GROUPS) {
+            for (const key of group.keys) {
+                const inV = normalizeAttrValue(input.attributes[key]);
+                const prV = normalizeAttrValue(product.attributes[key]);
+                if (inV && prV && inV === prV) {
+                    score += 20;
+                    reasons.push(`attr_${group.name}`);
+                    break; // bir grup içinde sadece bir key sayılır
+                }
             }
         }
     }
@@ -134,23 +143,33 @@ export function scoreProductMatch(
 }
 
 /**
- * Top-N candidate üretir. catalog'u in-memory tarar (cache 60s yapılabilir,
- * şimdilik her çağrıda fetch). 10k+ ürün için performans değerlendirmesi 3c'de.
+ * Aktif ürünleri in-memory matching için lite shape'e çevirir. Route bunu
+ * extraction loop ÖNCESİ bir kez çağırıp `productsCache` olarak matcher'a
+ * geçer → N satır × 1 fetch (eski: N fetch). Review 3b P2/P3-D fix.
  */
-export async function findProductMatchCandidates(
-    input: ExtractedRowInput,
-    limit = 3,
-): Promise<ImportDocumentLineCandidate[]> {
-    if (!input.name && !input.sku && !input.attributes) return [];
-
+export async function loadActiveMatchables(): Promise<MatchableProduct[]> {
     const allProducts: ProductRow[] = await dbListAllActiveProducts();
-    const matchables: MatchableProduct[] = allProducts.map(p => ({
+    return allProducts.map(p => ({
         id: p.id,
         sku: p.sku,
         name: p.name,
         attributes: (p.attributes ?? {}) as Record<string, unknown>,
     }));
+}
 
+/**
+ * Top-N candidate üretir. `productsCache` verilirse yeniden fetch etmez
+ * (extraction loop performansı için kritik). undefined ise mevcut davranış
+ * (her çağrıda fetch) — tek-satır kullanımlar için geriye uyumlu.
+ */
+export async function findProductMatchCandidates(
+    input: ExtractedRowInput,
+    limit = 3,
+    productsCache?: MatchableProduct[],
+): Promise<ImportDocumentLineCandidate[]> {
+    if (!input.name && !input.sku && !input.attributes) return [];
+
+    const matchables = productsCache ?? await loadActiveMatchables();
     return rankProductCandidates(matchables, input, limit);
 }
 

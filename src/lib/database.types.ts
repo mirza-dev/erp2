@@ -557,6 +557,7 @@ export interface ImportDocumentLineRow {
     document_id: string
     line_number: number
     extraction_type: ImportDocumentLineExtractionType
+    product_type_id: string | null
     extracted_name: string | null
     extracted_sku: string | null
     extracted_attributes: Record<string, unknown>

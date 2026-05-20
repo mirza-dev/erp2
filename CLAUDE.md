@@ -3,7 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3b — Type-aware Extractor + Matching (2026-05-20; 3305 test)
+**Son tamamlanan iş:** Faz 3b Review — 6 P2/P3 bulgu kapatma (2026-05-20; 3326 test)
+
+- **P2-A (product_type_id taşıma):** Migration 063 ekledi `import_document_lines.product_type_id uuid NULL FK product_types(id) ON DELETE SET NULL` + index. `ImportDocumentLineRow` + `CreateExtractedLineInput` + `ExtractedProductLine` interface'lerine alan eklendi; route extract'ta her satıra `productTypeContext?.id ?? bodyOverride ?? null` inject ediliyor. 3c apply'da "yeni ürün hangi tipte yaratılacak?" belirsizliği kalktı.
+- **P2-B (matcher formülü):** scoreProductMatch yeniden ağırlıklandırıldı — SKU+40 (aynı), name_high+45 (30→45), name_partial+15 (10→15), attr per-grup +20 (DN ve PN ayrı grup, max +40). KEY_ATTR_KEYS flat list → KEY_ATTR_GROUPS gruplu. Sonuç: SKU+name=85 matched (sertifika), name+DN+PN=85 matched (plan tarifi).
+- **P2-C (empty re-extract silent silme):** Route'ta `linesToCreate.length === 0 && existingLines > 0` → 422 + "AI hiçbir satır çıkaramadı, mevcut satırlar korundu". Cert flow'da `target_name=null && target_sku=null && confidence=0` → linesToCreate'e push'lama. UI 422'yi info toast ile handle eder.
+- **P2/P3-D (N full scan perf):** `loadActiveMatchables` yeni export; route extraction loop ÖNCESİ tek seferlik fetch + `findProductMatchCandidates`'a productsCache opsiyonel 3. arg. 100 satır × 1 fetch (eski 100 fetch).
+- **P2-E (bulk approve sessiz fail):** `Promise.all(fetch(...))` → her sonuçta `res.ok` kontrolü + okCount/failedCount toast'ları. 400/403/500 sessiz başarı olmaz.
+- **P3-F (PATCH validation):** UUID_RE check + `dbGetProductById` exists + is_active check + match_confidence 0-100 range. DB constraint 500 → 400 mapping.
+- **+21 yeni test (1 yeni dosya + 5 dosya genişletme):** migration-063 (5) + matcher (3 yeni weight + plan tarifi + sertifika) + extract-route (3 empty + 1 cache + 3 product_type_id) + line-patch (6 validation) + extract-route (cert empty guard 1)
+- 12 dosya · **3326 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3b — Type-aware Extractor + Matching (2026-05-20; 3305 test) · commit `492fc0b`
 
 - **Alt-faz şeması:** Faz 3a (classifier ✅) → 3b (extractor+matcher, BU) → 3c (review+apply) → 3d (klasik mod toggle cleanup).
 - **Backend:**

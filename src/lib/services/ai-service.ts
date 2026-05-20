@@ -1321,6 +1321,13 @@ export interface ExtractedProductLine {
     line: number;
     name: string | null;
     sku: string | null;
+    /**
+     * Faz 3b Review P2-A: yaratılacak ürünün tipi. Şu an tek tip context'i
+     * tüm doc için geçerli olduğundan AI item başına farklı tip dönmez —
+     * route productTypeContext.id'yi her item'a uniform inject eder.
+     * Gelecekte AI item başına farklı tip önerebilirse parse'a eklenir.
+     */
+    product_type_id: string | null;
     attributes: Record<string, unknown>;
     confidence: number;
 }
@@ -1418,7 +1425,8 @@ export function parseExtractionResponse(text: string, allowedFieldKeys: Set<stri
             }
             // Diğer (object/array) tipler reddedilir — şema basit tutuluyor
         }
-        out.push({ line, name, sku, attributes, confidence });
+        // product_type_id: route inject eder (P2-A) — parse stage'de null
+        out.push({ line, name, sku, product_type_id: null, attributes, confidence });
     }
     return { items: out };
 }

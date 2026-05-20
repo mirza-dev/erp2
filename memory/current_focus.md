@@ -7,6 +7,21 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-20
 
+**Faz 3b Review — 6 P2/P3 bulgu kapatma (3326 test)**
+
+- **P2-A** (product_type_id taşıma): Migration 063 + interface + helper + route inject → 3c "yeni ürün hangi tipte?" belirsizliği kalktı
+- **P2-B** (matcher formülü): SKU+40, name_high+45, attr per-grup +20 (KEY_ATTR_GROUPS); plan'ın "DN+sınıf+isim → auto" tarifi karşılandı (85 puan)
+- **P2-C** (empty re-extract silent silme): Route 422 guard + cert flow null-signal guard; UI info toast handler
+- **P2/P3-D** (N full scan perf): `loadActiveMatchables` cache + matcher `productsCache` param → N satır × 1 fetch
+- **P2-E** (bulk approve sessiz fail): `Promise.all` → res.ok kontrolü + okCount/failedCount toast
+- **P3-F** (PATCH validation): UUID_RE + dbGetProductById exists/active + confidence 0-100 range
+- **+21 test** (5 yeni dosya yok ama 1 yeni: migration-063, kalan 5 dosya genişletme)
+- 12 dosya · **3326 test yeşil** · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 3b (3305 test)
+
 **Faz 3b — Type-aware Extractor + Matching (3305 test)**
 
 - **Backend:** Migration 062 (`import_document_lines` + pg_trgm indexes products(name, sku)). Helper (`dbCreateExtractedLines`, `dbListLinesByDocument`, `dbReplaceLinesForDocument`, `dbUpdateLineMatch`). Matcher (`scoreProductMatch` SKU+40/name+30/attr+20/partial+10; `decideMatchAction` 85/60 thresholds; trigramSimilarity Jaccard). 2 yeni AI fn: `aiExtractProductsFromDocument` (productType context, multimodal, JSON array, hard cancel) + `aiExtractCertificateTarget` (single target). AiFeature +2 entries.

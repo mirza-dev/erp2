@@ -99,6 +99,12 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             });
+            // Review 3b P2-C: 422 → AI hiç çıkaramadı, eski satırlar korundu
+            if (res.status === 422) {
+                const err = await res.json().catch(() => ({}));
+                toast({ type: "info", message: err.error ?? "AI hiçbir satır çıkaramadı." });
+                return;
+            }
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
                 toast({ type: "error", message: err.error ?? "Ekstraksiyon başarısız" });
@@ -164,19 +170,32 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             toast({ type: "info", message: "Onaylanacak satır yok" });
             return;
         }
-        Promise.all(pending.map(l => fetch(`/api/import/document-lines/${l.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                match_action: "reviewed",
-                matched_product_id: l.matched_product_id,
-                match_confidence: l.match_confidence,
-            }),
-        }))).then(() => {
-            router.refresh();
-            toast({ type: "success", message: `${pending.length} satır onaylandı` });
-        }).catch(e => {
-            toast({ type: "error", message: e instanceof Error ? e.message : "Toplu onay hatası" });
+        // Review 3b P2-E: res.ok kontrolü — 400/403/500 sessiz başarı olmasın
+        Promise.all(pending.map(async l => {
+            try {
+                const res = await fetch(`/api/import/document-lines/${l.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        match_action: "reviewed",
+                        matched_product_id: l.matched_product_id,
+                        match_confidence: l.match_confidence,
+                    }),
+                });
+                return { ok: res.ok };
+            } catch {
+                return { ok: false };
+            }
+        })).then(results => {
+            const okCount = results.filter(r => r.ok).length;
+            const failedCount = results.length - okCount;
+            if (okCount > 0) {
+                router.refresh();
+                toast({ type: "success", message: `${okCount} satır onaylandı` });
+            }
+            if (failedCount > 0) {
+                toast({ type: "error", message: `${failedCount} satır onaylanamadı` });
+            }
         });
     }
 

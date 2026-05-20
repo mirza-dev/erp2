@@ -22,12 +22,18 @@ import { dbGetImportDocument } from "@/lib/supabase/import-documents";
 import {
     dbReplaceLinesForDocument,
     type CreateExtractedLineInput,
+    dbListLinesByDocument,
 } from "@/lib/supabase/import-document-lines";
 import {
     aiExtractProductsFromDocument,
     aiExtractCertificateTarget,
 } from "@/lib/services/ai-service";
-import { findProductMatchCandidates, decideMatchAction } from "@/lib/services/product-matcher";
+import {
+    findProductMatchCandidates,
+    decideMatchAction,
+    loadActiveMatchables,
+    type MatchableProduct,
+} from "@/lib/services/product-matcher";
 import { dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
 import { requireRole } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
@@ -127,7 +133,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
         if (req.signal.aborted) return new NextResponse(null, { status: 499 });
 
+        // Review 3b P2/P3-D: matching loop ÖNCESİ tek seferlik fetch.
+        // N satır × N fetch → N satır × 1 fetch.
+        const productsCache: MatchableProduct[] = await loadActiveMatchables();
+
         const linesToCreate: CreateExtractedLineInput[] = [];
+        let injectedProductTypeId: string | null = null;
 
         if (isProductFlow) {
             // Product type context — body override → classification suggestion → null (free-form)
@@ -135,6 +146,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             const productTypeContext = productTypeId
                 ? await dbGetProductTypeWithFields(productTypeId).catch(() => null)
                 : null;
+            // Review 3b P2-A: product_type_id satıra persist edilir; 3c apply
+            // bunu kullanarak yeni ürün yaratırken doğru tipi atayabilir.
+            injectedProductTypeId = productTypeContext?.id ?? null;
 
             let result;
             try {
@@ -168,13 +182,13 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                 throw err;
             }
 
-            // Her item için top-3 match
+            // Her item için top-3 match (productsCache reuse)
             for (const item of result.items) {
                 const candidates = await findProductMatchCandidates({
                     name: item.name,
                     sku: item.sku,
                     attributes: item.attributes,
-                }, 3);
+                }, 3, productsCache);
                 const top = candidates[0] ?? null;
                 const initialAction: ImportDocumentLineMatchAction = top
                     ? decideMatchAction(top.score)
@@ -182,6 +196,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                 linesToCreate.push({
                     line_number: item.line,
                     extraction_type: "product",
+                    product_type_id: injectedProductTypeId,
                     extracted_name: item.name,
                     extracted_sku: item.sku,
                     extracted_attributes: item.attributes,
@@ -210,25 +225,45 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                 throw err;
             }
 
-            const candidates: ImportDocumentLineCandidate[] = await findProductMatchCandidates({
-                name: target.target_name,
-                sku: target.target_sku,
-            }, 3);
-            const top = candidates[0] ?? null;
-            const initialAction: ImportDocumentLineMatchAction = top
-                ? decideMatchAction(top.score)
-                : "new_product";
-            linesToCreate.push({
-                line_number: 1,
-                extraction_type: "certificate_target",
-                extracted_name: target.target_name,
-                extracted_sku: target.target_sku,
-                extracted_attributes: {},
-                candidate_matches: candidates,
-                matched_product_id: initialAction === "matched" ? top!.id : null,
-                match_confidence: top?.score ?? null,
-                match_action: initialAction,
-            });
+            // Review 3b P2-C: cert AI hiçbir ipucu çıkaramadıysa (name+sku null
+            // ve confidence 0) satır yaratma — re-extract sessizce silme
+            // tehlikesini önlemek için 422 guard'a düşer.
+            const hasCertSignal = target.target_name !== null || target.target_sku !== null || target.confidence > 0;
+            if (hasCertSignal) {
+                const candidates: ImportDocumentLineCandidate[] = await findProductMatchCandidates({
+                    name: target.target_name,
+                    sku: target.target_sku,
+                }, 3, productsCache);
+                const top = candidates[0] ?? null;
+                const initialAction: ImportDocumentLineMatchAction = top
+                    ? decideMatchAction(top.score)
+                    : "new_product";
+                linesToCreate.push({
+                    line_number: 1,
+                    extraction_type: "certificate_target",
+                    product_type_id: null, // sertifika hedef ürün üzerinden 3c'de belirlenir
+                    extracted_name: target.target_name,
+                    extracted_sku: target.target_sku,
+                    extracted_attributes: {},
+                    candidate_matches: candidates,
+                    matched_product_id: initialAction === "matched" ? top!.id : null,
+                    match_confidence: top?.score ?? null,
+                    match_action: initialAction,
+                });
+            }
+        }
+
+        // Review 3b P2-C: AI boş döndüyse ve mevcut satırlar varsa
+        // re-extract eski satırları silmesin → 422.
+        if (linesToCreate.length === 0) {
+            const existing = await dbListLinesByDocument(id);
+            if (existing.length > 0) {
+                return NextResponse.json(
+                    { error: "AI hiçbir satır çıkaramadı. Mevcut satırlar korundu." },
+                    { status: 422 },
+                );
+            }
+            // İlk extraction + boş — normal akış (boş array yazılır)
         }
 
         // Pre-write hard cancel

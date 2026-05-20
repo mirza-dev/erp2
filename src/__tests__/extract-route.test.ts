@@ -11,6 +11,8 @@ const mockExtractProducts = vi.fn();
 const mockExtractCert = vi.fn();
 const mockFindCandidates = vi.fn();
 const mockStorageDownload = vi.fn();
+const mockLoadActiveMatchables = vi.fn();
+const mockListLines = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
@@ -22,6 +24,7 @@ vi.mock("@/lib/supabase/import-documents", () => ({
 
 vi.mock("@/lib/supabase/import-document-lines", () => ({
     dbReplaceLinesForDocument: (...a: unknown[]) => mockReplaceLines(...a),
+    dbListLinesByDocument: (...a: unknown[]) => mockListLines(...a),
 }));
 
 vi.mock("@/lib/services/ai-service", () => ({
@@ -34,6 +37,7 @@ vi.mock("@/lib/services/product-matcher", async () => {
     return {
         ...actual,
         findProductMatchCandidates: (...a: unknown[]) => mockFindCandidates(...a),
+        loadActiveMatchables: (...a: unknown[]) => mockLoadActiveMatchables(...a),
     };
 });
 
@@ -72,10 +76,14 @@ beforeEach(() => {
     mockExtractCert.mockReset();
     mockFindCandidates.mockReset();
     mockStorageDownload.mockReset();
+    mockLoadActiveMatchables.mockReset();
+    mockListLines.mockReset();
     mockStorageDownload.mockResolvedValue({
         data: { arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer },
         error: null,
     });
+    mockLoadActiveMatchables.mockResolvedValue([]);
+    mockListLines.mockResolvedValue([]);
 });
 
 function makeReq(id: string, body?: Record<string, unknown>): NextRequest {
@@ -238,5 +246,114 @@ describe("POST /api/import/documents/[id]/extract — error paths", () => {
         mockExtractProducts.mockRejectedValueOnce(new Error("network exploded"));
         const res = await callPOST(makeReq("doc-1"), "doc-1");
         expect(res.status).toBe(500);
+    });
+});
+
+// ── Review 3b P2/P3 — empty re-extract guard + cache + product_type_id ──
+
+describe("POST extract — Review 3b P2-C (empty re-extract)", () => {
+    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+
+    it("AI items=[] + existing lines>0 → 422, replace not called", async () => {
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockExtractProducts.mockResolvedValueOnce({ items: [] });
+        mockListLines.mockResolvedValueOnce([{ id: "l-old", line_number: 1 }]);
+        const res = await callPOST(makeReq("doc-1"), "doc-1");
+        expect(res.status).toBe(422);
+        expect(mockReplaceLines).not.toHaveBeenCalled();
+    });
+
+    it("AI items=[] + no existing lines → 201 (boş kayıt yazılır, ilk extraction)", async () => {
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockExtractProducts.mockResolvedValueOnce({ items: [] });
+        mockListLines.mockResolvedValueOnce([]);
+        mockReplaceLines.mockResolvedValueOnce([]);
+        const res = await callPOST(makeReq("doc-1"), "doc-1");
+        expect(res.status).toBe(201);
+        expect(mockReplaceLines).toHaveBeenCalled();
+    });
+
+    it("cert AI tüm null + existing>0 → 422, replace not called", async () => {
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            classification: { ...PROD_DOC.classification, document_type: "material_certificate" },
+        });
+        mockExtractCert.mockResolvedValueOnce({ target_name: null, target_sku: null, confidence: 0 });
+        mockListLines.mockResolvedValueOnce([{ id: "l-old", line_number: 1 }]);
+        const res = await callPOST(makeReq("doc-1"), "doc-1");
+        expect(res.status).toBe(422);
+        expect(mockReplaceLines).not.toHaveBeenCalled();
+    });
+});
+
+describe("POST extract — Review 3b P2/P3-D (productsCache)", () => {
+    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+
+    it("loadActiveMatchables tek kez çağrılır + matcher cache ile çağrılır (N=3 satır → 1 fetch)", async () => {
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockExtractProducts.mockResolvedValueOnce({
+            items: [
+                { line: 1, name: "A", sku: "SKU-A", attributes: {}, confidence: 0.9, product_type_id: null },
+                { line: 2, name: "B", sku: "SKU-B", attributes: {}, confidence: 0.9, product_type_id: null },
+                { line: 3, name: "C", sku: "SKU-C", attributes: {}, confidence: 0.9, product_type_id: null },
+            ],
+        });
+        mockFindCandidates.mockResolvedValue([]);
+        mockReplaceLines.mockResolvedValueOnce([]);
+
+        await callPOST(makeReq("doc-1"), "doc-1");
+        expect(mockLoadActiveMatchables).toHaveBeenCalledTimes(1);
+        // findProductMatchCandidates her item için çağrılır AMA productsCache ile
+        expect(mockFindCandidates).toHaveBeenCalledTimes(3);
+        // 3. argüman cache (boş array stub) olmalı
+        expect(mockFindCandidates.mock.calls[0]?.[2]).toEqual([]);
+    });
+});
+
+describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
+    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+
+    it("body productTypeId override → linesToCreate her satırda product_type_id set", async () => {
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockExtractProducts.mockResolvedValueOnce({
+            items: [{ line: 1, name: "X", sku: "X", attributes: {}, confidence: 0.5, product_type_id: null }],
+        });
+        mockGetProductType.mockResolvedValueOnce({ id: "type-x", name: "Conta", fields: [] });
+        mockFindCandidates.mockResolvedValueOnce([]);
+        mockReplaceLines.mockResolvedValueOnce([]);
+
+        await callPOST(makeReq("doc-1", { productTypeId: "type-x" }), "doc-1");
+        const lines = mockReplaceLines.mock.calls[0]?.[1] as Array<{ product_type_id: string | null }>;
+        expect(lines[0].product_type_id).toBe("type-x");
+    });
+
+    it("body override yok + classification suggested null → product_type_id null", async () => {
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            classification: { ...PROD_DOC.classification, suggested_product_type_id: null },
+        });
+        mockExtractProducts.mockResolvedValueOnce({
+            items: [{ line: 1, name: "X", sku: "X", attributes: {}, confidence: 0.5, product_type_id: null }],
+        });
+        mockFindCandidates.mockResolvedValueOnce([]);
+        mockReplaceLines.mockResolvedValueOnce([]);
+
+        await callPOST(makeReq("doc-1"), "doc-1");
+        const lines = mockReplaceLines.mock.calls[0]?.[1] as Array<{ product_type_id: string | null }>;
+        expect(lines[0].product_type_id).toBeNull();
+    });
+
+    it("cert flow product_type_id null (sertifika 3c'de hedef üzerinden belirlenir)", async () => {
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            classification: { ...PROD_DOC.classification, document_type: "material_certificate" },
+        });
+        mockExtractCert.mockResolvedValueOnce({ target_name: "Vana", target_sku: null, confidence: 0.7 });
+        mockFindCandidates.mockResolvedValueOnce([]);
+        mockReplaceLines.mockResolvedValueOnce([]);
+
+        await callPOST(makeReq("doc-1"), "doc-1");
+        const lines = mockReplaceLines.mock.calls[0]?.[1] as Array<{ product_type_id: string | null }>;
+        expect(lines[0].product_type_id).toBeNull();
     });
 });

@@ -45,33 +45,58 @@ describe("scoreProductMatch", () => {
         expect(score).toBe(40);
     });
 
-    it("high-sim name → +30", () => {
+    it("high-sim name → +45 (Review 3b weight bump)", () => {
         const { score, reasons } = scoreProductMatch(PROD, { name: "Vana DN100 PN16" });
-        expect(score).toBe(30);
+        expect(score).toBe(45);
         expect(reasons).toContain("name_high");
     });
 
-    it("partial name (similarity 0.4-0.8) → +10", () => {
+    it("partial name (similarity 0.4-0.8) → +15 (Review 3b weight bump)", () => {
         // "Vana DN100" vs "Vana DN100 PN16" trigram ~0.61 → partial range
         const { score, reasons } = scoreProductMatch(PROD, { name: "Vana DN100" });
         expect(reasons).toContain("name_partial");
-        expect(score).toBe(10);
+        expect(score).toBe(15);
     });
 
-    it("attribute (dn + class) match → +20", () => {
+    it("DN grup match → +20 (per-group, attr_dn reason)", () => {
         const { score, reasons } = scoreProductMatch(PROD, { attributes: { dn: 100 } });
         expect(score).toBe(20);
-        expect(reasons).toContain("attr_match");
+        expect(reasons).toContain("attr_dn");
     });
 
-    it("SKU + name + attr → max 100 clamped", () => {
+    it("DN + PN gruplarının ikisi de match → +40 (per-group sum)", () => {
+        const { score, reasons } = scoreProductMatch(PROD, { attributes: { dn: 100, pn_class: "PN16" } });
+        expect(score).toBe(40);
+        expect(reasons).toContain("attr_dn");
+        expect(reasons).toContain("attr_pn");
+    });
+
+    it("name + DN + PN (plan tarifi: SKU yok) → 85 auto-match", () => {
+        // 45 (name_high) + 20 (dn) + 20 (pn) = 85 → matched threshold
+        const { score } = scoreProductMatch(PROD, {
+            name: "Vana DN100 PN16",
+            attributes: { dn: 100, pn_class: "PN16" },
+        });
+        expect(score).toBe(85);
+    });
+
+    it("SKU + name (sertifika senaryosu) → 85 auto-match", () => {
+        // 40 (sku) + 45 (name_high) = 85 → matched (eski sürümde 70 idi)
+        const { score } = scoreProductMatch(PROD, {
+            sku: "KV-DB-DN100",
+            name: "Vana DN100 PN16",
+        });
+        expect(score).toBe(85);
+    });
+
+    it("SKU + name + 1 attr → clamp 100", () => {
         const { score } = scoreProductMatch(PROD, {
             sku: "KV-DB-DN100",
             name: "Vana DN100 PN16",
             attributes: { dn: 100 },
         });
-        // 40 + 30 + 20 = 90
-        expect(score).toBe(90);
+        // 40 + 45 + 20 = 105 → clamp 100
+        expect(score).toBe(100);
     });
 
     it("no match at all → 0", () => {

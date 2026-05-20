@@ -19,6 +19,7 @@ import type {
 export interface CreateExtractedLineInput {
     line_number: number;
     extraction_type: ImportDocumentLineExtractionType;
+    product_type_id?: string | null;
     extracted_name?: string | null;
     extracted_sku?: string | null;
     extracted_attributes?: Record<string, unknown>;
@@ -54,6 +55,7 @@ export async function dbCreateExtractedLines(
         document_id: documentId,
         line_number: l.line_number,
         extraction_type: l.extraction_type,
+        product_type_id: l.product_type_id ?? null,
         extracted_name: l.extracted_name ?? null,
         extracted_sku: l.extracted_sku ?? null,
         extracted_attributes: l.extracted_attributes ?? {},
