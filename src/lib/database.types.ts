@@ -45,7 +45,7 @@ export type AuditSource = "ui" | "system" | "ai" | "integration"
 export type RecommendationType = "purchase_suggestion" | "stock_risk" | "order_risk"
 export type RecommendationStatus = "suggested" | "accepted" | "edited" | "rejected" | "expired"
 export type FeedbackType = "accepted" | "edited" | "rejected" | "note"
-export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "import_classify" | "ops_summary" | "purchase_enrich" | "production_voice"
+export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "import_classify" | "import_extract_products" | "import_extract_certificate" | "ops_summary" | "purchase_enrich" | "production_voice"
 export type PurchaseCommitmentStatus = "pending" | "received" | "cancelled"
 export type PurchaseOrderStatus = "draft" | "sent" | "confirmed" | "partially_received" | "received" | "cancelled"
 export type ParasutStep = "contact" | "product" | "shipment" | "invoice" | "edoc" | "done"
@@ -539,6 +539,34 @@ export interface ImportDocumentRow {
     classified_at: string | null
     created_by: string | null
     created_at: string
+}
+
+export type ImportDocumentLineExtractionType = "product" | "certificate_target"
+export type ImportDocumentLineMatchAction = "pending" | "matched" | "new_product" | "skipped" | "reviewed"
+
+export interface ImportDocumentLineCandidate {
+    id: string
+    sku: string
+    name: string
+    score: number
+    reasons: string[]
+}
+
+export interface ImportDocumentLineRow {
+    id: string
+    document_id: string
+    line_number: number
+    extraction_type: ImportDocumentLineExtractionType
+    extracted_name: string | null
+    extracted_sku: string | null
+    extracted_attributes: Record<string, unknown>
+    candidate_matches: ImportDocumentLineCandidate[]
+    matched_product_id: string | null
+    match_confidence: number | null
+    match_action: ImportDocumentLineMatchAction
+    extracted_at: string
+    reviewed_at: string | null
+    reviewed_by: string | null
 }
 
 export interface ImportDraftRow {

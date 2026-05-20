@@ -11,10 +11,29 @@
  * documentTypeLabel, documentTypeIcon, confidenceColor, chunkBy.
  */
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type { DocumentType, DocumentClassification, ImportDocumentRow } from "@/lib/database.types";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import Button from "@/components/ui/Button";
 import { formatBytes, validateClassifyUpload } from "@/components/import/DropZone";
+
+// Faz 3b — hangi document_type'lar için "İncele" CTA enable olur.
+// Pure helper export (test edilebilir).
+const EXTRACTION_SUPPORTED_TYPES: ReadonlySet<DocumentType> = new Set([
+    "product_catalog",
+    "product_datasheet",
+    "material_certificate",
+    "compliance_doc",
+    "test_report",
+]);
+
+export function isExtractionSupportedType(t: DocumentType): boolean {
+    return EXTRACTION_SUPPORTED_TYPES.has(t);
+}
+
+export function isMigrationExcelType(t: DocumentType): boolean {
+    return t === "migration_excel";
+}
 
 // ── Pure helpers (exported for tests) ────────────────────────────────────────
 
@@ -425,13 +444,35 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
                                         Yeniden dene
                                     </Button>
                                 )}
-                                {q.status === "classified" && (
-                                    <Button
-                                        variant="primary"
-                                        disabled
-                                        title="3b'de aktive olacak — type-aware extraction"
+                                {q.status === "classified" && c && q.documentId && isExtractionSupportedType(c.document_type) && (
+                                    <Link
+                                        href={`/dashboard/import/extract/${q.documentId}`}
+                                        style={{
+                                            fontSize: "12px", padding: "6px 12px",
+                                            background: "var(--accent-bg)", color: "var(--accent-text)",
+                                            border: "0.5px solid var(--accent-border)", borderRadius: "5px",
+                                            fontWeight: 600, textDecoration: "none", cursor: "pointer",
+                                        }}
                                     >
-                                        Devam Et
+                                        İncele →
+                                    </Link>
+                                )}
+                                {q.status === "classified" && c && isMigrationExcelType(c.document_type) && (
+                                    <span style={{
+                                        fontSize: "11px", padding: "4px 10px",
+                                        background: "var(--warning-bg)", color: "var(--warning-text)",
+                                        border: "0.5px solid var(--warning-border)", borderRadius: "5px",
+                                    }}>
+                                        Klasik Mod&apos;a geçin
+                                    </span>
+                                )}
+                                {q.status === "classified" && c && !isExtractionSupportedType(c.document_type) && !isMigrationExcelType(c.document_type) && (
+                                    <Button
+                                        variant="secondary"
+                                        disabled
+                                        title="Bu belge tipi için ekstraksiyon kapsam dışı"
+                                    >
+                                        Kapsam dışı
                                     </Button>
                                 )}
                                 <button

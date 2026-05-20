@@ -5,7 +5,7 @@
 import { createHash } from "crypto";
 import { createServiceClient } from "@/lib/supabase/service";
 
-export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "import_classify" | "ops_summary" | "purchase_enrich" | "production_voice";
+export type AiFeature = "order_score" | "stock_risk" | "import_parse" | "import_classify" | "import_extract_products" | "import_extract_certificate" | "ops_summary" | "purchase_enrich" | "production_voice";
 
 export interface LogAiRunParams {
     feature: AiFeature;

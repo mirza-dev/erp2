@@ -1314,3 +1314,273 @@ export function parseClassifierResponse(
 
     return { document_type, confidence, language, summary, suggested_product_type_id };
 }
+
+// ── Faz 3b — Type-aware extraction ────────────────────────────────────────────
+
+export interface ExtractedProductLine {
+    line: number;
+    name: string | null;
+    sku: string | null;
+    attributes: Record<string, unknown>;
+    confidence: number;
+}
+
+export interface ExtractProductsInput {
+    buffer: Buffer;
+    mimeType: string;
+    fileName: string;
+    excelTextSample?: string;
+    productTypeContext: {
+        id: string;
+        name: string;
+        fields: Array<{
+            field_key: string;
+            label_tr: string;
+            field_type: string;
+            unit: string | null;
+            options: string[] | null;
+        }>;
+    } | null;
+    multiRow: boolean; // catalog=true, datasheet=false
+}
+
+export interface ExtractProductsResult {
+    items: ExtractedProductLine[];
+}
+
+function buildExtractionSystemPrompt(input: ExtractProductsInput): string {
+    const ctx = input.productTypeContext;
+    const fieldsBlock = ctx?.fields?.length
+        ? ctx.fields.map(f => {
+            const opts = f.options?.length ? ` [seçenekler: ${f.options.slice(0, 12).join(", ")}]` : "";
+            const unit = f.unit ? ` (${f.unit})` : "";
+            return `- ${f.field_key} (${f.field_type}${unit}): ${f.label_tr}${opts}`;
+        }).join("\n")
+        : "(ürün tipi belirsiz; sadece name + sku çıkar)";
+
+    const cardinality = input.multiRow
+        ? "Belge bir KATALOG; her benzersiz ürün satırını ayrı item olarak çıkar."
+        : "Belge tek bir ürünün VERİ SAYFASI; yalnız bir item üret (line=1).";
+
+    return `Sen bir endüstriyel vana/fitting kataloğunu analiz eden ekstraksiyon asistanısın.
+${cardinality}
+
+Ürün tipi: ${ctx?.name ?? "belirsiz"}
+Tipe ait alanlar:
+${fieldsBlock}
+
+Kurallar:
+- Her item için name (Türkçe normalize) ve sku (varsa) çıkar.
+- attributes objesinde yalnız yukarıdaki field_key'leri kullan; sayısal değerleri number tipinde, select'leri tam liste değerinde yaz.
+- Bilmediğin alanı boş bırak (null veya hiç ekleme).
+- confidence: 0.0-1.0 float — emin değilsen düşük tut.
+- Çıkarımı normalize et: TR/EN karışık ise ortak token'a indirge ("Valve DN50 PN16" → name "Vana DN50 PN16").
+
+Çıktı YALNIZCA aşağıdaki JSON formatında olmalı (başka metin yok):
+{
+  "items": [
+    { "line": 1, "name": "...", "sku": "...", "attributes": { "field_key": value, ... }, "confidence": 0.92 }
+  ]
+}`;
+}
+
+export function parseExtractionResponse(text: string, allowedFieldKeys: Set<string>): ExtractProductsResult {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { items: [] };
+
+    let raw: { items?: unknown };
+    try {
+        raw = JSON.parse(jsonMatch[0]) as { items?: unknown };
+    } catch {
+        return { items: [] };
+    }
+
+    if (!Array.isArray(raw.items)) return { items: [] };
+
+    const out: ExtractedProductLine[] = [];
+    for (const item of raw.items) {
+        if (!item || typeof item !== "object") continue;
+        const it = item as Record<string, unknown>;
+        const line = typeof it.line === "number" && it.line > 0 ? Math.floor(it.line) : out.length + 1;
+        const name = typeof it.name === "string" ? sanitizeAiOutput(it.name, 300) : null;
+        const sku = typeof it.sku === "string" ? sanitizeAiOutput(it.sku, 100) : null;
+        const confidence = clampConfidence(typeof it.confidence === "number" ? it.confidence : 0);
+
+        const rawAttrs = (it.attributes && typeof it.attributes === "object") ? it.attributes as Record<string, unknown> : {};
+        const attributes: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(rawAttrs)) {
+            if (allowedFieldKeys.size > 0 && !allowedFieldKeys.has(k)) continue;
+            // Basic sanitize: string'leri kırp, primitive'leri olduğu gibi al
+            if (typeof v === "string") {
+                attributes[k] = sanitizeAiOutput(v, 300);
+            } else if (typeof v === "number" || typeof v === "boolean" || v === null) {
+                attributes[k] = v;
+            }
+            // Diğer (object/array) tipler reddedilir — şema basit tutuluyor
+        }
+        out.push({ line, name, sku, attributes, confidence });
+    }
+    return { items: out };
+}
+
+/**
+ * Multi-row catalog veya single-row datasheet'ten ürün satırları çıkarır.
+ * `signal` hard cancel için: abort'ta AbortError re-throw (graceful fallback DEĞİL).
+ */
+export async function aiExtractProductsFromDocument(
+    input: ExtractProductsInput,
+    signal?: AbortSignal,
+): Promise<ExtractProductsResult> {
+    if (!isAIAvailable()) {
+        return { items: [] };
+    }
+
+    const t0 = Date.now();
+    try {
+        const contentBlock = pickContentBlockForMime(input.mimeType, input.buffer, input.excelTextSample);
+        const systemPrompt = buildExtractionSystemPrompt(input);
+
+        const userBlocks: ClassifierContentBlock[] = [
+            contentBlock,
+            { type: "text", text: `Dosya adı: ${sanitizeAiInput(input.fileName, 200)}` },
+        ];
+
+        const message = await client.messages.create(
+            {
+                model: MODEL,
+                max_tokens: 4096, // catalog 50-100 satır için yeterli
+                system: systemPrompt,
+                messages: [{ role: "user", content: userBlocks as unknown as Anthropic.MessageParam["content"] }],
+            },
+            { signal },
+        );
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const allowedFieldKeys = new Set(input.productTypeContext?.fields.map(f => f.field_key) ?? []);
+        const result = parseExtractionResponse(text, allowedFieldKeys);
+
+        const avgConf = result.items.length > 0
+            ? result.items.reduce((s, it) => s + it.confidence, 0) / result.items.length
+            : 0;
+
+        void logAiRun({
+            feature: "import_extract_products",
+            entity_id: null,
+            input_hash: hashInput(`${input.mimeType}:${input.fileName}:${input.buffer.length}:${input.productTypeContext?.id ?? "none"}`),
+            confidence: avgConf,
+            latency_ms: Date.now() - t0,
+            model: MODEL,
+        });
+
+        return result;
+    } catch (err) {
+        if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
+            throw err;
+        }
+        console.error("[AI Extract Products] graceful degradation:", err);
+        return { items: [] };
+    }
+}
+
+export interface ExtractCertificateInput {
+    buffer: Buffer;
+    mimeType: string;
+    fileName: string;
+    excelTextSample?: string;
+}
+
+export interface ExtractedCertificateTarget {
+    target_name: string | null;
+    target_sku: string | null;
+    confidence: number;
+}
+
+const CERT_SYSTEM_PROMPT = `Sen bir endüstriyel sertifika/uygunluk belgesi okuyup, belgenin atfedildiği ürünün ad ve SKU'sunu çıkaran asistansın.
+
+Kurallar:
+- Belgenin başlığı, "Product Name", "Tag No", "PO No", "Material Cert No" gibi alanları tara.
+- target_name: ürün adı (TR/EN normalize).
+- target_sku: ürün SKU/kodu (varsa).
+- Emin değilsen confidence düşük tut.
+
+Çıktı YALNIZCA aşağıdaki JSON formatında olmalı:
+{
+  "target_name": "...",
+  "target_sku": "...",
+  "confidence": 0.85
+}`;
+
+export function parseCertificateTargetResponse(text: string): ExtractedCertificateTarget {
+    const fallback: ExtractedCertificateTarget = { target_name: null, target_sku: null, confidence: 0 };
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return fallback;
+
+    let raw: Record<string, unknown> = {};
+    try {
+        raw = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    } catch {
+        return fallback;
+    }
+
+    const name = typeof raw.target_name === "string" ? sanitizeAiOutput(raw.target_name, 300) : null;
+    const sku = typeof raw.target_sku === "string" ? sanitizeAiOutput(raw.target_sku, 100) : null;
+    const conf = clampConfidence(typeof raw.confidence === "number" ? raw.confidence : 0);
+
+    return { target_name: name || null, target_sku: sku || null, confidence: conf };
+}
+
+export async function aiExtractCertificateTarget(
+    input: ExtractCertificateInput,
+    signal?: AbortSignal,
+): Promise<ExtractedCertificateTarget> {
+    if (!isAIAvailable()) {
+        return { target_name: null, target_sku: null, confidence: 0 };
+    }
+
+    const t0 = Date.now();
+    try {
+        const contentBlock = pickContentBlockForMime(input.mimeType, input.buffer, input.excelTextSample);
+        const userBlocks: ClassifierContentBlock[] = [
+            contentBlock,
+            { type: "text", text: `Dosya adı: ${sanitizeAiInput(input.fileName, 200)}` },
+        ];
+
+        const message = await client.messages.create(
+            {
+                model: MODEL,
+                max_tokens: 512,
+                system: CERT_SYSTEM_PROMPT,
+                messages: [{ role: "user", content: userBlocks as unknown as Anthropic.MessageParam["content"] }],
+            },
+            { signal },
+        );
+
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+
+        const result = parseCertificateTargetResponse(text);
+
+        void logAiRun({
+            feature: "import_extract_certificate",
+            entity_id: null,
+            input_hash: hashInput(`${input.mimeType}:${input.fileName}:${input.buffer.length}`),
+            confidence: result.confidence,
+            latency_ms: Date.now() - t0,
+            model: MODEL,
+        });
+
+        return result;
+    } catch (err) {
+        if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
+            throw err;
+        }
+        console.error("[AI Extract Certificate] graceful degradation:", err);
+        return { target_name: null, target_sku: null, confidence: 0 };
+    }
+}

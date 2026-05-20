@@ -3,7 +3,29 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3a Review 3.e — Commit-point semantik netleştirme (2026-05-20; 3200 test)
+**Son tamamlanan iş:** Faz 3b — Type-aware Extractor + Matching (2026-05-20; 3305 test)
+
+- **Alt-faz şeması:** Faz 3a (classifier ✅) → 3b (extractor+matcher, BU) → 3c (review+apply) → 3d (klasik mod toggle cleanup).
+- **Backend:**
+  - Migration 062: `import_document_lines` (id, document_id FK CASCADE, line_number UNIQUE per doc, extraction_type CHECK, extracted_name/sku/attributes JSONB, candidate_matches JSONB, matched_product_id FK SET NULL, match_confidence 0-100, match_action CHECK 5-state, extracted_at/reviewed_at/reviewed_by) + pg_trgm GIN indexes products(name, sku) WHERE is_active.
+  - Helper `src/lib/supabase/import-document-lines.ts`: dbCreateExtractedLines (bulk) + dbListLinesByDocument + dbGetLine + dbUpdateLineMatch (auto reviewed_at) + dbReplaceLinesForDocument + isValidMatchAction guard.
+  - Matcher `src/lib/services/product-matcher.ts`: scoreProductMatch (SKU+40 / name_high+30 / attr_match+20 / name_partial+10, max 100) + rankProductCandidates (top-3) + decideMatchAction (≥85 matched / 60-84 pending / <60 new_product) + pure trigramSimilarity (Jaccard).
+  - AI service +2 fonksiyon: `aiExtractProductsFromDocument` (multi-row catalog veya single datasheet, productType context'li system prompt + multimodal + JSON array parse + clamp + sanitize + AbortSignal forward + AbortError re-throw) + `aiExtractCertificateTarget` (single target). `parseExtractionResponse` + `parseCertificateTargetResponse` pure helper exports.
+  - **AiFeature** union'a 2 yeni feature: `import_extract_products` + `import_extract_certificate` (database.types + ai-runs sync).
+  - 3 yeni API route:
+    - `POST /api/import/documents/[id]/extract` (requireRole admin|purchaser, doc_type routing: catalog/datasheet → product flow; certificate/compliance/test_report → cert flow; migration_excel → 400 Klasik Mod; diğer → 400 unsupported; storage download + re-extract + 4 katman hard cancel guard 499)
+    - `GET /api/import/documents/[id]/lines` (auth required)
+    - `PATCH /api/import/document-lines/[id]` (review override: matched/skipped/new_product/reviewed; matched zorunlu product_id; reviewed_by audit)
+- **Frontend:**
+  - `ClassifierQueue` "Devam Et" disabled → "İncele →" Link (extraction supported doc_type'larda) + "Klasik Mod'a geçin" CTA (migration_excel) + "Kapsam dışı" disabled (msds/vendor_profile/product_photo/unknown). Yeni pure helpers: isExtractionSupportedType, isMigrationExcelType.
+  - Yeni route `/dashboard/import/extract/[documentId]` (RSC): paralel fetch doc + lines + productTypes → `ExtractionReview`.
+  - `ExtractionReview` (client): doc header + product type override select + "Çıkar/Yeniden Çıkar" CTA + lines tablosu (# | name+sku | candidate dropdown | skor | durum badge | yeni/atla aksiyonu) + bulk "Eşleşmeleri Onayla" + Apply placeholder (3c). 3 pure helper exports: formatMatchAction, getMatchActionColor, pickSuggestedAction.
+- **Demo + a11y:** tüm POST/PATCH demo guard'lı, aria-label tüm interaktif alanlarda, role/alert error banner.
+- **AI cost:** catalog ~$0.03-0.05/extract, cert ~$0.01/extract → 100 doc/ay ~$5-10.
+- **+105 yeni test (9 dosya):** migration (12) + helper (16) + matcher (18) + aiExtractProducts (16) + aiExtractCertificate (8) + extract-route (11) + lines-route (4) + line-patch (7) + helpers (13)
+- 19 dosya · **3305 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3a Review 3.e — Commit-point semantik netleştirme (2026-05-20; 3200 test)
 
 - **P3 (commit point):** Hard cancel garantisi `dbCreateImportDocument` çağrısına KADAR geçerli. Helper başladıktan sonra 3-step orphan-safe transaction (INSERT pending → upload → UPDATE classified) kendi try/catch'i ile tamamlanır veya rollback eder; signal helper'a yayılmaz. Helper sonrası nadir orphan ihtimali 3c'deki 30-gün storage cron cleanup'ına bırakılmıştır.
 - **Karar gerekçesi:** Helper'a signal yaymak ~5-10 satır + 2-3 test gerektirir ama storage cleanup async olduğu için race penceresini sıfırlamaz, sadece daraltır. Commit point semantiği daha temiz ve test yüzeyi küçük.

@@ -7,6 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-20
 
+**Faz 3b — Type-aware Extractor + Matching (3305 test)**
+
+- **Backend:** Migration 062 (`import_document_lines` + pg_trgm indexes products(name, sku)). Helper (`dbCreateExtractedLines`, `dbListLinesByDocument`, `dbReplaceLinesForDocument`, `dbUpdateLineMatch`). Matcher (`scoreProductMatch` SKU+40/name+30/attr+20/partial+10; `decideMatchAction` 85/60 thresholds; trigramSimilarity Jaccard). 2 yeni AI fn: `aiExtractProductsFromDocument` (productType context, multimodal, JSON array, hard cancel) + `aiExtractCertificateTarget` (single target). AiFeature +2 entries.
+- **Routes:** POST extract (doc_type routing catalog/datasheet/cert/compliance/test_report; migration_excel→400 Klasik Mod; storage download + 4 katman 499 hard cancel), GET lines, PATCH line-match (reviewed_by audit).
+- **Frontend:** ClassifierQueue "İncele →" Link (extraction supported) + "Klasik Mod'a geçin" CTA + "Kapsam dışı" disabled. Yeni route `/dashboard/import/extract/[documentId]` (RSC + ExtractionReview client component: tablo + candidate dropdown + bulk approve + Apply 3c placeholder).
+- **+105 test (9 dosya):** migration (12) + helper (16) + matcher (18) + AI products (16) + AI cert (8) + extract route (11) + lines route (4) + line patch (7) + UI helpers (13).
+- 19 dosya · **3305 test yeşil** · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 3c — Review screen + apply pipeline (matched → product update; new_product → product create; cert → product_attachments + superseded_by versiyonlama). Sonra Faz 3d (klasik mod toggle cleanup).
+
+---
+
+## Önceki — Faz 3a Review 3.e (3200 test)
+
 **Faz 3a Review 3.e — Commit-point semantik netleştirme (3200 test)**
 
 - **P3 KAPANDI** (commit point): Hard cancel garantisi `dbCreateImportDocument` çağrısına KADAR. Helper başladıktan sonra 3-step orphan-safe transaction (INSERT pending → upload → UPDATE classified) kendi try/catch'i ile tamamlanır; signal helper'a yayılmaz. Nadir orphan 3c'deki 30-gün cron'a bırakıldı.
