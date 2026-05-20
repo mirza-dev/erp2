@@ -142,6 +142,40 @@ describe("ExtractionReview — bulk approve (Review 3b 4.tur P3)", () => {
         expect(calls.some(c => c.type === "error" && /1 satır onaylanamadı/.test(c.message))).toBe(true);
     });
 
+    // Review 3b 5.tur P2: cert-flow productTypeId bypass
+    it("cert-flow + suggested_product_type_id set → filter dropdown gizli + body'de productTypeId yok", async () => {
+        const fetchSpy = vi.fn(async () => new Response(JSON.stringify({ ok: true, lines: [] }), { status: 201 }));
+        vi.stubGlobal("fetch", fetchSpy);
+
+        const certDoc: ImportDocumentRow = {
+            ...DOC,
+            classification: {
+                document_type: "material_certificate",
+                confidence: 0.9,
+                language: "tr",
+                summary: "sertifika",
+                suggested_product_type_id: "type-stale-or-deleted",
+            },
+        };
+        const productTypes = [{ id: "type-vana", name: "Vana" }];
+
+        render(<ExtractionReview document={certDoc} initialLines={[]} productTypes={productTypes} />);
+
+        // Filter dropdown render edilmemeli
+        expect(screen.queryByLabelText(/Ürün tipi filtresi/)).toBeNull();
+
+        // "Çıkar" tıkla
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /^Çıkar$/ }));
+        });
+
+        await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+        const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+        const body = JSON.parse((init.body as string) || "{}");
+        // Cert-flow'da productTypeId gönderilmemeli (suggested set olsa bile)
+        expect(body.productTypeId).toBeUndefined();
+    });
+
     it("matched satır yoksa info toast + PATCH atmaz", async () => {
         const fetchSpy = vi.fn();
         vi.stubGlobal("fetch", fetchSpy);

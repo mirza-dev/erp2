@@ -3,7 +3,15 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3b Review 4.tur — 2 takip bulgu kapatma (2026-05-20; 3348 test)
+**Son tamamlanan iş:** Faz 3b Review 5.tur — cert-flow productTypeId validation bypass (2026-05-20; 3350 test)
+
+- **P2 (cert-flow yanlış 400):** 4.tur'da eklenen early `bodyProductTypeId` validation `isProductFlow` ayrımı yapmıyordu. Sertifika belgesinde UI `doc.classification.suggested_product_type_id`'yi default'a aktarıyor, body'ye `productTypeId` ekliyor, classifier'ın önerdiği tip silinmişse route 400 dönüp cert extraction hiç çalışmıyordu. Halbuki cert-flow `product_type_id` kullanmıyor (hedef ürün matched üzerinden 3c'de belirlenir).
+- **Backend:** Validation koşulu `bodyProductTypeId && isProductFlow` oldu — cert-flow'da silently ignore.
+- **Frontend (ExtractionReview):** Yeni helper `isCertFlowDocumentType(t)` + `isCertFlow` bayrağı. Cert-flow'da: (a) filter `<select>` render edilmez, (b) `overrideTypeId` init "" (suggested aktarılmaz), (c) handleExtract body'ye `productTypeId` eklenmez (defansif).
+- **+2 test:** extract-route (cert-flow + invalid bodyProductTypeId → 201 + mockGetProductType not called) + RTL (cert-flow render → filter yok + fetch body.productTypeId undefined)
+- 4 dosya · **3350 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3b Review 4.tur — 2 takip bulgu kapatma (2026-05-20; 3348 test)
 
 - **P3 (early validation):** Invalid/stale `bodyProductTypeId` artık storage download + `loadActiveMatchables` ÖNCESİNDE doğrulanır. `dbGetProductTypeWithFields` erken çağrıldı; sonuç null ise 400 (kullanıcı bilinçli girdisi → fail-closed). Başarılı çağrıda `resolvedBodyType` reuse — gereksiz 2. fetch yok. Önceki davranış: doc + storage + cache yüklenip sonra 400'e düşülüyordu (gereksiz I/O).
 - **P3 (bulk approve interaction test):** `handleApproveAll` optimistic state davranışı şimdiye dek sadece helper testleriyle kanıtlıydı. Yeni `extraction-review-interaction.test.tsx` (jsdom + RTL): (1) tüm matched satırlar başarılı PATCH → tümü "Onaylandı" badge'e geçer + 1 `router.refresh()`; (2) karışık başarı/hata → 1 reviewed + 1 matched, ayrı toast'lar; (3) matched satır yoksa info toast + fetch atmaz. Stale UI regression artık unit-test seviyesinde kilitli.

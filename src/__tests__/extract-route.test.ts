@@ -352,6 +352,30 @@ describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
         expect(mockReplaceLines).not.toHaveBeenCalled();
     });
 
+    // Review 3b 5.tur P2: cert-flow productTypeId validation bypass
+    it("cert-flow + invalid bodyProductTypeId → 201 (validation atlanır, cert extraction çalışır)", async () => {
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            classification: { ...PROD_DOC.classification, document_type: "material_certificate" },
+        });
+        // Cert-flow'da bu çağrılmamalı; ama mock'lansa bile etkilemez
+        mockExtractCert.mockResolvedValueOnce({
+            target_name: "Vana DN50", target_sku: "KV-50", confidence: 0.8,
+        });
+        mockFindCandidates.mockResolvedValueOnce([]);
+        mockReplaceLines.mockResolvedValueOnce([{ id: "l-1", line_number: 1 }]);
+
+        const res = await callPOST(
+            makeReq("doc-1", { productTypeId: "type-deleted-but-cert-doesnt-care" }),
+            "doc-1",
+        );
+        expect(res.status).toBe(201);
+        // dbGetProductTypeWithFields cert-flow'da hiç çağrılmamalı (validation atlandı)
+        expect(mockGetProductType).not.toHaveBeenCalled();
+        expect(mockExtractCert).toHaveBeenCalledTimes(1);
+        expect(mockReplaceLines).toHaveBeenCalledTimes(1);
+    });
+
     it("AI null döndü → satır product_type_id null (free-form fallback)", async () => {
         // Multi-type mode: classification suggestion route'a girmez; AI tüm tipler context'inde seçim yapar.
         // AI hiçbir tipe uydurmayıp null bıraktıysa satır null kalır (kullanıcı UI'dan override eder).

@@ -7,6 +7,16 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-20
 
+**Faz 3b Review 5.tur — cert-flow productTypeId validation bypass (3350 test)**
+
+- **P2:** 4.tur early validation cert-flow'u da etkiliyordu — stale suggested_product_type_id ile sertifika 400 alıyordu. Validation `bodyProductTypeId && isProductFlow` koşuluna alındı. UI'da cert-flow'da filter `<select>` gizlendi + `overrideTypeId` init boş + handleExtract body'ye productTypeId eklemiyor.
+- **+2 test:** extract-route (cert-flow invalid id → 201, mockGetProductType not called) + RTL (cert-flow render → filter yok + body productTypeId undefined)
+- 4 dosya · **3350 test yeşil** · TS clean · 0 lint · build OK
+
+---
+
+## Önceki — Faz 3b Review 4.tur (3348 test)
+
 **Faz 3b Review 4.tur — Early validation + bulk approve RTL test (3348 test)**
 
 - **P3 (early validation):** Invalid `bodyProductTypeId` storage download + `loadActiveMatchables` öncesinde 400 döner. Gereksiz I/O atlanır. `resolvedBodyType` reuse → ek fetch yok.

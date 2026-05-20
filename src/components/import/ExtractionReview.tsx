@@ -88,14 +88,30 @@ export interface ExtractionReviewProps {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
+// Review 3b 5.tur P2: sertifika/uygunluk/test_report doc'larında product_type_id
+// kullanılmaz — tip filter UI gizlenir ve body'ye productTypeId eklenmez.
+const CERT_FLOW_TYPES: ReadonlySet<string> = new Set([
+    "material_certificate", "compliance_doc", "test_report",
+]);
+
+export function isCertFlowDocumentType(t: string | null | undefined): boolean {
+    return typeof t === "string" && CERT_FLOW_TYPES.has(t);
+}
+
 export default function ExtractionReview({ document: doc, initialLines, productTypes }: ExtractionReviewProps) {
     const isDemo = useIsDemo();
     const { toast } = useToast();
     const router = useRouter();
 
+    const isCertFlow = isCertFlowDocumentType(doc.classification?.document_type ?? null);
+
     const [lines, setLines] = useState<ImportDocumentLineRow[]>(initialLines);
     const [extracting, setExtracting] = useState(false);
-    const [overrideTypeId, setOverrideTypeId] = useState<string>(doc.classification?.suggested_product_type_id ?? "");
+    // Cert-flow'da suggested_product_type_id default'a aktarılmaz (anlamsız);
+    // product-flow'da AI'nın önerdiği tipi başlangıç olarak gösterir.
+    const [overrideTypeId, setOverrideTypeId] = useState<string>(
+        isCertFlow ? "" : (doc.classification?.suggested_product_type_id ?? ""),
+    );
 
     async function handleExtract() {
         if (isDemo) {
@@ -105,7 +121,9 @@ export default function ExtractionReview({ document: doc, initialLines, productT
         setExtracting(true);
         try {
             const body: Record<string, unknown> = {};
-            if (overrideTypeId) body.productTypeId = overrideTypeId;
+            // Cert-flow'da productTypeId body'ye eklenmez (route zaten ignore
+            // ediyor ama defansif olarak burada da temiz tutulur).
+            if (overrideTypeId && !isCertFlow) body.productTypeId = overrideTypeId;
             const res = await fetch(`/api/import/documents/${doc.id}/extract`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -277,20 +295,23 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                     {/* Multi-type filter — default "AI otomatik": tüm tipler context'e
                         geçirilir, AI her satırın tipini kendi seçer (PMT multi-type).
-                        "Sadece X" seçilirse availableProductTypes tek tipe filtre olur. */}
-                    <select
-                        value={overrideTypeId}
-                        onChange={e => setOverrideTypeId(e.target.value)}
-                        aria-label="Ürün tipi filtresi"
-                        style={{
-                            padding: "6px 10px", fontSize: "12px",
-                            background: "var(--bg-secondary)", color: "var(--text-primary)",
-                            border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
-                        }}
-                    >
-                        <option value="">— Otomatik (AI seçer) —</option>
-                        {productTypes.map(t => <option key={t.id} value={t.id}>Sadece {t.name}</option>)}
-                    </select>
+                        "Sadece X" seçilirse availableProductTypes tek tipe filtre olur.
+                        Cert-flow'da gizlenir — sertifika product_type_id kullanmıyor. */}
+                    {!isCertFlow && (
+                        <select
+                            value={overrideTypeId}
+                            onChange={e => setOverrideTypeId(e.target.value)}
+                            aria-label="Ürün tipi filtresi"
+                            style={{
+                                padding: "6px 10px", fontSize: "12px",
+                                background: "var(--bg-secondary)", color: "var(--text-primary)",
+                                border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
+                            }}
+                        >
+                            <option value="">— Otomatik (AI seçer) —</option>
+                            {productTypes.map(t => <option key={t.id} value={t.id}>Sadece {t.name}</option>)}
+                        </select>
+                    )}
                     <Button
                         variant="primary"
                         onClick={handleExtract}

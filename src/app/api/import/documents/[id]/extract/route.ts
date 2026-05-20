@@ -122,8 +122,14 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         // Review 3b 4.tur P3: Body productTypeId early validation — kullanıcının
         // bilinçli girdisi storage download + matcher cache yüklemeden ÖNCE
         // doğrulanır. Stale/tampered id için gereksiz I/O atlanır.
+        //
+        // Review 3b 5.tur P2: Validation SADECE product-flow için anlamlı —
+        // sertifika/uygunluk/test_report flow'u product_type_id kullanmıyor
+        // (hedef ürün matched üzerinden 3c'de belirlenir). UI bug'ı veya stale
+        // classification suggestion cert-flow'u kırmasın → cert-flow'da
+        // bodyProductTypeId silently ignored.
         let resolvedBodyType: Awaited<ReturnType<typeof dbGetProductTypeWithFields>> | null = null;
-        if (bodyProductTypeId) {
+        if (bodyProductTypeId && isProductFlow) {
             resolvedBodyType = await dbGetProductTypeWithFields(bodyProductTypeId).catch(() => null);
             if (!resolvedBodyType) {
                 return NextResponse.json(
