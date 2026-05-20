@@ -34,15 +34,20 @@ describe("trigramSimilarity", () => {
 });
 
 describe("scoreProductMatch", () => {
-    it("exact SKU match → +40", () => {
+    it("exact SKU match → +60 (Review 3b 2.tur: UNIQUE anchor)", () => {
         const { score, reasons } = scoreProductMatch(PROD, { sku: "KV-DB-DN100" });
-        expect(score).toBe(40);
+        expect(score).toBe(60);
         expect(reasons).toContain("sku_exact");
     });
 
     it("case-insensitive SKU", () => {
         const { score } = scoreProductMatch(PROD, { sku: "kv-db-dn100" });
-        expect(score).toBe(40);
+        expect(score).toBe(60);
+    });
+
+    it("SKU-only → 60 = pending (en az pending, AI halüsinasyon koruması)", () => {
+        const { score } = scoreProductMatch(PROD, { sku: "KV-DB-DN100" });
+        expect(decideMatchAction(score)).toBe("pending");
     });
 
     it("high-sim name → +45 (Review 3b weight bump)", () => {
@@ -80,13 +85,15 @@ describe("scoreProductMatch", () => {
         expect(score).toBe(85);
     });
 
-    it("SKU + name (sertifika senaryosu) → 85 auto-match", () => {
-        // 40 (sku) + 45 (name_high) = 85 → matched (eski sürümde 70 idi)
+    it("SKU + name (sertifika senaryosu) → 105 clamp 100 matched", () => {
+        // 60 (sku) + 45 (name_high) = 105 → clamp 100 → matched
+        // Review 3b 2.tur P2: cert flow için SKU+name = auto-match güçlü
         const { score } = scoreProductMatch(PROD, {
             sku: "KV-DB-DN100",
             name: "Vana DN100 PN16",
         });
-        expect(score).toBe(85);
+        expect(score).toBe(100);
+        expect(decideMatchAction(score)).toBe("matched");
     });
 
     it("SKU + name + 1 attr → clamp 100", () => {

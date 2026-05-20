@@ -422,9 +422,27 @@ Yüklenen dosyayı incele ve tipini tespit et:
 - UI'da "Aktif" + "Önceki versiyonlar" şeklinde gösterilir
 
 ### Type-Aware Extraction
-- AI promptuna `available_product_types` ve her tipin `fields` listesi context olarak verilir
-- AI extraction'da bu alanlara mapping yapar
-- Output: `{ product_type_id, attributes: { dn: 50, pn_class: "600LB", ... } }`
+
+**Faz 3b uygulama notu (2026-05-20):** Faz 3b mevcut sürümü **tek-tip katalog**
+varsayımı ile çalışır — kullanıcı UI'dan tek bir product type seçer (veya
+classification suggestion otomatik gelir), AI o tipin field set'ine göre
+extract eder, route tüm satırlara uniform `product_type_id` inject eder.
+Çoklu-tip karışık katalog senaryosu (örn. bir dosyada hem vana hem conta) için
+AI item başına `product_type_id` çıktısı + UI satır bazlı tip override şu an
+yok; PMT'nin tipik tedarikçi kataloglarında ihtiyaç düşük olduğu için Faz 3c
+veya sonrasına ertelendi.
+
+**Mevcut sürüm:**
+- AI promptuna seçilen tek tipin `fields` listesi context olarak verilir
+- AI extraction'da bu alanlara mapping yapar (attributes)
+- Route her satıra `product_type_id`'yi uniform inject eder (extract route)
+- Satır şeması: `{ extracted_name, extracted_sku, extracted_attributes,
+  product_type_id }` — `import_document_lines` tablosunda persist
+
+**İleride değerlendirilebilir (3c+ scope):**
+- `available_product_types` çoklu liste prompt'ta
+- AI item başına farklı `product_type_id` döner
+- UI'da satır bazında tip override
 
 ### Kabul Kriterleri
 - Spiral Wound katalog PDF (gerçek örnek) → 6+ conta ürünü taslağı, kullanıcı onayıyla eklenir

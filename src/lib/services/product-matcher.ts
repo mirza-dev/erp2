@@ -102,10 +102,14 @@ export function scoreProductMatch(
     let score = 0;
     const reasons: string[] = [];
 
-    // SKU exact (case-insensitive) — +40
+    // SKU exact (case-insensitive) — +60. Review 3b 2.tur P2:
+    // products.sku UNIQUE constraint (001:30) sayesinde exact match aslında
+    // "kesinlikle aynı ürün" anlamına gelir. Yine de SKU-only matched değil
+    // pending tutulur (AI halüsinasyonu = yanlış SKU'ya karşı kullanıcı onayı).
+    // SKU + name_high → 105 clamp 100 → matched (cert flow auto-link).
     if (input.sku && product.sku) {
         if (product.sku.toLowerCase().trim() === input.sku.toLowerCase().trim()) {
-            score += 40;
+            score += 60;
             reasons.push("sku_exact");
         }
     }

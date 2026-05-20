@@ -7,6 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-20
 
+**Faz 3b Review 2.tur — 4 yeni P2/P3 bulgu kapatma (3329 test)**
+
+- **P2 (SKU UNIQUE anchor):** SKU exact +40 → +60. `products.sku` UNIQUE constraint sayesinde güvenli; SKU-only 60 pending (AI halüsinasyon koruması), SKU+name 105 clamp 100 matched (cert auto-link).
+- **P2/P3 (multi-type):** Faz 3b tek-tip katalog varsayımıyla uygulandı; plan dokümanına uygulama notu eklendi, multi-type karışık katalog 3c+'a ertelendi (PMT için pratik gereklilik düşük).
+- **P3 (bulk approve stale state):** `router.refresh()` client state'i tutmuyordu; `setLines` optimistic update eklendi (`succeededIds` Set + `match_action='reviewed'` + `reviewed_at` ISO).
+- **P3 (invalid productTypeId fail-closed):** Body'den gelen id helper null dönerse 400 "Belirtilen ürün tipi bulunamadı". Classification suggestion'da best-effort davranış korunur.
+- **+3 test:** matcher (SKU-only pending + SKU+name 100) + extract-route (invalid 400 + stale classification 201)
+- 6 dosya · **3329 test yeşil** · TS clean · 0 lint warning · build OK
+
+---
+
+## Önceki — Faz 3b Review (3326 test)
+
 **Faz 3b Review — 6 P2/P3 bulgu kapatma (3326 test)**
 
 - **P2-A** (product_type_id taşıma): Migration 063 + interface + helper + route inject → 3c "yeni ürün hangi tipte?" belirsizliği kalktı

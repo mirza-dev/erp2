@@ -182,14 +182,23 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                         match_confidence: l.match_confidence,
                     }),
                 });
-                return { ok: res.ok };
+                return { ok: res.ok, id: l.id };
             } catch {
-                return { ok: false };
+                return { ok: false, id: l.id };
             }
         })).then(results => {
-            const okCount = results.filter(r => r.ok).length;
+            const succeededIds = new Set(results.filter(r => r.ok).map(r => r.id));
+            const okCount = succeededIds.size;
             const failedCount = results.length - okCount;
+            // Review 3b 2.tur P3: optimistic local state — router.refresh()
+            // Server Component'leri yeniler ama useState(initialLines) ilk
+            // değerinde kalır; client state'i de açıkça güncelle.
             if (okCount > 0) {
+                const nowIso = new Date().toISOString();
+                setLines(prev => prev.map(l => succeededIds.has(l.id)
+                    ? { ...l, match_action: "reviewed", reviewed_at: nowIso }
+                    : l,
+                ));
                 router.refresh();
                 toast({ type: "success", message: `${okCount} satır onaylandı` });
             }

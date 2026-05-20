@@ -327,6 +327,33 @@ describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
         expect(lines[0].product_type_id).toBe("type-x");
     });
 
+    it("body productTypeId verilmiş ama tip bulunamadı → 400 (Review 3b 2.tur fail-closed)", async () => {
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockGetProductType.mockResolvedValueOnce(null); // tip silinmiş / stale id
+        const res = await callPOST(makeReq("doc-1", { productTypeId: "type-deleted" }), "doc-1");
+        expect(res.status).toBe(400);
+        expect(mockExtractProducts).not.toHaveBeenCalled();
+        expect(mockReplaceLines).not.toHaveBeenCalled();
+    });
+
+    it("classification suggested_product_type_id bulunamadı → best-effort (free-form, 201)", async () => {
+        // Body override YOK, classification suggestion var ama tip silinmiş — sessizce free-form
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            classification: { ...PROD_DOC.classification, suggested_product_type_id: "type-stale" },
+        });
+        mockGetProductType.mockResolvedValueOnce(null);
+        mockExtractProducts.mockResolvedValueOnce({
+            items: [{ line: 1, name: "X", sku: "X", attributes: {}, confidence: 0.5, product_type_id: null }],
+        });
+        mockFindCandidates.mockResolvedValueOnce([]);
+        mockReplaceLines.mockResolvedValueOnce([]);
+        const res = await callPOST(makeReq("doc-1"), "doc-1");
+        expect(res.status).toBe(201);
+        const lines = mockReplaceLines.mock.calls[0]?.[1] as Array<{ product_type_id: string | null }>;
+        expect(lines[0].product_type_id).toBeNull();
+    });
+
     it("body override yok + classification suggested null → product_type_id null", async () => {
         mockGetDoc.mockResolvedValueOnce({
             ...PROD_DOC,

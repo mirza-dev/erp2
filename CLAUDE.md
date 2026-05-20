@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3b Review — 6 P2/P3 bulgu kapatma (2026-05-20; 3326 test)
+**Son tamamlanan iş:** Faz 3b Review 2.tur — 4 yeni P2/P3 bulgu kapatma (2026-05-20; 3329 test)
+
+- **P2 (SKU UNIQUE anchor):** `products.sku` UNIQUE DB constraint sayesinde exact SKU match aslında "kesinlikle aynı ürün" anlamına geliyor; eski +40 (new_product) yetersizdi. SKU exact +60 yapıldı → SKU-only 60 pending (AI halüsinasyon koruması), SKU+name 105 clamp 100 matched (cert flow auto-link). Plan tarifi (name+DN+PN=85 matched) korunur.
+- **P2/P3 (multi-type type-aware):** Faz 3b mevcut sürümü **tek-tip katalog** varsayımı ile uygulandı (UI tek tip seçer, route uniform inject). Plan'daki `available_product_types` + item başına `product_type_id` çıktısı multi-type karışık katalog scope'u 3c+'a ertelendi (PMT tedarikçi kataloglarında tek-tip yaygın). `MODUL_REVIZE_PLAN.md` Type-Aware Extraction section'a uygulama notu eklendi.
+- **P3 (bulk approve stale state):** `router.refresh()` Server Component'leri yeniler ama `useState(initialLines)` client state aynı kalır → kullanıcı "onaylandı" sonrası satırları "Eşleştirildi" görmeye devam ederdi. `ExtractionReview.handleApproveAll` artık `succeededIds` Set ile `setLines` optimistic update yapıyor (`match_action='reviewed'` + `reviewed_at` ISO) + router.refresh().
+- **P3 (invalid productTypeId fail-closed):** Body'den gelen `productTypeId` `dbGetProductTypeWithFields` null dönerse artık 400 "Belirtilen ürün tipi bulunamadı" (stale UI cache / tampered POST / silinmiş tip). Classification suggestion'da (AI heuristic) best-effort free-form fallback davranışı korunur.
+- **+3 yeni test:** SKU-only pending + SKU+name clamp 100 (matcher), invalid productTypeId 400 + stale classification suggestion best-effort 201 (extract-route)
+- 6 dosya · **3329 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3b Review — 6 P2/P3 bulgu kapatma (2026-05-20; 3326 test) · commit `6f8ea23`
 
 - **P2-A (product_type_id taşıma):** Migration 063 ekledi `import_document_lines.product_type_id uuid NULL FK product_types(id) ON DELETE SET NULL` + index. `ImportDocumentLineRow` + `CreateExtractedLineInput` + `ExtractedProductLine` interface'lerine alan eklendi; route extract'ta her satıra `productTypeContext?.id ?? bodyOverride ?? null` inject ediliyor. 3c apply'da "yeni ürün hangi tipte yaratılacak?" belirsizliği kalktı.
 - **P2-B (matcher formülü):** scoreProductMatch yeniden ağırlıklandırıldı — SKU+40 (aynı), name_high+45 (30→45), name_partial+15 (10→15), attr per-grup +20 (DN ve PN ayrı grup, max +40). KEY_ATTR_KEYS flat list → KEY_ATTR_GROUPS gruplu. Sonuç: SKU+name=85 matched (sertifika), name+DN+PN=85 matched (plan tarifi).

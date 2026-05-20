@@ -146,6 +146,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             const productTypeContext = productTypeId
                 ? await dbGetProductTypeWithFields(productTypeId).catch(() => null)
                 : null;
+            // Review 3b 2.tur P3: body'den gelen productTypeId kullanıcının
+            // BİLİNÇLİ seçimi — bulunamadıysa sessizce free-form'a düşme,
+            // 400 dön (stale UI cache / tampered POST / silinmiş tip).
+            // Classification suggestion (AI heuristic) için best-effort
+            // davranış korunur (null → free-form, AI yanılmış olabilir).
+            if (bodyProductTypeId && !productTypeContext) {
+                return NextResponse.json(
+                    { error: "Belirtilen ürün tipi bulunamadı." },
+                    { status: 400 },
+                );
+            }
             // Review 3b P2-A: product_type_id satıra persist edilir; 3c apply
             // bunu kullanarak yeni ürün yaratırken doğru tipi atayabilir.
             injectedProductTypeId = productTypeContext?.id ?? null;
