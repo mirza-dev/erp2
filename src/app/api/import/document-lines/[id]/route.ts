@@ -16,6 +16,7 @@ import {
     isValidMatchAction,
 } from "@/lib/supabase/import-document-lines";
 import { dbGetProductById } from "@/lib/supabase/products";
+import { dbGetProductType } from "@/lib/supabase/product-types";
 import { requireRole } from "@/lib/auth/role-guard";
 import { createClient } from "@/lib/supabase/server";
 import { handleApiError } from "@/lib/api-error";
@@ -75,6 +76,26 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             }
         }
 
+        // Review 3b 3.tur: product_type_id override (multi-type satır bazlı override).
+        // undefined → patch yok; null → clear; string → UUID + existence check.
+        let productTypeIdPatch: string | null | undefined = undefined;
+        if (body.product_type_id !== undefined) {
+            if (body.product_type_id === null) {
+                productTypeIdPatch = null;
+            } else if (typeof body.product_type_id === "string") {
+                if (!UUID_RE.test(body.product_type_id)) {
+                    return NextResponse.json({ error: "Geçersiz ürün tipi UUID." }, { status: 400 });
+                }
+                const type = await dbGetProductType(body.product_type_id);
+                if (!type) {
+                    return NextResponse.json({ error: "Belirtilen ürün tipi bulunamadı." }, { status: 400 });
+                }
+                productTypeIdPatch = body.product_type_id;
+            } else {
+                return NextResponse.json({ error: "product_type_id string veya null olmalı." }, { status: 400 });
+            }
+        }
+
         // Reviewer bilgisi
         const sb = await createClient();
         const { data: { user } } = await sb.auth.getUser();
@@ -86,6 +107,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             match_action: body.match_action,
             match_confidence: confidence,
             reviewed_by: user?.id ?? null,
+            product_type_id: productTypeIdPatch,
         });
 
         return NextResponse.json({ ok: true, line: updated });

@@ -34,7 +34,7 @@ import {
     loadActiveMatchables,
     type MatchableProduct,
 } from "@/lib/services/product-matcher";
-import { dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
+import { dbGetProductTypeWithFields, dbListProductTypes } from "@/lib/supabase/product-types";
 import { requireRole } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
@@ -138,28 +138,48 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         const productsCache: MatchableProduct[] = await loadActiveMatchables();
 
         const linesToCreate: CreateExtractedLineInput[] = [];
-        let injectedProductTypeId: string | null = null;
 
         if (isProductFlow) {
-            // Product type context — body override → classification suggestion → null (free-form)
-            const productTypeId = bodyProductTypeId ?? doc.classification?.suggested_product_type_id ?? null;
-            const productTypeContext = productTypeId
-                ? await dbGetProductTypeWithFields(productTypeId).catch(() => null)
-                : null;
-            // Review 3b 2.tur P3: body'den gelen productTypeId kullanıcının
-            // BİLİNÇLİ seçimi — bulunamadıysa sessizce free-form'a düşme,
-            // 400 dön (stale UI cache / tampered POST / silinmiş tip).
-            // Classification suggestion (AI heuristic) için best-effort
-            // davranış korunur (null → free-form, AI yanılmış olabilir).
-            if (bodyProductTypeId && !productTypeContext) {
-                return NextResponse.json(
-                    { error: "Belirtilen ürün tipi bulunamadı." },
-                    { status: 400 },
+            // Review 3b 3.tur: Multi-type extraction — PMT multi-product-type firma.
+            // Tüm aktif tipleri AI context'ine ver; AI item başına en uygun
+            // product_type_id'yi seçer (whitelisted). Body productTypeId
+            // verildiyse availableProductTypes tek tipe filtrelenir
+            // ("sadece bu tip katalogu" semantiği).
+            let availableProductTypes: Array<{
+                id: string; name: string;
+                fields: Array<{ field_key: string; label_tr: string; field_type: string; unit: string | null; options: string[] | null }>;
+            }> = [];
+
+            if (bodyProductTypeId) {
+                const single = await dbGetProductTypeWithFields(bodyProductTypeId).catch(() => null);
+                if (!single) {
+                    return NextResponse.json(
+                        { error: "Belirtilen ürün tipi bulunamadı." },
+                        { status: 400 },
+                    );
+                }
+                availableProductTypes = [{
+                    id: single.id, name: single.name,
+                    fields: single.fields.map(f => ({
+                        field_key: f.field_key, label_tr: f.label_tr,
+                        field_type: f.field_type, unit: f.unit, options: f.options,
+                    })),
+                }];
+            } else {
+                const types = await dbListProductTypes();
+                const withFields = await Promise.all(
+                    types.map(t => dbGetProductTypeWithFields(t.id).catch(() => null)),
                 );
+                availableProductTypes = withFields
+                    .filter((t): t is NonNullable<typeof t> => t !== null)
+                    .map(t => ({
+                        id: t.id, name: t.name,
+                        fields: t.fields.map(f => ({
+                            field_key: f.field_key, label_tr: f.label_tr,
+                            field_type: f.field_type, unit: f.unit, options: f.options,
+                        })),
+                    }));
             }
-            // Review 3b P2-A: product_type_id satıra persist edilir; 3c apply
-            // bunu kullanarak yeni ürün yaratırken doğru tipi atayabilir.
-            injectedProductTypeId = productTypeContext?.id ?? null;
 
             let result;
             try {
@@ -169,19 +189,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                         mimeType: doc.mime_type,
                         fileName: doc.file_name,
                         excelTextSample,
-                        productTypeContext: productTypeContext
-                            ? {
-                                id: productTypeContext.id,
-                                name: productTypeContext.name,
-                                fields: productTypeContext.fields.map(f => ({
-                                    field_key: f.field_key,
-                                    label_tr: f.label_tr,
-                                    field_type: f.field_type,
-                                    unit: f.unit,
-                                    options: f.options,
-                                })),
-                            }
-                            : null,
+                        availableProductTypes,
                         multiRow: docType === "product_catalog",
                     },
                     req.signal,
@@ -193,7 +201,9 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                 throw err;
             }
 
-            // Her item için top-3 match (productsCache reuse)
+            // Her item için top-3 match (productsCache reuse).
+            // product_type_id: AI'dan (uniform inject KALDIRILDI — multi-type
+            // karışık katalog desteği için her satır kendi tipinde olur).
             for (const item of result.items) {
                 const candidates = await findProductMatchCandidates({
                     name: item.name,
@@ -207,7 +217,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                 linesToCreate.push({
                     line_number: item.line,
                     extraction_type: "product",
-                    product_type_id: injectedProductTypeId,
+                    product_type_id: item.product_type_id,
                     extracted_name: item.name,
                     extracted_sku: item.sku,
                     extracted_attributes: item.attributes,

@@ -13,6 +13,7 @@ const mockFindCandidates = vi.fn();
 const mockStorageDownload = vi.fn();
 const mockLoadActiveMatchables = vi.fn();
 const mockListLines = vi.fn();
+const mockListProductTypes = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
@@ -43,6 +44,7 @@ vi.mock("@/lib/services/product-matcher", async () => {
 
 vi.mock("@/lib/supabase/product-types", () => ({
     dbGetProductTypeWithFields: (...a: unknown[]) => mockGetProductType(...a),
+    dbListProductTypes: (...a: unknown[]) => mockListProductTypes(...a),
 }));
 
 vi.mock("@/lib/supabase/service", async () => {
@@ -78,6 +80,9 @@ beforeEach(() => {
     mockStorageDownload.mockReset();
     mockLoadActiveMatchables.mockReset();
     mockListLines.mockReset();
+    mockListProductTypes.mockReset();
+    // Default: multi-type mode için boş tip listesi yeterli (parseExtractionResponse'a uyumlu)
+    mockListProductTypes.mockResolvedValue([]);
     mockStorageDownload.mockResolvedValue({
         data: { arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer },
         error: null,
@@ -160,8 +165,8 @@ describe("POST /api/import/documents/[id]/extract — happy product flow", () =>
         mockGetDoc.mockResolvedValueOnce(PROD_DOC);
         mockExtractProducts.mockResolvedValueOnce({
             items: [
-                { line: 1, name: "Vana DN50", sku: "KV-50", attributes: { dn: 50 }, confidence: 0.9 },
-                { line: 2, name: "Vana DN100", sku: "KV-100", attributes: { dn: 100 }, confidence: 0.85 },
+                { line: 1, name: "Vana DN50", sku: "KV-50", attributes: { dn: 50 }, confidence: 0.9, product_type_id: null },
+                { line: 2, name: "Vana DN100", sku: "KV-100", attributes: { dn: 100 }, confidence: 0.85, product_type_id: null },
             ],
         });
         mockFindCandidates.mockResolvedValue([
@@ -313,16 +318,24 @@ describe("POST extract — Review 3b P2/P3-D (productsCache)", () => {
 describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
     beforeEach(() => mockRequireRole.mockResolvedValue(null));
 
-    it("body productTypeId override → linesToCreate her satırda product_type_id set", async () => {
+    it("body productTypeId restrict → availableProductTypes tek tip + AI o tipi seçer", async () => {
+        // Multi-type mode'da body productTypeId = "sadece bu tip" filter semantiği.
+        // availableProductTypes route tarafından [single] olarak AI'ya geçer; AI o tek
+        // tip içinde seçim yapar. Mock AI dönüş içinde product_type_id'yi de set eder.
         mockGetDoc.mockResolvedValueOnce(PROD_DOC);
-        mockExtractProducts.mockResolvedValueOnce({
-            items: [{ line: 1, name: "X", sku: "X", attributes: {}, confidence: 0.5, product_type_id: null }],
-        });
         mockGetProductType.mockResolvedValueOnce({ id: "type-x", name: "Conta", fields: [] });
+        mockExtractProducts.mockResolvedValueOnce({
+            items: [{ line: 1, name: "X", sku: "X", attributes: {}, confidence: 0.5, product_type_id: "type-x" }],
+        });
         mockFindCandidates.mockResolvedValueOnce([]);
         mockReplaceLines.mockResolvedValueOnce([]);
 
         await callPOST(makeReq("doc-1", { productTypeId: "type-x" }), "doc-1");
+        // availableProductTypes tek elemana indirildi (restrict)
+        const aiInput = mockExtractProducts.mock.calls[0]?.[0] as { availableProductTypes: Array<{ id: string }> };
+        expect(aiInput.availableProductTypes).toHaveLength(1);
+        expect(aiInput.availableProductTypes[0].id).toBe("type-x");
+        // AI'nın seçtiği product_type_id satıra persist
         const lines = mockReplaceLines.mock.calls[0]?.[1] as Array<{ product_type_id: string | null }>;
         expect(lines[0].product_type_id).toBe("type-x");
     });
@@ -336,29 +349,10 @@ describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
         expect(mockReplaceLines).not.toHaveBeenCalled();
     });
 
-    it("classification suggested_product_type_id bulunamadı → best-effort (free-form, 201)", async () => {
-        // Body override YOK, classification suggestion var ama tip silinmiş — sessizce free-form
-        mockGetDoc.mockResolvedValueOnce({
-            ...PROD_DOC,
-            classification: { ...PROD_DOC.classification, suggested_product_type_id: "type-stale" },
-        });
-        mockGetProductType.mockResolvedValueOnce(null);
-        mockExtractProducts.mockResolvedValueOnce({
-            items: [{ line: 1, name: "X", sku: "X", attributes: {}, confidence: 0.5, product_type_id: null }],
-        });
-        mockFindCandidates.mockResolvedValueOnce([]);
-        mockReplaceLines.mockResolvedValueOnce([]);
-        const res = await callPOST(makeReq("doc-1"), "doc-1");
-        expect(res.status).toBe(201);
-        const lines = mockReplaceLines.mock.calls[0]?.[1] as Array<{ product_type_id: string | null }>;
-        expect(lines[0].product_type_id).toBeNull();
-    });
-
-    it("body override yok + classification suggested null → product_type_id null", async () => {
-        mockGetDoc.mockResolvedValueOnce({
-            ...PROD_DOC,
-            classification: { ...PROD_DOC.classification, suggested_product_type_id: null },
-        });
+    it("AI null döndü → satır product_type_id null (free-form fallback)", async () => {
+        // Multi-type mode: classification suggestion route'a girmez; AI tüm tipler context'inde seçim yapar.
+        // AI hiçbir tipe uydurmayıp null bıraktıysa satır null kalır (kullanıcı UI'dan override eder).
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
         mockExtractProducts.mockResolvedValueOnce({
             items: [{ line: 1, name: "X", sku: "X", attributes: {}, confidence: 0.5, product_type_id: null }],
         });
@@ -368,6 +362,27 @@ describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
         await callPOST(makeReq("doc-1"), "doc-1");
         const lines = mockReplaceLines.mock.calls[0]?.[1] as Array<{ product_type_id: string | null }>;
         expect(lines[0].product_type_id).toBeNull();
+    });
+
+    it("AI per-item tip seçer → satıra AI'nın seçimi persist", async () => {
+        // Multi-type mode: AI item 1 vana, item 2 conta seçti — route AI'nın seçimini direkt persist.
+        // Uniform inject KALDIRILDI (3.tur multi-type refactor).
+        const VANA = "00000000-0000-4000-8000-000000000001";
+        const CONTA = "00000000-0000-4000-8000-000000000002";
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockExtractProducts.mockResolvedValueOnce({
+            items: [
+                { line: 1, name: "Vana DN50", sku: "KV-50", attributes: {}, confidence: 0.9, product_type_id: VANA },
+                { line: 2, name: "Conta DN50", sku: "CT-50", attributes: {}, confidence: 0.85, product_type_id: CONTA },
+            ],
+        });
+        mockFindCandidates.mockResolvedValue([]);
+        mockReplaceLines.mockResolvedValueOnce([]);
+
+        await callPOST(makeReq("doc-1"), "doc-1");
+        const lines = mockReplaceLines.mock.calls[0]?.[1] as Array<{ product_type_id: string | null }>;
+        expect(lines[0].product_type_id).toBe(VANA);
+        expect(lines[1].product_type_id).toBe(CONTA);
     });
 
     it("cert flow product_type_id null (sertifika 3c'de hedef üzerinden belirlenir)", async () => {

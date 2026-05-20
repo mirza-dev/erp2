@@ -156,6 +156,28 @@ describe("dbUpdateLineMatch", () => {
         expect(typeof patch.reviewed_at).toBe("string");
         expect(patch.matched_product_id).toBe("p-1");
     });
+
+    // Review 3b 3.tur: product_type_id pass-through (multi-type override)
+    it("product_type_id undefined → patch'e yazılmaz (mevcut korunur)", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { id: "l-1" }, error: null });
+        await dbUpdateLineMatch("l-1", { match_action: "pending" });
+        const patch = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(Object.prototype.hasOwnProperty.call(patch, "product_type_id")).toBe(false);
+    });
+
+    it("product_type_id string → patch'e yazılır", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { id: "l-1" }, error: null });
+        await dbUpdateLineMatch("l-1", { match_action: "pending", product_type_id: "type-x" });
+        const patch = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(patch.product_type_id).toBe("type-x");
+    });
+
+    it("product_type_id null → patch'e null yazılır (explicit clear)", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { id: "l-1" }, error: null });
+        await dbUpdateLineMatch("l-1", { match_action: "pending", product_type_id: null });
+        const patch = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(patch.product_type_id).toBeNull();
+    });
 });
 
 describe("dbReplaceLinesForDocument", () => {

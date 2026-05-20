@@ -34,6 +34,12 @@ export interface UpdateLineMatchInput {
     match_action: ImportDocumentLineMatchAction;
     match_confidence?: number | null;
     reviewed_by?: string | null;
+    /**
+     * Review 3b 3.tur: kullanıcı UI'dan tip override edebilir
+     * (AI yanlış tip seçti veya null bıraktıysa). undefined = patch'e
+     * yazma (mevcut korunur), null = explicit clear.
+     */
+    product_type_id?: string | null;
 }
 
 const VALID_MATCH_ACTIONS: ImportDocumentLineMatchAction[] = [
@@ -109,16 +115,22 @@ export async function dbUpdateLineMatch(
     // reviewed_at: pending hariç tüm action'larda otomatik set
     const reviewedAt = input.match_action === "pending" ? null : new Date().toISOString();
 
+    const patch: Record<string, unknown> = {
+        matched_product_id: input.matched_product_id ?? null,
+        match_action: input.match_action,
+        match_confidence: input.match_confidence ?? null,
+        reviewed_at: reviewedAt,
+        reviewed_by: input.reviewed_by ?? null,
+    };
+    // product_type_id: undefined → patch'e yazma; null → explicit clear; string → set
+    if (input.product_type_id !== undefined) {
+        patch.product_type_id = input.product_type_id;
+    }
+
     const sb = createServiceClient();
     const { data, error } = await sb
         .from("import_document_lines")
-        .update({
-            matched_product_id: input.matched_product_id ?? null,
-            match_action: input.match_action,
-            match_confidence: input.match_confidence ?? null,
-            reviewed_at: reviewedAt,
-            reviewed_by: input.reviewed_by ?? null,
-        })
+        .update(patch)
         .eq("id", id)
         .select("*")
         .single();

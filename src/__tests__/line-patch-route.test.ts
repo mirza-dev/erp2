@@ -7,6 +7,7 @@ const mockRequireRole = vi.fn();
 const mockGetLine = vi.fn();
 const mockUpdateLine = vi.fn();
 const mockGetProductById = vi.fn();
+const mockGetProductType = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
@@ -23,6 +24,10 @@ vi.mock("@/lib/supabase/import-document-lines", async () => {
 
 vi.mock("@/lib/supabase/products", () => ({
     dbGetProductById: (...a: unknown[]) => mockGetProductById(...a),
+}));
+
+vi.mock("@/lib/supabase/product-types", () => ({
+    dbGetProductType: (...a: unknown[]) => mockGetProductType(...a),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -42,6 +47,7 @@ beforeEach(() => {
     mockGetLine.mockReset();
     mockUpdateLine.mockReset();
     mockGetProductById.mockReset();
+    mockGetProductType.mockReset();
 });
 
 // Valid UUID for happy paths
@@ -166,5 +172,63 @@ describe("PATCH /api/import/document-lines/[id]", () => {
         mockUpdateLine.mockResolvedValueOnce({ id: "l-1", match_action: "new_product" });
         const res = await callPATCH("l-1", { match_action: "new_product" });
         expect(res.status).toBe(200);
+    });
+
+    // ── Review 3b 3.tur: product_type_id override (multi-type) ──
+    const TYPE_ID = "00000000-0000-4000-8000-000000000001";
+
+    it("product_type_id override happy: UUID + ürün tipi var → 200 + helper'a forward", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetProductType.mockResolvedValueOnce({ id: TYPE_ID, name: "Vana" });
+        mockUpdateLine.mockResolvedValueOnce({ id: "l-1", product_type_id: TYPE_ID });
+        const res = await callPATCH("l-1", { match_action: "pending", product_type_id: TYPE_ID });
+        expect(res.status).toBe(200);
+        const args = mockUpdateLine.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(args.product_type_id).toBe(TYPE_ID);
+    });
+
+    it("product_type_id null → helper'a forward (explicit clear)", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockUpdateLine.mockResolvedValueOnce({ id: "l-1", product_type_id: null });
+        const res = await callPATCH("l-1", { match_action: "pending", product_type_id: null });
+        expect(res.status).toBe(200);
+        const args = mockUpdateLine.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(args.product_type_id).toBeNull();
+    });
+
+    it("product_type_id undefined → helper'da undefined (mevcut korunur)", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockUpdateLine.mockResolvedValueOnce({ id: "l-1" });
+        const res = await callPATCH("l-1", { match_action: "pending" });
+        expect(res.status).toBe(200);
+        const args = mockUpdateLine.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(args.product_type_id).toBeUndefined();
+    });
+
+    it("product_type_id invalid UUID → 400", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        const res = await callPATCH("l-1", { match_action: "pending", product_type_id: "garbage" });
+        expect(res.status).toBe(400);
+        expect(mockUpdateLine).not.toHaveBeenCalled();
+    });
+
+    it("product_type_id var ama tip bulunamadı → 400", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetProductType.mockResolvedValueOnce(null);
+        const res = await callPATCH("l-1", { match_action: "pending", product_type_id: TYPE_ID });
+        expect(res.status).toBe(400);
+        expect(mockUpdateLine).not.toHaveBeenCalled();
+    });
+
+    it("product_type_id wrong type (number) → 400", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        const res = await callPATCH("l-1", { match_action: "pending", product_type_id: 42 });
+        expect(res.status).toBe(400);
     });
 });

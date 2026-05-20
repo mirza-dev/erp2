@@ -61,6 +61,18 @@ export function pickSuggestedAction(topScore: number | null): ImportDocumentLine
     return "new_product";
 }
 
+/**
+ * UUID veya null → product type'ın insan-okur adı. Bilinmeyen → "—".
+ * Pure — Review 3b 3.tur satır bazlı tip dropdown'u için.
+ */
+export function formatProductTypeName(
+    id: string | null,
+    productTypes: ReadonlyArray<{ id: string; name: string }>,
+): string {
+    if (!id) return "—";
+    return productTypes.find(t => t.id === id)?.name ?? "—";
+}
+
 // ── Props ────────────────────────────────────────────────────────────────────
 
 export interface QueuedSuggestedType {
@@ -159,6 +171,38 @@ export default function ExtractionReview({ document: doc, initialLines, productT
         void patchLine(line.id, { match_action: "skipped", matched_product_id: null });
     }
 
+    // Review 3b 3.tur: satır bazlı tip override. AI yanlış tip seçtiyse veya
+    // null bıraktıysa kullanıcı düzeltir. match_action korunur; sadece
+    // product_type_id güncellenir. Helper signature genişlemediği için ayrı
+    // bir fetch yapıyoruz (patchLine match_action zorunlu kılıyor).
+    async function handleTypeChange(line: ImportDocumentLineRow, newTypeId: string | null) {
+        if (isDemo) {
+            toast({ type: "info", message: DEMO_BLOCK_TOAST });
+            return;
+        }
+        try {
+            const res = await fetch(`/api/import/document-lines/${line.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    match_action: line.match_action, // mevcut korunur
+                    matched_product_id: line.matched_product_id,
+                    match_confidence: line.match_confidence,
+                    product_type_id: newTypeId,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                toast({ type: "error", message: err.error ?? "Tip güncellenemedi" });
+                return;
+            }
+            const data = await res.json() as { line: ImportDocumentLineRow };
+            setLines(prev => prev.map(l => l.id === line.id ? data.line : l));
+        } catch (e) {
+            toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
+        }
+    }
+
     function handleApproveAll() {
         if (isDemo) {
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
@@ -231,19 +275,21 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    {/* Product type override (datasheet için anlamlı) */}
+                    {/* Multi-type filter — default "AI otomatik": tüm tipler context'e
+                        geçirilir, AI her satırın tipini kendi seçer (PMT multi-type).
+                        "Sadece X" seçilirse availableProductTypes tek tipe filtre olur. */}
                     <select
                         value={overrideTypeId}
                         onChange={e => setOverrideTypeId(e.target.value)}
-                        aria-label="Ürün tipi şablonu"
+                        aria-label="Ürün tipi filtresi"
                         style={{
                             padding: "6px 10px", fontSize: "12px",
                             background: "var(--bg-secondary)", color: "var(--text-primary)",
                             border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
                         }}
                     >
-                        <option value="">— Tip otomatik —</option>
-                        {productTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        <option value="">— Otomatik (AI seçer) —</option>
+                        {productTypes.map(t => <option key={t.id} value={t.id}>Sadece {t.name}</option>)}
                     </select>
                     <Button
                         variant="primary"
@@ -295,6 +341,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                 <tr style={{ background: "var(--bg-secondary)" }}>
                                     <th style={th}>#</th>
                                     <th style={th}>Ad / SKU</th>
+                                    <th style={th}>Tip</th>
                                     <th style={th}>Adaylar</th>
                                     <th style={th}>Skor</th>
                                     <th style={th}>Durum</th>
@@ -312,6 +359,29 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                 {line.extracted_sku && (
                                                     <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>{line.extracted_sku}</div>
                                                 )}
+                                            </td>
+                                            <td style={td}>
+                                                {/* Review 3b 3.tur: per-row tip override (multi-type) */}
+                                                <select
+                                                    value={line.product_type_id ?? ""}
+                                                    onChange={e => {
+                                                        const v = e.target.value;
+                                                        void handleTypeChange(line, v === "" ? null : v);
+                                                    }}
+                                                    disabled={isDemo}
+                                                    aria-label={`Satır ${line.line_number} ürün tipi`}
+                                                    style={{
+                                                        padding: "4px 8px", fontSize: "11px",
+                                                        background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                        border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
+                                                        minWidth: "120px",
+                                                    }}
+                                                >
+                                                    <option value="">— Yok —</option>
+                                                    {productTypes.map(t => (
+                                                        <option key={t.id} value={t.id}>{t.name}</option>
+                                                    ))}
+                                                </select>
                                             </td>
                                             <td style={td}>
                                                 {line.candidate_matches.length === 0 ? (

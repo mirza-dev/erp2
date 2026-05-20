@@ -7,6 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-20
 
+**Faz 3b Review 3.tur — Multi-type extraction refactor (3345 test)**
+
+- **Kullanıcı feedback:** "PMT tek tip ürün katoloğu olan bir firma değil" → 2.tur'daki tek-tip assumption düzeltildi
+- **AI service:** productTypeContext → availableProductTypes Array; AI item başına product_type_id seçer; parseExtractionResponse dinamik field whitelist (item.product_type_id'ye göre)
+- **Extract route:** dbListProductTypes + Promise.all multi-fetch; bodyProductTypeId artık "restrict" (filter); uniform inject KALDIRILDI — AI'nın seçimi doğrudan persist
+- **PATCH route + helper:** product_type_id override (UUID + existence check); UpdateLineMatchInput koşullu pass-through
+- **UI ExtractionReview:** "Otomatik (AI seçer)" default header + tablo'ya "Tip" kolonu dropdown + formatProductTypeName helper
+- **Plan doc + memory:** MODUL_REVIZE_PLAN multi-type uyumlu; project_pmt_multi_type.md memory eklendi
+- **+16 test** · 11 dosya · **3345 test yeşil** · TS clean · 0 lint · build OK
+
+---
+
+## Önceki — Faz 3b Review 2.tur (3329 test)
+
 **Faz 3b Review 2.tur — 4 yeni P2/P3 bulgu kapatma (3329 test)**
 
 - **P2 (SKU UNIQUE anchor):** SKU exact +40 → +60. `products.sku` UNIQUE constraint sayesinde güvenli; SKU-only 60 pending (AI halüsinasyon koruması), SKU+name 105 clamp 100 matched (cert auto-link).

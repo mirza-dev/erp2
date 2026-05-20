@@ -423,26 +423,20 @@ Yüklenen dosyayı incele ve tipini tespit et:
 
 ### Type-Aware Extraction
 
-**Faz 3b uygulama notu (2026-05-20):** Faz 3b mevcut sürümü **tek-tip katalog**
-varsayımı ile çalışır — kullanıcı UI'dan tek bir product type seçer (veya
-classification suggestion otomatik gelir), AI o tipin field set'ine göre
-extract eder, route tüm satırlara uniform `product_type_id` inject eder.
-Çoklu-tip karışık katalog senaryosu (örn. bir dosyada hem vana hem conta) için
-AI item başına `product_type_id` çıktısı + UI satır bazlı tip override şu an
-yok; PMT'nin tipik tedarikçi kataloglarında ihtiyaç düşük olduğu için Faz 3c
-veya sonrasına ertelendi.
+**Faz 3b 3.tur multi-type refactor (2026-05-20):** PMT multi-product-type
+firma — vana, conta, flans, fitting, bağlantı elemanı, enstrüman,
+sızdırmazlık vs. katalogda karışık bulunur. Plan'ın orijinal tarifine uygun
+şekilde tek-tip assumption KALDIRILDI; multi-type karışık katalog desteği aktif.
 
 **Mevcut sürüm:**
-- AI promptuna seçilen tek tipin `fields` listesi context olarak verilir
-- AI extraction'da bu alanlara mapping yapar (attributes)
-- Route her satıra `product_type_id`'yi uniform inject eder (extract route)
-- Satır şeması: `{ extracted_name, extracted_sku, extracted_attributes,
-  product_type_id }` — `import_document_lines` tablosunda persist
+- AI promptuna **tüm aktif tipler** + her tipin `fields` listesi context olarak verilir (UUID + name + fields)
+- AI item başına en uygun `product_type_id` (UUID, whitelisted) seçer + o tipin field set'inden `attributes` doldurur; hiçbir tipe uymuyorsa `null` bırakır
+- Route AI'nın seçimini doğrudan satıra persist eder (uniform inject KALDIRILDI)
+- `parseExtractionResponse` per-item attribute whitelist'i `product_type_id`'ye göre dinamik uygular (item'ın tipinin field_key'lerinden olmayan alanlar drop)
+- UI: header'da "Otomatik (AI seçer)" default + opsiyonel "Sadece [tip]" filter (verilirse `availableProductTypes` tek tipe daraltılır). Tablo'da her satır için tip dropdown — kullanıcı override edebilir, `PATCH /api/import/document-lines/[id]` `{ product_type_id }` ile persist
+- Satır şeması: `{ extracted_name, extracted_sku, extracted_attributes, product_type_id }` — `import_document_lines` tablosunda persist (063 ile eklenmişti)
 
-**İleride değerlendirilebilir (3c+ scope):**
-- `available_product_types` çoklu liste prompt'ta
-- AI item başına farklı `product_type_id` döner
-- UI'da satır bazında tip override
+**Backward compat:** Eski tek-tip extraction satırları (062 + 063 ile yaratılmış) etkilenmez — schema değişikliği yok, sadece extraction-time davranışı multi-type oldu.
 
 ### Kabul Kriterleri
 - Spiral Wound katalog PDF (gerçek örnek) → 6+ conta ürünü taslağı, kullanıcı onayıyla eklenir

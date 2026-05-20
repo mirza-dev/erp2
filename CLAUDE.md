@@ -3,7 +3,19 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3b Review 2.tur — 4 yeni P2/P3 bulgu kapatma (2026-05-20; 3329 test)
+**Son tamamlanan iş:** Faz 3b Review 3.tur — Multi-type extraction refactor (2026-05-20; 3345 test)
+
+- **Kullanıcı feedback:** "PMT tek tip ürün katoloğu olan bir firma değil çeşitli ürünler var ve her tip ürün de girebilir sistemin bunlara hazır olması gerek." 2.tur'daki "tek-tip katalog assumption" düzeltildi; plan'ın orijinal multi-type tarifine uygun refactor yapıldı.
+- **AI service:** `ExtractProductsInput.productTypeContext` (tek) → `availableProductTypes` (Array). System prompt her tip için `### {UUID} — {name}` başlığı altında fields listesi. AI item başına `product_type_id` (UUID, whitelisted) seçer. `parseExtractionResponse(text, availableProductTypes)` — `product_type_id` UUID + whitelist check; attributes filter item başına DİNAMİK (item.product_type_id'nin field_key'lerinden olmayan alanlar drop). Tip belirlenmediyse attributes boş set ile filter → free-form'a düşer.
+- **Extract route:** `dbListProductTypes + Promise.all(dbGetProductTypeWithFields)` paralel multi-fetch (8 tip = 9 query). bodyProductTypeId artık "restrict semantiği" — availableProductTypes tek tipe filtrelenir ("sadece bu tip katalogu"). Uniform `injectedProductTypeId` KALDIRILDI — route AI'nın seçimini doğrudan persist eder (her satır kendi tipinde).
+- **PATCH route + helper:** Body `product_type_id` parse (undefined/null/UUID) + UUID_RE check + `dbGetProductType` existence check. `UpdateLineMatchInput.product_type_id` opsiyonel (undefined = patch yok, null = clear, string = set). `dbUpdateLineMatch` patch'i koşullu ekler.
+- **UI ExtractionReview:** Header filter "Otomatik (AI seçer)" default + "Sadece X" tip filtreleri. Yeni tablo kolonu **Tip** — her satırda dropdown ile override; PATCH `{product_type_id}` ile persist + optimistic local state update. Yeni pure helper `formatProductTypeName(id, types)`.
+- **Plan doc:** `MODUL_REVIZE_PLAN.md` Type-Aware Extraction section multi-type uygulamasıyla uyumlu hale getirildi.
+- **Memory feedback:** Yeni `project_pmt_multi_type.md` — PMT multi-product-type firma kuralı (gelecek tasarımlar için).
+- **+16 yeni test:** parseExtractionResponse multi-type (9: per-item product_type_id whitelist, dinamik attribute filter, karışık tip mixed) + aiExtract multi-type prompt (1: tüm tipler + UUID'ler + product_type_id talimatı) + extract-route multi-type behavior (1: AI per-item seçim persist; 2 eski test güncellendi) + line-patch product_type_id override (6: happy/null/undefined/invalid UUID/not found/wrong type) + helper pass-through (3) + UI helper formatProductTypeName (4)
+- 11 dosya · **3345 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3b Review 2.tur — 4 yeni P2/P3 bulgu kapatma (2026-05-20; 3329 test) · commit `8a95a31`
 
 - **P2 (SKU UNIQUE anchor):** `products.sku` UNIQUE DB constraint sayesinde exact SKU match aslında "kesinlikle aynı ürün" anlamına geliyor; eski +40 (new_product) yetersizdi. SKU exact +60 yapıldı → SKU-only 60 pending (AI halüsinasyon koruması), SKU+name 105 clamp 100 matched (cert flow auto-link). Plan tarifi (name+DN+PN=85 matched) korunur.
 - **P2/P3 (multi-type type-aware):** Faz 3b mevcut sürümü **tek-tip katalog** varsayımı ile uygulandı (UI tek tip seçer, route uniform inject). Plan'daki `available_product_types` + item başına `product_type_id` çıktısı multi-type karışık katalog scope'u 3c+'a ertelendi (PMT tedarikçi kataloglarında tek-tip yaygın). `MODUL_REVIZE_PLAN.md` Type-Aware Extraction section'a uygulama notu eklendi.

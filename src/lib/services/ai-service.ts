@@ -1322,14 +1322,27 @@ export interface ExtractedProductLine {
     name: string | null;
     sku: string | null;
     /**
-     * Faz 3b Review P2-A: yaratılacak ürünün tipi. Şu an tek tip context'i
-     * tüm doc için geçerli olduğundan AI item başına farklı tip dönmez —
-     * route productTypeContext.id'yi her item'a uniform inject eder.
-     * Gelecekte AI item başına farklı tip önerebilirse parse'a eklenir.
+     * Faz 3b Review 3.tur: AI item başına en uygun product_type_id'yi
+     * seçer (availableProductTypes'tan whitelisted UUID veya null).
+     * PMT multi-type firma — karışık katalogda her satır farklı tipte
+     * olabilir. Route AI'nın seçimini doğrudan persist eder (uniform
+     * inject KALDIRILDI). Kullanıcı UI'dan satır bazında override edebilir.
      */
     product_type_id: string | null;
     attributes: Record<string, unknown>;
     confidence: number;
+}
+
+export interface ProductTypeForExtraction {
+    id: string;
+    name: string;
+    fields: Array<{
+        field_key: string;
+        label_tr: string;
+        field_type: string;
+        unit: string | null;
+        options: string[] | null;
+    }>;
 }
 
 export interface ExtractProductsInput {
@@ -1337,17 +1350,14 @@ export interface ExtractProductsInput {
     mimeType: string;
     fileName: string;
     excelTextSample?: string;
-    productTypeContext: {
-        id: string;
-        name: string;
-        fields: Array<{
-            field_key: string;
-            label_tr: string;
-            field_type: string;
-            unit: string | null;
-            options: string[] | null;
-        }>;
-    } | null;
+    /**
+     * Review 3b 3.tur: tek tip context yerine TÜM aktif tipler. AI item
+     * başına `product_type_id` seçer (whitelisted UUID). PMT multi-type
+     * firma — vana/conta/flans/fitting/bağlantı/enstrüman vs. karışık
+     * katalog desteklenir. Tek tipe kısıtlamak gerekirse route bu array'i
+     * tek elemana indirir.
+     */
+    availableProductTypes: ProductTypeForExtraction[];
     multiRow: boolean; // catalog=true, datasheet=false
 }
 
@@ -1356,29 +1366,36 @@ export interface ExtractProductsResult {
 }
 
 function buildExtractionSystemPrompt(input: ExtractProductsInput): string {
-    const ctx = input.productTypeContext;
-    const fieldsBlock = ctx?.fields?.length
-        ? ctx.fields.map(f => {
-            const opts = f.options?.length ? ` [seçenekler: ${f.options.slice(0, 12).join(", ")}]` : "";
-            const unit = f.unit ? ` (${f.unit})` : "";
-            return `- ${f.field_key} (${f.field_type}${unit}): ${f.label_tr}${opts}`;
-        }).join("\n")
-        : "(ürün tipi belirsiz; sadece name + sku çıkar)";
+    const types = input.availableProductTypes;
+    const typesBlock = types.length === 0
+        ? "(sistem tipi yok — sadece name + sku çıkar, attributes boş bırak)"
+        : types.map(t => {
+            const fieldsList = t.fields.length === 0
+                ? "  (bu tipin tanımlı alanı yok)"
+                : t.fields.map(f => {
+                    const opts = f.options?.length ? ` [seçenekler: ${f.options.slice(0, 12).join(", ")}]` : "";
+                    const unit = f.unit ? ` (${f.unit})` : "";
+                    return `  - ${f.field_key} (${f.field_type}${unit}): ${f.label_tr}${opts}`;
+                }).join("\n");
+            return `### ${t.id} — ${t.name}\n${fieldsList}`;
+        }).join("\n\n");
 
     const cardinality = input.multiRow
-        ? "Belge bir KATALOG; her benzersiz ürün satırını ayrı item olarak çıkar."
+        ? "Belge bir KATALOG; her benzersiz ürün satırını ayrı item olarak çıkar (karışık tipte ürünler olabilir)."
         : "Belge tek bir ürünün VERİ SAYFASI; yalnız bir item üret (line=1).";
 
-    return `Sen bir endüstriyel vana/fitting kataloğunu analiz eden ekstraksiyon asistanısın.
+    return `Sen bir endüstriyel ekipman kataloğunu analiz eden ekstraksiyon asistanısın.
 ${cardinality}
 
-Ürün tipi: ${ctx?.name ?? "belirsiz"}
-Tipe ait alanlar:
-${fieldsBlock}
+Aşağıda sistemdeki mevcut ürün tipleri ve her tipin alan tanımları var:
+
+${typesBlock}
 
 Kurallar:
+- Her item için en uygun tipin UUID'sini "product_type_id" alanına yaz. Hiçbiri uymuyorsa null bırak.
+- "attributes" objesinde YALNIZ seçtiğin tipin field_key'lerini kullan; başka tipin alanlarını yazma.
+- Sayısal değerleri number tipinde, select'leri tam liste değerinde yaz.
 - Her item için name (Türkçe normalize) ve sku (varsa) çıkar.
-- attributes objesinde yalnız yukarıdaki field_key'leri kullan; sayısal değerleri number tipinde, select'leri tam liste değerinde yaz.
 - Bilmediğin alanı boş bırak (null veya hiç ekleme).
 - confidence: 0.0-1.0 float — emin değilsen düşük tut.
 - Çıkarımı normalize et: TR/EN karışık ise ortak token'a indirge ("Valve DN50 PN16" → name "Vana DN50 PN16").
@@ -1386,12 +1403,24 @@ Kurallar:
 Çıktı YALNIZCA aşağıdaki JSON formatında olmalı (başka metin yok):
 {
   "items": [
-    { "line": 1, "name": "...", "sku": "...", "attributes": { "field_key": value, ... }, "confidence": 0.92 }
+    {
+      "line": 1,
+      "name": "...",
+      "sku": "...",
+      "product_type_id": "<yukarıdaki UUID'lerden biri veya null>",
+      "attributes": { "field_key": value, ... },
+      "confidence": 0.92
+    }
   ]
 }`;
 }
 
-export function parseExtractionResponse(text: string, allowedFieldKeys: Set<string>): ExtractProductsResult {
+const EXTRACTION_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function parseExtractionResponse(
+    text: string,
+    availableProductTypes: ProductTypeForExtraction[],
+): ExtractProductsResult {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return { items: [] };
 
@@ -1404,6 +1433,13 @@ export function parseExtractionResponse(text: string, allowedFieldKeys: Set<stri
 
     if (!Array.isArray(raw.items)) return { items: [] };
 
+    // Tip → field_keys Set haritası (per-item attribute whitelist için)
+    const fieldKeysByType = new Map<string, Set<string>>();
+    for (const t of availableProductTypes) {
+        fieldKeysByType.set(t.id, new Set(t.fields.map(f => f.field_key)));
+    }
+    const validTypeIds = new Set(availableProductTypes.map(t => t.id));
+
     const out: ExtractedProductLine[] = [];
     for (const item of raw.items) {
         if (!item || typeof item !== "object") continue;
@@ -1413,11 +1449,23 @@ export function parseExtractionResponse(text: string, allowedFieldKeys: Set<stri
         const sku = typeof it.sku === "string" ? sanitizeAiOutput(it.sku, 100) : null;
         const confidence = clampConfidence(typeof it.confidence === "number" ? it.confidence : 0);
 
+        // product_type_id: UUID + whitelist
+        let product_type_id: string | null = null;
+        if (typeof it.product_type_id === "string"
+            && EXTRACTION_UUID_RE.test(it.product_type_id)
+            && validTypeIds.has(it.product_type_id)) {
+            product_type_id = it.product_type_id;
+        }
+
+        // attributes whitelist: item'ın tipine göre dinamik
+        const allowedKeys = product_type_id
+            ? (fieldKeysByType.get(product_type_id) ?? new Set<string>())
+            : new Set<string>();
+
         const rawAttrs = (it.attributes && typeof it.attributes === "object") ? it.attributes as Record<string, unknown> : {};
         const attributes: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(rawAttrs)) {
-            if (allowedFieldKeys.size > 0 && !allowedFieldKeys.has(k)) continue;
-            // Basic sanitize: string'leri kırp, primitive'leri olduğu gibi al
+            if (!allowedKeys.has(k)) continue; // tip belirsizse veya tipin alanı değilse drop
             if (typeof v === "string") {
                 attributes[k] = sanitizeAiOutput(v, 300);
             } else if (typeof v === "number" || typeof v === "boolean" || v === null) {
@@ -1425,8 +1473,8 @@ export function parseExtractionResponse(text: string, allowedFieldKeys: Set<stri
             }
             // Diğer (object/array) tipler reddedilir — şema basit tutuluyor
         }
-        // product_type_id: route inject eder (P2-A) — parse stage'de null
-        out.push({ line, name, sku, product_type_id: null, attributes, confidence });
+
+        out.push({ line, name, sku, product_type_id, attributes, confidence });
     }
     return { items: out };
 }
@@ -1468,17 +1516,17 @@ export async function aiExtractProductsFromDocument(
             .map(c => (c as { type: "text"; text: string }).text)
             .join("\n");
 
-        const allowedFieldKeys = new Set(input.productTypeContext?.fields.map(f => f.field_key) ?? []);
-        const result = parseExtractionResponse(text, allowedFieldKeys);
+        const result = parseExtractionResponse(text, input.availableProductTypes);
 
         const avgConf = result.items.length > 0
             ? result.items.reduce((s, it) => s + it.confidence, 0) / result.items.length
             : 0;
 
+        const typeIdsHash = input.availableProductTypes.map(t => t.id).sort().join(",");
         void logAiRun({
             feature: "import_extract_products",
             entity_id: null,
-            input_hash: hashInput(`${input.mimeType}:${input.fileName}:${input.buffer.length}:${input.productTypeContext?.id ?? "none"}`),
+            input_hash: hashInput(`${input.mimeType}:${input.fileName}:${input.buffer.length}:${typeIdsHash}`),
             confidence: avgConf,
             latency_ms: Date.now() - t0,
             model: MODEL,

@@ -6,6 +6,7 @@ import {
     formatMatchAction,
     getMatchActionColor,
     pickSuggestedAction,
+    formatProductTypeName,
 } from "@/components/import/ExtractionReview";
 import {
     isExtractionSupportedType,
@@ -53,6 +54,30 @@ describe("pickSuggestedAction", () => {
     });
     it("<60 → new_product", () => {
         expect(pickSuggestedAction(59)).toBe("new_product");
+    });
+});
+
+describe("formatProductTypeName (Review 3b 3.tur multi-type)", () => {
+    const types = [
+        { id: "type-vana", name: "Vana" },
+        { id: "type-conta", name: "Conta" },
+    ];
+
+    it("null id → —", () => {
+        expect(formatProductTypeName(null, types)).toBe("—");
+    });
+
+    it("known UUID → name", () => {
+        expect(formatProductTypeName("type-vana", types)).toBe("Vana");
+        expect(formatProductTypeName("type-conta", types)).toBe("Conta");
+    });
+
+    it("unknown UUID → —", () => {
+        expect(formatProductTypeName("type-unknown", types)).toBe("—");
+    });
+
+    it("empty types list + any id → —", () => {
+        expect(formatProductTypeName("type-vana", [])).toBe("—");
     });
 });
 
