@@ -340,11 +340,14 @@ describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
         expect(lines[0].product_type_id).toBe("type-x");
     });
 
-    it("body productTypeId verilmiş ama tip bulunamadı → 400 (Review 3b 2.tur fail-closed)", async () => {
+    it("body productTypeId verilmiş ama tip bulunamadı → 400 (storage + cache yüklenmeden, 4.tur)", async () => {
         mockGetDoc.mockResolvedValueOnce(PROD_DOC);
         mockGetProductType.mockResolvedValueOnce(null); // tip silinmiş / stale id
         const res = await callPOST(makeReq("doc-1", { productTypeId: "type-deleted" }), "doc-1");
         expect(res.status).toBe(400);
+        // 4.tur: early validation — storage download, loadActiveMatchables ve AI hiç çağrılmaz
+        expect(mockStorageDownload).not.toHaveBeenCalled();
+        expect(mockLoadActiveMatchables).not.toHaveBeenCalled();
         expect(mockExtractProducts).not.toHaveBeenCalled();
         expect(mockReplaceLines).not.toHaveBeenCalled();
     });

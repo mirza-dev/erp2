@@ -119,6 +119,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             }
         } catch { /* boş body OK */ }
 
+        // Review 3b 4.tur P3: Body productTypeId early validation — kullanıcının
+        // bilinçli girdisi storage download + matcher cache yüklemeden ÖNCE
+        // doğrulanır. Stale/tampered id için gereksiz I/O atlanır.
+        let resolvedBodyType: Awaited<ReturnType<typeof dbGetProductTypeWithFields>> | null = null;
+        if (bodyProductTypeId) {
+            resolvedBodyType = await dbGetProductTypeWithFields(bodyProductTypeId).catch(() => null);
+            if (!resolvedBodyType) {
+                return NextResponse.json(
+                    { error: "Belirtilen ürün tipi bulunamadı." },
+                    { status: 400 },
+                );
+            }
+        }
+
         // Pre-AI hard cancel
         if (req.signal.aborted) return new NextResponse(null, { status: 499 });
 
@@ -144,23 +158,17 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             // Tüm aktif tipleri AI context'ine ver; AI item başına en uygun
             // product_type_id'yi seçer (whitelisted). Body productTypeId
             // verildiyse availableProductTypes tek tipe filtrelenir
-            // ("sadece bu tip katalogu" semantiği).
+            // ("sadece bu tip katalogu" semantiği — resolvedBodyType erken
+            // doğrulamada zaten yüklendi, tekrar fetch yok).
             let availableProductTypes: Array<{
                 id: string; name: string;
                 fields: Array<{ field_key: string; label_tr: string; field_type: string; unit: string | null; options: string[] | null }>;
             }> = [];
 
-            if (bodyProductTypeId) {
-                const single = await dbGetProductTypeWithFields(bodyProductTypeId).catch(() => null);
-                if (!single) {
-                    return NextResponse.json(
-                        { error: "Belirtilen ürün tipi bulunamadı." },
-                        { status: 400 },
-                    );
-                }
+            if (resolvedBodyType) {
                 availableProductTypes = [{
-                    id: single.id, name: single.name,
-                    fields: single.fields.map(f => ({
+                    id: resolvedBodyType.id, name: resolvedBodyType.name,
+                    fields: resolvedBodyType.fields.map(f => ({
                         field_key: f.field_key, label_tr: f.label_tr,
                         field_type: f.field_type, unit: f.unit, options: f.options,
                     })),

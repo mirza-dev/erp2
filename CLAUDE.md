@@ -3,7 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3b Review 3.tur — Multi-type extraction refactor (2026-05-20; 3345 test)
+**Son tamamlanan iş:** Faz 3b Review 4.tur — 2 takip bulgu kapatma (2026-05-20; 3348 test)
+
+- **P3 (early validation):** Invalid/stale `bodyProductTypeId` artık storage download + `loadActiveMatchables` ÖNCESİNDE doğrulanır. `dbGetProductTypeWithFields` erken çağrıldı; sonuç null ise 400 (kullanıcı bilinçli girdisi → fail-closed). Başarılı çağrıda `resolvedBodyType` reuse — gereksiz 2. fetch yok. Önceki davranış: doc + storage + cache yüklenip sonra 400'e düşülüyordu (gereksiz I/O).
+- **P3 (bulk approve interaction test):** `handleApproveAll` optimistic state davranışı şimdiye dek sadece helper testleriyle kanıtlıydı. Yeni `extraction-review-interaction.test.tsx` (jsdom + RTL): (1) tüm matched satırlar başarılı PATCH → tümü "Onaylandı" badge'e geçer + 1 `router.refresh()`; (2) karışık başarı/hata → 1 reviewed + 1 matched, ayrı toast'lar; (3) matched satır yoksa info toast + fetch atmaz. Stale UI regression artık unit-test seviyesinde kilitli.
+- **+1 mevcut test güncellemesi** (storage/cache çağrılmadığını doğrulayan extra assertion) **+3 yeni RTL test**
+- 3 dosya · **3348 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3b Review 3.tur — Multi-type extraction refactor (2026-05-20; 3345 test) · commit `fbf828f`
 
 - **Kullanıcı feedback:** "PMT tek tip ürün katoloğu olan bir firma değil çeşitli ürünler var ve her tip ürün de girebilir sistemin bunlara hazır olması gerek." 2.tur'daki "tek-tip katalog assumption" düzeltildi; plan'ın orijinal multi-type tarifine uygun refactor yapıldı.
 - **AI service:** `ExtractProductsInput.productTypeContext` (tek) → `availableProductTypes` (Array). System prompt her tip için `### {UUID} — {name}` başlığı altında fields listesi. AI item başına `product_type_id` (UUID, whitelisted) seçer. `parseExtractionResponse(text, availableProductTypes)` — `product_type_id` UUID + whitelist check; attributes filter item başına DİNAMİK (item.product_type_id'nin field_key'lerinden olmayan alanlar drop). Tip belirlenmediyse attributes boş set ile filter → free-form'a düşer.

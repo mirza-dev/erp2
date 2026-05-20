@@ -7,6 +7,16 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-20
 
+**Faz 3b Review 4.tur — Early validation + bulk approve RTL test (3348 test)**
+
+- **P3 (early validation):** Invalid `bodyProductTypeId` storage download + `loadActiveMatchables` öncesinde 400 döner. Gereksiz I/O atlanır. `resolvedBodyType` reuse → ek fetch yok.
+- **P3 (bulk approve RTL):** Yeni `extraction-review-interaction.test.tsx` (jsdom). 3 senaryo: tümü başarılı → tümü Onaylandı + 1 router.refresh; karışık → reviewed/matched ayrı badge + ayrı toast; matched yoksa → info toast, fetch atmaz. Stale UI regression unit-test'le kilitli.
+- 3 dosya · **3348 test yeşil** · TS clean · 0 lint · build OK
+
+---
+
+## Önceki — Faz 3b Review 3.tur (3345 test)
+
 **Faz 3b Review 3.tur — Multi-type extraction refactor (3345 test)**
 
 - **Kullanıcı feedback:** "PMT tek tip ürün katoloğu olan bir firma değil" → 2.tur'daki tek-tip assumption düzeltildi
