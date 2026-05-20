@@ -30,7 +30,7 @@ _Son güncelleme: 2026-05-20_
 - **P3 (commit point):** Hard cancel garantisi `dbCreateImportDocument` çağrısına KADAR geçerli. Helper başladıktan sonra 3-step orphan-safe transaction (INSERT pending → upload → UPDATE classified) kendi try/catch'i ile tamamlanır veya rollback eder; signal helper'a yayılmaz. Helper sonrası nadir orphan ihtimali 3c'deki 30-gün storage cron cleanup'ına bırakılmıştır.
 - **Karar gerekçesi:** Helper'a signal yaymak ~5-10 satır + 2-3 test gerektirir ama storage cleanup async olduğu için race penceresini sıfırlamaz, sadece daraltır. Commit point semantiği daha temiz ve test yüzeyi küçük.
 - **Dokümantasyon:** `dbCreateImportDocument` JSDoc'una commit-point note + `route.ts` pre-write guard yorumuna semantik açıklama. Kod davranışı değişmedi.
-- 3 dosya · **3200 test yeşil** · TS clean · 0 lint warning · build OK
+- 4 dosya · **3200 test yeşil** · TS clean · 0 lint warning · build OK
 
 **Önceki:** Faz 3a Review 3.d — Pre-write abort guard (auth.getUser race) (2026-05-20; 3200 test)
 

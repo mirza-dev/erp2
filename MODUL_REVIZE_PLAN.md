@@ -370,7 +370,8 @@ Tek "dosya bırak" arayüzü. AI belge tipini sınıflandırır → uygun extrac
    - Yeni ürün(ler) yaratılır
    - Mevcut ürün(ler) güncellenir
    - Belge `product_attachments`'a yazılır + dosya Storage'a yüklenir
-   - Sertifika ise `product_batches`'a yeni parti açılır
+   - Sertifika `product_attachments` (kind=certificate) ile ürüne bağlanır
+     (Faz 2e iptal: parti tablosu kullanılmıyor; sertifika doğrudan ürüne)
    - Eski versiyon "önceki versiyon" işaretlenir (superseded_by)
    ↓
 7. Audit log + toast
@@ -427,7 +428,7 @@ Yüklenen dosyayı incele ve tipini tespit et:
 
 ### Kabul Kriterleri
 - Spiral Wound katalog PDF (gerçek örnek) → 6+ conta ürünü taslağı, kullanıcı onayıyla eklenir
-- 3.1 sertifika Excel → 1 ürün eşleştirilir (high confidence) veya sorulur (low confidence) + parti açılır + dosya eklenir
+- 3.1 sertifika (PDF/Excel) → 1 ürün eşleştirilir (high confidence) veya sorulur (low confidence) + `product_attachments` (kind=certificate) ile ürüne bağlanır + dosya Storage'a yüklenir (Faz 2e iptal: parti tablosu yok)
 - Çoklu dosya yükleme → sıralı onay ekranları
 - Eski/yeni sertifika versiyonlama çalışır
 - Eski 7-adım wizard kaldırılır veya "Klasik Mod" altına gizlenir
