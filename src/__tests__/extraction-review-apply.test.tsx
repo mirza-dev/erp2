@@ -187,4 +187,54 @@ describe("ExtractionReview — Faz 3c Apply", () => {
         expect(btn.getAttribute("title")).toMatch(/uygulandı/i);
         expect(screen.getByText(/Belge uygulandı/)).toBeTruthy();
     });
+
+    // ── Faz 3c Review — all-fail policy + attachments_superseded ──
+
+    it("all-fail (successCount=0) → button enabled kalır, warning toast, doc applied'a geçmez", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+            ok: true,
+            result: {
+                products_created: 0, products_updated: 0, attachments_created: 0,
+                attachments_superseded: 0, skipped: 1,
+                errors: ["Satır 1: SKU eksik"], untyped_products: 0,
+            },
+        }), { status: 200 })));
+
+        render(<ExtractionReview document={DOC} initialLines={[makeLine("1")]} productTypes={[]} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /^Uygula$/ }));
+        });
+
+        await waitFor(() => {
+            expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+                type: "warning",
+                message: expect.stringMatching(/Hiçbir satır uygulanamadı/i),
+            }));
+        });
+        // Button hâlâ enabled (doc 'classified' kalır, retry mümkün)
+        expect(screen.getByRole("button", { name: /^Uygula$/ })).toHaveProperty("disabled", false);
+        // "Belge uygulandı" hint görünmez
+        expect(screen.queryByText(/Belge uygulandı/)).toBeNull();
+    });
+
+    it("attachments_superseded > 0 → sonuç panelinde 'önceki versiyon' bilgisi", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+            ok: true,
+            result: {
+                products_created: 0, products_updated: 0, attachments_created: 1,
+                attachments_superseded: 2, skipped: 0, errors: [], untyped_products: 0,
+            },
+        }), { status: 200 })));
+
+        render(<ExtractionReview document={DOC} initialLines={[makeLine("1")]} productTypes={[]} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /^Uygula$/ }));
+        });
+
+        await waitFor(() => {
+            expect(screen.getByText(/2 eski sertifika önceki versiyona alındı/)).toBeTruthy();
+        });
+    });
 });

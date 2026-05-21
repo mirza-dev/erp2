@@ -5,7 +5,21 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-21
+## Son Tamamlanan İş — 2026-05-22
+
+**Faz 3c Review — 4 P2/P3 bulgu kapatma (3401 test)**
+
+- **P2-1 (cert versiyonlama):** Kullanıcı önceki "supersede etme" kararını güncelledi → yeni `dbSupersedeCertificatesByName` helper'ı (ad bazlı eşleşme, self-exclude). Apply cert branch'inde dbCreateAttachment sonrası çağrılır; fail warning olarak errors[]. UI'da "N eski sertifika önceki versiyona alındı".
+- **P2-2 (all-fail policy):** successCount===0 ise doc 'classified' kalır, retry mümkün. UI button enabled + warning toast.
+- **P3 (PATCH 409):** Applied belgede satır PATCH'i 409. Parent doc fetch eklendi.
+- **P3 (aggregate audit):** Tek audit_log entry action='import_applied' (success/all-fail dahil). Insert fail silent.
+- **+14 test** (service 7 + line-patch 2 + RTL 2 + helper 3)
+- 7 dosya · **3401 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 3d — klasik mod toggle cleanup (eski 7-adım wizard "Klasik Mod" altına gizleme, AI default akış polish).
+
+---
+
+## Önceki — Faz 3c (3387 test)
 
 **Faz 3c — Review screen apply pipeline (3387 test)**
 

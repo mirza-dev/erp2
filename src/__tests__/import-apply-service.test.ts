@@ -27,15 +27,21 @@ vi.mock("@/lib/supabase/products", () => ({
     dbGetProductById: (...a: unknown[]) => mockGetProductById(...a),
 }));
 
+const mockSupersedeCerts = vi.fn();
 vi.mock("@/lib/supabase/product-attachments", () => ({
     dbCreateAttachment: (...a: unknown[]) => mockCreateAttachment(...a),
+    dbSupersedeCertificatesByName: (...a: unknown[]) => mockSupersedeCerts(...a),
 }));
 
+const mockAuditInsert = vi.fn(() => Promise.resolve({ error: null }));
 vi.mock("@/lib/supabase/service", async () => {
     const actual = await vi.importActual<typeof import("@/lib/supabase/service")>("@/lib/supabase/service");
     return {
         ...actual,
         createServiceClient: () => ({
+            from: (_table: string) => ({
+                insert: (row: unknown) => mockAuditInsert(row),
+            }),
             storage: { from: () => ({ download: (...a: unknown[]) => mockStorageDownload(...a) }) },
         }),
     };
@@ -86,6 +92,10 @@ beforeEach(() => {
     mockGetProductById.mockReset();
     mockCreateAttachment.mockReset();
     mockStorageDownload.mockReset();
+    mockSupersedeCerts.mockReset();
+    mockSupersedeCerts.mockResolvedValue(0);
+    mockAuditInsert.mockReset();
+    mockAuditInsert.mockImplementation(() => Promise.resolve({ error: null }));
     mockStorageDownload.mockResolvedValue({
         data: { arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer },
         error: null,
@@ -257,5 +267,120 @@ describe("serviceApplyImportDocument — partial failure + status", () => {
         const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
         await serviceApplyImportDocument("doc-1", null);
         expect(mockStorageDownload).not.toHaveBeenCalled();
+    });
+});
+
+// ── Faz 3c Review — cert versiyonlama, all-fail policy, aggregate audit ──
+
+describe("serviceApplyImportDocument — Review (P2-1 cert versioning)", () => {
+    const CERT_DOC = { ...DOC, classification: { ...DOC.classification, document_type: "material_certificate" } };
+
+    it("cert apply → dbSupersedeCertificatesByName çağrılır + attachments_superseded counter", async () => {
+        mockGetDoc.mockResolvedValueOnce(CERT_DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { extraction_type: "certificate_target", match_action: "matched", matched_product_id: "p-target" }),
+        ]);
+        mockCreateAttachment.mockResolvedValueOnce({ id: "att-new" });
+        mockSupersedeCerts.mockResolvedValueOnce(2); // 2 eski cert superseded
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.attachments_created).toBe(1);
+        expect(r.attachments_superseded).toBe(2);
+        expect(mockSupersedeCerts).toHaveBeenCalledWith("p-target", "catalog.pdf", "att-new");
+    });
+
+    it("versiyonlama fail → cert yine create, errors[] uyarı eklenir", async () => {
+        mockGetDoc.mockResolvedValueOnce(CERT_DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { extraction_type: "certificate_target", match_action: "matched", matched_product_id: "p-target" }),
+        ]);
+        mockCreateAttachment.mockResolvedValueOnce({ id: "att-new" });
+        mockSupersedeCerts.mockRejectedValueOnce(new Error("DB lock"));
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.attachments_created).toBe(1); // cert yine oluştu
+        expect(r.attachments_superseded).toBe(0);
+        expect(r.errors[0]).toMatch(/versiyonlama uyarısı/i);
+    });
+});
+
+describe("serviceApplyImportDocument — Review (P2-2 all-fail policy)", () => {
+    it("all-fail → dbUpdateImportDocumentStatus çağrılmaz, doc classified kalır", async () => {
+        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { match_action: "matched", matched_product_id: null }), // fail
+            makeLine("2", { extracted_name: "", extracted_sku: "x" }), // fail (ad eksik)
+        ]);
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", null);
+        expect(r.products_created).toBe(0);
+        expect(r.products_updated).toBe(0);
+        expect(r.attachments_created).toBe(0);
+        expect(r.errors.length).toBe(2);
+        // CRITICAL: status update çağrılmamalı (doc 'classified' kalır → retry)
+        expect(mockUpdateDocStatus).not.toHaveBeenCalled();
+    });
+
+    it("partial success → status applied (en az 1 başarı varsa)", async () => {
+        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1"), // OK new_product
+            makeLine("2", { match_action: "matched", matched_product_id: null }), // fail
+        ]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", null);
+        expect(r.products_created).toBe(1);
+        expect(r.errors.length).toBe(1);
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
+    });
+});
+
+describe("serviceApplyImportDocument — Review (P3 aggregate audit)", () => {
+    it("apply tamamlandıktan sonra audit_log 'import_applied' insert (success path)", async () => {
+        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([makeLine("1")]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await serviceApplyImportDocument("doc-1", "user-1");
+        expect(mockAuditInsert).toHaveBeenCalledTimes(1);
+        const row = mockAuditInsert.mock.calls[0]?.[0] as {
+            action: string; entity_type: string; entity_id: string;
+            after_state: { success: boolean; products_created: number };
+            actor: string | null;
+        };
+        expect(row.action).toBe("import_applied");
+        expect(row.entity_type).toBe("import_document");
+        expect(row.entity_id).toBe("doc-1");
+        expect(row.after_state.success).toBe(true);
+        expect(row.after_state.products_created).toBe(1);
+        expect(row.actor).toBe("user-1");
+    });
+
+    it("all-fail durumda da audit yazılır (forensic)", async () => {
+        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { match_action: "matched", matched_product_id: null }),
+        ]);
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await serviceApplyImportDocument("doc-1", null);
+        expect(mockAuditInsert).toHaveBeenCalledTimes(1);
+        const row = mockAuditInsert.mock.calls[0]?.[0] as {
+            after_state: { success: boolean; errors_count: number };
+        };
+        expect(row.after_state.success).toBe(false);
+        expect(row.after_state.errors_count).toBe(1);
+    });
+
+    it("audit insert fail (silent) → apply başarısı geri alınmaz", async () => {
+        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([makeLine("1")]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        mockAuditInsert.mockResolvedValueOnce({ error: { message: "DB down" } });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", null);
+        // Apply başarılı: audit fail throw etmez
+        expect(r.products_created).toBe(1);
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
     });
 });

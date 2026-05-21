@@ -8,6 +8,7 @@ const mockGetLine = vi.fn();
 const mockUpdateLine = vi.fn();
 const mockGetProductById = vi.fn();
 const mockGetProductType = vi.fn();
+const mockGetImportDoc = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
@@ -21,6 +22,10 @@ vi.mock("@/lib/supabase/import-document-lines", async () => {
         dbUpdateLineMatch: (...a: unknown[]) => mockUpdateLine(...a),
     };
 });
+
+vi.mock("@/lib/supabase/import-documents", () => ({
+    dbGetImportDocument: (...a: unknown[]) => mockGetImportDoc(...a),
+}));
 
 vi.mock("@/lib/supabase/products", () => ({
     dbGetProductById: (...a: unknown[]) => mockGetProductById(...a),
@@ -48,6 +53,9 @@ beforeEach(() => {
     mockUpdateLine.mockReset();
     mockGetProductById.mockReset();
     mockGetProductType.mockReset();
+    mockGetImportDoc.mockReset();
+    // Default: doc 'classified' (mevcut testler buna göre yazıldı; Faz 3c Review)
+    mockGetImportDoc.mockResolvedValue({ id: "doc-1", status: "classified" });
 });
 
 // Valid UUID for happy paths
@@ -82,21 +90,21 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("400 for invalid match_action", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         const res = await callPATCH("l-1", { match_action: "garbage" });
         expect(res.status).toBe(400);
     });
 
     it("400 when matched action without matched_product_id", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         const res = await callPATCH("l-1", { match_action: "matched" });
         expect(res.status).toBe(400);
     });
 
     it("happy: matched action with product_id → 200", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockGetProductById.mockResolvedValueOnce({ id: PID, is_active: true });
         mockUpdateLine.mockResolvedValueOnce({ id: "l-1", match_action: "matched" });
         const res = await callPATCH("l-1", { match_action: "matched", matched_product_id: PID, match_confidence: 95 });
@@ -111,7 +119,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
     // ── Review 3b P3-F: validation hardening ──
     it("invalid UUID → 400 (DB cast hatasına düşmez)", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         const res = await callPATCH("l-1", { match_action: "matched", matched_product_id: "not-a-uuid" });
         expect(res.status).toBe(400);
         expect(mockGetProductById).not.toHaveBeenCalled();
@@ -120,7 +128,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("matched action + ürün bulunamadı → 400", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockGetProductById.mockResolvedValueOnce(null);
         const res = await callPATCH("l-1", { match_action: "matched", matched_product_id: PID });
         expect(res.status).toBe(400);
@@ -129,7 +137,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("matched action + ürün pasif → 400", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockGetProductById.mockResolvedValueOnce({ id: PID, is_active: false });
         const res = await callPATCH("l-1", { match_action: "matched", matched_product_id: PID });
         expect(res.status).toBe(400);
@@ -138,7 +146,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("match_confidence > 100 → 400", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         const res = await callPATCH("l-1", { match_action: "skipped", match_confidence: 150 });
         expect(res.status).toBe(400);
         expect(mockUpdateLine).not.toHaveBeenCalled();
@@ -146,21 +154,21 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("match_confidence < 0 → 400", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         const res = await callPATCH("l-1", { match_action: "skipped", match_confidence: -10 });
         expect(res.status).toBe(400);
     });
 
     it("match_confidence non-number → 400", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         const res = await callPATCH("l-1", { match_action: "skipped", match_confidence: "high" });
         expect(res.status).toBe(400);
     });
 
     it("happy: skipped action (no product_id needed) → 200", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockUpdateLine.mockResolvedValueOnce({ id: "l-1", match_action: "skipped" });
         const res = await callPATCH("l-1", { match_action: "skipped" });
         expect(res.status).toBe(200);
@@ -168,7 +176,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("happy: new_product action → 200", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockUpdateLine.mockResolvedValueOnce({ id: "l-1", match_action: "new_product" });
         const res = await callPATCH("l-1", { match_action: "new_product" });
         expect(res.status).toBe(200);
@@ -179,7 +187,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("product_type_id override happy: UUID + ürün tipi var → 200 + helper'a forward", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockGetProductType.mockResolvedValueOnce({ id: TYPE_ID, name: "Vana" });
         mockUpdateLine.mockResolvedValueOnce({ id: "l-1", product_type_id: TYPE_ID });
         const res = await callPATCH("l-1", { match_action: "pending", product_type_id: TYPE_ID });
@@ -190,7 +198,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("product_type_id null → helper'a forward (explicit clear)", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockUpdateLine.mockResolvedValueOnce({ id: "l-1", product_type_id: null });
         const res = await callPATCH("l-1", { match_action: "pending", product_type_id: null });
         expect(res.status).toBe(200);
@@ -200,7 +208,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("product_type_id undefined → helper'da undefined (mevcut korunur)", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockUpdateLine.mockResolvedValueOnce({ id: "l-1" });
         const res = await callPATCH("l-1", { match_action: "pending" });
         expect(res.status).toBe(200);
@@ -210,7 +218,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("product_type_id invalid UUID → 400", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         const res = await callPATCH("l-1", { match_action: "pending", product_type_id: "garbage" });
         expect(res.status).toBe(400);
         expect(mockUpdateLine).not.toHaveBeenCalled();
@@ -218,7 +226,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("product_type_id var ama tip bulunamadı → 400", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockGetProductType.mockResolvedValueOnce(null);
         const res = await callPATCH("l-1", { match_action: "pending", product_type_id: TYPE_ID });
         expect(res.status).toBe(400);
@@ -227,8 +235,29 @@ describe("PATCH /api/import/document-lines/[id]", () => {
 
     it("product_type_id wrong type (number) → 400", async () => {
         mockRequireRole.mockResolvedValueOnce(null);
-        mockGetLine.mockResolvedValueOnce({ id: "l-1" });
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         const res = await callPATCH("l-1", { match_action: "pending", product_type_id: 42 });
         expect(res.status).toBe(400);
+    });
+
+    // ── Faz 3c Review P3: applied belgede PATCH 409 ──
+    it("parent doc.status='applied' → 409 + helper update çağrılmaz", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-applied" });
+        mockGetImportDoc.mockReset();
+        mockGetImportDoc.mockResolvedValueOnce({ id: "doc-applied", status: "applied" });
+        const res = await callPATCH("l-1", { match_action: "matched", matched_product_id: PID });
+        expect(res.status).toBe(409);
+        expect(mockUpdateLine).not.toHaveBeenCalled();
+        expect(mockGetProductById).not.toHaveBeenCalled();
+    });
+
+    it("parent doc.status='classified' → mevcut PATCH path çalışır (backward compat)", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
+        // Default mock zaten classified; explicit yine bırak
+        mockUpdateLine.mockResolvedValueOnce({ id: "l-1" });
+        const res = await callPATCH("l-1", { match_action: "skipped" });
+        expect(res.status).toBe(200);
     });
 });

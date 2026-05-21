@@ -17,7 +17,7 @@ import {
 } from "@/lib/supabase/import-documents";
 import { dbListLinesByDocument } from "@/lib/supabase/import-document-lines";
 import { dbCreateProduct, dbUpdateProduct, dbGetProductById } from "@/lib/supabase/products";
-import { dbCreateAttachment } from "@/lib/supabase/product-attachments";
+import { dbCreateAttachment, dbSupersedeCertificatesByName } from "@/lib/supabase/product-attachments";
 import type { ImportDocumentLineRow } from "@/lib/database.types";
 
 const STORAGE_BUCKET = "product-files";
@@ -28,6 +28,7 @@ export interface ApplyResult {
     products_created: number;
     products_updated: number;
     attachments_created: number;
+    attachments_superseded: number;
     skipped: number;
     errors: string[]; // "Satır N: <reason>"
     untyped_products: number;
@@ -38,6 +39,7 @@ function emptyResult(): ApplyResult {
         products_created: 0,
         products_updated: 0,
         attachments_created: 0,
+        attachments_superseded: 0,
         skipped: 0,
         errors: [],
         untyped_products: 0,
@@ -146,7 +148,7 @@ export async function serviceApplyImportDocument(
                 if (!docBuffer) {
                     throw new Error("belge buffer'ı yüklenemedi");
                 }
-                await dbCreateAttachment({
+                const newCert = await dbCreateAttachment({
                     productId: line.matched_product_id,
                     file: docBuffer,
                     fileName: doc.file_name,
@@ -156,6 +158,25 @@ export async function serviceApplyImportDocument(
                     uploadedBy: actorUserId,
                 });
                 result.attachments_created += 1;
+
+                // Faz 3c Review P2-1: aynı (product_id, file_name) eski aktif
+                // sertifikaları yeni cert'e supersede et. Versiyonlama fail
+                // ederse yeni cert geri alınmaz (zaten aktif); warning logla.
+                try {
+                    const superseded = await dbSupersedeCertificatesByName(
+                        line.matched_product_id,
+                        doc.file_name,
+                        newCert.id,
+                    );
+                    if (superseded > 0) {
+                        result.attachments_superseded += superseded;
+                    }
+                } catch (vErr) {
+                    const vMsg = vErr instanceof Error ? vErr.message : String(vErr);
+                    result.errors.push(
+                        `Satır ${line.line_number}: versiyonlama uyarısı — ${vMsg}`,
+                    );
+                }
             }
         } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -164,9 +185,46 @@ export async function serviceApplyImportDocument(
         }
     }
 
-    // 5. Doc terminal state (best-effort; başarı olmasa bile applied — kullanıcı
-    // re-extract veya new doc ile yeniden başlayabilir; errors[] log'da kalır).
-    await dbUpdateImportDocumentStatus(documentId, "applied");
+    // 5. Doc terminal state.
+    // Faz 3c Review P2-2: All-fail policy — successCount=0 ise doc 'classified'
+    // kalır; kullanıcı satırları düzeltip tekrar Uygula. Mevcut idempotency
+    // korunur (başarılı doc 'applied'; başarısız doc retry'a açık).
+    const successCount =
+        result.products_created
+        + result.products_updated
+        + result.attachments_created;
+
+    if (successCount > 0) {
+        await dbUpdateImportDocumentStatus(documentId, "applied");
+    }
+
+    // Faz 3c Review P3: Aggregate audit log — apply olayının forensic kaydı.
+    // Mevcut DB helper'ların kendi per-row audit'leri korunur; bu agg-level.
+    // All-fail dahil her apply denemesi loglanır (best-effort).
+    try {
+        const sb = createServiceClient();
+        const { error: auditErr } = await sb.from("audit_log").insert({
+            action: "import_applied",
+            entity_type: "import_document",
+            entity_id: documentId,
+            after_state: {
+                products_created: result.products_created,
+                products_updated: result.products_updated,
+                attachments_created: result.attachments_created,
+                attachments_superseded: result.attachments_superseded,
+                skipped: result.skipped,
+                errors_count: result.errors.length,
+                untyped_products: result.untyped_products,
+                success: successCount > 0,
+            },
+            source: "ui",
+            actor: actorUserId,
+        });
+        if (auditErr) console.warn("[import-apply] audit insert failed:", auditErr);
+    } catch (err) {
+        // Audit insert fail apply başarısını geri almaz; sadece log
+        console.warn("[import-apply] audit insert exception:", err);
+    }
 
     return result;
 }

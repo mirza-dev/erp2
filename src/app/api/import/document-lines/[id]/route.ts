@@ -15,6 +15,7 @@ import {
     dbUpdateLineMatch,
     isValidMatchAction,
 } from "@/lib/supabase/import-document-lines";
+import { dbGetImportDocument } from "@/lib/supabase/import-documents";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbGetProductType } from "@/lib/supabase/product-types";
 import { requireRole } from "@/lib/auth/role-guard";
@@ -35,6 +36,17 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
         const existing = await dbGetLine(id);
         if (!existing) return NextResponse.json({ error: "Satır bulunamadı." }, { status: 404 });
+
+        // Faz 3c Review P3: applied belgede satır PATCH'i 409 — apply ile
+        // doc terminal state'e geçti, satır düzenlemenin operational etkisi
+        // yok ve UI tutarlılığı bozulur. Extract route paterniyle uyumlu.
+        const parentDoc = await dbGetImportDocument(existing.document_id);
+        if (parentDoc?.status === "applied") {
+            return NextResponse.json(
+                { error: "Belge uygulandı, satır düzenlenemez." },
+                { status: 409 },
+            );
+        }
 
         const body = await req.json().catch(() => ({})) as Record<string, unknown>;
 

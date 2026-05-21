@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3c — Review screen apply pipeline (2026-05-21; 3387 test)
+**Son tamamlanan iş:** Faz 3c Review — 4 P2/P3 bulgu kapatma (2026-05-22; 3401 test)
+
+- **P2-1 (cert versiyonlama):** Önceki turdaki "supersede etme" kararı kullanıcı tarafından güncellendi → supersede ET. Yeni helper `dbSupersedeCertificatesByName(productId, fileName, newAttachmentId)`: aynı (product_id, kind=certificate, file_name) ile aktif (superseded_by IS NULL) cert'leri yeni cert id'ye bağlar; self-exclude (.neq("id", newId)). Apply service cert branch'inde `dbCreateAttachment` sonrası çağrılır; versiyonlama fail cert'i geri almaz, sadece warning errors[]'e eklenir. `ApplyResult.attachments_superseded` counter. UI sonuç paneline "N eski sertifika önceki versiyona alındı" satırı eklendi. UI Ekler sekmesi zaten `superseded_by IS NULL` filter'ı sayesinde sadece aktif olanı gösterir.
+- **P2-2 (all-fail policy):** `successCount = products_created + products_updated + attachments_created`. successCount===0 → `dbUpdateImportDocumentStatus("applied")` çağrılmaz, doc 'classified' kalır, kullanıcı satırları düzeltip tekrar Uygula. UI: koşullu `setDocStatus`, warning toast "Hiçbir satır uygulanamadı — hataları inceleyip tekrar deneyin", button enabled kalır.
+- **P3 (PATCH applied 409):** `line-patch route` `dbGetLine` sonrası parent doc fetch + `status === 'applied'` → 409 "Belge uygulandı, satır düzenlenemez". Extract route paterniyle uyumlu, UI tutarlılık.
+- **P3 (aggregate audit):** Apply tamamlandığında `audit_log` insert: action='import_applied', entity_type='import_document', after_state={counts, errors_count, success boolean}, actor. All-fail dahil her apply denemesi loglanır (forensic). Audit insert fail silent (apply başarısı geri alınmaz).
+- **+14 yeni test:** apply-service +7 (cert versioning happy/fail, all-fail status, partial success, aggregate audit success/all-fail/silent-fail), line-patch +2 (applied 409, classified mevcut path), RTL apply +2 (all-fail button enabled + warning, attachments_superseded panel), product-attachments-helper +3 (supersede happy/empty/error)
+- 7 dosya · **3401 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3c — Review screen apply pipeline (2026-05-21; 3387 test) · commit `d266718`
 
 - **Service:** `serviceApplyImportDocument(documentId, actorUserId)` — doc.status='classified' pre-check (idempotency); eligible filter (matched|reviewed|new_product); cert flow varsa storage download bir kez; per-row try/catch loose (serviceConfirmBatch paterni); new_product → `dbCreateProduct` (+ untyped_products counter); matched|reviewed → `dbUpdateProduct` (attributes merge `{...current, ...new}`); cert+matched|reviewed → `dbCreateAttachment` (kind=certificate, Faz 2d 3-step orphan-safe helper); cert+new_product → error+skip; doc.status='applied' terminal. `ApplyResult` { products_created, products_updated, attachments_created, skipped, errors[], untyped_products }.
 - **Helper:** `dbUpdateImportDocumentStatus(id, status)` (yeni) — generic status update + enum guard. `dbCreateProduct`/`dbUpdateProduct` mevcut (Faz 1) — reuse.

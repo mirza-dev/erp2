@@ -16,6 +16,7 @@ const mockDelete  = vi.fn();
 const mockSelect  = vi.fn();
 const mockEq      = vi.fn();
 const mockIs      = vi.fn();
+const mockNeq     = vi.fn();
 const mockOrder   = vi.fn();
 const mockSingle  = vi.fn();
 
@@ -35,6 +36,7 @@ const makeChain = () => {
     c.select = (v?: unknown) => { mockSelect(v); return c; };
     c.eq     = (k: unknown, v: unknown) => { mockEq(k, v); return c; };
     c.is     = (k: unknown, v: unknown) => { mockIs(k, v); return c; };
+    c.neq    = (k: unknown, v: unknown) => { mockNeq(k, v); return c; };
     c.order  = (v: unknown, o?: unknown) => { mockOrder(v, o); return c; };
     c.single = () => mockSingle();
     return c;
@@ -62,6 +64,7 @@ beforeEach(() => {
     mockSelect.mockReset();
     mockEq.mockReset();
     mockIs.mockReset();
+    mockNeq.mockReset();
     mockOrder.mockReset();
     mockSingle.mockReset();
     mockStorageUpload.mockReset();
@@ -166,5 +169,38 @@ describe("dbDeleteAttachment", () => {
 
         expect(mockDelete).toHaveBeenCalled();
         expect(mockStorageRemove).toHaveBeenCalledWith([`${PRODUCT_ID}/${ATTACH_ID}.png`]);
+    });
+});
+
+// ── Faz 3c Review — dbSupersedeCertificatesByName ──
+
+describe("dbSupersedeCertificatesByName", () => {
+    const NEW_ID = "00000000-0000-4000-8000-000000000099";
+
+    it("eski aktif cert'leri supersede eder, sayım döner", async () => {
+        setTerminal({ data: [{ id: "old-1" }, { id: "old-2" }], error: null });
+        const { dbSupersedeCertificatesByName } = await import("@/lib/supabase/product-attachments");
+        const count = await dbSupersedeCertificatesByName(PRODUCT_ID, "cert.pdf", NEW_ID);
+        expect(count).toBe(2);
+        expect(mockUpdate).toHaveBeenCalledWith({ superseded_by: NEW_ID });
+        expect(mockEq).toHaveBeenCalledWith("product_id", PRODUCT_ID);
+        expect(mockEq).toHaveBeenCalledWith("kind", "certificate");
+        expect(mockEq).toHaveBeenCalledWith("file_name", "cert.pdf");
+        expect(mockIs).toHaveBeenCalledWith("superseded_by", null);
+        expect(mockNeq).toHaveBeenCalledWith("id", NEW_ID);
+    });
+
+    it("eşleşen eski cert yoksa → 0 döner", async () => {
+        setTerminal({ data: [], error: null });
+        const { dbSupersedeCertificatesByName } = await import("@/lib/supabase/product-attachments");
+        const count = await dbSupersedeCertificatesByName(PRODUCT_ID, "new.pdf", NEW_ID);
+        expect(count).toBe(0);
+    });
+
+    it("DB error → throw", async () => {
+        setTerminal({ data: null, error: { message: "DB lock" } });
+        const { dbSupersedeCertificatesByName } = await import("@/lib/supabase/product-attachments");
+        await expect(dbSupersedeCertificatesByName(PRODUCT_ID, "cert.pdf", NEW_ID))
+            .rejects.toThrow(/versiyonlama başarısız/i);
     });
 });

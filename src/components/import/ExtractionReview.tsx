@@ -66,6 +66,7 @@ export interface ApplyResultSummary {
     products_created: number;
     products_updated: number;
     attachments_created: number;
+    attachments_superseded: number;
     skipped: number;
     errors: string[];
     untyped_products: number;
@@ -154,15 +155,22 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             }
             const result = body.result as ApplyResultSummary;
             setApplyResult(result);
-            setDocStatus("applied");
             const successCount = result.products_created + result.products_updated + result.attachments_created;
+            // Faz 3c Review P2-2: all-fail durumunda doc 'classified' kalır —
+            // button enabled kalmalı, retry mümkün olsun.
             if (successCount > 0) {
+                setDocStatus("applied");
+                router.refresh();
                 toast({ type: "success", message: `${successCount} işlem uygulandı` });
+            } else if (result.errors.length > 0) {
+                toast({
+                    type: "warning",
+                    message: "Hiçbir satır uygulanamadı — hataları inceleyip tekrar deneyin",
+                });
             }
-            if (result.errors.length > 0) {
+            if (result.errors.length > 0 && successCount > 0) {
                 toast({ type: "error", message: `${result.errors.length} satır hatayla atlandı` });
             }
-            router.refresh();
         } catch (e) {
             toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
         } finally {
@@ -553,6 +561,9 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                             </div>
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                                 {applyResult.products_created} yeni ürün · {applyResult.products_updated} güncelleme · {applyResult.attachments_created} sertifika · {applyResult.skipped} atlandı
+                                {applyResult.attachments_superseded > 0 && (
+                                    <> · {applyResult.attachments_superseded} eski sertifika önceki versiyona alındı</>
+                                )}
                             </div>
                             {applyResult.untyped_products > 0 && (
                                 <div style={{

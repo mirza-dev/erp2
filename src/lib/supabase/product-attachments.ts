@@ -127,6 +127,37 @@ export async function dbCreateAttachment(input: CreateAttachmentInput): Promise<
     return updated;
 }
 
+/**
+ * Faz 3c Review: Aynı (product_id, kind=certificate, file_name) ile mevcut
+ * AKTİF (superseded_by IS NULL) sertifikaları yeni cert'e bağlar
+ * (`superseded_by = newAttachmentId`). PMT için ad bazlı eşleşme yeterli:
+ * aynı PDF dosyası tekrar yüklenirse "yeni versiyon" sayılır.
+ *
+ * UI Ekler sekmesi zaten `superseded_by IS NULL` filter'ı kullanıyor →
+ * supersede edilen eski cert'ler listede görünmez, sadece yeni aktif kalır.
+ *
+ * Yeni cert'in kendisi (`newAttachmentId`) defansif olarak hariç tutulur.
+ * @returns superseded edilen eski cert sayısı
+ */
+export async function dbSupersedeCertificatesByName(
+    productId: string,
+    fileName: string,
+    newAttachmentId: string,
+): Promise<number> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("product_attachments")
+        .update({ superseded_by: newAttachmentId })
+        .eq("product_id", productId)
+        .eq("kind", "certificate")
+        .eq("file_name", fileName)
+        .is("superseded_by", null)
+        .neq("id", newAttachmentId)
+        .select("id");
+    if (error) throw new Error(`Sertifika versiyonlama başarısız: ${error.message}`);
+    return (data ?? []).length;
+}
+
 export async function dbDeleteAttachment(id: string): Promise<void> {
     const supabase = createServiceClient();
 
