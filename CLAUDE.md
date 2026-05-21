@@ -3,7 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3b Review 6.tur — Type-aware matcher + cert-flow per-row Tip kolonu (2026-05-21; 3360 test)
+**Son tamamlanan iş:** Faz 3c — Review screen apply pipeline (2026-05-21; 3387 test)
+
+- **Service:** `serviceApplyImportDocument(documentId, actorUserId)` — doc.status='classified' pre-check (idempotency); eligible filter (matched|reviewed|new_product); cert flow varsa storage download bir kez; per-row try/catch loose (serviceConfirmBatch paterni); new_product → `dbCreateProduct` (+ untyped_products counter); matched|reviewed → `dbUpdateProduct` (attributes merge `{...current, ...new}`); cert+matched|reviewed → `dbCreateAttachment` (kind=certificate, Faz 2d 3-step orphan-safe helper); cert+new_product → error+skip; doc.status='applied' terminal. `ApplyResult` { products_created, products_updated, attachments_created, skipped, errors[], untyped_products }.
+- **Helper:** `dbUpdateImportDocumentStatus(id, status)` (yeni) — generic status update + enum guard. `dbCreateProduct`/`dbUpdateProduct` mevcut (Faz 1) — reuse.
+- **Route:** `POST /api/import/documents/[id]/apply` — requireRole admin|purchaser, service çağrısı, revalidateTag("products","max"), pre-check throw'ları 400 mapping (bulunamadı / hazır değil).
+- **UI ExtractionReview:** "Uygula (Faz 3c)" placeholder → aktif `<Button>` (hasApplicable + applying + isDocApplied + isDemo guard); `handleApply` POST → `applyResult` state; sonuç paneli (counts breakdown + untyped warning + errors details accordion); doc.status='applied' → "Belge uygulandı" mesajı.
+- **Cert versiyonlama:** Bu faz scope dışı — `superseded_by` yazılmaz, tüm cert'ler aktif kalır. UI Ekler sekmesi zaten `superseded_by IS NULL` filter'ı kullanıyor → yeni cert'ler doğrudan listelenir. Versiyonlama gelecek bir tura ertelendi.
+- **NULL product_type_id:** Yeni ürün AI tip seçememişse `products.product_type_id=NULL` ile yarat (Faz 1 izin veriyor); UI warning bilgisi.
+- **+27 yeni test:** apply-service (13) + apply-route (6) + RTL apply UI (6) + helper status (2)
+- 6 yeni dosya · 3 değişen · **3387 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3b Review 6.tur — Type-aware matcher + cert-flow per-row Tip kolonu (2026-05-21; 3360 test) · commit `ed36aaf`
 
 - **P2 (matcher type-blind):** Faz 3b 3.tur multi-type extraction'da AI item başına `product_type_id` seçiyordu ama matcher bu bilgiyi kullanmıyordu. PMT multi-type firma — aynı DN/PN'li farklı tipte ürünler (vana DN50 vs conta DN50) yanlış top-candidate üretebiliyordu. **Soft boost + penalty paterni** eklendi: `MatchableProduct` ve `ExtractedRowInput` `product_type_id` alanları + `scoreProductMatch` aynı tip +20 / farklı tip -20 / her ikisi non-null değilse nötr. 0 floor eklendi (penalty düşük skoru negatife çekmesin), 100 clamp korundu. `loadActiveMatchables` mapper p.product_type_id forward eder.
 - **Davranış doğrulaması:** Vana DN50 input → aynı katalogda vana DN50 (auto matched 85+) ve conta DN50 (penalty ile filter dışı veya pending'e düşer). SKU+name+type_mismatch hâlâ 85=matched (UNIQUE SKU anchor korunur). Cert-flow input.product_type_id null → tip katmanı atlanır, eski davranış.

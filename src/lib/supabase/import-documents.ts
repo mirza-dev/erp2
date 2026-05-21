@@ -203,3 +203,26 @@ export async function dbMarkImportDocumentError(
         .eq("id", id);
     if (error) throw new Error(error.message);
 }
+
+const VALID_STATUS_TRANSITIONS: ImportDocumentStatus[] = [
+    "pending", "classifying", "classified", "error", "applied",
+];
+
+/**
+ * Faz 3c: Apply pipeline sonunda doc'u terminal 'applied' state'ine alır.
+ * Generic status update — diğer enum geçişleri için de kullanılır.
+ */
+export async function dbUpdateImportDocumentStatus(
+    id: string,
+    status: ImportDocumentStatus,
+): Promise<void> {
+    if (!VALID_STATUS_TRANSITIONS.includes(status)) {
+        throw new Error(`Geçersiz status: ${status}`);
+    }
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("import_documents")
+        .update({ status })
+        .eq("id", id);
+    if (error) throw new Error(error.message);
+}

@@ -187,3 +187,20 @@ describe("dbMarkImportDocumentError", () => {
         expect(patch.error_message).toBe("AI down");
     });
 });
+
+// Faz 3c — apply pipeline terminal state helper
+describe("dbUpdateImportDocumentStatus", () => {
+    it("'applied' geçişi → UPDATE { status: 'applied' }", async () => {
+        const { dbUpdateImportDocumentStatus } = await import("@/lib/supabase/import-documents");
+        await dbUpdateImportDocumentStatus("doc-1", "applied");
+        const patch = mockUpdate.mock.calls[0]?.[0] as { status: string };
+        expect(patch.status).toBe("applied");
+    });
+
+    it("invalid status → throw, UPDATE çağrılmaz", async () => {
+        const { dbUpdateImportDocumentStatus } = await import("@/lib/supabase/import-documents");
+        await expect(dbUpdateImportDocumentStatus("doc-1", "garbage" as never))
+            .rejects.toThrow(/Geçersiz status/);
+        expect(mockUpdate).not.toHaveBeenCalled();
+    });
+});

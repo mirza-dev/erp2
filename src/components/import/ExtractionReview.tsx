@@ -61,6 +61,16 @@ export function pickSuggestedAction(topScore: number | null): ImportDocumentLine
     return "new_product";
 }
 
+// Faz 3c — apply route ApplyResult shape (import-apply-service.ts ile aynı)
+export interface ApplyResultSummary {
+    products_created: number;
+    products_updated: number;
+    attachments_created: number;
+    skipped: number;
+    errors: string[];
+    untyped_products: number;
+}
+
 /**
  * UUID veya null → product type'ın insan-okur adı. Bilinmeyen → "—".
  * Pure — Review 3b 3.tur satır bazlı tip dropdown'u için.
@@ -112,6 +122,53 @@ export default function ExtractionReview({ document: doc, initialLines, productT
     const [overrideTypeId, setOverrideTypeId] = useState<string>(
         isCertFlow ? "" : (doc.classification?.suggested_product_type_id ?? ""),
     );
+
+    // Faz 3c — Apply pipeline state
+    const [applying, setApplying] = useState(false);
+    const [applyResult, setApplyResult] = useState<ApplyResultSummary | null>(null);
+    const [docStatus, setDocStatus] = useState<typeof doc.status>(doc.status);
+    const isDocApplied = docStatus === "applied";
+    const hasApplicable = lines.some(l =>
+        l.match_action === "matched" || l.match_action === "reviewed" || l.match_action === "new_product",
+    );
+
+    async function handleApply() {
+        if (isDemo) {
+            toast({ type: "info", message: DEMO_BLOCK_TOAST });
+            return;
+        }
+        if (!hasApplicable) {
+            toast({ type: "info", message: "Uygulanacak satır yok" });
+            return;
+        }
+        setApplying(true);
+        try {
+            const res = await fetch(`/api/import/documents/${doc.id}/apply`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast({ type: "error", message: body.error ?? "Uygulama başarısız" });
+                return;
+            }
+            const result = body.result as ApplyResultSummary;
+            setApplyResult(result);
+            setDocStatus("applied");
+            const successCount = result.products_created + result.products_updated + result.attachments_created;
+            if (successCount > 0) {
+                toast({ type: "success", message: `${successCount} işlem uygulandı` });
+            }
+            if (result.errors.length > 0) {
+                toast({ type: "error", message: `${result.errors.length} satır hatayla atlandı` });
+            }
+            router.refresh();
+        } catch (e) {
+            toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
+        } finally {
+            setApplying(false);
+        }
+    }
 
     async function handleExtract() {
         if (isDemo) {
@@ -478,13 +535,71 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                         </table>
                     </div>
 
-                    {/* Apply footer (3c'de aktive) */}
+                    {/* Faz 3c — apply result paneli (apply başarılı sonrasında görünür) */}
+                    {applyResult && (
+                        <div
+                            role="status"
+                            aria-live="polite"
+                            style={{
+                                padding: "12px 14px",
+                                background: "var(--bg-secondary)",
+                                border: "0.5px solid var(--border-tertiary)",
+                                borderRadius: "6px",
+                                display: "flex", flexDirection: "column", gap: "8px",
+                            }}
+                        >
+                            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+                                Uygulama sonucu
+                            </div>
+                            <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                {applyResult.products_created} yeni ürün · {applyResult.products_updated} güncelleme · {applyResult.attachments_created} sertifika · {applyResult.skipped} atlandı
+                            </div>
+                            {applyResult.untyped_products > 0 && (
+                                <div style={{
+                                    fontSize: "11px", padding: "6px 10px",
+                                    background: "var(--warning-bg)", color: "var(--warning-text)",
+                                    border: "0.5px solid var(--warning-border)", borderRadius: "5px",
+                                }}>
+                                    {applyResult.untyped_products} ürün tipsiz oluşturuldu — ürün detayından tip atayın
+                                </div>
+                            )}
+                            {applyResult.errors.length > 0 && (
+                                <details style={{ fontSize: "11px" }}>
+                                    <summary style={{ cursor: "pointer", color: "var(--danger-text)" }}>
+                                        {applyResult.errors.length} satır hatayla atlandı (detay)
+                                    </summary>
+                                    <ul style={{ marginTop: "6px", paddingLeft: "16px", color: "var(--text-secondary)" }}>
+                                        {applyResult.errors.map((e, i) => (
+                                            <li key={i}>{e}</li>
+                                        ))}
+                                    </ul>
+                                </details>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Apply footer (Faz 3c) */}
                     <div style={{
-                        display: "flex", justifyContent: "flex-end", gap: "8px",
+                        display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "12px",
                         padding: "12px 0", borderTop: "0.5px solid var(--border-tertiary)",
                     }}>
-                        <Button variant="primary" disabled title="3c'de aktive olacak — apply pipeline">
-                            Uygula (Faz 3c)
+                        {isDocApplied && (
+                            <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
+                                Belge uygulandı — yeni doküman yükleyerek devam edin
+                            </span>
+                        )}
+                        <Button
+                            variant="primary"
+                            onClick={handleApply}
+                            disabled={isDemo || applying || !hasApplicable || isDocApplied}
+                            title={
+                                isDemo ? DEMO_DISABLED_TOOLTIP
+                                : isDocApplied ? "Belge zaten uygulandı"
+                                : !hasApplicable ? "Uygulanacak (matched/reviewed/new_product) satır yok"
+                                : undefined
+                            }
+                        >
+                            {applying ? "Uygulanıyor…" : "Uygula"}
                         </Button>
                     </div>
                 </>

@@ -7,6 +7,21 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-21
 
+**Faz 3c — Review screen apply pipeline (3387 test)**
+
+- **Service:** `serviceApplyImportDocument` — eligible filter (matched|reviewed|new_product), per-row try/catch loose; new_product → dbCreateProduct (+ untyped_products counter), matched|reviewed → dbUpdateProduct (attributes merge), cert+matched → dbCreateAttachment kind=certificate. Doc terminal state 'applied' (idempotency guard).
+- **Cert versiyonlama:** scope dışı — superseded_by yazılmaz, tüm cert'ler aktif (UI zaten filter'lı).
+- **NULL type:** Faz 1 izin veriyor → ürün yaratılır, UI warning toast.
+- **Route:** POST /apply, requireRole admin|purchaser, revalidateTag, pre-check 400 mapping.
+- **UI:** "Uygula" aktif button + applyResult sonuç paneli (counts + untyped warning + errors accordion) + isDocApplied → "Belge uygulandı".
+- **+27 test** (service 13 + route 6 + RTL 6 + helper 2)
+- 6 yeni · 3 değişen · **3387 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 3d — klasik mod toggle cleanup (eski 7-adım wizard "Klasik Mod" altına gizleme, AI default akış).
+
+---
+
+## Önceki — Faz 3b Review 6.tur (3360 test)
+
 **Faz 3b Review 6.tur — Type-aware matcher + cert-flow per-row Tip kolonu (3360 test)**
 
 - **P2 (matcher type-aware):** Multi-type extraction'da AI seçtiği `product_type_id` matcher'a forward edilmiyordu. Soft boost (+20) / penalty (-20) paterni: `MatchableProduct` + `ExtractedRowInput` + `scoreProductMatch` + 0 floor. Vana DN50 ile Conta DN50 ayırt edilir; SKU+name=85 (UNIQUE anchor) tip mismatch'le bile auto-match kalır.
