@@ -147,6 +147,102 @@ describe("rankProductCandidates", () => {
     });
 });
 
+// ── Review 3b 6.tur P2: type-aware matching ──
+
+const VANA = "00000000-0000-4000-8000-000000000001";
+const CONTA = "00000000-0000-4000-8000-000000000002";
+
+const PROD_TYPED: MatchableProduct = {
+    id: "p-vana", sku: "KV-DB-DN100", name: "Vana DN100 PN16",
+    product_type_id: VANA, attributes: { dn: 100 },
+};
+
+describe("scoreProductMatch — type-aware (Review 3b 6.tur)", () => {
+    it("aynı tip → +20 bonus + type_match reason", () => {
+        const { score, reasons } = scoreProductMatch(PROD_TYPED, { product_type_id: VANA });
+        expect(score).toBe(20);
+        expect(reasons).toContain("type_match");
+    });
+
+    it("farklı tip → -20 penalty + type_mismatch reason", () => {
+        // name_partial 15 + dn 20 - 20 = 15
+        const { score, reasons } = scoreProductMatch(PROD_TYPED, {
+            product_type_id: CONTA, name: "Vana DN100", attributes: { dn: 100 },
+        });
+        expect(score).toBe(15);
+        expect(reasons).toContain("type_mismatch");
+    });
+
+    it("input.product_type_id null → tip katmanı atlanır (eski davranış korunur)", () => {
+        const { score, reasons } = scoreProductMatch(PROD_TYPED, { attributes: { dn: 100 } });
+        expect(score).toBe(20);
+        expect(reasons).not.toContain("type_match");
+        expect(reasons).not.toContain("type_mismatch");
+    });
+
+    it("product.product_type_id null → tip katmanı atlanır", () => {
+        const untypedProd: MatchableProduct = { ...PROD_TYPED, product_type_id: null };
+        const { score, reasons } = scoreProductMatch(untypedProd, {
+            product_type_id: VANA, attributes: { dn: 100 },
+        });
+        expect(score).toBe(20);
+        expect(reasons).not.toContain("type_match");
+        expect(reasons).not.toContain("type_mismatch");
+    });
+
+    it("0 floor: name_partial 15 + type_mismatch -20 = -5 → 0 (negatif olmaz)", () => {
+        const { score } = scoreProductMatch(PROD_TYPED, {
+            product_type_id: CONTA, name: "Vana DN100",
+        });
+        expect(score).toBe(0);
+    });
+
+    it("SKU + name + type_mismatch sınırda matched (60+45-20=85)", () => {
+        const { score } = scoreProductMatch(PROD_TYPED, {
+            product_type_id: CONTA, sku: "KV-DB-DN100", name: "Vana DN100 PN16",
+        });
+        expect(score).toBe(85);
+        expect(decideMatchAction(score)).toBe("matched");
+    });
+});
+
+describe("rankProductCandidates — multi-type sıralama (vana vs conta)", () => {
+    it("vana satırı + (vana, conta) → vana top, conta drop", () => {
+        const products: MatchableProduct[] = [
+            { id: "p-vana", sku: "V-50", name: "Vana DN50",
+              product_type_id: VANA, attributes: { dn: 50 } },
+            { id: "p-conta", sku: "C-50", name: "Conta DN50",
+              product_type_id: CONTA, attributes: { dn: 50 } },
+        ];
+        const r = rankProductCandidates(products,
+            { name: "Vana DN50", attributes: { dn: 50 }, product_type_id: VANA }, 3);
+        expect(r[0].id).toBe("p-vana");
+        // Vana: name_high 45 + dn 20 + type_match 20 = 85
+        expect(r[0].score).toBe(85);
+        // Conta: name ~0.35 sim (partial threshold altında, +0) + dn 20 - type_mismatch 20 = 0
+        // → score 0 olduğu için rankProductCandidates filter eder (eski davranış)
+        expect(r.find(c => c.id === "p-conta")).toBeUndefined();
+    });
+
+    it("vana satırı + (vana SKU eksik, conta SKU eksik aynı name) → vana top, conta penalty", () => {
+        // Hem vana hem conta DN50 isimlerde "DN50" var, name benzer
+        const products: MatchableProduct[] = [
+            { id: "p-vana", sku: "V-50", name: "Vana DN50 PN16",
+              product_type_id: VANA, attributes: { dn: 50, pn_class: "PN16" } },
+            { id: "p-conta", sku: "C-50", name: "Vana DN50 PN16",  // AI confusion: aynı name
+              product_type_id: CONTA, attributes: { dn: 50, pn_class: "PN16" } },
+        ];
+        const r = rankProductCandidates(products,
+            { name: "Vana DN50 PN16", attributes: { dn: 50, pn_class: "PN16" }, product_type_id: VANA }, 3);
+        expect(r[0].id).toBe("p-vana");
+        // Vana: name_high 45 + dn 20 + pn 20 + type_match 20 = 105 → clamp 100
+        expect(r[0].score).toBe(100);
+        // Conta: 45 + 20 + 20 - 20 = 65 → pending (NOT matched, kullanıcı override edebilir)
+        expect(r[1]?.id).toBe("p-conta");
+        expect(r[1]?.score).toBe(65);
+    });
+});
+
 describe("decideMatchAction", () => {
     it("score >= 85 → matched", () => {
         expect(decideMatchAction(85)).toBe("matched");

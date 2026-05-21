@@ -391,6 +391,20 @@ describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
         expect(lines[0].product_type_id).toBeNull();
     });
 
+    it("matcher input'una item.product_type_id forward edilir (Review 3b 6.tur P2)", async () => {
+        const VANA = "00000000-0000-4000-8000-000000000001";
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockExtractProducts.mockResolvedValueOnce({
+            items: [{ line: 1, name: "Vana DN50", sku: "KV-50", attributes: { dn: 50 }, confidence: 0.9, product_type_id: VANA }],
+        });
+        mockFindCandidates.mockResolvedValueOnce([]);
+        mockReplaceLines.mockResolvedValueOnce([]);
+
+        await callPOST(makeReq("doc-1"), "doc-1");
+        const matcherInput = mockFindCandidates.mock.calls[0]?.[0] as { product_type_id?: string | null };
+        expect(matcherInput.product_type_id).toBe(VANA);
+    });
+
     it("AI per-item tip seçer → satıra AI'nın seçimi persist", async () => {
         // Multi-type mode: AI item 1 vana, item 2 conta seçti — route AI'nın seçimini direkt persist.
         // Uniform inject KALDIRILDI (3.tur multi-type refactor).

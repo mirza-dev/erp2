@@ -362,7 +362,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                 <tr style={{ background: "var(--bg-secondary)" }}>
                                     <th style={th}>#</th>
                                     <th style={th}>Ad / SKU</th>
-                                    <th style={th}>Tip</th>
+                                    {!isCertFlow && <th style={th}>Tip</th>}
                                     <th style={th}>Adaylar</th>
                                     <th style={th}>Skor</th>
                                     <th style={th}>Durum</th>
@@ -381,29 +381,33 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                     <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>{line.extracted_sku}</div>
                                                 )}
                                             </td>
-                                            <td style={td}>
-                                                {/* Review 3b 3.tur: per-row tip override (multi-type) */}
-                                                <select
-                                                    value={line.product_type_id ?? ""}
-                                                    onChange={e => {
-                                                        const v = e.target.value;
-                                                        void handleTypeChange(line, v === "" ? null : v);
-                                                    }}
-                                                    disabled={isDemo}
-                                                    aria-label={`Satır ${line.line_number} ürün tipi`}
-                                                    style={{
-                                                        padding: "4px 8px", fontSize: "11px",
-                                                        background: "var(--bg-primary)", color: "var(--text-primary)",
-                                                        border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
-                                                        minWidth: "120px",
-                                                    }}
-                                                >
-                                                    <option value="">— Yok —</option>
-                                                    {productTypes.map(t => (
-                                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                                    ))}
-                                                </select>
-                                            </td>
+                                            {/* Review 3b 3.tur: per-row tip override (multi-type).
+                                                Review 3b 6.tur: cert-flow'da gizli — sertifika satırı tip
+                                                kullanmıyor (3c'de hedef ürüne göre belirlenir). */}
+                                            {!isCertFlow && (
+                                                <td style={td}>
+                                                    <select
+                                                        value={line.product_type_id ?? ""}
+                                                        onChange={e => {
+                                                            const v = e.target.value;
+                                                            void handleTypeChange(line, v === "" ? null : v);
+                                                        }}
+                                                        disabled={isDemo}
+                                                        aria-label={`Satır ${line.line_number} ürün tipi`}
+                                                        style={{
+                                                            padding: "4px 8px", fontSize: "11px",
+                                                            background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                            border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
+                                                            minWidth: "120px",
+                                                        }}
+                                                    >
+                                                        <option value="">— Yok —</option>
+                                                        {productTypes.map(t => (
+                                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                                        ))}
+                                                    </select>
+                                                </td>
+                                            )}
                                             <td style={td}>
                                                 {line.candidate_matches.length === 0 ? (
                                                     <span style={{ color: "var(--text-tertiary)" }}>Aday yok</span>

@@ -26,12 +26,24 @@ export interface MatchableProduct {
     id: string;
     sku: string;
     name: string;
+    /**
+     * Review 3b 6.tur P2: tip-aware matching için ürünün tipi. PMT multi-type
+     * firma — aynı DN/PN'li farklı tiplerdeki ürünleri ayırt etmek için
+     * kullanılır. Eski (062 öncesi) ürünlerde null olabilir → tip katmanı
+     * nötr (skor değişmez).
+     */
+    product_type_id: string | null;
     attributes: Record<string, unknown>;
 }
 
 export interface ExtractedRowInput {
     name?: string | null;
     sku?: string | null;
+    /**
+     * Review 3b 6.tur P2: AI'nın seçtiği veya kullanıcının override ettiği
+     * ürün tipi. null ise tip katmanı atlanır (cert-flow + bilinmeyen tip).
+     */
+    product_type_id?: string | null;
     attributes?: Record<string, unknown>;
 }
 
@@ -143,7 +155,21 @@ export function scoreProductMatch(
         }
     }
 
-    return { score: Math.min(100, score), reasons };
+    // Review 3b 6.tur P2: Type bonus/penalty — multi-type karışık katalogda
+    // yanlış tipte ürünü top-candidate yapmaktan kaçınmak için.
+    // Her ikisi de non-null olduğunda etkindir; null durumlarda nötr.
+    if (input.product_type_id && product.product_type_id) {
+        if (input.product_type_id === product.product_type_id) {
+            score += 20;
+            reasons.push("type_match");
+        } else {
+            score -= 20;
+            reasons.push("type_mismatch");
+        }
+    }
+
+    // 0 floor şart: type_mismatch (-20) düşük skorlu satırı negatife çekebilir.
+    return { score: Math.max(0, Math.min(100, score)), reasons };
 }
 
 /**
@@ -157,6 +183,7 @@ export async function loadActiveMatchables(): Promise<MatchableProduct[]> {
         id: p.id,
         sku: p.sku,
         name: p.name,
+        product_type_id: p.product_type_id ?? null,
         attributes: (p.attributes ?? {}) as Record<string, unknown>,
     }));
 }

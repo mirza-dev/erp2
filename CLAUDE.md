@@ -3,7 +3,15 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-20_
 
-**Son tamamlanan iş:** Faz 3b Review 5.tur — cert-flow productTypeId validation bypass (2026-05-20; 3350 test)
+**Son tamamlanan iş:** Faz 3b Review 6.tur — Type-aware matcher + cert-flow per-row Tip kolonu (2026-05-21; 3360 test)
+
+- **P2 (matcher type-blind):** Faz 3b 3.tur multi-type extraction'da AI item başına `product_type_id` seçiyordu ama matcher bu bilgiyi kullanmıyordu. PMT multi-type firma — aynı DN/PN'li farklı tipte ürünler (vana DN50 vs conta DN50) yanlış top-candidate üretebiliyordu. **Soft boost + penalty paterni** eklendi: `MatchableProduct` ve `ExtractedRowInput` `product_type_id` alanları + `scoreProductMatch` aynı tip +20 / farklı tip -20 / her ikisi non-null değilse nötr. 0 floor eklendi (penalty düşük skoru negatife çekmesin), 100 clamp korundu. `loadActiveMatchables` mapper p.product_type_id forward eder.
+- **Davranış doğrulaması:** Vana DN50 input → aynı katalogda vana DN50 (auto matched 85+) ve conta DN50 (penalty ile filter dışı veya pending'e düşer). SKU+name+type_mismatch hâlâ 85=matched (UNIQUE SKU anchor korunur). Cert-flow input.product_type_id null → tip katmanı atlanır, eski davranış.
+- **P3 (cert-flow per-row Tip kolonu):** 5.tur header filter'ı gizledi ama tablo başlığında `<th>Tip</th>` + per-row `<select>` cert-flow için de render ediliyordu. Header + cell `!isCertFlow` guard'a alındı. Cert satırlarında semantik temizlik.
+- **+10 yeni test:** matcher type-aware (8: aynı tip, farklı tip, null fallback, 0 floor, sınır cases, multi-type ranking 2 senaryo) + extract-route matcher input.product_type_id forward (1) + RTL cert-flow tablo Tip header/cell yok (1)
+- 6 dosya · **3360 test yeşil** · TS clean · 0 lint warning · build OK
+
+**Önceki:** Faz 3b Review 5.tur — cert-flow productTypeId validation bypass (2026-05-20; 3350 test) · commit `79c3ed0`
 
 - **P2 (cert-flow yanlış 400):** 4.tur'da eklenen early `bodyProductTypeId` validation `isProductFlow` ayrımı yapmıyordu. Sertifika belgesinde UI `doc.classification.suggested_product_type_id`'yi default'a aktarıyor, body'ye `productTypeId` ekliyor, classifier'ın önerdiği tip silinmişse route 400 dönüp cert extraction hiç çalışmıyordu. Halbuki cert-flow `product_type_id` kullanmıyor (hedef ürün matched üzerinden 3c'de belirlenir).
 - **Backend:** Validation koşulu `bodyProductTypeId && isProductFlow` oldu — cert-flow'da silently ignore.

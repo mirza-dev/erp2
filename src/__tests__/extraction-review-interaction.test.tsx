@@ -176,6 +176,35 @@ describe("ExtractionReview — bulk approve (Review 3b 4.tur P3)", () => {
         expect(body.productTypeId).toBeUndefined();
     });
 
+    // Review 3b 6.tur P3: cert-flow satırlarda per-row "Tip" kolonu da gizli
+    it("cert-flow + satırlar render → tablo'da 'Tip' header yok + satır Tip <select> yok", async () => {
+        vi.stubGlobal("fetch", vi.fn());
+
+        const certDoc: ImportDocumentRow = {
+            ...DOC,
+            classification: {
+                document_type: "compliance_doc", confidence: 0.85, language: "tr",
+                summary: "uygunluk", suggested_product_type_id: null,
+            },
+        };
+        const certLine = makeLine("1", {
+            extraction_type: "certificate_target",
+            product_type_id: null,
+            match_action: "pending",
+            matched_product_id: null,
+            match_confidence: 70,
+        });
+
+        render(<ExtractionReview document={certDoc} initialLines={[certLine]} productTypes={[{ id: "type-vana", name: "Vana" }]} />);
+
+        // Tablo başlığında "Tip" kolonu yok
+        const headers = screen.getAllByRole("columnheader").map(h => h.textContent);
+        expect(headers).not.toContain("Tip");
+
+        // Per-row Tip <select> de yok
+        expect(screen.queryByLabelText(/Satır 1 ürün tipi/)).toBeNull();
+    });
+
     it("matched satır yoksa info toast + PATCH atmaz", async () => {
         const fetchSpy = vi.fn();
         vi.stubGlobal("fetch", fetchSpy);

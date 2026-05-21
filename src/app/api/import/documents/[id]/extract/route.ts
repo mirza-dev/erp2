@@ -222,6 +222,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                 const candidates = await findProductMatchCandidates({
                     name: item.name,
                     sku: item.sku,
+                    product_type_id: item.product_type_id,
                     attributes: item.attributes,
                 }, 3, productsCache);
                 const top = candidates[0] ?? null;

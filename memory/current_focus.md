@@ -5,7 +5,18 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-20
+## Son Tamamlanan İş — 2026-05-21
+
+**Faz 3b Review 6.tur — Type-aware matcher + cert-flow per-row Tip kolonu (3360 test)**
+
+- **P2 (matcher type-aware):** Multi-type extraction'da AI seçtiği `product_type_id` matcher'a forward edilmiyordu. Soft boost (+20) / penalty (-20) paterni: `MatchableProduct` + `ExtractedRowInput` + `scoreProductMatch` + 0 floor. Vana DN50 ile Conta DN50 ayırt edilir; SKU+name=85 (UNIQUE anchor) tip mismatch'le bile auto-match kalır.
+- **P3 (cert-flow per-row Tip kolonu):** Header filter 5.tur'da gizlendi ama tablo başlığı + cell hâlâ render ediliyordu — `!isCertFlow` guard ile temizlendi.
+- **+10 test:** matcher (8 senaryo: aynı tip / farklı tip / null fallback / 0 floor / 2 multi-type ranking) + route forward + RTL cert tablo Tip yok
+- 6 dosya · **3360 test yeşil** · TS clean · 0 lint · build OK
+
+---
+
+## Önceki — Faz 3b Review 5.tur (3350 test)
 
 **Faz 3b Review 5.tur — cert-flow productTypeId validation bypass (3350 test)**
 
