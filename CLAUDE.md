@@ -3,7 +3,21 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-22_
 
-**Son tamamlanan iş:** Faz 3c Review 4.tur — Post-commit rollback fix (P2 duplicate engel) + applying state UX (P3) (2026-05-22; 3439 test)
+**Son tamamlanan iş:** Faz 3c Review 5.tur — status_update_failed UI/API propagate (P2/P3 follow-up) (2026-05-22; 3441 test)
+
+- **Bulgu:** 4.tur post-commit guard duplicate riskini engelliyordu ama route 200 + result olduğu gibi dönüyor, UI `successCount > 0` görünce `setDocStatus("applied")` çağırıyordu → kullanıcı "Belge uygulandı" toast'ı görüyor, oysa DB'de doc 'applying'de takılı. Refresh sonrası server'dan applying gelir, state tutarsız. `status_update_failed` flag sadece audit log'a yazılıyordu, frontend göremiyordu.
+- **Fix:**
+  - **Service shape:** `ApplyResult` interface'ine `status_update_failed: boolean` alanı eklendi (default false `emptyResult` factory'sinde). Post-commit catch'te `result.status_update_failed = true` set edilir → audit flag ile hizalı, response'a taşınır.
+  - **UI shape:** `ApplyResultSummary` interface'ine `status_update_failed?: boolean` (opsiyonel — backward compat eski response'lar için undefined). `handleApply` kontrol sırası: önce `result.status_update_failed` → setDocStatus('applying') + warning toast "{N} işlem yazıldı ancak belge durumu güncellenemedi. Yönetici müdahalesi gerekiyor." + erken return (success/error toast'ları YOK).
+  - **Result panel:** Yeni `role="alert"` admin recovery uyarı bandı (danger renkli, yalnız `applyResult.status_update_failed` true ise render): "İşlemler başarıyla yazıldı ancak belge durumu 'applied' olarak güncellenemedi (belge 'applying'de takılı kaldı). Duplicate apply engellenmiş durumda. Yönetici müdahalesi gerekiyor — belgeyi manuel olarak 'applied' durumuna alın."
+- **+3 yeni test:**
+  - `import-apply-service.test.ts` (+2): post-commit fail testi `r.status_update_failed === true` assertion eklendi; başarılı path testi `false` döner.
+  - `extraction-review-apply.test.tsx` (+1): `result.status_update_failed: true` fixture → warning toast (yönetici/güncellenemedi mesajı), success toast YOK, `role="alert"` admin recovery bandı render, Uygula button disabled ("uygulanıyor" tooltip), "Belge uygulandı" mesajı görünmez.
+- **Plan-domain check:** Bu invariant'ı sıkılaştırır — UI artık DB ile senkron (applying'i applied göstermez). Audit + UI iki kanal aynı flag'i kullanır → tek source of truth.
+- 4 dosya · **3441 test yeşil** (önceki 3439 + 2) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 3d — klasik mod toggle cleanup (eski 7-adım wizard "Klasik Mod" altına gizleme, AI default akış polish).
+
+**Önceki:** Faz 3c Review 4.tur — Post-commit rollback fix (P2 duplicate engel) + applying state UX (P3) (2026-05-22; 3439 test)
 
 - **P2 (kritik data integrity):** 3.tur outer catch `successCount>0` sonrası terminal status update fail'inde de 'classified'e rollback yapıyordu → ürün/cert ZATEN yazılmış, kullanıcı tekrar Apply → claim CAS başarılı → loop yeniden → **duplicate product/cert** (özellikle cert path orphan zinciri kirletir; SKU UNIQUE create path'i bloklar ama audit/state kirli).
 - **Fix:** `successCount>0` sonrası `dbUpdateImportDocumentStatus("applied")` ayrı try/catch içinde; fail → `postCommitStatusFailed=true` flag set, throw YOK (outer catch'i tetiklemez), audit log `status_update_failed: true` ile yazılır. Doc 'applying'de takılı kalır → tekrar Apply çağrısı claim null → "hazır değil (applying)" → duplicate sıfır. Admin SQL ile manuel 'applied'a alır (recovery cron ileride opsiyonel).

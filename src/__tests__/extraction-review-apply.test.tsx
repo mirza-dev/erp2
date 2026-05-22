@@ -272,6 +272,58 @@ describe("ExtractionReview — Faz 3c Apply", () => {
         expect(extractBtn.getAttribute("title")).toMatch(/uygulanıyor/i);
     });
 
+    it("Faz 3c Review 5.tur: result.status_update_failed → setDocStatus('applying'), warning toast, admin recovery uyarısı, 'applied' YAPMAZ", async () => {
+        // Service ürün/cert yazdı ama terminal status update fail oldu.
+        // Route 200 + result döner; UI flag'i görüp applied YAPMAMALI.
+        vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+            ok: true,
+            result: {
+                products_created: 3,
+                products_updated: 0,
+                attachments_created: 2,
+                attachments_superseded: 0,
+                skipped: 0,
+                errors: [],
+                untyped_products: 0,
+                status_update_failed: true,
+            },
+        }), { status: 200 })));
+
+        render(<ExtractionReview document={DOC} initialLines={[makeLine("1")]} productTypes={[]} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /^Uygula$/ }));
+        });
+
+        // Warning toast — admin müdahalesi mesajı
+        await waitFor(() => {
+            expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+                type: "warning",
+                message: expect.stringMatching(/yazıldı.*belge durumu.*güncellenemedi.*[Yy]önetici/i),
+            }));
+        });
+
+        // Success toast HİÇ atılmamalı (applied semantiği yanıltıcı)
+        const successCall = mockToast.mock.calls.find(([arg]) =>
+            (arg as { type?: string })?.type === "success",
+        );
+        expect(successCall).toBeUndefined();
+
+        // Result panel'de admin recovery uyarı bandı render edilir
+        await waitFor(() => {
+            expect(screen.getByRole("alert").textContent).toMatch(/applying.*takılı|durumunu.*manuel.*applied/i);
+        });
+
+        // UI 'applying'e geçer → Uygula buton disable + "uygulanıyor" tooltip
+        await waitFor(() => {
+            const btn = screen.getByRole("button", { name: /^Uygula$/ });
+            expect(btn).toHaveProperty("disabled", true);
+            expect(btn.getAttribute("title")).toMatch(/uygulanıyor/i);
+        });
+        // "Belge uygulandı" mesajı GÖRÜNMEMELI (yanıltıcı applied önlenir)
+        expect(screen.queryByText(/Belge uygulandı/)).toBeNull();
+    });
+
     it("handleApply 409 (başka oturum) → info toast + setDocStatus('applying') + buton disable", async () => {
         vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
             error: "Belge şu anda başka bir oturumda uygulanıyor. Lütfen sayfayı yenileyin.",

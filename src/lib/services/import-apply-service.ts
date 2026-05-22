@@ -33,6 +33,12 @@ export interface ApplyResult {
     skipped: number;
     errors: string[]; // "Satır N: <reason>"
     untyped_products: number;
+    // Faz 3c Review 5.tur (P2/P3 follow-up): true → ürün/cert ZATEN yazıldı
+    // ama terminal 'applied' status update fail oldu, doc DB'de 'applying'de
+    // takılı. UI bu flag'i görürse setDocStatus('applied') YAPMAZ — admin
+    // recovery gerektiğini kullanıcıya bildirir. Audit log forensic kayıt
+    // (after_state.status_update_failed) bu flag ile hizalı.
+    status_update_failed: boolean;
 }
 
 function emptyResult(): ApplyResult {
@@ -44,6 +50,7 @@ function emptyResult(): ApplyResult {
         skipped: 0,
         errors: [],
         untyped_products: 0,
+        status_update_failed: false,
     };
 }
 
@@ -224,6 +231,10 @@ export async function serviceApplyImportDocument(
                 successPath = true;
             } catch (statusErr) {
                 postCommitStatusFailed = true;
+                // Faz 3c Review 5.tur: result'a da flag yaz → API response'ta
+                // UI'a taşınır, "Belge uygulandı" yerine "admin recovery gerek"
+                // mesajı gösterilir (yanıltıcı applied state önlenir).
+                result.status_update_failed = true;
                 console.error(
                     "[import-apply] CRITICAL: applied status update failed AFTER commit; doc stays in 'applying' to prevent duplicate apply",
                     statusErr,

@@ -70,6 +70,11 @@ export interface ApplyResultSummary {
     skipped: number;
     errors: string[];
     untyped_products: number;
+    // Faz 3c Review 5.tur: ürün/cert yazıldı ama terminal status update fail
+    // → doc DB'de 'applying'de takılı. UI bu flag'i görürse setDocStatus
+    // ('applied') YAPMAZ, warning toast + result panel uyarısı gösterir.
+    // Opsiyonel — eski response'lar için undefined (backward compat).
+    status_update_failed?: boolean;
 }
 
 /**
@@ -166,6 +171,19 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             const result = body.result as ApplyResultSummary;
             setApplyResult(result);
             const successCount = result.products_created + result.products_updated + result.attachments_created;
+            // Faz 3c Review 5.tur: post-commit status update fail → ürün/cert
+            // yazıldı ama doc 'applying'de takılı. 'applied' setleme YAPMA
+            // (yanıltıcı); UI 'applying' ile senkron + warning + admin recovery
+            // mesajı. Duplicate engelleme service-side aktif (claim CAS).
+            if (result.status_update_failed) {
+                setDocStatus("applying");
+                router.refresh();
+                toast({
+                    type: "warning",
+                    message: `${successCount} işlem yazıldı ancak belge durumu güncellenemedi. Yönetici müdahalesi gerekiyor.`,
+                });
+                return;
+            }
             // Faz 3c Review P2-2: all-fail durumunda doc 'classified' kalır —
             // button enabled kalmalı, retry mümkün olsun.
             if (successCount > 0) {
@@ -583,6 +601,22 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                     <> · {applyResult.attachments_superseded} eski sertifika önceki versiyona alındı</>
                                 )}
                             </div>
+                            {/* Faz 3c Review 5.tur: post-commit status fail → admin recovery */}
+                            {applyResult.status_update_failed && (
+                                <div
+                                    role="alert"
+                                    style={{
+                                        fontSize: "11px", padding: "8px 10px",
+                                        background: "var(--danger-bg)", color: "var(--danger-text)",
+                                        border: "0.5px solid var(--danger-border)", borderRadius: "5px",
+                                        lineHeight: 1.5,
+                                    }}
+                                >
+                                    ⚠️ İşlemler başarıyla yazıldı ancak belge durumu &quot;applied&quot; olarak güncellenemedi
+                                    (belge &quot;applying&quot;de takılı kaldı). Duplicate apply engellenmiş durumda.
+                                    Yönetici müdahalesi gerekiyor — belgeyi manuel olarak &quot;applied&quot; durumuna alın.
+                                </div>
+                            )}
                             {applyResult.untyped_products > 0 && (
                                 <div style={{
                                     fontSize: "11px", padding: "6px 10px",

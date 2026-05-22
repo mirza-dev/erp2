@@ -7,7 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-22
 
-**Faz 3c Review 4.tur — Post-commit rollback fix (P2 duplicate engel) + applying state UX (P3) (3439 test)**
+**Faz 3c Review 5.tur — status_update_failed UI/API propagate (3441 test)**
+
+- **Bulgu:** 4.tur post-commit guard duplicate engelliyordu ama route 200 + result olduğu gibi dönüyor, UI successCount>0 görüp `setDocStatus("applied")` çağırıyordu → yanıltıcı "Belge uygulandı" + refresh sonrası DB/UI state tutarsız. `status_update_failed` audit'te vardı ama frontend göremiyordu.
+- **Fix:** `ApplyResult` shape'ine `status_update_failed: boolean` (default false). Service post-commit catch'te `result.status_update_failed = true` set eder. UI: flag true → `setDocStatus("applying")` + warning toast "{N} işlem yazıldı ama güncellenemedi, yönetici müdahalesi gerek" + result panel'de role="alert" admin recovery uyarı bandı. Success toast YOK. `ApplyResultSummary` opsiyonel `status_update_failed?: boolean` (eski response backward compat).
+- **+3 test** (service result alan happy/fail + UI conditional render).
+- 4 dosya · **3441 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 3d — klasik mod toggle cleanup.
+
+## Önceki — Faz 3c Review 4.tur (3439 test)
+
+**Post-commit rollback fix (P2 duplicate engel) + applying state UX (P3)**
 
 - **P2 (kritik):** 3.tur outer catch successCount>0 sonrası status fail'inde de 'classified'e rollback yapıyordu → duplicate apply riski (ürün/cert zaten yazılmış). Fix: applied UPDATE ayrı try/catch, fail → `postCommitStatusFailed=true`, doc 'applying'de takılı, audit `status_update_failed: true`. Tekrar Apply → claim null → "hazır değil (applying)" → duplicate sıfır. Admin manuel SQL ile düzeltir.
 - **P3 (UX):** Route applying → 409 + "başka oturum uygulanıyor"; UI `isDocApplying` derive + buton/footer + handleApply 409 handler (info toast + setDocStatus).

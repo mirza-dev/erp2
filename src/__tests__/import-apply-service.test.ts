@@ -464,6 +464,8 @@ describe("serviceApplyImportDocument — Faz 3c Review 4.tur (P2 post-commit)", 
 
         // Ürün yazıldı
         expect(r.products_created).toBe(1);
+        // Faz 3c Review 5.tur: result.status_update_failed flag UI'a taşınır
+        expect(r.status_update_failed).toBe(true);
         // Status update "applied" denendi (rejected)
         expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
         // CRITICAL: rollback ('classified') ÇAĞRILMAMALI — outer catch tetiklenmedi
@@ -478,6 +480,17 @@ describe("serviceApplyImportDocument — Faz 3c Review 4.tur (P2 post-commit)", 
         expect(row.after_state.status_update_failed).toBe(true);
         expect(row.after_state.success).toBe(false);  // successPath, applied set başarısız
         expect(row.after_state.products_created).toBe(1);  // gerçek yazım sayısı korunur
+    });
+
+    it("Faz 3c Review 5.tur: başarılı path → result.status_update_failed=false (varsayılan)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([makeLine("1")]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", null);
+        // Başarılı path: applied UPDATE OK, flag false kalır
+        expect(r.status_update_failed).toBe(false);
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
     });
 
     it("duplicate apply engeli: doc applying'de iken 2. çağrı → claim null + 'hazır değil' throw", async () => {
