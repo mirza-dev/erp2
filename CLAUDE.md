@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-22_
 
-**Son tamamlanan iş:** Faz 3c Review 3.tur — Apply concurrency atomic claim (2026-05-22; 3430 test)
+**Son tamamlanan iş:** Faz 3c Review 3.tur — Apply concurrency atomic claim + cert versioning identity karar (2026-05-22; 3432 test, 2 commit)
+
+**Bulgu 1 (kullanıcı kararı: A — file_name only + dokümante; commit pending):**
+- Versiyonlama identity `(product_id, kind=certificate, file_name)` olarak korundu (plan literal "ürün bazlı supersede" reddedildi).
+- **Gerekçe:** PMT'de bir vananın aynı anda birden çok meşru aktif sertifikası olabilir (farklı heat no, farklı test type, EN10204 3.1 vs. 3.2 farklı standartlar). Plan'ın literal okuması seçilseydi bu paralel meşru cert'ler yanlışlıkla arşivlenir, regression yaratırdı.
+- **Trade-off:** Aynı PDF dosyası tekrar yüklenirse versiyonlanır; isim değişen revize cert otomatik supersede etmez (paralel aktif kalır, kullanıcı manuel silebilir). AI extraction `metadata.cert_no` üretmeye başlarsa ileride kompozit identity (cert_no öncelikli + file_name fallback) ile genişletilebilir.
+- **Değişiklikler:** `dbSupersedeCertificatesByName` helper JSDoc'una LIMITATION bloğu eklendi (file_name bağımlılığı + paralel meşru cert gerekçesi + future-proof kompozit identity notu). `MODUL_REVIZE_PLAN.md:418-422` "Versiyonlama Uygulaması" bölümü güncellendi — plan ↔ implementation hizalı.
+- **+2 test:** JSDoc LIMITATION source-regression lock + file_name identity behavior lock (eq("file_name") filter'ı kaldırılırsa kırılır).
+
+**Önceki bulgu — Apply concurrency atomic claim (commit `5f1dea0`):**
 
 - **P2 (race condition):** `serviceApplyImportDocument` başta JS-side `doc.status !== "classified"` kontrol yapıyordu ama atomic claim/lock yoktu. Status okuma → AI/storage/DB iş → status yazma arasında TOCTOU race penceresi vardı. İki paralel apply (iki sekme, retry double-click) classified status'unu aynı anda görüp ikisi de işleme girebiliyordu → duplicate product/cert riski.
 - **Çözüm — Faz 8 (Sprint B G3) `dbClaimBatchForConfirm` paterni:**

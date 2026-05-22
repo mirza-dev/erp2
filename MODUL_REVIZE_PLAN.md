@@ -416,10 +416,25 @@ Yüklenen dosyayı incele ve tipini tespit et:
 - Her dosya için ayrı onay ekranı (kullanıcı isterse "tümünü atla" / "tümünü onayla" )
 
 ### Versiyonlama Uygulaması
-- Yeni sertifika geldi, aynı ürüne bağlı eski sertifika var
+- Yeni sertifika geldi, aynı ürüne bağlı **aynı dosya adıyla** eski sertifika var
 - Yeni record `product_attachments`'a yazılır
 - Eski record'un `superseded_by` alanı yeni record'a set edilir
-- UI'da "Aktif" + "Önceki versiyonlar" şeklinde gösterilir
+- UI'da "Aktif" + "Önceki Sertifika Versiyonları" (collapsible) şeklinde gösterilir
+
+**Identity kararı (Faz 3c Review 3.tur, 2026-05-22):** Versiyonlama
+`(product_id, kind=certificate, file_name)` üçlüsü ile eşleşir — yani
+ürün bazlı **literal** supersede DEĞİL, dosya adı bazlı. Gerekçe: PMT'de
+bir vananın aynı anda birden çok meşru aktif sertifikası olabilir
+(farklı heat no, farklı test type, EN10204 3.1 vs. 3.2 farklı standartlar).
+"Aynı üründeki her cert yeni cert geldiğinde supersede edilir" semantiği
+bu paralel meşru cert'leri yanlışlıkla arşivler.
+
+Trade-off: aynı PDF dosyası tekrar yüklenirse versiyonlanır; isim
+değişen revize cert otomatik supersede etmez (eski + yeni paralel aktif
+kalır, kullanıcı manuel silebilir). AI extraction `metadata.cert_no`
+üretmeye başlarsa ileride kompozit identity (cert_no öncelikli + file_name
+fallback) eklenebilir. Helper: `dbSupersedeCertificatesByName`
+(`src/lib/supabase/product-attachments.ts`).
 
 ### Type-Aware Extraction
 

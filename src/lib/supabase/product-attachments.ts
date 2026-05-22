@@ -141,10 +141,28 @@ export async function dbCreateAttachment(input: CreateAttachmentInput): Promise<
  * (`superseded_by = newAttachmentId`). PMT için ad bazlı eşleşme yeterli:
  * aynı PDF dosyası tekrar yüklenirse "yeni versiyon" sayılır.
  *
- * UI Ekler sekmesi zaten `superseded_by IS NULL` filter'ı kullanıyor →
- * supersede edilen eski cert'ler listede görünmez, sadece yeni aktif kalır.
+ * UI Ekler sekmesi default `superseded_by IS NULL` filter'ı kullanıyor →
+ * supersede edilen eski cert'ler aktif listede görünmez; `?includeSuperseded=1`
+ * ile "Önceki Sertifika Versiyonları" bölümünde gösterilir (Faz 3c Review 2.tur).
  *
  * Yeni cert'in kendisi (`newAttachmentId`) defansif olarak hariç tutulur.
+ *
+ * ── LIMITATION (Faz 3c Review 3.tur, kullanıcı kararı: A) ──
+ * Identity file_name'e bağlı: aynı belgenin farklı bir dosya adıyla yüklenen
+ * revize/yeni versiyonu otomatik supersede edilmez — eski cert aktif kalır,
+ * yeni cert paralel aktif olarak listelenir.
+ *
+ * Bu bilinçli bir kısıt. Gerekçe: PMT'de bir vananın aynı anda birden çok
+ * meşru aktif sertifikası olabilir (farklı heat no, farklı test type,
+ * EN10204 3.1 vs. 3.2 farklı standartlar). Plan'ın "ürün bazlı supersede"
+ * literal okuması (product_id + kind=certificate) seçilseydi bu paralel
+ * meşru cert'ler yanlışlıkla arşivlenir, regression yaratırdı.
+ *
+ * Trade-off: aynı PDF dosyası tekrar yüklenirse versiyonlanır; isim
+ * değişirse versiyonlanmaz. AI extraction `metadata.cert_no` üretmeye
+ * başlarsa ileride kompozit identity (cert_no öncelikli + file_name
+ * fallback) ile genişletilebilir.
+ *
  * @returns superseded edilen eski cert sayısı
  */
 export async function dbSupersedeCertificatesByName(

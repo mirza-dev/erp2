@@ -232,4 +232,36 @@ describe("dbSupersedeCertificatesByName", () => {
         await expect(dbSupersedeCertificatesByName(PRODUCT_ID, "cert.pdf", NEW_ID))
             .rejects.toThrow(/versiyonlama başarısız/i);
     });
+
+    // Faz 3c Review 3.tur Bulgu 1 (kullanıcı kararı: A) — JSDoc LIMITATION lock
+    it("KARAR: helper JSDoc'unda LIMITATION dokümantasyonu kalıcı (gelecek tur'lar bilinçli kısıtı görür)", async () => {
+        const { readFileSync } = await import("node:fs");
+        const { join } = await import("node:path");
+        const SOURCE = readFileSync(
+            join(process.cwd(), "src/lib/supabase/product-attachments.ts"),
+            "utf8",
+        );
+        // Limitation başlığı + file_name bağımlılığı + paralel meşru cert gerekçesi
+        expect(SOURCE).toMatch(/LIMITATION/);
+        expect(SOURCE).toMatch(/file_name/);
+        expect(SOURCE).toMatch(/heat|paralel meşru|EN10204/i);
+    });
+
+    // Faz 3c Review 3.tur Bulgu 1 (kullanıcı kararı: A) — file_name identity lock
+    it("KARAR: identity file_name'e bağlı — farklı dosya adı eski cert'i supersede ETMEZ", async () => {
+        // İlk PDF: cert-2025.pdf
+        setTerminal({ data: [], error: null });  // henüz yok
+        const { dbSupersedeCertificatesByName } = await import("@/lib/supabase/product-attachments");
+        const c1 = await dbSupersedeCertificatesByName(PRODUCT_ID, "cert-2026.pdf", NEW_ID);
+        // Helper aktif cert listesinde cert-2026.pdf adına eşleşen aramaz →
+        // cert-2025.pdf adlı eski cert mock terminal'inden DÖNMEZ (data=[]).
+        expect(c1).toBe(0);
+        // Match kriteri ürün-bazlı değil, ad-bazlı — sadece file_name filtre uygulanır.
+        expect(mockEq).toHaveBeenCalledWith("file_name", "cert-2026.pdf");
+        // Plan-bazlı "tüm aktif cert'ler ürün altında supersede" semantiği OLMAMALI:
+        // kind ve product_id eşitliği var, ama file_name OPSİYONEL/yok olmamalı.
+        // Bu test biri yanlışlıkla `.eq("file_name", ...)` satırını kaldırırsa kırılır.
+        const fileNameCall = mockEq.mock.calls.find(([k]) => k === "file_name");
+        expect(fileNameCall).toBeDefined();
+    });
 });

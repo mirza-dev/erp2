@@ -7,7 +7,11 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-22
 
-**Faz 3c Review 3.tur — Apply concurrency atomic claim (3430 test)**
+**Faz 3c Review 3.tur — Apply concurrency + cert versioning identity (3432 test, 2 commit)**
+
+- **Bulgu 1 (cert versioning identity, kullanıcı kararı A):** file_name bazlı supersede korundu — plan literal "ürün bazlı" reddedildi. Gerekçe: PMT'de bir vananın paralel meşru aktif cert'leri (heat/test/standart) olabilir; literal supersede regression yaratırdı. Helper JSDoc'una LIMITATION + plan dokümanına identity kararı eklendi. +2 test (source lock + behavior lock).
+
+**Önceki bulgu — Apply concurrency atomic claim (commit `5f1dea0`):**
 
 - **P2 (TOCTOU race):** `serviceApplyImportDocument` başta JS-side status check yapıyordu, atomic lock yoktu. İki paralel apply çağrısı classified status'unu aynı anda görüp duplicate product/cert riski. Faz 8 `dbClaimBatchForConfirm` paterni uygulandı.
 - Migration 064 → `import_documents.status` CHECK genişledi (+ 'applying' ara state).
