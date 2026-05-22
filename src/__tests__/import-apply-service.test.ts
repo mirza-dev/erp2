@@ -446,3 +446,72 @@ describe("serviceApplyImportDocument — Review (P3 aggregate audit)", () => {
         expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
     });
 });
+
+// ── Faz 3c Review 4.tur — Post-commit rollback fix (P2) ──────────────────────
+
+describe("serviceApplyImportDocument — Faz 3c Review 4.tur (P2 post-commit)", () => {
+    it("CRITICAL: post-commit status update fail → 'applying'de KAL (rollback YOK, duplicate engel)", async () => {
+        // Setup: 1 ürün başarıyla yaratılır
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([makeLine("1")]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        // İlk dbUpdateImportDocumentStatus("applied") çağrısı fail
+        mockUpdateDocStatus.mockRejectedValueOnce(new Error("DB write conflict"));
+
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        // Service throw ETMEZ — audit yazılır, result döner
+        const r = await serviceApplyImportDocument("doc-1", null);
+
+        // Ürün yazıldı
+        expect(r.products_created).toBe(1);
+        // Status update "applied" denendi (rejected)
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
+        // CRITICAL: rollback ('classified') ÇAĞRILMAMALI — outer catch tetiklenmedi
+        const classifiedCalls = mockUpdateDocStatus.mock.calls.filter(c => c[1] === "classified");
+        expect(classifiedCalls).toHaveLength(0);
+
+        // Audit log: status_update_failed=true, success=false
+        expect(mockAuditInsert).toHaveBeenCalledTimes(1);
+        const row = mockAuditInsert.mock.calls[0]?.[0] as {
+            after_state: { success: boolean; status_update_failed: boolean; products_created: number };
+        };
+        expect(row.after_state.status_update_failed).toBe(true);
+        expect(row.after_state.success).toBe(false);  // successPath, applied set başarısız
+        expect(row.after_state.products_created).toBe(1);  // gerçek yazım sayısı korunur
+    });
+
+    it("duplicate apply engeli: doc applying'de iken 2. çağrı → claim null + 'hazır değil' throw", async () => {
+        // 1. çağrı post-commit fail sonrası doc applying'de takılı kaldı (yukarıdaki test).
+        // 2. çağrı: claim CAS classified→applying başarısız (status='applying'), helper null döner.
+        mockClaim.mockResolvedValueOnce(null);
+        mockGetDoc.mockResolvedValueOnce({ ...DOC, status: "applying" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await expect(serviceApplyImportDocument("doc-1", null))
+            .rejects.toThrow(/hazır değil.*applying/);
+        // Hiçbir DB iş yapılmamalı (duplicate engel)
+        expect(mockCreateProduct).not.toHaveBeenCalled();
+        expect(mockCreateAttachment).not.toHaveBeenCalled();
+        expect(mockUpdateDocStatus).not.toHaveBeenCalled();
+    });
+
+    it("successCount=0 + status update fail → outer catch tetiklenir (eski davranış korunur)", async () => {
+        // all-fail path: ürün/cert yok, status 'classified' rollback denenir.
+        // Bu UPDATE fail ederse outer catch tetiklenir → 2. rollback denenir (yutulur),
+        // throw propagate. Burada post-commit guard DEVREDE DEĞİL (successCount=0).
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { match_action: "matched", matched_product_id: null }), // fail
+        ]);
+        // İlk status update 'classified' (all-fail için) → throw
+        mockUpdateDocStatus.mockRejectedValueOnce(new Error("DB blip"));
+        // Outer catch rollback 'classified' tekrar denenir → bu da fail (warn log)
+        mockUpdateDocStatus.mockRejectedValueOnce(new Error("DB still down"));
+
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await expect(serviceApplyImportDocument("doc-1", null))
+            .rejects.toThrow(/DB blip/);
+        // İki 'classified' denemesi (ilki normal flow, ikincisi outer catch rollback)
+        const classifiedCalls = mockUpdateDocStatus.mock.calls.filter(c => c[1] === "classified");
+        expect(classifiedCalls.length).toBeGreaterThanOrEqual(1);
+    });
+});

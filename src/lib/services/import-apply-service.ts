@@ -92,6 +92,9 @@ export async function serviceApplyImportDocument(
 
     const result = emptyResult();
     let successPath = false;
+    // Faz 3c Review 4.tur (P2): post-commit terminal status update fail flag.
+    // True → ürün/cert yazıldı ama 'applied' yazılamadı; doc 'applying'de kalır.
+    let postCommitStatusFailed = false;
 
     try {
         // 1. Lines
@@ -209,16 +212,34 @@ export async function serviceApplyImportDocument(
             + result.attachments_created;
 
         if (successCount > 0) {
-            await dbUpdateImportDocumentStatus(documentId, "applied");
-            successPath = true;
+            // Faz 3c Review 4.tur (P2): post-commit guard — ürün/cert ZATEN
+            // yazıldı. Status update fail ederse 'classified'e rollback YAPMA
+            // (outer catch'i tetikleme); aksi halde kullanıcı tekrar Apply →
+            // duplicate product/cert riski. 'applying'de bırak: ikinci çağrı
+            // claim null alır ("hazır değil"), duplicate engellenir.
+            // Admin SQL ile manuel 'applied'a alır veya recovery cron temizler.
+            // Audit log status_update_failed=true ile forensic kayıt yapılır.
+            try {
+                await dbUpdateImportDocumentStatus(documentId, "applied");
+                successPath = true;
+            } catch (statusErr) {
+                postCommitStatusFailed = true;
+                console.error(
+                    "[import-apply] CRITICAL: applied status update failed AFTER commit; doc stays in 'applying' to prevent duplicate apply",
+                    statusErr,
+                );
+                // throw YOK — outer catch'e düşmesin, audit yazılsın.
+            }
         } else {
             // Faz 3c Review 3.tur: lock'u serbest bırak — 'applying' takılı kalmasın
             await dbUpdateImportDocumentStatus(documentId, "classified");
         }
     } catch (err) {
-        // Faz 3c Review 3.tur: dış exception (storage download / status update
-        // fail vb.) → lock'u 'classified'e geri çek, hata propagate.
+        // Faz 3c Review 3.tur: dış exception (storage download / claim sonrası
+        // listLines fail vb.) → lock'u 'classified'e geri çek, hata propagate.
         // Per-row loop kendi try/catch'i ile bu dala düşmez (errors[]'e push'lar).
+        // Faz 3c Review 4.tur: post-commit status fail bu dala DÜŞMEZ (içeride
+        // yutulur) — ürün/cert yazıldıktan sonra 'classified'e dönmek tehlikeli.
         try { await dbUpdateImportDocumentStatus(documentId, "classified"); }
         catch (rollbackErr) {
             console.warn("[import-apply] rollback failed:", rollbackErr);
@@ -246,6 +267,9 @@ export async function serviceApplyImportDocument(
                 errors_count: result.errors.length,
                 untyped_products: result.untyped_products,
                 success: successPath,
+                // Faz 3c Review 4.tur (P2): true → ürün/cert yazıldı ama
+                // 'applied' status update fail oldu, doc 'applying'de takılı.
+                status_update_failed: postCommitStatusFailed,
             },
             source: "ui",
             actor: actorUserId,

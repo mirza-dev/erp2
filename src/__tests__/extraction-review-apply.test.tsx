@@ -249,4 +249,54 @@ describe("ExtractionReview — Faz 3c Apply", () => {
             expect(screen.getByText(/2 eski sertifika önceki versiyona alındı/)).toBeTruthy();
         });
     });
+
+    // ── Faz 3c Review 4.tur (P3) — applying state UX ─────────────────────
+
+    it("doc.status='applying' → Uygula disabled + 'devam ediyor' tooltip + warning footer", () => {
+        vi.stubGlobal("fetch", vi.fn());
+        render(<ExtractionReview
+            document={{ ...DOC, status: "applying" }}
+            initialLines={[makeLine("1")]}
+            productTypes={[]}
+        />);
+        const applyBtn = screen.getByRole("button", { name: /^Uygula$/ });
+        expect(applyBtn).toHaveProperty("disabled", true);
+        expect(applyBtn.getAttribute("title")).toMatch(/uygulanıyor/i);
+        // Footer warning mesajı
+        expect(screen.getByText(/uygulanıyor — başka bir oturumda/i)).toBeTruthy();
+        // "Belge uygulandı" mesajı GÖRÜNMEMELI (applied terminal değil, applying transient)
+        expect(screen.queryByText(/Belge uygulandı/)).toBeNull();
+        // Yeniden Çıkar de disabled
+        const extractBtn = screen.getByRole("button", { name: /Yeniden Çıkar|^Çıkar$/ });
+        expect(extractBtn).toHaveProperty("disabled", true);
+        expect(extractBtn.getAttribute("title")).toMatch(/uygulanıyor/i);
+    });
+
+    it("handleApply 409 (başka oturum) → info toast + setDocStatus('applying') + buton disable", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+            error: "Belge şu anda başka bir oturumda uygulanıyor. Lütfen sayfayı yenileyin.",
+        }), { status: 409 })));
+
+        render(<ExtractionReview document={DOC} initialLines={[makeLine("1")]} productTypes={[]} />);
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /^Uygula$/ }));
+        });
+
+        // Info toast (error değil)
+        await waitFor(() => {
+            expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({
+                type: "info",
+                message: expect.stringMatching(/başka bir oturumda uygulanıyor/i),
+            }));
+        });
+
+        // setDocStatus('applying') sonrası buton disable + warning footer görünür
+        await waitFor(() => {
+            const btn = screen.getByRole("button", { name: /^Uygula$/ });
+            expect(btn).toHaveProperty("disabled", true);
+            expect(btn.getAttribute("title")).toMatch(/uygulanıyor/i);
+        });
+        expect(screen.getByText(/uygulanıyor — başka bir oturumda/i)).toBeTruthy();
+    });
 });

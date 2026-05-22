@@ -129,6 +129,9 @@ export default function ExtractionReview({ document: doc, initialLines, productT
     const [applyResult, setApplyResult] = useState<ApplyResultSummary | null>(null);
     const [docStatus, setDocStatus] = useState<typeof doc.status>(doc.status);
     const isDocApplied = docStatus === "applied";
+    // Faz 3c Review 4.tur (P3): başka oturum apply'ı sürüyor veya post-commit
+    // status fail sonrası takılı kalan durum — UI buton disable + net mesaj.
+    const isDocApplying = docStatus === "applying";
     const hasApplicable = lines.some(l =>
         l.match_action === "matched" || l.match_action === "reviewed" || l.match_action === "new_product",
     );
@@ -149,6 +152,13 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                 headers: { "Content-Type": "application/json" },
             });
             const body = await res.json().catch(() => ({}));
+            // Faz 3c Review 4.tur (P3): 409 = başka oturum apply'ı sürüyor.
+            // UI state'ini senkron tut → buton disable + "devam ediyor" mesajı.
+            if (res.status === 409) {
+                toast({ type: "info", message: body.error ?? "Belge şu anda uygulanıyor" });
+                setDocStatus("applying");
+                return;
+            }
             if (!res.ok) {
                 toast({ type: "error", message: body.error ?? "Uygulama başarısız" });
                 return;
@@ -380,13 +390,15 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                     <Button
                         variant="primary"
                         onClick={handleExtract}
-                        disabled={isDemo || extracting || isDocApplied}
+                        disabled={isDemo || extracting || isDocApplied || isDocApplying}
                         title={
                             isDemo
                                 ? DEMO_DISABLED_TOOLTIP
                                 : isDocApplied
                                     ? "Belge uygulandı, tekrar çıkarılamaz"
-                                    : undefined
+                                    : isDocApplying
+                                        ? "Belge şu anda uygulanıyor, sayfayı yenileyin"
+                                        : undefined
                         }
                     >
                         {extracting ? "Çıkarılıyor…" : lines.length > 0 ? "Yeniden Çıkar" : "Çıkar"}
@@ -605,13 +617,19 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                 Belge uygulandı — yeni doküman yükleyerek devam edin
                             </span>
                         )}
+                        {isDocApplying && (
+                            <span style={{ fontSize: "12px", color: "var(--warning-text)" }}>
+                                Belge uygulanıyor — başka bir oturumda devam ediyor olabilir
+                            </span>
+                        )}
                         <Button
                             variant="primary"
                             onClick={handleApply}
-                            disabled={isDemo || applying || !hasApplicable || isDocApplied}
+                            disabled={isDemo || applying || !hasApplicable || isDocApplied || isDocApplying}
                             title={
                                 isDemo ? DEMO_DISABLED_TOOLTIP
                                 : isDocApplied ? "Belge zaten uygulandı"
+                                : isDocApplying ? "Belge şu anda uygulanıyor"
                                 : !hasApplicable ? "Uygulanacak (matched/reviewed/new_product) satır yok"
                                 : undefined
                             }

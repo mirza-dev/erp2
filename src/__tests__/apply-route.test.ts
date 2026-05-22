@@ -100,4 +100,27 @@ describe("POST /api/import/documents/[id]/apply", () => {
         await callPOST("doc-1");
         expect(mockApplyService).toHaveBeenCalledWith("doc-1", "user-1");
     });
+
+    // ── Faz 3c Review 4.tur (P3) — 409 mapping for 'applying' state ──────
+
+    it("service throw 'hazır değil (durum: applying)' → 409 Conflict + net mesaj", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockApplyService.mockRejectedValueOnce(
+            new Error("Belge uygulanmaya hazır değil (durum: applying)"),
+        );
+        const res = await callPOST("doc-1");
+        expect(res.status).toBe(409);
+        const body = await res.json();
+        expect(body.error).toMatch(/başka bir oturumda uygulanıyor/i);
+    });
+
+    it("service throw 'hazır değil (durum: applied)' → 400 korunur (applying değil)", async () => {
+        // Sadece 'applying' 409'a maplenir; diğer terminal/transient state'ler 400.
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockApplyService.mockRejectedValueOnce(
+            new Error("Belge uygulanmaya hazır değil (durum: applied)"),
+        );
+        const res = await callPOST("doc-1");
+        expect(res.status).toBe(400);
+    });
 });

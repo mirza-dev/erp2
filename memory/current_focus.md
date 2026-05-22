@@ -7,7 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-22
 
-**Faz 3c Review 3.tur — Apply concurrency + cert versioning identity (3432 test, 2 commit)**
+**Faz 3c Review 4.tur — Post-commit rollback fix (P2 duplicate engel) + applying state UX (P3) (3439 test)**
+
+- **P2 (kritik):** 3.tur outer catch successCount>0 sonrası status fail'inde de 'classified'e rollback yapıyordu → duplicate apply riski (ürün/cert zaten yazılmış). Fix: applied UPDATE ayrı try/catch, fail → `postCommitStatusFailed=true`, doc 'applying'de takılı, audit `status_update_failed: true`. Tekrar Apply → claim null → "hazır değil (applying)" → duplicate sıfır. Admin manuel SQL ile düzeltir.
+- **P3 (UX):** Route applying → 409 + "başka oturum uygulanıyor"; UI `isDocApplying` derive + buton/footer + handleApply 409 handler (info toast + setDocStatus).
+- **+7 test** (apply-service 3, route 2, RTL 2).
+- 4 dosya · **3439 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 3d — klasik mod toggle cleanup (eski 7-adım wizard "Klasik Mod" altına gizleme).
+
+## Önceki — Faz 3c Review 3.tur (3432 test, 2 commit)
+
+**Apply concurrency + cert versioning identity**
 
 - **Bulgu 1 (cert versioning identity, kullanıcı kararı A):** file_name bazlı supersede korundu — plan literal "ürün bazlı" reddedildi. Gerekçe: PMT'de bir vananın paralel meşru aktif cert'leri (heat/test/standart) olabilir; literal supersede regression yaratırdı. Helper JSDoc'una LIMITATION + plan dokümanına identity kararı eklendi. +2 test (source lock + behavior lock).
 

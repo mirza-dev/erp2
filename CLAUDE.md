@@ -3,7 +3,21 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-22_
 
-**Son tamamlanan iş:** Faz 3c Review 3.tur — Apply concurrency atomic claim + cert versioning identity karar (2026-05-22; 3432 test, 2 commit)
+**Son tamamlanan iş:** Faz 3c Review 4.tur — Post-commit rollback fix (P2 duplicate engel) + applying state UX (P3) (2026-05-22; 3439 test)
+
+- **P2 (kritik data integrity):** 3.tur outer catch `successCount>0` sonrası terminal status update fail'inde de 'classified'e rollback yapıyordu → ürün/cert ZATEN yazılmış, kullanıcı tekrar Apply → claim CAS başarılı → loop yeniden → **duplicate product/cert** (özellikle cert path orphan zinciri kirletir; SKU UNIQUE create path'i bloklar ama audit/state kirli).
+- **Fix:** `successCount>0` sonrası `dbUpdateImportDocumentStatus("applied")` ayrı try/catch içinde; fail → `postCommitStatusFailed=true` flag set, throw YOK (outer catch'i tetiklemez), audit log `status_update_failed: true` ile yazılır. Doc 'applying'de takılı kalır → tekrar Apply çağrısı claim null → "hazır değil (applying)" → duplicate sıfır. Admin SQL ile manuel 'applied'a alır (recovery cron ileride opsiyonel).
+- **P3 (UX):** UI ve API 'applying' state'i bilmiyordu — sayfa yenile/ikinci sekme sırasında generic 400 "hazır değil" alıyordu.
+- **Fix:** Route — `msg includes "applying"` → **409 Conflict** + "Belge şu anda başka bir oturumda uygulanıyor" (Faz 8 yarış 409 paterni); diğer "hazır değil" 400'de kalır. UI — `isDocApplying = docStatus === "applying"` türevi; Yeniden Çıkar + Uygula buton disabled koşullarına eklenir; warning footer "Belge uygulanıyor — başka bir oturumda devam ediyor olabilir"; `handleApply` 409 yakalar → info toast + `setDocStatus("applying")` → UI senkron.
+- **+7 yeni test:**
+  - `import-apply-service.test.ts` (+3): post-commit fail rollback YOK + audit flag, duplicate engel (2. çağrı claim null), all-fail outer catch eski davranış korunur.
+  - `apply-route.test.ts` (+2): applying → 409 + net mesaj, applied → 400 korunur (sadece applying 409'a maplenir).
+  - `extraction-review-apply.test.tsx` (+2): doc.status='applying' fixture → buton disable + tooltip + warning footer + Yeniden Çıkar disable; handleApply 409 → info toast + setDocStatus + UI senkron.
+- **Plan-domain check:** `domain-rules.md` özel kural yok; data integrity (zero-duplicate) genel ilke. Faz 8 import-batches `dbClaimBatchForConfirm` outer catch 'review'e rollback yapıyor ama orada side-effect atomic transaction içinde — apply'da her satır ayrı transaction olduğundan "applying'de bırak" doğru karar.
+- 4 dosya · **3439 test yeşil** (önceki 3432 + 7) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 3d — klasik mod toggle cleanup (eski 7-adım wizard "Klasik Mod" altına gizleme, AI default akış polish).
+
+**Önceki:** Faz 3c Review 3.tur — Apply concurrency atomic claim + cert versioning identity karar (2026-05-22; 3432 test, 2 commit)
 
 **Bulgu 1 (kullanıcı kararı: A — file_name only + dokümante; commit pending):**
 - Versiyonlama identity `(product_id, kind=certificate, file_name)` olarak korundu (plan literal "ürün bazlı supersede" reddedildi).
