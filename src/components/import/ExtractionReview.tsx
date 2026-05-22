@@ -380,8 +380,14 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                     <Button
                         variant="primary"
                         onClick={handleExtract}
-                        disabled={isDemo || extracting}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        disabled={isDemo || extracting || isDocApplied}
+                        title={
+                            isDemo
+                                ? DEMO_DISABLED_TOOLTIP
+                                : isDocApplied
+                                    ? "Belge uygulandı, tekrar çıkarılamaz"
+                                    : undefined
+                        }
                     >
                         {extracting ? "Çıkarılıyor…" : lines.length > 0 ? "Yeniden Çıkar" : "Çıkar"}
                     </Button>

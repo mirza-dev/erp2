@@ -188,6 +188,18 @@ describe("ExtractionReview — Faz 3c Apply", () => {
         expect(screen.getByText(/Belge uygulandı/)).toBeTruthy();
     });
 
+    it("doc.status='applied' → 'Yeniden Çıkar' disabled + 'tekrar çıkarılamaz' tooltip (Faz 3c Review 2.tur)", () => {
+        vi.stubGlobal("fetch", vi.fn());
+        render(<ExtractionReview
+            document={{ ...DOC, status: "applied" }}
+            initialLines={[makeLine("1")]}
+            productTypes={[]}
+        />);
+        const btn = screen.getByRole("button", { name: /Yeniden Çıkar|^Çıkar$/ });
+        expect(btn).toHaveProperty("disabled", true);
+        expect(btn.getAttribute("title")).toMatch(/tekrar çıkarılamaz/i);
+    });
+
     // ── Faz 3c Review — all-fail policy + attachments_superseded ──
 
     it("all-fail (successCount=0) → button enabled kalır, warning toast, doc applied'a geçmez", async () => {
