@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockInsert = vi.fn();
 const mockSelectSingle = vi.fn();
+const mockSelectMaybeSingle = vi.fn();
 const mockUpdate = vi.fn();
 const mockDelete = vi.fn();
 const mockStorageUpload = vi.fn();
@@ -49,17 +50,19 @@ vi.mock("@/lib/supabase/service", () => ({
             }),
             update: (patch: unknown) => {
                 mockUpdate(patch);
-                return {
-                    eq: (k: string, v: unknown) => {
-                        mockEq(k, v);
-                        // For update().eq() the call may resolve directly OR chain .select().single()
-                        return {
-                            select: () => ({ single: () => mockSelectSingle() }),
-                            then: (cb: (v: { data: { id: string }; error: null }) => unknown) =>
-                                Promise.resolve(cb({ data: { id: "row-1" }, error: null })),
-                        };
-                    },
+                // Recursive chainable — supports .eq().eq().select().single|maybeSingle()
+                // plus direct await (then). dbClaimImportDocumentForApply uses
+                // .update().eq("id").eq("status","classified").select("*").maybeSingle().
+                const chain = {
+                    eq: (k: string, v: unknown) => { mockEq(k, v); return chain; },
+                    select: (_cols?: string) => ({
+                        single: () => mockSelectSingle(),
+                        maybeSingle: () => mockSelectMaybeSingle(),
+                    }),
+                    then: (cb: (v: { data: { id: string }; error: null }) => unknown) =>
+                        Promise.resolve(cb({ data: { id: "row-1" }, error: null })),
                 };
+                return chain;
             },
             delete: () => ({ eq: (k: string, v: unknown) => { mockDelete(k, v); return Promise.resolve({ error: null }); } }),
         }),
@@ -75,6 +78,7 @@ vi.mock("@/lib/supabase/service", () => ({
 beforeEach(() => {
     mockInsert.mockReset();
     mockSelectSingle.mockReset();
+    mockSelectMaybeSingle.mockReset();
     mockUpdate.mockReset();
     mockDelete.mockReset();
     mockStorageUpload.mockReset();
@@ -202,5 +206,46 @@ describe("dbUpdateImportDocumentStatus", () => {
         await expect(dbUpdateImportDocumentStatus("doc-1", "garbage" as never))
             .rejects.toThrow(/Geçersiz status/);
         expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("'applying' (Faz 3c Review 3.tur intermediate state) geçerli", async () => {
+        const { dbUpdateImportDocumentStatus } = await import("@/lib/supabase/import-documents");
+        await dbUpdateImportDocumentStatus("doc-1", "applying");
+        const patch = mockUpdate.mock.calls[0]?.[0] as { status: string };
+        expect(patch.status).toBe("applying");
+    });
+});
+
+// Faz 3c Review 3.tur — atomic CAS claim
+describe("dbClaimImportDocumentForApply", () => {
+    it("classified → applying CAS başarılı: row döner", async () => {
+        mockSelectMaybeSingle.mockResolvedValueOnce({
+            data: { id: "doc-1", status: "applying" },
+            error: null,
+        });
+        const { dbClaimImportDocumentForApply } = await import("@/lib/supabase/import-documents");
+        const result = await dbClaimImportDocumentForApply("doc-1");
+        expect(result).toEqual({ id: "doc-1", status: "applying" });
+        // UPDATE patch'i 'applying' yazar
+        expect(mockUpdate).toHaveBeenCalledWith({ status: "applying" });
+        // CAS filter: id + status='classified' (yarış koruması)
+        expect(mockEq).toHaveBeenCalledWith("id", "doc-1");
+        expect(mockEq).toHaveBeenCalledWith("status", "classified");
+    });
+
+    it("classified değilse (zaten applying / applied) → null döner (race lost)", async () => {
+        mockSelectMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+        const { dbClaimImportDocumentForApply } = await import("@/lib/supabase/import-documents");
+        const result = await dbClaimImportDocumentForApply("doc-2");
+        expect(result).toBeNull();
+    });
+
+    it("DB error → throw", async () => {
+        mockSelectMaybeSingle.mockResolvedValueOnce({
+            data: null,
+            error: { message: "DB lock" },
+        });
+        const { dbClaimImportDocumentForApply } = await import("@/lib/supabase/import-documents");
+        await expect(dbClaimImportDocumentForApply("doc-3")).rejects.toThrow(/DB lock/);
     });
 });

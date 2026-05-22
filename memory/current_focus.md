@@ -7,15 +7,32 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-22
 
-**Faz 3c Review — 4 P2/P3 bulgu kapatma (3401 test)**
+**Faz 3c Review 3.tur — Apply concurrency atomic claim (3430 test)**
 
-- **P2-1 (cert versiyonlama):** Kullanıcı önceki "supersede etme" kararını güncelledi → yeni `dbSupersedeCertificatesByName` helper'ı (ad bazlı eşleşme, self-exclude). Apply cert branch'inde dbCreateAttachment sonrası çağrılır; fail warning olarak errors[]. UI'da "N eski sertifika önceki versiyona alındı".
+- **P2 (TOCTOU race):** `serviceApplyImportDocument` başta JS-side status check yapıyordu, atomic lock yoktu. İki paralel apply çağrısı classified status'unu aynı anda görüp duplicate product/cert riski. Faz 8 `dbClaimBatchForConfirm` paterni uygulandı.
+- Migration 064 → `import_documents.status` CHECK genişledi (+ 'applying' ara state).
+- Yeni helper `dbClaimImportDocumentForApply(id)`: tek SQL CAS `classified → applying RETURNING`. Null = race lost.
+- Service: claim (null → "hazır değil" throw); try block içinde lines/storage/per-row/finalize. Final: success→'applied', all-fail/eligible-0→'classified' (lock serbest), exception→catch rollback 'classified' + throw.
+- **+11 test** (migration 4, helper 4, service 3 yeni + 5 mevcut güncelleme; 20 `mockGetDoc` → `mockClaim` taşındı).
+- 7 dosya (1 commit) · **3430 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Bulgu 1 (cert versioning identity) — file_name match plan'la uyumsuz (plan ürün bazlı diyor). Kullanıcıya 3 seçenek: A) file_name only (mevcut + dokümante), B) product+kind literal (plan reading), C) metadata.cert_no kompozit. AskUserQuestion ile karar.
+
+## Önceki — Faz 3c Review 2.tur (3419 test, 2 commit)
+
+**UI sertifika geçmişi + Yeniden Çıkar applied guard**
+
+- **Bulgu 1 (P3, commit `6a7cb39`):** ExtractionReview "Yeniden Çıkar" butonu docStatus=applied iken disabled + "Belge uygulandı, tekrar çıkarılamaz" tooltip. Uygula butonuyla simetri. +1 RTL test.
+- **Bulgu 2 (P2, commit `3440a5d`):** Sertifika geçmiş görünümü — 1.tur supersede helper'ı UI'da görünür hale geldi. dbListAttachmentsByProduct opsiyonel `{ includeSuperseded }` 3.param (geriye uyumlu); GET route `?includeSuperseded=1` query → `{ items, superseded, expires_in }` shape; mapper + ProductAttachment.supersededBy alanı; UI Ekler sekmesinde "Önceki Sertifika Versiyonları (N)" collapsible (default kapalı, ▸/▾ toggle, faded liste, İndir butonu reuse handleDownloadDocument, Sil yok — forensic). +16 test.
+- **Toplam +17 test** (8→25 attachment-domain test artışı)
+- 12 dosya (2 commit) · **3419 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 3d — klasik mod toggle cleanup (eski 7-adım wizard "Klasik Mod" altına gizleme, AI default akış polish).
+
+## Önceki — Faz 3c Review 1.tur (2026-05-22; 3401 test, commit `14a7253`)
+
+- **P2-1 (cert versiyonlama):** Yeni `dbSupersedeCertificatesByName` helper'ı (ad bazlı eşleşme, self-exclude). Apply cert branch'inde dbCreateAttachment sonrası çağrılır; fail warning olarak errors[]. UI'da "N eski sertifika önceki versiyona alındı".
 - **P2-2 (all-fail policy):** successCount===0 ise doc 'classified' kalır, retry mümkün. UI button enabled + warning toast.
 - **P3 (PATCH 409):** Applied belgede satır PATCH'i 409. Parent doc fetch eklendi.
 - **P3 (aggregate audit):** Tek audit_log entry action='import_applied' (success/all-fail dahil). Insert fail silent.
-- **+14 test** (service 7 + line-patch 2 + RTL 2 + helper 3)
-- 7 dosya · **3401 test yeşil** · TS clean · 0 lint · build OK
-- **Sıradaki:** Faz 3d — klasik mod toggle cleanup (eski 7-adım wizard "Klasik Mod" altına gizleme, AI default akış polish).
 
 ---
 

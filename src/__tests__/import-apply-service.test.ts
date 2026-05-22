@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockGetDoc = vi.fn();
+const mockClaim = vi.fn();
 const mockListLines = vi.fn();
 const mockUpdateDocStatus = vi.fn();
 const mockCreateProduct = vi.fn();
@@ -15,6 +16,7 @@ const mockStorageDownload = vi.fn();
 vi.mock("@/lib/supabase/import-documents", () => ({
     dbGetImportDocument: (...a: unknown[]) => mockGetDoc(...a),
     dbUpdateImportDocumentStatus: (...a: unknown[]) => mockUpdateDocStatus(...a),
+    dbClaimImportDocumentForApply: (...a: unknown[]) => mockClaim(...a),
 }));
 
 vi.mock("@/lib/supabase/import-document-lines", () => ({
@@ -85,6 +87,7 @@ function makeLine(id: string, overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     mockGetDoc.mockReset();
+    mockClaim.mockReset();
     mockListLines.mockReset();
     mockUpdateDocStatus.mockReset();
     mockCreateProduct.mockReset();
@@ -102,24 +105,40 @@ beforeEach(() => {
     });
 });
 
-describe("serviceApplyImportDocument — pre-checks", () => {
-    it("doc bulunamadı → throw 'Belge bulunamadı'", async () => {
+describe("serviceApplyImportDocument — pre-checks (Faz 3c Review 3.tur atomic claim)", () => {
+    it("claim null + doc null → throw 'Belge bulunamadı'", async () => {
+        mockClaim.mockResolvedValueOnce(null);
         mockGetDoc.mockResolvedValueOnce(null);
         const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
         await expect(serviceApplyImportDocument("doc-x", null)).rejects.toThrow(/bulunamadı/);
+        expect(mockUpdateDocStatus).not.toHaveBeenCalled();
     });
 
-    it("doc.status !== 'classified' → throw (idempotency)", async () => {
+    it("claim null + doc.status='applied' → throw 'hazır değil' (idempotency)", async () => {
+        mockClaim.mockResolvedValueOnce(null);
         mockGetDoc.mockResolvedValueOnce({ ...DOC, status: "applied" });
         const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
         await expect(serviceApplyImportDocument("doc-1", null)).rejects.toThrow(/hazır değil/);
+        expect(mockUpdateDocStatus).not.toHaveBeenCalled();
+    });
+
+    it("claim null + doc.status='applying' → throw 'hazır değil' (paralel apply race koruması)", async () => {
+        // Aynı belgeye iki paralel apply: ikincinin claim'i null döner çünkü
+        // birincisi zaten classified→applying CAS'i kazanmıştır.
+        mockClaim.mockResolvedValueOnce(null);
+        mockGetDoc.mockResolvedValueOnce({ ...DOC, status: "applying" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await expect(serviceApplyImportDocument("doc-1", null)).rejects.toThrow(/hazır değil/);
+        // İkinci çağrı hiçbir DB iş yapmamalı
+        expect(mockListLines).not.toHaveBeenCalled();
+        expect(mockCreateProduct).not.toHaveBeenCalled();
         expect(mockUpdateDocStatus).not.toHaveBeenCalled();
     });
 });
 
 describe("serviceApplyImportDocument — product flow", () => {
     it("all new_product → products_created sayılır + dbCreateProduct N kez", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1"),
             makeLine("2"),
@@ -134,7 +153,7 @@ describe("serviceApplyImportDocument — product flow", () => {
     });
 
     it("matched satır → dbUpdateProduct attributes merge ({...current, ...new})", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { match_action: "matched", matched_product_id: "p-existing", extracted_attributes: { dn: 50, pn_class: "PN16" } }),
         ]);
@@ -151,7 +170,7 @@ describe("serviceApplyImportDocument — product flow", () => {
     });
 
     it("untyped_products: product_type_id null ile yeni ürün → counter artar", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { product_type_id: null }),
             makeLine("2", { product_type_id: "type-vana" }),
@@ -164,7 +183,7 @@ describe("serviceApplyImportDocument — product flow", () => {
     });
 
     it("matched + matched_product_id eksik → error + skipped++", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { match_action: "matched", matched_product_id: null }),
         ]);
@@ -176,7 +195,7 @@ describe("serviceApplyImportDocument — product flow", () => {
     });
 
     it("new_product ad/sku eksik → error + skipped++", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { extracted_name: "", extracted_sku: "SKU-1" }),
         ]);
@@ -192,7 +211,7 @@ describe("serviceApplyImportDocument — certificate flow", () => {
     const CERT_DOC = { ...DOC, classification: { ...DOC.classification, document_type: "material_certificate" } };
 
     it("cert + matched → dbCreateAttachment(kind=certificate) + storage download bir kez", async () => {
-        mockGetDoc.mockResolvedValueOnce(CERT_DOC);
+        mockClaim.mockResolvedValueOnce(CERT_DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { extraction_type: "certificate_target", match_action: "matched", matched_product_id: "p-target" }),
         ]);
@@ -208,7 +227,7 @@ describe("serviceApplyImportDocument — certificate flow", () => {
     });
 
     it("cert + new_product → error + skipped++ (anlamsız)", async () => {
-        mockGetDoc.mockResolvedValueOnce(CERT_DOC);
+        mockClaim.mockResolvedValueOnce(CERT_DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { extraction_type: "certificate_target", match_action: "new_product" }),
         ]);
@@ -219,21 +238,23 @@ describe("serviceApplyImportDocument — certificate flow", () => {
         expect(r.errors[0]).toMatch(/yeni ürün.*edilemez/i);
     });
 
-    it("cert + storage download fail → throw (pre-loop)", async () => {
-        mockGetDoc.mockResolvedValueOnce(CERT_DOC);
+    it("cert + storage download fail → throw + status 'classified'e rollback", async () => {
+        mockClaim.mockResolvedValueOnce(CERT_DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { extraction_type: "certificate_target", match_action: "matched", matched_product_id: "p-target" }),
         ]);
         mockStorageDownload.mockResolvedValueOnce({ data: null, error: { message: "not found" } });
         const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
         await expect(serviceApplyImportDocument("doc-1", null)).rejects.toThrow(/okunamadı/);
-        expect(mockUpdateDocStatus).not.toHaveBeenCalled();
+        // Faz 3c Review 3.tur: exception path → applying lock 'classified'e geri çekilir
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "classified");
+        expect(mockUpdateDocStatus).not.toHaveBeenCalledWith("doc-1", "applied");
     });
 });
 
 describe("serviceApplyImportDocument — partial failure + status", () => {
     it("bir satır fail diğeri başarılı → diğeri çalışır, errors[] dolar", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { match_action: "matched", matched_product_id: null }), // fail
             makeLine("2"), // OK new_product
@@ -247,8 +268,8 @@ describe("serviceApplyImportDocument — partial failure + status", () => {
         expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
     });
 
-    it("hiç eligible satır yok → skipped, doc applied'a geçmez", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+    it("hiç eligible satır yok → skipped, doc applied'a geçmez, lock serbest", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { match_action: "pending" }),
             makeLine("2", { match_action: "skipped" }),
@@ -257,11 +278,14 @@ describe("serviceApplyImportDocument — partial failure + status", () => {
         const r = await serviceApplyImportDocument("doc-1", null);
         expect(r.skipped).toBe(2);
         expect(r.products_created).toBe(0);
-        expect(mockUpdateDocStatus).not.toHaveBeenCalled();
+        // Faz 3c Review 3.tur: applying lock 'classified'e geri çekilir;
+        // 'applied' geçişi olmaz (eligible satır yok).
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "classified");
+        expect(mockUpdateDocStatus).not.toHaveBeenCalledWith("doc-1", "applied");
     });
 
     it("storage download yalnız cert flow varsa çağrılır", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([makeLine("1")]);
         mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
         const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
@@ -276,7 +300,7 @@ describe("serviceApplyImportDocument — Review (P2-1 cert versioning)", () => {
     const CERT_DOC = { ...DOC, classification: { ...DOC.classification, document_type: "material_certificate" } };
 
     it("cert apply → dbSupersedeCertificatesByName çağrılır + attachments_superseded counter", async () => {
-        mockGetDoc.mockResolvedValueOnce(CERT_DOC);
+        mockClaim.mockResolvedValueOnce(CERT_DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { extraction_type: "certificate_target", match_action: "matched", matched_product_id: "p-target" }),
         ]);
@@ -290,7 +314,7 @@ describe("serviceApplyImportDocument — Review (P2-1 cert versioning)", () => {
     });
 
     it("versiyonlama fail → cert yine create, errors[] uyarı eklenir", async () => {
-        mockGetDoc.mockResolvedValueOnce(CERT_DOC);
+        mockClaim.mockResolvedValueOnce(CERT_DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { extraction_type: "certificate_target", match_action: "matched", matched_product_id: "p-target" }),
         ]);
@@ -305,8 +329,8 @@ describe("serviceApplyImportDocument — Review (P2-1 cert versioning)", () => {
 });
 
 describe("serviceApplyImportDocument — Review (P2-2 all-fail policy)", () => {
-    it("all-fail → dbUpdateImportDocumentStatus çağrılmaz, doc classified kalır", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+    it("all-fail → status 'classified'e geri alınır (lock serbest, retry mümkün)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { match_action: "matched", matched_product_id: null }), // fail
             makeLine("2", { extracted_name: "", extracted_sku: "x" }), // fail (ad eksik)
@@ -317,12 +341,15 @@ describe("serviceApplyImportDocument — Review (P2-2 all-fail policy)", () => {
         expect(r.products_updated).toBe(0);
         expect(r.attachments_created).toBe(0);
         expect(r.errors.length).toBe(2);
-        // CRITICAL: status update çağrılmamalı (doc 'classified' kalır → retry)
-        expect(mockUpdateDocStatus).not.toHaveBeenCalled();
+        // Faz 3c Review 3.tur: applying lock serbest bırakılır → classified
+        // (Önceden hiç çağrılmıyordu çünkü status hiç değişmemişti; artık
+        // 'applying' kilidi geri çekilir.)
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "classified");
+        expect(mockUpdateDocStatus).not.toHaveBeenCalledWith("doc-1", "applied");
     });
 
     it("partial success → status applied (en az 1 başarı varsa)", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1"), // OK new_product
             makeLine("2", { match_action: "matched", matched_product_id: null }), // fail
@@ -336,9 +363,44 @@ describe("serviceApplyImportDocument — Review (P2-2 all-fail policy)", () => {
     });
 });
 
+describe("serviceApplyImportDocument — Faz 3c Review 3.tur rollback", () => {
+    it("eligible.length=0 → status 'classified'e geri alınır (lock serbest)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { match_action: "pending" }),   // not eligible
+            makeLine("2", { match_action: "skipped" }),    // not eligible
+        ]);
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", null);
+        expect(r.products_created).toBe(0);
+        expect(r.skipped).toBe(2);
+        // CRITICAL: applying lock 'classified'e geri çekilir (sızıntı koruması)
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "classified");
+    });
+
+    it("storage download fail (cert flow) → throw + status 'classified'e rollback", async () => {
+        const CERT_DOC2 = { ...DOC, file_name: "cert.pdf" };
+        mockClaim.mockResolvedValueOnce(CERT_DOC2);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", {
+                extraction_type: "certificate_target",
+                match_action: "matched",
+                matched_product_id: "p-1",
+            }),
+        ]);
+        mockStorageDownload.mockResolvedValueOnce({ data: null, error: { message: "404 Not Found" } });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await expect(serviceApplyImportDocument("doc-1", null)).rejects.toThrow(/okunamadı/i);
+        // Rollback: applying → classified
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "classified");
+        // Audit insert exception path'inde yapılmaz (throw yukarıda)
+        expect(mockAuditInsert).not.toHaveBeenCalled();
+    });
+});
+
 describe("serviceApplyImportDocument — Review (P3 aggregate audit)", () => {
     it("apply tamamlandıktan sonra audit_log 'import_applied' insert (success path)", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([makeLine("1")]);
         mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
         const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
@@ -358,7 +420,7 @@ describe("serviceApplyImportDocument — Review (P3 aggregate audit)", () => {
     });
 
     it("all-fail durumda da audit yazılır (forensic)", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { match_action: "matched", matched_product_id: null }),
         ]);
@@ -373,7 +435,7 @@ describe("serviceApplyImportDocument — Review (P3 aggregate audit)", () => {
     });
 
     it("audit insert fail (silent) → apply başarısı geri alınmaz", async () => {
-        mockGetDoc.mockResolvedValueOnce(DOC);
+        mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([makeLine("1")]);
         mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
         mockAuditInsert.mockResolvedValueOnce({ error: { message: "DB down" } });

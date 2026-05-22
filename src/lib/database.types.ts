@@ -19,7 +19,7 @@ export type AlertSeverity = "critical" | "warning" | "info"
 export type AlertStatus = "open" | "acknowledged" | "resolved" | "dismissed"
 export type ImportBatchStatus = "pending" | "processing" | "review" | "confirming" | "confirmed" | "failed"
 export type ImportDraftStatus = "pending" | "confirmed" | "rejected" | "merged"
-export type ImportDocumentStatus = "pending" | "classifying" | "classified" | "error" | "applied"
+export type ImportDocumentStatus = "pending" | "classifying" | "classified" | "applying" | "error" | "applied"
 
 export type DocumentType =
     | "product_catalog"

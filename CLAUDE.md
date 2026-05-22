@@ -1,9 +1,43 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-20_
+_Son güncelleme: 2026-05-22_
 
-**Son tamamlanan iş:** Faz 3c Review — 4 P2/P3 bulgu kapatma (2026-05-22; 3401 test)
+**Son tamamlanan iş:** Faz 3c Review 3.tur — Apply concurrency atomic claim (2026-05-22; 3430 test)
+
+- **P2 (race condition):** `serviceApplyImportDocument` başta JS-side `doc.status !== "classified"` kontrol yapıyordu ama atomic claim/lock yoktu. Status okuma → AI/storage/DB iş → status yazma arasında TOCTOU race penceresi vardı. İki paralel apply (iki sekme, retry double-click) classified status'unu aynı anda görüp ikisi de işleme girebiliyordu → duplicate product/cert riski.
+- **Çözüm — Faz 8 (Sprint B G3) `dbClaimBatchForConfirm` paterni:**
+  - **Migration 064:** `import_documents.status` CHECK genişletildi → 'applying' ara state eklendi (mevcut 5 state korunur, idempotent ROLLBACK SQL).
+  - **`ImportDocumentStatus` type + `VALID_STATUS_TRANSITIONS` array:** 'applying' eklendi.
+  - **Yeni helper `dbClaimImportDocumentForApply(id)`:** Tek SQL'le `UPDATE import_documents SET status='applying' WHERE id=$1 AND status='classified' RETURNING *`. CAS — yarışı kazanan row alır, kaybeden null. `maybeSingle()` ile null-safe.
+  - **Service refactor:** Eski 1-3 step (doc fetch + status check + lines fetch) → atomic claim. Null → `dbGetImportDocument` ile detail oku, "hazır değil (durum: X)" throw. Tüm processing (storage download, per-row loop, status finalize) try/catch içinde:
+    - successCount > 0 → `dbUpdateImportDocumentStatus('applied')` (terminal)
+    - successCount === 0 (all-fail) → `dbUpdateImportDocumentStatus('classified')` (lock serbest, retry mümkün)
+    - eligible.length === 0 → `dbUpdateImportDocumentStatus('classified')` (lock serbest)
+    - Outer exception (storage fail, status update fail) → catch: rollback 'classified' + throw propagate
+  - **Audit log:** Exception path'inde audit yazılmaz (throw yukarıda); başarılı + all-fail apply'lar `success: boolean` ile loglanır.
+- **+11 yeni test:**
+  - `import-documents-applying-migration.test.ts` (yeni dosya, 4): CHECK constraint genişlemesi + 'applying' + ROLLBACK + race doc.
+  - `import-documents-helper.test.ts` (+4): `dbClaimImportDocumentForApply` happy/race-lost/error + `dbUpdateImportDocumentStatus('applying')` valid; mock chain'e `maybeSingle()` + recursive `.eq().eq()` desteği.
+  - `import-apply-service.test.ts` (+3 yeni, ~5 güncelleme): `mockClaim` mock'u eklendi; 20 mevcut `mockGetDoc.mockResolvedValueOnce(DOC|CERT_DOC)` çağrısı `mockClaim`'e taşındı; pre-check testleri (3): claim null + doc null/applied/applying → throw; rollback testleri (3): all-fail/eligible-0 → 'classified' geri çekilir, cert storage fail → throw + rollback + no audit.
+- **Geriye uyumluluk:** Mevcut başarılı flow değişmedi; sadece status sırası `classified → applying → applied` (önceden `classified → applied`). UI'da fark görülmez (idempotency hâlâ aktif: applying'de iken 2. çağrı reddedilir).
+- **Plan-domain check:** `domain-rules.md` özel kural yok; Faz 8 paterni (import_batches confirming) aynı disiplin.
+- 7 dosya (1 commit) · **3430 test yeşil** (önceki 3419 + 11) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Bulgu 1 (cert versioning identity semantik) için kullanıcıya net seçenek sorusu (file_name only / product+kind / metadata.cert_no kompozit).
+
+**Önceki:** Faz 3c Review 2.tur — UI sertifika geçmişi + Yeniden Çıkar applied guard (2026-05-22; 3419 test, 2 commit)
+
+- **Bulgu 1 — Yeniden Çıkar applied guard (P3, commit `6a7cb39`):** ExtractionReview.tsx:380 disabled koşulu `isDemo || extracting || isDocApplied` oldu; title `isDocApplied ? "Belge uygulandı, tekrar çıkarılamaz" : ...`. "Uygula" butonuyla simetri (zaten applied'da disable). Extract route server-side guard zaten 4xx döner; bu UX'i hizalar. +1 RTL test (`extraction-review-apply.test.tsx`).
+- **Bulgu 2 — Sertifika geçmiş görünümü (P2, commit `3440a5d`):** 1.tur supersede helper'ı UI'da görünür hale getirildi.
+  - **Backend:** `dbListAttachmentsByProduct` opsiyonel `options?: { includeSuperseded? }` 3.param — default `superseded_by IS NULL` filter korunur (mevcut caller'lar etkilenmez), `includeSuperseded:true` ile filter UYGULANMAZ. `GET /api/products/[id]/attachments?includeSuperseded=1` query desteği → response `{ items: active, superseded: prev[], expires_in }` ayrı diziler; default shape geriye uyumlu (`{ items, expires_in }`).
+  - **Mapper + interface:** `mapProductAttachment` ve `ProductAttachment` interface'ine `supersededBy: string | null` alanı eklendi (DB column zaten Faz 2a migration'da).
+  - **UI (ürün detay → Ekler sekmesi):** Yeni pure helper export `parseSupersededAttachmentsResponse` (defansif shape parse, yoksa []). State: `supersededAttachments` + `showSuperseded` (default kapalı). `fetchAttachments` artık `?includeSuperseded=1` ile tek round-trip'te ikisini de getirir. Belgeler bloğunun hemen ardından "Önceki Sertifika Versiyonları (N)" başlığı + ▸/▾ collapsible (yalnız superseded.length > 0 olduğunda render). Liste opacity 0.7 faded; her satır dosya adı + "Önceki versiyon · X KB" + İndir butonu (handleDownloadDocument reuse, signed URL refresh). **Sil butonu YOK** — önceki versiyonlar forensic/audit için kalır.
+  - **+16 test (5 dosya):** helper mock chain 3 (default/explicit false/true), mapper supersededBy 2 + toEqual güncelleme, route ?includeSuperseded=1 2 (default + flag shape), pure helper 5 (parseSupersededAttachmentsResponse drift defense + makeAtt factory'sine supersededBy:null), UI source-regex 5 (export, fetch URL, state setters, collapsible markup, aria-label).
+- **Plan-domain check:** `feedback_no_silent_deletes` paterni — önceki versiyon silinmiyor, supersede ediliyor; forensic için saklanır.
+- 12 dosya (2 commit) · **3419 test yeşil** · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 3d — klasik mod toggle cleanup (eski 7-adım wizard "Klasik Mod" altına gizleme, AI default akış polish).
+
+**Önceki:** Faz 3c Review 1.tur — 4 P2/P3 bulgu kapatma (2026-05-22; 3401 test, commit `14a7253`)
 
 - **P2-1 (cert versiyonlama):** Önceki turdaki "supersede etme" kararı kullanıcı tarafından güncellendi → supersede ET. Yeni helper `dbSupersedeCertificatesByName(productId, fileName, newAttachmentId)`: aynı (product_id, kind=certificate, file_name) ile aktif (superseded_by IS NULL) cert'leri yeni cert id'ye bağlar; self-exclude (.neq("id", newId)). Apply service cert branch'inde `dbCreateAttachment` sonrası çağrılır; versiyonlama fail cert'i geri almaz, sadece warning errors[]'e eklenir. `ApplyResult.attachments_superseded` counter. UI sonuç paneline "N eski sertifika önceki versiyona alındı" satırı eklendi. UI Ekler sekmesi zaten `superseded_by IS NULL` filter'ı sayesinde sadece aktif olanı gösterir.
 - **P2-2 (all-fail policy):** `successCount = products_created + products_updated + attachments_created`. successCount===0 → `dbUpdateImportDocumentStatus("applied")` çağrılmaz, doc 'classified' kalır, kullanıcı satırları düzeltip tekrar Uygula. UI: koşullu `setDocStatus`, warning toast "Hiçbir satır uygulanamadı — hataları inceleyip tekrar deneyin", button enabled kalır.

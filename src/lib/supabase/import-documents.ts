@@ -205,7 +205,7 @@ export async function dbMarkImportDocumentError(
 }
 
 const VALID_STATUS_TRANSITIONS: ImportDocumentStatus[] = [
-    "pending", "classifying", "classified", "error", "applied",
+    "pending", "classifying", "classified", "applying", "error", "applied",
 ];
 
 /**
@@ -225,4 +225,39 @@ export async function dbUpdateImportDocumentStatus(
         .update({ status })
         .eq("id", id);
     if (error) throw new Error(error.message);
+}
+
+/**
+ * Faz 3c Review 3.tur (P2 race): Atomik CAS — apply yetkisi al.
+ *
+ * `serviceApplyImportDocument` başında JS-side status check yapıyordu;
+ * status okuma → AI/DB iş → status yazma arasında TOCTOU race penceresi
+ * vardı. İki paralel apply (örn. iki sekme, retry, double-click) classified
+ * status'unu aynı anda görüp ikisi de işleme girebiliyordu → duplicate
+ * product/cert riski.
+ *
+ * Bu helper tek SQL'le classified durumundaki belgeyi 'applying'e geçirir.
+ * Yarışı kazanan row'u döner; kaybeden null döner (zaten applying veya
+ * applied veya başka bir terminal state'de).
+ *
+ * Kullanım: service başında çağrılır; null dönerse "zaten işleniyor / hazır
+ * değil" hatası. Service sonunda dbUpdateImportDocumentStatus(id, 'applied')
+ * (başarı) veya (id, 'classified') (rollback / all-fail / exception) ile
+ * lock serbest bırakılır.
+ *
+ * Faz 8 import_batches `dbClaimBatchForConfirm` paterniyle aynı disiplin.
+ */
+export async function dbClaimImportDocumentForApply(
+    id: string,
+): Promise<ImportDocumentRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("import_documents")
+        .update({ status: "applying" })
+        .eq("id", id)
+        .eq("status", "classified")
+        .select("*")
+        .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data as ImportDocumentRow | null;
 }
