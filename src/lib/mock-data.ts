@@ -111,6 +111,7 @@ export interface ProductAttachment {
     version: number;
     uploadedAt: string;
     uploadedBy: string | null;
+    supersededBy: string | null;
     signedUrl: string | null;
 }
 

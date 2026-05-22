@@ -149,4 +149,40 @@ describe("GET /api/products/[id]/attachments — list response shape", () => {
         expect(res.status).toBe(200);
         expect(mockDbList).toHaveBeenCalledWith(PRODUCT_ID, undefined);
     });
+
+    // ── Faz 3c Review 2.tur — ?includeSuperseded=1 ────────────────────────
+
+    it("default (includeSuperseded yok) → eski response shape { items, expires_in } korunur", async () => {
+        mockDbList.mockResolvedValueOnce([row("00000000-0000-4000-8000-000000000020", "p/active.png")]);
+        mockDbGetBulk.mockResolvedValueOnce(new Map([["p/active.png", "https://signed/active"]]));
+        const { GET } = await import("@/app/api/products/[id]/attachments/route");
+        const res = await GET(makeReq(), { params: Promise.resolve({ id: PRODUCT_ID }) });
+        const body = await res.json();
+        expect(body).toHaveProperty("items");
+        expect(body).toHaveProperty("expires_in", 3600);
+        expect(body).not.toHaveProperty("superseded");  // default path superseded eklemez
+        // Helper 3. arg geçilmez (geriye uyumlu)
+        expect(mockDbList).toHaveBeenCalledWith(PRODUCT_ID, undefined);
+    });
+
+    it("?includeSuperseded=1 → response { items, superseded, expires_in } ile aktif/önceki ayrı diziler", async () => {
+        const active     = row("00000000-0000-4000-8000-000000000030", "p/active.pdf",  { kind: "certificate", superseded_by: null });
+        const superseded = row("00000000-0000-4000-8000-000000000031", "p/old.pdf",     { kind: "certificate", superseded_by: "00000000-0000-4000-8000-000000000030" });
+        mockDbList.mockResolvedValueOnce([active, superseded]);
+        mockDbGetBulk.mockResolvedValueOnce(new Map([
+            ["p/active.pdf", "https://signed/active"],
+            ["p/old.pdf",    "https://signed/old"],
+        ]));
+        const req = new NextRequest(new URL(`http://localhost/api/products/${PRODUCT_ID}/attachments?includeSuperseded=1`));
+        const { GET } = await import("@/app/api/products/[id]/attachments/route");
+        const res = await GET(req, { params: Promise.resolve({ id: PRODUCT_ID }) });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.items).toHaveLength(1);
+        expect(body.items[0].supersededBy).toBeNull();
+        expect(body.superseded).toHaveLength(1);
+        expect(body.superseded[0].supersededBy).toBe("00000000-0000-4000-8000-000000000030");
+        // Helper 3. arg ile çağrılır
+        expect(mockDbList).toHaveBeenCalledWith(PRODUCT_ID, undefined, { includeSuperseded: true });
+    });
 });

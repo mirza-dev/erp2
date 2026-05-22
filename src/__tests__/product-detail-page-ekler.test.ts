@@ -228,3 +228,34 @@ describe("Faz 2d Review P3-006 — document download uses /url endpoint", () => 
         expect(SOURCE).toMatch(/handleDownloadDocument[\s\S]{0,800}?setAttachments\(prev => prev\.map/);
     });
 });
+
+// ── Faz 3c Review 2.tur: Önceki Sertifika Versiyonları collapsible ────────────
+
+describe("Faz 3c Review 2.tur — sertifika geçmiş görünümü", () => {
+    it("exports parseSupersededAttachmentsResponse helper", () => {
+        expect(SOURCE).toMatch(/export function parseSupersededAttachmentsResponse/);
+    });
+
+    it("fetchAttachments uses ?includeSuperseded=1 query (single round-trip)", () => {
+        expect(SOURCE).toMatch(/attachments\?includeSuperseded=1/);
+    });
+
+    it("state holds superseded list + collapsible toggle", () => {
+        expect(SOURCE).toMatch(/setSupersededAttachments/);
+        expect(SOURCE).toMatch(/setShowSuperseded/);
+    });
+
+    it("fetchAttachments parses both items + superseded from response", () => {
+        expect(SOURCE).toMatch(/setSupersededAttachments\(parseSupersededAttachmentsResponse\(data\)\)/);
+    });
+
+    it("renders 'Önceki Sertifika Versiyonları' header (count + toggle) when superseded > 0", () => {
+        expect(SOURCE).toMatch(/supersededAttachments\.length > 0 &&/);
+        expect(SOURCE).toMatch(/Önceki Sertifika Versiyonları/);
+        expect(SOURCE).toMatch(/aria-expanded=\{showSuperseded\}/);
+    });
+
+    it("superseded list 'İndir' butonu handleDownloadDocument'a bağlı (kart audit forensic erişim)", () => {
+        expect(SOURCE).toMatch(/aria-label=\{`\$\{doc\.fileName\} indir \(önceki versiyon\)`\}/);
+    });
+});

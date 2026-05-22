@@ -172,6 +172,35 @@ describe("dbDeleteAttachment", () => {
     });
 });
 
+// ── Faz 3c Review 2.tur — dbListAttachmentsByProduct includeSuperseded ──
+
+describe("dbListAttachmentsByProduct includeSuperseded option", () => {
+    it("default (options yok) → superseded_by IS NULL filter uygular", async () => {
+        setTerminal({ data: [], error: null });
+        const { dbListAttachmentsByProduct } = await import("@/lib/supabase/product-attachments");
+        await dbListAttachmentsByProduct(PRODUCT_ID);
+        expect(mockIs).toHaveBeenCalledWith("superseded_by", null);
+    });
+
+    it("includeSuperseded:false → superseded_by IS NULL filter uygular (explicit false)", async () => {
+        setTerminal({ data: [], error: null });
+        const { dbListAttachmentsByProduct } = await import("@/lib/supabase/product-attachments");
+        await dbListAttachmentsByProduct(PRODUCT_ID, undefined, { includeSuperseded: false });
+        expect(mockIs).toHaveBeenCalledWith("superseded_by", null);
+    });
+
+    it("includeSuperseded:true → superseded_by filter UYGULANMAZ (önceki versiyonlar dahil)", async () => {
+        setTerminal({ data: [], error: null });
+        const { dbListAttachmentsByProduct } = await import("@/lib/supabase/product-attachments");
+        await dbListAttachmentsByProduct(PRODUCT_ID, "certificate", { includeSuperseded: true });
+        // is("superseded_by", null) çağrılmamalı
+        const supersededIsCall = mockIs.mock.calls.find(([k]) => k === "superseded_by");
+        expect(supersededIsCall).toBeUndefined();
+        // kind filter hâlâ uygulanır
+        expect(mockEq).toHaveBeenCalledWith("kind", "certificate");
+    });
+});
+
 // ── Faz 3c Review — dbSupersedeCertificatesByName ──
 
 describe("dbSupersedeCertificatesByName", () => {

@@ -54,8 +54,20 @@ describe("mapProductAttachment", () => {
             version: 2,
             uploadedAt: "2026-01-01T00:00:00Z",
             uploadedBy: "user-uuid",
+            supersededBy: null,
             signedUrl: "https://signed.example/x",
         });
+    });
+
+    it("Faz 3c Review 2.tur — superseded_by alanını supersededBy olarak expose eder", () => {
+        const NEW_ID = "00000000-0000-4000-8000-00000000ffff";
+        const result = mapProductAttachment(makeRow({ superseded_by: NEW_ID }));
+        expect(result.supersededBy).toBe(NEW_ID);
+    });
+
+    it("Faz 3c Review 2.tur — null superseded_by olduğu gibi geçer (aktif cert)", () => {
+        const result = mapProductAttachment(makeRow({ superseded_by: null }));
+        expect(result.supersededBy).toBeNull();
     });
 
     it("defaults signedUrl to null when 2nd arg omitted", () => {

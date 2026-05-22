@@ -134,6 +134,7 @@ export function mapProductAttachment(
     version: row.version,
     uploadedAt: row.uploaded_at,
     uploadedBy: row.uploaded_by,
+    supersededBy: row.superseded_by,
     signedUrl,
   };
 }

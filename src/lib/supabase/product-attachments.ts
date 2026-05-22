@@ -43,14 +43,22 @@ export interface CreateAttachmentInput {
 export async function dbListAttachmentsByProduct(
     productId: string,
     kind?: ProductAttachmentKind,
+    options?: { includeSuperseded?: boolean },
 ): Promise<ProductAttachmentRow[]> {
     const supabase = createServiceClient();
     let query = supabase
         .from("product_attachments")
         .select("*")
-        .eq("product_id", productId)
-        .is("superseded_by", null)
-        .order("uploaded_at", { ascending: false });
+        .eq("product_id", productId);
+
+    // Faz 3c Review 2.tur: default davranışta yalnız aktif (superseded_by IS NULL)
+    // dönülür — Ekler sekmesinin mevcut tüm caller'ları etkilenmez. UI sertifika
+    // geçmiş bölümü `includeSuperseded:true` ile tüm satırları çeker.
+    if (!options?.includeSuperseded) {
+        query = query.is("superseded_by", null);
+    }
+
+    query = query.order("uploaded_at", { ascending: false });
 
     if (kind) query = query.eq("kind", kind);
 

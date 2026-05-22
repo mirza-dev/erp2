@@ -248,6 +248,16 @@ export function parseAttachmentsResponse(data: unknown): ProductAttachment[] {
     return items as ProductAttachment[];
 }
 
+// Faz 3c Review 2.tur: GET /attachments?includeSuperseded=1 response'unun
+// "superseded" alanını parse eder (yoksa []). UI Ekler sekmesinde "Önceki
+// Sertifika Versiyonları" collapsible bölümünü besler.
+export function parseSupersededAttachmentsResponse(data: unknown): ProductAttachment[] {
+    if (!data || typeof data !== "object") return [];
+    const superseded = (data as { superseded?: unknown }).superseded;
+    if (!Array.isArray(superseded)) return [];
+    return superseded as ProductAttachment[];
+}
+
 // Returns the primary image that ALSO has a non-empty signedUrl (renderable).
 export function findPrimaryImageWithUrl(list: ProductAttachment[]): ProductAttachment | undefined {
     return list.find(a => a.isPrimaryImage && a.kind === "image" && !!a.signedUrl);
@@ -340,6 +350,9 @@ export default function ProductDetailPage() {
 
     // Faz 2d — attachments + upload + lightbox
     const [attachments, setAttachments] = useState<ProductAttachment[]>([]);
+    // Faz 3c Review 2.tur — sertifika geçmiş (superseded) listesi + collapsible state
+    const [supersededAttachments, setSupersededAttachments] = useState<ProductAttachment[]>([]);
+    const [showSuperseded, setShowSuperseded] = useState(false);
     const [attachmentsLoading, setAttachmentsLoading] = useState(false);
     const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
     const [uploadKind, setUploadKind] = useState<ProductAttachmentKind>("image");
@@ -538,17 +551,20 @@ export default function ProductDetailPage() {
     };
 
     // Faz 2d — Attachments fetch + handlers
+    // Faz 3c Review 2.tur: ?includeSuperseded=1 — response { items, superseded }
+    // ile aktif + önceki sertifika versiyonları aynı round-trip'te döner.
     const fetchAttachments = useCallback(async () => {
         if (!productId) return;
         setAttachmentsLoading(true);
         try {
-            const res = await fetch(`/api/products/${productId}/attachments`);
+            const res = await fetch(`/api/products/${productId}/attachments?includeSuperseded=1`);
             if (!res.ok) {
                 setAttachmentsError("Ekler yüklenemedi. Lütfen tekrar deneyin.");
                 return;
             }
             const data = await res.json();
             setAttachments(parseAttachmentsResponse(data));
+            setSupersededAttachments(parseSupersededAttachmentsResponse(data));
             setAttachmentsError(null);
         } catch {
             setAttachmentsError("Ekler yüklenemedi. Lütfen tekrar deneyin.");
@@ -1589,6 +1605,78 @@ export default function ProductDetailPage() {
                                                     </div>
                                                 ))}
                                             </div>
+                                        </div>
+                                    )}
+
+                                    {/* Faz 3c Review 2.tur — Önceki Sertifika Versiyonları (supersede edilenler) */}
+                                    {supersededAttachments.length > 0 && (
+                                        <div style={{ marginTop: "12px" }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowSuperseded(s => !s)}
+                                                aria-expanded={showSuperseded}
+                                                aria-label="Önceki Sertifika Versiyonları"
+                                                style={{
+                                                    fontSize: "12px",
+                                                    color: "var(--text-secondary)",
+                                                    background: "transparent",
+                                                    border: "none",
+                                                    cursor: "pointer",
+                                                    padding: "4px 0",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: "6px",
+                                                }}
+                                            >
+                                                <span aria-hidden>{showSuperseded ? "▾" : "▸"}</span>
+                                                <span>Önceki Sertifika Versiyonları ({supersededAttachments.length})</span>
+                                            </button>
+                                            {showSuperseded && (
+                                                <div style={{
+                                                    marginTop: "8px",
+                                                    display: "flex",
+                                                    flexDirection: "column",
+                                                    gap: "4px",
+                                                    opacity: 0.7,
+                                                }}>
+                                                    {supersededAttachments.map(doc => (
+                                                        <div
+                                                            key={doc.id}
+                                                            style={{
+                                                                display: "flex", alignItems: "center", gap: "10px",
+                                                                padding: "6px 10px",
+                                                                background: "var(--bg-tertiary)",
+                                                                border: "0.5px solid var(--border-tertiary)",
+                                                                borderRadius: "5px",
+                                                            }}
+                                                        >
+                                                            <span aria-hidden style={{ fontSize: "14px" }}>{getKindIcon(doc.kind)}</span>
+                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={doc.fileName}>
+                                                                    {doc.fileName}
+                                                                </div>
+                                                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                                                    Önceki versiyon · {formatFileSize(doc.fileSize)}
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDownloadDocument(doc.id)}
+                                                                aria-label={`${doc.fileName} indir (önceki versiyon)`}
+                                                                style={{
+                                                                    fontSize: "11px", color: "var(--accent-text)",
+                                                                    background: "transparent",
+                                                                    padding: "3px 8px",
+                                                                    border: "0.5px solid var(--accent-border)", borderRadius: "4px",
+                                                                    cursor: "pointer",
+                                                                }}
+                                                            >
+                                                                İndir
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </>

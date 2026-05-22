@@ -20,8 +20,9 @@ const SIGNED_URL_TTL = 3600;
 
 export const dynamic = "force-dynamic";
 
-// GET /api/products/[id]/attachments?kind=image|datasheet|...
-// Response: { items: ProductAttachment[], expires_in: number }
+// GET /api/products/[id]/attachments?kind=image|datasheet|...&includeSuperseded=1
+// Default response: { items: ProductAttachment[], expires_in: number }
+// includeSuperseded=1: { items: active[], superseded: ProductAttachment[], expires_in: number }
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
@@ -31,7 +32,9 @@ export async function GET(
         if (!UUID_RE.test(id)) {
             return NextResponse.json({ error: "Geçersiz ürün id." }, { status: 400 });
         }
-        const kindParam = new URL(req.url).searchParams.get("kind");
+        const url = new URL(req.url);
+        const kindParam = url.searchParams.get("kind");
+        const includeSuperseded = url.searchParams.get("includeSuperseded") === "1";
         let kind: ProductAttachmentKind | undefined;
         if (kindParam !== null) {
             // Faz 2d Review P3-003: kindParam VARSA whitelist'te olmalı; aksi halde
@@ -41,10 +44,21 @@ export async function GET(
             }
             kind = kindParam as ProductAttachmentKind;
         }
-        const rows = await dbListAttachmentsByProduct(id, kind);
+        const rows = includeSuperseded
+            ? await dbListAttachmentsByProduct(id, kind, { includeSuperseded: true })
+            : await dbListAttachmentsByProduct(id, kind);
         const urlMap = await dbGetSignedUrlsForRows(rows, SIGNED_URL_TTL);
-        const items = rows.map(row => mapProductAttachment(row, urlMap.get(row.file_path) ?? null));
-        return NextResponse.json({ items, expires_in: SIGNED_URL_TTL });
+        const enriched = rows.map(row => mapProductAttachment(row, urlMap.get(row.file_path) ?? null));
+
+        // Faz 3c Review 2.tur: includeSuperseded=1 → aktif/önceki ayrı diziler
+        // (UI Ekler sekmesinde "Önceki Sertifika Versiyonları" collapsible).
+        // Default response shape geriye uyumlu: yalnız {items, expires_in}.
+        if (includeSuperseded) {
+            const items = enriched.filter(i => i.supersededBy === null);
+            const superseded = enriched.filter(i => i.supersededBy !== null);
+            return NextResponse.json({ items, superseded, expires_in: SIGNED_URL_TTL });
+        }
+        return NextResponse.json({ items: enriched, expires_in: SIGNED_URL_TTL });
     } catch (err) {
         return handleApiError(err, "GET /api/products/[id]/attachments");
     }

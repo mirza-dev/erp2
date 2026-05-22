@@ -16,6 +16,7 @@ import {
     pickInitialKind,
     groupAttachments,
     parseAttachmentsResponse,
+    parseSupersededAttachmentsResponse,
     findPrimaryImageWithUrl,
     buildUploadFormData,
     parseAttachmentApiError,
@@ -35,6 +36,7 @@ function makeAtt(overrides: Partial<ProductAttachment> = {}): ProductAttachment 
         version: 1,
         uploadedAt: "2026-01-01",
         uploadedBy: null,
+        supersededBy: null,
         signedUrl: null,
         ...overrides,
     };
@@ -195,6 +197,31 @@ describe("parseAttachmentsResponse", () => {
     it("returns empty array when response is a primitive", () => {
         expect(parseAttachmentsResponse("string")).toEqual([]);
         expect(parseAttachmentsResponse(42)).toEqual([]);
+    });
+});
+
+// ── parseSupersededAttachmentsResponse (Faz 3c Review 2.tur) ─────────────────
+
+describe("parseSupersededAttachmentsResponse", () => {
+    it("returns the superseded array when response is { superseded: [...] }", () => {
+        const superseded = [makeAtt({ id: "old-1", supersededBy: "new-1" })];
+        expect(parseSupersededAttachmentsResponse({ items: [], superseded, expires_in: 3600 })).toEqual(superseded);
+    });
+
+    it("returns empty array when superseded alanı yok (default response shape)", () => {
+        expect(parseSupersededAttachmentsResponse({ items: [], expires_in: 3600 })).toEqual([]);
+    });
+
+    it("returns empty array when response null/undefined/primitive (defansif)", () => {
+        expect(parseSupersededAttachmentsResponse(null)).toEqual([]);
+        expect(parseSupersededAttachmentsResponse(undefined)).toEqual([]);
+        expect(parseSupersededAttachmentsResponse("str")).toEqual([]);
+        expect(parseSupersededAttachmentsResponse(42)).toEqual([]);
+    });
+
+    it("returns empty array when superseded is not an array (drift defense)", () => {
+        expect(parseSupersededAttachmentsResponse({ superseded: "not-array" })).toEqual([]);
+        expect(parseSupersededAttachmentsResponse({ superseded: null })).toEqual([]);
     });
 });
 
