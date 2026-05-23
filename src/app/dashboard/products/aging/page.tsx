@@ -163,6 +163,7 @@ export default function AgingPage() {
                     return (
                         <button
                             key={tab.key}
+                            data-testid={`aging-report-tab-${tab.key}`}
                             onClick={() => switchTab(tab.key)}
                             style={{
                                 flex: 1,
@@ -394,8 +395,17 @@ export default function AgingPage() {
                 )}
             </div>
 
-            {/* Eşik Referansı */}
-            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textAlign: "center" }}>
+            {/* Eşik Referansı — Faz 3d Review aging (2026-05-23): data-testid +
+                role="note" ile E2E scope. Tablo hücrelerinde "X gün" rendering
+                var (daysWaiting=45 olan ürün/avg bekleme süresi 45 olursa
+                `/45 gün/i` regex strict mode'da çakışırdı). Bu div sadece eşik
+                referansı içeriği — testid ile diğer "gün" geçen alanlardan
+                ayırt edilir. */}
+            <div
+                role="note"
+                data-testid="aging-threshold-hint"
+                style={{ fontSize: "11px", color: "var(--text-tertiary)", textAlign: "center" }}
+            >
                 {THRESHOLDS[reportType]}
             </div>
         </div>

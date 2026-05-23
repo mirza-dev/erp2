@@ -7,7 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-23
 
-**Faz 3d Review 2.tur — error banner role="alert" + accordion testid (3457 test)**
+**Aging E2E 2 fail kapatma — tab + threshold testid (3460 test)**
+
+- **Kök:** Tab `getByText` label+subtitle render çakışma riski; `/45 gün/i` tablo `daysWaiting} gün` ile strict mode collision (seed-dependent); "Mamul" vs gerçek "İmalat" label tutarsızlığı.
+- **Fix:** REPORT_TABS button'lara `data-testid="aging-report-tab-{key}"`; threshold div'e `role="note"` + `data-testid="aging-threshold-hint"`. Test'ler `getByTestId(...).toContainText(/45 gün/i)` çift katmanlı. "Mamul" → "İmalat".
+- **+3 test** (aging-page-testids.test.ts source-regex lock).
+- 3 dosya · **3460 test yeşil** · TS clean · 0 lint · build OK
+- E2E (sende): 8/8 passed beklenir (önceki 6/8).
+
+## Önceki — Faz 3d Review 2.tur (3457 test)
+
+**error banner role="alert" + accordion testid**
 
 - **P2 son E2E fail:** Geçersiz dosya testi geniş regex 7 element'e çakışıyordu (DropZone/empty/summary/accept attribute). Error banner'a `role="alert"` + `aria-live="polite"` + close button `aria-label`. Test artık `getByRole("alert") + toContainText(regex)` ile çift katmanlı.
 - **P3 accordion stabilite:** `<details data-testid="classic-mode-accordion">`; beforeEach testid scope (sayfaya başka details eklense bile stable).

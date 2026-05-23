@@ -3,7 +3,21 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-23_
 
-**Son tamamlanan iş:** Faz 3d Review 2.tur — error banner role="alert" + accordion testid (2026-05-23; 3457 test)
+**Son tamamlanan iş:** Aging E2E 2 fail kapatma — tab + threshold testid (2026-05-23; 3460 test)
+
+- **Kök problem:** `tests/aging.spec.ts` 2 fail (kullanıcı rapor etti). Analiz:
+  - **Tab tıklama testleri** `getByText(/imalat eskimesi/i)` ile button içinde label + subtitle render edilen iki div'e Playwright strict mode'da çakışma riski (subtitle "Üretilen ama satılamayan ürünler" → "imalat" yok ama label birden fazla yere match olabiliyordu).
+  - **`/45 gün/i` regex** tablo satırlarındaki `{row.daysWaiting} gün` rendering ile çakışma kaynağı: seed data'ya bağlı bir ürünün `daysWaiting === 45` olması veya avg bekleme süresinin 45 olması durumunda strict mode 2+ element bulup fail eder.
+  - **Label tutarsızlığı:** Test'ler "Mamul" diyor, gerçek UI label "İmalat Eskimesi".
+- **Fix:**
+  - `page.tsx`: REPORT_TABS button'larına `data-testid={\`aging-report-tab-${tab.key}\`}` (manufactured/commercial). Eşik referansı div'ine `role="note"` + `data-testid="aging-threshold-hint"`.
+  - `tests/aging.spec.ts`: 5 test güncellendi — tab tıklama `getByTestId("aging-report-tab-manufactured")`, eşik referansı `getByTestId("aging-threshold-hint")` + `toContainText(/45 gün/i)` (çift katmanlı: testid scope + içerik regex). "Mamul" → "İmalat" label hizalandı.
+- **+3 source-regex test:** `aging-page-testids.test.ts` (yeni) — tab testid pattern + threshold hint role/testid + 45 gün referansı tutarlılığı. Gelecek regression'ı (biri testid silerse) yakalar.
+- **E2E doğrulama (kullanıcı tarafı):** `npx playwright test tests/aging.spec.ts` → 8/8 passed beklenir (önceki 6/8).
+- 3 dosya (1 yeni test) · **3460 test yeşil** (önceki 3457 + 3) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 4 (teklif modülü revize) veya kullanıcı kararı.
+
+**Önceki:** Faz 3d Review 2.tur — error banner role="alert" + accordion testid (2026-05-23; 3457 test)
 
 - **P2 — Son E2E fail (`tests/import.spec.ts:60`):** Geçersiz dosya testi `page.getByText(/desteklenmiyor|geçersiz|xlsx|excel/i)` ile 7 element'e çakışıyordu (DropZone metni "Excel, CSV", empty state "Migration Excel", accordion summary "eski 7-adım Excel wizard", klasik input `accept=".xlsx,.xls,.csv"` vb.) → Playwright strict mode fail. Hata banner'ı görünüyordu ama assertion yanlış element'i (veya hepsini) yakalıyordu.
 - **Fix — `role="alert"` + `aria-live="polite"`:** `page.tsx:599-608` error banner'a a11y semantic eklendi (`ExtractionReview` pattern tutarlılığı). Close button `&times;`'a `aria-label="Hata mesajını kapat"`. Test artık `page.getByRole("alert")` + `toContainText(/.../)` ile çift katmanlı assertion (banner var mı + içerik eşleşiyor mu). Strict + esnek.
