@@ -256,6 +256,8 @@ function mapQuoteLineItem(line: QuoteLineItemRow): QuoteLineItem {
     lineTotal: Number(line.line_total),
     hsCode: line.hs_code ?? "",
     weightKg: line.weight_kg ?? null,
+    // Faz 4a: PMT formunda "Ölçü / Size" kolonu (serbest text).
+    sizeText: line.size_text ?? "",
   };
 }
 
@@ -294,6 +296,9 @@ export function mapQuoteDetail(row: QuoteWithLines): QuoteDetail {
     sigPrepared: row.sig_prepared ?? "",
     sigApproved: row.sig_approved ?? "",
     sigManager: row.sig_manager ?? "",
+    // Faz 4a: PMT brand teklif formunda "Teslimat Şekli" + "Ödeme Şekli".
+    deliveryMethod: row.delivery_method ?? "",
+    paymentMethod: row.payment_method ?? "",
     lines: row.lines.map(mapQuoteLineItem),
   };
 }

@@ -19,6 +19,9 @@ interface QuoteRow {
     price: string;
     hs: string;
     kg: string;
+    // Faz 4a (2026-05-23): PMT formunda "Ölçü / Size" kolonu (örn. "3/4''",
+    // "DN50", "8\""). Serbest text; auto-build description Faz 4b'de gelir.
+    size: string;
 }
 
 type Currency = "TRY" | "USD" | "EUR";
@@ -29,7 +32,7 @@ function fmt(n: number) {
 }
 
 function emptyRow(id: number): QuoteRow {
-    return { id, code: "", lead: "", desc: "", qty: "", price: "", hs: "", kg: "" };
+    return { id, code: "", lead: "", desc: "", qty: "", price: "", hs: "", kg: "", size: "" };
 }
 
 // ── Injected styles (hover states + print) ────────────────────────────────────
@@ -114,6 +117,11 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     const [sellerWeb, setSellerWeb] = useState("");
 
     // Footer
+    // Faz 4a (2026-05-23): PMT brand teklif formunda "Teslimat Şekli" +
+    // "Ödeme Şekli". Serbest text (örn. "İSTANBUL PMT DEPO TESLİMİ /
+    // EXWORKS PMT İSTANBUL DEPO" / "%50 AVANS, %50 SEVKE HAZIR OLUNCA").
+    const [deliveryMethod, setDeliveryMethod] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState("");
     const [notes, setNotes] = useState("");
     const [sig1, setSig1] = useState("");
     const [sig2, setSig2] = useState("");
@@ -165,6 +173,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             setSalesPhone(initialData.salesPhone);
             setSalesEmail(initialData.salesEmail);
             setNotes(initialData.notes);
+            // Faz 4a: yeni alanları DB'den hydrate et (eski quote'larda boş string)
+            setDeliveryMethod(initialData.deliveryMethod);
+            setPaymentMethod(initialData.paymentMethod);
             setSig1(initialData.sigPrepared);
             setSig2(initialData.sigApproved);
             setSig3(initialData.sigManager);
@@ -178,6 +189,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                     price: l.unitPrice > 0 ? String(l.unitPrice) : "",
                     hs: l.hsCode,
                     kg: l.weightKg !== null ? String(l.weightKg) : "",
+                    size: l.sizeText,
                 }));
                 setRows(mapped);
                 setNextId(initialData.lines.length + 1);
@@ -456,6 +468,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             sig_manager: sig3 || undefined,
             quote_date: quoteDate || undefined,
             valid_until: validUntil || undefined,
+            // Faz 4a (2026-05-23): PMT brand alanları payload'a dahil
+            delivery_method: deliveryMethod || undefined,
+            payment_method: paymentMethod || undefined,
             lines: rows
                 .filter(r => r.code.trim() || r.desc.trim())
                 .map((r, i) => ({
@@ -468,6 +483,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                     line_total: (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0),
                     hs_code: r.hs || undefined,
                     weight_kg: r.kg ? parseFloat(r.kg) : undefined,
+                    size_text: r.size || undefined,
                 })),
         };
     }
@@ -837,6 +853,8 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                         <th className="q-th" style={{ ...th, width: "32px", textAlign: "center" }}>#</th>
                                         <th className="q-th" style={{ ...th, width: "90px" }}>Product Code<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ürün Kodu</span></th>
                                         <th className="q-th" style={{ ...th, width: "90px" }}>Lead Time<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Teslim Süresi</span></th>
+                                        {/* Faz 4a (2026-05-23): PMT brand "Ölçü / Size" kolonu */}
+                                        <th className="q-th" style={{ ...th, width: "70px" }}>Size<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ölçü</span></th>
                                         <th className="q-th" style={th}>Description<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ürün Açıklaması</span></th>
                                         <th className="q-th" style={{ ...th, width: "70px", textAlign: "center" }}>Qty<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Adet</span></th>
                                         <th className="q-th" style={{ ...th, width: "110px", textAlign: "right" }}>Unit Price<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Birim Fiyat</span></th>
@@ -897,6 +915,8 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                                 </td>
                                                 {/* Lead */}
                                                 <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="30 gün" value={row.lead} onChange={e => updateRow(row.id, "lead", e.target.value)} /></td>
+                                                {/* Faz 4a: Size (PMT brand "Ölçü") */}
+                                                <td style={tdBase}><input className="q-cell" style={cellInput} placeholder={`3/4'' / DN50`} value={row.size} onChange={e => updateRow(row.id, "size", e.target.value)} aria-label={`Satır ${idx + 1} ölçü`} /></td>
                                                 {/* Desc */}
                                                 <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="Ürün açıklaması / Description" value={row.desc} onChange={e => updateRow(row.id, "desc", e.target.value)} /></td>
                                                 {/* Qty */}
@@ -1027,6 +1047,36 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                         </table>
                     </div>
 
+                    {/* ── Faz 4a (2026-05-23): PMT brand Teslimat / Ödeme ── */}
+                    <div className="q-terms-block" style={{ padding: "16px 24px", borderTop: "1px solid var(--border-secondary)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                        <div>
+                            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
+                                Delivery Method <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Teslimat Şekli</span>
+                            </div>
+                            <textarea
+                                className="q-notes"
+                                aria-label="Teslimat şekli"
+                                style={{ width: "100%", background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", padding: "8px 10px", fontSize: "12px", color: "var(--text-primary)", resize: "vertical", minHeight: "60px", lineHeight: 1.5 }}
+                                placeholder={"İSTANBUL PMT DEPO TESLİMİ\nEXWORKS PMT İSTANBUL DEPO"}
+                                value={deliveryMethod}
+                                onChange={e => setDeliveryMethod(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
+                                Payment Method <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Ödeme Şekli</span>
+                            </div>
+                            <textarea
+                                className="q-notes"
+                                aria-label="Ödeme şekli"
+                                style={{ width: "100%", background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", padding: "8px 10px", fontSize: "12px", color: "var(--text-primary)", resize: "vertical", minHeight: "60px", lineHeight: 1.5 }}
+                                placeholder={"%50 AVANS, %50 SEVKE HAZIR OLUNCA\n%100 PEŞİN"}
+                                value={paymentMethod}
+                                onChange={e => setPaymentMethod(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
                     {/* ── Notes ── */}
                     <div className="q-notes-block" style={{ padding: "16px 24px", borderTop: "1px solid var(--border-secondary)" }}>
                         <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
@@ -1035,7 +1085,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                         <textarea
                             className="q-notes"
                             style={{ width: "100%", background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", padding: "8px 10px", fontSize: "12px", color: "var(--text-primary)", resize: "vertical", minHeight: "80px", lineHeight: 1.6 }}
-                            placeholder={"Ödeme koşulları, geçerlilik süresi, teslimat şartları vb.\nPayment terms, validity period, delivery conditions, etc."}
+                            placeholder={"Diğer notlar, özel koşullar vb.\nOther notes, special conditions, etc."}
                             value={notes}
                             onChange={e => setNotes(e.target.value)}
                         />

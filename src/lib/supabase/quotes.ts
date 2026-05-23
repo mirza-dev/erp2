@@ -14,6 +14,8 @@ export interface CreateQuoteLineInput {
     line_total: number;
     hs_code?: string;
     weight_kg?: number;
+    // Faz 4a (2026-05-23): PMT formunda "Ölçü / Size" kolonu (serbest text).
+    size_text?: string;
 }
 
 export interface CreateQuoteInput {
@@ -37,6 +39,9 @@ export interface CreateQuoteInput {
     sig_manager?: string;
     quote_date?: string;
     valid_until?: string;
+    // Faz 4a (2026-05-23): PMT brand teklif formunda "Teslimat Şekli" + "Ödeme Şekli".
+    delivery_method?: string;
+    payment_method?: string;
     lines: CreateQuoteLineInput[];
 }
 

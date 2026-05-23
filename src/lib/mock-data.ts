@@ -210,6 +210,8 @@ export interface QuoteLineItem {
     lineTotal: number;
     hsCode: string;
     weightKg: number | null;
+    // Faz 4a: PMT formunda "Ölçü / Size" kolonu (serbest text).
+    sizeText: string;
 }
 
 export interface QuoteSummary {
@@ -239,6 +241,10 @@ export interface QuoteDetail extends QuoteSummary {
     sigPrepared: string;
     sigApproved: string;
     sigManager: string;
+    // Faz 4a: PMT brand teklif formunda "Teslimat Şekli" + "Ödeme Şekli".
+    // Serbest text — auto-build/preset Faz 4b/4c'de gelir.
+    deliveryMethod: string;
+    paymentMethod: string;
     lines: QuoteLineItem[];
 }
 

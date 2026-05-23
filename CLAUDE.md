@@ -3,7 +3,31 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-23_
 
-**Son tamamlanan iş:** Aging E2E 2 fail kapatma — tab + threshold testid (2026-05-23; 3460 test)
+**Son tamamlanan iş:** Faz 4a — Teklif modülü PMT brand alanları (DB + form) (2026-05-23; 3480 test)
+
+- **Plan:** `MODUL_REVIZE_PLAN.md §466` Faz 4 — Teklif Modülü Revize. Alt-faz planı (kullanıcı kararı): 4a = DB + form, 4b = auto-build description, 4c = PDF PMT brand template rewrite.
+- **Migration 065** (`065_quotes_faz4a_delivery_payment_size.sql`):
+  - `quotes.delivery_method TEXT NULL` — "İSTANBUL PMT DEPO TESLİMİ / EXWORKS PMT İSTANBUL DEPO"
+  - `quotes.payment_method TEXT NULL` — "%50 AVANS, %50 SEVKE HAZIR OLUNCA"
+  - `quote_line_items.size_text TEXT NULL` — "3/4''", "DN50", "8\""
+  - `create_quote_with_lines` + `update_quote_with_lines` RPC'leri yeniden tanımlandı (NULLIF empty string handling).
+  - Idempotent (ADD COLUMN IF NOT EXISTS) + ROLLBACK SQL bloğu.
+- **Type layer:** `QuoteRow + QuoteLineItemRow` (database.types.ts), `QuoteLineItem.sizeText + QuoteDetail.deliveryMethod/paymentMethod` (mock-data.ts), `mapQuoteDetail + mapQuoteLineItem` (api-mappers.ts) genişletildi.
+- **Helper:** `CreateQuoteInput.delivery_method/payment_method` + `CreateQuoteLineInput.size_text` opsiyonel alanlar; mevcut `dbCreateQuote`/`dbUpdateQuote` RPC payload'a otomatik forward eder.
+- **UI (QuoteForm.tsx):**
+  - `QuoteRow` interface'ine `size: string` + `emptyRow()` factory güncel.
+  - State: `deliveryMethod`, `paymentMethod` (default "").
+  - `initialData` hydration: 3 yeni alan DB'den çekilir.
+  - `buildQuotePayload`: 3 yeni alan payload'a `||undefined` ile eklendi.
+  - Tablo: Lead Time'dan sonra yeni "Size / Ölçü" kolonu (placeholder `3/4'' / DN50`, aria-label).
+  - Notes bloğunun üstünde 2-kolonlu Teslimat / Ödeme bloğu (bilingual etiket "Delivery Method / Teslimat Şekli", "Payment Method / Ödeme Şekli", textarea aria-label).
+  - Notes placeholder güncellendi ("Diğer notlar, özel koşullar" — ödeme/teslimat bilgileri artık ayrı bloklarda).
+- **+20 yeni test (2 dosya):** migration 7 (CHECK constraint genişlemesi + RPC sözleşme + ROLLBACK + idempotent) + helper/mapper/form 13 (mapper null/dolu, RPC payload forward, source-regex form lock'ları).
+- **Plan-domain check:** `feedback_no_silent_deletes` — mevcut hiçbir alan/state silinmedi, yalnız genişletildi; eski quote'lar (NULL delivery/payment/size) boş string olarak hydrate olur (geriye uyumlu).
+- 6 dosya (1 migration + 1 helper + 1 mapper + 1 type + 1 mock-data + 1 form + 2 yeni test) · **3480 test yeşil** (önceki 3460 + 20) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 4b — Auto-build description helper + form integration (ürün seçince satır description otomatik doldur, override edilebilir; şablon `{name} {body_material} {pn_class} {end_connection}, {trim_material} TRİM`).
+
+**Önceki:** Aging E2E 2 fail kapatma — tab + threshold testid (2026-05-23; 3460 test)
 
 - **Kök problem:** `tests/aging.spec.ts` 2 fail (kullanıcı rapor etti). Analiz:
   - **Tab tıklama testleri** `getByText(/imalat eskimesi/i)` ile button içinde label + subtitle render edilen iki div'e Playwright strict mode'da çakışma riski (subtitle "Üretilen ama satılamayan ürünler" → "imalat" yok ama label birden fazla yere match olabiliyordu).

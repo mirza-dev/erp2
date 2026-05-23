@@ -461,6 +461,11 @@ export interface QuoteRow {
     sig_manager: string | null
     quote_date: string | null
     valid_until: string | null
+    // Faz 4a (2026-05-23): PMT brand teklif PDF'i için yeni alanlar.
+    // Serbest TEXT — operatör formdan doldurur. Auto-build description ve
+    // brand PDF render Faz 4b/4c'de gelir.
+    delivery_method: string | null
+    payment_method: string | null
     created_at: string
     updated_at: string
 }
@@ -478,6 +483,9 @@ export interface QuoteLineItemRow {
     line_total: number
     hs_code: string | null
     weight_kg: number | null
+    // Faz 4a (2026-05-23): PMT formunda "Ölçü / Size" kolonu için satır
+    // bazlı serbest text (örn. "3/4''", "DN50", "8\"").
+    size_text: string | null
     created_at: string
 }
 

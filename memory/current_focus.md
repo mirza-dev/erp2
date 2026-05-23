@@ -7,7 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-23
 
-**Aging E2E 2 fail kapatma — tab + threshold testid (3460 test)**
+**Faz 4a — Teklif modülü PMT brand alanları (DB + form) (3480 test)**
+
+- Plan §466 Faz 4 — alt-faz: 4a (DB+form, şimdi), 4b (auto-build desc), 4c (PDF PMT brand rewrite).
+- Migration 065: quotes.delivery_method/payment_method TEXT + quote_line_items.size_text TEXT (idempotent + ROLLBACK). RPC'ler güncellendi.
+- Type+helper+mapper genişletildi (`QuoteRow`, `QuoteLineItemRow`, `QuoteDetail.deliveryMethod/paymentMethod`, `QuoteLineItem.sizeText`).
+- QuoteForm: `size` per-row state + tablo kolonu + 2-kolonlu bilingual Teslimat/Ödeme textarea bloğu (notes üstünde). buildQuotePayload 3 yeni alanı yollar.
+- **+20 test** (migration 7 + helper/mapper/form source-regex 13).
+- 7 dosya · **3480 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 4b — auto-build description (ürün seçince `{name} {body_material} {pn_class} {end_connection}, {trim_material} TRİM` doldur, override edilebilir).
+
+## Önceki — Aging E2E 2 fail kapatma (3460 test)
+
+**Tab + threshold testid**
 
 - **Kök:** Tab `getByText` label+subtitle render çakışma riski; `/45 gün/i` tablo `daysWaiting} gün` ile strict mode collision (seed-dependent); "Mamul" vs gerçek "İmalat" label tutarsızlığı.
 - **Fix:** REPORT_TABS button'lara `data-testid="aging-report-tab-{key}"`; threshold div'e `role="note"` + `data-testid="aging-threshold-hint"`. Test'ler `getByTestId(...).toContainText(/45 gün/i)` çift katmanlı. "Mamul" → "İmalat".
