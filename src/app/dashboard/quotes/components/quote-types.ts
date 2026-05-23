@@ -6,6 +6,10 @@ export interface QuoteRow {
     price: string;
     hs: string;
     kg: string;
+    // Faz 4a Review (2026-05-23): PMT brand "Ölçü / Size" kolonu. Form
+    // ve DB tarafında zaten taşınıyordu; preview/PDF kontratta yoktu.
+    // Faz 4c bilingual PMT layout'unda görsel olarak da kullanılacak.
+    size: string;
 }
 
 export interface QuoteSignature {
@@ -54,6 +58,11 @@ export interface QuoteData {
 
     // Footer
     notes: string;
+    // Faz 4a Review (2026-05-23): PMT brand Teslimat/Ödeme bilgisi.
+    // Form ve DB save path'inde zaten taşınıyordu; preview/PDF kontratta
+    // yoktu. Faz 4c PMT brand layout terms band'i bu alanları kullanacak.
+    deliveryMethod: string;
+    paymentMethod: string;
     signatures: QuoteSignature[];
 
     // Meta

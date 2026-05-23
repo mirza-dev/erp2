@@ -366,6 +366,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 })(),
                 totalKg: rows.reduce((s, r) => s + (parseFloat(r.kg) || 0), 0),
                 notes,
+                // Faz 4a Review: preview/PDF kontratına PMT brand alanları
+                deliveryMethod,
+                paymentMethod,
                 signatures: [
                     { role: "Prepared by", roleTr: "Hazırlayan",   name: sig1, title: sig1Title },
                     { role: "Approved by", roleTr: "Onay",         name: sig2, title: sig2Title },
@@ -378,7 +381,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     }, [readOnly, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
         custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand,
-        notes, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
+        notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
 
     // Saves preview data regardless of readOnly — used by preview button.
     // Does NOT write teklif_v3 (draft key) to avoid polluting the new-quote draft restore.
@@ -401,6 +404,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 })(),
                 totalKg: rows.reduce((s, r) => s + (parseFloat(r.kg) || 0), 0),
                 notes,
+                // Faz 4a Review: preview/PDF kontratına PMT brand alanları
+                deliveryMethod,
+                paymentMethod,
                 signatures: [
                     { role: "Prepared by", roleTr: "Hazırlayan",   name: sig1, title: sig1Title },
                     { role: "Approved by", roleTr: "Onay",         name: sig2, title: sig2Title },
@@ -413,7 +419,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     }, [status, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
         custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand,
-        notes, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
+        notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
 
     useEffect(() => { autoSave(); }, [rows, currency, autoSave]);
 

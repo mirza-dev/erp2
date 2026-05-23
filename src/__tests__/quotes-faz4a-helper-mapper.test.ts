@@ -203,3 +203,57 @@ describe("QuoteForm — Faz 4a UI alanları", () => {
         expect(FORM_SOURCE).toMatch(/aria-label="Ödeme şekli"/);
     });
 });
+
+// ── Faz 4a Review (2026-05-23) — Preview/PDF data contract lock ──────────────
+
+const TYPES_SOURCE = readFileSync(
+    join(process.cwd(), "src/app/dashboard/quotes/components/quote-types.ts"),
+    "utf8",
+);
+
+const DOC_SOURCE = readFileSync(
+    join(process.cwd(), "src/app/dashboard/quotes/components/QuoteDocument.tsx"),
+    "utf8",
+);
+
+describe("Faz 4a Review — preview/PDF contract", () => {
+    it("QuoteData interface deliveryMethod + paymentMethod alanlarını içerir", () => {
+        expect(TYPES_SOURCE).toMatch(/deliveryMethod:\s*string;/);
+        expect(TYPES_SOURCE).toMatch(/paymentMethod:\s*string;/);
+    });
+
+    it("QuoteRow (preview) interface size alanını içerir", () => {
+        expect(TYPES_SOURCE).toMatch(/interface QuoteRow\s*\{[\s\S]{0,800}size:\s*string;/);
+    });
+
+    it("QuoteForm autoSave() payload deliveryMethod + paymentMethod yazıyor (preview kontratı)", () => {
+        // autoSave fullData içinde delivery + payment field var
+        expect(FORM_SOURCE).toMatch(/const autoSave = useCallback[\s\S]{0,2000}deliveryMethod,\s*\n\s*paymentMethod/);
+    });
+
+    it("QuoteForm savePreviewData() payload deliveryMethod + paymentMethod yazıyor", () => {
+        expect(FORM_SOURCE).toMatch(/savePreviewData = useCallback[\s\S]{0,2000}deliveryMethod,\s*\n\s*paymentMethod/);
+    });
+
+    it("useCallback dep array'lerinde deliveryMethod + paymentMethod var (stale closure önleme)", () => {
+        // En az 2 callback dep array'inde ikisi de geçmeli
+        const depMatches = FORM_SOURCE.match(/notes,\s*deliveryMethod,\s*paymentMethod/g) ?? [];
+        expect(depMatches.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("QuoteDocument data.deliveryMethod || data.paymentMethod conditional render", () => {
+        expect(DOC_SOURCE).toMatch(/data\.deliveryMethod \|\| data\.paymentMethod/);
+        // Bilingual etiketler
+        expect(DOC_SOURCE).toMatch(/Teslimat Şekli[\s\S]{0,200}Delivery Method/);
+        expect(DOC_SOURCE).toMatch(/Ödeme Şekli[\s\S]{0,200}Payment Method/);
+    });
+
+    it("QuoteDocument lines tablosu row.size render eder + colSpan empty 10'a güncel", () => {
+        expect(DOC_SOURCE).toMatch(/\{row\.size \|\| "—"\}/);
+        // Header bilingual: Size / Ölçü (PMT brand) — header bloğunda art arda gelir
+        expect(DOC_SOURCE).toMatch(/Size[\s\S]{0,500}Ölçü/);
+        // Empty colSpan eskiden 9; yeni Size kolonu ile 10
+        expect(DOC_SOURCE).toMatch(/colSpan=\{10\}/);
+        expect(DOC_SOURCE).not.toMatch(/colSpan=\{9\}/);
+    });
+});

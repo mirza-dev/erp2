@@ -422,6 +422,11 @@ export default function QuoteDocument({ data }: Props) {
                                     Lead Time
                                     <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Teslim Süresi</span>
                                 </th>
+                                {/* Faz 4a Review: PMT brand "Ölçü / Size" kolonu (4c'de stil ince ayarı yapılır) */}
+                                <th className="doc-brand-bg" style={{ ...thStyle, width: "60px" }}>
+                                    Size
+                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Ölçü</span>
+                                </th>
                                 <th className="doc-brand-bg" style={thStyle}>
                                     Description
                                     <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Ürün Açıklaması</span>
@@ -460,6 +465,8 @@ export default function QuoteDocument({ data }: Props) {
                                         <td style={{ ...tdStyle, background: rowBg, textAlign: "center" as const, color: C.muted, fontFamily: FONT.mono, fontSize: "9px" }}>{idx + 1}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.code || "—"}</td>
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.lead || "—"}</td>
+                                        {/* Faz 4a Review: Size kolonu (PMT brand "Ölçü") */}
+                                        <td style={{ ...tdStyle, background: rowBg }}>{row.size || "—"}</td>
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.desc || "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "center" as const }}>{row.qty || "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{price > 0 ? `${sym} ${fmt(price)}` : "—"}</td>
@@ -471,7 +478,8 @@ export default function QuoteDocument({ data }: Props) {
                             })}
                             {data.rows.length === 0 && (
                                 <tr>
-                                    <td colSpan={9} style={{ ...tdStyle, textAlign: "center" as const, color: C.subtle, padding: "20px" }}>
+                                    {/* Faz 4a Review: colSpan 9 → 10 (Size kolonu eklendi) */}
+                                    <td colSpan={10} style={{ ...tdStyle, textAlign: "center" as const, color: C.subtle, padding: "20px" }}>
                                         — Kalem girilmedi —
                                     </td>
                                 </tr>
@@ -509,6 +517,39 @@ export default function QuoteDocument({ data }: Props) {
                         </tbody>
                     </table>
                 </div>
+
+                {/* ── Faz 4a Review: Teslimat / Ödeme Şekli (PMT brand köprü) ──
+                    Faz 4c'de full PMT brand layout'a entegre edilecek. Şimdi
+                    yalnız contract bağlandı ki preview "veri yok" göstermesin. */}
+                {(data.deliveryMethod || data.paymentMethod) && (
+                    <div className="doc-no-break" style={notesSectionStyle}>
+                        <div style={{ fontFamily: FONT.heading, fontSize: "8px", fontWeight: 700, color: C.brand, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "8px" }}>
+                            Delivery &amp; Payment / Teslimat &amp; Ödeme
+                        </div>
+                        <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "10px" }}>
+                            <tbody>
+                                {data.deliveryMethod && (
+                                    <tr>
+                                        <td style={{ padding: "6px 10px", width: "30%", fontWeight: 600, color: C.text, background: C.zebraEven, border: `0.5px solid ${C.border}`, verticalAlign: "top" as const }}>
+                                            Teslimat Şekli
+                                            <div style={{ fontSize: "8px", fontWeight: 400, fontStyle: "italic", color: C.subtle, marginTop: "2px" }}>Delivery Method</div>
+                                        </td>
+                                        <td style={{ padding: "6px 10px", color: C.text, whiteSpace: "pre-wrap" as const, border: `0.5px solid ${C.border}` }}>{data.deliveryMethod}</td>
+                                    </tr>
+                                )}
+                                {data.paymentMethod && (
+                                    <tr>
+                                        <td style={{ padding: "6px 10px", width: "30%", fontWeight: 600, color: C.text, background: C.zebraEven, border: `0.5px solid ${C.border}`, verticalAlign: "top" as const }}>
+                                            Ödeme Şekli
+                                            <div style={{ fontSize: "8px", fontWeight: 400, fontStyle: "italic", color: C.subtle, marginTop: "2px" }}>Payment Method</div>
+                                        </td>
+                                        <td style={{ padding: "6px 10px", color: C.text, whiteSpace: "pre-wrap" as const, border: `0.5px solid ${C.border}` }}>{data.paymentMethod}</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
                 {/* ── Notes & Terms ── */}
                 {data.notes && (

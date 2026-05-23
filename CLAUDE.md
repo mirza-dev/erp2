@@ -3,7 +3,22 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-23_
 
-**Son tamamlanan iş:** Faz 4a — Teklif modülü PMT brand alanları (DB + form) (2026-05-23; 3480 test)
+**Son tamamlanan iş:** Faz 4a Review — Preview/PDF contract lock + PATCH validation parity (2026-05-23; 3491 test)
+
+- **P3-A (preview/PDF data contract eksikti):** Faz 4a form save path DB'ye `delivery_method`/`payment_method`/`size_text` yazıyordu ama preview/PDF render kontratı (`QuoteData` interface'i + `teklif_v3_full` localStorage shape) hâlâ Faz 4a alanlarını taşımıyordu → form'da girilen değerler preview'da "yok" görünür.
+  - **Fix:** `quote-types.ts` — `QuoteData.deliveryMethod/paymentMethod: string` + `QuoteRow.size: string` eklendi. `QuoteForm.tsx` `autoSave()` + `savePreviewData()` payload'a 3 yeni alan eklendi + `useCallback` dep array (`deliveryMethod, paymentMethod`) → stale closure önlendi. `QuoteDocument.tsx` — Notes section'ından önce conditional render Teslimat/Ödeme bloğu (bilingual etiket "Teslimat Şekli / Delivery Method", "Ödeme Şekli / Payment Method", `whiteSpace: pre-wrap`, zebra bg, border) + lines tablosuna Lead Time'dan sonra "Size / Ölçü" kolonu + empty state `colSpan={10}` (eskiden 9).
+  - **Not — minimal kapsam (4c'ye köprü):** Tam PMT brand layout (logo, full bilingual header, footer band) Faz 4c'de gelir; bu tur yalnız contract bağlandı ki preview "veri yok" göstermesin.
+- **P3-B (PATCH validation parity yok):** `/api/quotes/route.ts` POST `validateStringLengths` çalıştırıyordu ama `/api/quotes/[id]/route.ts:75` PATCH draft-update branch body'yi doğrudan `dbUpdateQuote`'a iletiyordu. Faz 4a iki yeni serbest text alanı (10K char limit) için defense-in-depth gerek.
+  - **Fix:** PATCH draft-update branch'inde `existing.status !== "draft"` guard'ından sonra `validateStringLengths(body)` çağrısı → 400. Helper recursive (`api-error.ts:90-97`) — `lines[].size_text` gibi nested alanları da kapsar.
+- **P3-C (scope dışı, Next.js route announcer flake):** `tests/import.spec.ts:69` `page.getByRole("alert")` Next.js prod build route announcer ile çakışıyor — Faz 4a ile ilgisiz, ayrı tur (selector daha spesifik: `.filter({hasText: regex})` veya testid bazlı scope).
+- **+11 yeni test:**
+  - `quotes-faz4a-helper-mapper.test.ts` (+7): `QuoteData` deliveryMethod/paymentMethod, `QuoteRow.size`, autoSave/savePreviewData payload genişlemesi, useCallback dep array kilidi (stale closure), `QuoteDocument` conditional Teslimat/Ödeme render + bilingual etiketler + lines `row.size` render + `colSpan={10}`.
+  - `quotes-faz4a-patch-validation.test.ts` (yeni, +4): delivery_method/payment_method 10001 char → 400 + dbUpdateQuote ÇAĞRILMAZ, nested `lines[].size_text` 10001 char → 400 (recursive validation lock), normal kısa body → 200 + dbUpdateQuote çağrılır (regression korunur).
+- **Plan-domain check:** `feedback_no_silent_deletes` — hiçbir alan/state silinmedi, yalnız genişledi. Faz 4 plan §466 PDF brand rewrite 4c'de; bu Review turu **veri köprüsü** atıyor (kontrat hazır, 4c yalnız görsel rewrite).
+- 6 dosya (4 source + 2 test) · **3491 test yeşil** (önceki 3480 + 11) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 4b — Auto-build description helper + form integration (ürün seçince satır description otomatik dolar; şablon `{name} {body_material} {pn_class} {end_connection}, {trim_material} TRİM`).
+
+**Önceki:** Faz 4a — Teklif modülü PMT brand alanları (DB + form) (2026-05-23; 3480 test)
 
 - **Plan:** `MODUL_REVIZE_PLAN.md §466` Faz 4 — Teklif Modülü Revize. Alt-faz planı (kullanıcı kararı): 4a = DB + form, 4b = auto-build description, 4c = PDF PMT brand template rewrite.
 - **Migration 065** (`065_quotes_faz4a_delivery_payment_size.sql`):

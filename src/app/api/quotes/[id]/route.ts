@@ -4,7 +4,7 @@ import { dbGetQuote, dbUpdateQuote, dbDeleteQuote } from "@/lib/supabase/quotes"
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { mapQuoteDetail } from "@/lib/api-mappers";
-import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
 
 function getCachedQuote(id: string) {
@@ -78,6 +78,13 @@ export async function PATCH(
         if (existing.status !== "draft") {
             return NextResponse.json({ error: "Sadece taslak teklifler düzenlenebilir." }, { status: 409 });
         }
+        // Faz 4a Review (2026-05-23): POST ile parity — yeni serbest text alanları
+        // (delivery_method, payment_method) + mevcut notes/customer fields için
+        // string length guard. Helper recursive tarama yapar, lines[].size_text
+        // gibi nested alanları da kapsar.
+        const lengthErr = validateStringLengths(body);
+        if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
+
         const row = await dbUpdateQuote(id, body as unknown as CreateQuoteInput);
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");

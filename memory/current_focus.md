@@ -7,7 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-23
 
-**Faz 4a — Teklif modülü PMT brand alanları (DB + form) (3480 test)**
+**Faz 4a Review — Preview/PDF contract + PATCH validation (3491 test)**
+
+- **P3-A:** Form DB'ye yazıyordu ama preview/PDF kontratı (`QuoteData`) Faz 4a alanlarını taşımıyordu. Fix: `quote-types.ts` genişlet, `QuoteForm` autoSave + savePreviewData payload + useCallback dep, `QuoteDocument` Notes öncesi conditional Teslimat/Ödeme bloğu + lines `Size/Ölçü` kolonu (colSpan 9→10). Minimal — 4c full PMT brand rewrite gelecek.
+- **P3-B:** PATCH draft branch'inde POST ile parity yoktu; `validateStringLengths(body)` eklendi (recursive nested `lines[].size_text` dahil).
+- **+11 test** (contract source-regex 7 + PATCH validation 4).
+- 6 dosya · **3491 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 4b — auto-build description.
+
+## Önceki — Faz 4a (3480 test)
+
+**Teklif modülü PMT brand alanları (DB + form)**
 
 - Plan §466 Faz 4 — alt-faz: 4a (DB+form, şimdi), 4b (auto-build desc), 4c (PDF PMT brand rewrite).
 - Migration 065: quotes.delivery_method/payment_method TEXT + quote_line_items.size_text TEXT (idempotent + ROLLBACK). RPC'ler güncellendi.
