@@ -540,9 +540,12 @@ export default function ImportPage() {
                 />
             </div>
 
-            {/* Faz 3d — Klasik Mod accordion (eski 7-adım wizard fallback) */}
+            {/* Faz 3d — Klasik Mod accordion (eski 7-adım wizard fallback).
+                Faz 3d Review 2: data-testid eklendi — E2E locator stable kalır;
+                sayfaya başka <details> eklense bile bu testid spesifik. */}
             <details
                 ref={classicDetailsRef}
+                data-testid="classic-mode-accordion"
                 open={showClassic}
                 onToggle={e => setShowClassic((e.target as HTMLDetailsElement).open)}
                 style={{
@@ -595,15 +598,26 @@ export default function ImportPage() {
                 </div>
             )}
 
-            {/* Error banner */}
+            {/* Error banner — Faz 3d Review 2: role="alert" + aria-live (a11y +
+                E2E tek/kararlı locator). Yalnız parseError varken DOM'a girer
+                → duplicate announce yok. Close button aria-label (&times; sr'da
+                anlamsız). */}
             {parseError && (
-                <div style={{
-                    padding: "10px 14px", background: "var(--danger-bg)",
-                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
-                    fontSize: "12px", color: "var(--danger-text)", display: "flex", alignItems: "center", gap: "8px",
-                }}>
+                <div
+                    role="alert"
+                    aria-live="polite"
+                    style={{
+                        padding: "10px 14px", background: "var(--danger-bg)",
+                        border: "0.5px solid var(--danger-border)", borderRadius: "6px",
+                        fontSize: "12px", color: "var(--danger-text)", display: "flex", alignItems: "center", gap: "8px",
+                    }}
+                >
                     <span style={{ fontWeight: 600 }}>Hata:</span> {parseError}
-                    <button onClick={() => setParseError(null)} style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--danger-text)", cursor: "pointer", fontSize: "14px" }}>&times;</button>
+                    <button
+                        onClick={() => setParseError(null)}
+                        aria-label="Hata mesajını kapat"
+                        style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--danger-text)", cursor: "pointer", fontSize: "14px" }}
+                    >&times;</button>
                 </div>
             )}
 

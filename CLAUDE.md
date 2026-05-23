@@ -3,7 +3,17 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-23_
 
-**Son tamamlanan iş:** Faz 3d Review — 3 bulgu kapatma + E2E adaptasyon (2026-05-23; 3455 test)
+**Son tamamlanan iş:** Faz 3d Review 2.tur — error banner role="alert" + accordion testid (2026-05-23; 3457 test)
+
+- **P2 — Son E2E fail (`tests/import.spec.ts:60`):** Geçersiz dosya testi `page.getByText(/desteklenmiyor|geçersiz|xlsx|excel/i)` ile 7 element'e çakışıyordu (DropZone metni "Excel, CSV", empty state "Migration Excel", accordion summary "eski 7-adım Excel wizard", klasik input `accept=".xlsx,.xls,.csv"` vb.) → Playwright strict mode fail. Hata banner'ı görünüyordu ama assertion yanlış element'i (veya hepsini) yakalıyordu.
+- **Fix — `role="alert"` + `aria-live="polite"`:** `page.tsx:599-608` error banner'a a11y semantic eklendi (`ExtractionReview` pattern tutarlılığı). Close button `&times;`'a `aria-label="Hata mesajını kapat"`. Test artık `page.getByRole("alert")` + `toContainText(/.../)` ile çift katmanlı assertion (banner var mı + içerik eşleşiyor mu). Strict + esnek.
+- **P3 — Accordion locator stabilitesi:** `<details data-testid="classic-mode-accordion">` eklendi. `tests/import.spec.ts:38` `beforeEach` `document.querySelector("details")` → `[data-testid='classic-mode-accordion']` ile scope'landı (TS `HTMLDetailsElement` generic). Sayfaya başka `<details>` eklense bile bu locator stabil kalır.
+- **+2 source-regex test:** `import-page-faz3d.test.ts` — error banner role/aria-live/aria-label + accordion data-testid kilitleme.
+- **E2E doğrulama (kullanıcı tarafı):** `npx playwright test tests/import.spec.ts` → 12/12 passed beklenir (önceki 11/12; tek fail kapanır).
+- 3 dosya · **3457 test yeşil** (önceki 3455 + 2) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Aging E2E 2 fail (Faz 3d ile ilgisiz, ayrı tur) veya Faz 4 (teklif modülü revize).
+
+**Önceki:** Faz 3d Review — 3 bulgu kapatma + E2E adaptasyon (2026-05-23; 3455 test)
 
 - **P3 typo (görünür metin):** `page.tsx:483` "ürün kataloğları" → "ürün katalogları" (commit `7bcb07b`'de doğru yazılmıştı, source kaçmış).
 - **P3 scroll/focus (migration_excel CTA):** ClassifierQueue'dan tıklama tek başına `setShowClassic(true)` yapıyor; uzun queue altında kullanıcı klasik wizard'a görsel olarak inmiyordu. Yeni `openClassicFromCta` wrapper helper: `setShowClassic(true)` + `setTimeout(100ms) → classicDetailsRef.scrollIntoView({behavior:"smooth", block:"start"})`. Sadece CTA'dan tetiklenir; manuel `<summary>` tıklamada native browser scroll yeterli (extra scroll yok). `<details ref={classicDetailsRef}>` ile bağlı.

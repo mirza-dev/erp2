@@ -104,4 +104,19 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
     it("P2 E2E adaptasyon: klasik wizard input'una data-testid='classic-import-file' eklendi", () => {
         expect(SOURCE).toMatch(/data-testid="classic-import-file"/);
     });
+
+    // ── Faz 3d Review 2.tur (2026-05-23) — alert + accordion testid ──────
+
+    it("Review 2 P2: error banner role='alert' + aria-live (a11y + E2E stability)", () => {
+        // parseError JSX bloğu role="alert" ile başlar
+        expect(SOURCE).toMatch(/parseError &&[\s\S]{0,300}role="alert"/);
+        // Yumuşak aria-live (polite) — duplicate announce yok
+        expect(SOURCE).toMatch(/aria-live="polite"/);
+        // Close button (×) screen reader için aria-label
+        expect(SOURCE).toMatch(/aria-label="Hata mesajını kapat"/);
+    });
+
+    it("Review 2 P3: <details> accordion'a data-testid='classic-mode-accordion' eklendi (locator stability)", () => {
+        expect(SOURCE).toMatch(/<details[\s\S]{0,300}data-testid="classic-mode-accordion"/);
+    });
 });

@@ -7,7 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-23
 
-**Faz 3d Review — 3 bulgu kapatma + E2E adaptasyon (3455 test)**
+**Faz 3d Review 2.tur — error banner role="alert" + accordion testid (3457 test)**
+
+- **P2 son E2E fail:** Geçersiz dosya testi geniş regex 7 element'e çakışıyordu (DropZone/empty/summary/accept attribute). Error banner'a `role="alert"` + `aria-live="polite"` + close button `aria-label`. Test artık `getByRole("alert") + toContainText(regex)` ile çift katmanlı.
+- **P3 accordion stabilite:** `<details data-testid="classic-mode-accordion">`; beforeEach testid scope (sayfaya başka details eklense bile stable).
+- **+2 test** (source-regex lock).
+- 3 dosya · **3457 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Aging E2E 2 fail (ayrı tur) veya Faz 4.
+
+## Önceki — Faz 3d Review 1.tur (3455 test)
+
+**3 bulgu + E2E adaptasyon**
 
 - **P3 typo:** "ürün kataloğları" → "ürün katalogları" (page.tsx:483).
 - **P3 scroll/focus:** Yeni `openClassicFromCta` helper — migration_excel CTA'sından accordion açılınca smooth scroll. `<details ref={classicDetailsRef}>`. Manuel summary tıklamada native scroll yeterli.

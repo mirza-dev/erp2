@@ -34,8 +34,12 @@ test.beforeEach(async ({ page }) => {
     // Faz 3d: klasik wizard accordion'ı testler için programmatic aç. <summary>
     // tıklama animasyonla async olabildiği için doğrudan DOM mutasyonu daha
     // güvenilir. classicDetailsRef React state'ine onToggle ile senkron olur.
+    // Faz 3d Review 2 (2026-05-23): data-testid scope — sayfaya başka <details>
+    // eklense bile bu locator klasik mod accordion'una sabit kalır.
     await page.evaluate(() => {
-        const d = document.querySelector("details");
+        const d = document.querySelector<HTMLDetailsElement>(
+            "[data-testid='classic-mode-accordion']"
+        );
         if (d && !d.open) d.open = true;
     });
 });
@@ -56,9 +60,14 @@ test("geçersiz dosya türü yüklenince hata mesajı", async ({ page }) => {
     // ile DOM varlığını doğrularız, setInputFiles hidden input'a da çalışır.
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(TXT_PATH);
-    await expect(
-        page.getByText(/desteklenmiyor|geçersiz|xlsx|excel/i)
-    ).toBeVisible({ timeout: 5_000 });
+    // Faz 3d Review 2 (2026-05-23): error banner artık role="alert" + aria-live
+    // ile semantik. Eski geniş regex `desteklenmiyor|geçersiz|xlsx|excel` 7
+    // element'e çakışıyordu (DropZone metni, empty state, accordion summary,
+    // input accept attribute, vb.) → strict mode fail. getByRole("alert") +
+    // contains regex çift katmanlı güvence: banner var mı + içerik eşleşiyor mu.
+    const errorBanner = page.getByRole("alert");
+    await expect(errorBanner).toBeVisible({ timeout: 5_000 });
+    await expect(errorBanner).toContainText(/desteklenmiyor|geçersiz|xlsx|excel/i);
 });
 
 // ── Dosya yükleme → Sheet seçimi ─────────────────────────────────────────────
