@@ -289,3 +289,57 @@ describe("ClassifierQueue — onRemove parent sync (Review 3 P2)", () => {
         // Test fail vermez = onRemove opsiyonel, geriye uyumlu
     });
 });
+
+// ── Faz 3d (2026-05-23) — onOpenClassicMode CTA (migration_excel) ──────────
+
+function migrationExcelResponse() {
+    return new Response(JSON.stringify({
+        ok: true,
+        document: {
+            id: "doc-mig",
+            classification: {
+                document_type: "migration_excel",
+                confidence: 0.95,
+                language: "tr",
+                summary: "Eski sistem Excel'i",
+                suggested_product_type_id: null,
+            },
+        },
+    }), { status: 201, headers: { "Content-Type": "application/json" } });
+}
+
+describe("ClassifierQueue — Faz 3d onOpenClassicMode callback", () => {
+    it("migration_excel + onOpenClassicMode → 'Klasik Mod'a geç ↓' button render; tıklama callback'i tetikler", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => migrationExcelResponse()));
+        const onOpenClassicMode = vi.fn();
+        render(<ClassifierQueue
+            files={[makeFile("eski-katalog.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]}
+            suggestedProductTypes={[PT]}
+            onOpenClassicMode={onOpenClassicMode}
+        />);
+
+        // classified state bekle
+        const btn = await screen.findByRole("button", { name: /Klasik Mod accordion'unu aç/ }, { timeout: 3000 });
+        expect(btn.textContent).toMatch(/Klasik Mod'a geç/);
+
+        await act(async () => {
+            fireEvent.click(btn);
+        });
+
+        expect(onOpenClassicMode).toHaveBeenCalledTimes(1);
+    });
+
+    it("migration_excel + onOpenClassicMode YOK → eski disabled span davranışı (backward compat)", async () => {
+        vi.stubGlobal("fetch", vi.fn(async () => migrationExcelResponse()));
+        // onOpenClassicMode geçilmedi
+        render(<ClassifierQueue
+            files={[makeFile("eski-katalog.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]}
+            suggestedProductTypes={[PT]}
+        />);
+
+        // Span: aria-label yok, button rolünde değil
+        await screen.findByText(/Klasik Mod'a geçin/, {}, { timeout: 3000 });
+        // Button rolünde "Klasik Mod accordion" aria-label'ı olmamalı
+        expect(screen.queryByRole("button", { name: /Klasik Mod accordion'unu aç/ })).toBeNull();
+    });
+});

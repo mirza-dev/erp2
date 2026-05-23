@@ -11,7 +11,10 @@ import DropZone from "@/components/import/DropZone";
 import ClassifierQueue from "@/components/import/ClassifierQueue";
 import type { ProductTypeRow } from "@/lib/database.types";
 
-type ImportMode = "ai" | "classic";
+// Faz 3d (2026-05-23): Eski `ImportMode = "ai" | "classic"` toggle kaldırıldı;
+// AI artık default+her zaman görünür akış, klasik mod alt accordion'da fallback.
+// Bayrak `showClassic` sayfanın altındaki <details> collapsible'ını kontrol eder.
+// migration_excel belgesi yüklenirse otomatik açılır (parent state).
 
 type ImportState = "idle" | "analyzing" | "sheet_select" | "column_mapping" | "preview" | "importing" | "done";
 
@@ -112,8 +115,9 @@ export default function ImportPage() {
     const { refetchAll } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
-    // Faz 3a — AI tab toggle (default ai, classic = eski 7-adım wizard)
-    const [mode, setMode] = useState<ImportMode>("ai");
+    // Faz 3d — AI default akış; klasik mod alt accordion (default kapalı,
+    // migration_excel tespit edilirse otomatik açılır).
+    const [showClassic, setShowClassic] = useState(false);
     const [aiFiles, setAiFiles] = useState<File[]>([]);
     const [aiSuggestedTypes, setAiSuggestedTypes] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -476,12 +480,10 @@ export default function ImportPage() {
                         Veri İçe Aktarım
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        {mode === "ai"
-                            ? "Belge bırak, AI sınıflandırsın — tip-aware extraction ve onay (Faz 3a: sınıflandırma)"
-                            : "Excel dosyasını yükle — kolon eşleştirme, önizleme ve içe aktarım"}
+                        Belge bırak, AI sınıflandırsın — sertifikalar, ürün kataloğları ve datasheet&apos;ler için akıllı extraction
                     </div>
                 </div>
-                {mode === "classic" && (state !== "idle" && state !== "analyzing") && (
+                {showClassic && (state !== "idle" && state !== "analyzing") && (
                     <button onClick={reset} style={{
                         fontSize: "12px", padding: "5px 12px",
                         border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
@@ -490,61 +492,72 @@ export default function ImportPage() {
                 )}
             </div>
 
-            {/* Faz 3a — Mode toggle (AI / Klasik) */}
-            <div role="tablist" aria-label="İçe aktarım modu" style={{
-                display: "inline-flex", padding: "3px", borderRadius: "8px",
-                background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)",
-                alignSelf: "flex-start", gap: "2px",
-            }}>
-                <button
-                    role="tab"
-                    aria-selected={mode === "ai"}
-                    onClick={() => setMode("ai")}
-                    style={{
-                        fontSize: "12px", padding: "6px 14px", borderRadius: "6px",
-                        background: mode === "ai" ? "var(--bg-primary)" : "transparent",
-                        color: mode === "ai" ? "var(--text-primary)" : "var(--text-tertiary)",
-                        fontWeight: mode === "ai" ? 600 : 500,
-                        border: "none", cursor: "pointer",
-                    }}
-                >
-                    ✨ AI ile Aktar
-                </button>
-                <button
-                    role="tab"
-                    aria-selected={mode === "classic"}
-                    onClick={() => setMode("classic")}
-                    style={{
-                        fontSize: "12px", padding: "6px 14px", borderRadius: "6px",
-                        background: mode === "classic" ? "var(--bg-primary)" : "transparent",
-                        color: mode === "classic" ? "var(--text-primary)" : "var(--text-tertiary)",
-                        fontWeight: mode === "classic" ? 600 : 500,
-                        border: "none", cursor: "pointer",
-                    }}
-                >
-                    Klasik Mod
-                </button>
+            {/* Faz 3d — AI default akış (her zaman görünür); klasik mod alt accordion'da */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <DropZone
+                    onFiles={files => setAiFiles(prev => [...prev, ...files])}
+                    disabled={isDemo}
+                    disabledTooltip={DEMO_DISABLED_TOOLTIP}
+                />
+                {/* Faz 3d — empty state (henüz dosya yüklenmedi) */}
+                {aiFiles.length === 0 && (
+                    <div
+                        role="status"
+                        style={{
+                            padding: "16px 20px",
+                            background: "var(--bg-secondary)",
+                            border: "0.5px dashed var(--border-tertiary)",
+                            borderRadius: "8px",
+                            color: "var(--text-tertiary)",
+                            fontSize: "12px", lineHeight: 1.6,
+                        }}
+                    >
+                        <div style={{ fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px" }}>
+                            Henüz dosya yüklenmedi
+                        </div>
+                        PDF sertifika, Excel kataloğu, datasheet veya ürün resmi sürükle bırak.
+                        AI dosyayı sınıflandırır, eşleşen ürünleri bulur ve onayınla katalogu günceller.
+                        Migration Excel dosyaları için aşağıdaki <b>Gelişmiş / Klasik Mod</b> kullanılır.
+                    </div>
+                )}
+                <ClassifierQueue
+                    files={aiFiles}
+                    suggestedProductTypes={aiSuggestedTypes}
+                    onClear={() => setAiFiles([])}
+                    onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}
+                    onOpenClassicMode={() => setShowClassic(true)}
+                />
             </div>
 
-            {/* Faz 3a — AI tab content */}
-            {mode === "ai" && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                    <DropZone
-                        onFiles={files => setAiFiles(prev => [...prev, ...files])}
-                        disabled={isDemo}
-                        disabledTooltip={DEMO_DISABLED_TOOLTIP}
-                    />
-                    <ClassifierQueue
-                        files={aiFiles}
-                        suggestedProductTypes={aiSuggestedTypes}
-                        onClear={() => setAiFiles([])}
-                        onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}
-                    />
-                </div>
-            )}
-
-            {mode === "classic" && (
-            <>
+            {/* Faz 3d — Klasik Mod accordion (eski 7-adım wizard fallback) */}
+            <details
+                open={showClassic}
+                onToggle={e => setShowClassic((e.target as HTMLDetailsElement).open)}
+                style={{
+                    marginTop: "8px",
+                    padding: "0",
+                    border: "0.5px solid var(--border-tertiary)",
+                    borderRadius: "8px",
+                    background: "var(--bg-secondary)",
+                }}
+            >
+                <summary
+                    style={{
+                        padding: "10px 14px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        color: "var(--text-secondary)",
+                        userSelect: "none",
+                        listStyle: "none",
+                        display: "flex", alignItems: "center", gap: "8px",
+                    }}
+                    aria-label="Gelişmiş: Klasik Mod (eski 7-adım wizard)"
+                >
+                    <span aria-hidden style={{ fontSize: "10px" }}>{showClassic ? "▾" : "▸"}</span>
+                    <span>Gelişmiş: Klasik Mod — eski 7-adım Excel wizard (migration için)</span>
+                </summary>
+                <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: "16px", background: "var(--bg-primary)" }}>
             {/* Klasik mod — eski 7-adım wizard */}
 
             {/* Step indicator */}
@@ -1148,8 +1161,8 @@ export default function ImportPage() {
                     </div>
                 </div>
             )}
-            </>
-            )}
+                </div>
+            </details>
         </div>
     );
 }

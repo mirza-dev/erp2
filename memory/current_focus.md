@@ -5,9 +5,21 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-22
+## Son Tamamlanan İş — 2026-05-23
 
-**Faz 3c Review 5.tur — status_update_failed UI/API propagate (3441 test)**
+**Faz 3d — Klasik mod accordion + AI default akış polish (3452 test)**
+
+- Faz 3a tab toggle ("AI ile Aktar" / "Klasik Mod") kaldırıldı; AI artık varsayılan + her zaman görünür akış. Header tek satır AI odaklı.
+- Empty state: `aiFiles.length === 0` ise yardım metni (role="status") + Migration Excel için Gelişmiş Mod yönergesi.
+- Klasik 7-adım wizard `<details>` collapsible'a alındı (`showClassic` state, default kapalı, summary "Gelişmiş: Klasik Mod — eski 7-adım Excel wizard"). Eski state'ler/fonksiyonlar silinmedi (no_silent_deletes).
+- ClassifierQueue `onOpenClassicMode?: () => void` opsiyonel prop: migration_excel kartında tıklanabilir "Klasik Mod'a geç ↓" button; parent setShowClassic(true) ile accordion auto-open. Callback yoksa eski disabled span (backward compat).
+- **+11 test** (import-page-faz3d source-regex 9 + classifier-queue-interaction onOpenClassicMode 2).
+- 4 dosya · **3452 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 4 (teklif modülü revize) veya kullanıcı karar.
+
+## Önceki — Faz 3c Review 5.tur (3441 test)
+
+**status_update_failed UI/API propagate**
 
 - **Bulgu:** 4.tur post-commit guard duplicate engelliyordu ama route 200 + result olduğu gibi dönüyor, UI successCount>0 görüp `setDocStatus("applied")` çağırıyordu → yanıltıcı "Belge uygulandı" + refresh sonrası DB/UI state tutarsız. `status_update_failed` audit'te vardı ama frontend göremiyordu.
 - **Fix:** `ApplyResult` shape'ine `status_update_failed: boolean` (default false). Service post-commit catch'te `result.status_update_failed = true` set eder. UI: flag true → `setDocStatus("applying")` + warning toast "{N} işlem yazıldı ama güncellenemedi, yönetici müdahalesi gerek" + result panel'de role="alert" admin recovery uyarı bandı. Success toast YOK. `ApplyResultSummary` opsiyonel `status_update_failed?: boolean` (eski response backward compat).

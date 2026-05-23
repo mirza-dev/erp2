@@ -1,9 +1,22 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-22_
+_Son güncelleme: 2026-05-23_
 
-**Son tamamlanan iş:** Faz 3c Review 5.tur — status_update_failed UI/API propagate (P2/P3 follow-up) (2026-05-22; 3441 test)
+**Son tamamlanan iş:** Faz 3d — Klasik mod accordion + AI default akış polish (2026-05-23; 3452 test)
+
+- **AI default akış:** Faz 3a'dan beri var olan `mode: "ai" | "classic"` tab toggle KALDIRILDI. AI akışı (DropZone + ClassifierQueue) artık sayfanın varsayılan + her zaman görünür içeriği. Header açıklama metni tek satır AI odaklı.
+- **Empty state polish:** `aiFiles.length === 0` ise DropZone altında `role="status"` yardım bandı: "Henüz dosya yüklenmedi — PDF sertifika, Excel kataloğu, datasheet veya ürün resmi sürükle bırak. AI sınıflandırır, eşleşen ürünleri bulur, onayınla katalogu günceller." + Migration Excel için Gelişmiş/Klasik Mod yönergesi.
+- **Klasik mod accordion:** Eski 7-adım wizard (sheets/columnMappings/preview/import) sayfanın altında `<details>` collapsible'a alındı. Summary: "▸ Gelişmiş: Klasik Mod — eski 7-adım Excel wizard (migration için)". Default kapalı; `showClassic: boolean` state + `onToggle` ile senkron. Tüm eski state'ler ve fonksiyonlar korundu (silinmedi).
+- **migration_excel CTA aktif:** ClassifierQueue'ya `onOpenClassicMode?: () => void` opsiyonel prop eklendi. Callback verilirse migration_excel kartında eski disabled "Klasik Mod'a geçin" span'ı yerine tıklanabilir "Klasik Mod'a geç ↓" button render olur (aria-label "Klasik Mod accordion'unu aç"). Parent `setShowClassic(true)` ile accordion otomatik açılır. Callback yoksa eski disabled span davranışı korunur (backward compat).
+- **+11 yeni test:**
+  - `import-page-faz3d.test.ts` (yeni, 9): tab toggle kaldırma + `showClassic` state + AI guard kalkması + empty state + `<details>` + summary metni + header polish + migration_excel CTA prop geçişi (source-regex tarzı yapısal kilitleme).
+  - `classifier-queue-interaction.test.tsx` (+2): migration_excel + onOpenClassicMode → tıklanabilir button + callback tetiklenir; onOpenClassicMode yok → eski disabled span davranışı (backward compat).
+- **Plan-domain check:** `feedback_no_silent_deletes` paterni — klasik wizard'ın hiçbir state/fonksiyonu silinmedi, sadece UI'da accordion'a alındı. Migration Excel hâlâ destekleniyor; AI extraction "kapsam dışı" gördüğü doc'ları kullanıcıya net CTA ile klasik moda yönlendiriyor.
+- 3 dosya + 1 yeni test + 1 yeni içerik test = 4 dosya · **3452 test yeşil** (önceki 3441 + 11) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 4 (teklif modülü revize) veya başka bir alanda Bulgular turu — kullanıcı kararı.
+
+**Önceki:** Faz 3c Review 5.tur — status_update_failed UI/API propagate (P2/P3 follow-up) (2026-05-22; 3441 test)
 
 - **Bulgu:** 4.tur post-commit guard duplicate riskini engelliyordu ama route 200 + result olduğu gibi dönüyor, UI `successCount > 0` görünce `setDocStatus("applied")` çağırıyordu → kullanıcı "Belge uygulandı" toast'ı görüyor, oysa DB'de doc 'applying'de takılı. Refresh sonrası server'dan applying gelir, state tutarsız. `status_update_failed` flag sadece audit log'a yazılıyordu, frontend göremiyordu.
 - **Fix:**

@@ -173,6 +173,12 @@ export interface ClassifierQueueProps {
      * yeniden "uploading" item olarak eklenir → duplicate POST/AI cost (Faz 3a Review 3 bug).
      */
     onRemove?: (file: File) => void;
+    /**
+     * Faz 3d: migration_excel doc tespit edilirse parent'ın klasik mod
+     * accordion'unu açmasına izin verir. Callback verilirse "Klasik Mod'a geçin"
+     * CTA tıklanabilir button olur; verilmezse eski disabled span davranışı.
+     */
+    onOpenClassicMode?: () => void;
 }
 
 const CONCURRENCY = 3;
@@ -203,7 +209,7 @@ async function uploadAndClassify(
     }
 }
 
-export default function ClassifierQueue({ files, suggestedProductTypes = [], onClear, onRemove }: ClassifierQueueProps) {
+export default function ClassifierQueue({ files, suggestedProductTypes = [], onClear, onRemove, onOpenClassicMode }: ClassifierQueueProps) {
     const isDemo = useIsDemo();
 
     const [queue, setQueue] = useState<QueuedFile[]>([]);
@@ -458,13 +464,29 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
                                     </Link>
                                 )}
                                 {q.status === "classified" && c && isMigrationExcelType(c.document_type) && (
-                                    <span style={{
-                                        fontSize: "11px", padding: "4px 10px",
-                                        background: "var(--warning-bg)", color: "var(--warning-text)",
-                                        border: "0.5px solid var(--warning-border)", borderRadius: "5px",
-                                    }}>
-                                        Klasik Mod&apos;a geçin
-                                    </span>
+                                    onOpenClassicMode ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => onOpenClassicMode()}
+                                            aria-label="Klasik Mod accordion'unu aç"
+                                            style={{
+                                                fontSize: "11px", padding: "4px 10px",
+                                                background: "var(--warning-bg)", color: "var(--warning-text)",
+                                                border: "0.5px solid var(--warning-border)", borderRadius: "5px",
+                                                cursor: "pointer", fontWeight: 500,
+                                            }}
+                                        >
+                                            Klasik Mod&apos;a geç ↓
+                                        </button>
+                                    ) : (
+                                        <span style={{
+                                            fontSize: "11px", padding: "4px 10px",
+                                            background: "var(--warning-bg)", color: "var(--warning-text)",
+                                            border: "0.5px solid var(--warning-border)", borderRadius: "5px",
+                                        }}>
+                                            Klasik Mod&apos;a geçin
+                                        </span>
+                                    )
                                 )}
                                 {q.status === "classified" && c && !isExtractionSupportedType(c.document_type) && !isMigrationExcelType(c.document_type) && (
                                     <Button
