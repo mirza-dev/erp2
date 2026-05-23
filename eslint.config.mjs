@@ -16,6 +16,9 @@ const eslintConfig = defineConfig([
     "coverage/**",
     // k6 load test runner — separate runtime; Next.js ESLint kuralları geçerli değil
     "tests/load/**",
+    // Playwright generated artifacts (test-results + HTML report; .gitignored zaten)
+    "playwright-report/**",
+    "test-results/**",
   ]),
   // "_"-prefix konvansiyonu: kullanılmayan args/vars/catch error'lar ESLint'te
   // sessize alınır (TS/JS topluluk standardı). Mevcut `_code`, `_input`, `_maxLen`

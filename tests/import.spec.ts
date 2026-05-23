@@ -1,11 +1,26 @@
 /**
- * Import Wizard E2E Tests — the most critical flow
+ * Import Wizard E2E Tests — klasik 7-adım wizard akışı.
+ *
+ * Faz 3d (2026-05-23): "AI ile Aktar" / "Klasik Mod" tab toggle kaldırıldı;
+ * klasik wizard sayfanın altında <details> accordion'a alındı (default kapalı).
+ * AI default akışında DropZone'un kendi <input type="file"> var → eski genel
+ * `page.locator(CLASSIC_FILE_INPUT)` locator'ı Playwright strict mode'da
+ * iki element bulup hata veriyordu.
+ *
+ * Adaptasyon:
+ *   - beforeEach: klasik accordion programmatic açılır
+ *     (`<details>` el.open = true).
+ *   - Tüm file input locator'ları `data-testid="classic-import-file"`
+ *     ile scope'lanır → AI DropZone input'u ile karışmaz.
  */
 import { test, expect } from "@playwright/test";
 import path from "path";
 
 const XLSX_PATH = path.join(__dirname, "fixtures/test-import.xlsx");
 const TXT_PATH  = path.join(__dirname, "fixtures/invalid.txt");
+// Faz 3d: page.tsx classic wizard input'una testid eklendi (AI dropzone input'u
+// ile karışmasın diye). Tüm aşağıdaki test'ler bu testid'i kullanır.
+const CLASSIC_FILE_INPUT = "[data-testid='classic-import-file']";
 
 // Create a small invalid file for testing
 import fs from "fs";
@@ -16,6 +31,13 @@ if (!fs.existsSync(path.join(__dirname, "fixtures/invalid.txt"))) {
 test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard/import");
     await page.waitForLoadState("networkidle");
+    // Faz 3d: klasik wizard accordion'ı testler için programmatic aç. <summary>
+    // tıklama animasyonla async olabildiği için doğrudan DOM mutasyonu daha
+    // güvenilir. classicDetailsRef React state'ine onToggle ile senkron olur.
+    await page.evaluate(() => {
+        const d = document.querySelector("details");
+        if (d && !d.open) d.open = true;
+    });
 });
 
 // ── Idle state ────────────────────────────────────────────────────────────────
@@ -29,19 +51,20 @@ test("import sayfası idle state ile yükleniyor", async ({ page }) => {
 });
 
 test("geçersiz dosya türü yüklenince hata mesajı", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
-    if (await fileInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await fileInput.setInputFiles(TXT_PATH);
-        await expect(
-            page.getByText(/desteklenmiyor|geçersiz|xlsx|excel/i)
-        ).toBeVisible({ timeout: 5_000 });
-    }
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
+    // Faz 3d: input display:none olduğu için isVisible false döner; isAttached
+    // ile DOM varlığını doğrularız, setInputFiles hidden input'a da çalışır.
+    await expect(fileInput).toBeAttached({ timeout: 5_000 });
+    await fileInput.setInputFiles(TXT_PATH);
+    await expect(
+        page.getByText(/desteklenmiyor|geçersiz|xlsx|excel/i)
+    ).toBeVisible({ timeout: 5_000 });
 });
 
 // ── Dosya yükleme → Sheet seçimi ─────────────────────────────────────────────
 
 test("xlsx dosyası yükleniyor → analyzing → sheet_select", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
 
     await fileInput.setInputFiles(XLSX_PATH);
@@ -58,7 +81,7 @@ test("xlsx dosyası yükleniyor → analyzing → sheet_select", async ({ page }
 });
 
 test("sheet seçim ekranında checkbox'lar görünür", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
     await page.waitForTimeout(3_000);
@@ -71,7 +94,7 @@ test("sheet seçim ekranında checkbox'lar görünür", async ({ page }) => {
 });
 
 test("sheet seçimi toggle edilebiliyor", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
 
@@ -86,7 +109,7 @@ test("sheet seçimi toggle edilebiliyor", async ({ page }) => {
 // ── Kolon eşleştirme ──────────────────────────────────────────────────────────
 
 test("'Kolon Eşleştirmeye Geç' butonu tıklanıyor → mapping tablosu görünür", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
 
@@ -111,7 +134,7 @@ test("'Kolon Eşleştirmeye Geç' butonu tıklanıyor → mapping tablosu görü
 });
 
 test("kolon mapping tablosunda source chip'ler görünür (memory/fallback/ai)", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
     await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
@@ -128,7 +151,7 @@ test("kolon mapping tablosunda source chip'ler görünür (memory/fallback/ai)",
 });
 
 test("dropdown ile alan değiştirilince chip 'Kullanıcı' (sarı) oluyor", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
     await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
@@ -153,7 +176,7 @@ test("dropdown ile alan değiştirilince chip 'Kullanıcı' (sarı) oluyor", asy
 // ── Preview ekranı ────────────────────────────────────────────────────────────
 
 test("preview ekranı draft tablosunu gösteriyor", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
     await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
@@ -180,7 +203,7 @@ test("preview ekranı draft tablosunu gösteriyor", async ({ page }) => {
 
 test("tam import akışı: dosya → done ekranı", async ({ page }) => {
     test.setTimeout(90_000);
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
 
@@ -243,7 +266,7 @@ test("done ekranında 'Yeni Dosya' butonu idle state'e döndürüyor", async ({ 
 });
 
 test("geri navigasyon (column_mapping → sheet_select) batch'i siliyor", async ({ page }) => {
-    const fileInput = page.locator("input[type='file']");
+    const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
     await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });

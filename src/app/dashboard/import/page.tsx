@@ -118,6 +118,17 @@ export default function ImportPage() {
     // Faz 3d — AI default akış; klasik mod alt accordion (default kapalı,
     // migration_excel tespit edilirse otomatik açılır).
     const [showClassic, setShowClassic] = useState(false);
+    const classicDetailsRef = useRef<HTMLDetailsElement | null>(null);
+    // Faz 3d Review (2026-05-23): migration_excel CTA accordion'u açtığında
+    // uzun ClassifierQueue altında kalan kullanıcı için smooth scroll. Manuel
+    // <summary> tıklamada zaten görsel temas olduğundan tetiklenmez — yalnız
+    // programmatic open (openClassicFromCta) için.
+    const openClassicFromCta = useCallback(() => {
+        setShowClassic(true);
+        setTimeout(() => {
+            classicDetailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+    }, []);
     const [aiFiles, setAiFiles] = useState<File[]>([]);
     const [aiSuggestedTypes, setAiSuggestedTypes] = useState<Array<{ id: string; name: string }>>([]);
 
@@ -480,7 +491,7 @@ export default function ImportPage() {
                         Veri İçe Aktarım
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        Belge bırak, AI sınıflandırsın — sertifikalar, ürün kataloğları ve datasheet&apos;ler için akıllı extraction
+                        Belge bırak, AI sınıflandırsın — sertifikalar, ürün katalogları ve datasheet&apos;ler için akıllı extraction
                     </div>
                 </div>
                 {showClassic && (state !== "idle" && state !== "analyzing") && (
@@ -525,12 +536,13 @@ export default function ImportPage() {
                     suggestedProductTypes={aiSuggestedTypes}
                     onClear={() => setAiFiles([])}
                     onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}
-                    onOpenClassicMode={() => setShowClassic(true)}
+                    onOpenClassicMode={openClassicFromCta}
                 />
             </div>
 
             {/* Faz 3d — Klasik Mod accordion (eski 7-adım wizard fallback) */}
             <details
+                ref={classicDetailsRef}
                 open={showClassic}
                 onToggle={e => setShowClassic((e.target as HTMLDetailsElement).open)}
                 style={{
@@ -608,8 +620,14 @@ export default function ImportPage() {
                             background: dragOver ? "rgba(56,139,253,0.07)" : "var(--bg-primary)",
                         }}
                     >
-                        <input ref={fileInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: "none" }}
-                            onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }} />
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            data-testid="classic-import-file"
+                            style={{ display: "none" }}
+                            onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }}
+                        />
                         <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", background: "var(--accent-bg)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <svg width="24" height="24" viewBox="0 0 22 22" fill="none">
                                 <path d="M11 14V4M11 4L7 8M11 4L15 8" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

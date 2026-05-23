@@ -3,7 +3,19 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-23_
 
-**Son tamamlanan iş:** Faz 3d — Klasik mod accordion + AI default akış polish (2026-05-23; 3452 test)
+**Son tamamlanan iş:** Faz 3d Review — 3 bulgu kapatma + E2E adaptasyon (2026-05-23; 3455 test)
+
+- **P3 typo (görünür metin):** `page.tsx:483` "ürün kataloğları" → "ürün katalogları" (commit `7bcb07b`'de doğru yazılmıştı, source kaçmış).
+- **P3 scroll/focus (migration_excel CTA):** ClassifierQueue'dan tıklama tek başına `setShowClassic(true)` yapıyor; uzun queue altında kullanıcı klasik wizard'a görsel olarak inmiyordu. Yeni `openClassicFromCta` wrapper helper: `setShowClassic(true)` + `setTimeout(100ms) → classicDetailsRef.scrollIntoView({behavior:"smooth", block:"start"})`. Sadece CTA'dan tetiklenir; manuel `<summary>` tıklamada native browser scroll yeterli (extra scroll yok). `<details ref={classicDetailsRef}>` ile bağlı.
+- **P2 E2E adaptasyon (9 fail):** Faz 3d sonrası sayfada iki `input[type='file']` var (AI DropZone + klasik wizard) → Playwright strict mode çakışıyordu. Klasik wizard input'una `data-testid="classic-import-file"` eklendi. `tests/import.spec.ts` tüm 11 file-input locator'ı `CLASSIC_FILE_INPUT` constant ile scope'landı. `beforeEach`'e accordion auto-open eklendi: `await page.evaluate(() => { const d = document.querySelector("details"); if (d && !d.open) d.open = true; })`. Geçersiz dosya testi `isVisible()` (input display:none → false dönerdi) yerine `isAttached()` kullanır.
+- **Lint config ek:** Playwright artifact'ları (`playwright-report/**`, `test-results/**`) eslint global ignore'a eklendi — kullanıcı E2E koşumu sonrası oluşan generated JS dosyaları 185 error/2828 warning üretiyordu. `.gitignore`'da zaten ignored, eslint scope hizalandı.
+- **+3 yeni test:** `import-page-faz3d.test.ts` — typo fix lock + openClassicFromCta scroll handler + classic-import-file testid (source-regress kilitleme). Mevcut 1 test güncellendi (inline arrow yerine helper referansı).
+- **Ayrı task — `.claude/settings.local.json`:** `/permissions` ile yanlışlıkla silinen 49 allow rule geri yüklendi (önceki turda planlanıp uygulanmıştı).
+- 5 dosya · **3455 test yeşil** (önceki 3452 + 3) · TS clean · 0 lint warning · build OK
+- **Aging E2E (2 fail) scope dışı:** Kullanıcı raporladı ama "ayrı/global kırmızı" not düştü; Faz 3d ile ilgisiz, ayrı turda ele alınır.
+- **Sıradaki:** Faz 4 (teklif modülü revize) veya kullanıcı kararı.
+
+**Önceki:** Faz 3d — Klasik mod accordion + AI default akış polish (2026-05-23; 3452 test)
 
 - **AI default akış:** Faz 3a'dan beri var olan `mode: "ai" | "classic"` tab toggle KALDIRILDI. AI akışı (DropZone + ClassifierQueue) artık sayfanın varsayılan + her zaman görünür içeriği. Header açıklama metni tek satır AI odaklı.
 - **Empty state polish:** `aiFiles.length === 0` ise DropZone altında `role="status"` yardım bandı: "Henüz dosya yüklenmedi — PDF sertifika, Excel kataloğu, datasheet veya ürün resmi sürükle bırak. AI sınıflandırır, eşleşen ürünleri bulur, onayınla katalogu günceller." + Migration Excel için Gelişmiş/Klasik Mod yönergesi.

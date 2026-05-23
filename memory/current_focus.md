@@ -7,7 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-23
 
-**Faz 3d — Klasik mod accordion + AI default akış polish (3452 test)**
+**Faz 3d Review — 3 bulgu kapatma + E2E adaptasyon (3455 test)**
+
+- **P3 typo:** "ürün kataloğları" → "ürün katalogları" (page.tsx:483).
+- **P3 scroll/focus:** Yeni `openClassicFromCta` helper — migration_excel CTA'sından accordion açılınca smooth scroll. `<details ref={classicDetailsRef}>`. Manuel summary tıklamada native scroll yeterli.
+- **P2 E2E (9 fail):** Klasik wizard input'una `data-testid="classic-import-file"` + `tests/import.spec.ts` `CLASSIC_FILE_INPUT` constant ile tüm locator'lar scope'landı. `beforeEach` accordion auto-open (`details.open = true` evaluate). `isVisible()` → `isAttached()` (input display:none).
+- Eslint config: `playwright-report/**` + `test-results/**` global ignore (185 error/2828 warning fix).
+- **+3 test** (import-page-faz3d source-regex lock).
+- 5 dosya · **3455 test yeşil** · TS clean · 0 lint · build OK
+- **Sıradaki:** Aging E2E (2 fail) scope dışı; Faz 4 veya kullanıcı kararı.
+
+## Önceki — Faz 3d (3452 test)
+
+**Klasik mod accordion + AI default akış polish**
 
 - Faz 3a tab toggle ("AI ile Aktar" / "Klasik Mod") kaldırıldı; AI artık varsayılan + her zaman görünür akış. Header tek satır AI odaklı.
 - Empty state: `aiFiles.length === 0` ise yardım metni (role="status") + Migration Excel için Gelişmiş Mod yönergesi.

@@ -46,7 +46,10 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
     });
 
     it("ClassifierQueue'ya onOpenClassicMode prop'u geçer (migration_excel CTA)", () => {
-        expect(SOURCE).toMatch(/onOpenClassicMode=\{?\(?\)?\s*=>\s*setShowClassic\(true\)/);
+        // Faz 3d Review (2026-05-23): inline arrow yerine openClassicFromCta
+        // helper'a bağlı (scroll/focus için wrapper). Aşağıdaki P3 scroll
+        // testi tam davranışı kontrol eder; burada yalnız prop bağlı mı.
+        expect(SOURCE).toMatch(/onOpenClassicMode=\{openClassicFromCta\}/);
     });
 
     it("AI empty state — aiFiles.length === 0 ise yardım metni render edilir", () => {
@@ -78,5 +81,27 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
         expect(SOURCE).not.toMatch(/mode === "ai"\s*\?\s*"Belge bırak/);
         // Yeni tek satır AI odaklı
         expect(SOURCE).toMatch(/Belge bırak, AI sınıflandırsın/);
+    });
+
+    // ── Faz 3d Review (2026-05-23) — 3 bulgu kapatma ──────────────────────────
+
+    it("P3 typo fix: 'ürün katalogları' (eski 'kataloğları' kaldırıldı)", () => {
+        expect(SOURCE).toMatch(/ürün katalogları/);
+        expect(SOURCE).not.toMatch(/ürün kataloğları/);
+    });
+
+    it("P3 scroll/focus: openClassicFromCta wrapper helper'ı tanımlandı (CTA'dan açılırsa smooth scroll)", () => {
+        // useRef classicDetailsRef + handler
+        expect(SOURCE).toMatch(/classicDetailsRef\s*=\s*useRef<HTMLDetailsElement/);
+        expect(SOURCE).toMatch(/openClassicFromCta/);
+        expect(SOURCE).toMatch(/scrollIntoView.*behavior.*smooth/);
+        // ClassifierQueue.onOpenClassicMode artık doğrudan setShowClassic değil
+        expect(SOURCE).toMatch(/onOpenClassicMode=\{openClassicFromCta\}/);
+        // <details ref={classicDetailsRef} ile bağlı
+        expect(SOURCE).toMatch(/<details[\s\S]{0,200}ref=\{classicDetailsRef\}/);
+    });
+
+    it("P2 E2E adaptasyon: klasik wizard input'una data-testid='classic-import-file' eklendi", () => {
+        expect(SOURCE).toMatch(/data-testid="classic-import-file"/);
     });
 });
