@@ -1,9 +1,18 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-23_
+_Son güncelleme: 2026-05-25_
 
-**Son tamamlanan iş:** Faz 4a Review — Preview/PDF contract lock + PATCH validation parity (2026-05-23; 3491 test)
+**Son tamamlanan iş:** Import E2E — banner testid scope (route announcer collision fix) (2026-05-25; 3493 test)
+
+- **Açık E2E kırmızı (Faz 4a dışı):** `tests/import.spec.ts:68` "geçersiz dosya türü yüklenince hata mesajı" testi `page.getByRole("alert")` ile Next.js App Router prod build route announcer'ı (otomatik enjekte ikinci `<div role="alert">`) ile çakışıyordu → Playwright strict mode 2+ element → fail. E2E sonucu: 11 passed, 1 failed. Faz 3d Review 2'de tanınmıştı (kodda yorum bile vardı) ama testid taşıma adımı atlanmıştı.
+- **Fix:** `src/app/dashboard/import/page.tsx:607` error banner div'ine `data-testid="import-error-banner"` eklendi. `role="alert"` + `aria-live="polite"` + close button `aria-label` korundu — a11y semantiği bozulmadı. `tests/import.spec.ts:68` `getByRole("alert")` → `getByTestId("import-error-banner")`; içerik regex (`toContainText(/desteklenmiyor|geçersiz|xlsx|excel/i)`) çift katmanlı güvence olarak kaldı (Aging E2E `getByTestId(...).toContainText(...)` paterniyle aynı).
+- **+2 source-regex test** (`import-page-faz3d.test.ts`): (1) `page.tsx` `parseError &&` JSX bloğunda `data-testid="import-error-banner"` stringi var, (2) `tests/import.spec.ts` `getByTestId("import-error-banner")` içerir + `getByRole("alert")` içermez (regression — eski selector geri gelirse strict-mode collision döner).
+- **Küçük not scope DIŞI (kullanıcı kendi belirtti):** Yeni teklif draft restore (refresh sonrası teslimat/ödeme alanları döner mi) — mevcut draft davranışıyla uyumlu, Faz 4A blocker değil. Draft restore UX genişletmesi ayrı tur.
+- 3 dosya (1 source + 1 e2e spec + 1 test) · **3493 test yeşil** (önceki 3491 + 2) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Faz 4b — Auto-build description helper + form integration (ürün seçince satır description otomatik dolar; şablon `{name} {body_material} {pn_class} {end_connection}, {trim_material} TRİM`).
+
+**Önceki:** Faz 4a Review — Preview/PDF contract lock + PATCH validation parity (2026-05-23; 3491 test)
 
 - **P3-A (preview/PDF data contract eksikti):** Faz 4a form save path DB'ye `delivery_method`/`payment_method`/`size_text` yazıyordu ama preview/PDF render kontratı (`QuoteData` interface'i + `teklif_v3_full` localStorage shape) hâlâ Faz 4a alanlarını taşımıyordu → form'da girilen değerler preview'da "yok" görünür.
   - **Fix:** `quote-types.ts` — `QuoteData.deliveryMethod/paymentMethod: string` + `QuoteRow.size: string` eklendi. `QuoteForm.tsx` `autoSave()` + `savePreviewData()` payload'a 3 yeni alan eklendi + `useCallback` dep array (`deliveryMethod, paymentMethod`) → stale closure önlendi. `QuoteDocument.tsx` — Notes section'ından önce conditional render Teslimat/Ödeme bloğu (bilingual etiket "Teslimat Şekli / Delivery Method", "Ödeme Şekli / Payment Method", `whiteSpace: pre-wrap`, zebra bg, border) + lines tablosuna Lead Time'dan sonra "Size / Ölçü" kolonu + empty state `colSpan={10}` (eskiden 9).

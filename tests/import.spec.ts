@@ -60,12 +60,11 @@ test("geçersiz dosya türü yüklenince hata mesajı", async ({ page }) => {
     // ile DOM varlığını doğrularız, setInputFiles hidden input'a da çalışır.
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(TXT_PATH);
-    // Faz 3d Review 2 (2026-05-23): error banner artık role="alert" + aria-live
-    // ile semantik. Eski geniş regex `desteklenmiyor|geçersiz|xlsx|excel` 7
-    // element'e çakışıyordu (DropZone metni, empty state, accordion summary,
-    // input accept attribute, vb.) → strict mode fail. getByRole("alert") +
-    // contains regex çift katmanlı güvence: banner var mı + içerik eşleşiyor mu.
-    const errorBanner = page.getByRole("alert");
+    // E2E fix (2026-05-25): banner data-testid="import-error-banner" ile scope'lanır.
+    // Generic role-based locator Next.js App Router prod build route announcer ile
+    // çakışıyordu (announcer da role=alert enjekte eder → strict mode fail).
+    // Testid scope + içerik regex çift katmanlı güvence (banner var mı + doğru mesaj mı).
+    const errorBanner = page.getByTestId("import-error-banner");
     await expect(errorBanner).toBeVisible({ timeout: 5_000 });
     await expect(errorBanner).toContainText(/desteklenmiyor|geçersiz|xlsx|excel/i);
 });

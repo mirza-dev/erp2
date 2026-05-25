@@ -598,12 +598,13 @@ export default function ImportPage() {
                 </div>
             )}
 
-            {/* Error banner — Faz 3d Review 2: role="alert" + aria-live (a11y +
-                E2E tek/kararlı locator). Yalnız parseError varken DOM'a girer
-                → duplicate announce yok. Close button aria-label (&times; sr'da
-                anlamsız). */}
+            {/* Error banner — Faz 3d Review 2 + E2E fix: role="alert" + aria-live
+                (a11y); data-testid (E2E strict-mode scope — Next.js prod build
+                route announcer da role="alert" enjekte ediyor, getByRole çakışır).
+                Close button aria-label (&times; sr'da anlamsız). */}
             {parseError && (
                 <div
+                    data-testid="import-error-banner"
                     role="alert"
                     aria-live="polite"
                     style={{

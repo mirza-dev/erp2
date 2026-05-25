@@ -119,4 +119,22 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
     it("Review 2 P3: <details> accordion'a data-testid='classic-mode-accordion' eklendi (locator stability)", () => {
         expect(SOURCE).toMatch(/<details[\s\S]{0,300}data-testid="classic-mode-accordion"/);
     });
+
+    // ── E2E fix (2026-05-25) — import-error-banner testid scope ─────────────
+
+    it("E2E fix: error banner div'inde data-testid='import-error-banner' var (route announcer çakışmasını engeller)", () => {
+        // parseError JSX bloğu içinde testid bulunmalı — getByRole('alert')
+        // Next.js prod build route announcer ile çakışıyor; testid scope çözer.
+        expect(SOURCE).toMatch(/parseError &&[\s\S]{0,400}data-testid="import-error-banner"/);
+    });
+
+    it("E2E fix: tests/import.spec.ts getByTestId kullanır, eski getByRole('alert') geri gelmez", () => {
+        const E2E_SRC = readFileSync(
+            join(process.cwd(), "tests/import.spec.ts"),
+            "utf8",
+        );
+        expect(E2E_SRC).toMatch(/getByTestId\("import-error-banner"\)/);
+        // Defense-in-depth — eski selector geri gelirse strict-mode collision döner
+        expect(E2E_SRC).not.toMatch(/getByRole\("alert"\)/);
+    });
 });

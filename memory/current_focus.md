@@ -5,15 +5,25 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-23
+## Son Tamamlanan İş — 2026-05-25
 
-**Faz 4a Review — Preview/PDF contract + PATCH validation (3491 test)**
+**Import E2E — banner testid scope (3493 test)**
+
+- **Açık E2E kırmızı (Faz 4a dışı):** `tests/import.spec.ts` "geçersiz dosya türü yüklenince hata mesajı" testi `page.getByRole("alert")` ile Next.js App Router prod build route announcer'ı (otomatik enjekte `<div role="alert">`) ile çakışıyordu → Playwright strict mode 2+ element → fail. E2E: 11 passed, 1 failed.
+- **Fix:** `page.tsx:607` error banner div'ine `data-testid="import-error-banner"` eklendi (`role="alert"` + `aria-live="polite"` korundu — a11y semantiği bozulmadı). `tests/import.spec.ts:68` `getByRole("alert")` → `getByTestId("import-error-banner")`; içerik regex assertion (`toContainText(/desteklenmiyor|geçersiz|xlsx|excel/i)`) çift katmanlı güvence olarak kalır. Aging E2E (testid + içerik regex) ile uyumlu desen.
+- **+2 source-regex test** (import-page-faz3d.test.ts): banner testid present + tests/import.spec.ts getByTestId kullanımı + eski getByRole alert regression'ı kapatan defense-in-depth.
+- **Küçük not scope DIŞI (kullanıcı kendi belirtti):** Yeni teklif draft restore (refresh sonrası teslimat/ödeme döner mi) — mevcut draft davranışıyla uyumlu, Faz 4A blocker değil. Ayrı tur.
+- 3 dosya · **3493 test yeşil** (önceki 3491 + 2) · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 4b — auto-build description helper + form integration (`{name} {body_material} {pn_class} {end_connection}, {trim_material} TRİM` şablonu).
+
+## Önceki — Faz 4a Review (3491 test)
+
+**Preview/PDF contract + PATCH validation**
 
 - **P3-A:** Form DB'ye yazıyordu ama preview/PDF kontratı (`QuoteData`) Faz 4a alanlarını taşımıyordu. Fix: `quote-types.ts` genişlet, `QuoteForm` autoSave + savePreviewData payload + useCallback dep, `QuoteDocument` Notes öncesi conditional Teslimat/Ödeme bloğu + lines `Size/Ölçü` kolonu (colSpan 9→10). Minimal — 4c full PMT brand rewrite gelecek.
 - **P3-B:** PATCH draft branch'inde POST ile parity yoktu; `validateStringLengths(body)` eklendi (recursive nested `lines[].size_text` dahil).
 - **+11 test** (contract source-regex 7 + PATCH validation 4).
 - 6 dosya · **3491 test yeşil** · TS clean · 0 lint · build OK
-- **Sıradaki:** Faz 4b — auto-build description.
 
 ## Önceki — Faz 4a (3480 test)
 
