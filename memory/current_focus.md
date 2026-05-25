@@ -7,7 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-25
 
-**Faz 4c — PDF PMT brand template rewrite (final visual, 3534 test)**
+**Faz 4c Review 1 — plan wording + label semantik + print CSS coverage (3539 test)**
+
+- **P2/P3 — Geçerlilik label semantik:** `L.validity` label "Geçerlilik Süresi / Validity Period" idi ama data shape `validUntil: ISO date` (Faz 1'den beri); değer 25.06.2026 render ediliyordu — label/değer tutarsızlığı. Fix: `L.validity = { tr: "Geçerlilik Tarihi", en: "Valid Until" }` (data semantiğine hizala). `L.validUntil` ayrı key kaldırıldı; meta row + terms band + footer hepsi tek source. Süre/duration konsepti (örn. "30 GÜN / 30 DAYS") farklı feature — Faz 4d'ye (quoteDate→validUntil gün farkı helper).
+- **P3 — Title + QuoteNo wording:** Plan §503 PMT brand legal wording. Fix: `L.title = { tr: "TEKLİF FORMU", en: "COMMERCIAL OFFER" }` (eskiden "TEKLİF | QUOTATION"); `L.quoteNo.en = "Offer No"` (eskiden "Quote No"). Tr aynı kaldı.
+- **P3 — Footer "Fabrika" scope kararı:** Plan §527'de 4 etiket (Fabrika | Merkez | Tel | Web), kod 3 (Merkez/HQ + Tel + Web). `QuoteData.sellerAddr` tek alan (PMT'de tek operasyon adresi yeterli). Plan sapması olarak dokümante; ileride Fabrika ayrı alan istenirse Faz 4d (QuoteData genişletmesi + company_settings schema + form UI). Footer yorum genişletildi.
+- **P3 — Print test:** Playwright screenshot smoke ayrı altyapı (preview UI flow + demo seed) — bu tur kapsam dışı. Yerine vitest'te **3 PRINT_CSS yapısal assertion** eklendi: (1) `@page size: A4 portrait`, (2) tbody tr break-inside avoid + page-break-inside avoid, (3) kritik section'larda `.doc-no-break` class kullanım coverage (min 5 occurrence). Manuel print preview kontrolü kullanıcı checklist'inde.
+- **+5 yeni test** (2 yeni constant assertion + 3 print CSS) + 4 expected güncellemesi (Geçerlilik Süresi → Tarihi). Toplam test sayısı 3534 → 3539.
+- **Plan-domain check:** `feedback_plan_domain_check` — plan §503/§521 wording hizalandı. `feedback_no_silent_deletes` — L.validUntil key kaldırıldı ama tüm callsite L.validity'ye yönlendirildi (silinmiş değil, konsolide); davranış değişmedi (label metni güncellendi). Footer Fabrika scope sapması açıkça dokümante.
+- 3 dosya (1 source + 2 test) · **3539 test yeşil** (önceki 3534 + 5) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Manuel print preview kontrolü (kullanıcı tarafı) → kapanış. Veya kullanıcı kararı.
+
+## Önceki — Faz 4c (3534 test)
+
+**PDF PMT brand template rewrite (final visual)**
 
 - **Plan §490-546:** QuoteDocument.tsx görsel rewrite — bilingual TR ana / EN alt italic hierarchy + Terms 3-column grid + Footer fabrika/merkez/tel/web. Faz 4 zincirinin son halkası; veri kontratı 4a Review'da kilitliydi.
 - **`BILINGUAL_LABELS` constant export** (33 label pair): tüm `{tr, en}` çiftleri tek noktada. 35+ hard-coded label string → `L.x.tr` + `L.x.en` Map lookup. Drift tek noktada yakalanır, test edilebilir.

@@ -35,7 +35,9 @@ const SYM: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
  */
 export const BILINGUAL_LABELS = {
     // Title band
-    title:        { tr: "TEKLİF",                en: "QUOTATION" },
+    // Faz 4c Review (2026-05-25): plan §503 wording — "TEKLİF FORMU / COMMERCIAL OFFER"
+    // (eskiden "TEKLİF | QUOTATION"). PMT brand/legal hizalama.
+    title:        { tr: "TEKLİF FORMU",          en: "COMMERCIAL OFFER" },
     // Meta sections
     customer:     { tr: "Müşteri",               en: "Customer" },
     quoteDetails: { tr: "Teklif Detayları",      en: "Quote Details" },
@@ -46,9 +48,9 @@ export const BILINGUAL_LABELS = {
     email:        { tr: "E-Posta",               en: "Email" },
     // Meta rows (quote)
     salesRep:     { tr: "Satış Temsilcisi",      en: "Sales Rep" },
-    quoteNo:      { tr: "Teklif No",             en: "Quote No" },
+    // Faz 4c Review: plan §503 — "Teklif No / Offer No" (eskiden "Quote No").
+    quoteNo:      { tr: "Teklif No",             en: "Offer No" },
     date:         { tr: "Tarih",                 en: "Date" },
-    validUntil:   { tr: "Geçerlilik",            en: "Valid Until" },
     currency:     { tr: "Para Birimi",           en: "Currency" },
     // Table section + columns
     lineItems:    { tr: "Kalemler",              en: "Line Items" },
@@ -70,7 +72,12 @@ export const BILINGUAL_LABELS = {
     // Terms band (3-col)
     termsTitle:   { tr: "Teslimat, Geçerlilik & Ödeme", en: "Delivery, Validity & Payment" },
     delivery:     { tr: "Teslimat Şekli",        en: "Delivery Method" },
-    validity:     { tr: "Geçerlilik Süresi",     en: "Validity Period" },
+    // Faz 4c Review (2026-05-25): label semantik fix — data shape `validUntil`
+    // ISO tarih (Faz 1'den beri); plan §521 örneği "30 GÜN / 30 DAYS" süre tarif
+    // eder ama o ayrı bir feature (gün hesabı). Burada label data tipine
+    // hizalandı: "Geçerlilik Tarihi / Valid Until". Süre/duration konsepti
+    // istenirse Faz 4d (quoteDate'ten validUntil'e gün farkı hesabı + suffix).
+    validity:     { tr: "Geçerlilik Tarihi",     en: "Valid Until" },
     payment:      { tr: "Ödeme Şekli",           en: "Payment Method" },
     // Notes
     notes:        { tr: "NOTLAR & KOŞULLAR",     en: "Notes & Terms" },
@@ -543,7 +550,9 @@ export default function QuoteDocument({ data }: Props) {
                             [L.email,      data.salesEmail],
                             [L.quoteNo,    data.quoteNo],
                             [L.date,       fmtDate(data.quoteDate)],
-                            [L.validUntil, data.validUntil ? fmtDate(data.validUntil) : ""],
+                            // Faz 4c Review: L.validUntil kaldırıldı, L.validity tek source
+                            // (Geçerlilik Tarihi / Valid Until — terms band + footer ile aynı).
+                            [L.validity,   data.validUntil ? fmtDate(data.validUntil) : ""],
                             [L.currency,   data.currency],
                         ].map(([label, value]) => {
                             const lab = label as { tr: string; en: string };
@@ -755,10 +764,19 @@ export default function QuoteDocument({ data }: Props) {
                     </div>
                 </div>
 
-                {/* ── Faz 4c: Footer band — fabrika/merkez/tel/web 2-row layout ──
-                    Plan §527 PMT brand: Fabrika | Merkez | Tel | Web horizontal list.
-                    PMT'de tek "Merkez" yeterli; sellerAddr alanı buradan render olur.
-                    İleride factory ayrı alan istenirse Faz 4d. */}
+                {/* ── Faz 4c: Footer band — Merkez/HQ + Tel + Web (2-row layout) ──
+                    Plan §527 PMT brand layout'unda 4 etiket gösterilir:
+                    Fabrika | Merkez | Tel | Web. Bu implementasyonda yalnız 3
+                    etiket var (Fabrika atlandı) çünkü mevcut data shape
+                    `QuoteData.sellerAddr` tek alan; PMT'nin çoğu teklif
+                    senaryosunda tek operasyon adresi yeterli.
+
+                    Plan sapması (kabul edilen scope kararı, Faz 4c Review 2026-05-25):
+                    Fabrika ayrı bir alan olarak gerekirse Faz 4d tetiklenmeli —
+                    QuoteData'ya `sellerFactoryAddr: string` eklenir, company_settings
+                    schema'sında karşılığı tanımlanır, form UI'da ayrı input alanı
+                    açılır. Şu anda PMT'de tek-merkez yeterli olduğu için bu Faz'a
+                    girilmedi (over-engineering riski). */}
                 <div className="doc-footer-band" style={footerBandStyle}>
                     <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "4px 14px", fontSize: "8.5px", color: C.muted, fontFamily: FONT.body }}>
                         {data.sellerAddr && (

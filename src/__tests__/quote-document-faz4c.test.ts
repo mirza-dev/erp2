@@ -97,11 +97,29 @@ describe("BILINGUAL_LABELS — Faz 4c PMT brand TR/EN pairs", () => {
 
     it("PMT brand-critical label'lar tanımlı (terms 3-col + notes + signatures)", () => {
         expect(BILINGUAL_LABELS.delivery.tr).toBe("Teslimat Şekli");
-        expect(BILINGUAL_LABELS.validity.tr).toBe("Geçerlilik Süresi");
+        // Faz 4c Review (2026-05-25): validity label semantik fix — data ISO
+        // tarih olduğu için "Geçerlilik Tarihi / Valid Until" tek source.
+        expect(BILINGUAL_LABELS.validity.tr).toBe("Geçerlilik Tarihi");
+        expect(BILINGUAL_LABELS.validity.en).toBe("Valid Until");
         expect(BILINGUAL_LABELS.payment.tr).toBe("Ödeme Şekli");
         expect(BILINGUAL_LABELS.notes.tr).toBe("NOTLAR & KOŞULLAR");
         expect(BILINGUAL_LABELS.signatures.tr).toBe("İmzalar");
         expect(BILINGUAL_LABELS.termsTitle.tr).toMatch(/Teslimat.*Geçerlilik.*Ödeme/);
+    });
+
+    it("Faz 4c Review — plan §503 wording (TEKLİF FORMU / COMMERCIAL OFFER + Teklif No / Offer No)", () => {
+        // Title — PMT brand/legal hizalama
+        expect(BILINGUAL_LABELS.title.tr).toBe("TEKLİF FORMU");
+        expect(BILINGUAL_LABELS.title.en).toBe("COMMERCIAL OFFER");
+        // QuoteNo — Offer No (eskiden Quote No)
+        expect(BILINGUAL_LABELS.quoteNo.tr).toBe("Teklif No");
+        expect(BILINGUAL_LABELS.quoteNo.en).toBe("Offer No");
+    });
+
+    it("Faz 4c Review — L.validUntil key kaldırıldı (L.validity tek source)", () => {
+        // L.validUntil legacy key sıkıştırma — meta row + terms + footer hepsi
+        // L.validity kullanır (Geçerlilik Tarihi / Valid Until). Drift önlenir.
+        expect((BILINGUAL_LABELS as Record<string, unknown>).validUntil).toBeUndefined();
     });
 });
 
@@ -150,11 +168,11 @@ describe("Terms band — 3-column grid (Delivery | Validity | Payment)", () => {
         expect(html).toMatch(/grid-template-columns:\s*1fr 1fr 1fr/);
         // 3 etiket TR
         expect(html).toContain("Teslimat Şekli");
-        expect(html).toContain("Geçerlilik Süresi");
+        expect(html).toContain("Geçerlilik Tarihi");
         expect(html).toContain("Ödeme Şekli");
         // 3 etiket EN
         expect(html).toContain("Delivery Method");
-        expect(html).toContain("Validity Period");
+        expect(html).toContain("Valid Until");
         expect(html).toContain("Payment Method");
         // 3 değer render
         expect(html).toContain("İSTANBUL PMT DEPO TESLİMİ");
@@ -183,7 +201,7 @@ describe("Terms band — 3-column grid (Delivery | Validity | Payment)", () => {
             paymentMethod: "",
         }));
         expect(html).toContain("31.12.2026");
-        expect(html).toContain("Geçerlilik Süresi");
+        expect(html).toContain("Geçerlilik Tarihi");
     });
 
     it("üçü de boş → terms section HİÇ render edilmez (conditional)", () => {
@@ -267,5 +285,38 @@ describe("Faz 4a Review regression — Size kolonu + colSpan 10 + Size data", ()
         const html = render(makeData({ rows: [makeRow({ size: "" })] }));
         // Diğer alanlar dolu — Size hücresinde — placeholder olmalı
         expect(html).toContain("—");
+    });
+});
+
+// ── 6. Faz 4c Review — Print CSS yapısal coverage ────────────────────────────
+//
+// Bu testler print-time davranışı (sayfa boyutu, page break) HTML markup'tan
+// doğrulayabildiğimiz kadarıyla kilitler. Tam visual regression için Playwright
+// screenshot smoke ayrı altyapı gerektirir (preview UI flow + demo seed); bu
+// tur kapsam dışı, manuel kontrol kullanıcı checklist'ine bırakıldı.
+
+describe("Print CSS — PMT brand A4 portrait + page-break guards (Faz 4c Review)", () => {
+    it("@page kuralı 'A4 portrait' boyutu tanımlar (PMT teklif standart format)", () => {
+        const html = render(makeData());
+        expect(html).toMatch(/@page\s*\{[\s\S]*size:\s*A4 portrait/);
+    });
+
+    it("tbody tr için break-inside avoid + page-break-inside avoid (satır bölünme önleme)", () => {
+        const html = render(makeData());
+        // Print CSS'te tbody satırları sayfa kenarında bölünmesin
+        expect(html).toMatch(/#quote-document\s+table\s+tbody\s+tr[\s\S]{0,200}break-inside:\s*avoid/);
+        expect(html).toMatch(/#quote-document\s+table\s+tbody\s+tr[\s\S]{0,200}page-break-inside:\s*avoid/);
+    });
+
+    it("kritik section'larda .doc-no-break class kullanılır (header/title/meta/terms/notes/sigs)", () => {
+        const html = render(makeData({
+            deliveryMethod: "X",
+            notes: "N",
+        }));
+        // .doc-no-break class hem header/title hem terms/notes/signatures sectionlarında olmalı
+        const noBreakCount = (html.match(/class="[^"]*doc-no-break/g) || []).length;
+        // Header band + title band + meta grid + terms (data dolu) + notes (data dolu) + signatures = 6
+        // En az 5 (terms ya da notes data'sı boşsa 4-5'e iner; burada ikisi de dolu)
+        expect(noBreakCount).toBeGreaterThanOrEqual(5);
     });
 });

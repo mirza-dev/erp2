@@ -250,8 +250,10 @@ describe("Faz 4a Review — preview/PDF contract", () => {
         expect(DOC_SOURCE).toMatch(/Delivery Method/);
         expect(DOC_SOURCE).toMatch(/Ödeme Şekli/);
         expect(DOC_SOURCE).toMatch(/Payment Method/);
-        // Geçerlilik Süresi etiketi 3. kolonda (PMT brand 3-col layout)
-        expect(DOC_SOURCE).toMatch(/Geçerlilik Süresi/);
+        // Geçerlilik Tarihi etiketi 3. kolonda (PMT brand 3-col layout).
+        // Faz 4c Review (2026-05-25): label "Geçerlilik Süresi" → "Geçerlilik Tarihi"
+        // (data ISO tarih olduğu için label semantik fix).
+        expect(DOC_SOURCE).toMatch(/Geçerlilik Tarihi/);
     });
 
     it("QuoteDocument lines tablosu row.size render eder + colSpan empty 10'a güncel", () => {
