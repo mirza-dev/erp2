@@ -7,7 +7,21 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-25
 
-**Import E2E — banner testid scope (3493 test)**
+**Faz 4b — Auto-build description helper + form integration (3512 test)**
+
+- **Plan §484-488:** Teklif satırında ürün seçilince description otomatik dolar; şablon `{name} {body_material} {pn_class} {end_connection}, {trim_material} TRİM`. Vana-merkezli — multi-type uyum için graceful degrade (non-Vana ürünlerde yalnız `name` çıkar).
+- **Pure helper** `src/lib/quote-description-builder.ts`: template constant + `buildQuoteLineDescription(product)`. Post-processing: `trim_material` boş ise trailing "TRİM" düşer; çift boşluk collapse; leading/trailing virgül-boşluk trim. Number/boolean attribute string'e çevrilir; array/object boş muamelesi (defansif).
+- **QuoteForm güncellemesi:** import + yeni `descDirtyRowIds: useState<Set<number>>` state. `handleSelectProduct` `!descDirtyRowIds.has(rowId)` guard + helper çağrısı (fallback `|| p.name`). Description input onChange ilk manuel düzenlemede `prev.has(row.id) ? prev : new Set(prev).add(row.id)` paterniyle Set'e ekler (referans eşitliği — gereksiz re-render yok). 2 hydration noktası: initialData (tüm satırlar dirty — DB desc'leri korunur) + localStorage (non-empty desc filter).
+- **+19 test:**
+  - `quote-description-builder.test.ts` (yeni, +13): template constant doc + Vana tam/eksik trim/eksik body, Conta degrade, attrs null/undefined, name boş, hepsi boş, number coercion, whitespace-only trim, array attr, name extra whitespace.
+  - `quotes-faz4b-form-integration.test.ts` (yeni, +6): helper import + dirty Set state + handleSelectProduct guard + onChange Set update + initialData hydration dirty + localStorage hydration filter.
+- **Plan-domain check:** `project_pmt_multi_type` — Vana dışı tipler graceful degrade ediyor, kullanıcı sürprizi yok. `feedback_no_silent_deletes` — eski "desc = p.name" davranışı override edilebilir hâle gelir, hiçbir state silinmedi. `feedback_plan_domain_check` — Vana seed (`057_seed_product_types.sql:30-44`) field_key'leriyle birebir uyumlu.
+- 4 dosya (1 helper + 2 yeni test + 1 form güncelleme) · **3512 test yeşil** (önceki 3493 + 19) · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 4c — PDF PMT brand template rewrite (logo, bilingual full header, lines tablosu Sıra/Ölçü/Tanım/Miktar/Birim/B.Fiyat/Toplam, footer band, signatures grid). Veri kontratı (Faz 4a Review'da kilitlendi) hazır.
+
+## Önceki — Import E2E (3493 test)
+
+**Banner testid scope (route announcer collision fix)**
 
 - **Açık E2E kırmızı (Faz 4a dışı):** `tests/import.spec.ts` "geçersiz dosya türü yüklenince hata mesajı" testi `page.getByRole("alert")` ile Next.js App Router prod build route announcer'ı (otomatik enjekte `<div role="alert">`) ile çakışıyordu → Playwright strict mode 2+ element → fail. E2E: 11 passed, 1 failed.
 - **Fix:** `page.tsx:607` error banner div'ine `data-testid="import-error-banner"` eklendi (`role="alert"` + `aria-live="polite"` korundu — a11y semantiği bozulmadı). `tests/import.spec.ts:68` `getByRole("alert")` → `getByTestId("import-error-banner")`; içerik regex assertion (`toContainText(/desteklenmiyor|geçersiz|xlsx|excel/i)`) çift katmanlı güvence olarak kalır. Aging E2E (testid + içerik regex) ile uyumlu desen.

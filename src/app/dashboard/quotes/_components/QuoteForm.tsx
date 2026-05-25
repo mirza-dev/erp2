@@ -7,6 +7,7 @@ import { useData } from "@/lib/data-context";
 import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import type { QuoteStatus } from "@/lib/database.types";
+import { buildQuoteLineDescription } from "@/lib/quote-description-builder";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,10 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     // ── State ────────────────────────────────────────────────────────────────
     const [rows, setRows] = useState<QuoteRow[]>([]);
     const [nextId, setNextId] = useState(4);
+    // Faz 4b (2026-05-25): per-row description manual-edit tracking. Set'te
+    // bir rowId varsa handleSelectProduct desc auto-fill'i atlar (kullanıcı
+    // override etti, ürün değişimi override'ı silmesin).
+    const [descDirtyRowIds, setDescDirtyRowIds] = useState<Set<number>>(new Set());
     const [currency, setCurrency] = useState<Currency>("TRY");
     const [vatRate, setVatRate] = useState(20);
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
@@ -193,6 +198,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 }));
                 setRows(mapped);
                 setNextId(initialData.lines.length + 1);
+                // Faz 4b: DB'den yüklenen description'ları user-edited say;
+                // ürün değiştirilse bile auto-build override etmesin.
+                setDescDirtyRowIds(new Set(mapped.map(r => r.id)));
             } else {
                 setRows([emptyRow(1), emptyRow(2), emptyRow(3)]);
             }
@@ -204,8 +212,13 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 const saved = JSON.parse(localStorage.getItem("teklif_v3") || "{}") as any;
                 if (saved.currency) setCurrency(saved.currency as Currency);
                 if (saved.rows?.length) {
-                    setRows(saved.rows.map((r: QuoteRow, i: number) => ({ ...r, id: i + 1 })));
+                    const restored: QuoteRow[] = saved.rows.map((r: QuoteRow, i: number) => ({ ...r, id: i + 1 }));
+                    setRows(restored);
                     setNextId(saved.rows.length + 1);
+                    // Faz 4b: localStorage'dan dönen non-empty desc'leri user-edited say.
+                    setDescDirtyRowIds(new Set(
+                        restored.filter(r => r.desc.trim().length > 0).map(r => r.id)
+                    ));
                 } else {
                     setRows([emptyRow(1), emptyRow(2), emptyRow(3)]);
                 }
@@ -311,7 +324,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
 
     const handleSelectProduct = (rowId: number, p: Product) => {
         updateRow(rowId, "code", p.sku);
-        updateRow(rowId, "desc", p.name);
+        // Faz 4b: auto-build description PMT şablonuyla (Vana-merkezli, non-Vana
+        // ürünlerde graceful degrade). Override edilmiş satırı silmemek için
+        // descDirtyRowIds guard'ı. Helper boş dönerse defansif olarak p.name.
+        if (!descDirtyRowIds.has(rowId)) {
+            updateRow(rowId, "desc", buildQuoteLineDescription(p) || p.name);
+        }
         updateRow(rowId, "price", p.currency === currency ? String(p.price) : "");
         if (p.weightKg) {
             updateRow(rowId, "kg", String(p.weightKg));
@@ -924,7 +942,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                                 {/* Faz 4a: Size (PMT brand "Ölçü") */}
                                                 <td style={tdBase}><input className="q-cell" style={cellInput} placeholder={`3/4'' / DN50`} value={row.size} onChange={e => updateRow(row.id, "size", e.target.value)} aria-label={`Satır ${idx + 1} ölçü`} /></td>
                                                 {/* Desc */}
-                                                <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="Ürün açıklaması / Description" value={row.desc} onChange={e => updateRow(row.id, "desc", e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="Ürün açıklaması / Description" value={row.desc} onChange={e => {
+                                                    updateRow(row.id, "desc", e.target.value);
+                                                    // Faz 4b: ilk manuel düzenleme dirty Set'e ekler;
+                                                    // sonraki product select desc'i override etmez.
+                                                    setDescDirtyRowIds(prev => prev.has(row.id) ? prev : new Set(prev).add(row.id));
+                                                }} /></td>
                                                 {/* Qty */}
                                                 <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "center" }} type="number" min="0" step="any" placeholder="0" value={row.qty} onChange={e => updateRow(row.id, "qty", e.target.value)} /></td>
                                                 {/* Unit Price */}
