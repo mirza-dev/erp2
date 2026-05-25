@@ -483,9 +483,13 @@ ALTER TABLE quote_lines ADD COLUMN size_text text;         -- "3/4''", "DN50", "
 
 ### Auto-Build Description
 - Ürün seçilince satır description otomatik oluşturulur
-- Şablon: `{name} {body_material} {pn_class} {end_connection}, {trim_material} TRİM`
+- Şablon: `{name} {body_material}, {pn_class} {end_connection}, {trim_material} TRİM`
+  (Faz 4b Review P3 — 2026-05-25: şablon örnek satıra birebir hizalandı;
+  PMT teklif diline uygun noktalama için 3 segment virgül-boşluk ile ayrılır.)
 - Örnek: `GATE VALVE A105 GÖVDE, CLASS 600 SW, SS TRİM`
-- Kullanıcı override edebilir (manuel düzenleme)
+- Kullanıcı override edebilir (manuel düzenleme); per-row dirty Set
+  localStorage'da `descDirty: boolean[]` index-aligned persist edilir
+  (refresh sonrası auto-generated vs user-edited ayrımı korunur).
 
 ### PDF Yeniden Tasarım
 

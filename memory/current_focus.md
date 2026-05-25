@@ -7,7 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-25
 
-**Faz 4b — Auto-build description helper + form integration (3512 test)**
+**Faz 4b Review 1 — 3 bulgu kapatma (P2-A, P2-B, P3) (3516 test)**
+
+- **P2-A (clearAll dirty Set):** `QuoteForm.clearAll()` rows + nextId sıfırlıyordu ama `descDirtyRowIds` Set'i sıfırlamıyordu. Kullanıcı row 1 desc'ini düzenleyip Temizle → yeni boş row 1'de ürün seçince eski dirty ID 1 hâlâ Set'te → auto-build atlanıyordu. Fix: `setDescDirtyRowIds(new Set())` çağrısı clearAll'a eklendi.
+- **P2-B (refresh sonrası auto-gen sanılma — ticari risk):** localStorage restore'da non-empty desc'lerin hepsi dirty kabul ediliyordu — kullanıcı ürün A seçip auto-desc geldi → refresh → ürün B seçince A'nın desc'i kalıyordu (yanlış ürün açıklaması). Fix: autoSave `teklif_v3`'e `descDirty: boolean[]` index-aligned persist eder; restore `Array.isArray(saved.descDirty)` ise ondan rebuild eder, yoksa eski payload için backward-compat fallback (non-empty filter). useCallback dep array'ine `descDirtyRowIds` eklendi (stale closure önlenir).
+- **P3 (plan örneği vs şablon noktalama):** Plan §486 şablonu `body_material` sonrası virgülsüzdü, §487 örnek `A105 GÖVDE, CLASS 600...` ile virgül istiyordu. PMT teklif diline uygun olarak **örnek authoritative kabul edildi**. Helper literal template substitution'dan **parts-join paterniyle refactor edildi**: `part1 = name+body`, `part2 = pn+end`, `part3 = trim+TRİM` → `parts.filter(Boolean).join(", ")`. Constant `QUOTE_DESCRIPTION_TEMPLATE` doc-only olarak `{name} {body_material}, {pn_class} {end_connection}, {trim_material} TRİM` ile güncellendi. Plan §486 hizalandı.
+- **+4 yeni regression testi** (`quotes-faz4b-form-integration.test.ts`): clearAll dirty reset, autoSave descDirty boolean[] write, restore `Array.isArray(saved.descDirty)` yeni payload, useCallback dep'inde `descDirtyRowIds`. Mevcut 6 source-regex korundu (1 update — backward-compat fallback paterni); helper'ın 13 davranış testinin expected output'ları yeni parts-join sonuçlarına güncellendi (örnek § 487 birebir).
+- **Plan-domain check:** `feedback_no_silent_deletes` — eski parts'tan hiçbir field silinmedi, sadece noktalama düzeldi. `feedback_plan_domain_check` — plan §486 şablonu örneğe (§487) hizalandı, helper ile doc tek source.
+- 5 dosya (1 helper refactor + 1 form fix + 1 test güncelleme + 1 test eklemesi + 1 plan doc) · **3516 test yeşil** (önceki 3512 + 4 yeni integration; helper test sayısı sabit) · TS clean · 0 lint · build OK
+- **Sıradaki:** Faz 4c — PDF PMT brand template rewrite.
+
+## Önceki — Faz 4b (3512 test)
+
+**Auto-build description helper + form integration**
 
 - **Plan §484-488:** Teklif satırında ürün seçilince description otomatik dolar; şablon `{name} {body_material} {pn_class} {end_connection}, {trim_material} TRİM`. Vana-merkezli — multi-type uyum için graceful degrade (non-Vana ürünlerde yalnız `name` çıkar).
 - **Pure helper** `src/lib/quote-description-builder.ts`: template constant + `buildQuoteLineDescription(product)`. Post-processing: `trim_material` boş ise trailing "TRİM" düşer; çift boşluk collapse; leading/trailing virgül-boşluk trim. Number/boolean attribute string'e çevrilir; array/object boş muamelesi (defansif).

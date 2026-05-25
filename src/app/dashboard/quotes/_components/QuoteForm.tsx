@@ -215,10 +215,20 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                     const restored: QuoteRow[] = saved.rows.map((r: QuoteRow, i: number) => ({ ...r, id: i + 1 }));
                     setRows(restored);
                     setNextId(saved.rows.length + 1);
-                    // Faz 4b: localStorage'dan dönen non-empty desc'leri user-edited say.
-                    setDescDirtyRowIds(new Set(
-                        restored.filter(r => r.desc.trim().length > 0).map(r => r.id)
-                    ));
+                    // Faz 4b Review P2-B: saved.descDirty index-aligned boolean[]
+                    // varsa kullan (gerçek user-edit ayrımı). Yoksa eski payload
+                    // — geriye uyumlu fallback: non-empty desc → dirty.
+                    const dirtyIds = new Set<number>();
+                    if (Array.isArray(saved.descDirty)) {
+                        restored.forEach((r, i) => {
+                            if (saved.descDirty[i]) dirtyIds.add(r.id);
+                        });
+                    } else {
+                        restored.forEach(r => {
+                            if (r.desc.trim().length > 0) dirtyIds.add(r.id);
+                        });
+                    }
+                    setDescDirtyRowIds(dirtyIds);
                 } else {
                     setRows([emptyRow(1), emptyRow(2), emptyRow(3)]);
                 }
@@ -366,7 +376,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     const autoSave = useCallback(() => {
         if (readOnly) return;
         try {
-            localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows }));
+            // Faz 4b Review P2-B: descDirty boolean[] index-aligned persist.
+            // Refresh sonrası "auto-generated vs user-edited" ayrımı korunur;
+            // yoksa restore'da tüm non-empty desc'ler dirty kabul edilir ve
+            // auto-build override edilemez hale gelir (yanlış ürün açıklaması).
+            const descDirty = rows.map(r => descDirtyRowIds.has(r.id));
+            localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows, descDirty }));
             const fullData: QuoteData = {
                 sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
                 custCompany, custContact, custPhone, custEmail,
@@ -399,7 +414,8 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     }, [readOnly, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
         custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand,
-        notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
+        notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title,
+        descDirtyRowIds]);
 
     // Saves preview data regardless of readOnly — used by preview button.
     // Does NOT write teklif_v3 (draft key) to avoid polluting the new-quote draft restore.
@@ -454,6 +470,10 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         if (!confirm("Tüm satırlar silinecek. Devam edilsin mi?")) return;
         setRows([emptyRow(1), emptyRow(2), emptyRow(3)]);
         setNextId(4);
+        // Faz 4b Review P2-A: dirty Set'i de sıfırla — eski rowId'ler (1,2,3)
+        // Set'te kalırsa yeni boş satırlara ürün seçildiğinde auto-build
+        // atlanır (kullanıcı temizledi → "her şey baştan" beklentisi).
+        setDescDirtyRowIds(new Set());
     }
 
     // ── Other handlers ───────────────────────────────────────────────────────

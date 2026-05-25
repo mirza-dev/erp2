@@ -48,10 +48,44 @@ describe("QuoteForm Faz 4b integration — auto-build description + dirty tracki
         );
     });
 
-    it("localStorage hydration non-empty desc'li satırları dirty Set'e koyar", () => {
-        // restored.filter(r => r.desc.trim().length > 0).map(r => r.id)
+    it("localStorage hydration backward-compat fallback: non-empty desc → dirty (saved.descDirty yoksa)", () => {
+        // Eski payload yolu — saved.descDirty undefined → r.desc.trim().length > 0 filter
         expect(SOURCE).toMatch(
-            /restored\.filter\(r\s*=>\s*r\.desc\.trim\(\)\.length\s*>\s*0\)\.map\(r\s*=>\s*r\.id\)/,
+            /restored\.forEach\(r\s*=>\s*\{\s*if\s*\(r\.desc\.trim\(\)\.length\s*>\s*0\)\s*dirtyIds\.add\(r\.id\)/,
+        );
+    });
+
+    // ── Review 1 (2026-05-25) — 3 bulgu kapatma ─────────────────────────────
+
+    it("Review P2-A: clearAll dirty Set'i de sıfırlar (yeni satırlarda auto-build çalışır)", () => {
+        // clearAll fonksiyonu içinde setDescDirtyRowIds(new Set()) çağrısı
+        expect(SOURCE).toMatch(
+            /function\s+clearAll\(\)[\s\S]{0,500}setDescDirtyRowIds\(new Set\(\)\)/,
+        );
+    });
+
+    it("Review P2-B: autoSave teklif_v3'e descDirty index-aligned boolean[] yazar", () => {
+        // const descDirty = rows.map(r => descDirtyRowIds.has(r.id))
+        expect(SOURCE).toMatch(
+            /const descDirty\s*=\s*rows\.map\(r\s*=>\s*descDirtyRowIds\.has\(r\.id\)\)/,
+        );
+        // setItem JSON.stringify({ currency, rows, descDirty })
+        expect(SOURCE).toMatch(
+            /setItem\("teklif_v3",\s*JSON\.stringify\(\{\s*currency,\s*rows,\s*descDirty\s*\}\)\)/,
+        );
+    });
+
+    it("Review P2-B: restore Array.isArray(saved.descDirty) ile yeni payload'ı tanır", () => {
+        // if (Array.isArray(saved.descDirty)) → restored.forEach((r, i) => if (saved.descDirty[i]) dirtyIds.add(r.id))
+        expect(SOURCE).toMatch(
+            /if\s*\(\s*Array\.isArray\(saved\.descDirty\)\s*\)[\s\S]{0,300}saved\.descDirty\[i\]/,
+        );
+    });
+
+    it("Review P2-B: autoSave useCallback dep array'inde descDirtyRowIds var (stale closure önlenir)", () => {
+        // autoSave deps son satırına eklenmiş (sig3Title sonrasında)
+        expect(SOURCE).toMatch(
+            /sig3Title\s*,\s*\n?\s*descDirtyRowIds\]\)/,
         );
     });
 });
