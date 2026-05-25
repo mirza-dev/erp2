@@ -1,5 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import {
+    rateLimitCheck,
+    selectPolicy,
+    extractClientIp,
+    detectSupabaseAuthCookie,
+} from "@/lib/rate-limit";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
@@ -21,25 +27,63 @@ const CRON_PATHS = [
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
-    // Kesinlikle public olan path'ler
+    // ── 1. /api/health — ABSOLUTE bypass (monitoring, k6 smoke) ─────────────
+    // Coolify/UptimeRobot health check 30-60sn/IP frekans — rate limit'e takılırsa
+    // izleme kırılır. Diğer eski ALWAYS_PUBLIC endpoint'leri (auth/demo, ai/*) artık
+    // rate limit'e tabi (M-3) ama auth gate'i aşağıda atlamaya devam eder.
+    if (pathname === "/api/health") {
+        return NextResponse.next();
+    }
+
+    // ── 2. CRON_SECRET Bearer — server-to-server bypass ─────────────────────
+    // Vercel/GH Actions cron meşru yüksek frekans (4-8x/gün × server-side). Rate
+    // limit'i de atlatır. SECRET yoksa aşağıda 401 dönülecek (M-1 invariant).
+    const cronSecret = process.env.CRON_SECRET;
+    const authHeader = request.headers.get("authorization");
+    const hasCronSecret = Boolean(cronSecret) && authHeader === `Bearer ${cronSecret}`;
+    if (hasCronSecret && CRON_PATHS.some(p => pathname === p)) {
+        return NextResponse.next();
+    }
+
+    // ── 3. Rate limit (M-3) — auth-cookie hibrit policy, IP-based key ───────
+    // getUser() maliyetine girmeden auth proxy (cookie varlığı). Saldırgan fake
+    // cookie ile yüksek limit alsa bile aşağıda auth check 401 döner → resource
+    // consumption hâlâ sınırlı.
+    const ip = extractClientIp(request);
+    const hasAuthCookie = detectSupabaseAuthCookie(request);
+    const policy = selectPolicy(pathname, request.method, hasAuthCookie);
+    const rate = await rateLimitCheck(`ip:${ip}`, policy);
+
+    if (!rate.ok) {
+        return new NextResponse(
+            JSON.stringify({ error: "Çok fazla istek. Lütfen biraz bekleyin.", retryAfter: rate.retryAfter }),
+            {
+                status: 429,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Retry-After": String(rate.retryAfter),
+                    "X-RateLimit-Limit": String(rate.limit),
+                    "X-RateLimit-Remaining": "0",
+                    "X-RateLimit-Reset": String(Math.ceil(Date.now() / 1000) + rate.retryAfter),
+                },
+            }
+        );
+    }
+
+    // ── 4. ALWAYS_PUBLIC bypass (rate limit'ten geçti) ──────────────────────
     if (ALWAYS_PUBLIC.some(p => pathname === p || pathname.startsWith(p + "/"))) {
         return NextResponse.next();
     }
 
-    // Cron path'ler — SADECE CRON_SECRET Bearer token kabul edilir, session bypass YOK (M-1)
+    // ── 5. CRON path ama CRON_SECRET yoksa 401 (mevcut M-1 invariant) ──────
     if (CRON_PATHS.some(p => pathname === p)) {
-        const secret = process.env.CRON_SECRET;
-        const authHeader = request.headers.get("authorization");
-        if (secret && authHeader === `Bearer ${secret}`) {
-            return NextResponse.next();
-        }
         return NextResponse.json(
             { error: "CRON_SECRET gerekli." },
             { status: 401 }
         );
     }
 
-    // Supabase session kontrolü
+    // ── 6. Supabase session kontrolü ────────────────────────────────────────
     let supabaseResponse = NextResponse.next({ request });
 
     // C-1: Turbopack Edge Runtime'da createServerClient başarısız olabilir.
@@ -135,6 +179,9 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url);
     }
 
+    // Başarı response'ına observability header'ları ekle (rate limit info).
+    supabaseResponse.headers.set("X-RateLimit-Limit", String(rate.limit));
+    supabaseResponse.headers.set("X-RateLimit-Remaining", String(rate.remaining));
     return supabaseResponse;
 }
 

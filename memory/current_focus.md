@@ -7,7 +7,16 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-25
 
-**Faz 4c Review 1 — plan wording + label semantik + print CSS coverage (3539 test)**
+**M-3 Rate Limiting — Coolify self-hosted Redis (3565 test)**
+
+- **Audit M-3 ✅:** Güvenlik audit'inde ertelenmiş bulgu. Coolify cutover sonrası Vercel platform katmanı yok → öncelik yükseldi. Saldırı yüzeyleri: login brute-force, demo abuse, AI cost amplification, Paraşüt sync, scrape.
+- **Yaklaşım B:** Coolify Resource olarak self-hosted Redis. Backend: `ioredis` + `rate-limiter-flexible` (sliding window, atomic Lua). Sıfır ek hosting, same-VPS low latency.
+- **Helper** (`src/lib/rate-limit.ts`): Singleton Redis lazy init (REDIS_URL yoksa fail-open). POLICIES: LOGIN 5/15dk+15dk block, DEMO 5/15dk, AI 10/dk, PARASUT_SYNC 30/dk, API_AUTH 300/dk, API_ANON 30/dk. `selectPolicy` pathname+method+auth-cookie hibrit. `extractClientIp` Coolify Traefik XFF. `detectSupabaseAuthCookie` getUser maliyetine girmeden auth proxy (sb-*-auth-token regex).
+- **Middleware sıralaması:** (1) /api/health absolute bypass, (2) CRON_SECRET bypass, (3) rate-limit (IP-anchor key, hibrit policy), (4) ALWAYS_PUBLIC bypass — /api/auth/demo ve /api/ai/purchase-copilot artık koruma altında, (5) CRON 401 (M-1), (6) mevcut Supabase auth gate. 429 → JSON + Retry-After + X-RateLimit-* header'lar.
+- **+26 test:** helper 11 (mock pattern: vi.hoisted + class-based MockRateLimiterRedis/MockRedis constructor invariant) + pure helper 6 + middleware 9. Mevcut middleware testleri etkilenmedi (fail-open path varsayılan ok=true).
+- **Plan-domain check:** Audit M-3 kapandı, son kalan `purchase_commitments`+`column_mappings` explicit RLS policy. `feedback_no_silent_deletes` korundu.
+- 6 dosya · **3565 test yeşil** (önceki 3539 + 26) · TS clean · 0 lint · build OK
+- **Sıradaki:** Coolify deploy (kullanıcı tarafı — Redis Resource ekle + REDIS_URL doğrula + redeploy + smoke 6 hızlı POST /login → 6. 429).
 
 - **P2/P3 — Geçerlilik label semantik:** `L.validity` label "Geçerlilik Süresi / Validity Period" idi ama data shape `validUntil: ISO date` (Faz 1'den beri); değer 25.06.2026 render ediliyordu — label/değer tutarsızlığı. Fix: `L.validity = { tr: "Geçerlilik Tarihi", en: "Valid Until" }` (data semantiğine hizala). `L.validUntil` ayrı key kaldırıldı; meta row + terms band + footer hepsi tek source. Süre/duration konsepti (örn. "30 GÜN / 30 DAYS") farklı feature — Faz 4d'ye (quoteDate→validUntil gün farkı helper).
 - **P3 — Title + QuoteNo wording:** Plan §503 PMT brand legal wording. Fix: `L.title = { tr: "TEKLİF FORMU", en: "COMMERCIAL OFFER" }` (eskiden "TEKLİF | QUOTATION"); `L.quoteNo.en = "Offer No"` (eskiden "Quote No"). Tr aynı kaldı.

@@ -86,5 +86,17 @@ Tüm rotalar için (`/:path*`):
 ## Audit Durumu (2026-04-23) — TÜM BULGULAR KAPALI ✅
 
 Son kalan ertelenen:
-- M-3: Rate limiting — Vercel KV / upstash, altyapı kararı gerekiyor
+- ~~M-3: Rate limiting~~ — ✅ TAMAMLANDI (2026-05-25, commit pending). Yaklaşım B uygulandı:
+  Coolify self-hosted Redis (Resource olarak panel'den eklenir, REDIS_URL auto-inject).
+  Backend: `ioredis` + `rate-limiter-flexible` (sliding window, atomic Lua scripts).
+  Helper `src/lib/rate-limit.ts`: singleton Redis + POLICIES (LOGIN 5/15dk, DEMO 5/15dk,
+  AI 10/dk, PARASUT_SYNC 30/dk, API_AUTH 300/dk, API_ANON 30/dk) + `selectPolicy` +
+  `extractClientIp` + `detectSupabaseAuthCookie` (getUser maliyetine girmeden auth proxy).
+  Middleware sıralaması: (1) /api/health absolute bypass, (2) CRON_SECRET bypass,
+  (3) rate-limit (auth-cookie hibrit, IP-anchor key), (4) ALWAYS_PUBLIC bypass,
+  (5) CRON 401, (6) Supabase auth gate. Fail-open: REDIS_URL boş veya bağlantı hatası
+  → tüm istekler geçer + console.error (site downtime'a sebep olmaz).
+  +26 test (helper 11 + pure 6 + middleware 9). Deploy adımları: Coolify panel → Redis
+  Resource ekle → REDIS_URL doğrula → redeploy. Smoke: 6 hızlı POST /login → 6. 429.
+- `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)

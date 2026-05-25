@@ -3,7 +3,43 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-25_
 
-**Son tamamlanan iş:** Faz 4c Review 1 — plan wording + label semantik + print CSS coverage (2026-05-25; 3539 test)
+**Son tamamlanan iş:** M-3 Rate Limiting — Coolify self-hosted Redis (2026-05-25; 3565 test)
+
+- **Audit bulgu** (`memory/project_security.md:89`): M-3 Rate limiting Vercel'de built-in DDoS koruması nedeniyle ertelenmişti. 2026-05-13'te Coolify cutover sonrası Vercel platform katmanı yok → öncelik yükseldi. Saldırı yüzeyleri: login brute-force, demo abuse, AI cost amplification (Anthropic faturası), Paraşüt manuel sync, /api/products scrape.
+- **Karar (Yaklaşım B):** Coolify Resource olarak self-hosted Redis kur (sıfır ek hosting maliyeti, same-VPS low latency, vendor-lock yok, code portable). Backend: `ioredis` (production Node.js Redis client) + `rate-limiter-flexible` (sliding window, atomic Lua scripts, mature ~1M weekly downloads).
+- **Helper** (`src/lib/rate-limit.ts`): Singleton Redis lazy init (REDIS_URL env yoksa null → fail-open). `POLICIES` map:
+  - **LOGIN**: 5/15dk + 15dk block — brute-force koruması
+  - **DEMO**: 5/15dk — anon demo cookie abuse
+  - **AI**: 10/dk — Anthropic cost amplification (kullanıcı "↻ Yenile" spam'i)
+  - **PARASUT_SYNC**: 30/dk — manuel sync POST'lar
+  - **API_AUTH**: 300/dk — authenticated kullanıcı normal API
+  - **API_ANON**: 30/dk — anon read-only
+- **`selectPolicy`** pathname + method + auth-cookie hibrit: en spesifik route önce (login/demo/ai/parasut), sonra genel /api/** auth/anon ayrımı. **`extractClientIp`**: Coolify Traefik X-Forwarded-For zinciri (virgül split, ilki client) + x-real-ip fallback + `0.0.0.0` default. **`detectSupabaseAuthCookie`**: `sb-*-auth-token(\.\d+)?` regex (chunked cookie suffix dahil) — getUser maliyetine girmeden hızlı auth proxy. Saldırgan fake cookie atarsa yüksek limit alır ama backend auth check 401 döner → resource consumption hâlâ sınırlı.
+- **`rateLimitCheck`**: `consume(key, 1)` → success `{ok:true, remaining, fromRedis:true}`; `RateLimiterRes` throw → `{ok:false, retryAfter:Math.ceil(msBeforeNext/1000), fromRedis:true}`; non-RateLimiterRes throw → fail-open + console.error (Redis disconnect site'ı düşürmesin).
+- **Middleware sıralaması** (`middleware.ts`):
+  1. `/api/health` → ABSOLUTE bypass (monitoring/UptimeRobot kırılmasın)
+  2. CRON_SECRET Bearer + CRON_PATHS → bypass (server-to-server meşru yüksek frekans)
+  3. **Rate limit** — auth-cookie hibrit policy, `ip:${ip}` key. 429 → JSON `{error, retryAfter}` + `Retry-After` + `X-RateLimit-Limit/Remaining/Reset` header'lar
+  4. ALWAYS_PUBLIC bypass (auth atlatır ama rate limit'ten geçti) — `/api/auth/demo` ve `/api/ai/purchase-copilot` artık rate limit'e tabi (eskiden full bypass'taydı, M-3 ile koruma altına alındı)
+  5. CRON path ama SECRET yok → 401 (M-1 invariant korunur)
+  6. Mevcut Supabase getUser + demo/auth gate akışı (değişmedi)
+- Başarı response'larına `X-RateLimit-Limit` + `X-RateLimit-Remaining` header'lar eklenir (client observability).
+- **+26 yeni test:**
+  - `rate-limit-helper.test.ts` (+11): `selectPolicy` 5 senaryo + `rateLimitCheck` 5 (consume success, RateLimiterRes throw, multi-key isolation, multi-policy ctor distinct keyPrefix, non-RateLimiterRes fail-open + console.error) + fail-open invariant source-check. Mock paterni: `vi.hoisted` + class-based `MockRateLimiterRedis` (constructor invariant) + `MockRedis` (no-op on() listener).
+  - `rate-limit-helpers.test.ts` (+6): `extractClientIp` 3 (xff zinciri + x-real-ip fallback + default 0.0.0.0); `detectSupabaseAuthCookie` 3 (standart `sb-abc-auth-token` + chunked `.0/.1` + diğer cookie'ler false).
+  - `middleware-rate-limit.test.ts` (+9): `/api/health` absolute bypass, CRON_SECRET bypass, CRON_PATH 401 (M-1 korunur), `/api/auth/demo` artık rate-limit'te (DEMO policy), `/api/ai/purchase-copilot` AI policy, auth-cookie var → API_AUTH (300/dk + observability header), auth-cookie yok → API_ANON, 429 + Retry-After + auth gate kısa devre, fail-open Redis down → request geçer.
+- **Mevcut testler etkilenmedi:** `middleware-auth.test.ts`, `demo-mode-middleware.test.ts`, vb. rate-limit'e header/cookie eklemiyor → mevcut assertion'lar geçer (rate limit fail-open path'inde varsayılan ok=true).
+- **Deploy adımları (kullanıcı tarafı):**
+  1. Coolify panel → New Resource → Database → Redis 7.x → resource adı `kokpit-redis` (auto password)
+  2. Project Environment → `REDIS_URL` auto-inject veya manuel `redis://default:PASSWORD@kokpit-redis:6379`
+  3. Redeploy → middleware Redis'e bağlanır
+  4. Smoke: `curl -X POST https://erp.getmedspace.com/login -d 'wrong' --repeat 6` → 6. denemede 429 + `Retry-After: 900`; `curl /api/health` → 200 (bypass)
+- **Lokal dev:** `docker run -d -p 6379:6379 redis:7-alpine` + `.env.local`'a `REDIS_URL="redis://localhost:6379"`. ENV boş ise rate limiter no-op (fail-open).
+- **Plan-domain check:** Audit M-3 ✅ kapanır; `purchase_commitments` + `column_mappings` explicit RLS policy (son audit maddesi) hariç güvenlik audit tamamen kapalı. `feedback_no_silent_deletes` — mevcut middleware behavior'ı silinmedi, yeni guard layer eklendi.
+- 6 dosya değişen + 3 yeni test (1 helper + 1 middleware + .env.example + 2 dependency + memory + CLAUDE.md) · **3565 test yeşil** (önceki 3539 + 26) · TS clean · 0 lint warning · build OK
+- **Sıradaki:** Coolify deploy + smoke test (kullanıcı tarafı). Sonra: kullanıcı kararı.
+
+**Önceki:** Faz 4c Review 1 — plan wording + label semantik + print CSS coverage (2026-05-25; 3539 test)
 
 - **P2/P3 (Geçerlilik label semantik tutarsızlığı):** `L.validity` label "Geçerlilik Süresi / Validity Period" idi ama data shape `validUntil` Faz 1'den beri ISO tarih (`2026-06-25`); değer `fmtDate(validUntil)` ile `25.06.2026` render ediliyordu — label "Süre" diyorken değer tarih. **Fix:** `L.validity = { tr: "Geçerlilik Tarihi", en: "Valid Until" }` (data semantiğine hizala). Plan §521 örneği "30 GÜN / 30 DAYS" süre tarif eder ama o ayrı feature — `quoteDate`→`validUntil` gün farkı helper Faz 4d'ye. Ayrıca `L.validUntil` ayrı key kaldırıldı (meta row da artık `L.validity` kullanır); konsolide tek source-of-truth, drift önlenir.
 - **P3 (Title + QuoteNo wording planla uyumsuz):** Plan §503 PMT brand legal wording: "TEKLİF FORMU / COMMERCIAL OFFER", "Teklif No / Offer No". Kod "TEKLİF | QUOTATION" + "Quote No" kullanıyordu. **Fix:** `L.title = { tr: "TEKLİF FORMU", en: "COMMERCIAL OFFER" }`; `L.quoteNo.en = "Offer No"` (TR aynı). Title band ve meta row otomatik yansır.
@@ -1051,7 +1087,7 @@ _Son güncelleme: 2026-05-25_
 - SMTP altyapısı production deploy: Migration 047 + Resend hesabı/domain + Vercel env + cron config (kod hazır 2026-05-06'da yapıldı; deploy eksik)
 
 **Kalan / ertelendi:**
-- M-3: Rate limiting (Upstash Redis — altyapı kararı bekliyor)
+- ~~M-3: Rate limiting~~ ✅ TAMAMLANDI (2026-05-25). Coolify self-hosted Redis + `ioredis` + `rate-limiter-flexible`. Detay: `memory/project_security.md` + son tamamlanan iş bloğu yukarıda.
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY eklendi ✅ (explicit policy yok; proje genelinde aynı pattern — tüm erişim service_role'den)
 - Sesli giriş V3: fireNotes → scrap_qty UI, Ctrl+M klavye kısayolu
 
