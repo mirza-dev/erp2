@@ -26,6 +26,66 @@ const C = {
 
 const SYM: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
 
+/**
+ * Faz 4c (2026-05-25) — PMT brand bilingual label pairs.
+ *
+ * PMT teklif diline uygun: TR ana, EN alt italic. Tüm component bu Map'i
+ * kullanır → drift tek noktada yakalanır, source-of-truth.
+ * Test edilebilirlik: `import { BILINGUAL_LABELS } from ...`.
+ */
+export const BILINGUAL_LABELS = {
+    // Title band
+    title:        { tr: "TEKLİF",                en: "QUOTATION" },
+    // Meta sections
+    customer:     { tr: "Müşteri",               en: "Customer" },
+    quoteDetails: { tr: "Teklif Detayları",      en: "Quote Details" },
+    // Meta rows (customer)
+    company:      { tr: "Firma",                 en: "Company" },
+    contact:      { tr: "İlgili",                en: "Contact" },
+    phone:        { tr: "Telefon",               en: "Phone" },
+    email:        { tr: "E-Posta",               en: "Email" },
+    // Meta rows (quote)
+    salesRep:     { tr: "Satış Temsilcisi",      en: "Sales Rep" },
+    quoteNo:      { tr: "Teklif No",             en: "Quote No" },
+    date:         { tr: "Tarih",                 en: "Date" },
+    validUntil:   { tr: "Geçerlilik",            en: "Valid Until" },
+    currency:     { tr: "Para Birimi",           en: "Currency" },
+    // Table section + columns
+    lineItems:    { tr: "Kalemler",              en: "Line Items" },
+    rowNo:        { tr: "Sıra",                  en: "Item" },
+    productCode:  { tr: "Ürün Kodu",             en: "Product Code" },
+    leadTime:     { tr: "Teslim Süresi",         en: "Lead Time" },
+    size:         { tr: "Ölçü",                  en: "Size" },
+    description:  { tr: "Ürün Tanımı",           en: "Description" },
+    qty:          { tr: "Miktar",                en: "Qty" },
+    unitPrice:    { tr: "Birim Fiyat",           en: "Unit Price" },
+    totalPrice:   { tr: "Toplam",                en: "Total" },
+    hsCode:       { tr: "GTİP Kodu",             en: "HS Code" },
+    weight:       { tr: "Ağırlık",               en: "Weight (Kg)" },
+    // Totals
+    subtotal:     { tr: "Ara Toplam",            en: "Subtotal" },
+    vat:          { tr: "KDV",                   en: "VAT" },
+    totalWeight:  { tr: "Toplam Ağırlık",        en: "Total Weight" },
+    grandTotal:   { tr: "GENEL TOPLAM",          en: "GRAND TOTAL" },
+    // Terms band (3-col)
+    termsTitle:   { tr: "Teslimat, Geçerlilik & Ödeme", en: "Delivery, Validity & Payment" },
+    delivery:     { tr: "Teslimat Şekli",        en: "Delivery Method" },
+    validity:     { tr: "Geçerlilik Süresi",     en: "Validity Period" },
+    payment:      { tr: "Ödeme Şekli",           en: "Payment Method" },
+    // Notes
+    notes:        { tr: "NOTLAR & KOŞULLAR",     en: "Notes & Terms" },
+    // Signatures
+    signatures:   { tr: "İmzalar",               en: "Signatures" },
+    // Footer
+    hq:           { tr: "Merkez",                en: "HQ" },
+    tel:          { tr: "Tel",                   en: "Tel" },
+    web:          { tr: "Web",                   en: "Web" },
+    confidential: { tr: "Bu belge gizlidir",     en: "This document is confidential" },
+    emptyRows:    { tr: "Kalem girilmedi",       en: "No items" },
+} as const;
+
+const L = BILINGUAL_LABELS;
+
 function fmt(n: number) {
     return n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -114,6 +174,26 @@ interface Props {
     data: QuoteData;
 }
 
+// Faz 4c: TR ana / EN alt italic — common <th> sub-label style.
+const enSubLabelStyle: React.CSSProperties = {
+    display: "block",
+    fontSize: "7.5px",
+    opacity: 0.65,
+    fontStyle: "italic",
+    textTransform: "none" as const,
+    fontWeight: 400,
+    marginTop: "1px",
+};
+
+// Faz 4c: Section heading EN-italic suffix (used in notes/terms/signatures heads).
+const enSectionSuffixStyle: React.CSSProperties = {
+    fontWeight: 400,
+    fontStyle: "italic",
+    opacity: 0.7,
+    textTransform: "none" as const,
+    letterSpacing: "normal",
+};
+
 export default function QuoteDocument({ data }: Props) {
     const sym = SYM[data.currency] ?? "₺";
 
@@ -199,6 +279,16 @@ export default function QuoteDocument({ data }: Props) {
         letterSpacing: "0.05em",
     };
 
+    const metaLabelEnStyle: React.CSSProperties = {
+        display: "block",
+        fontSize: "7px",
+        fontWeight: 400,
+        color: C.subtle,
+        fontStyle: "italic",
+        textTransform: "none" as const,
+        letterSpacing: "normal",
+    };
+
     const metaValueStyle: React.CSSProperties = {
         fontSize: "10px",
         fontWeight: 500,
@@ -273,6 +363,16 @@ export default function QuoteDocument({ data }: Props) {
         background: C.zebraEven,
     };
 
+    const totalLabelEnStyle: React.CSSProperties = {
+        display: "block",
+        fontSize: "7.5px",
+        fontWeight: 400,
+        color: C.subtle,
+        fontStyle: "italic",
+        marginTop: "1px",
+        letterSpacing: "normal",
+    };
+
     const totalValueTdStyle: React.CSSProperties = {
         padding: "6px 12px",
         fontSize: "10px",
@@ -295,12 +395,52 @@ export default function QuoteDocument({ data }: Props) {
     };
 
     const footerBandStyle: React.CSSProperties = {
-        padding: "8px 20px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
+        padding: "10px 20px",
         background: C.footerBg,
         borderTop: `1px solid ${C.border}`,
+    };
+
+    const sectionHeadStyle: React.CSSProperties = {
+        fontFamily: FONT.heading,
+        fontSize: "8px",
+        fontWeight: 700,
+        color: C.brand,
+        textTransform: "uppercase" as const,
+        letterSpacing: "0.1em",
+        marginBottom: "10px",
+    };
+
+    // Faz 4c: Terms band — 3-column grid (Delivery | Validity | Payment).
+    const termsColStyle: React.CSSProperties = {
+        padding: "10px 12px",
+        display: "flex",
+        flexDirection: "column" as const,
+        gap: "4px",
+    };
+
+    const termsLabelStyle: React.CSSProperties = {
+        fontFamily: FONT.heading,
+        fontSize: "9px",
+        fontWeight: 700,
+        color: C.text,
+        textTransform: "uppercase" as const,
+        letterSpacing: "0.05em",
+    };
+
+    const termsLabelEnStyle: React.CSSProperties = {
+        fontSize: "7.5px",
+        fontWeight: 400,
+        fontStyle: "italic",
+        color: C.subtle,
+        textTransform: "none" as const,
+        marginTop: "1px",
+    };
+
+    const termsValueStyle: React.CSSProperties = {
+        fontSize: "10px",
+        color: C.text,
+        whiteSpace: "pre-wrap" as const,
+        marginTop: "2px",
     };
 
     return (
@@ -349,7 +489,7 @@ export default function QuoteDocument({ data }: Props) {
                         </div>
                         {data.validUntil && (
                             <div style={{ fontSize: "9px", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>
-                                Geçerli: {fmtDate(data.validUntil)}
+                                {L.validity.tr}: {fmtDate(data.validUntil)}
                             </div>
                         )}
                     </div>
@@ -358,9 +498,9 @@ export default function QuoteDocument({ data }: Props) {
                 {/* ── Title Band ── */}
                 <div className="doc-no-break" style={titleBandStyle}>
                     <div style={{ fontFamily: FONT.heading, fontSize: "20px", fontWeight: 800, letterSpacing: "0.08em", color: C.brand }}>
-                        TEKLİF
+                        {L.title.tr}
                         <span style={{ margin: "0 12px", color: C.border, fontWeight: 300 }}>|</span>
-                        <span style={{ fontStyle: "italic", fontWeight: 600, letterSpacing: "0.04em" }}>QUOTATION</span>
+                        <span style={{ fontStyle: "italic", fontWeight: 600, letterSpacing: "0.04em" }}>{L.title.en}</span>
                     </div>
                     <div style={{ marginTop: "8px", height: "2px", background: `linear-gradient(90deg, transparent, ${C.brand}, transparent)`, borderRadius: "1px" }} />
                 </div>
@@ -369,87 +509,106 @@ export default function QuoteDocument({ data }: Props) {
                 <div className="doc-no-break" style={metaGridStyle}>
                     {/* Left: Customer */}
                     <div style={metaColStyle}>
-                        <div className="doc-brand-text" style={metaSectionHeadStyle}>Müşteri / Customer</div>
+                        <div className="doc-brand-text" style={metaSectionHeadStyle}>
+                            {L.customer.tr} <span style={enSectionSuffixStyle}>/ {L.customer.en}</span>
+                        </div>
                         {[
-                            ["Company", data.custCompany],
-                            ["Contact", data.custContact],
-                            ["Phone",   data.custPhone],
-                            ["Email",   data.custEmail],
-                        ].map(([label, value]) => (
-                            value ? (
-                                <div key={label} style={metaRowStyle}>
-                                    <span style={metaLabelStyle}>{label}</span>
-                                    <span style={metaValueStyle}>{value}</span>
+                            [L.company, data.custCompany],
+                            [L.contact, data.custContact],
+                            [L.phone,   data.custPhone],
+                            [L.email,   data.custEmail],
+                        ].map(([label, value]) => {
+                            const lab = label as { tr: string; en: string };
+                            const val = value as string;
+                            return val ? (
+                                <div key={lab.tr} style={metaRowStyle}>
+                                    <span style={metaLabelStyle}>
+                                        {lab.tr}
+                                        <span style={metaLabelEnStyle}>{lab.en}</span>
+                                    </span>
+                                    <span style={metaValueStyle}>{val}</span>
                                 </div>
-                            ) : null
-                        ))}
+                            ) : null;
+                        })}
                     </div>
 
                     {/* Right: Quote details */}
                     <div style={metaColRightStyle}>
-                        <div className="doc-brand-text" style={metaSectionHeadStyle}>Teklif Detayları / Quote Details</div>
+                        <div className="doc-brand-text" style={metaSectionHeadStyle}>
+                            {L.quoteDetails.tr} <span style={enSectionSuffixStyle}>/ {L.quoteDetails.en}</span>
+                        </div>
                         {[
-                            ["Sales Rep",   data.salesRep],
-                            ["Phone",       data.salesPhone],
-                            ["Email",       data.salesEmail],
-                            ["Quote No",    data.quoteNo],
-                            ["Date",        fmtDate(data.quoteDate)],
-                            ["Valid Until", data.validUntil ? fmtDate(data.validUntil) : ""],
-                            ["Currency",    data.currency],
-                        ].map(([label, value]) => (
-                            value ? (
-                                <div key={label} style={metaRowStyle}>
-                                    <span style={metaLabelStyle}>{label}</span>
-                                    <span style={metaValueStyle}>{value}</span>
+                            [L.salesRep,   data.salesRep],
+                            [L.phone,      data.salesPhone],
+                            [L.email,      data.salesEmail],
+                            [L.quoteNo,    data.quoteNo],
+                            [L.date,       fmtDate(data.quoteDate)],
+                            [L.validUntil, data.validUntil ? fmtDate(data.validUntil) : ""],
+                            [L.currency,   data.currency],
+                        ].map(([label, value]) => {
+                            const lab = label as { tr: string; en: string };
+                            const val = value as string;
+                            return val ? (
+                                <div key={lab.tr} style={metaRowStyle}>
+                                    <span style={metaLabelStyle}>
+                                        {lab.tr}
+                                        <span style={metaLabelEnStyle}>{lab.en}</span>
+                                    </span>
+                                    <span style={metaValueStyle}>{val}</span>
                                 </div>
-                            ) : null
-                        ))}
+                            ) : null;
+                        })}
                     </div>
                 </div>
 
                 {/* ── Items Table ── */}
                 <div style={tableSectionStyle}>
-                    <div style={tableLabelStyle}>Kalemler / Line Items</div>
+                    <div style={tableLabelStyle}>
+                        {L.lineItems.tr} <span style={enSectionSuffixStyle}>/ {L.lineItems.en}</span>
+                    </div>
                     <table style={{ width: "100%", borderCollapse: "collapse" as const }}>
                         <thead>
                             <tr>
-                                <th className="doc-brand-bg" style={{ ...thStyle, width: "28px", textAlign: "center" as const }}>#</th>
+                                <th className="doc-brand-bg" style={{ ...thStyle, width: "28px", textAlign: "center" as const }}>
+                                    {L.rowNo.tr}
+                                    <span style={enSubLabelStyle}>{L.rowNo.en}</span>
+                                </th>
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "88px" }}>
-                                    Product Code
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Ürün Kodu</span>
+                                    {L.productCode.tr}
+                                    <span style={enSubLabelStyle}>{L.productCode.en}</span>
                                 </th>
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "80px" }}>
-                                    Lead Time
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Teslim Süresi</span>
+                                    {L.leadTime.tr}
+                                    <span style={enSubLabelStyle}>{L.leadTime.en}</span>
                                 </th>
-                                {/* Faz 4a Review: PMT brand "Ölçü / Size" kolonu (4c'de stil ince ayarı yapılır) */}
+                                {/* Faz 4a Review: PMT brand "Ölçü / Size" kolonu */}
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "60px" }}>
-                                    Size
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Ölçü</span>
+                                    {L.size.tr}
+                                    <span style={enSubLabelStyle}>{L.size.en}</span>
                                 </th>
                                 <th className="doc-brand-bg" style={thStyle}>
-                                    Description
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Ürün Açıklaması</span>
+                                    {L.description.tr}
+                                    <span style={enSubLabelStyle}>{L.description.en}</span>
                                 </th>
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "52px", textAlign: "center" as const }}>
-                                    Qty
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Adet</span>
+                                    {L.qty.tr}
+                                    <span style={enSubLabelStyle}>{L.qty.en}</span>
                                 </th>
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "100px", textAlign: "right" as const }}>
-                                    Unit Price
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Birim Fiyat</span>
+                                    {L.unitPrice.tr}
+                                    <span style={enSubLabelStyle}>{L.unitPrice.en}</span>
                                 </th>
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "110px", textAlign: "right" as const }}>
-                                    Total Price
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Toplam Fiyat</span>
+                                    {L.totalPrice.tr}
+                                    <span style={enSubLabelStyle}>{L.totalPrice.en}</span>
                                 </th>
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "80px" }}>
-                                    HS Code
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>GTİP Kodu</span>
+                                    {L.hsCode.tr}
+                                    <span style={enSubLabelStyle}>{L.hsCode.en}</span>
                                 </th>
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "62px", textAlign: "right" as const }}>
-                                    Kg
-                                    <span style={{ display: "block", fontSize: "7.5px", opacity: 0.65, fontStyle: "italic", textTransform: "none" as const, fontWeight: 400, marginTop: "1px" }}>Ağırlık</span>
+                                    {L.weight.tr}
+                                    <span style={enSubLabelStyle}>{L.weight.en}</span>
                                 </th>
                             </tr>
                         </thead>
@@ -480,7 +639,7 @@ export default function QuoteDocument({ data }: Props) {
                                 <tr>
                                     {/* Faz 4a Review: colSpan 9 → 10 (Size kolonu eklendi) */}
                                     <td colSpan={10} style={{ ...tdStyle, textAlign: "center" as const, color: C.subtle, padding: "20px" }}>
-                                        — Kalem girilmedi —
+                                        — {L.emptyRows.tr} / {L.emptyRows.en} —
                                     </td>
                                 </tr>
                             )}
@@ -493,22 +652,32 @@ export default function QuoteDocument({ data }: Props) {
                     <table style={totalsTableStyle}>
                         <tbody>
                             <tr>
-                                <td style={totalLabelTdStyle}>Subtotal / Ara Toplam</td>
+                                <td style={totalLabelTdStyle}>
+                                    {L.subtotal.tr}
+                                    <span style={totalLabelEnStyle}>{L.subtotal.en}</span>
+                                </td>
                                 <td style={totalValueTdStyle}>{sym} {fmt(data.subtotal)}</td>
                             </tr>
                             <tr>
-                                <td style={totalLabelTdStyle}>VAT / KDV ({data.vatRate}%)</td>
+                                <td style={totalLabelTdStyle}>
+                                    {L.vat.tr} ({data.vatRate}%)
+                                    <span style={totalLabelEnStyle}>{L.vat.en}</span>
+                                </td>
                                 <td style={totalValueTdStyle}>{sym} {fmt(data.vatTotal)}</td>
                             </tr>
                             {data.totalKg > 0 && (
                                 <tr>
-                                    <td style={{ ...totalLabelTdStyle, color: C.subtle, fontWeight: 400 }}>Total Weight / Toplam Kg</td>
+                                    <td style={{ ...totalLabelTdStyle, color: C.subtle, fontWeight: 400 }}>
+                                        {L.totalWeight.tr}
+                                        <span style={totalLabelEnStyle}>{L.totalWeight.en}</span>
+                                    </td>
                                     <td style={{ ...totalValueTdStyle, color: C.muted }}>{fmt(data.totalKg)} kg</td>
                                 </tr>
                             )}
                             <tr>
                                 <td style={{ ...totalLabelTdStyle, background: C.brand, color: C.white, fontFamily: FONT.heading, fontWeight: 700, fontSize: "11px", letterSpacing: "0.04em" }} className="doc-brand-bg">
-                                    GRAND TOTAL
+                                    {L.grandTotal.tr}
+                                    <span style={{ ...totalLabelEnStyle, color: "rgba(255,255,255,0.7)" }}>{L.grandTotal.en}</span>
                                 </td>
                                 <td style={{ ...totalValueTdStyle, background: C.brand, color: C.white, fontSize: "13px", fontWeight: 700 }} className="doc-brand-bg">
                                     {sym} {fmt(data.grandTotal)}
@@ -518,44 +687,46 @@ export default function QuoteDocument({ data }: Props) {
                     </table>
                 </div>
 
-                {/* ── Faz 4a Review: Teslimat / Ödeme Şekli (PMT brand köprü) ──
-                    Faz 4c'de full PMT brand layout'a entegre edilecek. Şimdi
-                    yalnız contract bağlandı ki preview "veri yok" göstermesin. */}
-                {(data.deliveryMethod || data.paymentMethod) && (
+                {/* ── Faz 4c: Terms band — 3-column grid (Delivery | Validity | Payment) ──
+                    Plan §516-519 PMT brand layout: Teslimat | Geçerlilik | Ödeme yan yana
+                    tek satır. En az biri dolu ise section render (üçü de boşsa hiç gösterilmez).
+                    Boş hücreler "—" placeholder ile 3-column tutarlılık sağlar. */}
+                {(data.deliveryMethod || data.validUntil || data.paymentMethod) && (
                     <div className="doc-no-break" style={notesSectionStyle}>
-                        <div style={{ fontFamily: FONT.heading, fontSize: "8px", fontWeight: 700, color: C.brand, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "8px" }}>
-                            Delivery &amp; Payment / Teslimat &amp; Ödeme
+                        <div style={sectionHeadStyle}>
+                            {L.termsTitle.tr} <span style={enSectionSuffixStyle}>/ {L.termsTitle.en}</span>
                         </div>
-                        <table style={{ width: "100%", borderCollapse: "collapse" as const, fontSize: "10px" }}>
-                            <tbody>
-                                {data.deliveryMethod && (
-                                    <tr>
-                                        <td style={{ padding: "6px 10px", width: "30%", fontWeight: 600, color: C.text, background: C.zebraEven, border: `0.5px solid ${C.border}`, verticalAlign: "top" as const }}>
-                                            Teslimat Şekli
-                                            <div style={{ fontSize: "8px", fontWeight: 400, fontStyle: "italic", color: C.subtle, marginTop: "2px" }}>Delivery Method</div>
-                                        </td>
-                                        <td style={{ padding: "6px 10px", color: C.text, whiteSpace: "pre-wrap" as const, border: `0.5px solid ${C.border}` }}>{data.deliveryMethod}</td>
-                                    </tr>
-                                )}
-                                {data.paymentMethod && (
-                                    <tr>
-                                        <td style={{ padding: "6px 10px", width: "30%", fontWeight: 600, color: C.text, background: C.zebraEven, border: `0.5px solid ${C.border}`, verticalAlign: "top" as const }}>
-                                            Ödeme Şekli
-                                            <div style={{ fontSize: "8px", fontWeight: 400, fontStyle: "italic", color: C.subtle, marginTop: "2px" }}>Payment Method</div>
-                                        </td>
-                                        <td style={{ padding: "6px 10px", color: C.text, whiteSpace: "pre-wrap" as const, border: `0.5px solid ${C.border}` }}>{data.paymentMethod}</td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", border: `0.5px solid ${C.border}`, background: C.zebraEven }}>
+                            <div style={termsColStyle}>
+                                <div style={termsLabelStyle}>
+                                    {L.delivery.tr}
+                                    <div style={termsLabelEnStyle}>{L.delivery.en}</div>
+                                </div>
+                                <div style={termsValueStyle}>{data.deliveryMethod || "—"}</div>
+                            </div>
+                            <div style={{ ...termsColStyle, borderLeft: `0.5px solid ${C.border}` }}>
+                                <div style={termsLabelStyle}>
+                                    {L.validity.tr}
+                                    <div style={termsLabelEnStyle}>{L.validity.en}</div>
+                                </div>
+                                <div style={termsValueStyle}>{data.validUntil ? fmtDate(data.validUntil) : "—"}</div>
+                            </div>
+                            <div style={{ ...termsColStyle, borderLeft: `0.5px solid ${C.border}` }}>
+                                <div style={termsLabelStyle}>
+                                    {L.payment.tr}
+                                    <div style={termsLabelEnStyle}>{L.payment.en}</div>
+                                </div>
+                                <div style={termsValueStyle}>{data.paymentMethod || "—"}</div>
+                            </div>
+                        </div>
                     </div>
                 )}
 
                 {/* ── Notes & Terms ── */}
                 {data.notes && (
                     <div className="doc-no-break" style={notesSectionStyle}>
-                        <div style={{ fontFamily: FONT.heading, fontSize: "8px", fontWeight: 700, color: C.brand, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "8px" }}>
-                            Notes &amp; Terms / Notlar &amp; Koşullar
+                        <div style={sectionHeadStyle}>
+                            {L.notes.tr} <span style={enSectionSuffixStyle}>/ {L.notes.en}</span>
                         </div>
                         <div style={{ fontSize: "10px", color: C.text, lineHeight: 1.7, whiteSpace: "pre-wrap" as const, padding: "10px 14px", background: C.zebraEven, border: `0.5px solid ${C.border}`, borderRadius: "3px" }}>
                             {data.notes}
@@ -565,15 +736,15 @@ export default function QuoteDocument({ data }: Props) {
 
                 {/* ── Signatures ── */}
                 <div className="doc-no-break" style={sigSectionStyle}>
-                    <div style={{ fontFamily: FONT.heading, fontSize: "8px", fontWeight: 700, color: C.brand, textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "14px" }}>
-                        Signatures / İmzalar
+                    <div style={sectionHeadStyle}>
+                        {L.signatures.tr} <span style={enSectionSuffixStyle}>/ {L.signatures.en}</span>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px" }}>
                         {data.signatures.map((sig, i) => (
                             <div key={i} style={{ display: "flex", flexDirection: "column" as const }}>
-                                {/* Role */}
-                                <div style={{ fontSize: "10px", fontWeight: 700, fontFamily: FONT.heading, color: C.text, marginBottom: "2px" }}>{sig.role}</div>
-                                <div style={{ fontSize: "8.5px", color: C.muted, fontStyle: "italic", marginBottom: "6px" }}>{sig.roleTr}</div>
+                                {/* Role — TR ana, EN alt italic (PMT brand hierarchy) */}
+                                <div style={{ fontSize: "10px", fontWeight: 700, fontFamily: FONT.heading, color: C.text, marginBottom: "2px" }}>{sig.roleTr}</div>
+                                <div style={{ fontSize: "8.5px", color: C.muted, fontStyle: "italic", marginBottom: "6px" }}>{sig.role}</div>
                                 {/* Name & Title (shown above signature line) */}
                                 <div style={{ fontSize: "10.5px", fontWeight: 600, color: C.text, minHeight: "16px" }}>{sig.name || ""}</div>
                                 <div style={{ fontSize: "9.5px", color: C.muted, minHeight: "14px", marginBottom: "6px" }}>{sig.title || ""}</div>
@@ -584,17 +755,39 @@ export default function QuoteDocument({ data }: Props) {
                     </div>
                 </div>
 
-                {/* ── Footer Band ── */}
+                {/* ── Faz 4c: Footer band — fabrika/merkez/tel/web 2-row layout ──
+                    Plan §527 PMT brand: Fabrika | Merkez | Tel | Web horizontal list.
+                    PMT'de tek "Merkez" yeterli; sellerAddr alanı buradan render olur.
+                    İleride factory ayrı alan istenirse Faz 4d. */}
                 <div className="doc-footer-band" style={footerBandStyle}>
-                    <span style={{ fontSize: "8.5px", color: C.muted, fontFamily: FONT.heading, fontWeight: 600 }}>
-                        {data.sellerName}
-                    </span>
-                    <span style={{ fontSize: "8px", color: C.subtle }}>
-                        Bu belge gizlidir / This document is confidential
-                    </span>
-                    <span style={{ fontSize: "8.5px", color: C.muted }}>
-                        {data.validUntil ? `Geçerlilik: ${fmtDate(data.validUntil)}` : ""}
-                    </span>
+                    <div style={{ display: "flex", flexWrap: "wrap" as const, gap: "4px 14px", fontSize: "8.5px", color: C.muted, fontFamily: FONT.body }}>
+                        {data.sellerAddr && (
+                            <span>
+                                <strong style={{ color: C.text }}>{L.hq.tr} / {L.hq.en}:</strong> {data.sellerAddr}
+                            </span>
+                        )}
+                        {data.sellerTel && (
+                            <span>
+                                <strong style={{ color: C.text }}>{L.tel.tr}:</strong> {data.sellerTel}
+                            </span>
+                        )}
+                        {data.sellerWeb && (
+                            <span>
+                                <strong style={{ color: C.text }}>{L.web.tr}:</strong> {data.sellerWeb}
+                            </span>
+                        )}
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "6px", fontSize: "7.5px", color: C.subtle }}>
+                        <span style={{ fontFamily: FONT.heading, fontWeight: 600, color: C.muted }}>
+                            {data.sellerName}
+                        </span>
+                        <span>
+                            {L.confidential.tr} / {L.confidential.en}
+                        </span>
+                        <span>
+                            {data.validUntil ? `${L.validity.tr}: ${fmtDate(data.validUntil)}` : ""}
+                        </span>
+                    </div>
                 </div>
 
             </div>

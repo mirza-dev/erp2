@@ -7,7 +7,25 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-25
 
-**Faz 4b Review 1 — 3 bulgu kapatma (P2-A, P2-B, P3) (3516 test)**
+**Faz 4c — PDF PMT brand template rewrite (final visual, 3534 test)**
+
+- **Plan §490-546:** QuoteDocument.tsx görsel rewrite — bilingual TR ana / EN alt italic hierarchy + Terms 3-column grid + Footer fabrika/merkez/tel/web. Faz 4 zincirinin son halkası; veri kontratı 4a Review'da kilitliydi.
+- **`BILINGUAL_LABELS` constant export** (33 label pair): tüm `{tr, en}` çiftleri tek noktada. 35+ hard-coded label string → `L.x.tr` + `L.x.en` Map lookup. Drift tek noktada yakalanır, test edilebilir.
+- **TR ana / EN alt italic flip:** 10 lines table header + 4 totals + 2 meta sections + 7 meta rows + 3 terms + notes/signatures/empty-rows başlık ≈ 30 noktada hierarchy flip (eski English ana / Türkçe italic alt → TR ana / EN italic alt; PMT brand standardı).
+- **Terms band 3-column rewrite:** Eski 2-row vertical (Delivery + Payment ayrı satır, Validity header'da) → tek section, `grid-template-columns: 1fr 1fr 1fr` (Delivery | Validity | Payment). Conditional: en az biri dolu ise section render; boş hücreler "—" placeholder (3-column tutarlılık). Validity fmtDate ile DD.MM.YYYY.
+- **Footer band 2-row layout:** Eski 3-span tek satır → (1) `<strong>Merkez/HQ:</strong>` + `<strong>Tel:</strong>` + `<strong>Web:</strong>` horizontal liste, (2) sellerName + bilingual confidential + validity prefix.
+- **Notes başlık:** "Notes & Terms / Notlar & Koşullar" → "NOTLAR & KOŞULLAR / Notes & Terms" (TR ana). Signatures rol etiketi: `sig.roleTr` ana, `sig.role` italic alt.
+- **+18 yeni test** (`quote-document-faz4c.test.ts`, Faz 9 PO Document paterni `renderToStaticMarkup`): 3 constant (kapsam + shape + critical labels) + 3 hierarchy (TR<EN idx kontrol) + 5 terms (3-col grid, single-fill placeholder, validUntil fmtDate, hepsi boş hidden, etiket pair proximity) + 4 footer (HQ/Tel/Web prefix + boş alanlarda defansif render) + 3 regression (Faz 4a Review Size kolonu + colSpan 10).
+- **Mevcut Faz 4a Review test güncellemesi:** `quotes-faz4a-helper-mapper.test.ts` 2 testte conditional regex `deliveryMethod || paymentMethod` → `deliveryMethod || validUntil || paymentMethod` (yeni 3-col); Size header regex source string match → `BILINGUAL_LABELS.size: { tr: "Ölçü" }` constant kontrolüne dönüştürüldü.
+- **Plan-domain check:** `feedback_no_silent_deletes` — hiçbir data field veya conditional render silinmedi; mevcut layout struktur korundu, yalnız etiket hierarchy + terms visual yapı + footer içerik PMT brand'ine hizalandı. Plan §544 "HS code + weight per line korunur" — 10 kolon korundu (plan ASCII §508-510 yedi kolon literal değil; kabul kriterleri authoritative). `feedback_plan_domain_check` — plan §490-546 + Faz 4a Review contract + PMT brand sözleşmesi tutarlı.
+- 2 dosya değişen + 1 dosya yeni (1 source rewrite + 1 mevcut test update + 1 yeni test) · **3534 test yeşil** (önceki 3516 + 18) · TS clean · 0 lint warning · build OK
+- **Faz 4 zinciri tamamlandı:** 4a (DB) → 4a Review (preview/PDF contract) → 4b (auto-build desc) → 4b Review (parts-join + dirty persist) → 4c (PDF PMT brand template). Teklif modülü revize tam tamamlandı.
+- **Manuel görsel kontrol (kullanıcı tarafında):** Yeni teklif aç → Preview → Header TEKLİF | QUOTATION, lines table "Ürün Kodu" ana + "Product Code" alt, Totals "Ara Toplam" ana, Terms 3-col Delivery|Validity|Payment, Notes başlık NOTLAR & KOŞULLAR, Footer Merkez/HQ/Tel/Web horizontal. Yazdır → A4 sığar.
+- **Sıradaki:** Kullanıcı kararı — Faz 5 alanı (henüz tanımlanmadı) veya mevcut modüllerde Bulgular turu.
+
+## Önceki — Faz 4b Review 1 (3516 test)
+
+**3 bulgu kapatma (P2-A, P2-B, P3)**
 
 - **P2-A (clearAll dirty Set):** `QuoteForm.clearAll()` rows + nextId sıfırlıyordu ama `descDirtyRowIds` Set'i sıfırlamıyordu. Kullanıcı row 1 desc'ini düzenleyip Temizle → yeni boş row 1'de ürün seçince eski dirty ID 1 hâlâ Set'te → auto-build atlanıyordu. Fix: `setDescDirtyRowIds(new Set())` çağrısı clearAll'a eklendi.
 - **P2-B (refresh sonrası auto-gen sanılma — ticari risk):** localStorage restore'da non-empty desc'lerin hepsi dirty kabul ediliyordu — kullanıcı ürün A seçip auto-desc geldi → refresh → ürün B seçince A'nın desc'i kalıyordu (yanlış ürün açıklaması). Fix: autoSave `teklif_v3`'e `descDirty: boolean[]` index-aligned persist eder; restore `Array.isArray(saved.descDirty)` ise ondan rebuild eder, yoksa eski payload için backward-compat fallback (non-empty filter). useCallback dep array'ine `descDirtyRowIds` eklendi (stale closure önlenir).

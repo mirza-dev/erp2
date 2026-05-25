@@ -241,17 +241,24 @@ describe("Faz 4a Review — preview/PDF contract", () => {
         expect(depMatches.length).toBeGreaterThanOrEqual(2);
     });
 
-    it("QuoteDocument data.deliveryMethod || data.paymentMethod conditional render", () => {
-        expect(DOC_SOURCE).toMatch(/data\.deliveryMethod \|\| data\.paymentMethod/);
-        // Bilingual etiketler
-        expect(DOC_SOURCE).toMatch(/Teslimat Şekli[\s\S]{0,200}Delivery Method/);
-        expect(DOC_SOURCE).toMatch(/Ödeme Şekli[\s\S]{0,200}Payment Method/);
+    it("QuoteDocument terms band conditional render (Faz 4c: 3-column delivery|validity|payment)", () => {
+        // Faz 4c güncellemesi (2026-05-25): Eskiden `deliveryMethod || paymentMethod`
+        // 2-row vertical; 4c'de validUntil 3. kolona alındı, conditional genişledi.
+        expect(DOC_SOURCE).toMatch(/data\.deliveryMethod \|\| data\.validUntil \|\| data\.paymentMethod/);
+        // Bilingual etiketler — BILINGUAL_LABELS map'inde tanımlı (TR ana, EN alt)
+        expect(DOC_SOURCE).toMatch(/Teslimat Şekli/);
+        expect(DOC_SOURCE).toMatch(/Delivery Method/);
+        expect(DOC_SOURCE).toMatch(/Ödeme Şekli/);
+        expect(DOC_SOURCE).toMatch(/Payment Method/);
+        // Geçerlilik Süresi etiketi 3. kolonda (PMT brand 3-col layout)
+        expect(DOC_SOURCE).toMatch(/Geçerlilik Süresi/);
     });
 
     it("QuoteDocument lines tablosu row.size render eder + colSpan empty 10'a güncel", () => {
         expect(DOC_SOURCE).toMatch(/\{row\.size \|\| "—"\}/);
-        // Header bilingual: Size / Ölçü (PMT brand) — header bloğunda art arda gelir
-        expect(DOC_SOURCE).toMatch(/Size[\s\S]{0,500}Ölçü/);
+        // Faz 4c güncellemesi: Size header BILINGUAL_LABELS.size'den geliyor.
+        // Map içeriği: { tr: "Ölçü", en: "Size" } — TR ana / EN alt italic.
+        expect(DOC_SOURCE).toMatch(/size:\s*\{\s*tr:\s*"Ölçü"/);
         // Empty colSpan eskiden 9; yeni Size kolonu ile 10
         expect(DOC_SOURCE).toMatch(/colSpan=\{10\}/);
         expect(DOC_SOURCE).not.toMatch(/colSpan=\{9\}/);

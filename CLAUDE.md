@@ -3,7 +3,36 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-25_
 
-**Son tamamlanan iş:** Faz 4b Review 1 — 3 bulgu kapatma (P2-A, P2-B, P3) (2026-05-25; 3516 test)
+**Son tamamlanan iş:** Faz 4c — PDF PMT brand template rewrite (final visual) (2026-05-25; 3534 test)
+
+- **Plan §490-546** (MODUL_REVIZE_PLAN.md): `QuoteDocument.tsx` görsel rewrite ile PMT brand template'ine tam uyum. Faz 4 zincirinin son halkası — veri kontratı Faz 4a Review'da kilitliydi (`QuoteData.deliveryMethod/paymentMethod`, `QuoteRow.size`), bu tur yalnız görsel hizalama.
+- **`BILINGUAL_LABELS` constant export** (33 label pair): Tüm `{tr, en}` çiftleri tek noktada toplandı. 35+ noktada hard-coded "Müşteri / Customer" stringi → `L.customer.tr` + `L.customer.en` Map lookup. Drift tek noktada yakalanır (bir label silinirse undefined runtime crash; test 1.b coverage). Test edilebilirlik: `import { BILINGUAL_LABELS } from "@/app/dashboard/quotes/components/QuoteDocument"`.
+- **TR ana / EN alt italic hierarchy flip:** 10 lines table header (`{tr: "Ürün Kodu", en: "Product Code"}` vb.) + 4 totals (Ara Toplam/Subtotal, KDV/VAT, Toplam Ağırlık/Total Weight, GENEL TOPLAM/GRAND TOTAL) + 2 meta sections (Müşteri/Customer, Teklif Detayları/Quote Details) + 7 meta rows (Firma, İlgili, Telefon, vb.) + 3 terms (Teslimat/Geçerlilik/Ödeme) + notes/signatures/empty-rows ≈ 30 noktada hierarchy flip. Eski: English ana / Türkçe italic alt (yanlış sıra). Yeni: TR ana / EN italic alt (PMT brand standardı, Türkçe müşteri-öncelikli teklif).
+- **Terms band — 3-column grid rewrite:** Eski 2-row vertical (`Teslimat Şekli` 1. satır, `Ödeme Şekli` 2. satır; `Geçerlilik` header'da ayrı yerde) → tek conditional section, `grid-template-columns: 1fr 1fr 1fr` (Delivery | Validity | Payment). Conditional: `data.deliveryMethod || data.validUntil || data.paymentMethod` — en az biri dolu ise section render; üçü de boşsa hiç gösterilmez. Boş hücreler "—" placeholder (3-column tutarlılığı için). Validity hücresi `fmtDate(data.validUntil)` ile DD.MM.YYYY. Section başlığı `Teslimat, Geçerlilik & Ödeme / Delivery, Validity & Payment`.
+- **Footer band — 2-row fabrika/merkez/tel/web:** Eski 3-span tek satır (sellerName + confidential + validity) → 2-row layout. **Satır 1:** `<strong>Merkez / HQ:</strong>` + `<strong>Tel:</strong>` + `<strong>Web:</strong>` horizontal liste (her biri conditional — alan boşsa hiç render edilmez). **Satır 2:** sellerName (sol) + bilingual confidential mesaj (orta) + validity prefix (sağ). Plan §527 PMT brand 3-line footer'ına yakın; "Fabrika" ayrı alan değil (sellerAddr tek, PMT tek-merkez). İleride factory ayrı alan istenirse Faz 4d.
+- **Notes başlık + Signatures hierarchy:** "Notes & Terms / Notlar & Koşullar" → "NOTLAR & KOŞULLAR / Notes & Terms" (TR ana, EN italic suffix). Signatures rol etiketi `sig.role` (English) ana → `sig.roleTr` (Türkçe) ana, `sig.role` italic alt (PMT brand hierarchy).
+- **+18 yeni test** (`quote-document-faz4c.test.ts`, Faz 9 PO Document `react-dom/server.renderToStaticMarkup` paterni):
+  - **3 BILINGUAL_LABELS constant:** min 30 pair tanımlı + her pair `{tr, en}` non-empty string + PMT brand-critical label coverage (delivery/validity/payment/notes/signatures/termsTitle).
+  - **3 TR ana / EN alt hierarchy:** lines table `Ürün Kodu` < `Product Code` index, totals `Ara Toplam` < `Subtotal`, notes `NOTLAR & KOŞULLAR` < `Notes & Terms`.
+  - **5 Terms 3-column:** 3 alan dolu → grid + 6 etiket (3TR/3EN) + 3 değer render, yalnız delivery → diğer 2 "—", yalnız validity → fmtDate, üçü boş → section hidden, etiket pair proximity (TR<EN<300 char).
+  - **4 Footer band:** sellerAddr → "Merkez/HQ:" prefix, sellerTel → "Tel:" prefix, sellerWeb → "Web:" prefix, 3 alan boş → defansif render (component crash yok, alt satır görünür).
+  - **3 Faz 4a Review regression:** empty rows colSpan=10, Size kolonu header bilingual (Ölçü/Size), row.size cell render + fallback.
+- **Mevcut Faz 4a Review test güncellemesi** (`quotes-faz4a-helper-mapper.test.ts`): 2 testte regex güncel — conditional `deliveryMethod || paymentMethod` → `deliveryMethod || validUntil || paymentMethod` (yeni 3-col); Size header inline string match → `BILINGUAL_LABELS.size: { tr: "Ölçü" }` Map constant kontrolüne dönüştürüldü (Faz 4c source-of-truth değişimi). Hiçbir test silinmedi, sadece şart güncellendi.
+- **Plan-domain check:** `feedback_no_silent_deletes` — hiçbir data field veya conditional render silinmedi; mevcut layout struktur (header band, title band, meta grid, lines table, totals, notes, signatures, footer band) tamamen korundu, yalnız etiket hierarchy + terms visual yapı + footer içerik PMT brand'ine hizalandı. Print CSS (PAGE_CSS, PRINT_CSS, `.doc-brand-bg`, `.doc-zebra-even`, `.doc-no-break`) dokunulmadı — Faz 4a Review'da doğrulanan print breakpoint davranışı korundu. Plan §544 "HS code + weight per line korunur" — 10 kolon kararı sürdü (plan ASCII §508-510 7 kolon görünür ama metinsel detay layout çiziminde yer kısıtı; literal değil, kabul kriterleri authoritative). `feedback_plan_domain_check` — plan §490-546 + Faz 4a Review contract + PMT brand sözleşmesi tutarlı, helper ile doc tek source.
+- 3 dosya (1 source rewrite + 1 mevcut test update + 1 yeni test) · **3534 test yeşil** (önceki 3516 + 18 yeni) · TS clean · 0 lint warning · build OK
+- **Faz 4 zinciri tamamlandı:** 4a (DB + form) → 4a Review (preview/PDF contract lock + PATCH validation parity) → 4b (auto-build description) → 4b Review (parts-join + dirty Set persist) → 4c (PDF PMT brand template). **Teklif modülü revize tam tamamlandı.**
+- **Manuel görsel kontrol (kullanıcı tarafında — UI değişimi):**
+  - Yeni teklif aç → form doldur → Preview'a tıkla
+  - Header bilingual: "TEKLİF | QUOTATION" (italic English)
+  - Lines table: "Ürün Kodu" başlık ana, "Product Code" küçük italic alt
+  - Totals: "Ara Toplam" ana + "Subtotal" italic alt
+  - Terms 3-column: Delivery | Validity | Payment grid (boş alanlar "—")
+  - Notes başlık: "NOTLAR & KOŞULLAR / Notes & Terms"
+  - Footer: "Merkez/HQ:", "Tel:", "Web:" horizontal liste
+  - Yazdır → A4 portrait sığar, kolon overflow yok
+- **Sıradaki:** Kullanıcı kararı — Faz 5 alanı (henüz tanımlanmadı, MODUL_REVIZE_PLAN sona erdi) veya mevcut modüllerde Bulgular turu.
+
+**Önceki:** Faz 4b Review 1 — 3 bulgu kapatma (P2-A, P2-B, P3) (2026-05-25; 3516 test)
 
 - **P2-A (clearAll dirty Set sıfırlamıyor):** `QuoteForm.clearAll()` rows + nextId sıfırlıyordu ama `descDirtyRowIds` Set'i sıfırlamıyordu. Kullanıcı row 1 desc'ini elle düzenleyip "Temizle" der → yeni boş row 1 (`emptyRow(1)`) → ürün seçince eski dirty ID `1` hâlâ Set'te → `handleSelectProduct` auto-build atlanıyordu. **Fix:** `setDescDirtyRowIds(new Set())` çağrısı clearAll'a eklendi.
 - **P2-B (refresh sonrası auto-generated desc → manuel sanılma, ticari risk):** localStorage restore tüm non-empty desc'leri dirty kabul ediyordu — kullanıcı ürün A seçip auto-desc geldi → refresh → ürün B seçince A'nın description'ı kalıyordu (yanlış ürün açıklaması teklifte). **Fix:** autoSave `teklif_v3` payload'ına `descDirty: boolean[]` index-aligned persist eder; restore `Array.isArray(saved.descDirty)` ise rebuild eder, yoksa eski payload için backward-compat fallback (non-empty desc → dirty filter). `autoSave` `useCallback` dep array'ine `descDirtyRowIds` eklendi (stale closure önlendi).
