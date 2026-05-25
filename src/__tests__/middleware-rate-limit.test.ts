@@ -28,7 +28,7 @@ vi.mock("@supabase/ssr", () => ({
 // rate-limit modülünün gerçek pure helper'ları korunur (extractClientIp, selectPolicy,
 // detectSupabaseAuthCookie, POLICIES); sadece rateLimitCheck mock'lanır.
 vi.mock("@/lib/rate-limit", async () => {
-    const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
+    const actual = await vi.importActual("@/lib/rate-limit") as Record<string, unknown>;
     return {
         ...actual,
         rateLimitCheck: (...args: unknown[]) => mockRateLimitCheck(...args),
@@ -36,6 +36,7 @@ vi.mock("@/lib/rate-limit", async () => {
 });
 
 import { middleware } from "../../middleware";
+import { selectPolicy, POLICIES } from "@/lib/rate-limit";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -103,8 +104,11 @@ describe("middleware rate-limit — CRON_SECRET Bearer", () => {
 // ── 4-5. Demo + AI artık rate limit'e tabi ───────────────────────────────────
 
 describe("middleware rate-limit — eski ALWAYS_PUBLIC artık rate limit'te", () => {
-    it("/api/auth/demo POST → rate limit ÇAĞRILIR (DEMO policy seçilir)", async () => {
-        const res = await middleware(makeRequest("/api/auth/demo", { method: "POST" }));
+    it("/api/auth/demo GET → rate limit ÇAĞRILIR (DEMO policy seçilir)", async () => {
+        // M-3 Review (2026-05-25): Demo route gerçek akışı GET (route.ts:10 GET handler;
+        // DemoButton.tsx:16 <Link href>). Eski test POST'tu — gerçek abuse yüzeyini
+        // ölçmüyordu. GET'e geçirildi.
+        const res = await middleware(makeRequest("/api/auth/demo", { method: "GET" }));
         expect(mockRateLimitCheck).toHaveBeenCalled();
         // 1. arg: ip:0.0.0.0 (header yok), 2. arg: DEMO policy
         const [key, policy] = mockRateLimitCheck.mock.calls[0]!;
@@ -180,5 +184,49 @@ describe("middleware rate-limit — Redis down (fail-open)", () => {
         expect([401]).toContain(res2.status);   // anon /api/products → 401
         // Rate limit çağrıldı ama fail-open → request akış devam etti
         expect(mockRateLimitCheck).toHaveBeenCalled();
+    });
+});
+
+// ── Review 1 (2026-05-25) — 6 bulgu kapatma regression testleri ─────────────
+
+describe("middleware rate-limit Review 1 — bulgular regression lock", () => {
+    it("P2 (demo cookie auth-like): demo_mode=1 → API_AUTH policy (300/dk, anon değil)", async () => {
+        // Demo dashboard auto-reload trafiği (alerts 60s + purchase 60s vb.) anon
+        // 30/dk limitine takılırsa kullanıcı yanlışlıkla 429 görür. demo_mode
+        // cookie de "session-like" sayılır.
+        await middleware(makeRequest("/api/orders", { cookies: { demo_mode: "1" } }));
+        const [, policy] = mockRateLimitCheck.mock.calls[0]!;
+        expect((policy as { name: string }).name).toBe("auth");
+    });
+
+    it("P2 (withRateHeaders): ALWAYS_PUBLIC bypass response'unda da X-RateLimit-* var", async () => {
+        // Eskiden ALWAYS_PUBLIC bypass NextResponse.next() döndüğü için header'lar
+        // eklenmiyordu. Review sonrası withRateHeaders ile tüm allow path'ler dahil.
+        // /api/auth/demo en güvenilir test (rate limit çağrılır + ALWAYS_PUBLIC).
+        mockRateLimitCheck.mockResolvedValueOnce({
+            ok: true, limit: 5, remaining: 4, retryAfter: 0, fromRedis: true,
+        });
+        const res = await middleware(makeRequest("/api/auth/demo"));
+        expect(res.status).toBe(200);
+        expect(res.headers.get("X-RateLimit-Limit")).toBe("5");
+        expect(res.headers.get("X-RateLimit-Remaining")).toBe("4");
+    });
+
+    it("P2 (withRateHeaders): anon /api/products 401 response'unda da X-RateLimit-* var", async () => {
+        // Auth gate'in 401 dalı da header taşımalı (client observability).
+        mockRateLimitCheck.mockResolvedValueOnce({
+            ok: true, limit: 30, remaining: 29, retryAfter: 0, fromRedis: true,
+        });
+        const res = await middleware(makeRequest("/api/products"));
+        expect(res.status).toBe(401);
+        expect(res.headers.get("X-RateLimit-Limit")).toBe("30");
+        expect(res.headers.get("X-RateLimit-Remaining")).toBe("29");
+    });
+
+    it("P1 (login dead-code): selectPolicy POST /login hâlâ LOGIN policy döner (gelecek server route için hazır)", () => {
+        // Login akışı şu an client-side Supabase SDK (login/page.tsx:21) → middleware
+        // görmez. /api/auth/login server route eklenirse otomatik aktif olur.
+        // selectPolicy doğrudan test — runtime'da hit etmez ama invariant kilitli.
+        expect(selectPolicy("/login", "POST", false)).toBe(POLICIES.LOGIN);
     });
 });

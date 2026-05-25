@@ -5,6 +5,7 @@ import {
     selectPolicy,
     extractClientIp,
     detectSupabaseAuthCookie,
+    type RateCheckResult,
 } from "@/lib/rate-limit";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
@@ -23,6 +24,17 @@ const CRON_PATHS = [
     "/api/quotes/expire",
     "/api/email/retry-failed",
 ];
+
+/**
+ * M-3 Review (2026-05-25): rate-limit allow path'lerinin TÜMÜNE X-RateLimit-*
+ * observability header ekler — NextResponse.next / redirect / 401 ayrımı yok.
+ * 429 response zaten kendi header set'iyle dönüyor; bu helper başarılı yol için.
+ */
+function withRateHeaders(response: NextResponse, rate: RateCheckResult): NextResponse {
+    response.headers.set("X-RateLimit-Limit", String(rate.limit));
+    response.headers.set("X-RateLimit-Remaining", String(rate.remaining));
+    return response;
+}
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
@@ -49,9 +61,16 @@ export async function middleware(request: NextRequest) {
     // getUser() maliyetine girmeden auth proxy (cookie varlığı). Saldırgan fake
     // cookie ile yüksek limit alsa bile aşağıda auth check 401 döner → resource
     // consumption hâlâ sınırlı.
+    //
+    // M-3 Review (P2): demo_mode cookie de "authenticated-like" sayılır —
+    // demo dashboard auto-reload trafiği (alerts 60s, purchase 60s, vb.) anon
+    // 30/dk limitine takılırsa kullanıcı yanlışlıkla 429 görür. Demo session
+    // YARATMA (/api/auth/demo) yine DEMO policy'de (5/15dk) kalır.
     const ip = extractClientIp(request);
     const hasAuthCookie = detectSupabaseAuthCookie(request);
-    const policy = selectPolicy(pathname, request.method, hasAuthCookie);
+    const hasDemoCookie = request.cookies.get("demo_mode")?.value === "1";
+    const isSessionLike = hasAuthCookie || hasDemoCookie;
+    const policy = selectPolicy(pathname, request.method, isSessionLike);
     const rate = await rateLimitCheck(`ip:${ip}`, policy);
 
     if (!rate.ok) {
@@ -72,14 +91,14 @@ export async function middleware(request: NextRequest) {
 
     // ── 4. ALWAYS_PUBLIC bypass (rate limit'ten geçti) ──────────────────────
     if (ALWAYS_PUBLIC.some(p => pathname === p || pathname.startsWith(p + "/"))) {
-        return NextResponse.next();
+        return withRateHeaders(NextResponse.next(), rate);
     }
 
     // ── 5. CRON path ama CRON_SECRET yoksa 401 (mevcut M-1 invariant) ──────
     if (CRON_PATHS.some(p => pathname === p)) {
-        return NextResponse.json(
-            { error: "CRON_SECRET gerekli." },
-            { status: 401 }
+        return withRateHeaders(
+            NextResponse.json({ error: "CRON_SECRET gerekli." }, { status: 401 }),
+            rate,
         );
     }
 
@@ -132,24 +151,24 @@ export async function middleware(request: NextRequest) {
                 process.env.ATTACHMENTS_BLOCK_DEMO_ANON === "true" &&
                 /^\/api\/products\/[^/]+\/attachments/.test(pathname)
             ) {
-                return NextResponse.json(
-                    { error: "Bu kaynak için kimlik doğrulama gerekiyor." },
-                    { status: 401 }
+                return withRateHeaders(
+                    NextResponse.json({ error: "Bu kaynak için kimlik doğrulama gerekiyor." }, { status: 401 }),
+                    rate,
                 );
             }
             // Dashboard sayfaları → izin ver
             if (pathname.startsWith("/dashboard")) {
-                return NextResponse.next();
+                return withRateHeaders(NextResponse.next(), rate);
             }
             // GET API → izin ver (DataProvider veri çekebilsin)
             if (pathname.startsWith("/api/") && request.method === "GET") {
-                return NextResponse.next();
+                return withRateHeaders(NextResponse.next(), rate);
             }
             // Non-GET API (POST/PATCH/DELETE) → 403
             if (pathname.startsWith("/api/")) {
-                return NextResponse.json(
-                    { error: "Demo modunda değişiklik yapılamaz." },
-                    { status: 403 }
+                return withRateHeaders(
+                    NextResponse.json({ error: "Demo modunda değişiklik yapılamaz." }, { status: 403 }),
+                    rate,
                 );
             }
             // / veya /login → mevcut davranışa düş
@@ -157,34 +176,36 @@ export async function middleware(request: NextRequest) {
 
         // Public sayfalar — auth gerektirmiyor
         if (pathname === "/login" || pathname === "/") {
-            return NextResponse.next();
+            return withRateHeaders(NextResponse.next(), rate);
         }
         // API → 401 JSON
         if (pathname.startsWith("/api/")) {
-            return NextResponse.json(
-                { error: "Yetkisiz erişim." },
-                { status: 401 }
+            return withRateHeaders(
+                NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 }),
+                rate,
             );
         }
         // Diğer sayfalar → /login'e yönlendir
         const url = request.nextUrl.clone();
         url.pathname = "/login";
-        return NextResponse.redirect(url);
+        return withRateHeaders(NextResponse.redirect(url), rate);
     }
 
     // Auth'lu kullanıcı /login veya / → dashboard'a yönlendir
     if (pathname === "/login" || pathname === "/") {
         const url = request.nextUrl.clone();
         url.pathname = "/dashboard";
-        return NextResponse.redirect(url);
+        return withRateHeaders(NextResponse.redirect(url), rate);
     }
 
-    // Başarı response'ına observability header'ları ekle (rate limit info).
-    supabaseResponse.headers.set("X-RateLimit-Limit", String(rate.limit));
-    supabaseResponse.headers.set("X-RateLimit-Remaining", String(rate.remaining));
-    return supabaseResponse;
+    return withRateHeaders(supabaseResponse, rate);
 }
 
 export const config = {
     matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+    // M-3 Review (2026-05-25): Node.js runtime zorunlu — middleware'de ioredis
+    // (TCP socket) ve Supabase SSR Node-only API'leri kullanılır. Next 16'da
+    // middleware default Edge runtime; bu config Node.js'e zorlar (Coolify
+    // Resource Redis container TCP üzerinden, Edge'de imkansız).
+    runtime: "nodejs",
 };

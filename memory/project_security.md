@@ -86,7 +86,7 @@ Tüm rotalar için (`/:path*`):
 ## Audit Durumu (2026-04-23) — TÜM BULGULAR KAPALI ✅
 
 Son kalan ertelenen:
-- ~~M-3: Rate limiting~~ — ✅ TAMAMLANDI (2026-05-25, commit pending). Yaklaşım B uygulandı:
+- ~~M-3: Rate limiting~~ — ✅ TAMAMLANDI (2026-05-25, Review 1 dahil). Yaklaşım B uygulandı:
   Coolify self-hosted Redis (Resource olarak panel'den eklenir, REDIS_URL auto-inject).
   Backend: `ioredis` + `rate-limiter-flexible` (sliding window, atomic Lua scripts).
   Helper `src/lib/rate-limit.ts`: singleton Redis + POLICIES (LOGIN 5/15dk, DEMO 5/15dk,
@@ -96,7 +96,15 @@ Son kalan ertelenen:
   (3) rate-limit (auth-cookie hibrit, IP-anchor key), (4) ALWAYS_PUBLIC bypass,
   (5) CRON 401, (6) Supabase auth gate. Fail-open: REDIS_URL boş veya bağlantı hatası
   → tüm istekler geçer + console.error (site downtime'a sebep olmaz).
-  +26 test (helper 11 + pure 6 + middleware 9). Deploy adımları: Coolify panel → Redis
-  Resource ekle → REDIS_URL doğrula → redeploy. Smoke: 6 hızlı POST /login → 6. 429.
+  +30 test (helper 11 + pure 6 + middleware 13). Deploy adımları: Coolify panel →
+  Redis Resource ekle → REDIS_URL doğrula → redeploy. Smoke: `curl /api/auth/demo`
+  6 kez → 6. 429 (login akışı client-side SDK, Supabase GoTrue brute-force koruması).
+  Review 1 bulguları: (a) middleware `runtime: "nodejs"` config Next 16 (ioredis TCP
+  Edge'de çalışmaz), (b) LOGIN policy dead-code dokümante (login akışı Supabase SDK
+  middleware görmez; gelecek server route için hazır), (c) demo test POST→GET fix
+  (gerçek route GET), (d) demo_mode cookie API_AUTH limit (auto-reload anon 30/dk
+  yetersizdi → 300/dk), (e) `withRateHeaders` helper tüm allow path'lerde, (f)
+  PARASUT_SYNC policy dead-code dokümante (UI sync-all CRON_PATHS'te → 401, UX bug
+  ayrı tur).
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)

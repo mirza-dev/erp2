@@ -53,16 +53,28 @@ export interface RatePolicy {
 }
 
 export const POLICIES = {
-    // Auth surface — brute-force koruması
+    // Auth surface — brute-force koruması.
+    // M-3 Review (2026-05-25): LOGIN şu an effective DEĞİL — login akışı
+    // `src/app/login/page.tsx:21` Supabase SDK `signInWithPassword` ile
+    // doğrudan Supabase GoTrue'ya gider, middleware görmez. Brute-force
+    // koruması şu an Supabase GoTrue'nun built-in limit'i ile sağlanır.
+    // Bu policy, ileride `/api/auth/login` server route veya server action
+    // arkasına alındığında otomatik aktif olsun diye policy katmanında hazır
+    // tutulur (selectPolicy zaten `POST /login` için bunu seçer; route yok).
     LOGIN:        { name: "login", points: 5,   duration: 900,  blockDuration: 900 }, // 5 / 15 dk + 15 dk block
     DEMO:         { name: "demo",  points: 5,   duration: 900 },                       // 5 / 15 dk
     // AI cost amplification koruması
     AI:           { name: "ai",    points: 10,  duration: 60 },                        // 10 / dk
-    // Paraşüt manuel sync
+    // Paraşüt manuel sync.
+    // M-3 Review (2026-05-25): PARASUT_SYNC şu an effective DEĞİL —
+    // `/api/parasut/sync-all` middleware CRON_PATHS'te, sadece CRON_SECRET
+    // Bearer ile erişilir; UI buton POST atsa (parasut/page.tsx:161) 401 alır
+    // (mevcut UX bug, ayrı tur). Policy ileride UI manuel sync akışı CRON'dan
+    // çıkarılırsa aktif olur. selectPolicy `POST /api/parasut/*` için bunu seçer.
     PARASUT_SYNC: { name: "psync", points: 30,  duration: 60 },                        // 30 / dk
-    // Authenticated user normal API
+    // Authenticated user normal API (Supabase auth cookie VEYA demo_mode cookie)
     API_AUTH:     { name: "auth",  points: 300, duration: 60 },                        // 300 / dk
-    // Anon (login öncesi public read, demo öncesi)
+    // Anon (login öncesi public read)
     API_ANON:     { name: "anon",  points: 30,  duration: 60 },                        // 30 / dk
 } as const satisfies Record<string, RatePolicy>;
 

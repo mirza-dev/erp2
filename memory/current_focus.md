@@ -7,7 +7,21 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-25
 
-**M-3 Rate Limiting — Coolify self-hosted Redis (3565 test)**
+**M-3 Rate Limiting Review 1 — 6 bulgu kapatma (3569 test)**
+
+- **P1 Edge runtime fix:** Next 16 middleware default Edge → ioredis TCP socket'i çalışmaz (build geçer, runtime patlar). `middleware.ts` `config.runtime = "nodejs"` eklendi. Build doğrulandı.
+- **P1 Login dead-code dokümante:** Login akışı (`login/page.tsx:21`) client-side Supabase SDK `signInWithPassword` → middleware görmez. LOGIN policy `selectPolicy` map'inde korundu ama JSDoc + memory'de "şu an etki yok, /api/auth/login server route eklenirse aktif" notu. Brute-force koruması Supabase GoTrue built-in limit'inde.
+- **P2 Demo test POST→GET:** `/api/auth/demo` gerçek akışı GET (`DemoButton.tsx:16` Link, `route.ts:10` GET handler). Test ve smoke komutu güncel.
+- **P2 Demo cookie auth-like detection:** demo_mode cookie de "session-like" sayılır → API_AUTH (300/dk). Demo dashboard auto-reload trafiği (alerts 60s, purchase 60s) anon 30/dk limitine takılmaz. Demo session yaratma (`/api/auth/demo`) yine DEMO 5/15dk.
+- **P2 `withRateHeaders` helper:** Rate-limit allow path'lerinin TÜMÜ (`NextResponse.next` bypass, `redirect`, `401`, `403`) X-RateLimit-Limit/Remaining header alır. 429 zaten kendi set'iyle dönüyor. Tutarlı client observability.
+- **P3 PARASUT_SYNC dead-code dokümante:** `/api/parasut/sync-all` CRON_PATHS'te → UI buton POST atsa 401 alır (mevcut UX bug, ayrı tur). PARASUT_SYNC policy `selectPolicy` map'inde korundu; UI flow CRON'dan çıkarılırsa aktif olur.
+- **+4 regression test** (`middleware-rate-limit.test.ts`): demo cookie API_AUTH policy + ALWAYS_PUBLIC bypass X-RateLimit-* header + anon 401 X-RateLimit-* header + LOGIN policy selectPolicy invariant.
+- 5 dosya (middleware + rate-limit helper JSDoc + 1 test güncellemesi + 2 memory) · **3569 test yeşil** (önceki 3565 + 4) · TS clean · 0 lint · build OK
+- **Smoke komutu güncellendi:** `for i in {1..6}; do curl -I https://erp.getmedspace.com/api/auth/demo; done` → 6. denemede 429.
+
+## Önceki — M-3 ilk implementasyon (3565 test)
+
+**Coolify self-hosted Redis (ioredis + rate-limiter-flexible)**
 
 - **Audit M-3 ✅:** Güvenlik audit'inde ertelenmiş bulgu. Coolify cutover sonrası Vercel platform katmanı yok → öncelik yükseldi. Saldırı yüzeyleri: login brute-force, demo abuse, AI cost amplification, Paraşüt sync, scrape.
 - **Yaklaşım B:** Coolify Resource olarak self-hosted Redis. Backend: `ioredis` + `rate-limiter-flexible` (sliding window, atomic Lua). Sıfır ek hosting, same-VPS low latency.
