@@ -35,7 +35,7 @@ vi.mock("@/lib/rate-limit", async () => {
     };
 });
 
-import { middleware } from "../../middleware";
+import { middleware } from "../proxy";
 import { selectPolicy, POLICIES } from "@/lib/rate-limit";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

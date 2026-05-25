@@ -15,7 +15,10 @@ import { NextRequest } from "next/server";
 // ── Source files for regression locks ────────────────────────────────────────
 
 const MIDDLEWARE = fs.readFileSync(
-    path.join(process.cwd(), "middleware.ts"),
+    // M-3 Review 2 (2026-05-25): middleware.ts → src/proxy.ts (Next 16 Turbopack
+    // proxy convention; root-level proxy.ts discover edilmiyor). İçerik aynen
+    // korundu (export `proxy` + alias `middleware`); demo guard branch'i aynı.
+    path.join(process.cwd(), "src/proxy.ts"),
     "utf8",
 );
 const URL_ROUTE = fs.readFileSync(
@@ -70,7 +73,7 @@ vi.mock("@supabase/ssr", () => ({
 }));
 
 // NOT: import middleware after the mock declaration.
-import { middleware } from "../../middleware";
+import { middleware } from "../proxy";
 
 const ANON = { data: { user: null } };
 const AUTH = { data: { user: { id: "u1", email: "admin@pmt.com" } } };

@@ -96,9 +96,26 @@ Son kalan ertelenen:
   (3) rate-limit (auth-cookie hibrit, IP-anchor key), (4) ALWAYS_PUBLIC bypass,
   (5) CRON 401, (6) Supabase auth gate. Fail-open: REDIS_URL boş veya bağlantı hatası
   → tüm istekler geçer + console.error (site downtime'a sebep olmaz).
-  +30 test (helper 11 + pure 6 + middleware 13). Deploy adımları: Coolify panel →
-  Redis Resource ekle → REDIS_URL doğrula → redeploy. Smoke: `curl /api/auth/demo`
-  6 kez → 6. 429 (login akışı client-side SDK, Supabase GoTrue brute-force koruması).
+  +36 test (helper 11 + pure 6 + middleware 13 + proxy build manifest 6). Deploy
+  adımları: Coolify panel → Redis Resource ekle → REDIS_URL doğrula → redeploy.
+  Smoke: `curl /api/auth/demo` 6 kez → 6. 429 (login akışı client-side SDK,
+  Supabase GoTrue brute-force koruması).
+
+  **Review 2 (2026-05-25 P0 fix):** İlk implementation `middleware.ts` + Next 16
+  `runtime: "nodejs"` config kullanıyordu — TESTLER YEŞİL ama production'da
+  middleware INVOKE EDİLMEDİ. Kanıt: `.next/server/functions-config-manifest.json`
+  BOŞ kalıyordu (`functions: {}`), HTTP smoke /dashboard auth'suz 200,
+  /api/products 401 değil, /api/parasut/sync-all Bearer'sız 200, X-RateLimit-*
+  header yok. Next 16 source incelendi: `build/utils.js:1535` `if (staticInfo.runtime
+  === 'nodejs' || isProxyFile(page))` koşulu Turbopack'te `middleware.ts` için
+  yanlış parse ediyordu. **Çözüm:** `middleware.ts` → `src/proxy.ts` rename
+  (Next 16 PROXY_FILENAME convention, otomatik Node runtime). Root-level
+  `proxy.ts` Turbopack tarafından discover edilmediği için `src/` altında.
+  Build log artık `ƒ Proxy (Middleware)` satırı içerir, functions-config-manifest
+  /_middleware entry'si dolar. proxy.ts içinde `export async function proxy(...)`
+  + backward-compat `export const middleware = proxy` (test importları korunur).
+  +6 regression test (`proxy-build-manifest.test.ts`) — proxy.ts varlığı, root
+  middleware.ts yok, named export pattern, alias, matcher, manifest entry.
   Review 1 bulguları: (a) middleware `runtime: "nodejs"` config Next 16 (ioredis TCP
   Edge'de çalışmaz), (b) LOGIN policy dead-code dokümante (login akışı Supabase SDK
   middleware görmez; gelecek server route için hazır), (c) demo test POST→GET fix

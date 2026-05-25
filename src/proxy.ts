@@ -36,7 +36,10 @@ function withRateHeaders(response: NextResponse, rate: RateCheckResult): NextRes
     return response;
 }
 
-export async function middleware(request: NextRequest) {
+// proxy.ts convention: Next 16 named export `proxy` veya default export bekler.
+// Mevcut testler `middleware()` import ediyordu — geriye uyumluluk için
+// `middleware` alias'ı da export edilir (proxy.ts dosya altında).
+export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // ── 1. /api/health — ABSOLUTE bypass (monitoring, k6 smoke) ─────────────
@@ -201,11 +204,33 @@ export async function middleware(request: NextRequest) {
     return withRateHeaders(supabaseResponse, rate);
 }
 
+// Backward-compat alias — mevcut testler `import { middleware } from "../../middleware"`
+// veya proxy'den `middleware` import ediyor. Bu alias 1 satır maliyetle hem
+// proxy convention'ı (Next runtime) hem test import'larını destekler.
+export const middleware = proxy;
+
 export const config = {
     matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
-    // M-3 Review (2026-05-25): Node.js runtime zorunlu — middleware'de ioredis
-    // (TCP socket) ve Supabase SSR Node-only API'leri kullanılır. Next 16'da
-    // middleware default Edge runtime; bu config Node.js'e zorlar (Coolify
-    // Resource Redis container TCP üzerinden, Edge'de imkansız).
-    runtime: "nodejs",
 };
+
+// M-3 Review 2 (2026-05-25): Bu dosya **proxy.ts** convention'ı (eski
+// `middleware.ts` rename). Next 16'da middleware Node.js runtime için iki yol:
+//
+//   1) `middleware.ts` + `export const runtime = "nodejs"` veya
+//      `config.runtime = "nodejs"` — build'de `getStaticInfoIncludingLayouts`
+//      runtime'ı düzgün parse etmedi. functions-config-manifest.json boş kaldı,
+//      production'da middleware invoke EDİLMEDİ.
+//
+//   2) `proxy.ts` — `isProxyFile(page)` otomatik tanır, runtime export
+//      gerekmez, build/utils.js:1535 koşulu (`staticInfo.runtime === 'nodejs'
+//      || isProxyFile(page)`) sağlanır → functions-config-manifest.json'a
+//      `/_middleware` entry'si yazılır → production'da middleware invoke EDİLİR.
+//
+// P0 smoke kanıtı (ilk Review öncesi): GET /dashboard auth'suz 200 (login
+// redirect olmalıydı), GET /api/products 401 değil, POST /api/parasut/sync-all
+// Bearer'sız 200 (CRON_SECRET 401 olmalıydı), X-RateLimit-* header yoktu —
+// middleware tamamen bypass oluyordu. proxy.ts rename bu P0'ı kapatır.
+//
+// Davranış sözleşmesi değişmedi — Next runtime aynı fn signature'ı bekler
+// (`export async function middleware(request: NextRequest)`); auth/cron/
+// rate-limit gate'leri aynen çalışır.

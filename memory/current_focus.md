@@ -7,7 +7,21 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-25
 
-**M-3 Rate Limiting Review 1 — 6 bulgu kapatma (3569 test)**
+**M-3 Rate Limiting Review 2 — P0 production pipeline fix (3575 test)**
+
+- **P0 Kanıt (kullanıcı smoke):** Review 1 sonrası testler/build yeşil ama production HTTP smoke kırmızı. `.next/server/functions-config-manifest.json` BOŞ (`functions: {}`), `.next/server/middleware-manifest.json` BOŞ. Production gözlem: GET /dashboard auth'suz 200 (login redirect olmalıydı), GET /api/products 401 değil, POST /api/parasut/sync-all Bearer'sız 200, X-RateLimit-* header yok. Yani middleware production'da INVOKE EDİLMİYORDU — auth/cron/rate-limit gate'leri tamamen bypass.
+- **Tanı (Next 16 source):** `build/utils.js:1535` `if (staticInfo.runtime === 'nodejs' || isProxyFile(page)) { functionsConfigManifest.functions['/_middleware'] = { runtime: 'nodejs', matchers } }`. Bizim `middleware.ts` + `config.runtime = "nodejs"` veya `export const runtime = "nodejs"` denendi → ikisi de Turbopack tarafından parse edilmedi → koşul sağlanmadı → manifest boş kaldı. Test ettim: `experimental.nodeMiddleware: true` Next 16 ExperimentalConfig type'ında yok (artık değil). Webpack build TS hatasıyla fail oldu (ayrı route sorunu, scope dışı). **Anahtar bulgu:** Next 16 yeni `PROXY_FILENAME = 'proxy'` convention'ı tanıttı — `isProxyFile(page)` otomatik true, runtime export gerekmez.
+- **Çözüm:** `middleware.ts` → `src/proxy.ts` rename. **İki önemli ayrıntı:** (1) Root-level `proxy.ts` Turbopack tarafından discover edilmedi, **`src/proxy.ts`** zorunlu. (2) Function adı `export async function proxy(...)` olmalı (Next "Ensure this file has either a default or 'proxy' function export" error verir); backward-compat için `export const middleware = proxy` alias eklendi → mevcut testler bozulmadı.
+- **Doğrulama:** Build artık `ƒ Proxy (Middleware)` satırı içeriyor. `functions-config-manifest.json` dolu — `/_middleware` entry `runtime: "nodejs"` + matcher regex.
+- **+6 yeni regression test** (`proxy-build-manifest.test.ts`): src/proxy.ts varlığı, root middleware.ts yok, `export async function proxy` pattern, `export const middleware = proxy` alias, matcher tanımı, post-build manifest assertion (`functions["/_middleware"].runtime === "nodejs"`).
+- **Mevcut test importları güncel:** 4 test dosyası `from "../../middleware"` → `from "../proxy"` (alias sayesinde davranış aynı). 1 source-regex test dosyası `middleware.ts` → `src/proxy.ts` path update.
+- **next.config.ts:** `experimental.nodeMiddleware` (denenmişti) geri alındı — Next 16 type'ında yok, gereksiz.
+- 8 dosya (1 rename src/proxy.ts, 1 next.config rollback, 4 test import update, 1 source-regex path update, 1 yeni test) · **3575 test yeşil** (önceki 3569 + 6 regression) · TS clean · 0 lint · build OK (manifest dolu)
+- **Sıradaki:** Coolify deploy + smoke (kullanıcı tarafı). Bu sefer gerçekten çalışır.
+
+## Önceki — M-3 Review 1 (3569 test)
+
+**6 bulgu kapatma (P1-P3) — runtime nodejs config, login dead-code, demo GET, demo cookie, withRateHeaders, PARASUT_SYNC**
 
 - **P1 Edge runtime fix:** Next 16 middleware default Edge → ioredis TCP socket'i çalışmaz (build geçer, runtime patlar). `middleware.ts` `config.runtime = "nodejs"` eklendi. Build doğrulandı.
 - **P1 Login dead-code dokümante:** Login akışı (`login/page.tsx:21`) client-side Supabase SDK `signInWithPassword` → middleware görmez. LOGIN policy `selectPolicy` map'inde korundu ama JSDoc + memory'de "şu an etki yok, /api/auth/login server route eklenirse aktif" notu. Brute-force koruması Supabase GoTrue built-in limit'inde.
