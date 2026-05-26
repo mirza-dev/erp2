@@ -668,6 +668,9 @@ export default function PurchaseSuggestedPage() {
     } | null>(null);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiError, setAiError] = useState(false);
+    // 2026-05-26: Route-level AI rate limit guard 429 dönerse spesifik banner için.
+    // null = limit aşılmadı; { retryAfter } = aşıldı, X saniye sonra dene.
+    const [aiRateLimited, setAiRateLimited] = useState<{ retryAfter: number } | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
     const [aiDrawerProductId, setAiDrawerProductId] = useState<string | null>(null);
@@ -723,15 +726,27 @@ export default function PurchaseSuggestedPage() {
         if (shouldSkipAiFetch(isDemo)) {
             setAiData(null);
             setAiError(false);
+            setAiRateLimited(null);
             return true;
         }
         setAiLoading(true);
         setAiError(false);
+        setAiRateLimited(null);
         try {
             const res = await fetch("/api/ai/purchase-copilot", {
                 method: "POST",
                 signal,
             });
+            // 2026-05-26: Route-level AI rate limit guard 429 dönerse generic
+            // "AI çağrısı başarısız" yerine spesifik "AI istek limiti aşıldı"
+            // mesajı göster (retryAfter ile). Aksi halde kullanıcı tek tıkta
+            // 10'u aşınca "Aşağıda standart hesaplamalara dayalı..." gibi
+            // yanıltıcı bir mesaj görüyordu.
+            if (res.status === 429) {
+                const body = await res.json().catch(() => ({ retryAfter: 60 }));
+                setAiRateLimited({ retryAfter: typeof body?.retryAfter === "number" ? body.retryAfter : 60 });
+                return false;
+            }
             const data = res.ok ? await res.json() : null;
             if (data) {
                 setAiData(data);
@@ -1251,8 +1266,20 @@ export default function PurchaseSuggestedPage() {
                 </div>
             )}
 
+            {/* 2026-05-26: Route-level AI rate limit guard 429 — spesifik mesaj.
+                aiError genel "AI başarısız" banner'ından önce render edilir; rate-limit
+                aktifken iki banner birden gösterilmesin diye aiRateLimited != null kontrol. */}
+            {!isDemo && aiRateLimited && (
+                <AiUnavailableBanner
+                    message={`AI istek limiti aşıldı. Lütfen yaklaşık ${aiRateLimited.retryAfter} saniye bekleyip tekrar deneyin. Bu sırada deterministik hesaplamalar gösteriliyor.`}
+                    onRetry={() => loadAiData()}
+                    retryDisabled={aiLoading}
+                    style={{ marginTop: "16px", borderRadius: "8px" }}
+                />
+            )}
+
             {/* Sprint C G2: AI çağrısı başarısız sarı banner + Yeniden dene */}
-            {!isDemo && (aiError || aiData?.ai_call_failed) && (
+            {!isDemo && !aiRateLimited && (aiError || aiData?.ai_call_failed) && (
                 <AiUnavailableBanner
                     message="AI önerisi şu an oluşturulamadı. Aşağıda standart hesaplamalara dayalı öneriler gösteriliyor."
                     onRetry={() => loadAiData()}

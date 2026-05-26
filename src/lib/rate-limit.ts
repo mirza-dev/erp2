@@ -261,13 +261,10 @@ export function selectPolicy(pathname: string, method: string, isAuthenticated: 
     return POLICIES.API_AUTH;  // /dashboard/** vb — practical olarak hit etmez (middleware /api ve auth path filter)
 }
 
-/** IP extraction — Coolify Traefik X-Forwarded-For (virgülle ayrılmış zincir, ilki client). */
-export function extractClientIp(req: { headers: Headers }): string {
-    const xff = req.headers.get("x-forwarded-for");
-    if (xff) return xff.split(",")[0]!.trim();
-    const real = req.headers.get("x-real-ip");
-    return real ?? "0.0.0.0";
-}
+// IP extraction `src/lib/request-ip.ts`'e taşındı — `ai-route-limit.ts` Redis
+// runtime bağımlılığı taşımasın diye (Upstash refactor'da bu dosya silinebilir).
+// Backward-compat: mevcut import'lar (proxy.ts, testler) bozulmasın diye re-export.
+export { extractClientIp } from "@/lib/request-ip";
 
 /**
  * Supabase auth cookie varlığı kontrolü — getUser maliyetine girmeden hızlı proxy.

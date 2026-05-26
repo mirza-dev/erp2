@@ -3,7 +3,19 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-26_
 
-**Son tamamlanan iş:** Route-level AI rate limit — Anthropic fatura amplifikasyonu koruması (2026-05-26; 3606 test)
+**Son tamamlanan iş:** AI rate limit advisor refinement — request-ip extract + limit 10 + 429 frontend (2026-05-26; 3614 test)
+
+- **Trigger:** Önceki commit `c92ff9f` (route-level AI guard) deploy edildi, kullanıcı UI'da "AI önerisi oluşturulamadı" sarı banner gördü. Tanı: purchase-copilot 5/dk limiti sayfa açılışı + auto-reload + manuel yenile toplamında pratikte aşılıyordu; frontend 429'u generic "AI başarısız" olarak yutuyordu (yanıltıcı).
+- **Advisor 3 düzeltme + kullanıcı keşfi 1 ek fix:**
+  - **P3 — Redis bağımsızlık:** `extractClientIp` `src/lib/rate-limit.ts`'ten yeni `src/lib/request-ip.ts`'e taşındı. `rate-limit.ts` re-export ile backward-compat (proxy.ts + mevcut testler kırılmaz). `ai-route-limit.ts` artık `request-ip`'ten import — `ioredis`/`rate-limiter-flexible` runtime bağımlılığı yok. Upstash refactor'da `rate-limit.ts` silinse bile bu helper kalır.
+  - **P3 — Validation öncesi guard:** `score` + `parse` route'larında guard `safeParseJson` + field validation sonrasına taşındı (kötü JSON / eksik body AI kotasını tüketmesin — semantik temizlik).
+  - **P2 — Smoke test düzeltme:** Plan'da `/api/ai/score` auth'suz curl yanlış tarif edilmişti — proxy auth gate altında 401 alır, guard tetiklenmez. Authenticated session veya purchase-copilot (route-içi auth) ile UI'dan test edilmeli (memory'de belgelendi).
+  - **Yeni fix — purchase-copilot limit 5→10 + frontend 429 handling:** Limit artırıldı + `aiRateLimited` state + spesifik banner ("AI istek limiti aşıldı. Lütfen yaklaşık X saniye bekleyip tekrar deneyin"). loadAiData 429 dalı eklendi (`res.status === 429` → setAiRateLimited, generic aiError set etmez). UI iki banner birden göstermesin diye `!aiRateLimited` koşulu mevcut aiError banner'ına eklendi.
+- **+7 yeni test** (`request-ip.test.ts`): XFF zincir ilki, single IP trim, x-real-ip fallback, default 0.0.0.0, re-export aynı fn, request-ip.ts varlığı, ai-route-limit.ts redis bağımsız import + negatif assertion. integration test güncellendi: purchase-copilot limit 10.
+- 10 dosya (1 yeni helper + 1 yeni test + 1 source-regex test güncel + 3 AI route düzenleme + 1 frontend page + 1 rate-limit re-export + 2 memory + CLAUDE.md) · **3614 test yeşil** (önceki 3606 + 8) · TS clean · 0 lint warning · build OK
+- **Sıradaki — kullanıcı:** (1) Coolify redeploy + UI smoke (auth'lı dashboard → /dashboard/purchase/suggested → "↻ Yenile" 11 kez bas → 11. tıklamada artık spesifik "AI istek limiti aşıldı" banner görmeli — generic değil), (2) 1-2 hafta sonra Upstash REST migration ayrı PR.
+
+**Önceki:** Route-level AI rate limit — Anthropic fatura amplifikasyonu koruması (2026-05-26; 3606 test)
 
 - **Bağlam:** M-3 global Redis rate limit Coolify Docker network sorunlarıyla çıkmazda. REDIS_URL unset → fail-open path stabil. Kullanıcı kararı: A (Redis disable) + route-level AI guard (defense-in-depth). Upstash REST refactor 1-2 hafta sonra ayrı PR.
 - **Tasarım kararı:** Guard MIDDLEWARE'de DEĞİL ROUTE içinde. Next 16 Turbopack proxy convention P0 bug'ından öğrenildi — route-içi guard middleware bypass olsa bile AI faturası korunur.

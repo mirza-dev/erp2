@@ -22,7 +22,9 @@
  */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { extractClientIp } from "@/lib/rate-limit";
+// Redis-bağımsız import — `rate-limit.ts` üzerinden gitmek `ioredis` +
+// `rate-limiter-flexible` modüllerini gereksiz yere yüklerdi.
+import { extractClientIp } from "@/lib/request-ip";
 
 const WINDOW_MS = 60_000;                    // 1 dk rolling window
 const DEFAULT_LIMIT = 5;                     // 5 req/dk/IP/route

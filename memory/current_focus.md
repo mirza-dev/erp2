@@ -7,6 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-26
 
+**AI rate limit advisor refinement — request-ip extract + limit 10 + 429 frontend (3614 test)**
+
+- **Trigger:** `c92ff9f` deploy sonrası kullanıcı "AI önerisi oluşturulamadı" sarı banner gördü. purchase-copilot 5/dk limiti pratikte aşılıyordu, frontend 429'u generic AI hatası olarak yutuyordu.
+- **3 advisor + 1 kullanıcı bulgu fix:**
+  - **Redis bağımsızlık (P3):** `extractClientIp` → yeni `src/lib/request-ip.ts`. `rate-limit.ts` re-export. `ai-route-limit.ts` direkt request-ip'ten import → ioredis runtime bağımlılığı yok.
+  - **Validation öncesi guard (P3):** score + parse'ta guard `safeParseJson` + field validation sonrasına taşındı.
+  - **Smoke test düzeltme (P2):** Plan'da `/api/ai/score` auth'suz curl yanlıştı (proxy 401). UI'dan authenticated session veya purchase-copilot ile test edilmeli — belgelendi.
+  - **Yeni fix:** purchase-copilot limit 5→10 + frontend 429 spesifik handling (`aiRateLimited` state + spesifik banner mesajı). loadAiData 429 dalı eklendi, mevcut aiError banner `!aiRateLimited` koşullu (çift banner yok).
+- **+7 yeni test** `request-ip.test.ts` (XFF zincir, trim, x-real-ip fallback, default, re-export, dosya varlığı, ai-route-limit redis bağımsız + negatif assertion). integration test purchase-copilot limit 10 güncel.
+- **10 dosya** (1 yeni helper + 1 yeni test + 1 source-regex update + 3 AI route + 1 frontend page + 1 rate-limit re-export + 3 memory) · **3614 test yeşil** (önceki 3606 + 8) · TS clean · 0 lint warning · build OK (`ƒ Proxy (Middleware)` korundu)
+- **Sıradaki:** (1) Coolify redeploy + UI smoke (auth'lı /dashboard/purchase/suggested → 11. yenile → spesifik 429 banner görmeli, generic değil), (2) 1-2 hafta sonra Upstash REST migration ayrı PR.
+
+## Önceki — Route-level AI rate limit (3606 test, 2026-05-26)
+
 **Route-level AI rate limit — Anthropic fatura amplifikasyonu koruması (3606 test)**
 
 - **Karar bağlamı:** M-3 global Redis rate limit Coolify Docker network sorunlarıyla çıkmaza girdi (terminal yok, debug zor). REDIS_URL env unset → fail-open path stabil, sistem normal hızda. Kullanıcı kararı: A (disable Redis) + route-level AI guard (defense-in-depth). 1-2 hafta sonra Upstash REST refactor (ayrı PR).

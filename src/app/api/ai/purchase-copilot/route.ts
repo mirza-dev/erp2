@@ -91,10 +91,13 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
 
     // Route-level AI rate limit (2026-05-26) — Anthropic fatura amplifikasyonu koruması.
     // checkAuth'tan sonra çalışır → cron isteği zaten Bearer ile doğrulandı, manuel curl
-    // ile yapay yük üretmek isteyen kullanıcı 5/dk limitine takılır.
+    // ile yapay yük üretmek isteyen kullanıcı 10/dk limitine takılır.
+    // Limit 10/dk seçildi: sayfa açılışı 1 fetch + auto-reload signature değişimi 1-2
+    // + kullanıcının manuel "↻ Yenile" denemeleri toplamı pratikte 5'i aşıyordu (UI
+    // "AI önerisi oluşturulamadı" yanlış mesajı tetikliyordu).
     // Middleware-level Redis rate limit şu an pasif (Docker network sorunu); guard burada.
     if (request) {
-        const limited = guardAiRoute(request, "purchase-copilot", 5);
+        const limited = guardAiRoute(request, "purchase-copilot", 10);
         if (limited) return limited;
     }
 

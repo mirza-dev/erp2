@@ -16,7 +16,7 @@ import { join } from "node:path";
 const ROUTES = [
     {
         path: "src/app/api/ai/purchase-copilot/route.ts",
-        limit: 5,
+        limit: 10,  // 2026-05-26 advisor refinement: 5 → 10 (sayfa açılışı + yenile yetersizdi)
         routeName: "purchase-copilot",
     },
     {

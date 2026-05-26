@@ -6,10 +6,6 @@ import { guardAiRoute } from "@/lib/ai-route-limit";
 // POST /api/ai/score
 // Body: { order_id: string }
 export async function POST(req: NextRequest) {
-    // Route-level AI rate limit (2026-05-26) — Anthropic fatura amplifikasyonu koruması.
-    const limited = guardAiRoute(req, "score", 5);
-    if (limited) return limited;
-
     try {
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
@@ -21,6 +17,11 @@ export async function POST(req: NextRequest) {
                 { status: 400 }
             );
         }
+
+        // Route-level AI rate limit (2026-05-26) — validasyondan sonra, Anthropic
+        // çağrısından önce. Kötü JSON / eksik body AI kotasını tüketmesin (semantik).
+        const limited = guardAiRoute(req, "score", 5);
+        if (limited) return limited;
 
         const result = await aiScoreOrder(order_id);
         return NextResponse.json(result);
