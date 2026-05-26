@@ -9,12 +9,34 @@
  * Singleton lazy init — REDIS_URL env yoksa veya Redis bağlanamazsa fail-open
  * (tüm istekler geçer + console.error). Site downtime'a sebep olmaz.
  *
+ * RESILIENCE (2026-05-26 production outage sonrası eklendi):
+ * - HARD_TIMEOUT_MS=200: her `rateLimitCheck` en geç 200ms döner (Promise.race).
+ * - CIRCUIT BREAKER: 3 ardışık fail → 30sn Redis'e dokunma (probe pattern).
+ *   Sonraki istek devre açıkken Redis'e gitmeden fail-open döner — ETIMEDOUT
+ *   gibi kalıcı network hataları kullanıcıyı bloke etmez.
+ * - ioredis options: `maxRetriesPerRequest=0` + `retryStrategy=null` —
+ *   fail fast; ioredis kendi exponential backoff'u devreden çıkar.
+ * - `lazyConnect: true` + fire-and-forget `connect()` — startup race önlenir;
+ *   ilk request gelmeden bağlantı denemesi başlar.
+ *
+ * Circuit state in-memory module-level — tek Next.js process içinde paylaşılır.
+ * Coolify horizontal scale-up yapılırsa her instance ayrı circuit yönetir
+ * (3 instance × 3 fail = 9 timeout, her biri 200ms ile sınırlı). Multi-instance
+ * gelirse Redis-backed shared circuit state eklenebilir.
+ *
  * Politika seçimi `selectPolicy` (pathname + method + auth-cookie). Anahtar
  * IP-bazlı (`ip:${ip}`); auth-cookie hibrit sayesinde NAT'lı ofis kullanıcıları
  * API_AUTH limit'inden (300/dk) faydalanır.
  */
 import { RateLimiterRedis, RateLimiterRes } from "rate-limiter-flexible";
 import Redis from "ioredis";
+
+// ── Resilience constants ─────────────────────────────────────────────────────
+
+const HARD_TIMEOUT_MS = 200;             // rateLimitCheck max latency
+const CIRCUIT_OPEN_THRESHOLD = 3;        // ardışık fail sayısı → circuit OPEN
+const CIRCUIT_OPEN_DURATION_MS = 30_000; // OPEN durumda kalış süresi
+const CONNECT_TIMEOUT_MS = 1500;         // ioredis TCP connect timeout (HARD_TIMEOUT'tan kısa)
 
 // ── Singleton Redis client ───────────────────────────────────────────────────
 
@@ -28,13 +50,20 @@ function getRedis(): Redis | null {
     if (!url) return null;
     try {
         _client = new Redis(url, {
-            enableOfflineQueue: true,     // startup'ta bağlantı hazır olmadan gelen komutları queue'ya alır (race önleme)
-            maxRetriesPerRequest: 1,
-            connectTimeout: 3000,         // 3s içinde bağlanamazsa error emit → fail-open
-            lazyConnect: false,
+            enableOfflineQueue: false,            // permanent down'da queue şişmesin
+            maxRetriesPerRequest: 0,              // tek deneme, fail fast
+            connectTimeout: CONNECT_TIMEOUT_MS,
+            lazyConnect: true,                    // construct'ta TCP açma — startup race önlenir
+            retryStrategy: () => null,            // ioredis kendiliğinden reconnect denemesin
+            reconnectOnError: () => false,
         });
         _client.on("error", err => {
             console.error("[rate-limit] redis error:", err.message);
+        });
+        // Fire-and-forget initial connect — başarısızlık halinde
+        // rateLimitCheck hard timeout + circuit breaker mekanizması işler.
+        _client.connect().catch(err => {
+            console.error("[rate-limit] initial connect failed:", err.message);
         });
         return _client;
     } catch (err) {
@@ -42,6 +71,44 @@ function getRedis(): Redis | null {
         _initFailed = true;
         return null;
     }
+}
+
+// ── Circuit breaker state ────────────────────────────────────────────────────
+
+let _consecutiveFailures = 0;
+let _circuitOpenedAt = 0; // 0 = closed; epoch ms = openedAt
+
+function isCircuitOpen(): boolean {
+    if (_circuitOpenedAt === 0) return false;
+    return Date.now() - _circuitOpenedAt < CIRCUIT_OPEN_DURATION_MS;
+}
+
+function recordFailure(reason: string): void {
+    _consecutiveFailures++;
+    if (_consecutiveFailures >= CIRCUIT_OPEN_THRESHOLD) {
+        // OPEN log YALNIZ ilk açılışta — probe fail'lerinde spam yapma
+        if (_circuitOpenedAt === 0) {
+            console.error(
+                `[rate-limit] circuit OPEN after ${_consecutiveFailures} failures (last: ${reason})`,
+            );
+        }
+        // Timestamp her fail'de yenilenir → probe fail circuit'i yeni 30sn açar
+        _circuitOpenedAt = Date.now();
+    }
+}
+
+function recordSuccess(): void {
+    if (_circuitOpenedAt > 0) {
+        console.info("[rate-limit] circuit CLOSED — Redis healthy again");
+    }
+    _consecutiveFailures = 0;
+    _circuitOpenedAt = 0;
+}
+
+/** Test-only export — circuit breaker state reset (test izolasyon için). */
+export function __resetCircuitForTests(): void {
+    _consecutiveFailures = 0;
+    _circuitOpenedAt = 0;
 }
 
 // ── Policies ─────────────────────────────────────────────────────────────────
@@ -107,20 +174,55 @@ export interface RateCheckResult {
     limit: number;
     remaining: number;
     retryAfter: number;  // saniye
-    fromRedis: boolean;  // false → fail-open (redis down/missing)
+    fromRedis: boolean;  // false → fail-open (redis down/missing/circuit-open)
 }
 
-/** Fail-open: Redis yoksa veya hata olursa ok=true. */
+const TIMEOUT_SENTINEL: unique symbol = Symbol("rate-limit-timeout");
+
+/** Fail-open: Redis yoksa, devre açıksa, timeout'a düşerse veya hata olursa ok=true. */
 export async function rateLimitCheck(
     key: string,
     policy: RatePolicy,
 ): Promise<RateCheckResult> {
+    const failOpen = (): RateCheckResult => ({
+        ok: true,
+        limit: policy.points,
+        remaining: policy.points,
+        retryAfter: 0,
+        fromRedis: false,
+    });
+
+    // 1. Circuit open + duration dolmadıysa → Redis'e dokunmadan erken return
+    if (isCircuitOpen()) {
+        return failOpen();
+    }
+
     const limiter = getLimiter(policy);
     if (!limiter) {
-        return { ok: true, limit: policy.points, remaining: policy.points, retryAfter: 0, fromRedis: false };
+        return failOpen();
     }
+
+    // 2. Promise.race + hard timeout (clearTimeout finally'de garantili)
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutPromise = new Promise<typeof TIMEOUT_SENTINEL>(resolve => {
+        timer = setTimeout(() => resolve(TIMEOUT_SENTINEL), HARD_TIMEOUT_MS);
+    });
+
+    const consumePromise = limiter.consume(key, 1);
+    // Hard timeout kazanırsa consume promise hâlâ pending kalır; ioredis
+    // connect timeout ~1.5s'de reject ederse "unhandled rejection" warning
+    // ortaya çıkar. .catch(()=>{}) no-op handler ile bastırılır — gerçek
+    // hata zaten Promise.race üzerinden propagate olmuş (veya timeout).
+    consumePromise.catch(() => {});
+
     try {
-        const res = await limiter.consume(key, 1);
+        const winner = await Promise.race([consumePromise, timeoutPromise]);
+        if (winner === TIMEOUT_SENTINEL) {
+            recordFailure("timeout");
+            return failOpen();
+        }
+        recordSuccess();
+        const res = winner as RateLimiterRes;
         return {
             ok: true,
             limit: policy.points,
@@ -130,6 +232,7 @@ export async function rateLimitCheck(
         };
     } catch (err) {
         if (err instanceof RateLimiterRes) {
+            recordSuccess();  // 429 da Redis'in başarılı cevabı — counter reset
             return {
                 ok: false,
                 limit: policy.points,
@@ -138,9 +241,11 @@ export async function rateLimitCheck(
                 fromRedis: true,
             };
         }
-        // Redis disconnect / Lua error → fail-open + log
+        recordFailure((err as Error).message);
         console.error("[rate-limit] check failed, allowing:", err);
-        return { ok: true, limit: policy.points, remaining: policy.points, retryAfter: 0, fromRedis: false };
+        return failOpen();
+    } finally {
+        if (timer) clearTimeout(timer);
     }
 }
 

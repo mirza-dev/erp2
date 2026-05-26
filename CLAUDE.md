@@ -1,9 +1,27 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-25_
+_Son güncelleme: 2026-05-26_
 
-**Son tamamlanan iş:** M-3 Rate Limiting Review 2 — P0 production pipeline fix (2026-05-25; 3575 test)
+**Son tamamlanan iş:** M-3 Rate Limiting Resilience fix — production outage (2026-05-26; 3581 test)
+
+- **P0 Production outage:** Coolify deploy sonrası ERP container Redis Resource'a `connect ETIMEDOUT` — Docker network izolasyonu. Önceki ioredis options (`enableOfflineQueue:true`, `maxRetriesPerRequest:1`, `connectTimeout:3000`) her isteğe ~6s bloke ekliyordu → kullanıcı login OLAMIYORDU, OAuth refresh `Invalid Refresh Token` hataları. **Kök problem:** `rateLimitCheck` Redis kopukken kullanıcıyı bekletiyor. Aşamalı plan: (1) Acil unblock REDIS_URL env sil + redeploy → fail-open path, (2) Kalıcı kod resilience fix, (3) Uzun vadeli backend kararı (A disable / B Coolify network fix / C Upstash / D Cloudflare WAF) — kullanıcı seçimi pending.
+- **Aşama 2 — Resilience fix:**
+  - **ioredis options:** `enableOfflineQueue:false` + `maxRetriesPerRequest:0` (fail fast) + `connectTimeout:1500` + `lazyConnect:true` + fire-and-forget `_client.connect().catch(log)` + `retryStrategy:()=>null` (ioredis kendi reconnect denemesin, circuit breaker yönetir).
+  - **Module-level circuit breaker:** `HARD_TIMEOUT_MS=200`, `CIRCUIT_OPEN_THRESHOLD=3`, `CIRCUIT_OPEN_DURATION_MS=30_000`. `_consecutiveFailures` + `_circuitOpenedAt` state. `isCircuitOpen()` erken return (Redis'e dokunmaz). `recordFailure` — counter++ + threshold'da console.error + timestamp YENİLE (probe fail timer reset eder). `recordSuccess` — counter sıfırla + circuit kapatma log. 429 (RateLimiterRes) `recordSuccess` sayar.
+  - **Promise.race + hard timeout:** `setTimeout(()=>resolve(TIMEOUT_SENTINEL), 200)` ile yarış. Hanging consume için `.catch(()=>{})` no-op (unhandled rejection bastırma). `finally clearTimeout` (memory leak yok).
+  - **Test-only export:** `__resetCircuitForTests` — test izolasyon.
+- **Performans bütçesi:** Redis sağlıklı <5ms, circuit open <1ms, circuit closed+Redis kopuk <200ms (HARD_TIMEOUT_MS).
+- **+6 yeni regression test** (`rate-limit-helper.test.ts`): (1) hard timeout fail-open gerçek elapsed 195-300ms ölçümü, (2) 3 fail → OPEN → 4. çağrı consume hiç çağrılmaz + circuit OPEN log, (3) OPEN+30sn sonra probe başarılı → CLOSE + console.info "circuit CLOSED", (4) probe BAŞARISIZ → timestamp yenilenir (10sn sonra hâlâ OPEN), (5) 429 RateLimiterRes recordSuccess sayar (counter reset, 4. fail circuit açmaz), (6) `finally clearTimeout` source-regex regression lock. Mock güncellemesi: `MockRedis.connect()` Promise.resolve eklendi (lazyConnect pattern için), `beforeEach` `__resetCircuitForTests()` çağrısı.
+- **In-memory state notu:** Tek Next.js process içinde paylaşılır. Multi-instance scale-up'ta her instance ayrı circuit (3 instance × 3 fail = 9 timeout, her biri 200ms ile sınırlı). Mevcut single-instance Coolify için yeterli.
+- 3 dosya (1 source [src/lib/rate-limit.ts ~+80 satır] + 1 test [+6 test + reset + MockRedis.connect] + 1 memory [project_security.md]) · **3581 test yeşil** (önceki 3575 + 6) · TS clean · 0 lint warning · build OK (`ƒ Proxy (Middleware)` manifest entry korundu)
+- **Sıradaki — kullanıcı kararı (Aşama 3 Redis backend):**
+  - **A — Disable:** REDIS_URL hiç set edilmez. Audit M-3 reopens ama Supabase GoTrue brute-force koruması + Hetzner firewall yeterli interim. 0 iş.
+  - **B — Coolify network fix:** Redis Ports Mappings 6379 + REDIS_URL `redis://default:PASS@172.17.0.1:6379` (Docker bridge gateway). Hetzner Cloud Firewall'dan dış IP'ler kapatılmalı. Gateway IP doğru olmazsa `.18`/`.19`/server public IP dene.
+  - **C — Upstash REST:** `ioredis` → `@upstash/redis` + `@upstash/ratelimit`. Docker networking yok. Code refactor 2-4 saat.
+  - **D — Cloudflare WAF veya Traefik native:** Application code'dan tamamen ayır.
+
+**Önceki:** M-3 Rate Limiting Review 2 — P0 production pipeline fix (2026-05-25; 3575 test)
 
 - **P0 Bulgu (kullanıcı production smoke):** Review 1 commit'i sonrası tüm testler/build yeşil, ama production HTTP smoke kanıtları middleware'in HİÇ ÇAĞRILMADIĞINI gösterdi:
   - `.next/server/middleware-manifest.json` ve `.next/server/functions-config-manifest.json` boş (`functions: {}`)

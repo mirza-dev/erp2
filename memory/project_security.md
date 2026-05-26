@@ -123,5 +123,29 @@ Son kalan ertelenen:
   yetersizdi → 300/dk), (e) `withRateHeaders` helper tüm allow path'lerde, (f)
   PARASUT_SYNC policy dead-code dokümante (UI sync-all CRON_PATHS'te → 401, UX bug
   ayrı tur).
+
+  **Resilience fix (2026-05-26 production outage):** Coolify deploy sonrası Redis
+  Docker network izolasyonu nedeniyle ulaşılamadı (`connect ETIMEDOUT`). Önceki
+  ioredis options (`enableOfflineQueue:true`, `maxRetriesPerRequest:1`,
+  `connectTimeout:3000`) **her isteğe ~6s bloke** ekliyordu → login broken,
+  OAuth refresh fail. Kök sorun: `rateLimitCheck` Redis kopukken kullanıcıyı
+  bekletmemeli. **Çözüm:** (1) ioredis options sıkılaştırıldı —
+  `enableOfflineQueue:false` + `maxRetriesPerRequest:0` + `connectTimeout:1500`
+  + `lazyConnect:true` (fire-and-forget `connect().catch(log)`) +
+  `retryStrategy:()=>null` (ioredis kendi reconnect denemesin). (2) Module-level
+  CIRCUIT BREAKER eklendi: `HARD_TIMEOUT_MS=200` Promise.race + `clearTimeout`
+  finally, `CIRCUIT_OPEN_THRESHOLD=3` ardışık fail → `_circuitOpenedAt=Date.now()`
+  + console.error, `CIRCUIT_OPEN_DURATION_MS=30_000` boyunca Redis'e dokunma,
+  probe başarılı → recordSuccess + console.info "circuit CLOSED", probe fail →
+  timestamp yenilenir (yeni 30sn open). 429 (RateLimiterRes) recordSuccess
+  sayar (Redis'in başarılı cevabı). Test-only `__resetCircuitForTests` export.
+  Performans bütçesi: sağlıklı <5ms, circuit open <1ms, circuit closed+Redis
+  kopuk <200ms (HARD_TIMEOUT). In-memory state — multi-instance scale-up
+  yapılırsa her instance ayrı circuit (mevcut single-instance için yeterli).
+  +6 regression test (hard timeout, 3 fail→OPEN, probe başarılı→CLOSE, probe
+  fail→re-OPEN, 429 counter reset, clearTimeout finally). 3581 test yeşil.
+  **Üretim önerisi:** REDIS_URL set edilmemiş ise rate limit pasif (fail-open
+  path) — Coolify Redis Resource network sorunu çözülene kadar veya alternatif
+  backend (Upstash REST, Cloudflare WAF) seçilene kadar güvenli geçici durum.
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)

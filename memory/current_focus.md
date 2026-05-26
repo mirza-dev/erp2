@@ -5,7 +5,24 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-25
+## Son Tamamlanan İş — 2026-05-26
+
+**M-3 Rate Limiting Resilience fix — production outage (3581 test)**
+
+- **P0 Production outage:** Coolify deploy sonrası Redis Docker network izolasyonu — `connect ETIMEDOUT`. Önceki ioredis options (`enableOfflineQueue:true`, `maxRetriesPerRequest:1`, `connectTimeout:3000`) her isteğe ~6s bloke ekliyordu → kullanıcı login olamıyordu, OAuth refresh fail (`Invalid Refresh Token`). Coolify Terminal kullanılamadığı için network debug imkânsız.
+- **Plan 3 aşamalı:** (Aşama 1) Acil unblock — `REDIS_URL` env sil + redeploy → `if (!url) return null` fail-open. (Aşama 2) Kalıcı resilience fix kod. (Aşama 3) Uzun vadeli Redis backend kararı (A disable / B Coolify network fix / C Upstash / D Cloudflare WAF) — kullanıcı seçimi pending.
+- **Aşama 2 implementation:**
+  - **ioredis options sıkılaştırma:** `enableOfflineQueue:false` (queue şişmesin) + `maxRetriesPerRequest:0` (fail fast) + `connectTimeout:1500` (HARD_TIMEOUT'tan kısa) + `lazyConnect:true` + fire-and-forget `_client.connect().catch(log)` + `retryStrategy:()=>null` (ioredis kendi reconnect denemesin — circuit breaker yönetir).
+  - **Module-level circuit breaker:** `HARD_TIMEOUT_MS=200`, `CIRCUIT_OPEN_THRESHOLD=3`, `CIRCUIT_OPEN_DURATION_MS=30_000`. `_consecutiveFailures` + `_circuitOpenedAt` state. `isCircuitOpen()` erken return (Redis'e dokunmaz). `recordFailure(reason)` — counter++ + threshold'da console.error + timestamp YENİLE (probe fail de timer reset eder). `recordSuccess()` — counter sıfırla + circuit kapatma log. 429 (RateLimiterRes) `recordSuccess` sayar (Redis cevabı).
+  - **Promise.race + hard timeout:** `setTimeout(()=>resolve(TIMEOUT_SENTINEL), 200)` ile yarış. Hanging consume promise için `.catch(()=>{})` no-op handler (unhandled rejection bastırma). `finally` `clearTimeout` (memory leak yok).
+  - **Test-only export:** `__resetCircuitForTests` — test izolasyon için.
+- **Performans bütçesi:** sağlıklı <5ms, circuit open <1ms, circuit closed+Redis kopuk <200ms.
+- **+6 yeni test** (`rate-limit-helper.test.ts`): hard timeout fail-open (gerçek elapsed ölçümü 195-300ms), 3 fail → OPEN → 4. çağrı consume hiç çağrılmaz, OPEN+30sn sonra probe başarılı → CLOSE + circuit CLOSED log, probe BAŞARISIZ → timestamp yenilenir (re-OPEN 30sn), 429 RateLimiterRes recordSuccess sayar (counter reset), `finally clearTimeout` source-regex kilidi. Mock güncellemesi: `MockRedis.connect()` eklendi (yeni `lazyConnect:true` + `_client.connect()` pattern için), `beforeEach` `__resetCircuitForTests()` çağrısı.
+- **In-memory state notu:** Tek Next.js process — multi-instance scale-up'ta her instance ayrı circuit (3 instance × 3 fail = 9 timeout, her biri 200ms ile sınırlı). Mevcut Coolify single-instance için yeterli; gelecek scale-up'ta Redis-backed shared state.
+- 3 dosya (1 source [src/lib/rate-limit.ts +60 satır] + 1 test [+6 test + beforeEach reset + MockRedis.connect] + 1 memory [project_security.md]) · **3581 test yeşil** (önceki 3575 + 6 regression) · TS clean · 0 lint warning · build OK (manifest dolu, `ƒ Proxy (Middleware)` satırı korundu)
+- **Sıradaki — kullanıcı kararı (Aşama 3):** Redis backend yaklaşımı — A (disable) / B (Coolify network fix + Hetzner firewall) / C (Upstash REST + code refactor) / D (Cloudflare WAF rate limit). Tüm seçenekler artık güvenli — kod fail-open ile hazır.
+
+## Önceki — M-3 Review 2 (3575 test, 2026-05-25)
 
 **M-3 Rate Limiting Review 2 — P0 production pipeline fix (3575 test)**
 
