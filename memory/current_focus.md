@@ -7,6 +7,33 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-26
 
+**Route-level AI rate limit — Anthropic fatura amplifikasyonu koruması (3606 test)**
+
+- **Karar bağlamı:** M-3 global Redis rate limit Coolify Docker network sorunlarıyla çıkmaza girdi (terminal yok, debug zor). REDIS_URL env unset → fail-open path stabil, sistem normal hızda. Kullanıcı kararı: A (disable Redis) + route-level AI guard (defense-in-depth). 1-2 hafta sonra Upstash REST refactor (ayrı PR).
+- **Tasarım kararı (kritik):** Guard MIDDLEWARE'de değil ROUTE içinde. Sebep: Next 16 Turbopack proxy convention bug'ı bizi zaten ısırdı (P0 — middleware INVOKE EDİLMEMİŞTİ). Route-içi guard middleware bypass olsa bile çalışmaya devam eder — Anthropic fatura riski tüm koşullarda kapalı.
+- **Yeni helper** `src/lib/ai-route-limit.ts`:
+  - `checkAiRateLimit(route, ip, limit=5)` — pure rolling window. Map `${route}:${ip}` → timestamp[]. Window 60sn. Cleanup amortize her 5dk'da bir (expired ts + boş entry sil).
+  - `guardAiRoute(request, route, limit)` — tek-satır NextResponse|null helper. 429 response: `Retry-After` + `X-RateLimit-Limit/Remaining/Window` header.
+  - `__resetAiRateLimitForTests` + `__getAiRateLimitMapSize` test-only export.
+  - `extractClientIp` reuse `@/lib/rate-limit` (Coolify Traefik X-Forwarded-For).
+- **5 AI route entegrasyon (her birinde 2-3 satır):**
+  - purchase-copilot 5/dk — `if (request) guard` (POST type backward-compat)
+  - stock-risk 5/dk — POST signature `request?: NextRequest` (test compat)
+  - parse 10/dk — import wizard satır parse sırasında daha cömert
+  - ops-summary 5/dk — POST signature `request?` (test compat)
+  - score 5/dk
+  - observability — guard YOK (Anthropic çağrısı yok, sadece DB)
+- **purchase-copilot-auth.test.ts** güncellendi — `beforeEach` `__resetAiRateLimitForTests()` çağrısı (testler aynı 0.0.0.0 IP'sini kullanıyor, 6. test 429 alıyordu).
+- **+25 yeni test:**
+  - `ai-route-limit.test.ts` (10): rolling window, 5 ardışık + 6. 429, vi.useFakeTimers 61sn ileri → ok, IP izolasyon, route izolasyon, cleanup Map.size azalır, guardAiRoute null/429 + header'lar, __reset.
+  - `ai-route-limit-integration.test.ts` (15): 5 route'ta `guardAiRoute` import + çağrı + limit + erken çıkış pattern + observability'de YOKLUĞU.
+- **Tehdit modeli (M-3 statüsü):** login (Supabase GoTrue built-in), parasut sync (CRON_PATHS Bearer), products scrape (auth gate 401), demo mutation (403) — hepsi kapalı; **AI cost** bu PR ile kapatıldı. Tek kalan global Redis (Upstash 1-2 hafta).
+- **Single-container best-effort notu:** Map process restart'ta sıfırlanır (Coolify rolling deploy = saldırgan 5 yeni istek alır, pratikte cost sınırlı). Multi-instance scale-up Upstash refactor zorunlu hale getirir.
+- 8 dosya (1 source helper + 5 route + 2 test + 1 mevcut test reset + 3 memory) · **3606 test yeşil** (önceki 3581 + 25) · TS clean · 0 lint warning · build OK (`ƒ Proxy (Middleware)` korundu)
+- **Sıradaki:** (1) Production smoke — auth/cron invariant doğrulama + AI guard 6. istekte 429 testi, (2) 1-2 hafta sonra Upstash REST migration ayrı PR.
+
+## Önceki — M-3 Resilience fix (3581 test, 2026-05-26)
+
 **M-3 Rate Limiting Resilience fix — production outage (3581 test)**
 
 - **P0 Production outage:** Coolify deploy sonrası Redis Docker network izolasyonu — `connect ETIMEDOUT`. Önceki ioredis options (`enableOfflineQueue:true`, `maxRetriesPerRequest:1`, `connectTimeout:3000`) her isteğe ~6s bloke ekliyordu → kullanıcı login olamıyordu, OAuth refresh fail (`Invalid Refresh Token`). Coolify Terminal kullanılamadığı için network debug imkânsız.

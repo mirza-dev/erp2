@@ -50,9 +50,14 @@ function makeRequest(authHeader: string | null): NextRequest {
 describe("/api/ai/purchase-copilot — hybrid auth", () => {
     const ORIGINAL_SECRET = process.env.CRON_SECRET;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         mockGetUser.mockReset();
         process.env.CRON_SECRET = "test-cron-secret";
+        // 2026-05-26: Route-level AI rate limit eklendi (5/dk/IP). Tüm bu testler
+        // aynı IP'den (0.0.0.0, mock req'de x-forwarded-for yok) çağrılıyor →
+        // 6. test 429 alır. Her test arasında map sıfırlanmalı.
+        const { __resetAiRateLimitForTests } = await import("@/lib/ai-route-limit");
+        __resetAiRateLimitForTests();
     });
 
     afterAll(() => {

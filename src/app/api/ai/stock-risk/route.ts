@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { dbListProducts } from "@/lib/supabase/products";
 import { computeStockRiskLevel, type StockRiskLevel } from "@/lib/stock-utils";
 import { aiAssessStockRisk, isAIAvailable, type StockRiskItem } from "@/lib/services/ai-service";
@@ -10,6 +10,7 @@ import {
 } from "@/lib/supabase/recommendations";
 import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
+import { guardAiRoute } from "@/lib/ai-route-limit";
 
 interface StockRiskResponseItem {
     productId: string;
@@ -24,7 +25,15 @@ interface StockRiskResponseItem {
     aiConfidence: number | null;
 }
 
-export async function POST() {
+export async function POST(request?: NextRequest) {
+    // Route-level AI rate limit (2026-05-26) — Anthropic fatura amplifikasyonu koruması.
+    // `request` opsiyonel — Next.js production'da her zaman set; mevcut unit testler
+    // POST() ile çağırıyor, guard onları kırmasın diye `if (request)` ile sarılı.
+    if (request) {
+        const limited = guardAiRoute(request, "stock-risk", 5);
+        if (limited) return limited;
+    }
+
     // Expire suggested recommendations not acted on after 48 hours.
     try { await dbExpireStaleRecommendations(48); } catch { /* non-fatal */ }
 

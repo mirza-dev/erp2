@@ -25,6 +25,7 @@ import { dbGetPOsByRecommendationIds, type LinkedPO } from "@/lib/supabase/purch
 import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
 import { createClient as createServerSupabaseClient } from "@/lib/supabase/server";
+import { guardAiRoute } from "@/lib/ai-route-limit";
 
 type UrgencyLevel = "critical" | "high" | "moderate";
 
@@ -86,6 +87,15 @@ function readUrgencyLevelFromMeta(meta: Record<string, unknown> | null | undefin
 async function handler(request: NextRequest | undefined, method: "GET" | "POST") {
     if (!(await checkAuth(request, method))) {
         return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
+    }
+
+    // Route-level AI rate limit (2026-05-26) — Anthropic fatura amplifikasyonu koruması.
+    // checkAuth'tan sonra çalışır → cron isteği zaten Bearer ile doğrulandı, manuel curl
+    // ile yapay yük üretmek isteyen kullanıcı 5/dk limitine takılır.
+    // Middleware-level Redis rate limit şu an pasif (Docker network sorunu); guard burada.
+    if (request) {
+        const limited = guardAiRoute(request, "purchase-copilot", 5);
+        if (limited) return limited;
     }
 
     // 48 saat TTL — sadece purchase_suggestion (audit 3. tur Fix 4):

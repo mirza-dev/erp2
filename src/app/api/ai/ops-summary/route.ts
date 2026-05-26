@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { dbListProducts } from "@/lib/supabase/products";
 import { dbListAlerts } from "@/lib/supabase/alerts";
 import { dbListOrders } from "@/lib/supabase/orders";
 import { computeCoverageDays, computeStockRiskLevel } from "@/lib/stock-utils";
 import { aiGenerateOpsSummary, isAIAvailable, type OpsSummaryInput } from "@/lib/services/ai-service";
 import { handleApiError } from "@/lib/api-error";
+import { guardAiRoute } from "@/lib/ai-route-limit";
 
 async function gatherMetrics(): Promise<OpsSummaryInput> {
     const [products, alerts, pendingOrders, approvedOrders] = await Promise.all([
@@ -51,7 +52,13 @@ async function gatherMetrics(): Promise<OpsSummaryInput> {
     };
 }
 
-export async function POST() {
+export async function POST(request?: NextRequest) {
+    // Route-level AI rate limit (2026-05-26) — Anthropic fatura amplifikasyonu koruması.
+    if (request) {
+        const limited = guardAiRoute(request, "ops-summary", 5);
+        if (limited) return limited;
+    }
+
     let metrics: OpsSummaryInput;
     try {
         metrics = await gatherMetrics();

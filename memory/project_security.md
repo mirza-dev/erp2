@@ -86,7 +86,30 @@ Tüm rotalar için (`/:path*`):
 ## Audit Durumu (2026-04-23) — TÜM BULGULAR KAPALI ✅
 
 Son kalan ertelenen:
-- ~~M-3: Rate limiting~~ — ✅ TAMAMLANDI (2026-05-25, Review 1 dahil). Yaklaşım B uygulandı:
+- **M-3: Rate limiting** — 🟡 **AI cost mitigated / global Redis deferred (2026-05-26)**
+  Coolify self-hosted Redis Docker network izolasyonu nedeniyle çözülemedi
+  (terminal yok, `--network coolify` HTTP-only). REDIS_URL env unset →
+  middleware-level `rateLimitCheck` fail-open path (resilience fix `c65ee97`
+  ile her durumda <200ms). Yerine route-level in-memory AI guard eklendi
+  (`src/lib/ai-route-limit.ts`): `checkAiRateLimit` rolling window 5/dk/IP
+  + `guardAiRoute` helper. 5 AI route'unda auth check sonrası, Anthropic
+  çağrısı öncesi: purchase-copilot 5/dk, stock-risk 5/dk, parse 10/dk
+  (import wizard çoklu çağrı), ops-summary 5/dk, score 5/dk; observability
+  guard YOK (Anthropic çağrısı yok). Map cleanup amortize 5dk'da bir.
+  429 response: `Retry-After` + `X-RateLimit-*` header. Defense-in-depth —
+  middleware bypass olsa bile çalışır (önceki Next 16 Turbopack P0
+  bug'ından öğrenildi). Tehdit modeli: login brute-force Supabase GoTrue
+  built-in koruması, parasut sync CRON_PATHS Bearer zorunlu, /api/products
+  scrape auth gate (401), demo mutation 403 — sadece AI cost
+  amplification gerçek risk, kapatıldı.
+  **Aşama 3 (1-2 hafta sonra ayrı PR):** Upstash REST migration
+  (`@upstash/redis` + `@upstash/ratelimit`) — Docker networking yok,
+  Coolify env tek tıkla. Route-level AI guard refactor'da KORUNUR
+  (ek savunma katmanı). Free tier: 500K commands/ay (resmi pricing,
+  güncel limit dashboard'dan kontrol).
+  Test: 25 yeni (10 unit + 15 integration source-regex). 3606 test yeşil.
+
+- ~~M-3: Rate limiting (eski entry — Yaklaşım B Coolify Redis)~~ — Implementation kaldı (fail-open path), Upstash refactor'unda silinecek. Yaklaşım B uygulandı:
   Coolify self-hosted Redis (Resource olarak panel'den eklenir, REDIS_URL auto-inject).
   Backend: `ioredis` + `rate-limiter-flexible` (sliding window, atomic Lua scripts).
   Helper `src/lib/rate-limit.ts`: singleton Redis + POLICIES (LOGIN 5/15dk, DEMO 5/15dk,

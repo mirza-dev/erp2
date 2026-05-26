@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiScoreOrder } from "@/lib/services/ai-service";
 import { safeParseJson } from "@/lib/api-error";
+import { guardAiRoute } from "@/lib/ai-route-limit";
 
 // POST /api/ai/score
 // Body: { order_id: string }
 export async function POST(req: NextRequest) {
+    // Route-level AI rate limit (2026-05-26) — Anthropic fatura amplifikasyonu koruması.
+    const limited = guardAiRoute(req, "score", 5);
+    if (limited) return limited;
+
     try {
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;

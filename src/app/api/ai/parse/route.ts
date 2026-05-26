@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { aiParseEntity } from "@/lib/services/ai-service";
 import type { ParseEntityInput } from "@/lib/services/ai-service";
 import { safeParseJson } from "@/lib/api-error";
+import { guardAiRoute } from "@/lib/ai-route-limit";
 
 // POST /api/ai/parse
 // Body: { raw_text: string, entity_type: "customer"|"product"|"order" }
 export async function POST(req: NextRequest) {
+    // Route-level AI rate limit (2026-05-26) — limit 10/dk (import wizard sırasında çoklu satır parse).
+    const limited = guardAiRoute(req, "parse", 10);
+    if (limited) return limited;
+
     try {
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
