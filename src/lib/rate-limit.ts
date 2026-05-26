@@ -28,8 +28,9 @@ function getRedis(): Redis | null {
     if (!url) return null;
     try {
         _client = new Redis(url, {
-            enableOfflineQueue: false,    // request bekleterek istemez; fast fail
+            enableOfflineQueue: true,     // startup'ta bağlantı hazır olmadan gelen komutları queue'ya alır (race önleme)
             maxRetriesPerRequest: 1,
+            connectTimeout: 3000,         // 3s içinde bağlanamazsa error emit → fail-open
             lazyConnect: false,
         });
         _client.on("error", err => {
