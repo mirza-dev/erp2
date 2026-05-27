@@ -5,7 +5,22 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-27
+## Son Tamamlanan İş — 2026-05-28
+
+**React Doctor Bölüm 4 — inline style extract + OAuth disable fix (54 → 56, commit `11fad03`)**
+
+- **Trigger:** Bölüm 4 (no-inline-exhaustive-style ×301, alerts 42 + suggested 23 hedef) + önceki commit'teki disable directive sözdizimi hatasının düzeltilmesi.
+- **OAuth disable fix:** Önceki `// eslint-disable-next-line react-doctor/...` react-doctor tarafından algılanmıyordu (kendi sözdizimi var: `// react-doctor-disable-next-line`). Yorum `.upsert()` üstünden `export async function GET` öncesine taşındı + doğru sözdizimi. `nextjs-no-side-effect-in-get-handler` kapandı.
+- **Önceki memory "kapatıldı" yanıltıcıydı:** Full scan hâlâ 23 error gösteriyordu (22 only-export-components re-export + 1 OAuth). only-export-components ×22 hâlâ aktif — re-export'lar tetikliyor; sonraki PR'da test import path'leri helper'a yönlendirilip re-export silinmeli.
+- **Bölüm 4 refactor:**
+  - alerts/page.tsx: 130+ module-level const (header, tabs, AI panel, alertRow, systemAlert, orderAlertSmall, severity badge). Pilot 2 spread (Yol A) validation'da doğrulandı.
+  - suggested/page.tsx: 8 statik const + `AI_SIGNAL_BUTTON_STYLES` lookup map (3-urgency variant). Helper fn DEĞİL — Record<Variant, CSSProperties>.
+  - 301 → 271 (-30 uyarı). Hedef 65 idi; kalan ~50 nokta drawer body + suggested table sonraki tur.
+- **Helper fn tuzağı plan'da dokümante edildi:** `getX(args)` her render yeni obje üretir, kural kandırır ama perf sorununu çözmez. Lookup map önerilen.
+- 3 dosya · **3636 test yeşil · TS clean · 0 yeni warning**
+- **Sıradaki:** Push + redeploy + smoke; sonraki tur kalan ~50 inline + 22 re-export fix.
+
+## Önceki — React Doctor temizlik (3636 test, 2026-05-27)
 
 **React Doctor temizlik — error'lar + a11y + config (51 → 54, commit `e57361c`)**
 

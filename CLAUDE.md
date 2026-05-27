@@ -1,9 +1,25 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-27_
+_Son güncelleme: 2026-05-28_
 
-**Son tamamlanan iş:** React Doctor temizlik — error'lar + a11y + config (2026-05-27; 3636 test, skor 51 → 54, commit `e57361c`)
+**Son tamamlanan iş:** React Doctor Bölüm 4 — inline style extract + OAuth disable fix (2026-05-28; 3636 test, skor 54 → 56, commit `11fad03`)
+
+- **Trigger:** Plan `mellow-plotting-ladybug.md` Bölüm 4 (no-inline-exhaustive-style ×301 — alerts 42 + suggested 23 = 65 blok hedef) + kullanıcı doğrulamasıyla ortaya çıkan baseline hatası: önceki commit'teki `// eslint-disable-next-line react-doctor/...` yorumu react-doctor tarafından **algılanmıyordu** (kendi sözdizimi: `// react-doctor-disable-next-line`).
+- **OAuth disable directive fix (Bölüm 1 düzeltme):** `src/app/api/parasut/oauth/callback/route.ts` — disable yorumu `.upsert()` üstünden `export async function GET` öncesine taşındı + doğru sözdizimi (`// react-doctor-disable-next-line react-doctor/nextjs-no-side-effect-in-get-handler`). `nextjs-no-side-effect-in-get-handler` error kapandı (skor 54 → 56).
+- **Önceki memory yanıltıcı düzeltildi:** Önceki commit'te "Bölüm 1+2 error'ları kapatıldı" yazıldı ama full scan hâlâ **23 error gösteriyordu** (22 only-export-components re-export + 1 OAuth). only-export-components ×22 hâlâ aktif — 7 dosyada `export { X } from "@/lib/..."` re-export pattern'ı kuralı tetikliyor. Çözüm: test'lerin import path'lerini helper'a yönlendirmek + re-export silmek (sonraki PR).
+- **Bölüm 4 inline style refactor (alerts/page.tsx + suggested/page.tsx):**
+  - alerts/page.tsx: 130+ module-level const eklendi (header butonlar, tabs, AI panel, drawer, alertRow, systemAlert, orderAlertSmall, severity badge). Pilot 2 (`tabButtonBaseStyle` spread Yol A) validation'da doğrulandı — conditional için spread pattern kullanıldı. AlertDetailDrawer body bölümü 200+ satır olduğu için bu tura sığmadı, sonraki tura.
+  - suggested/page.tsx: 8 statik const + `AI_SIGNAL_BUTTON_STYLES` lookup map (AiSignalButton 3-urgency variant — helper fn DEĞİL, lookup map: critical/high/moderate 3 tam obje). C2/C3 büyük table/drawer blokları sonraki tura.
+  - **no-inline-exhaustive-style: 301 → 271 (-30 uyarı, ~%10).** Hedef 65 idi ama 30 da anlamlı başlangıç; kalan ~50 nokta drawer body + suggested mobile card/desktop row/AI drawer enrichment.
+- **Helper fn tuzağı dokümante edildi (plan §2):** `getX(args)` her render'da yeni `{...}` üretir, kuralı kandırır ama gerçek perf sorununu çözmez. Doğru pattern lookup map (`Record<Variant, React.CSSProperties>`). Plan'da pattern karar matrisi var.
+- **3 dosya değişti** (OAuth + 2 page) · **3636 test yeşil · TS clean · 0 yeni lint warning · görsel regression beklenmiyor** (style değerleri aynı, sadece konum).
+- **Sıradaki:**
+  1. Push + Coolify redeploy + smoke (OAuth callback davranışı + alerts/suggested görsel kontrol)
+  2. Sonraki tur: kalan ~50 inline style block (alerts drawer body + suggested table/drawer enrichment)
+  3. Ayrıca: only-export-components ×22 fix — re-export'ları sil, test import path'lerini helper'a yönlendir
+
+**Önceki:** React Doctor temizlik — error'lar + a11y + config (2026-05-27; 3636 test, skor 51 → 54, commit `e57361c`)
 
 - **Trigger:** `npx react-doctor@latest` 51/100 skor + 1812 sorun. Plan `mellow-plotting-ladybug.md` 4 bölümlü temizlik.
 - **Bölüm 2 — `only-export-components` ×23 kapatıldı (önceki session extract + bu session test fix + commit):**
