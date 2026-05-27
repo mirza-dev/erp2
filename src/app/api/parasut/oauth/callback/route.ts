@@ -35,6 +35,9 @@ function verifyCookieState(cookieValue: string, stateParam: string): boolean {
     }
 }
 
+// OAuth callback URL is always GET (called by Paraşüt provider — cannot be POST).
+// CSRF is mitigated via signed state cookie verification (verifyCookieState above).
+// react-doctor-disable-next-line react-doctor/nextjs-no-side-effect-in-get-handler
 export async function GET(request: NextRequest): Promise<NextResponse> {
     const { searchParams } = request.nextUrl;
     const code  = searchParams.get("code");
@@ -92,9 +95,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // would both see "no row" and both try to upsert; the last writer wins with
     // valid tokens (the first call's tokens are overwritten, not lost to a unique error).
     //
-    // OAuth callback URL is always GET (called by Paraşüt provider — cannot be POST).
-    // CSRF is mitigated via signed state cookie verification above.
-    // eslint-disable-next-line react-doctor/nextjs-no-side-effect-in-get-handler
     const { error: upsertError } = await supabase
         .from("parasut_oauth_tokens")
         .upsert(

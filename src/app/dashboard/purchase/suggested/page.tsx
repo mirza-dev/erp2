@@ -75,6 +75,110 @@ const PO_STATUS_LABELS: Record<string, string> = {
     cancelled: "İptal",
 };
 
+// ── Module-level styles (no-inline-exhaustive-style) ──────────
+
+const staleDriftBadgeStyle: React.CSSProperties = {
+    display: "inline-block",
+    marginTop: "4px",
+    fontSize: "10px",
+    fontWeight: 500,
+    padding: "2px 6px",
+    borderRadius: "3px",
+    background: "var(--warning-bg)",
+    color: "var(--warning-text)",
+    border: "0.5px solid var(--warning-border)",
+};
+
+const aiLoadingStyle: React.CSSProperties = {
+    marginTop: "4px", fontSize: "10px", color: "var(--text-tertiary)", fontStyle: "italic",
+};
+
+// AiSignalButton — 3-variant lookup map (urgency-based)
+const AI_SIGNAL_BUTTON_STYLES: Record<UrgencyLevel, React.CSSProperties> = {
+    critical: {
+        marginTop: "4px",
+        background: "var(--danger-bg)",
+        color: "var(--danger-text)",
+        border: "0.5px solid var(--danger-border)",
+        borderRadius: "4px",
+        padding: "2px 7px",
+        fontSize: "10px",
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+    },
+    high: {
+        marginTop: "4px",
+        background: "var(--warning-bg)",
+        color: "var(--warning-text)",
+        border: "0.5px solid var(--warning-border)",
+        borderRadius: "4px",
+        padding: "2px 7px",
+        fontSize: "10px",
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+    },
+    moderate: {
+        marginTop: "4px",
+        background: "var(--accent-bg)",
+        color: "var(--accent-text)",
+        border: "0.5px solid var(--accent-border)",
+        borderRadius: "4px",
+        padding: "2px 7px",
+        fontSize: "10px",
+        fontWeight: 600,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "4px",
+    },
+};
+
+const aiSignalArrowStyle: React.CSSProperties = { opacity: 0.6 };
+
+const whyBadgeWrapperStyle: React.CSSProperties = {
+    display: "flex", flexDirection: "column", gap: "3px", marginTop: "4px",
+};
+
+const whyBadgeItemBaseStyle: React.CSSProperties = {
+    display: "inline-block",
+    fontSize: "10px",
+    fontWeight: 500,
+    padding: "1px 6px",
+    borderRadius: "3px",
+    width: "fit-content",
+};
+
+const segmentBannerStyle: React.CSSProperties = {
+    marginTop: "12px",
+    padding: "12px 16px",
+    background: "var(--accent-bg)",
+    border: "1px solid var(--accent-border)",
+    borderRadius: "8px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    flexWrap: "wrap",
+};
+
+const segmentBannerTitleStyle: React.CSSProperties = {
+    fontSize: "13px", fontWeight: 600, color: "var(--accent-text)",
+};
+
+const segmentBannerSubtitleStyle: React.CSSProperties = {
+    fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px",
+};
+
+const segmentBannerBadgeStyle: React.CSSProperties = {
+    fontSize: "13px", fontWeight: 600, color: "var(--accent-text)", whiteSpace: "nowrap",
+};
+
 /** G11: Decided rec'lerde stok/aciliyet drift'i varsa gösterilen rozet. */
 function StaleDriftBadge({ drift, unit }: {
     drift: { suggestQty: number; urgencyLevel: UrgencyLevel };
@@ -83,17 +187,7 @@ function StaleDriftBadge({ drift, unit }: {
     return (
         <span
             title="Karar verildikten sonra ürün state'i değişti. Güncel öneri değerleri yanda."
-            style={{
-                display: "inline-block",
-                marginTop: "4px",
-                fontSize: "10px",
-                fontWeight: 500,
-                padding: "2px 6px",
-                borderRadius: "3px",
-                background: "var(--warning-bg)",
-                color: "var(--warning-text)",
-                border: "0.5px solid var(--warning-border)",
-            }}
+            style={staleDriftBadgeStyle}
         >
             Stok değişti — güncel: {drift.suggestQty} {unit}, {URGENCY_LABEL[drift.urgencyLevel]} aciliyet
         </span>
@@ -108,40 +202,24 @@ function AiSignalButton({ enrichment, loading, onClick }: {
 }) {
     if (loading) {
         return (
-            <div style={{ marginTop: "4px", fontSize: "10px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+            <div style={aiLoadingStyle}>
                 AI...
             </div>
         );
     }
     if (!enrichment) return null;
 
-    const urgency = enrichment.aiUrgencyLevel ?? "moderate";
+    const urgency: UrgencyLevel = enrichment.aiUrgencyLevel ?? "moderate";
     const urgencyLabel = urgency === "critical" ? "Kritik" : urgency === "high" ? "Yüksek" : "Orta";
-    const urgencyBg = urgency === "critical" ? "var(--danger-bg)" : urgency === "high" ? "var(--warning-bg)" : "var(--accent-bg)";
-    const urgencyText = urgency === "critical" ? "var(--danger-text)" : urgency === "high" ? "var(--warning-text)" : "var(--accent-text)";
-    const urgencyBorder = urgency === "critical" ? "var(--danger-border)" : urgency === "high" ? "var(--warning-border)" : "var(--accent-border)";
     return (
         <button
             onClick={onClick}
             aria-label="AI analizi detaylarını gör"
-            style={{
-                marginTop: "4px",
-                background: urgencyBg,
-                color: urgencyText,
-                border: `0.5px solid ${urgencyBorder}`,
-                borderRadius: "4px",
-                padding: "2px 7px",
-                fontSize: "10px",
-                fontWeight: 600,
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "4px",
-            }}
+            style={AI_SIGNAL_BUTTON_STYLES[urgency]}
         >
             <span>✦ AI</span>
             <span>{urgencyLabel}</span>
-            <span style={{ opacity: 0.6 }}>→</span>
+            <span style={aiSignalArrowStyle}>→</span>
         </button>
     );
 }
@@ -178,17 +256,12 @@ function WhyBadge({ daysLeft, urgency, leadTimeDays }: {
     if (lines.length === 0) return null;
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "3px", marginTop: "4px" }}>
+        <div style={whyBadgeWrapperStyle}>
             {lines.map((l, i) => (
                 <span key={i} style={{
-                    display: "inline-block",
-                    fontSize: "10px",
-                    fontWeight: 500,
+                    ...whyBadgeItemBaseStyle,
                     background: l.bg,
                     color: l.color,
-                    padding: "1px 6px",
-                    borderRadius: "3px",
-                    width: "fit-content",
                 }}>
                     {l.text}
                 </span>
@@ -213,27 +286,16 @@ function SegmentBanner({ filter, count }: {
         : `${count} satın alma planı bekliyor`;
 
     return (
-        <div style={{
-            marginTop: "12px",
-            padding: "12px 16px",
-            background: "var(--accent-bg)",
-            border: "1px solid var(--accent-border)",
-            borderRadius: "8px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-            flexWrap: "wrap",
-        }}>
+        <div style={segmentBannerStyle}>
             <div>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-text)" }}>
+                <div style={segmentBannerTitleStyle}>
                     {title}
                 </div>
-                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                <div style={segmentBannerSubtitleStyle}>
                     {subtitle}
                 </div>
             </div>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-text)", whiteSpace: "nowrap" }}>
+            <div style={segmentBannerBadgeStyle}>
                 {badge}
             </div>
         </div>

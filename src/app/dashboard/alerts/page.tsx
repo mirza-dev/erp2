@@ -16,6 +16,749 @@ import { AI_SUMMARY_LABELS } from "@/lib/ai-summary-labels";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 import { PARASUT_SYNC_ALERT_ENTITY_IDS, PARASUT_ALERT_ENTITY_TYPES } from "@/lib/parasut-constants";
 
+// ── Module-level styles (no-inline-exhaustive-style) ──────────
+
+const aiBadgePillStyle: React.CSSProperties = {
+    fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
+    padding: "1px 5px", borderRadius: "3px", flexShrink: 0,
+    background: "var(--accent-bg)", color: "var(--accent-text)",
+    border: "0.5px solid var(--accent-border)",
+};
+
+const tabButtonBaseStyle: React.CSSProperties = {
+    fontSize: "12px",
+    padding: "10px 14px",
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+};
+
+// ── B1: Static styles ──
+
+const pageRootStyle: React.CSSProperties = { padding: 0 };
+
+const headerContainerStyle: React.CSSProperties = {
+    padding: "18px 24px 14px",
+    borderBottom: "0.5px solid var(--border-tertiary)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    flexWrap: "wrap",
+};
+
+const headerTitleStyle: React.CSSProperties = {
+    fontSize: "15px",
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    margin: 0,
+};
+
+const headerSubtitleStyle: React.CSSProperties = {
+    fontSize: "11px",
+    color: "var(--text-tertiary)",
+    marginTop: "2px",
+};
+
+const headerButtonRowStyle: React.CSSProperties = { display: "flex", gap: "6px" };
+
+const aiUnavailableBannerStyle: React.CSSProperties = { margin: "12px 24px 0" };
+
+const tabsInnerRowBaseStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    padding: "0 24px",
+};
+
+const tabsButtonGroupStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    flexShrink: 0,
+};
+
+const tabsRightGroupStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexShrink: 0,
+};
+
+const tabSearchInputStyle: React.CSSProperties = {
+    fontSize: "12px",
+    padding: "5px 10px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "6px",
+    background: "var(--bg-primary)",
+    color: "var(--text-primary)",
+    width: "180px",
+};
+
+const tabMobileWrapperStyle: React.CSSProperties = {
+    padding: "6px 24px 6px",
+    borderBottom: "0.5px solid var(--border-tertiary)",
+};
+
+const systemAlertsContainerStyle: React.CSSProperties = {
+    marginBottom: "20px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "8px",
+    background: "var(--bg-secondary)",
+    overflow: "hidden",
+};
+
+const systemAlertsHeaderStyle: React.CSSProperties = {
+    padding: "10px 20px",
+    background: "var(--bg-tertiary)",
+    borderBottom: "0.5px solid var(--border-secondary)",
+    fontSize: "11px",
+    fontWeight: 600,
+    color: "var(--text-tertiary)",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+};
+
+const aiSectionContainerStyle: React.CSSProperties = {
+    borderTop: "0.5px solid var(--border-tertiary)",
+};
+
+const aiSectionHeaderStyle: React.CSSProperties = {
+    padding: "12px 24px 10px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+};
+
+const aiSectionTitleStyle: React.CSSProperties = {
+    fontSize: "11px",
+    fontWeight: 600,
+    color: "var(--text-tertiary)",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+};
+
+const aiSectionEmptyTextWrapperStyle: React.CSSProperties = { padding: "0 24px 16px" };
+
+const aiSectionEmptyTextStyle: React.CSSProperties = {
+    fontSize: "12px",
+    color: "var(--text-tertiary)",
+};
+
+const aiAlertsListStyle: React.CSSProperties = {
+    padding: "0 24px 16px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+};
+
+const aiOverallSummaryStyle: React.CSSProperties = {
+    padding: "9px 12px",
+    background: "var(--accent-bg)",
+    border: "0.5px solid var(--accent-border)",
+    borderRadius: "5px",
+    fontSize: "12px",
+    color: "var(--accent-text)",
+    lineHeight: 1.5,
+};
+
+const aiOverallSummaryLabelStyle: React.CSSProperties = {
+    fontWeight: 600,
+    marginRight: "6px",
+};
+
+const aiAlertRowStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    padding: "9px 12px",
+    background: "var(--bg-secondary)",
+    border: "0.5px solid var(--border-tertiary)",
+    borderRadius: "5px",
+};
+
+const aiAlertTitleStyle: React.CSSProperties = {
+    fontSize: "12px",
+    color: "var(--text-secondary)",
+    flex: 1,
+    lineHeight: 1.45,
+};
+
+const aiAlertConfidenceStyle: React.CSSProperties = {
+    fontSize: "10px",
+    fontWeight: 600,
+    padding: "2px 6px",
+    borderRadius: "3px",
+    background: "var(--accent-bg)",
+    color: "var(--accent-text)",
+    border: "0.5px solid var(--accent-border)",
+    flexShrink: 0,
+};
+
+const aiAlertRelTimeStyle: React.CSSProperties = {
+    fontSize: "10px",
+    color: "var(--text-tertiary)",
+    flexShrink: 0,
+};
+
+const aiAlertModelStyle: React.CSSProperties = {
+    fontSize: "10px",
+    color: "var(--text-tertiary)",
+    marginTop: "4px",
+    paddingLeft: "2px",
+};
+
+const drawerBackdropStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    zIndex: 200,
+    background: "rgba(0,0,0,0.45)",
+};
+
+const drawerPanelStyle: React.CSSProperties = {
+    position: "fixed",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 201,
+    width: "min(440px, 100vw)",
+    background: "var(--bg-primary)",
+    borderLeft: "0.5px solid var(--border-secondary)",
+    boxShadow: "-8px 0 32px rgba(0,0,0,0.25)",
+    display: "flex",
+    flexDirection: "column",
+    animation: "slide-in-right 0.2s ease-out",
+};
+
+const drawerHeaderStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "16px 20px",
+    borderBottom: "0.5px solid var(--border-tertiary)",
+    flexShrink: 0,
+    gap: "10px",
+};
+
+const drawerHeaderLeftStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    minWidth: 0,
+};
+
+const drawerSkuStyle: React.CSSProperties = {
+    fontSize: "11px",
+    color: "var(--text-tertiary)",
+    fontFamily: "monospace",
+    flexShrink: 0,
+};
+
+const drawerCloseButtonStyle: React.CSSProperties = {
+    background: "transparent",
+    border: "none",
+    cursor: "pointer",
+    color: "var(--text-tertiary)",
+    fontSize: "20px",
+    lineHeight: 1,
+    padding: "4px 8px",
+    borderRadius: "4px",
+    flexShrink: 0,
+};
+
+const drawerBodyStyle: React.CSSProperties = {
+    flex: 1,
+    overflowY: "auto",
+    padding: "20px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "20px",
+};
+
+const drawerSectionLabelStyle: React.CSSProperties = {
+    fontSize: "10px",
+    fontWeight: 600,
+    color: "var(--text-tertiary)",
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+    marginBottom: "8px",
+};
+
+const drawerOrphanedTextStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "13px",
+    color: "var(--text-secondary)",
+    lineHeight: 1.6,
+};
+
+const drawerReasonTextStyle: React.CSSProperties = {
+    margin: "0 0 12px",
+    fontSize: "13px",
+    color: "var(--text-primary)",
+    lineHeight: 1.6,
+};
+
+const drawerStatsGridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr 1fr",
+    gap: "10px",
+    padding: "10px 12px",
+    background: "var(--bg-secondary)",
+    border: "0.5px solid var(--border-tertiary)",
+    borderRadius: "5px",
+};
+
+const drawerImpactTextStyle: React.CSSProperties = {
+    margin: 0,
+    fontSize: "13px",
+    color: "var(--text-primary)",
+    lineHeight: 1.6,
+};
+
+const drawerActionsContainerStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "7px",
+};
+
+const drawerRelatedLinksContainerStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+};
+
+// ── OrderAlertRow / SystemAlertCard static styles ──
+
+const alertRowWrapperStyle: React.CSSProperties = {
+    padding: "14px 20px",
+    borderBottom: "0.5px solid var(--border-tertiary)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+};
+
+const alertRowFlexRowStyle: React.CSSProperties = {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "16px",
+};
+
+const alertRowMainColStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
+
+const alertRowTitleStyle: React.CSSProperties = {
+    fontSize: "13px",
+    fontWeight: 500,
+    color: "var(--text-primary)",
+};
+
+const alertRowDescStyle: React.CSSProperties = {
+    fontSize: "12px",
+    color: "var(--text-secondary)",
+    marginTop: "3px",
+};
+
+const alertRowMetaStyle: React.CSSProperties = {
+    fontSize: "11px",
+    color: "var(--text-tertiary)",
+    marginTop: "4px",
+};
+
+const alertRowActionsColStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    alignItems: "flex-end",
+    flexShrink: 0,
+};
+
+const alertRowDetailButtonStyle: React.CSSProperties = {
+    fontSize: "11px",
+    padding: "4px 9px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px",
+    background: "transparent",
+    color: "var(--text-secondary)",
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+};
+
+const alertRowOrderLinkStyle: React.CSSProperties = {
+    fontSize: "12px",
+    color: "var(--accent)",
+    whiteSpace: "nowrap",
+    textDecoration: "none",
+};
+
+const extendFormContainerStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    padding: "10px 12px",
+    background: "var(--bg-secondary)",
+    border: "0.5px solid var(--border-tertiary)",
+    borderRadius: "5px",
+};
+
+const extendFormLabelStyle: React.CSSProperties = {
+    fontSize: "11px",
+    color: "var(--text-tertiary)",
+    fontWeight: 600,
+    letterSpacing: "0.04em",
+};
+
+const extendFormControlsRowStyle: React.CSSProperties = {
+    display: "flex",
+    gap: "8px",
+    alignItems: "center",
+    flexWrap: "wrap",
+};
+
+const extendFormDateInputStyle: React.CSSProperties = {
+    fontSize: "12px",
+    padding: "5px 8px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px",
+    background: "var(--bg-primary)",
+    color: "var(--text-primary)",
+};
+
+const extendFormErrorStyle: React.CSSProperties = {
+    fontSize: "11px",
+    color: "var(--danger-text)",
+};
+
+const systemAlertHeaderRowStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    marginBottom: "4px",
+};
+
+const systemAlertParaSutLabelStyle: React.CSSProperties = {
+    fontSize: "10px",
+    fontWeight: 600,
+    color: "var(--text-tertiary)",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+};
+
+// ── B3: SEV badge lookup map (3 callsites: ProductRow mobile/desktop + drawer + SystemAlertCard) ──
+
+const SEV_BADGE_PILL_STYLES: Record<Severity, React.CSSProperties> = {
+    critical: {
+        fontSize: "9px",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        padding: "1px 5px",
+        borderRadius: "3px",
+        flexShrink: 0,
+        background: "var(--danger-bg)",
+        color: "var(--danger-text)",
+        border: "0.5px solid var(--danger-border)",
+    },
+    warning: {
+        fontSize: "9px",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        padding: "1px 5px",
+        borderRadius: "3px",
+        flexShrink: 0,
+        background: "var(--warning-bg)",
+        color: "var(--warning-text)",
+        border: "0.5px solid var(--warning-border)",
+    },
+    info: {
+        fontSize: "9px",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        padding: "1px 5px",
+        borderRadius: "3px",
+        flexShrink: 0,
+        background: "var(--accent-bg)",
+        color: "var(--accent-text)",
+        border: "0.5px solid var(--accent-border)",
+    },
+};
+
+const SEV_SUMMARY_PANEL_STYLES: Record<Severity, React.CSSProperties> = {
+    critical: {
+        padding: "14px",
+        background: "var(--danger-bg)",
+        border: "0.5px solid var(--danger-border)",
+        borderRadius: "6px",
+    },
+    warning: {
+        padding: "14px",
+        background: "var(--warning-bg)",
+        border: "0.5px solid var(--warning-border)",
+        borderRadius: "6px",
+    },
+    info: {
+        padding: "14px",
+        background: "var(--accent-bg)",
+        border: "0.5px solid var(--accent-border)",
+        borderRadius: "6px",
+    },
+};
+
+const SEV_DRAWER_HEADER_BADGE_STYLES: Record<Severity, React.CSSProperties> = {
+    critical: {
+        fontSize: "9px",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        padding: "2px 6px",
+        borderRadius: "3px",
+        flexShrink: 0,
+        background: "var(--danger-bg)",
+        color: "var(--danger-text)",
+        border: "0.5px solid var(--danger-border)",
+    },
+    warning: {
+        fontSize: "9px",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        padding: "2px 6px",
+        borderRadius: "3px",
+        flexShrink: 0,
+        background: "var(--warning-bg)",
+        color: "var(--warning-text)",
+        border: "0.5px solid var(--warning-border)",
+    },
+    info: {
+        fontSize: "9px",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        padding: "2px 6px",
+        borderRadius: "3px",
+        flexShrink: 0,
+        background: "var(--accent-bg)",
+        color: "var(--accent-text)",
+        border: "0.5px solid var(--accent-border)",
+    },
+};
+
+// ── B2: Conditional / spread base styles ──
+
+const headerAiButtonBaseStyle: React.CSSProperties = {
+    fontSize: "12px", padding: "6px 12px",
+    border: "0.5px solid var(--accent-border)",
+    borderRadius: "5px", background: "var(--accent-bg)",
+    color: "var(--accent-text)", fontWeight: 500,
+};
+
+const headerRefreshButtonBaseStyle: React.CSSProperties = {
+    fontSize: "12px", padding: "6px 12px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "5px", background: "transparent",
+    color: "var(--text-secondary)",
+};
+
+const tabButtonDotBaseStyle: React.CSSProperties = {
+    width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0,
+};
+
+const tabButtonCountBaseStyle: React.CSSProperties = {
+    fontSize: "10px", padding: "1px 5px", borderRadius: "10px", fontWeight: 500,
+};
+
+const showResolvedButtonBaseStyle: React.CSSProperties = {
+    fontSize: "11px",
+    padding: "4px 10px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px",
+    cursor: "pointer",
+    flexShrink: 0,
+};
+
+const aiAnalysisStartButtonBaseStyle: React.CSSProperties = {
+    fontSize: "11px", padding: "4px 10px",
+    border: "0.5px solid var(--accent-border)",
+    borderRadius: "4px", background: "var(--accent-bg)",
+    color: "var(--accent-text)", fontWeight: 500,
+};
+
+const aiAlertDetailButtonStyle: React.CSSProperties = {
+    fontSize: "10px", padding: "3px 8px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px", background: "transparent",
+    color: "var(--text-tertiary)", cursor: "pointer",
+    flexShrink: 0, whiteSpace: "nowrap",
+};
+
+const orderAlertExtendOpenButtonBaseStyle: React.CSSProperties = {
+    fontSize: "12px", padding: "5px 11px",
+    border: "0.5px solid var(--accent-border)",
+    borderRadius: "4px", background: "var(--accent-bg)",
+    color: "var(--accent-text)",
+    whiteSpace: "nowrap", fontWeight: 500,
+};
+
+const orderAlertExtendSaveButtonBaseStyle: React.CSSProperties = {
+    fontSize: "12px", padding: "5px 12px",
+    border: "0.5px solid var(--success-border)",
+    borderRadius: "4px",
+    background: "var(--success-bg)",
+    color: "var(--success-text)",
+    fontWeight: 500,
+};
+
+const orderAlertExtendCancelButtonBaseStyle: React.CSSProperties = {
+    fontSize: "12px", padding: "5px 10px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px",
+    background: "transparent",
+    color: "var(--text-secondary)",
+};
+
+const systemAlertRetryButtonBaseStyle: React.CSSProperties = {
+    fontSize: "12px", padding: "5px 11px",
+    border: "0.5px solid var(--accent-border)",
+    borderRadius: "4px", background: "var(--accent-bg)",
+    color: "var(--accent-text)",
+    whiteSpace: "nowrap",
+};
+
+const systemAlertParaSutLinkStyle: React.CSSProperties = {
+    fontSize: "11px", padding: "4px 10px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px", background: "transparent",
+    color: "var(--text-secondary)",
+    textDecoration: "none", whiteSpace: "nowrap",
+};
+
+const systemAlertDismissButtonBaseStyle: React.CSSProperties = {
+    fontSize: "11px", padding: "4px 10px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px", background: "transparent",
+    color: "var(--text-tertiary)",
+    whiteSpace: "nowrap",
+};
+
+const productRowMobileWrapperBaseStyle: React.CSSProperties = {
+    display: "flex",
+    borderBottom: "0.5px solid var(--border-tertiary)",
+};
+
+const productRowMobileStripeBaseStyle: React.CSSProperties = {
+    width: "3px", flexShrink: 0,
+};
+
+const productRowMobileCardStyle: React.CSSProperties = {
+    flex: 1,
+    padding: "12px 14px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "5px",
+    minWidth: 0,
+};
+
+const productRowSevRowStyle: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: "7px",
+};
+
+const productRowNameStyle: React.CSSProperties = {
+    fontSize: "13px", fontWeight: 500, color: "var(--text-primary)",
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+};
+
+const productRowSkuRowStyle: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: "8px",
+};
+
+const productRowSkuStyle: React.CSSProperties = {
+    fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace",
+};
+
+const productRowReasonStyle: React.CSSProperties = {
+    fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4,
+};
+
+const productRowActionsRowStyle: React.CSSProperties = {
+    display: "flex", alignItems: "center", gap: "8px",
+    flexWrap: "wrap", marginTop: "4px",
+};
+
+const productRowDetailButtonStyle: React.CSSProperties = {
+    fontSize: "11px", padding: "5px 12px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px", background: "transparent",
+    color: "var(--text-secondary)", cursor: "pointer",
+    whiteSpace: "nowrap",
+};
+
+const productRowMobileDismissButtonStyle: React.CSSProperties = {
+    fontSize: "13px", padding: "3px 9px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px", background: "transparent",
+    color: "var(--text-tertiary)", cursor: "pointer",
+    lineHeight: 1,
+};
+
+const productRowSeenLabelStyle: React.CSSProperties = {
+    fontSize: "10px", color: "var(--text-tertiary)",
+};
+
+const productRowDesktopWrapperBaseStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "3px 1fr 170px 120px 80px 148px 110px",
+    alignItems: "center",
+    borderBottom: "0.5px solid var(--border-tertiary)",
+    transition: "background 0.1s",
+};
+
+const productRowDesktopStripeBaseStyle: React.CSSProperties = {
+    alignSelf: "stretch", minHeight: "52px",
+};
+
+const productRowDesktopCellStyle: React.CSSProperties = {
+    padding: "12px 16px", minWidth: 0,
+};
+
+const productRowReasonCellStyle: React.CSSProperties = {
+    padding: "12px 12px",
+};
+
+const productRowReasonTextStyle: React.CSSProperties = {
+    fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.45,
+};
+
+const productRowOpenOrderCellStyle: React.CSSProperties = {
+    padding: "12px 12px",
+};
+
+const productRowActionLinkCellStyle: React.CSSProperties = {
+    padding: "12px 12px",
+};
+
+const productRowQuickActionsCellStyle: React.CSSProperties = {
+    padding: "12px 12px", display: "flex", alignItems: "center", gap: "6px",
+};
+
+const productRowDesktopDetailButtonStyle: React.CSSProperties = {
+    fontSize: "11px", padding: "4px 10px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px", background: "transparent",
+    color: "var(--text-secondary)", cursor: "pointer",
+    whiteSpace: "nowrap",
+};
+
+const productRowDesktopDismissButtonStyle: React.CSSProperties = {
+    fontSize: "13px", padding: "2px 7px",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "4px", background: "transparent",
+    color: "var(--text-tertiary)", cursor: "pointer",
+    lineHeight: 1,
+};
+
+const productRowDesktopSeenLabelStyle: React.CSSProperties = {
+    fontSize: "10px", color: "var(--text-tertiary)", whiteSpace: "nowrap",
+};
+
 // ── Types ──────────────────────────────────────────────────────
 
 type Severity = "critical" | "warning" | "info";
@@ -420,37 +1163,27 @@ export default function AlertsPage() {
     // ── Render ────────────────────────────────────────────────
 
     return (
-        <div style={{ padding: 0 }}>
+        <div style={pageRootStyle}>
 
             {/* ── Header ── */}
-            <div style={{
-                padding: "18px 24px 14px",
-                borderBottom: "0.5px solid var(--border-tertiary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "8px",
-                flexWrap: "wrap",
-            }}>
+            <div style={headerContainerStyle}>
                 <div>
-                    <h1 style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                    <h1 style={headerTitleStyle}>
                         Üretim & Stok Uyarıları
                     </h1>
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                    <div style={headerSubtitleStyle}>
                         Son tarama: {lastRefreshed}
                     </div>
                 </div>
-                <div style={{ display: "flex", gap: "6px" }}>
+                <div style={headerButtonRowStyle}>
                     <button
                         onClick={handleAiSuggest}
                         disabled={isDemo || aiGenerating}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                         style={{
-                            fontSize: "12px", padding: "6px 12px",
-                            border: "0.5px solid var(--accent-border)",
-                            borderRadius: "5px", background: "var(--accent-bg)",
-                            color: "var(--accent-text)", cursor: isDemo || aiGenerating ? "not-allowed" : "pointer",
-                            opacity: isDemo || aiGenerating ? 0.6 : 1, fontWeight: 500,
+                            ...headerAiButtonBaseStyle,
+                            cursor: isDemo || aiGenerating ? "not-allowed" : "pointer",
+                            opacity: isDemo || aiGenerating ? 0.6 : 1,
                         }}
                     >
                         {aiGenerating ? "Analiz..." : "✦ AI Analiz"}
@@ -460,10 +1193,8 @@ export default function AlertsPage() {
                         disabled={isDemo || refreshing}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                         style={{
-                            fontSize: "12px", padding: "6px 12px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "5px", background: "transparent",
-                            color: "var(--text-secondary)", cursor: isDemo || refreshing ? "not-allowed" : "pointer",
+                            ...headerRefreshButtonBaseStyle,
+                            cursor: isDemo || refreshing ? "not-allowed" : "pointer",
                             opacity: isDemo || refreshing ? 0.6 : 1,
                         }}
                     >
@@ -483,7 +1214,7 @@ export default function AlertsPage() {
                     onRetry={aiUnavailable.reason === "error" ? handleAiSuggest : undefined}
                     retryDisabled={aiGenerating}
                     onClose={() => setAiUnavailable(null)}
-                    style={{ margin: "12px 24px 0" }}
+                    style={aiUnavailableBannerStyle}
                 />
             )}
 
@@ -492,16 +1223,14 @@ export default function AlertsPage() {
                 borderBottom: isMobile ? "none" : "0.5px solid var(--border-tertiary)",
             }}>
                 <div style={{
-                    display: "flex",
-                    alignItems: "center",
+                    ...tabsInnerRowBaseStyle,
                     justifyContent: isMobile ? undefined : "space-between",
-                    padding: "0 24px",
                     borderBottom: isMobile ? "0.5px solid var(--border-tertiary)" : "none",
                     overflowX: isMobile ? "auto" : undefined,
-                    scrollbarWidth: "none" as React.CSSProperties["scrollbarWidth"],
-                    WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"],
+                    scrollbarWidth: "none",
+                    WebkitOverflowScrolling: "touch",
                 }}>
-                    <div style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+                    <div style={tabsButtonGroupStyle}>
                         {(
                             [
                                 { key: "all"              as AlertFilter, label: "Tümü",             count: productGroups.length, dot: null                },
@@ -516,34 +1245,21 @@ export default function AlertsPage() {
                                 key={tab.key}
                                 onClick={() => setActiveFilter(tab.key)}
                                 style={{
-                                    fontSize: "12px",
-                                    padding: "10px 14px",
-                                    border: "none",
+                                    ...tabButtonBaseStyle,
                                     borderBottom: activeFilter === tab.key ? "2px solid var(--accent)" : "2px solid transparent",
-                                    background: "transparent",
                                     color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-secondary)",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "6px",
                                     fontWeight: activeFilter === tab.key ? 500 : 400,
-                                    whiteSpace: "nowrap",
-                                    flexShrink: 0,
                                 }}
                             >
                                 {tab.dot && (
-                                    <span style={{
-                                        width: "6px", height: "6px", borderRadius: "50%",
-                                        background: tab.dot, flexShrink: 0,
-                                    }} />
+                                    <span style={{ ...tabButtonDotBaseStyle, background: tab.dot }} />
                                 )}
                                 {tab.label}
                                 {tab.count > 0 && (
                                     <span style={{
-                                        fontSize: "10px", padding: "1px 5px", borderRadius: "10px",
+                                        ...tabButtonCountBaseStyle,
                                         background: activeFilter === tab.key ? "var(--accent-bg)" : "var(--bg-tertiary)",
                                         color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-tertiary)",
-                                        fontWeight: 500,
                                     }}>
                                         {tab.count}
                                     </span>
@@ -552,33 +1268,20 @@ export default function AlertsPage() {
                         ))}
                     </div>
                     {!isMobile && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                        <div style={tabsRightGroupStyle}>
                             <input
                                 type="text"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 placeholder="Ürün adı veya SKU..."
-                                style={{
-                                    fontSize: "12px",
-                                    padding: "5px 10px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px",
-                                    background: "var(--bg-primary)",
-                                    color: "var(--text-primary)",
-                                    width: "180px",
-                                }}
+                                style={tabSearchInputStyle}
                             />
                             <button
                                 onClick={() => setShowResolved((v) => !v)}
                                 style={{
-                                    fontSize: "11px",
-                                    padding: "4px 10px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "4px",
+                                    ...showResolvedButtonBaseStyle,
                                     background: showResolved ? "var(--bg-tertiary)" : "transparent",
                                     color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
-                                    cursor: "pointer",
-                                    flexShrink: 0,
                                 }}
                             >
                                 {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
@@ -587,20 +1290,13 @@ export default function AlertsPage() {
                     )}
                 </div>
                 {isMobile && (
-                    <div style={{
-                        padding: "6px 24px 6px",
-                        borderBottom: "0.5px solid var(--border-tertiary)",
-                    }}>
+                    <div style={tabMobileWrapperStyle}>
                         <button
                             onClick={() => setShowResolved((v) => !v)}
                             style={{
-                                fontSize: "11px",
-                                padding: "4px 10px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "4px",
+                                ...showResolvedButtonBaseStyle,
                                 background: showResolved ? "var(--bg-tertiary)" : "transparent",
                                 color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
-                                cursor: "pointer",
                             }}
                         >
                             {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
@@ -615,23 +1311,8 @@ export default function AlertsPage() {
                 showResolved=false durumunda 'open/acknowledged' alertleri filtrelenir
                 (activeAlerts zaten o filtreyi uyguluyor). */}
             {!loading && systemAlerts.length > 0 && !isOrderAlertTab && (
-                <div style={{
-                    marginBottom: "20px",
-                    border: "0.5px solid var(--border-secondary)",
-                    borderRadius: "8px",
-                    background: "var(--bg-secondary)",
-                    overflow: "hidden",
-                }}>
-                    <div style={{
-                        padding: "10px 20px",
-                        background: "var(--bg-tertiary)",
-                        borderBottom: "0.5px solid var(--border-secondary)",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        color: "var(--text-tertiary)",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                    }}>
+                <div style={systemAlertsContainerStyle}>
+                    <div style={systemAlertsHeaderStyle}>
                         Paraşüt Sync Uyarıları ({systemAlerts.length})
                     </div>
                     {systemAlerts.map((alert) => (
@@ -747,18 +1428,9 @@ export default function AlertsPage() {
             )}
 
             {/* ── AI Alerts Section ── */}
-            <div style={{ borderTop: "0.5px solid var(--border-tertiary)" }}>
-                <div style={{
-                    padding: "12px 24px 10px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: "8px",
-                }}>
-                    <span style={{
-                        fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)",
-                        letterSpacing: "0.06em", textTransform: "uppercase",
-                    }}>
+            <div style={aiSectionContainerStyle}>
+                <div style={aiSectionHeaderStyle}>
+                    <span style={aiSectionTitleStyle}>
                         ✦ AI Önerileri
                     </span>
                     {aiAlerts.length === 0 && (
@@ -767,11 +1439,9 @@ export default function AlertsPage() {
                             disabled={isDemo || aiGenerating}
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             style={{
-                                fontSize: "11px", padding: "4px 10px",
-                                border: "0.5px solid var(--accent-border)",
-                                borderRadius: "4px", background: "var(--accent-bg)",
-                                color: "var(--accent-text)", cursor: isDemo || aiGenerating ? "not-allowed" : "pointer",
-                                opacity: isDemo || aiGenerating ? 0.6 : 1, fontWeight: 500,
+                                ...aiAnalysisStartButtonBaseStyle,
+                                cursor: isDemo || aiGenerating ? "not-allowed" : "pointer",
+                                opacity: isDemo || aiGenerating ? 0.6 : 1,
                             }}
                         >
                             {aiGenerating ? "Analiz..." : "Analizi Başlat"}
@@ -780,25 +1450,17 @@ export default function AlertsPage() {
                 </div>
 
                 {aiAlerts.length === 0 ? (
-                    <div style={{ padding: "0 24px 16px" }}>
-                        <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
+                    <div style={aiSectionEmptyTextWrapperStyle}>
+                        <span style={aiSectionEmptyTextStyle}>
                             Henüz çalıştırılmadı — stok riski, sipariş anomalileri ve tedarik boşluklarını analiz eder.
                         </span>
                     </div>
                 ) : (
-                    <div style={{ padding: "0 24px 16px", display: "flex", flexDirection: "column", gap: "6px" }}>
+                    <div style={aiAlertsListStyle}>
                         {/* G7 — Genel durum özeti (tüm insight'lar için aynı; tek sefer gösterilir) */}
                         {aiAlerts[0]?.description && (
-                            <div style={{
-                                padding: "9px 12px",
-                                background: "var(--accent-bg)",
-                                border: "0.5px solid var(--accent-border)",
-                                borderRadius: "5px",
-                                fontSize: "12px",
-                                color: "var(--accent-text)",
-                                lineHeight: 1.5,
-                            }}>
-                                <span style={{ fontWeight: 600, marginRight: "6px" }}>Genel durum:</span>
+                            <div style={aiOverallSummaryStyle}>
+                                <span style={aiOverallSummaryLabelStyle}>Genel durum:</span>
                                 {aiAlerts[0].description}
                             </div>
                         )}
@@ -807,53 +1469,27 @@ export default function AlertsPage() {
                                 ? Math.round(alert.ai_confidence * 100)
                                 : null;
                             return (
-                                <div key={alert.id} style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "10px",
-                                    padding: "9px 12px",
-                                    background: "var(--bg-secondary)",
-                                    border: "0.5px solid var(--border-tertiary)",
-                                    borderRadius: "5px",
-                                }}>
-                                    <span style={{
-                                        fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
-                                        padding: "1px 5px", borderRadius: "3px", flexShrink: 0,
-                                        background: "var(--accent-bg)", color: "var(--accent-text)",
-                                        border: "0.5px solid var(--accent-border)",
-                                    }}>
+                                <div key={alert.id} style={aiAlertRowStyle}>
+                                    <span style={aiBadgePillStyle}>
                                         AI
                                     </span>
-                                    <span style={{ fontSize: "12px", color: "var(--text-secondary)", flex: 1, lineHeight: 1.45 }}>
+                                    <span style={aiAlertTitleStyle}>
                                         {alert.title}
                                     </span>
                                     {confidencePct !== null && (
                                         <span
                                             title="AI'ın bu öneriye olan güveni"
-                                            style={{
-                                                fontSize: "10px", fontWeight: 600,
-                                                padding: "2px 6px", borderRadius: "3px",
-                                                background: "var(--accent-bg)",
-                                                color: "var(--accent-text)",
-                                                border: "0.5px solid var(--accent-border)",
-                                                flexShrink: 0,
-                                            }}
+                                            style={aiAlertConfidenceStyle}
                                         >
                                             %{confidencePct}
                                         </span>
                                     )}
-                                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", flexShrink: 0 }}>
+                                    <span style={aiAlertRelTimeStyle}>
                                         {formatRelTime(alert.created_at)}
                                     </span>
                                     <button
                                         onClick={() => setDrawerAiAlert(alert)}
-                                        style={{
-                                            fontSize: "10px", padding: "3px 8px",
-                                            border: "0.5px solid var(--border-secondary)",
-                                            borderRadius: "4px", background: "transparent",
-                                            color: "var(--text-tertiary)", cursor: "pointer",
-                                            flexShrink: 0, whiteSpace: "nowrap",
-                                        }}
+                                        style={aiAlertDetailButtonStyle}
                                     >
                                         Detay
                                     </button>
@@ -861,12 +1497,7 @@ export default function AlertsPage() {
                             );
                         })}
                         {aiAlerts[0]?.ai_model_version && (
-                            <div style={{
-                                fontSize: "10px",
-                                color: "var(--text-tertiary)",
-                                marginTop: "4px",
-                                paddingLeft: "2px",
-                            }}>
+                            <div style={aiAlertModelStyle}>
                                 Model: {aiAlerts[0].ai_model_version}
                             </div>
                         )}
@@ -968,44 +1599,31 @@ function OrderAlertRow({ alert, isDemo, onExtended, onOpenDrawer }: OrderAlertRo
     };
 
     return (
-        <div style={{
-            padding: "14px 20px",
-            borderBottom: "0.5px solid var(--border-tertiary)",
-            display: "flex", flexDirection: "column", gap: "10px",
-        }}>
-            <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: "16px",
-            }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
+        <div style={alertRowWrapperStyle}>
+            <div style={alertRowFlexRowStyle}>
+                <div style={alertRowMainColStyle}>
+                    <div style={alertRowTitleStyle}>
                         {alert.title}
                     </div>
                     {alert.description && (
-                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                        <div style={alertRowDescStyle}>
                             {alert.description}
                         </div>
                     )}
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                    <div style={alertRowMetaStyle}>
                         {new Date(alert.created_at).toLocaleDateString("tr-TR")}
                     </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end", flexShrink: 0 }}>
+                <div style={alertRowActionsColStyle}>
                     {isQuoteExpired && !showExtend && (
                         <button
                             onClick={() => setShowExtend(true)}
                             disabled={isDemo}
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : "Teklifin geçerlilik süresini uzat"}
                             style={{
-                                fontSize: "12px", padding: "5px 11px",
-                                border: "0.5px solid var(--accent-border)",
-                                borderRadius: "4px", background: "var(--accent-bg)",
-                                color: "var(--accent-text)",
+                                ...orderAlertExtendOpenButtonBaseStyle,
                                 cursor: isDemo ? "not-allowed" : "pointer",
                                 opacity: isDemo ? 0.6 : 1,
-                                whiteSpace: "nowrap", fontWeight: 500,
                             }}
                         >
                             Süreyi Uzat
@@ -1013,25 +1631,14 @@ function OrderAlertRow({ alert, isDemo, onExtended, onOpenDrawer }: OrderAlertRo
                     )}
                     <button
                         onClick={() => onOpenDrawer(alert)}
-                        style={{
-                            fontSize: "11px", padding: "4px 9px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "4px", background: "transparent",
-                            color: "var(--text-secondary)", cursor: "pointer",
-                            whiteSpace: "nowrap",
-                        }}
+                        style={alertRowDetailButtonStyle}
                     >
                         Detay
                     </button>
                     {alert.entity_id && (
                         <Link
                             href={`/dashboard/orders/${alert.entity_id}`}
-                            style={{
-                                fontSize: "12px",
-                                color: "var(--accent)",
-                                whiteSpace: "nowrap",
-                                textDecoration: "none",
-                            }}
+                            style={alertRowOrderLinkStyle}
                         >
                             Siparişe Git →
                         </Link>
@@ -1039,43 +1646,26 @@ function OrderAlertRow({ alert, isDemo, onExtended, onOpenDrawer }: OrderAlertRo
                 </div>
             </div>
             {isQuoteExpired && showExtend && (
-                <div style={{
-                    display: "flex", flexDirection: "column", gap: "8px",
-                    padding: "10px 12px",
-                    background: "var(--bg-secondary)",
-                    border: "0.5px solid var(--border-tertiary)",
-                    borderRadius: "5px",
-                }}>
-                    <label style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 600, letterSpacing: "0.04em" }}>
+                <div style={extendFormContainerStyle}>
+                    <label style={extendFormLabelStyle}>
                         YENİ GEÇERLİLİK TARİHİ
                     </label>
-                    <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                    <div style={extendFormControlsRowStyle}>
                         <input
                             type="date"
                             value={newDate}
                             min={todayStr}
                             onChange={(e) => { setNewDate(e.target.value); setError(null); }}
                             disabled={extending}
-                            style={{
-                                fontSize: "12px", padding: "5px 8px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "4px",
-                                background: "var(--bg-primary)",
-                                color: "var(--text-primary)",
-                            }}
+                            style={extendFormDateInputStyle}
                         />
                         <button
                             onClick={handleExtend}
                             disabled={isDemo || extending}
                             style={{
-                                fontSize: "12px", padding: "5px 12px",
-                                border: "0.5px solid var(--success-border)",
-                                borderRadius: "4px",
-                                background: "var(--success-bg)",
-                                color: "var(--success-text)",
+                                ...orderAlertExtendSaveButtonBaseStyle,
                                 cursor: isDemo || extending ? "not-allowed" : "pointer",
                                 opacity: isDemo || extending ? 0.6 : 1,
-                                fontWeight: 500,
                             }}
                         >
                             {extending ? "Kaydediliyor..." : "Kaydet"}
@@ -1084,11 +1674,7 @@ function OrderAlertRow({ alert, isDemo, onExtended, onOpenDrawer }: OrderAlertRo
                             onClick={() => { setShowExtend(false); setError(null); }}
                             disabled={extending}
                             style={{
-                                fontSize: "12px", padding: "5px 10px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "4px",
-                                background: "transparent",
-                                color: "var(--text-secondary)",
+                                ...orderAlertExtendCancelButtonBaseStyle,
                                 cursor: extending ? "not-allowed" : "pointer",
                             }}
                         >
@@ -1096,7 +1682,7 @@ function OrderAlertRow({ alert, isDemo, onExtended, onOpenDrawer }: OrderAlertRo
                         </button>
                     </div>
                     {error && (
-                        <div style={{ fontSize: "11px", color: "var(--danger-text)" }}>
+                        <div style={extendFormErrorStyle}>
                             {error}
                         </div>
                     )}
@@ -1120,72 +1706,43 @@ interface SystemAlertCardProps {
 
 function SystemAlertCard({ alert, isDemo, retrying, onRetry, onDismiss }: SystemAlertCardProps) {
     const sev = SEV[alert.severity as Severity] ?? SEV.warning;
+    const sevKey: Severity = (alert.severity as Severity) in SEV ? (alert.severity as Severity) : "warning";
     return (
-        <div style={{
-            padding: "14px 20px",
-            borderBottom: "0.5px solid var(--border-tertiary)",
-            display: "flex", flexDirection: "column", gap: "10px",
-        }}>
-            <div style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "flex-start",
-                gap: "16px",
-            }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                        <span style={{
-                            display: "inline-block",
-                            fontSize: "10px", fontWeight: 700,
-                            padding: "1px 6px", borderRadius: "3px",
-                            background: sev.bg, color: sev.text,
-                            border: `0.5px solid ${sev.border}`,
-                            letterSpacing: "0.04em",
-                        }}>{sev.label}</span>
-                        <span style={{
-                            fontSize: "10px", fontWeight: 600,
-                            color: "var(--text-tertiary)", textTransform: "uppercase",
-                            letterSpacing: "0.04em",
-                        }}>PARAŞÜT</span>
+        <div style={alertRowWrapperStyle}>
+            <div style={alertRowFlexRowStyle}>
+                <div style={alertRowMainColStyle}>
+                    <div style={systemAlertHeaderRowStyle}>
+                        <span style={SEV_BADGE_PILL_STYLES[sevKey]}>{sev.label}</span>
+                        <span style={systemAlertParaSutLabelStyle}>PARAŞÜT</span>
                     </div>
-                    <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
+                    <div style={alertRowTitleStyle}>
                         {alert.title}
                     </div>
                     {alert.description && (
-                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
+                        <div style={alertRowDescStyle}>
                             {alert.description}
                         </div>
                     )}
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                    <div style={alertRowMetaStyle}>
                         {formatRelTime(alert.created_at)}
                     </div>
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-end", flexShrink: 0 }}>
+                <div style={alertRowActionsColStyle}>
                     <button
                         onClick={() => onRetry(alert.id)}
                         disabled={isDemo || retrying}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : "Paraşüt senkronizasyonunu yeniden dene"}
                         style={{
-                            fontSize: "12px", padding: "5px 11px",
-                            border: "0.5px solid var(--accent-border)",
-                            borderRadius: "4px", background: "var(--accent-bg)",
-                            color: "var(--accent-text)",
+                            ...systemAlertRetryButtonBaseStyle,
                             cursor: (isDemo || retrying) ? "not-allowed" : "pointer",
                             opacity: (isDemo || retrying) ? 0.6 : 1,
-                            whiteSpace: "nowrap",
                         }}
                     >
                         {retrying ? "Deneniyor…" : "↻ Yeniden Dene"}
                     </button>
                     <Link
                         href="/dashboard/parasut"
-                        style={{
-                            fontSize: "11px", padding: "4px 10px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "4px", background: "transparent",
-                            color: "var(--text-secondary)",
-                            textDecoration: "none", whiteSpace: "nowrap",
-                        }}
+                        style={systemAlertParaSutLinkStyle}
                     >
                         Paraşüt sayfasına git
                     </Link>
@@ -1194,12 +1751,9 @@ function SystemAlertCard({ alert, isDemo, retrying, onRetry, onDismiss }: System
                         disabled={isDemo}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : "Bu uyarıyı yoksay"}
                         style={{
-                            fontSize: "11px", padding: "4px 10px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "4px", background: "transparent",
-                            color: "var(--text-tertiary)",
+                            ...systemAlertDismissButtonBaseStyle,
                             cursor: isDemo ? "not-allowed" : "pointer",
-                            opacity: isDemo ? 0.6 : 1, whiteSpace: "nowrap",
+                            opacity: isDemo ? 0.6 : 1,
                         }}
                     >
                         Yoksay
@@ -1229,44 +1783,28 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
         return (
             <div
                 style={{
-                    display: "flex",
-                    borderBottom: "0.5px solid var(--border-tertiary)",
+                    ...productRowMobileWrapperBaseStyle,
                     opacity: isAllAck ? 0.6 : 1,
                 }}
             >
                 {/* Severity stripe */}
-                <div style={{ width: "3px", background: sev.dot, flexShrink: 0 }} />
+                <div style={{ ...productRowMobileStripeBaseStyle, background: sev.dot }} />
 
                 {/* Card content */}
-                <div style={{
-                    flex: 1,
-                    padding: "12px 14px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "5px",
-                    minWidth: 0,
-                }}>
+                <div style={productRowMobileCardStyle}>
                     {/* Row 1: severity badge + product name */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                        <span style={{
-                            fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em",
-                            padding: "1px 5px", borderRadius: "3px",
-                            background: sev.bg, color: sev.text, border: `0.5px solid ${sev.border}`,
-                            flexShrink: 0,
-                        }}>
+                    <div style={productRowSevRowStyle}>
+                        <span style={SEV_BADGE_PILL_STYLES[group.topSeverity]}>
                             {sev.label}
                         </span>
-                        <span style={{
-                            fontSize: "13px", fontWeight: 500, color: "var(--text-primary)",
-                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                        }}>
+                        <span style={productRowNameStyle}>
                             {group.productName}
                         </span>
                     </div>
 
                     {/* Row 2: SKU + coverage */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
+                    <div style={productRowSkuRowStyle}>
+                        <span style={productRowSkuStyle}>
                             {group.sku}
                         </span>
                         {covDays !== null && (
@@ -1277,7 +1815,7 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
                     </div>
 
                     {/* Row 3: reason */}
-                    <span style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                    <span style={productRowReasonStyle}>
                         {group.reason}
                     </span>
 
@@ -1290,10 +1828,7 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
                     </span>
 
                     {/* Row 5: actions */}
-                    <div style={{
-                        display: "flex", alignItems: "center", gap: "8px",
-                        flexWrap: "wrap", marginTop: "4px",
-                    }}>
+                    <div style={productRowActionsRowStyle}>
                         <Link
                             href={group.actionHref}
                             style={{
@@ -1309,13 +1844,7 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
                         <button
                             onClick={onOpenDrawer}
                             aria-label={`${group.productName} detayını aç`}
-                            style={{
-                                fontSize: "11px", padding: "5px 12px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "4px", background: "transparent",
-                                color: "var(--text-secondary)", cursor: "pointer",
-                                whiteSpace: "nowrap",
-                            }}
+                            style={productRowDetailButtonStyle}
                         >
                             Detay
                         </button>
@@ -1324,18 +1853,12 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
                                 onClick={onDismissGroup}
                                 aria-label={`${group.productName} uyarılarını yoksay`}
                                 title="Tüm uyarıları yoksay"
-                                style={{
-                                    fontSize: "13px", padding: "3px 9px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "4px", background: "transparent",
-                                    color: "var(--text-tertiary)", cursor: "pointer",
-                                    lineHeight: 1,
-                                }}
+                                style={productRowMobileDismissButtonStyle}
                             >
                                 ×
                             </button>
                         ) : (
-                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Görüldü</span>
+                            <span style={productRowSeenLabelStyle}>Görüldü</span>
                         )}
                     </div>
                 </div>
@@ -1347,39 +1870,27 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
     return (
         <div
             style={{
-                display: "grid",
-                gridTemplateColumns: "3px 1fr 170px 120px 80px 148px 110px",
-                alignItems: "center",
-                borderBottom: "0.5px solid var(--border-tertiary)",
+                ...productRowDesktopWrapperBaseStyle,
                 opacity: isAllAck ? 0.6 : 1,
-                transition: "background 0.1s",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-secondary)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
         >
             {/* Severity stripe */}
-            <div style={{ alignSelf: "stretch", background: sev.dot, minHeight: "52px" }} />
+            <div style={{ ...productRowDesktopStripeBaseStyle, background: sev.dot }} />
 
             {/* Product */}
-            <div style={{ padding: "12px 16px", minWidth: 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "3px" }}>
-                    <span style={{
-                        fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em",
-                        padding: "1px 5px", borderRadius: "3px",
-                        background: sev.bg, color: sev.text, border: `0.5px solid ${sev.border}`,
-                        flexShrink: 0,
-                    }}>
+            <div style={productRowDesktopCellStyle}>
+                <div style={{ ...productRowSevRowStyle, marginBottom: "3px" }}>
+                    <span style={SEV_BADGE_PILL_STYLES[group.topSeverity]}>
                         {sev.label}
                     </span>
-                    <span style={{
-                        fontSize: "13px", fontWeight: 500, color: "var(--text-primary)",
-                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }}>
+                    <span style={productRowNameStyle}>
                         {group.productName}
                     </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>
+                <div style={productRowSkuRowStyle}>
+                    <span style={productRowSkuStyle}>
                         {group.sku}
                     </span>
                     {covDays !== null && (
@@ -1391,14 +1902,14 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
             </div>
 
             {/* Reason */}
-            <div style={{ padding: "12px 12px" }}>
-                <span style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+            <div style={productRowReasonCellStyle}>
+                <span style={productRowReasonTextStyle}>
                     {group.reason}
                 </span>
             </div>
 
             {/* Impact */}
-            <div style={{ padding: "12px 12px" }}>
+            <div style={productRowReasonCellStyle}>
                 <span style={{
                     fontSize: "12px", fontWeight: 600,
                     color: group.topSeverity === "critical" ? "var(--danger-text)" : "var(--warning-text)",
@@ -1408,7 +1919,7 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
             </div>
 
             {/* Açık Sipariş — onaylı + sevk edilmemiş sipariş sayısı */}
-            <div style={{ padding: "12px 12px" }}
+            <div style={productRowOpenOrderCellStyle}
                 title="Bu ürün için onaylı ve henüz sevk edilmemiş sipariş sayısı">
                 <span style={{
                     fontSize: "13px", fontWeight: 600,
@@ -1419,7 +1930,7 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
             </div>
 
             {/* Recommended action */}
-            <div style={{ padding: "12px 12px" }}>
+            <div style={productRowActionLinkCellStyle}>
                 <Link
                     href={group.actionHref}
                     style={{
@@ -1436,17 +1947,11 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
             </div>
 
             {/* Quick actions */}
-            <div style={{ padding: "12px 12px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <div style={productRowQuickActionsCellStyle}>
                 <button
                     onClick={onOpenDrawer}
                     aria-label={`${group.productName} detayını aç`}
-                    style={{
-                        fontSize: "11px", padding: "4px 10px",
-                        border: "0.5px solid var(--border-secondary)",
-                        borderRadius: "4px", background: "transparent",
-                        color: "var(--text-secondary)", cursor: "pointer",
-                        whiteSpace: "nowrap",
-                    }}
+                    style={productRowDesktopDetailButtonStyle}
                 >
                     Detay
                 </button>
@@ -1455,18 +1960,12 @@ function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRo
                         onClick={onDismissGroup}
                         aria-label={`${group.productName} uyarılarını yoksay`}
                         title="Tüm uyarıları yoksay"
-                        style={{
-                            fontSize: "13px", padding: "2px 7px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "4px", background: "transparent",
-                            color: "var(--text-tertiary)", cursor: "pointer",
-                            lineHeight: 1,
-                        }}
+                        style={productRowDesktopDismissButtonStyle}
                     >
                         ×
                     </button>
                 ) : (
-                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>
+                    <span style={productRowDesktopSeenLabelStyle}>
                         Görüldü
                     </span>
                 )}
@@ -1560,10 +2059,7 @@ function drawerRelatedLinks(group: ProductAlertGroup): Array<{ label: string; hr
 function DrawerSection({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <div>
-            <div style={{
-                fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)",
-                letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "8px",
-            }}>
+            <div style={drawerSectionLabelStyle}>
                 {title}
             </div>
             {children}
@@ -1658,7 +2154,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
             <div
                 aria-hidden="true"
                 onClick={onClose}
-                style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.45)" }}
+                style={drawerBackdropStyle}
             />
 
             {/* Panel */}
@@ -1667,31 +2163,12 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="alert-drawer-title"
-                style={{
-                    position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 201,
-                    width: "min(440px, 100vw)",
-                    background: "var(--bg-primary)",
-                    borderLeft: "0.5px solid var(--border-secondary)",
-                    boxShadow: "-8px 0 32px rgba(0,0,0,0.25)",
-                    display: "flex", flexDirection: "column",
-                    animation: "slide-in-right 0.2s ease-out",
-                }}
+                style={drawerPanelStyle}
             >
                 {/* Header */}
-                <div style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "16px 20px",
-                    borderBottom: "0.5px solid var(--border-tertiary)",
-                    flexShrink: 0,
-                    gap: "10px",
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-                        <span style={{
-                            fontSize: "9px", fontWeight: 700, letterSpacing: "0.06em",
-                            padding: "2px 6px", borderRadius: "3px",
-                            background: sev.bg, color: sev.text, border: `0.5px solid ${sev.border}`,
-                            flexShrink: 0,
-                        }}>
+                <div style={drawerHeaderStyle}>
+                    <div style={drawerHeaderLeftStyle}>
+                        <span style={SEV_DRAWER_HEADER_BADGE_STYLES[group.topSeverity]}>
                             {sev.label}
                         </span>
                         <span
@@ -1703,10 +2180,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                         >
                             {group.productName}
                         </span>
-                        <span style={{
-                            fontSize: "11px", color: "var(--text-tertiary)",
-                            fontFamily: "monospace", flexShrink: 0,
-                        }}>
+                        <span style={drawerSkuStyle}>
                             {group.sku}
                         </span>
                     </div>
@@ -1714,26 +2188,17 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                         ref={closeBtnRef}
                         onClick={onClose}
                         aria-label="Kapat"
-                        style={{
-                            background: "transparent", border: "none", cursor: "pointer",
-                            color: "var(--text-tertiary)", fontSize: "20px", lineHeight: 1,
-                            padding: "4px 8px", borderRadius: "4px", flexShrink: 0,
-                        }}
+                        style={drawerCloseButtonStyle}
                     >
                         ✕
                     </button>
                 </div>
 
                 {/* Scrollable body */}
-                <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
+                <div style={drawerBodyStyle}>
 
                     {/* ── 1. Uyarı Özeti ── */}
-                    <div style={{
-                        padding: "14px",
-                        background: sev.bg,
-                        border: `0.5px solid ${sev.border}`,
-                        borderRadius: "6px",
-                    }}>
+                    <div style={SEV_SUMMARY_PANEL_STYLES[group.topSeverity]}>
                         <div style={{
                             fontSize: "10px", fontWeight: 700, color: sev.text,
                             letterSpacing: "0.06em", marginBottom: "6px",
@@ -1765,23 +2230,16 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                     {/* ── 2. Neden ── */}
                     <DrawerSection title="NEDEN">
                         {group.isOrphaned ? (
-                            <p style={{ margin: 0, fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                            <p style={drawerOrphanedTextStyle}>
                                 Bu uyarının bağlı olduğu ürün sistemden silinmiş.
                                 Uyarı artık geçersiz — aşağıdan &quot;Yoksay&quot; ile kapatabilirsiniz.
                             </p>
                         ) : (
                             <>
-                                <p style={{ margin: "0 0 12px", fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
+                                <p style={drawerReasonTextStyle}>
                                     {drawerDetailedReason(group)}
                                 </p>
-                                <div style={{
-                                    display: "grid", gridTemplateColumns: "1fr 1fr 1fr",
-                                    gap: "10px",
-                                    padding: "10px 12px",
-                                    background: "var(--bg-secondary)",
-                                    border: "0.5px solid var(--border-tertiary)",
-                                    borderRadius: "5px",
-                                }}>
+                                <div style={drawerStatsGridStyle}>
                                     {[
                                         { label: "Mevcut",  value: group.available, color: sev.text },
                                         { label: "Minimum", value: group.minStock,  color: "var(--text-secondary)" },
@@ -1805,7 +2263,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                     {/* ── 3. Etki ── */}
                     {!group.isOrphaned && (
                         <DrawerSection title="ETKİ">
-                            <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
+                            <p style={drawerImpactTextStyle}>
                                 {drawerDetailedImpact(group)}
                             </p>
                         </DrawerSection>
@@ -1881,7 +2339,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
 
                     {/* ── 4. Önerilen Aksiyon ── */}
                     <DrawerSection title="ÖNERİLEN AKSİYON">
-                        <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
+                        <div style={drawerActionsContainerStyle}>
                             {actionLinks.map((link) => (
                                 <Link
                                     key={link.href}
@@ -1912,7 +2370,7 @@ function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve
                     {/* ── 5. İlgili Kayıtlar ── */}
                     {!group.isOrphaned && (
                         <DrawerSection title="İLGİLİ KAYITLAR">
-                            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                            <div style={drawerRelatedLinksContainerStyle}>
                                 {relatedLinks.map((link) => (
                                     <Link
                                         key={link.href + link.label}
