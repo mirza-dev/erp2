@@ -1,9 +1,33 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-05-26_
+_Son güncelleme: 2026-05-27_
 
-**Son tamamlanan iş:** UX iyileştirme — sipariş adlandırma + dashboard stok widget limit (2026-05-27; 3636 test)
+**Son tamamlanan iş:** React Doctor temizlik — error'lar + a11y + config (2026-05-27; 3636 test, skor 51 → 54, commit `e57361c`)
+
+- **Trigger:** `npx react-doctor@latest` 51/100 skor + 1812 sorun. Plan `mellow-plotting-ladybug.md` 4 bölümlü temizlik.
+- **Bölüm 2 — `only-export-components` ×23 kapatıldı (önceki session extract + bu session test fix + commit):**
+  - 7 yeni helper dosya: `import-file-helpers.ts`, `classifier-helpers.ts`, `extraction-review-helpers.ts`, `po-document-helpers.ts`, `customer-helpers.ts`, `quote-document-helpers.ts`, `pagination-helpers.ts`.
+  - 5 component'te non-component export'lar helper'lara taşındı + backward-compat re-export pattern (component içinde `import` + dış API için `export`).
+  - 3 test güncellendi (`stock-data-grid-limit`, `dropzone-component`, `quotes-faz4a-helper-mapper`) — source-regex'ler re-export pattern + helper file'a yönlendirildi.
+  - Fast Refresh artık 5 dosyada aktif (kaydet → tam remount yok).
+- **Bölüm 1 — `nextjs-no-side-effect-in-get-handler` ×1 disable + gerekçe:** OAuth callback (`/api/parasut/oauth/callback`) GET handler içinde `.upsert()` çalışıyor — Paraşüt provider GET çağırıyor (POST imkânsız, endüstri standardı). Mevcut signed state cookie CSRF korur. `.upsert()` öncesi `eslint-disable-next-line react-doctor/nextjs-no-side-effect-in-get-handler` + yorum.
+- **Bölüm 3 — `no-outline-none` ×29 (plan 19, gerçek 29):** `globals.css`'e global `input:focus-visible / select:focus-visible / textarea:focus-visible / button:focus-visible` ring (`outline: 2px solid var(--accent)`, `outline-offset: 1px`). 29 callsite'tan `outline: "none"` satır/inline kısımları sed ile temizlendi. A11y ring tek noktada — klavye Tab navigasyonunda görünür, mouse tıklama browser tarafından bastırılır (`:focus-visible` semantiği).
+- **Bölüm 5 — Config sessizleştirme:** Yeni `react-doctor.config.json` kök dizinde:
+  - `react-doctor/no-tiny-text` (434 occurrence) — PDF/print kasıtlı küçük font (QuoteDocument, PurchaseOrderDocument)
+  - `react-doctor/no-giant-component` (32) — alerts/settings ERP sayfaları kasıtlı büyük, domain gereği
+  - `react-doctor/prefer-useReducer` (29) — useState doğru tercih, fikir meselesi
+  - `react-doctor/no-fetch-in-effect` (20) — SWR/React Query yok (CLAUDE.md proje sözleşmesi)
+  - **Toplam 515 uyarı config'le bastırıldı.**
+- **Bölüm 4 — `no-inline-exhaustive-style` ×301 ERTELENDİ:** alerts/page.tsx (42) + suggested/page.tsx (23) = 65 inline style block extract iş büyük + manuel + JSX context bağımlı. Skor etkisi tahminen +5 ama risk yüksek. Sonraki tura.
+- **Yeni:** `.github/workflows/react-doctor.yml` (her PR otomatik tarama), `package.json` `"doctor": "npx react-doctor@latest"` script + `react-doctor@^0.2.9` dev dep.
+- **45 dosya · 3636 test yeşil · TS clean · 0 yeni warning · skor 51 → 54** (33 mevcut `react-hooks/set-state-in-effect` error'ları plan dışı).
+- **Sıradaki:**
+  1. Coolify redeploy + smoke (OAuth callback davranışı korunmuş mu, focus ring tüm form alanlarında görünür mü)
+  2. Bölüm 4 ayrı PR — alerts/page.tsx + suggested/page.tsx inline style → module-level const (65 block)
+  3. Sonra kalan ~236 `no-inline-exhaustive-style` (diğer dosyalar, üçüncü tur)
+
+**Önceki:** UX iyileştirme — sipariş adlandırma + dashboard stok widget limit (2026-05-27; 3636 test)
 
 - **İki küçük UX problemi kapatıldı:**
   1. **Sipariş adları çakışıyordu:** Sidebar'da `/dashboard/orders` ve `/dashboard/purchase/orders` ikisi de "Siparişler" → kullanıcı sadece grup başlığından ayırıyordu. ERP norm (Sales Orders vs Purchase Orders) uygulandı.

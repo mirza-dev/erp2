@@ -7,7 +7,32 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-27
 
-**UX iyileştirme — sipariş adlandırma + dashboard stok widget limit (3636 test)**
+**React Doctor temizlik — error'lar + a11y + config (51 → 54, commit `e57361c`)**
+
+- **Trigger:** `npx react-doctor@latest` 51/100 skor + 1812 sorun. Plan'a göre 4 bölümlü temizlik (`mellow-plotting-ladybug.md`).
+- **Bölüm 2 — `only-export-components` ×23 (önceki session'da extract edildi, bu session test fix + commit):**
+  - 7 yeni helper dosya: `import-file-helpers.ts`, `classifier-helpers.ts`, `extraction-review-helpers.ts`, `po-document-helpers.ts`, `customer-helpers.ts`, `quote-document-helpers.ts`, `pagination-helpers.ts`.
+  - 5 component dosyada non-component export'lar helper'lara taşındı + backward-compat re-export pattern (component'in kendi içinde import + dış API için re-export).
+  - 3 test güncellendi (`stock-data-grid-limit`, `dropzone-component`, `quotes-faz4a-helper-mapper`) — source-regex'ler re-export pattern'ine + helper file'a yönlendirildi.
+- **Bölüm 1 — `nextjs-no-side-effect-in-get-handler` ×1:** OAuth callback (`src/app/api/parasut/oauth/callback/route.ts`) GET handler içinde `.upsert()` — Paraşüt provider'ı GET çağırır (POST imkânsız). Mevcut signed state cookie CSRF korur. `.upsert()` öncesi eslint-disable yorum + gerekçe.
+- **Bölüm 3 — `no-outline-none` ×29 (plan tahmini 19, gerçek 29):** `globals.css`'e global `:focus-visible` ring (`outline: 2px solid var(--accent)`, `outline-offset: 1px`). 29 callsite'tan `outline: "none"` satırları/inline kısımları sed ile temizlendi (`outline: "none",\n` standalone satırlar silindi, `outline: "none", ` inline parçalar kesildi). A11y ring tek noktada, klavye Tab navigasyonunda görünür.
+- **Bölüm 5 — Config sessizleştirme:** Yeni `react-doctor.config.json` (kök):
+  - `react-doctor/no-tiny-text` — print/PDF kasıtlı küçük font (QuoteDocument, PurchaseOrderDocument).
+  - `react-doctor/no-giant-component` — alerts/settings ERP sayfaları kasıtlı büyük (domain gereği).
+  - `react-doctor/prefer-useReducer` — useState doğru tercih, fikir meselesi.
+  - `react-doctor/no-fetch-in-effect` — SWR/React Query yok (proje sözleşmesi, CLAUDE.md feedback'i).
+  - 515 uyarı (tiny-text 434 + giant 32 + useReducer 29 + fetch 20) config'le bastırıldı.
+- **Bölüm 4 — `no-inline-exhaustive-style` ×301 ERTELENDİ:** alerts/page.tsx (42) + suggested/page.tsx (23) = 65 inline style block extract işi büyük ve manuel — JSX context, conditional render, prop spread her birinde farklı. Risk/efor dengesi sonraki tura.
+- **Yeni:** `.github/workflows/react-doctor.yml` (PR'larda otomatik tarama), `package.json` `"doctor": "npx react-doctor@latest"` script + `react-doctor` dev dep.
+- **45 dosya · 3636 test yeşil · TS clean · 0 yeni warning · skor 51 → 54** (Bölüm 4 yapılırsa ~59 beklenir).
+- **Sıradaki:**
+  1. Coolify redeploy + smoke (sidebar, dashboard 15 ürün, OAuth callback davranışı, focus ring görsel kontrol)
+  2. Bölüm 4 — alerts/page.tsx + suggested/page.tsx inline style → module-level const refactor (65 block, ayrı PR)
+  3. Bölüm 4 sonrası kalan ~236 `no-inline-exhaustive-style` (diğer dosyalar)
+
+## Önceki — UX iyileştirme (3636 test, 2026-05-27)
+
+**UX iyileştirme — sipariş adlandırma + dashboard stok widget limit**
 
 - **Trigger:** Kullanıcı iki UX problemi: (1) sidebar'da iki "Siparişler" çakışıyor, (2) dashboard'da stok envanteri sınırsız → PMT prod 100+ ürün scroll'u patlatır.
 - **Kararlar (AskUserQuestion):** A — "Satış Siparişleri" + "Satın Alma Siparişleri" (ERP norm) + A — 15 ürün + "Tümünü gör" link (dashboard summary widget pattern).
@@ -16,7 +41,6 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Dashboard page:** `<StockDataGrid limit={15} showViewAllLink ... />`.
 - **+22 yeni test:** stock-data-grid-limit (12 — priority order, oran sort, immutable, source-regex), sidebar-order-labels (3 — yeni pair, regression eski yok), orders-page-title (5 — h1 + document.title + eski div başlığı yok). purchase-orders-ui.test.ts Sidebar assertion güncellendi.
 - 8 dosya · **3636 test yeşil** (önceki 3614 + 22) · TS clean · 0 lint warning · build OK (`ƒ Proxy (Middleware)` korundu)
-- **Sıradaki:** Coolify redeploy + UI smoke (sidebar, dashboard 15 ürün + Link, browser tab).
 
 ## Önceki — AI rate limit advisor refinement (3614 test, 2026-05-26)
 
