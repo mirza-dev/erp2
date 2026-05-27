@@ -1,12 +1,18 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useState, useMemo } from "react";
+import Link from "next/link";
 import { formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
+import type { Product } from "@/lib/mock-data";
 
 interface StockDataGridProps {
     filterCategory?: string;
     filterStatus?: string;
+    /** Maksimum gösterilecek satır sayısı (yok → tümü). Dashboard widget için 15 önerilir. */
+    limit?: number;
+    /** `limit` aktif + filtered > limit ise tablo altına "Tümünü gör (N) →" linki render. */
+    showViewAllLink?: boolean;
 }
 
 function getStatusInfo(available: number, min: number): { label: string; cls: string; key: string } {
@@ -16,6 +22,30 @@ function getStatusInfo(available: number, min: number): { label: string; cls: st
     if (ratio <= 1) return { label: "Kritik", cls: "badge-warning", key: "kritik" };
     if (ratio <= 2) return { label: "Düşük", cls: "badge-warning", key: "dusuk" };
     return { label: "Hazır", cls: "badge-success", key: "hazir" };
+}
+
+// Öncelik sıralama: tükendi → kritik → düşük → hazır. Aynı kategori içinde
+// available/min oranına göre ascending (en aza ilk). Dashboard widget'ında ilk
+// 15 ürün anlamlı kalsın diye — alfabetik 15 yerine en kritik 15.
+const STATUS_PRIORITY: Record<string, number> = {
+    tukendi: 0,
+    kritik:  1,
+    dusuk:   2,
+    hazir:   3,
+};
+
+export function sortByStockPriority(products: Product[]): Product[] {
+    return [...products].sort((a, b) => {
+        const sa = getStatusInfo(a.available_now, a.minStockLevel);
+        const sb = getStatusInfo(b.available_now, b.minStockLevel);
+        const pa = STATUS_PRIORITY[sa.key] ?? 99;
+        const pb = STATUS_PRIORITY[sb.key] ?? 99;
+        if (pa !== pb) return pa - pb;
+        // Aynı status → oran küçük olan (daha kritik) önce.
+        const ra = a.minStockLevel > 0 ? a.available_now / a.minStockLevel : Infinity;
+        const rb = b.minStockLevel > 0 ? b.available_now / b.minStockLevel : Infinity;
+        return ra - rb;
+    });
 }
 
 function getAvailClass(available: number, min: number) {
@@ -41,18 +71,31 @@ const tdStyle: React.CSSProperties = {
     lineHeight: 1.4,
 };
 
-const StockDataGrid = memo(function StockDataGrid({ filterCategory = "", filterStatus = "" }: StockDataGridProps) {
+const StockDataGrid = memo(function StockDataGrid({
+    filterCategory = "",
+    filterStatus = "",
+    limit,
+    showViewAllLink = false,
+}: StockDataGridProps) {
     const { products, loading } = useData();
     const [selectedId, setSelectedId] = useState<string | null>(null);
 
-    const filtered = products.filter(p => {
-        if (filterCategory && p.category !== filterCategory) return false;
-        if (filterStatus) {
-            const { key } = getStatusInfo(p.available_now, p.minStockLevel);
-            if (key !== filterStatus) return false;
-        }
-        return true;
-    });
+    const filtered = useMemo(() => {
+        const matched = products.filter(p => {
+            if (filterCategory && p.category !== filterCategory) return false;
+            if (filterStatus) {
+                const { key } = getStatusInfo(p.available_now, p.minStockLevel);
+                if (key !== filterStatus) return false;
+            }
+            return true;
+        });
+        // Sıralama yalnız `limit` kullanıldığında (dashboard widget) tetiklenir.
+        // Full sayfada (/dashboard/products) mevcut sort'a dokunulmaz.
+        return limit ? sortByStockPriority(matched) : matched;
+    }, [products, filterCategory, filterStatus, limit]);
+
+    const visible = limit ? filtered.slice(0, limit) : filtered;
+    const hasMore = showViewAllLink && limit ? filtered.length > limit : false;
 
     const applyHover = (tr: HTMLElement) => {
         const tds = tr.querySelectorAll("td");
@@ -118,13 +161,13 @@ const StockDataGrid = memo(function StockDataGrid({ filterCategory = "", filterS
                                 ))}
                             </tr>
                         ))
-                    ) : filtered.length === 0 ? (
+                    ) : visible.length === 0 ? (
                         <tr>
                             <td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--text-tertiary)", padding: "20px" }}>
                                 Eşleşen ürün bulunamadı
                             </td>
                         </tr>
-                    ) : filtered.map((product) => {
+                    ) : visible.map((product) => {
                         const status = getStatusInfo(product.available_now, product.minStockLevel);
                         const isSelected = selectedId === product.id;
                         return (
@@ -191,6 +234,28 @@ const StockDataGrid = memo(function StockDataGrid({ filterCategory = "", filterS
                     })}
                 </tbody>
             </table>
+            {hasMore && (
+                <div
+                    style={{
+                        padding: "10px 14px",
+                        borderTop: "0.5px solid var(--border-tertiary)",
+                        background: "var(--bg-secondary)",
+                        textAlign: "right",
+                    }}
+                >
+                    <Link
+                        href="/dashboard/products"
+                        style={{
+                            fontSize: "12px",
+                            color: "var(--accent-text)",
+                            textDecoration: "none",
+                            fontWeight: 500,
+                        }}
+                    >
+                        Tümünü gör ({filtered.length}) →
+                    </Link>
+                </div>
+            )}
         </div>
     );
 });

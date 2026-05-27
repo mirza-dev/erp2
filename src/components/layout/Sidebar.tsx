@@ -45,7 +45,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
             items: [
                 { label: "Dashboard", href: "/dashboard" },
                 { label: "Teklifler", href: "/dashboard/quotes" },
-                { label: "Siparişler", href: "/dashboard/orders", count: pendingOrderCount || undefined },
+                { label: "Satış Siparişleri", href: "/dashboard/orders", count: pendingOrderCount || undefined },
                 { label: "Stok & Ürünler", href: "/dashboard/products" },
             ],
         },
@@ -53,7 +53,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
             label: "Satın Alma",
             items: [
                 { label: "Öneriler", href: "/dashboard/purchase/suggested", count: reorderCount || undefined },
-                { label: "Siparişler", href: "/dashboard/purchase/orders" },
+                { label: "Satın Alma Siparişleri", href: "/dashboard/purchase/orders" },
                 { label: "Tedarikçiler", href: "/dashboard/vendors" },
             ],
         },

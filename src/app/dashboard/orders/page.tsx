@@ -88,6 +88,11 @@ function OrdersList() {
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const filterAppliedRef = useRef(false);
 
+    // Browser tab title — sidebar label ile hizalı (2026-05-27).
+    useEffect(() => {
+        document.title = "Satış Siparişleri · KokpitERP";
+    }, []);
+
     // Initialize from DataContext on first non-empty load (avoids redundant fetch after navigation)
     useEffect(() => {
         if (!contextInitRef.current && contextOrders.length > 0) {
@@ -215,9 +220,9 @@ function OrdersList() {
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                        Siparişler
-                    </div>
+                    <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                        Satış Siparişleri
+                    </h1>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
                         {mockOrders.length} sipariş · {pendingCount} onay bekliyor
                     </div>

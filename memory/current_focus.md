@@ -5,7 +5,20 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-26
+## Son Tamamlanan İş — 2026-05-27
+
+**UX iyileştirme — sipariş adlandırma + dashboard stok widget limit (3636 test)**
+
+- **Trigger:** Kullanıcı iki UX problemi: (1) sidebar'da iki "Siparişler" çakışıyor, (2) dashboard'da stok envanteri sınırsız → PMT prod 100+ ürün scroll'u patlatır.
+- **Kararlar (AskUserQuestion):** A — "Satış Siparişleri" + "Satın Alma Siparişleri" (ERP norm) + A — 15 ürün + "Tümünü gör" link (dashboard summary widget pattern).
+- **Sipariş adları:** Sidebar 2 label + `/dashboard/orders` div → h1 "Satış Siparişleri" + useEffect document.title + `/dashboard/purchase/orders` (h1 zaten vardı) sadece document.title.
+- **StockDataGrid:** opsiyonel `limit` + `showViewAllLink` prop. Yeni export `sortByStockPriority` (tükendi → kritik → düşük → hazır + aynı status'ta available/min oranı ascending → en kritik 15 ürün dashboard'da anlamlı). `filtered.slice(0, limit)` + "Tümünü gör (N) →" Link `/dashboard/products`'a yönlendirir. Backward-compat: limit yoksa eski mantık + sort YOK.
+- **Dashboard page:** `<StockDataGrid limit={15} showViewAllLink ... />`.
+- **+22 yeni test:** stock-data-grid-limit (12 — priority order, oran sort, immutable, source-regex), sidebar-order-labels (3 — yeni pair, regression eski yok), orders-page-title (5 — h1 + document.title + eski div başlığı yok). purchase-orders-ui.test.ts Sidebar assertion güncellendi.
+- 8 dosya · **3636 test yeşil** (önceki 3614 + 22) · TS clean · 0 lint warning · build OK (`ƒ Proxy (Middleware)` korundu)
+- **Sıradaki:** Coolify redeploy + UI smoke (sidebar, dashboard 15 ürün + Link, browser tab).
+
+## Önceki — AI rate limit advisor refinement (3614 test, 2026-05-26)
 
 **AI rate limit advisor refinement — request-ip extract + limit 10 + 429 frontend (3614 test)**
 

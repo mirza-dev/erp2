@@ -47,8 +47,9 @@ describe("Faz 4 — PO UI module load smoke", () => {
         expect(typeof mod.default).toBe("function");
     });
 
-    it("Sidebar export 'Satın Alma' grubuna 'Siparişler' linkini içerir", async () => {
-        // Sidebar source check — string match in file.
+    it("Sidebar export 'Satın Alma' grubuna 'Satın Alma Siparişleri' linkini içerir", async () => {
+        // 2026-05-27: label "Siparişler" → "Satın Alma Siparişleri" (operasyon
+        // grubundaki "Satış Siparişleri" ile karışmasın diye net adlandırma).
         const fs = await import("fs/promises");
         const path = await import("path");
         const src = await fs.readFile(
@@ -56,7 +57,7 @@ describe("Faz 4 — PO UI module load smoke", () => {
             "utf-8",
         );
         expect(src).toContain('href: "/dashboard/purchase/orders"');
-        expect(src).toContain('label: "Siparişler"');
+        expect(src).toContain('label: "Satın Alma Siparişleri"');
     });
 });
 

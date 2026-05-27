@@ -281,8 +281,13 @@ export default function DashboardPage() {
                 </div>
             )}
 
-            {/* Stock table */}
-            <StockDataGrid filterCategory={filterCategory} filterStatus={filterStatus} />
+            {/* Stock table — dashboard widget: ilk 15 ürün (en kritik öncelik) + "Tümünü gör" linki */}
+            <StockDataGrid
+                filterCategory={filterCategory}
+                filterStatus={filterStatus}
+                limit={15}
+                showViewAllLink
+            />
 
             {/* Bottom grid: AI alerts + (recent orders + import zone) */}
             <div className="dashboard-bottom-grid">

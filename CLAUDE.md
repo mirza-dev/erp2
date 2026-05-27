@@ -3,7 +3,30 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-26_
 
-**Son tamamlanan iş:** AI rate limit advisor refinement — request-ip extract + limit 10 + 429 frontend (2026-05-26; 3614 test)
+**Son tamamlanan iş:** UX iyileştirme — sipariş adlandırma + dashboard stok widget limit (2026-05-27; 3636 test)
+
+- **İki küçük UX problemi kapatıldı:**
+  1. **Sipariş adları çakışıyordu:** Sidebar'da `/dashboard/orders` ve `/dashboard/purchase/orders` ikisi de "Siparişler" → kullanıcı sadece grup başlığından ayırıyordu. ERP norm (Sales Orders vs Purchase Orders) uygulandı.
+  2. **Dashboard stok widget sınırsız:** `StockDataGrid` tüm aktif ürünleri gösteriyordu → PMT prod'unda 100+ ürün olunca dashboard scroll patlardı.
+- **Sipariş adları:**
+  - **Sidebar.tsx**: "Siparişler" → "Satış Siparişleri" (Operasyon) + "Satın Alma Siparişleri" (Satın Alma).
+  - **`/dashboard/orders/page.tsx`**: div → h1 "Satış Siparişleri" + `useEffect document.title = "Satış Siparişleri · KokpitERP"` (browser tab).
+  - **`/dashboard/purchase/orders/page.tsx`**: h1 zaten "Satın Alma Siparişleri"ydi, sadece document.title eklendi.
+- **StockDataGrid (`src/components/dashboard/StockDataGrid.tsx`):**
+  - Yeni opsiyonel prop: `limit?: number` + `showViewAllLink?: boolean`.
+  - Yeni export `sortByStockPriority(products)` — tükendi → kritik → düşük → hazır, aynı status içinde available/min oranı ascending. **Dashboard'da en kritik 15 ürün** anlamlı (alfabetik 15 değil).
+  - `filtered.slice(0, limit)` ile sınırlama, tablo altına Link "Tümünü gör (N) →" `/dashboard/products`'a yönlendirir (zaten 50/sayfa pagination + filtre + arama hazır).
+  - **Backward-compat:** limit undefined → tüm filtered render (mevcut diğer kullanım yerleri etkilenmez); limit varsa sortByStockPriority uygulanır, yoksa eski mantık korunur.
+  - Dashboard page'de `<StockDataGrid limit={15} showViewAllLink ... />`.
+- **+22 yeni test:**
+  - `stock-data-grid-limit.test.ts` (12): sortByStockPriority priority order + aynı status oran sort + immutable + boş array + minStockLevel=0 + source-regex (limit/showViewAllLink prop, slice, hasMore, Link, named export, backward-compat).
+  - `sidebar-order-labels.test.ts` (3): "Satış Siparişleri" + /dashboard/orders pair, "Satın Alma Siparişleri" + /dashboard/purchase/orders pair, eski generic "Siparişler"+href YOK (regression).
+  - `orders-page-title.test.ts` (5): /dashboard/orders h1 "Satış Siparişleri" + document.title + eski div başlığı YOK; /dashboard/purchase/orders h1 + document.title.
+- **Mevcut test güncellemesi:** `purchase-orders-ui.test.ts` Sidebar label assertion "Siparişler" → "Satın Alma Siparişleri".
+- 8 dosya (1 Sidebar + 2 sipariş page + 1 StockDataGrid + 1 dashboard page + 3 yeni test + 1 mevcut test update) · **3636 test yeşil** (önceki 3614 + 22) · TS clean · 0 lint warning · build OK (`ƒ Proxy (Middleware)` korundu)
+- **Sıradaki — kullanıcı:** Coolify redeploy + UI smoke (sidebar "Satış Siparişleri" + "Satın Alma Siparişleri" görmeli, dashboard'da en fazla 15 ürün + "Tümünü gör" linki tıklayınca /dashboard/products'a gitmeli, browser tab başlığı doğru).
+
+**Önceki:** AI rate limit advisor refinement — request-ip extract + limit 10 + 429 frontend (2026-05-26; 3614 test)
 
 - **Trigger:** Önceki commit `c92ff9f` (route-level AI guard) deploy edildi, kullanıcı UI'da "AI önerisi oluşturulamadı" sarı banner gördü. Tanı: purchase-copilot 5/dk limiti sayfa açılışı + auto-reload + manuel yenile toplamında pratikte aşılıyordu; frontend 429'u generic "AI başarısız" olarak yutuyordu (yanıltıcı).
 - **Advisor 3 düzeltme + kullanıcı keşfi 1 ek fix:**
