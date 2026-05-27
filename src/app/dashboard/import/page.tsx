@@ -993,7 +993,7 @@ export default function ImportPage() {
                                                                 onChange={e => setEditingValue(e.target.value)}
                                                                 onBlur={() => commitEdit(draft.id, f)}
                                                                 onKeyDown={e => { if (e.key === "Enter") commitEdit(draft.id, f); if (e.key === "Escape") setEditingCell(null); }}
-                                                                style={{ width: "100%", padding: "6px 12px", background: "var(--accent-bg)", border: "none", borderTop: "1.5px solid var(--accent)", fontSize: "12px", color: "var(--text-primary)", outline: "none", boxSizing: "border-box" }}
+                                                                style={{ width: "100%", padding: "6px 12px", background: "var(--accent-bg)", border: "none", borderTop: "1.5px solid var(--accent)", fontSize: "12px", color: "var(--text-primary)", boxSizing: "border-box" }}
                                                             />
                                                         ) : (
                                                             <div style={{ padding: "6px 12px", fontSize: "12px", color: isEmpty ? "var(--danger-text)" : "var(--text-primary)", cursor: "pointer", outline: isEmpty ? "1px solid var(--danger-border)" : "none", minHeight: "30px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

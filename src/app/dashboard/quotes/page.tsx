@@ -252,7 +252,6 @@ function QuotesList() {
                             background: "var(--bg-primary)",
                             color: "var(--text-primary)",
                             width: "200px",
-                            outline: "none",
                         }}
                     />
                     <input
@@ -267,7 +266,6 @@ function QuotesList() {
                             borderRadius: "6px",
                             background: "var(--bg-primary)",
                             color: dateFrom ? "var(--text-primary)" : "var(--text-tertiary)",
-                            outline: "none",
                             cursor: "pointer",
                         }}
                     />
@@ -284,7 +282,6 @@ function QuotesList() {
                             borderRadius: "6px",
                             background: "var(--bg-primary)",
                             color: dateTo ? "var(--text-primary)" : "var(--text-tertiary)",
-                            outline: "none",
                             cursor: "pointer",
                         }}
                     />
@@ -298,7 +295,6 @@ function QuotesList() {
                             borderRadius: "6px",
                             background: "var(--bg-primary)",
                             color: currencyFilter ? "var(--text-primary)" : "var(--text-tertiary)",
-                            outline: "none",
                             cursor: "pointer",
                         }}
                     >

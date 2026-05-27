@@ -41,7 +41,6 @@ const modalInputStyle: React.CSSProperties = {
     borderRadius: "6px",
     background: "var(--bg-tertiary)",
     color: "var(--text-primary)",
-    outline: "none",
     width: "100%",
     boxSizing: "border-box" as const,
 };
@@ -181,7 +180,6 @@ export default function CustomersPage() {
                                 background: "var(--bg-primary)",
                                 color: "var(--text-primary)",
                                 width: "220px",
-                                outline: "none",
                             }}
                         />
                         <Button variant="primary" onClick={() => setShowAddModal(true)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>

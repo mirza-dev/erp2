@@ -151,7 +151,6 @@ export default function DashboardPage() {
                                             borderRadius: "6px",
                                             background: "var(--bg-tertiary)",
                                             color: "var(--text-primary)",
-                                            outline: "none",
                                         }}
                                     >
                                         <option value="">Tüm Kategoriler</option>

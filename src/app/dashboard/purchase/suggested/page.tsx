@@ -1484,7 +1484,6 @@ export default function PurchaseSuggestedPage() {
                         background: "var(--bg-primary)",
                         color: "var(--text-primary)",
                         width: "200px",
-                        outline: "none",
                     }}
                 />
                 <div style={{ display: "flex", gap: "8px" }}>

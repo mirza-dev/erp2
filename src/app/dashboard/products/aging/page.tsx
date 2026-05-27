@@ -269,7 +269,6 @@ export default function AgingPage() {
                         background: "var(--bg-primary)",
                         color: "var(--text-primary)",
                         width: "200px",
-                        outline: "none",
                     }}
                 />
                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>

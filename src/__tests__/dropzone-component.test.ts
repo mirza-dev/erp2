@@ -14,21 +14,28 @@ const SOURCE = fs.readFileSync(
     "utf8",
 );
 
+const HELPERS_SOURCE = fs.readFileSync(
+    path.join(process.cwd(), "src/lib/import-file-helpers.ts"),
+    "utf8",
+);
+
 describe("DropZone component source", () => {
     it("exports default + pure helpers", () => {
         expect(SOURCE).toMatch(/export default function DropZone/);
-        expect(SOURCE).toMatch(/export function validateClassifyUpload/);
-        expect(SOURCE).toMatch(/export function pickAcceptForMime/);
-        expect(SOURCE).toMatch(/export function formatBytes/);
-        expect(SOURCE).toMatch(/export const CLASSIFIER_ACCEPT/);
+        // pure helpers are re-exported from @/lib/import-file-helpers
+        expect(SOURCE).toMatch(/export\s+\{[^}]*validateClassifyUpload/);
+        expect(SOURCE).toMatch(/export\s+\{[^}]*pickAcceptForMime/);
+        expect(SOURCE).toMatch(/export\s+\{[^}]*formatBytes/);
+        expect(SOURCE).toMatch(/export\s+\{[^}]*CLASSIFIER_ACCEPT/);
     });
 
     it("accept attribute uses CLASSIFIER_ACCEPT constant (whitelist sync)", () => {
         expect(SOURCE).toMatch(/accept=\{CLASSIFIER_ACCEPT\}/);
-        expect(SOURCE).toMatch(/application\/pdf/);
-        expect(SOURCE).toMatch(/image\/png/);
-        expect(SOURCE).toMatch(/spreadsheetml\.sheet/);
-        expect(SOURCE).toMatch(/text\/csv/);
+        // MIME strings are defined in import-file-helpers.ts
+        expect(HELPERS_SOURCE).toMatch(/application\/pdf/);
+        expect(HELPERS_SOURCE).toMatch(/image\/png/);
+        expect(HELPERS_SOURCE).toMatch(/spreadsheetml\.sheet/);
+        expect(HELPERS_SOURCE).toMatch(/text\/csv/);
     });
 
     it("supports multi-file (input multiple attr)", () => {

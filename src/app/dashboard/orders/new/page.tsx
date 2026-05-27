@@ -42,7 +42,6 @@ const inputStyle: React.CSSProperties = {
     borderRadius: "4px",
     background: "var(--bg-tertiary)",
     color: "var(--text-primary)",
-    outline: "none",
     width: "100%",
 };
 

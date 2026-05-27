@@ -6,50 +6,12 @@
  * Drop scope sınırlı — sadece bu component'in <div>'i (sayfa-wide overlay yok,
  * diğer file input'larla event çakışması yok).
  *
- * Pure helpers exported: pickAcceptForMime, validateClassifyUpload, formatBytes.
+ * Pure helpers live in @/lib/import-file-helpers.
  */
 import { useState, useRef } from "react";
-
-export const CLASSIFIER_ACCEPT =
-    "image/png,image/jpeg,image/webp,application/pdf," +
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet," +
-    "application/vnd.ms-excel,text/csv";
-
-const MAX_BYTES = 10 * 1024 * 1024;
-
-const ALLOWED = new Set([
-    "image/png", "image/jpeg", "image/webp", "application/pdf",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-excel", "text/csv",
-]);
-
-export interface UploadValidation {
-    ok: boolean;
-    reason?: string;
-}
-
-export function validateClassifyUpload(file: File): UploadValidation {
-    if (!file) return { ok: false, reason: "Dosya yok." };
-    if (file.size <= 0) return { ok: false, reason: "Dosya boş." };
-    if (file.size > MAX_BYTES) {
-        return { ok: false, reason: `Dosya 10 MB sınırını aşıyor (${formatBytes(file.size)}).` };
-    }
-    if (!ALLOWED.has(file.type)) {
-        return { ok: false, reason: `Desteklenmeyen dosya türü: ${file.type || "bilinmiyor"}.` };
-    }
-    return { ok: true };
-}
-
-export function pickAcceptForMime(mime: string): string | null {
-    return ALLOWED.has(mime) ? mime : null;
-}
-
-export function formatBytes(bytes: number): string {
-    if (!Number.isFinite(bytes) || bytes < 0) return "—";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-}
+import { CLASSIFIER_ACCEPT } from "@/lib/import-file-helpers";
+export type { UploadValidation } from "@/lib/import-file-helpers";
+export { CLASSIFIER_ACCEPT, CLASSIFIER_ALLOWED_MIMES, validateClassifyUpload, pickAcceptForMime, formatBytes } from "@/lib/import-file-helpers";
 
 export interface DropZoneProps {
     onFiles: (files: File[]) => void;

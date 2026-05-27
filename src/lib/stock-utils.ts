@@ -1,7 +1,9 @@
 /**
  * Shared stock risk utilities — used by alert-service, purchase-service,
- * alerts page, and purchase/suggested page.
+ * alerts page, purchase/suggested page, and StockDataGrid.
  */
+
+import type { Product } from "@/lib/mock-data";
 
 // ── Coverage Days ────────────────────────────────────────────
 
@@ -380,4 +382,45 @@ export function getStatusBadge(available: number, min: number, hasRisk?: boolean
     if (available <= min * 2) return { label: "Düşük", cls: "badge-warning" };
     if (hasRisk) return { label: "Riskli", cls: "badge-info" };
     return { label: "Hazır", cls: "badge-success" };
+}
+
+// ── StockDataGrid Helpers ─────────────────────────────────────
+// Extracted from StockDataGrid.tsx (React Fast Refresh requirement).
+
+export interface StockStatusInfo {
+    label: string;
+    cls: string;
+    key: string;
+}
+
+export function getStockStatusInfo(available: number, min: number): StockStatusInfo {
+    if (min === 0) return { label: "Hazır", cls: "badge-success", key: "hazir" };
+    const ratio = available / min;
+    if (available === 0) return { label: "Tükendi", cls: "badge-danger", key: "tukendi" };
+    if (ratio <= 1) return { label: "Kritik", cls: "badge-warning", key: "kritik" };
+    if (ratio <= 2) return { label: "Düşük", cls: "badge-warning", key: "dusuk" };
+    return { label: "Hazır", cls: "badge-success", key: "hazir" };
+}
+
+// Öncelik sıralama: tükendi → kritik → düşük → hazır. Aynı kategori içinde
+// available/min oranına göre ascending (en aza ilk).
+export const STOCK_STATUS_PRIORITY: Record<string, number> = {
+    tukendi: 0,
+    kritik:  1,
+    dusuk:   2,
+    hazir:   3,
+};
+
+export function sortByStockPriority(products: Product[]): Product[] {
+    return [...products].sort((a, b) => {
+        const sa = getStockStatusInfo(a.available_now, a.minStockLevel);
+        const sb = getStockStatusInfo(b.available_now, b.minStockLevel);
+        const pa = STOCK_STATUS_PRIORITY[sa.key] ?? 99;
+        const pb = STOCK_STATUS_PRIORITY[sb.key] ?? 99;
+        if (pa !== pb) return pa - pb;
+        // Aynı status → oran küçük olan (daha kritik) önce.
+        const ra = a.minStockLevel > 0 ? a.available_now / a.minStockLevel : Infinity;
+        const rb = b.minStockLevel > 0 ? b.available_now / b.minStockLevel : Infinity;
+        return ra - rb;
+    });
 }

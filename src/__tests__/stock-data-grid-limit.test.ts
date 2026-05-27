@@ -109,7 +109,7 @@ describe("StockDataGrid — source-regex regression (limit + Link)", () => {
     });
 
     it("sortByStockPriority named export — test edilebilirlik", () => {
-        expect(SOURCE).toMatch(/export\s+function\s+sortByStockPriority/);
+        expect(SOURCE).toMatch(/export\s+\{[^}]*sortByStockPriority/);
     });
 });
 

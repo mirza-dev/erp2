@@ -10,7 +10,7 @@ const inputStyle: React.CSSProperties = {
     fontSize: "13px", padding: "6px 10px",
     border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
     background: "var(--bg-tertiary)", color: "var(--text-primary)",
-    outline: "none", width: "100%", boxSizing: "border-box",
+    width: "100%", boxSizing: "border-box",
 };
 const labelStyle: React.CSSProperties = {
     fontSize: "11px", color: "var(--text-tertiary)", display: "block", marginBottom: "3px",

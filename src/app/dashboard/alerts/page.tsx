@@ -566,7 +566,6 @@ export default function AlertsPage() {
                                     background: "var(--bg-primary)",
                                     color: "var(--text-primary)",
                                     width: "180px",
-                                    outline: "none",
                                 }}
                             />
                             <button

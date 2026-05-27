@@ -18,7 +18,8 @@
     "test:e2e:report": "playwright show-report",
     "gen:test-xlsx": "tsx tests/fixtures/generate-test-xlsx.ts",
     "docker:build": "docker build -t erp2:local .",
-    "docker:run": "docker run --rm -p 3000:3000 --env-file .env.local erp2:local"
+    "docker:run": "docker run --rm -p 3000:3000 --env-file .env.local erp2:local",
+    "doctor": "npx react-doctor@latest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -54,6 +55,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.7",
     "jsdom": "^29.1.1",
+    "react-doctor": "^0.2.9",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",

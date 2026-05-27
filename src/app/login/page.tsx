@@ -112,7 +112,6 @@ export default function LoginPage() {
                             borderRadius: "6px",
                             background: "var(--bg-secondary)",
                             color: "var(--text-primary)",
-                            outline: "none",
                         }}
                     />
                 </label>
@@ -133,7 +132,6 @@ export default function LoginPage() {
                             borderRadius: "6px",
                             background: "var(--bg-secondary)",
                             color: "var(--text-primary)",
-                            outline: "none",
                         }}
                     />
                 </label>

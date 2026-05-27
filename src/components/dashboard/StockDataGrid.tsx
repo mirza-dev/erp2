@@ -4,7 +4,8 @@ import { memo, useState, useMemo } from "react";
 import Link from "next/link";
 import { formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
-import type { Product } from "@/lib/mock-data";
+import { getStockStatusInfo, sortByStockPriority } from "@/lib/stock-utils";
+export { sortByStockPriority } from "@/lib/stock-utils";
 
 interface StockDataGridProps {
     filterCategory?: string;
@@ -13,39 +14,6 @@ interface StockDataGridProps {
     limit?: number;
     /** `limit` aktif + filtered > limit ise tablo altına "Tümünü gör (N) →" linki render. */
     showViewAllLink?: boolean;
-}
-
-function getStatusInfo(available: number, min: number): { label: string; cls: string; key: string } {
-    if (min === 0) return { label: "Hazır", cls: "badge-success", key: "hazir" };
-    const ratio = available / min;
-    if (available === 0) return { label: "Tükendi", cls: "badge-danger", key: "tukendi" };
-    if (ratio <= 1) return { label: "Kritik", cls: "badge-warning", key: "kritik" };
-    if (ratio <= 2) return { label: "Düşük", cls: "badge-warning", key: "dusuk" };
-    return { label: "Hazır", cls: "badge-success", key: "hazir" };
-}
-
-// Öncelik sıralama: tükendi → kritik → düşük → hazır. Aynı kategori içinde
-// available/min oranına göre ascending (en aza ilk). Dashboard widget'ında ilk
-// 15 ürün anlamlı kalsın diye — alfabetik 15 yerine en kritik 15.
-const STATUS_PRIORITY: Record<string, number> = {
-    tukendi: 0,
-    kritik:  1,
-    dusuk:   2,
-    hazir:   3,
-};
-
-export function sortByStockPriority(products: Product[]): Product[] {
-    return [...products].sort((a, b) => {
-        const sa = getStatusInfo(a.available_now, a.minStockLevel);
-        const sb = getStatusInfo(b.available_now, b.minStockLevel);
-        const pa = STATUS_PRIORITY[sa.key] ?? 99;
-        const pb = STATUS_PRIORITY[sb.key] ?? 99;
-        if (pa !== pb) return pa - pb;
-        // Aynı status → oran küçük olan (daha kritik) önce.
-        const ra = a.minStockLevel > 0 ? a.available_now / a.minStockLevel : Infinity;
-        const rb = b.minStockLevel > 0 ? b.available_now / b.minStockLevel : Infinity;
-        return ra - rb;
-    });
 }
 
 function getAvailClass(available: number, min: number) {
@@ -84,7 +52,7 @@ const StockDataGrid = memo(function StockDataGrid({
         const matched = products.filter(p => {
             if (filterCategory && p.category !== filterCategory) return false;
             if (filterStatus) {
-                const { key } = getStatusInfo(p.available_now, p.minStockLevel);
+                const { key } = getStockStatusInfo(p.available_now, p.minStockLevel);
                 if (key !== filterStatus) return false;
             }
             return true;
@@ -168,7 +136,7 @@ const StockDataGrid = memo(function StockDataGrid({
                             </td>
                         </tr>
                     ) : visible.map((product) => {
-                        const status = getStatusInfo(product.available_now, product.minStockLevel);
+                        const status = getStockStatusInfo(product.available_now, product.minStockLevel);
                         const isSelected = selectedId === product.id;
                         return (
                             <tr

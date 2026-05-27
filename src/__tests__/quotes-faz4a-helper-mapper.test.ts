@@ -216,6 +216,11 @@ const DOC_SOURCE = readFileSync(
     "utf8",
 );
 
+const DOC_HELPERS_SOURCE = readFileSync(
+    join(process.cwd(), "src/lib/quote-document-helpers.ts"),
+    "utf8",
+);
+
 describe("Faz 4a Review — preview/PDF contract", () => {
     it("QuoteData interface deliveryMethod + paymentMethod alanlarını içerir", () => {
         expect(TYPES_SOURCE).toMatch(/deliveryMethod:\s*string;/);
@@ -245,22 +250,22 @@ describe("Faz 4a Review — preview/PDF contract", () => {
         // Faz 4c güncellemesi (2026-05-25): Eskiden `deliveryMethod || paymentMethod`
         // 2-row vertical; 4c'de validUntil 3. kolona alındı, conditional genişledi.
         expect(DOC_SOURCE).toMatch(/data\.deliveryMethod \|\| data\.validUntil \|\| data\.paymentMethod/);
-        // Bilingual etiketler — BILINGUAL_LABELS map'inde tanımlı (TR ana, EN alt)
-        expect(DOC_SOURCE).toMatch(/Teslimat Şekli/);
-        expect(DOC_SOURCE).toMatch(/Delivery Method/);
-        expect(DOC_SOURCE).toMatch(/Ödeme Şekli/);
-        expect(DOC_SOURCE).toMatch(/Payment Method/);
+        // Bilingual etiketler — BILINGUAL_LABELS map'inde tanımlı (quote-document-helpers.ts)
+        expect(DOC_HELPERS_SOURCE).toMatch(/Teslimat Şekli/);
+        expect(DOC_HELPERS_SOURCE).toMatch(/Delivery Method/);
+        expect(DOC_HELPERS_SOURCE).toMatch(/Ödeme Şekli/);
+        expect(DOC_HELPERS_SOURCE).toMatch(/Payment Method/);
         // Geçerlilik Tarihi etiketi 3. kolonda (PMT brand 3-col layout).
         // Faz 4c Review (2026-05-25): label "Geçerlilik Süresi" → "Geçerlilik Tarihi"
         // (data ISO tarih olduğu için label semantik fix).
-        expect(DOC_SOURCE).toMatch(/Geçerlilik Tarihi/);
+        expect(DOC_HELPERS_SOURCE).toMatch(/Geçerlilik Tarihi/);
     });
 
     it("QuoteDocument lines tablosu row.size render eder + colSpan empty 10'a güncel", () => {
         expect(DOC_SOURCE).toMatch(/\{row\.size \|\| "—"\}/);
-        // Faz 4c güncellemesi: Size header BILINGUAL_LABELS.size'den geliyor.
+        // Faz 4c güncellemesi: Size header BILINGUAL_LABELS.size'den geliyor (quote-document-helpers.ts).
         // Map içeriği: { tr: "Ölçü", en: "Size" } — TR ana / EN alt italic.
-        expect(DOC_SOURCE).toMatch(/size:\s*\{\s*tr:\s*"Ölçü"/);
+        expect(DOC_HELPERS_SOURCE).toMatch(/size:\s*\{\s*tr:\s*"Ölçü"/);
         // Empty colSpan eskiden 9; yeni Size kolonu ile 10
         expect(DOC_SOURCE).toMatch(/colSpan=\{10\}/);
         expect(DOC_SOURCE).not.toMatch(/colSpan=\{9\}/);

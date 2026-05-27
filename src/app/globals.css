@@ -463,3 +463,18 @@ select:focus-visible {
   #quote-document { box-shadow: none !important; }
   .quote-preview-toolbar { display: none !important; }
 }
+
+/* ============================================
+   A11y — keyboard focus ring
+   Inline style ile `outline: "none"` kullanan input/select/textarea/button
+   elemanlar globalde focus ring alır. Mouse tıklamada `:focus-visible`
+   browser tarafından bastırılır; klavye Tab navigasyonunda görünür.
+   ============================================ */
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

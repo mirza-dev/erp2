@@ -344,7 +344,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                                                 width: "80px", padding: "4px 8px", fontSize: "13px",
                                                 border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
                                                 background: "var(--bg-primary)", color: "var(--text-primary)",
-                                                outline: "none", fontVariantNumeric: "tabular-nums",
+                                                fontVariantNumeric: "tabular-nums",
                                             }}
                                         />
                                         <button
@@ -506,7 +506,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                                 fontSize: "13px", padding: "8px 10px",
                                 border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
                                 background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                                outline: "none", resize: "vertical",
+                                resize: "vertical",
                             }}
                         />
                         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>

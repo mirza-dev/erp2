@@ -197,7 +197,7 @@ export default function PurchaseOrdersPage() {
                         fontSize: "13px", padding: "6px 10px",
                         border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
                         background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                        outline: "none", maxWidth: "320px", width: "100%",
+                        maxWidth: "320px", width: "100%",
                     }}
                 />
             </div>
