@@ -7,6 +7,25 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-28
 
+**Sesli giriş V3 — fireNotes → notlar entegrasyonu + Ctrl+M kısayolu (3657 test)**
+
+- **Trigger:** Memory'de "Kapsam Dışı (V3)" listesinde bekleyen 2 madde tamamlama.
+- **Kullanıcı kararları (2026-05-28):** Fire için ayrı UI sütunu yok; fireNotes notlar alanına concat; scrap_qty DB kullanılmaz; Ctrl+M shortcut eklenir; sessizlik algılama hâlâ kapsam dışı.
+- **3 plan revizyonu (kullanıcı bulgusuyla):**
+  - Client/server boundary korundu: `voice-service.ts` top-level Anthropic SDK + env init ediyor. Pure helper yeni `src/lib/voice-note-helpers.ts` dosyasında (voice-service.ts'ten ayrı). voice-service import type kalır. Bundle smoke geçti (production chunk'larında Anthropic yok).
+  - Ctrl+M `isProcessing` race koruması: "Ses işleniyor..." sırasında ikinci kayıt başlamasın → `isProcessing` early return + `e.repeat` (held-down spam) guard.
+  - Test ayrımı: `production-prefill.test.ts` ile karışmasın → yeni `voice-production-page.test.ts`.
+- **Implementation:**
+  - `mergeFireIntoNote(note, fireNotes)`: pure helper — boş/dolu kombinasyonlar, orta nokta ayraç, case-insensitive duplicate guard, whitespace trim.
+  - `handleVoiceResult`: `notlar: mergeFireIntoNote(entry.note || data.sessionNote || "", entry.fireNotes)`. FormLine DEĞİŞMEDİ.
+  - Ctrl+M `useEffect`: `e.ctrlKey + key m/M` → `e.repeat` → `isProcessing` → INPUT/TEXTAREA/SELECT focus → `isDemo` → toggle. Cmd+M handle edilmez (macOS minimize çakışması).
+  - Button title hint: "Klavyeden Ctrl+M ile de başlatabilirsiniz".
+- **+20 yeni test:** voice-note-helpers (7) + voice-production-page source-regex (13).
+- 4 dosya · **3657 test yeşil** · TS clean · 0 yeni warning · build OK · bundle leak yok
+- **Sıradaki:** Push + Coolify redeploy + manuel smoke (Ctrl+M + fire notlar + V2 regression).
+
+## Önceki — React Doctor only-export-components ×22 fix (3637 test, 2026-05-28)
+
 **React Doctor only-export-components ×22 fix (56 → 57, commit `dd53b36`)**
 
 - **Trigger:** Önceki commit'lerde "kapandı" yazılmıştı ama `only-export-components` ×22 hâlâ baseline'daydı — 22 re-export (`export { X } from "@/lib/..."`) kuralı tetikliyordu.

@@ -6,8 +6,14 @@ type: project
 
 ## Durum
 
-**✅ TÜM TURLAR TAMAMLANDI — 2026-04-24**
-Test: 1638/1638 yeşil · TS: 0 hata · Build: temiz
+**✅ V1-V3 TAMAMLANDI — 2026-05-28**
+Test: 3657 yeşil · TS: 0 hata · Build: temiz · 0 yeni lint warning · bundle leak yok
+
+### V3 (2026-05-28)
+- **fireNotes → notlar entegrasyonu (scrap_qty kullanılmadı):** Kullanıcı kararı 2026-05-28 → ayrı UI sütunu yerine `mergeFireIntoNote` ile mevcut Notlar alanına concat. Pure helper `src/lib/voice-note-helpers.ts` (yeni — voice-service.ts'ten ayrı; Anthropic SDK + server env client bundle'a sızmasın diye).
+- **Ctrl+M klavye kısayolu:** mikrofon başlat/durdur. Guard'lar: `e.repeat` (held-down spam), `isProcessing` (race koruması — "Ses işleniyor..." sırasında ikinci kayıt başlamasın), `INPUT/TEXTAREA/SELECT` focus, `isDemo`. Cmd+M handle EDİLMEZ (macOS pencere minimize çakışması).
+- **Mikrofon button title hint:** "Klavyeden Ctrl+M ile de başlatabilirsiniz" (a11y).
+- **+20 yeni test:** voice-note-helpers (7 — boş kombinasyonlar, concat, dedup case-insensitive, whitespace trim) + voice-production-page source-regex (13 — import boundary, value-import guard, mergeFireIntoNote call, Ctrl+M guard'lar, addEventListener/removeEventListener pair, Cmd+M handle edilmiyor, title hint).
 
 | Tur | İçerik | Test |
 |-----|--------|------|
@@ -129,8 +135,12 @@ interface FormLine {
 
 ---
 
-## Kapsam Dışı (V3)
+## V3'te Tamamlanan (kullanıcı kararıyla revize)
 
-- `fireNotes` → `scrap_qty` DB alanı ve UI input
-- Ctrl+M klavye kısayolu
+- ✅ `fireNotes` → **notlar alanına entegre** (scrap_qty DB alanı kullanılmadı; UI sütunu eklenmedi). `mergeFireIntoNote` helper duplicate guard'lı, case-insensitive.
+- ✅ Ctrl+M klavye kısayolu — input/processing/demo/repeat guard'lı.
+
+## Kapsam Dışı (kalan)
+
 - Sessizlik algılama — EKLENMEYECEK (üretim ortamı riski)
+- `scrap_qty` DB raporlaması — raporlama gerekirse ileride ayrı tur (notlar metin olarak yeterli)

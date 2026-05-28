@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useVoiceRecorder, type VoiceRecorderResult } from "@/hooks/useVoiceRecorder";
 import type { VoiceProductionEntry } from "@/lib/services/voice-service";
+import { mergeFireIntoNote } from "@/lib/voice-note-helpers";
 
 interface FormLine {
     id: string;
@@ -136,7 +137,8 @@ function ProductionPageInner() {
             id: safeRandomUUID(),
             productId: entry.productId ?? "",
             adet: entry.quantity > 0 ? String(entry.quantity) : "",
-            notlar: entry.note || data.sessionNote,
+            // V3: fireNotes ("fire: N adet") notlar'a doğal Türkçe akışla concat (kullanıcı kararı 2026-05-28 — UI sütunu yok)
+            notlar: mergeFireIntoNote(entry.note || data.sessionNote || "", entry.fireNotes),
             _lowConfidence: entry.confidence < 0.7,
             _voiceHint: entry.productId ? undefined : (entry.productName || undefined),
         }));
@@ -161,6 +163,27 @@ function ProductionPageInner() {
     }, [toast]);
 
     const { isRecording, isProcessing, duration, volume, error: voiceError, startRecording, stopRecording, cancelRecording } = useVoiceRecorder(handleVoiceResult);
+
+    // V3: Ctrl+M klavye kısayolu — mikrofon başlat/durdur
+    // Cmd+M handle edilmez (macOS pencere minimize çakışması)
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (!e.ctrlKey || (e.key !== "m" && e.key !== "M")) return;
+            if (e.repeat) return;                              // held-down spam guard
+            if (isProcessing) return;                          // ses işleniyor → start engel (race)
+            const tag = document.activeElement?.tagName;
+            if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+            if (isDemo) return;
+            e.preventDefault();
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        };
+        document.addEventListener("keydown", handleKey);
+        return () => document.removeEventListener("keydown", handleKey);
+    }, [isRecording, isProcessing, startRecording, stopRecording, isDemo]);
 
     const setLineField = (id: string, field: keyof FormLine, val: string) => {
         setLines(prev => prev.map(l =>
@@ -367,7 +390,7 @@ function ProductionPageInner() {
                             <button
                                 onClick={isDemo ? () => toast({ type: "info", message: DEMO_BLOCK_TOAST }) : startRecording}
                                 disabled={isDemo}
-                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sesli üretim girişi (90sn max)"}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sesli üretim girişi (90sn max) — Klavyeden Ctrl+M ile de başlatabilirsiniz"}
                                 style={{
                                     fontSize: "13px", padding: "5px 12px",
                                     border: "0.5px solid var(--border-secondary)",

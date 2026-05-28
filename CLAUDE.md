@@ -3,7 +3,33 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-28_
 
-**Son tamamlanan iş:** React Doctor only-export-components ×22 fix (2026-05-28; 3637 test, skor 56 → 57, commit `dd53b36`)
+**Son tamamlanan iş:** Sesli giriş V3 — fireNotes → notlar entegrasyonu + Ctrl+M kısayolu (2026-05-28; 3657 test)
+
+- **Trigger:** Memory'de "Kapsam Dışı (V3)" listesinde bekleyen 2 madde — sesli giriş feature'ı tamamlama turu.
+- **Kullanıcı kararları (2026-05-28):**
+  - Fire için ayrı UI sütunu **OLMAYACAK** (yeni form alanı istenmiyor)
+  - `fireNotes` ("fire: 2 adet") mevcut Notlar alanına otomatik concat edilecek
+  - Ctrl+M klavye kısayolu eklenecek
+  - `scrap_qty` DB kolonu kullanılmayacak (raporlama gerekirse ileride)
+  - Sessizlik algılama eklenmeyecek (üretim gürültüsü riski)
+- **Plan revizyonu (3. tur kullanıcı bulgusu):**
+  - **Client/server boundary korundu:** Pure helper `mergeFireIntoNote` yeni `src/lib/voice-note-helpers.ts` dosyasında. `voice-service.ts` Anthropic SDK + server env top-level init ediyor (line 8, 14); production page'den value import → bundle leak riski. Çözüm: ayrı pure helper dosyası, voice-service `import type` olarak kalır. **Bundle smoke geçti** — production chunk'larında "Anthropic" yok.
+  - **Ctrl+M `isProcessing` race koruması:** Hook'tan dönen `isProcessing` state'i "Ses işleniyor..." sırasında button gizli. Handler `isRecording=false` görüp `startRecording()` çağırırsa ikinci kayıt başlar. Çözüm: `if (isProcessing) return` + `e.repeat` (held-down spam) guard'ları.
+  - **Test ayrımı:** Mevcut `production-prefill.test.ts` ile karışmaması için yeni `voice-production-page.test.ts` ayrı dosyada.
+- **Implementation:**
+  - **`src/lib/voice-note-helpers.ts` (YENİ):** `mergeFireIntoNote(note, fireNotes)` pure helper. Kurallar: boş/dolu kombinasyonlar, orta nokta ayraç (` · `), case-insensitive duplicate guard, whitespace trim.
+  - **`production/page.tsx` handleVoiceResult (line 132-142):** `notlar: entry.note || data.sessionNote` → `notlar: mergeFireIntoNote(entry.note || data.sessionNote || "", entry.fireNotes)`. `FormLine` interface DEĞİŞMEDİ.
+  - **Ctrl+M `useEffect`:** `document.addEventListener("keydown", ...)` + cleanup. Guard zinciri: `e.ctrlKey + key m/M` → `e.repeat` → `isProcessing` → INPUT/TEXTAREA/SELECT focus → `isDemo` → toggle (start/stop). Cmd+M HANDLE EDİLMEZ (macOS pencere minimize sistem-wide shortcut'u).
+  - **Mikrofon button title hint:** "Klavyeden Ctrl+M ile de başlatabilirsiniz" (a11y + keşfedilebilirlik).
+- **+20 yeni test:**
+  - `voice-note-helpers.test.ts` (7): boş kombinasyonlar (3), concat + whitespace trim (2), case-insensitive duplicate guard (2)
+  - `voice-production-page.test.ts` (13): import boundary (mergeFireIntoNote @/lib/voice-note-helpers'tan + VoiceProductionEntry type-only + value-import yok regex), handleVoiceResult mergeFireIntoNote call, Ctrl+M guard'lar (addEventListener+removeEventListener pair, e.ctrlKey + e.key m/M, e.repeat, isProcessing, INPUT/TEXTAREA/SELECT, isDemo, e.metaKey handle edilmiyor), title hint
+- 4 dosya (1 yeni helper + 1 yeni helper test + 1 yeni UI test + production page edit) · **3657 test yeşil** (önceki 3637 + 20) · TS clean · 0 yeni lint warning · build OK · **bundle leak yok** (production chunk'larında Anthropic geçmiyor)
+- **Sıradaki:**
+  1. Push + Coolify redeploy + manuel smoke (Ctrl+M davranışı + fire notlar entegrasyonu + V2 regression check)
+  2. Memory'deki bekleyenler: SMTP production deploy (Migration 047 + Resend DNS + Coolify env), Faz 12 Paraşüt Sandbox
+
+**Önceki:** React Doctor only-export-components ×22 fix (2026-05-28; 3637 test, skor 56 → 57, commit `dd53b36`)
 
 - **Trigger:** Önceki commit'lerde "kapatıldı" denilen `only-export-components` ×23 hâlâ baseline'daydı — 22 re-export satırı (`export { X } from "@/lib/..."`) kuralı tetikliyordu. Önceki Bölüm 4 commit'inden sonra son temizlik.
 - **Strateji:** Backward-compat re-export pattern'i söküldü. 9 test dosyasının import path'i doğrudan helper'lara yönlendirildi → component dosyalarındaki `export { ... } from` satırları kaldırıldı (internal `import` korundu).
