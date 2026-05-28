@@ -20,13 +20,13 @@ const HELPERS_SOURCE = fs.readFileSync(
 );
 
 describe("DropZone component source", () => {
-    it("exports default + pure helpers", () => {
+    it("exports default + pure helpers defined in import-file-helpers", () => {
         expect(SOURCE).toMatch(/export default function DropZone/);
-        // pure helpers are re-exported from @/lib/import-file-helpers
-        expect(SOURCE).toMatch(/export\s+\{[^}]*validateClassifyUpload/);
-        expect(SOURCE).toMatch(/export\s+\{[^}]*pickAcceptForMime/);
-        expect(SOURCE).toMatch(/export\s+\{[^}]*formatBytes/);
-        expect(SOURCE).toMatch(/export\s+\{[^}]*CLASSIFIER_ACCEPT/);
+        // pure helpers live in @/lib/import-file-helpers (no re-export from component)
+        expect(HELPERS_SOURCE).toMatch(/export function validateClassifyUpload/);
+        expect(HELPERS_SOURCE).toMatch(/export function pickAcceptForMime/);
+        expect(HELPERS_SOURCE).toMatch(/export function formatBytes/);
+        expect(HELPERS_SOURCE).toMatch(/export const CLASSIFIER_ACCEPT/);
     });
 
     it("accept attribute uses CLASSIFIER_ACCEPT constant (whitelist sync)", () => {

@@ -30,7 +30,6 @@ import type { CreateOrderInput } from "./supabase/orders";
 import type { SalesOrderRow } from "./database.types";
 import { isDemoMode as checkDemoMode } from "./demo-utils";
 import { shouldSuggestReorder } from "./stock-utils";
-export { buildCustomerPatch } from "./customer-helpers";
 import { buildCustomerPatch } from "./customer-helpers";
 
 // ── Exported types ─────────────────────────────────────────

@@ -15,8 +15,8 @@
 import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import QuoteDocument, { BILINGUAL_LABELS } from
-    "@/app/dashboard/quotes/components/QuoteDocument";
+import QuoteDocument from "@/app/dashboard/quotes/components/QuoteDocument";
+import { BILINGUAL_LABELS } from "@/lib/quote-document-helpers";
 import type { QuoteData, QuoteRow } from "@/app/dashboard/quotes/components/quote-types";
 
 function makeData(overrides: Partial<QuoteData> = {}): QuoteData {

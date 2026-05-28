@@ -64,7 +64,6 @@ const PRINT_CSS = `
 `;
 
 // ── Format helpers ────────────────────────────────────────────────────────────
-export { formatPoCurrency, formatPoDate } from "@/lib/po-document-helpers";
 import { formatPoCurrency, formatPoDate } from "@/lib/po-document-helpers";
 
 // ── Props ─────────────────────────────────────────────────────────────────────

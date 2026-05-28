@@ -7,11 +7,11 @@ import {
     getMatchActionColor,
     pickSuggestedAction,
     formatProductTypeName,
-} from "@/components/import/ExtractionReview";
+} from "@/lib/extraction-review-helpers";
 import {
     isExtractionSupportedType,
     isMigrationExcelType,
-} from "@/components/import/ClassifierQueue";
+} from "@/lib/classifier-helpers";
 
 describe("formatMatchAction", () => {
     it("returns Turkish labels for all 5 actions", () => {

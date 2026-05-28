@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { sortByStockPriority } from "@/components/dashboard/StockDataGrid";
+import { sortByStockPriority } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
 
 const SOURCE = readFileSync(
@@ -108,8 +108,8 @@ describe("StockDataGrid — source-regex regression (limit + Link)", () => {
         expect(SOURCE).toMatch(/Tümünü gör/);
     });
 
-    it("sortByStockPriority named export — test edilebilirlik", () => {
-        expect(SOURCE).toMatch(/export\s+\{[^}]*sortByStockPriority/);
+    it("sortByStockPriority @/lib/stock-utils'tan import edilir (test edilebilirlik)", () => {
+        expect(SOURCE).toMatch(/import\s+\{[^}]*sortByStockPriority[^}]*\}\s+from\s+"@\/lib\/stock-utils"/);
     });
 });
 

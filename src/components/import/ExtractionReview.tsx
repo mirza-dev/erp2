@@ -27,15 +27,7 @@ import {
     getMatchActionColor,
     isCertFlowDocumentType,
 } from "@/lib/extraction-review-helpers";
-export type { ApplyResultSummary } from "@/lib/extraction-review-helpers";
 import type { ApplyResultSummary } from "@/lib/extraction-review-helpers";
-export {
-    formatMatchAction,
-    getMatchActionColor,
-    pickSuggestedAction,
-    formatProductTypeName,
-    isCertFlowDocumentType,
-} from "@/lib/extraction-review-helpers";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 

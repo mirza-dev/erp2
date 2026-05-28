@@ -10,7 +10,7 @@
  *   - undefined fields must NOT appear in the body (no-op safety)
  */
 import { describe, it, expect } from "vitest";
-import { buildCustomerPatch } from "@/lib/data-context";
+import { buildCustomerPatch } from "@/lib/customer-helpers";
 
 // ─── camelCase → snake_case mapping ──────────────────────────────────────────
 

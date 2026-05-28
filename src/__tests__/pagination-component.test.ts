@@ -9,37 +9,40 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 
 describe("Pagination — module load", () => {
-    it("default export = function + buildPageWindow named export", async () => {
+    it("Pagination default export = function (component)", async () => {
         const mod = await import("@/components/ui/Pagination");
         expect(typeof mod.default).toBe("function");
+    });
+    it("buildPageWindow @/lib/pagination-helpers'tan named export", async () => {
+        const mod = await import("@/lib/pagination-helpers");
         expect(typeof mod.buildPageWindow).toBe("function");
     });
 });
 
 describe("buildPageWindow", () => {
     it("totalPages ≤ 7 → tüm sayfalar listelenir", async () => {
-        const { buildPageWindow } = await import("@/components/ui/Pagination");
+        const { buildPageWindow } = await import("@/lib/pagination-helpers");
         expect(buildPageWindow(3, 5)).toEqual([1, 2, 3, 4, 5]);
         expect(buildPageWindow(1, 7)).toEqual([1, 2, 3, 4, 5, 6, 7]);
     });
 
     it("totalPages > 7, current uzakta → 1 … current±2 … last", async () => {
-        const { buildPageWindow } = await import("@/components/ui/Pagination");
+        const { buildPageWindow } = await import("@/lib/pagination-helpers");
         expect(buildPageWindow(10, 20)).toEqual([1, "…", 8, 9, 10, 11, 12, "…", 20]);
     });
 
     it("totalPages > 7, current başta (sayfa 1) → 1 2 3 … last", async () => {
-        const { buildPageWindow } = await import("@/components/ui/Pagination");
+        const { buildPageWindow } = await import("@/lib/pagination-helpers");
         expect(buildPageWindow(1, 20)).toEqual([1, 2, 3, "…", 20]);
     });
 
     it("totalPages > 7, current sonda (sayfa 20) → 1 … 18 19 20", async () => {
-        const { buildPageWindow } = await import("@/components/ui/Pagination");
+        const { buildPageWindow } = await import("@/lib/pagination-helpers");
         expect(buildPageWindow(20, 20)).toEqual([1, "…", 18, 19, 20]);
     });
 
     it("current=3, total=10 → 1 2 3 4 5 … 10 (1-2 ile 3 bitişik)", async () => {
-        const { buildPageWindow } = await import("@/components/ui/Pagination");
+        const { buildPageWindow } = await import("@/lib/pagination-helpers");
         expect(buildPageWindow(3, 10)).toEqual([1, 2, 3, 4, 5, "…", 10]);
     });
 });

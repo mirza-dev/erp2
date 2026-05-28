@@ -16,8 +16,8 @@ describe("Faz 9 — PurchaseOrderDocument: module load", () => {
         expect(typeof mod.default).toBe("function");
     });
 
-    it("formatPoCurrency ve formatPoDate export edilir", async () => {
-        const mod = await import("@/components/purchase/PurchaseOrderDocument");
+    it("formatPoCurrency ve formatPoDate helper'dan export edilir", async () => {
+        const mod = await import("@/lib/po-document-helpers");
         expect(typeof mod.formatPoCurrency).toBe("function");
         expect(typeof mod.formatPoDate).toBe("function");
     });
@@ -25,28 +25,28 @@ describe("Faz 9 — PurchaseOrderDocument: module load", () => {
 
 describe("Faz 9 — formatPoCurrency (Intl.NumberFormat tr-TR)", () => {
     it("TRY → ₺ sembolü ile formatlanır", async () => {
-        const { formatPoCurrency } = await import("@/components/purchase/PurchaseOrderDocument");
+        const { formatPoCurrency } = await import("@/lib/po-document-helpers");
         const result = formatPoCurrency(1234.5, "TRY");
         expect(result).toContain("1.234,50");
         expect(result).toMatch(/₺|TRY/);
     });
 
     it("USD → $ veya USD sembolü", async () => {
-        const { formatPoCurrency } = await import("@/components/purchase/PurchaseOrderDocument");
+        const { formatPoCurrency } = await import("@/lib/po-document-helpers");
         const result = formatPoCurrency(1000, "USD");
         expect(result).toContain("1.000,00");
         expect(result).toMatch(/\$|USD/);
     });
 
     it("EUR → € veya EUR sembolü", async () => {
-        const { formatPoCurrency } = await import("@/components/purchase/PurchaseOrderDocument");
+        const { formatPoCurrency } = await import("@/lib/po-document-helpers");
         const result = formatPoCurrency(500.25, "EUR");
         expect(result).toContain("500,25");
         expect(result).toMatch(/€|EUR/);
     });
 
     it("Bilinmeyen currency → fallback (crash etmez)", async () => {
-        const { formatPoCurrency } = await import("@/components/purchase/PurchaseOrderDocument");
+        const { formatPoCurrency } = await import("@/lib/po-document-helpers");
         // Intl bilinmeyen currency'de RangeError throw eder → catch fallback
         expect(() => formatPoCurrency(100, "XXX")).not.toThrow();
     });
@@ -54,17 +54,17 @@ describe("Faz 9 — formatPoCurrency (Intl.NumberFormat tr-TR)", () => {
 
 describe("Faz 9 — formatPoDate (ISO → DD.MM.YYYY)", () => {
     it("'2026-05-18' → '18.05.2026'", async () => {
-        const { formatPoDate } = await import("@/components/purchase/PurchaseOrderDocument");
+        const { formatPoDate } = await import("@/lib/po-document-helpers");
         expect(formatPoDate("2026-05-18")).toBe("18.05.2026");
     });
 
     it("null → '—'", async () => {
-        const { formatPoDate } = await import("@/components/purchase/PurchaseOrderDocument");
+        const { formatPoDate } = await import("@/lib/po-document-helpers");
         expect(formatPoDate(null)).toBe("—");
     });
 
     it("ISO timestamp string (slice 0,10) → DD.MM.YYYY", async () => {
-        const { formatPoDate } = await import("@/components/purchase/PurchaseOrderDocument");
+        const { formatPoDate } = await import("@/lib/po-document-helpers");
         expect(formatPoDate("2026-05-18T10:30:00.000Z")).toBe("18.05.2026");
     });
 });

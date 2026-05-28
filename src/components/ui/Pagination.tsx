@@ -2,7 +2,6 @@
 
 import { CSSProperties, ReactNode } from "react";
 import { buildPageWindow } from "@/lib/pagination-helpers";
-export { buildPageWindow } from "@/lib/pagination-helpers";
 
 export interface PaginationProps {
     currentPage:  number;

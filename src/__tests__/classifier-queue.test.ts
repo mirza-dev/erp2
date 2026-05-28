@@ -18,7 +18,7 @@ import {
     classifierResultBadge,
     selectClassifyCandidates,
     type ConcurrencySelectableItem,
-} from "@/components/import/ClassifierQueue";
+} from "@/lib/classifier-helpers";
 import type { DocumentType } from "@/lib/database.types";
 
 describe("chunkBy", () => {

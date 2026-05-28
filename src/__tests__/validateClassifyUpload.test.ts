@@ -6,7 +6,7 @@ import {
     validateClassifyUpload,
     pickAcceptForMime,
     formatBytes,
-} from "@/components/import/DropZone";
+} from "@/lib/import-file-helpers";
 
 function makeFile(name: string, type: string, size: number): File {
     return new File([new Uint8Array(size)], name, { type });

@@ -10,8 +10,6 @@
  */
 import { useState, useRef } from "react";
 import { CLASSIFIER_ACCEPT } from "@/lib/import-file-helpers";
-export type { UploadValidation } from "@/lib/import-file-helpers";
-export { CLASSIFIER_ACCEPT, CLASSIFIER_ALLOWED_MIMES, validateClassifyUpload, pickAcceptForMime, formatBytes } from "@/lib/import-file-helpers";
 
 export interface DropZoneProps {
     onFiles: (files: File[]) => void;

@@ -23,18 +23,6 @@ import {
     formatLanguage,
     classifierResultBadge,
 } from "@/lib/classifier-helpers";
-export type { ConcurrencySelectableItem, ClassifierBadge } from "@/lib/classifier-helpers";
-export {
-    isExtractionSupportedType,
-    isMigrationExcelType,
-    chunkBy,
-    selectClassifyCandidates,
-    documentTypeLabel,
-    documentTypeIcon,
-    formatLanguage,
-    confidenceColor,
-    classifierResultBadge,
-} from "@/lib/classifier-helpers";
 
 // ── Component ────────────────────────────────────────────────────────────────
 

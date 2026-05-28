@@ -26,7 +26,6 @@ const C = {
 
 const SYM: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
 
-export { BILINGUAL_LABELS } from "@/lib/quote-document-helpers";
 import { BILINGUAL_LABELS } from "@/lib/quote-document-helpers";
 
 const L = BILINGUAL_LABELS;

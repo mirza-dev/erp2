@@ -5,7 +5,6 @@ import Link from "next/link";
 import { formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
 import { getStockStatusInfo, sortByStockPriority } from "@/lib/stock-utils";
-export { sortByStockPriority } from "@/lib/stock-utils";
 
 interface StockDataGridProps {
     filterCategory?: string;
