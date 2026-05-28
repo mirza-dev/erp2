@@ -7,6 +7,18 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-28
 
+**React Doctor only-export-components ×22 fix (56 → 57, commit `dd53b36`)**
+
+- **Trigger:** Önceki commit'lerde "kapandı" yazılmıştı ama `only-export-components` ×22 hâlâ baseline'daydı — 22 re-export (`export { X } from "@/lib/..."`) kuralı tetikliyordu.
+- **Fix:** Backward-compat re-export sökme. 9 test dosyası import path'i doğrudan helper'a yönlendirildi → component dosyalarındaki re-export satırları silindi (internal `import` korundu).
+- **Etki:** 8 component (`DropZone`, `ClassifierQueue`, `ExtractionReview`, `Pagination`, `StockDataGrid`, `data-context`, `PurchaseOrderDocument`, `QuoteDocument`) + 9 test güncellendi. `pagination-component` module-load testi 2'ye bölündü. `dropzone` + `stock-data-grid` source-regex'leri helper pattern'ine geçti.
+- **only-export-components: 22 → 0** (full scan'de artık yok).
+- 17 dosya · **3637 test yeşil · TS clean · 0 yeni warning**
+- **Skor toplam:** 51 → 57 (+6, dört tur birikimi)
+- **Sıradaki:** kalan ~50 inline style block + react-hooks/set-state-in-effect ×32 değerlendirmesi.
+
+## Önceki — React Doctor Bölüm 4 (3636 test, 2026-05-28)
+
 **React Doctor Bölüm 4 — inline style extract + OAuth disable fix (54 → 56, commit `11fad03`)**
 
 - **Trigger:** Bölüm 4 (no-inline-exhaustive-style ×301, alerts 42 + suggested 23 hedef) + önceki commit'teki disable directive sözdizimi hatasının düzeltilmesi.

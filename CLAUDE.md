@@ -3,7 +3,24 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-28_
 
-**Son tamamlanan iş:** React Doctor Bölüm 4 — inline style extract + OAuth disable fix (2026-05-28; 3636 test, skor 54 → 56, commit `11fad03`)
+**Son tamamlanan iş:** React Doctor only-export-components ×22 fix (2026-05-28; 3637 test, skor 56 → 57, commit `dd53b36`)
+
+- **Trigger:** Önceki commit'lerde "kapatıldı" denilen `only-export-components` ×23 hâlâ baseline'daydı — 22 re-export satırı (`export { X } from "@/lib/..."`) kuralı tetikliyordu. Önceki Bölüm 4 commit'inden sonra son temizlik.
+- **Strateji:** Backward-compat re-export pattern'i söküldü. 9 test dosyasının import path'i doğrudan helper'lara yönlendirildi → component dosyalarındaki `export { ... } from` satırları kaldırıldı (internal `import` korundu).
+- **Etki:**
+  - 8 component dosyası: `DropZone`, `ClassifierQueue`, `ExtractionReview`, `Pagination`, `StockDataGrid`, `data-context`, `PurchaseOrderDocument`, `QuoteDocument` — re-export'lar uçtu
+  - 9 test dosyası: `validateClassifyUpload`, `classifier-queue`, `extraction-review-helpers`, `pagination-component`, `purchase-order-document`, `quote-document-faz4c`, `customer-update-mapping`, `stock-data-grid-limit`, `dropzone-component` — helper'a yönlendirildi
+  - `pagination-component` module-load testi 2'ye bölündü (component default + helper named export ayrı assertion)
+  - `dropzone-component` + `stock-data-grid-limit` source-regex'leri helper file pattern'ine yönlendirildi
+- **only-export-components: 22 → 0 (HEPSİ KAPANDI).** React Doctor full scan'de artık `only-export-components` errors yok.
+- 17 dosya · **3637 test yeşil · TS clean · 0 yeni warning**
+- **Skor toplam:** 51 (baseline) → 54 (Bölüm 1+2+3+5) → 56 (Bölüm 4 + OAuth fix) → 57 (re-export temizlik) = +6 toplam
+- **Sıradaki:**
+  1. Push + Coolify redeploy + smoke (görsel kontrol)
+  2. Kalan ~50 `no-inline-exhaustive-style` (alerts drawer body + suggested table/drawer enrichment) — ayrı PR
+  3. `react-hooks/set-state-in-effect` ×32 error — plan dışı; ayrı tur'da değerlendirilir (kullanıcı kararı)
+
+**Önceki:** React Doctor Bölüm 4 — inline style extract + OAuth disable fix (2026-05-28; 3636 test, skor 54 → 56, commit `11fad03`)
 
 - **Trigger:** Plan `mellow-plotting-ladybug.md` Bölüm 4 (no-inline-exhaustive-style ×301 — alerts 42 + suggested 23 = 65 blok hedef) + kullanıcı doğrulamasıyla ortaya çıkan baseline hatası: önceki commit'teki `// eslint-disable-next-line react-doctor/...` yorumu react-doctor tarafından **algılanmıyordu** (kendi sözdizimi: `// react-doctor-disable-next-line`).
 - **OAuth disable directive fix (Bölüm 1 düzeltme):** `src/app/api/parasut/oauth/callback/route.ts` — disable yorumu `.upsert()` üstünden `export async function GET` öncesine taşındı + doğru sözdizimi (`// react-doctor-disable-next-line react-doctor/nextjs-no-side-effect-in-get-handler`). `nextjs-no-side-effect-in-get-handler` error kapandı (skor 54 → 56).
