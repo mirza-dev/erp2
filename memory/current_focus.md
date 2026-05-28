@@ -7,6 +7,21 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-05-28
 
+**SMTP smoke endpoint + deploy runbook (3667 test)**
+
+- **Trigger:** SMTP/Resend entegrasyonu 2026-05-06'dan beri kod hazır; production deploy yapılmadı. Müşteri domain'i belirsiz → Resend hesap + DNS verify bloklu. Bu turda kod tarafını deploy-ready yap + runbook yaz.
+- **Kod 100% hazırdı (doğrulandı):** Migration 047, `resend@^6.12.2`, `.env.example` (RESEND_API_KEY/EMAIL_FROM/NEXT_PUBLIC_APP_URL/ADMIN_EMAILS), email-service (fail-safe), email-logs (dedup+retry), templates (5 tip), retry-failed cron, trigger entegrasyonları (alert-service vb.).
+- **Eklenenler:**
+  - `POST /api/email/test` (admin-only smoke): requireRole admin + body validation (email regex + type whitelist) + config check (RESEND_API_KEY/EMAIL_FROM yoksa 503 config_missing) + 5 NOTIFICATION_TYPE için sample context + recipient lookup/dedup BYPASS (body.to'ya direkt) + email_logs entity_type='test_email' audit + Resend direct send. Browser console fetch ile test edilir.
+  - `docs/EMAIL_DEPLOY.md` runbook: Resend hesap + DNS verify (subdomain + DKIM kritik) + Coolify env vars + Migration 047 + redeploy + smoke (Yöntem A endpoint, Yöntem B gerçek tetik) + troubleshooting tablosu. ~30 dk.
+- **Resend mock fix:** `new Resend(apiKey)` constructor; `vi.fn().mockImplementation(() => ({...}))` uyumsuz → `class MockResend` pattern.
+- **+10 test:** auth (2), validation (3), config (2), happy (2), error (2).
+- 3 dosya · **3667 test yeşil** · TS clean · 0 yeni warning · build OK
+- **Domain henüz belirsiz** → Resend hesap + DNS + Coolify env + Migration kullanıcı tarafında bekliyor.
+- **Sıradaki:** Domain hazır olunca runbook Faz 1-5 (~30 dk); Faz 12 Paraşüt Sandbox.
+
+## Önceki — Sesli giriş V3 (3657 test, 2026-05-28)
+
 **Sesli giriş V3 — fireNotes → notlar entegrasyonu + Ctrl+M kısayolu (3657 test)**
 
 - **Trigger:** Memory'de "Kapsam Dışı (V3)" listesinde bekleyen 2 madde tamamlama.

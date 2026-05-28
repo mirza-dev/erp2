@@ -3,7 +3,28 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-28_
 
-**Son tamamlanan iş:** Sesli giriş V3 — fireNotes → notlar entegrasyonu + Ctrl+M kısayolu (2026-05-28; 3657 test)
+**Son tamamlanan iş:** SMTP smoke endpoint + deploy runbook (2026-05-28; 3667 test)
+
+- **Trigger:** SMTP/Resend entegrasyonu 2026-05-06'dan beri kod tarafında hazır ama production deploy yapılmadı. Müşteri domain'i henüz belli olmadığı için Resend hesabı + DNS verify bloklu. Bu turda **kod tarafını deploy-ready hale getir** + **kullanıcı için adım adım runbook yaz**.
+- **Kod tarafı 100% hazırdı (doğrulandı):**
+  - Migration 047 (`email_logs` tablosu), `resend@^6.12.2` package, `.env.example` (4 değişken), `email-service.ts` (fail-safe pattern), `email-logs.ts` (dedup+retry), `templates.ts` (5 bildirim tipi inline HTML), `email/retry-failed/route.ts`, `crons.yml` `email_retry` job (her saat) — hepsi mevcut, trigger entegrasyonları yapılmış (alert-service stock_critical, vb.).
+- **Bu turda eklenenler:**
+  - **`POST /api/email/test`** (yeni admin-only smoke endpoint): `requireRole(["admin"])` guard + body validation (email regex + NotificationTypeKey whitelist) + config check (RESEND_API_KEY + EMAIL_FROM yoksa 503 `config_missing`) + 5 NOTIFICATION_TYPE için sample context + recipient lookup/dedup **bypass** (test için body.to'ya direkt) + email_logs `entity_type='test_email'` ile audit + Resend direct send. Kullanıcı tek browser console fetch ile test atabilir, gerçek alert tetiklemeden doğrulama.
+  - **`docs/EMAIL_DEPLOY.md`** runbook: 7 faz — Resend hesap + DNS, Coolify env vars, Migration 047 uygulama, Coolify redeploy, smoke test (Yöntem A test endpoint + Yöntem B gerçek tetikleyici), troubleshooting tablosu, sağlık kontrolleri. Süre tahmini: ~30 dk (DNS propagation hariç).
+- **Resend mock fix:** Test'te Resend class constructor olarak çağrılıyor (`new Resend(apiKey)`). `vi.fn().mockImplementation(() => ({...}))` constructor uyumlu değil → `class MockResend { emails = {...} }` pattern'i kullanıldı.
+- **+10 yeni test (`email-test-endpoint.test.ts`):**
+  - Auth: admin değil → 403 + Resend çağrılmaz (2)
+  - Validation: geçersiz JSON / email / type → 400 (3)
+  - Config: RESEND_API_KEY eksik → 503; EMAIL_FROM eksik → 503 (2)
+  - Happy path: stock_critical → 200 sent + log + Resend args; 5 tip için kabul (2)
+  - Error: Resend response.error → 502 failed; Resend throw → 502 error + log failed (2)
+- 3 dosya (1 yeni route + 1 yeni test + 1 docs) · **3667 test yeşil** (önceki 3657 + 10) · TS clean · 0 yeni lint warning · build OK
+- **Müşteri domain'i belirsiz** olduğu için Resend hesap açma + DNS verify + Coolify env set + Migration 047 uygulama tamamen kullanıcı tarafında bekliyor. Domain hazır olduğunda runbook ile ~30 dk'da deploy edilir.
+- **Sıradaki:**
+  1. **Kullanıcı tarafında (domain hazır olunca):** Faz 1-5 (`docs/EMAIL_DEPLOY.md`)
+  2. Memory'deki kalan: Faz 12 Paraşüt Sandbox GATE, React Doctor kalan ~271 inline (düşük öncelik)
+
+**Önceki:** Sesli giriş V3 — fireNotes → notlar entegrasyonu + Ctrl+M kısayolu (2026-05-28; 3657 test)
 
 - **Trigger:** Memory'de "Kapsam Dışı (V3)" listesinde bekleyen 2 madde — sesli giriş feature'ı tamamlama turu.
 - **Kullanıcı kararları (2026-05-28):**
