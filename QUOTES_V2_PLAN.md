@@ -1,6 +1,6 @@
 # Master Plan: Teklif Modülü Kapsamlı Revize (V7) — DÜZELTİLMİŞ 6. TUR
 
-> **Durum:** Bu plan kullanıcı review 6. tur (2026-05-29) sonrası 7 düzeltme ile güncellendi (3 P1 + 3 P2 + 1 bonus tablo adı). Güvenlik kararı korunur, satır vat_rate snapshot eklenir, PDF arşiv kontrolü accept öncesi zorunlu. **IMPLEMENT EDİLMEYECEK** — sadece referans.
+> **Durum:** Bu plan kullanıcı review 6. tur (2026-05-29) sonrası 7 düzeltme ile güncellendi (3 P1 + 3 P2 + 1 bonus tablo adı). Güvenlik kararı korunur, satır vat_rate snapshot eklenir. **2 P2 kararı kullanıcı tarafından kesinleşti (2026-05-29):** (A5) PDF arşivi yoksa accept route'ta **recover/generate** (422 değil); (A4) header discount snapshot taşınır ama discount_amount>0'da Paraşüt **sessiz yanlış fatura göndermez** (bloklar/uyarır, gerçek aktarım ayrı faz). **IMPLEMENT EDİLMEYECEK** — sadece referans.
 
 ## Context
 
@@ -128,23 +128,26 @@ ORDER BY qli.position;
 
 **Sorun:** Paraşüt fatura header discount görmez; satır discount = 0 görür → fatura toplamı quote'tan farklı.
 
-**V7 KARAR (scope sınırlı):**
+**KULLANICI KARARI (2026-05-29, 6. tur kesinleşti): SNAPSHOT TAŞINIR + PARAŞÜT SESSİZ YANLIŞ TOPLAM GÖNDERMEZ.**
 
-**Bu faz Paraşüt fatura entegrasyonu değiştirmiyor.** Mevcut Paraşüt sync mevcut order_lines.discount_pct (= 0) ile çalışır; toplam farkı kabul edilir scope (Paraşüt fatura matemsel olarak tutarlı, sadece "header discount" satırlarda yansımaz).
+Tam Paraşüt iskonto implementasyonu (orantılı dağıtım vs ayrı iskonto satırı) bu faza şişirilmez (yuvarlama, KDV, çok satır, 0 fiyat, miktar hassasiyeti detayları çıkar). Ama saf "ertele" de KABUL DEĞİL — sessiz finansal hata yaratır (ERP toplamı ≠ Paraşüt faturası).
 
-**Gelecek faz (Faz 8+, scope dışı):** Paraşüt entegrasyonu header discount'ı destekleyecek şekilde güncellenir:
-- Seçenek A: Header discount'ı tüm satırlara orantılı dağıt (`line.discount_pct = headerDiscount / subtotal * 100`)
-- Seçenek B: Paraşüt fatura'ya "İskonto" satırı eklenir (negatif line item)
-- Seçenek C: Paraşüt fatura header discount API kullanılır (varsa)
+**Bu fazda yapılacak:**
+1. `quotes.discount_amount → sales_orders.discount_amount` snapshot **mutlaka taşınır** (V4-A8 korunur; ERP içi veri doğru).
+2. Paraşüt sync **guard**: `sales_orders.discount_amount > 0` olan siparişlerde Paraşüt fatura **sessizce oluşturulMAZ**. Bunun yerine ya validation/409 ile bloklanır ya da açık alert/uyarı: **"Paraşüt iskonto aktarımı henüz desteklenmiyor (ayrı faz)"**. Böylece muhasebeye yanlış toplam gitmez.
+3. order_lines.discount_pct = 0 kalır (V3-A4 header discount).
 
-**V7 plan dokümantasyonu:** Migration 075 yorum bloğunda Paraşüt scope açıkça yazılır:
+**Gelecek ayrı faz (scope dışı):** Paraşüt'e aktarım yöntemi seçilir — Seçenek A: orantılı satır iskontosu (`line.discount_pct = headerDiscount / subtotal * 100`); Seçenek B: negatif "İskonto" line item; Seçenek C: Paraşüt header discount API (varsa).
+
+**V7 plan dokümantasyonu:** Migration 075 yorum bloğu + parasut-service guard:
 ```sql
 -- Header discount (quotes.discount_amount → sales_orders.discount_amount):
--- Paraşüt fatura tarafında bu fazda yansıtılmaz (gelecek faz scope).
--- order_lines.discount_pct = 0 olarak yazılır; Paraşüt mevcut paterniyle sync devam eder.
+-- Bu fazda Paraşüt fatura'ya AKTARILMAZ. discount_amount > 0 ise Paraşüt sync
+-- bu siparişi atlar/bloklar + "Paraşüt iskonto aktarımı ayrı faz" uyarısı verir.
+-- Sessizce yanlış toplamlı fatura oluşturmak YASAK (ERP ≠ muhasebe riski).
 ```
 
-**Test:** Accept sonrası Paraşüt sync — fatura toplamı order_lines'tan hesaplanır (header discount yansımaz, kabul); kullanıcı UI'da "Paraşüt fatura header discount içermez" notu görür (opsiyonel).
+**Test:** discount_amount=0 → Paraşüt sync normal; discount_amount>0 → sync bloklanır/uyarı (sessiz fatura YOK), sales_orders.discount_amount snapshot doğru taşınmış.
 
 ### V7-A5 (P2) — Accept öncesi PDF arşiv kontrolü zorunlu
 
@@ -158,26 +161,23 @@ Null dönerse `quote_pdf_archive_id = NULL` ile order yaratılır → kabul edil
 
 **Kullanıcı isteği:** "Resmi PDF arşivlenmiş sent teklif kilitli arşiv olmalı" (V4 review).
 
-**V7 — Accept RPC guard (V5-A4 üzerine ek):**
+**KULLANICI KARARI (2026-05-29, 6. tur kesinleşti): RECOVER/GENERATE** — 422 hard-fail DEĞİL. Accept anında PDF arşivi eksikse otomatik üretilir, sonra sipariş oluşur. Kullanıcı akışı kesilmez.
 
-```sql
--- Step 4.5 (productId check'ten sonra):
--- PDF arşivi guard
-v_pdf_archive_id := (SELECT id FROM quote_pdf_archives
-                       WHERE quote_id = p_quote_id
-                       ORDER BY revision_no DESC LIMIT 1);
-IF v_pdf_archive_id IS NULL THEN
-  RAISE EXCEPTION 'Quote has no PDF archive; send quote first to generate archive'
-    USING ERRCODE = '23514', DETAIL = 'quote_id:' || p_quote_id::text;
-END IF;
--- Sonra order insert'te v_pdf_archive_id kullanılır (LIMIT 1 yerine)
+**Mimari sonuç (önemli):** PDF üretimi server-side (Puppeteer/Docker chromium) → atomik SQL RPC İÇİNDE yapılamaz. Recover/generate **route/service katmanında**, `accept_quote_and_create_order` RPC çağrısından ÖNCE yapılır:
+
+```
+/api/quotes/[id]/accept route (V5-A4 atomik RPC'den önce):
+  1. quote_pdf_archives son revizyon lookup
+  2. NULL ise → serviceGenerateAndArchiveQuotePdf(quoteId)
+     (Puppeteer render + quote_pdf_archives INSERT, V3-A5 immutable upsert=false)
+  3. Üretim başarısız → 502 (accept çağrılmaz; geçici hata, kullanıcı tekrar dener)
+  4. Arşiv hazır (mevcut veya yeni üretildi) → accept_quote_and_create_order RPC
+     RPC içinde v_pdf_archive_id artık her zaman dolu (LIMIT 1 güvenli)
 ```
 
-**Mantık:** Sent quote (`status='sent'`) → Send endpoint zaten PDF arşivledi → archive var. Kullanıcı manuel `UPDATE quotes SET status='sent'` ile arşiv olmadan sent'e geçirirse defansif guard 422 döner.
+**RPC tarafı:** Atomik RPC arşivin var olduğunu varsayar (route garanti etti); defansif olarak NULL kalırsa yine de order yaratılır (`quote_pdf_archive_id = NULL` kabul) — recover route'ta çözüldüğü için RPC'de hard-fail YOK.
 
-**HTTP map:** `23514` (check_violation) → 422 (`/api/quotes/[id]/accept` route handler).
-
-**Test:** Accept öncesi quote_pdf_archives boş → 422 "PDF arşivi yok"; arşiv varsa accept başarılı.
+**Test:** Accept öncesi quote_pdf_archives boş → route PDF üretir + arşivler → accept başarılı + order.quote_pdf_archive_id dolu; PDF üretimi throw → 502, accept çağrılmaz.
 
 ### V7-A6 (P2) — Faz 1 başlangıcında ayrı tam plan zorunlu
 
@@ -251,9 +251,9 @@ Faz 6:
           - V6-A2 generate_order_number()
           - V7-A1 SECURITY INVOKER (DEFINER DEĞİL)
           - V7-A3 satır vat_rate quote'tan taşı
-          - V7-A5 PDF arşiv guard (yoksa 422)
           - V7-A7 order_lines (sales_order_lines DEĞİL)
-        + V7-A4 Paraşüt scope yorum bloğu
+        + V7-A5 (karar) accept route'ta recover/generate PDF arşivi (RPC öncesi; 422 değil)
+        + V7-A4 (karar) Paraşüt guard yorum bloğu: discount_amount>0 sessiz fatura YOK
 
 Faz 7:
   076 → note_templates + RLS
@@ -267,8 +267,8 @@ Faz 7:
 | **SECURITY DEFINER privilege escalation** | **V7-A1: SECURITY INVOKER default; 036 kararı korunur** |
 | **Boş quote_date payload PATLAR** | **V7-A2: NULLIF guard pattern korunur** |
 | **Paraşüt satır VAT yanlış (quote.vat_rate ≠ 20)** | **V7-A3: satır vat_rate snapshot accept RPC'de** |
-| **Paraşüt header discount yansımaz** | **V7-A4: scope dışı, gelecek faz; UI notu opsiyonel** |
-| **PDF arşivsiz kabul edilen sipariş** | **V7-A5: accept RPC guard; arşiv yoksa 422** |
+| **Paraşüt header discount sessiz yanlış toplam** | **V7-A4 (karar): snapshot taşınır + discount_amount>0'da Paraşüt sync bloklar/uyarır; aktarım ayrı faz** |
+| **PDF arşivsiz kabul edilen sipariş** | **V7-A5 (karar): route accept öncesi recover/generate; üretim fail → 502** |
 | **Delta plan implementation belirsizliği** | **V7-A6: faz başı 3-adım prosedür** |
 | **order_lines tablo adı** | **V7-A7: sales_order_lines DEĞİL** |
 | Önceki V6/V5/V4/V3/V2 düzeltmeler | Korundu |
@@ -298,8 +298,9 @@ Faz 1 manuel smoke V7:
 
 Faz 6 manuel smoke V7:
 - Accept RPC SECURITY INVOKER
-- Accept öncesi quote_pdf_archives boş → 422 "PDF arşivi yok"
+- Accept öncesi quote_pdf_archives boş → route PDF üretir + arşivler → accept başarılı (V7-A5 recover/generate); PDF üretimi fail → 502
 - Accept sonrası order_lines.vat_rate her satırda quote.vat_rate'e eşit (Paraşüt sync doğru)
+- discount_amount>0 sipariş → Paraşüt sync sessizce fatura oluşturmaz (bloklar/uyarır; V7-A4)
 - Tablo adı `order_lines` (smoke testte `\d order_lines` ve `\d sales_order_lines` yok)
 
 ## Faz 1 Başlangıç Prosedürü (V7-A6)
@@ -335,8 +336,8 @@ Faz 1'e başlanırken (yeni Plan modu oturumu):
 | V7-A1 (P1) | SECURITY DEFINER yok (036 kararı korunur) | Privilege escalation |
 | V7-A2 (P1) | quote_date NULLIF guard korunur | Boş string cast PATLAR |
 | V7-A3 (P1) | order_lines satır vat_rate snapshot quote'tan | Paraşüt yanlış VAT fatura |
-| V7-A4 (P2) | Header discount Paraşüt scope dışı (yorum) | Karar belirsizliği |
-| V7-A5 (P2) | Accept öncesi PDF arşiv guard | PDF arşivsiz kabul |
+| V7-A4 (P2) | Header discount snapshot + Paraşüt guard (discount>0 sessiz fatura YOK) | Sessiz finansal hata (ERP≠muhasebe) |
+| V7-A5 (P2) | Accept route recover/generate (422 değil) | PDF arşivsiz kabul + akış kesintisi |
 | V7-A6 (P2) | Faz başı tam plan prosedürü | Implementation kapsam belirsizliği |
 | V7-A7 (Bonus) | order_lines tablo adı (sales_order_lines DEĞİL) | RPC patlar |
 

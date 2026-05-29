@@ -18,12 +18,12 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
   - V7-A1 SECURITY DEFINER kaldır (036:1-3 + 065 DEFINER yok) ✅
   - V7-A2 quote_date NULLIF guard (065:71,132) ✅
   - V7-A3 order_lines satır vat_rate snapshot (039:57 + parasut-service:686) ✅
-  - V7-A4 (P2) Paraşüt header discount (parasut-service:688 discount_pct) — **kullanıcı SORU sordu; V7 "ertelendi" KARARI verdi → onay bekliyor** ✅bulgu
-  - V7-A5 (P2) accept öncesi PDF arşiv guard (quote_pdf_archives henüz yok) — **kullanıcı "recover/generate VEYA 409" önerdi; V7 422 hard-fail seçti → onay bekliyor** ✅bulgu
+  - V7-A4 (P2) Paraşüt header discount (parasut-service:688 discount_pct) ✅ — **KULLANICI KARARI (kesinleşti):** snapshot taşı + discount_amount>0'da Paraşüt SESSİZ fatura YOK (bloklar/uyarır); gerçek aktarım ayrı faz
+  - V7-A5 (P2) accept öncesi PDF arşiv (quote_pdf_archives Faz4'te) ✅ — **KULLANICI KARARI (kesinleşti): RECOVER/GENERATE** (422 değil); accept route RPC öncesi eksik arşivi üretir, fail→502
   - V7-A7 order_lines tablo adı (001:110; sales_order_lines yok) ✅
   - V7-A6 faz başı tam plan prosedürü
-- **Toplam 46 düzeltme** (V2-V7). Implement EDİLMEDİ.
-- **Sıradaki:** Faz 1 başlama onayı + 2 P2 kararının (A4 erteleme, A5 422) teyidi.
+- **Toplam 46 düzeltme** (V2-V7). Implement EDİLMEDİ. 2 P2 kararı kesinleşti → plan dosyası güncellendi.
+- **Sıradaki:** Faz 1 başlama onayı (V7-A6: önce faz-spesifik self-contained tam plan).
 
 ## Önceki — Teklif Modülü V6 Master Plan (5. tur review, 2026-05-29)
 

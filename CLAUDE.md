@@ -10,13 +10,13 @@ _Son güncelleme: 2026-05-29_
   - V7-A1 SECURITY DEFINER kaldır (036:1-3 + 065 DEFINER yok) ✅
   - V7-A2 quote_date NULLIF guard (065:71,132) ✅
   - V7-A3 order_lines satır vat_rate snapshot (039:57 + parasut-service:686 `vat_rate: line.vat_rate ?? 20`) ✅
-  - V7-A4 (P2) Paraşüt header discount (parasut-service:688) — kullanıcı SORU sordu; V7 "ertelendi" KARARI → **onay bekliyor**
-  - V7-A5 (P2) accept öncesi PDF arşiv guard (quote_pdf_archives Faz 4'te) — kullanıcı "recover/generate VEYA 409" önerdi; V7 **422 hard-fail** seçti → **onay bekliyor**
+  - V7-A4 (P2) Paraşüt header discount (parasut-service:688) ✅ — **KULLANICI KARARI:** snapshot taşı + discount_amount>0'da Paraşüt SESSİZ fatura YOK (bloklar/uyarır); gerçek aktarım ayrı faz
+  - V7-A5 (P2) accept öncesi PDF arşiv (quote_pdf_archives Faz 4'te) ✅ — **KULLANICI KARARI: RECOVER/GENERATE** (422 değil); accept route RPC öncesi eksik arşivi üretir, fail→502
   - V7-A7 order_lines tablo adı (001:110; sales_order_lines yok) ✅
   - V7-A6 faz başı tam plan prosedürü
-- **Toplam 46 düzeltme (V2-V7).** Implement EDİLMEDİ. Detay: `memory/project_quotes.md` V7 başlığı.
+- **Toplam 46 düzeltme (V2-V7).** Implement EDİLMEDİ. 2 P2 kararı kesinleşti → plan güncellendi. Detay: `memory/project_quotes.md` V7 başlığı.
 - **commit mesajı notu:** `d201c11` "V6 master plan" der ama içerik V7; pushed main, history rewrite yapılmadı.
-- **Sıradaki:** Faz 1 başlama onayı + 2 P2 kararının (A4 erteleme / A5 422) teyidi bekleniyor.
+- **Sıradaki:** Faz 1 başlama onayı (V7-A6: önce faz-spesifik self-contained tam plan).
 
 **Önceki:** Teklif Modülü V6 Master Plan onaylandı (5. tur review), implement EDİLMEDİ (2026-05-29)
 
