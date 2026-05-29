@@ -65,6 +65,7 @@ tr:hover .q-del-btn { opacity: 1; }
 .q-notes:focus { border-color: var(--accent-border) !important; outline: none; }
 .q-logo-ph:hover { border-color: var(--accent) !important; }
 .q-cust-opt:hover { background: var(--bg-secondary) !important; }
+.q-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 `;
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -785,7 +786,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                     }}>
                         {/* Logo */}
                         <div>
-                            <input ref={logoFileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleLogoFile} />
+                            <input ref={logoFileRef} type="file" accept="image/*" aria-label="Logo dosyası seç" style={{ display: "none" }} onChange={handleLogoFile} />
                             <div className="q-logo-ph" title="Logo değiştir" onClick={() => logoFileRef.current?.click()} style={{
                                 width: "120px", height: "120px",
                                 border: "1.5px dashed var(--border-primary)", borderRadius: "12px",
@@ -804,6 +805,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                         <div style={{ display: "flex", flexDirection: "column", gap: "10px", paddingTop: "4px", minWidth: 0 }}>
                             <input
                                 className="q-info-inp"
+                                aria-label="Satıcı firma adı"
                                 style={{ fontSize: "17px", fontWeight: 700, color: "var(--text-primary)", letterSpacing: "-0.01em", textAlign: "right", background: "transparent", border: "none", borderBottom: "0.5px dashed var(--border-primary)", padding: "2px 4px", width: "100%" }}
                                 value={sellerName}
                                 onChange={e => setSellerName(e.target.value)}
@@ -822,6 +824,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                         <span style={{ color: "var(--text-tertiary)", fontWeight: 500 }}>:</span>
                                         <input
                                             className="q-info-inp"
+                                            aria-label={`Satıcı ${key}`}
                                             style={{ flex: 1, background: "transparent", border: "none", borderBottom: "0.5px dashed var(--border-primary)", padding: "2px 4px", fontSize: "12px", color: "var(--text-primary)" }}
                                             value={val} onChange={e => set(e.target.value)} placeholder={ph}
                                         />
@@ -861,6 +864,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                 <div style={{ position: "relative" }}>
                                     <input
                                         className="q-field-inp"
+                                        aria-label="Müşteri firma adı"
                                         style={fieldInput}
                                         type="text"
                                         placeholder="Firma adını girin veya seçin…"
@@ -911,6 +915,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                         </div>
                                         <input
                                             className="q-field-inp"
+                                            aria-label={`${en} (${tr})`}
                                             style={fieldInput}
                                             type={type} placeholder={ph} value={val}
                                             onChange={e => set(e.target.value)}
@@ -931,6 +936,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                 </div>
                                 <input
                                     className="q-field-inp"
+                                    aria-label="Teklif no"
                                     style={{ ...fieldInput, color: quoteNo ? "var(--text-primary)" : "var(--text-tertiary)", cursor: "default" }}
                                     type="text"
                                     value={quoteNo}
@@ -950,7 +956,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                         <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                                             {en} <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontWeight: 400 }}>{tr}</span>
                                         </div>
-                                        <input className="q-field-inp" style={fieldInput} type={type} placeholder={ph} value={val} onChange={e => set(e.target.value)} />
+                                        <input className="q-field-inp" aria-label={`${en} (${tr})`} style={fieldInput} type={type} placeholder={ph} value={val} onChange={e => set(e.target.value)} />
                                     </div>
                                 ))}
                             {/* Currency */}
@@ -958,7 +964,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                 <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                                     Currency <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontWeight: 400 }}>Para Birimi</span>
                                 </div>
-                                <select className="q-field-inp" style={fieldInput} value={currency} onChange={e => setCurrency(e.target.value as Currency)}>
+                                <select className="q-field-inp" aria-label="Para birimi" style={fieldInput} value={currency} onChange={e => setCurrency(e.target.value as Currency)}>
                                     <option value="TRY">₺ TRY — Türk Lirası</option>
                                     <option value="USD">$ USD — US Dollar</option>
                                     <option value="EUR">€ EUR — Euro</option>
@@ -1008,7 +1014,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                         <th className="q-th" style={{ ...th, width: "115px", textAlign: "right" }}>Total Price<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Toplam Fiyat</span></th>
                                         <th className="q-th" style={{ ...th, width: "90px" }}>HS Code<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>GTİP Kodu</span></th>
                                         <th className="q-th" style={{ ...th, width: "70px", textAlign: "right" }}>Kg<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ağırlık</span></th>
-                                        <th className="q-th q-no-print" style={{ ...th, width: "28px" }} />
+                                        <th className="q-th q-no-print" style={{ ...th, width: "28px" }}>
+                                            <span className="q-sr-only">İşlemler</span>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1022,6 +1030,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                                 <td style={{ ...tdBase, position: "relative" }} className="q-prod-cell">
                                                     <input
                                                         className="q-cell"
+                                                        aria-label={`Satır ${idx + 1} ürün kodu`}
                                                         style={cellInput}
                                                         placeholder="KOD-001"
                                                         value={row.code}
@@ -1061,32 +1070,32 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                                     )}
                                                 </td>
                                                 {/* Lead */}
-                                                <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="30 gün" value={row.lead} onChange={e => updateRow(row.id, "lead", e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} teslim süresi`} style={cellInput} placeholder="30 gün" value={row.lead} onChange={e => updateRow(row.id, "lead", e.target.value)} /></td>
                                                 {/* Faz 4a: Size (PMT brand "Ölçü") */}
                                                 <td style={tdBase}><input className="q-cell" style={cellInput} placeholder={`3/4'' / DN50`} value={row.size} onChange={e => updateRow(row.id, "size", e.target.value)} aria-label={`Satır ${idx + 1} ölçü`} /></td>
                                                 {/* Desc */}
-                                                <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="Ürün açıklaması / Description" value={row.desc} onChange={e => {
+                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} açıklama`} style={cellInput} placeholder="Ürün açıklaması / Description" value={row.desc} onChange={e => {
                                                     updateRow(row.id, "desc", e.target.value);
                                                     // Faz 4b: ilk manuel düzenleme dirty Set'e ekler;
                                                     // sonraki product select desc'i override etmez.
                                                     setDescDirtyRowIds(prev => prev.has(row.id) ? prev : new Set(prev).add(row.id));
                                                 }} /></td>
                                                 {/* Qty */}
-                                                <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "center" }} type="number" min="0" step="any" placeholder="0" value={row.qty} onChange={e => handleQtyChange(row.id, e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} adet`} style={{ ...cellInput, textAlign: "center" }} type="number" min="0" step="any" placeholder="0" value={row.qty} onChange={e => handleQtyChange(row.id, e.target.value)} /></td>
                                                 {/* Unit Price */}
-                                                <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.price} onChange={e => updateRow(row.id, "price", e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} birim fiyat`} style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.price} onChange={e => updateRow(row.id, "price", e.target.value)} /></td>
                                                 {/* Line Total */}
                                                 <td className="q-computed" style={{ ...tdBase, fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px", color: "var(--text-primary)", textAlign: "right", paddingRight: "8px", whiteSpace: "nowrap" }}>
                                                     {lt > 0 ? `${sym} ${fmt(lt)}` : "—"}
                                                 </td>
                                                 {/* HS Code */}
-                                                <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="8481.80" value={row.hs} onChange={e => updateRow(row.id, "hs", e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} GTİP kodu`} style={cellInput} placeholder="8481.80" value={row.hs} onChange={e => updateRow(row.id, "hs", e.target.value)} /></td>
                                                 {/* Kg */}
-                                                <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.kg} onChange={e => handleKgChange(row.id, e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} ağırlık (kg)`} style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.kg} onChange={e => handleKgChange(row.id, e.target.value)} /></td>
                                                 {/* Delete */}
                                                 {!readOnly && (
                                                 <td style={{ ...tdBase, width: "28px", textAlign: "center", padding: "0 4px" }} className="q-no-print">
-                                                    <button className="q-del-btn" style={{ width: "22px", height: "22px", borderRadius: "3px", display: "grid", placeItems: "center", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer" }} onClick={() => deleteRow(row.id)} title="Sil">
+                                                    <button type="button" aria-label={`Satır ${idx + 1} sil`} className="q-del-btn" style={{ width: "22px", height: "22px", borderRadius: "3px", display: "grid", placeItems: "center", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer" }} onClick={() => deleteRow(row.id)} title="Sil">
                                                         <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h10M6 4V2h4v2M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4" /></svg>
                                                     </button>
                                                 </td>
@@ -1121,6 +1130,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     <td style={tdBase}>
                                         <input
                                             className="q-total-inp"
+                                            aria-label="Ara toplam"
                                             style={totalInput}
                                             placeholder="—"
                                             value={subFocused ? subDisp : (effSub > 0 ? `${sym} ${fmt(effSub)}` : "")}
@@ -1137,7 +1147,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                         {compKg > 0 ? `${fmt(compKg)} kg` : "—"}
                                     </td>
                                     <td className="q-no-print" style={{ width: "28px", padding: "0 4px", textAlign: "center" }}>
-                                        {ovSub !== null && <button style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvSub(null)} title="Otomatik hesaplamaya dön">↻</button>}
+                                        {ovSub !== null && <button type="button" aria-label="Ara toplamı otomatik hesaplamaya döndür" style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvSub(null)} title="Otomatik hesaplamaya dön">↻</button>}
                                     </td>
                                 </tr>
                                 {/* VAT */}
@@ -1145,7 +1155,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     <td colSpan={6} className="q-total-label" style={totalLabel}>
                                         VAT / KDV{" "}
                                         <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                                            (<select className="q-vat-sel" value={vatRate} onChange={e => setVatRate(Number(e.target.value))} style={{ background: "transparent", border: "none", fontSize: "10px", color: "var(--text-tertiary)", cursor: "pointer", padding: 0 }}>
+                                            (<select className="q-vat-sel" aria-label="KDV oranı" value={vatRate} onChange={e => setVatRate(Number(e.target.value))} style={{ background: "transparent", border: "none", fontSize: "10px", color: "var(--text-tertiary)", cursor: "pointer", padding: 0 }}>
                                                 <option value={0}>%0</option>
                                                 <option value={10}>%10</option>
                                                 <option value={20}>%20</option>
@@ -1155,6 +1165,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     <td style={tdBase}>
                                         <input
                                             className="q-total-inp"
+                                            aria-label="KDV tutarı"
                                             style={totalInput}
                                             placeholder="—"
                                             value={vatFocused ? vatDisp : (effVat > 0 ? `${sym} ${fmt(effVat)}` : "")}
@@ -1167,9 +1178,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                             onBlur={() => setVatFocused(false)}
                                         />
                                     </td>
-                                    <td colSpan={2} />
+                                    <td colSpan={2}>&nbsp;</td>
                                     <td className="q-no-print" style={{ width: "28px", padding: "0 4px", textAlign: "center" }}>
-                                        {ovVat !== null && <button style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvVat(null)} title="Otomatik hesaplamaya dön">↻</button>}
+                                        {ovVat !== null && <button type="button" aria-label="KDV'yi otomatik hesaplamaya döndür" style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvVat(null)} title="Otomatik hesaplamaya dön">↻</button>}
                                     </td>
                                 </tr>
                                 {/* Grand Total */}
@@ -1178,6 +1189,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     <td style={tdBase}>
                                         <input
                                             className="q-total-inp q-grand-total-inp"
+                                            aria-label="Genel toplam"
                                             style={{ ...totalInput, fontSize: "13px", fontWeight: 600, color: "var(--accent-text)" }}
                                             placeholder="—"
                                             value={grandFocused ? grandDisp : (effGrand > 0 ? `${sym} ${fmt(effGrand)}` : "")}
@@ -1190,9 +1202,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                             onBlur={() => setGrandFocused(false)}
                                         />
                                     </td>
-                                    <td colSpan={2} />
+                                    <td colSpan={2}>&nbsp;</td>
                                     <td className="q-no-print" style={{ width: "28px", padding: "0 4px", textAlign: "center" }}>
-                                        {ovGrand !== null && <button style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvGrand(null)} title="Otomatik hesaplamaya dön">↻</button>}
+                                        {ovGrand !== null && <button type="button" aria-label="Genel toplamı otomatik hesaplamaya döndür" style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvGrand(null)} title="Otomatik hesaplamaya dön">↻</button>}
                                     </td>
                                 </tr>
                             </tbody>
@@ -1236,6 +1248,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                         </div>
                         <textarea
                             className="q-notes"
+                            aria-label="Notlar ve şartlar"
                             style={{ width: "100%", background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", padding: "8px 10px", fontSize: "12px", color: "var(--text-primary)", resize: "vertical", minHeight: "80px", lineHeight: 1.6 }}
                             placeholder={"Diğer notlar, özel koşullar vb.\nOther notes, special conditions, etc."}
                             value={notes}
@@ -1260,6 +1273,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     <div className="q-sig-space" style={{ height: "56px", borderBottom: "0.5px solid var(--border-secondary)" }} />
                                     <input
                                         className="q-sig-name"
+                                        aria-label={`${role} ad soyad`}
                                         style={{ background: "transparent", border: "none", borderBottom: "0.5px solid var(--border-tertiary)", fontSize: "11.5px", fontWeight: 500, color: "var(--text-primary)", padding: "4px 0", marginTop: "6px", width: "100%" }}
                                         placeholder="Ad Soyad / Name"
                                         value={val}
@@ -1267,6 +1281,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     />
                                     <input
                                         className="q-sig-title"
+                                        aria-label={`${role} unvan`}
                                         style={{ background: "transparent", border: "none", borderBottom: "0.5px solid var(--border-tertiary)", fontSize: "10.5px", color: "var(--text-secondary)", padding: "3px 0", width: "100%" }}
                                         placeholder="Unvan / Pozisyon"
                                         value={titleVal}

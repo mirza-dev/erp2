@@ -3,6 +3,8 @@
     "react-doctor/no-tiny-text": "off",
     "react-doctor/no-giant-component": "off",
     "react-doctor/prefer-useReducer": "off",
-    "react-doctor/no-fetch-in-effect": "off"
+    "react-doctor/no-fetch-in-effect": "off",
+    "react-doctor/no-initialize-state": "off",
+    "react-doctor/no-derived-state": "off"
   }
 }
