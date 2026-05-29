@@ -4,7 +4,7 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 3 REVIEW DÜZELTMELERİ (2026-05-29) — Bulgular P1-P3, 3812 test, COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR
+## Faz 3 REVIEW DÜZELTMELERİ (2026-05-29) — Bulgular P1-P3 (2 tur), 3815 test, COMMIT+PUSH 6366cbd + migration 072 APPLY BEKLİYOR
 
 İlk implement (c5d8267) sonrası kullanıcı review'unda 5 bulgu; hepsi kod karşısında doğrulandı + kapatıldı. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -16,7 +16,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **P3 doc:** lint repo geneli 32 error / 0 warning (memory "3" QuoteForm dosya-bazlıydı); bu turda yeni hata yok.
 - **Numbering:** 072 iskonto CHECK aldı → Faz 5 = 073, downstream +1. QUOTES_V2_PLAN.md "Migration Sırası" hizalandı.
 - **Test:** quotes-faz3-discount (r1 +13, r2 malformed/idempotent/mesaj) + quote-convert-service +2 + faz4b/faz4a regex. **3799 → 3815 yeşil** · tsc temiz · build OK · lint 32 baseline.
-- **DURUM: COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR.** Sıradaki: commit/push (explicit git add, 072 staged doğrula) + 072 apply (idempotent) + UI smoke + Faz 5 (073).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`6366cbd`, 072 dahil 15 dosya) **+ migration 072 APPLY BEKLİYOR.** Sıradaki: 072 apply (idempotent) + UI smoke + Faz 5 (073).
 
 ---
 ## Faz 3 IMPLEMENT EDİLDİ (2026-05-29) — header iskonto, 3799 test, COMMIT+PUSH c5d8267 + migration APPLY EDİLDİ

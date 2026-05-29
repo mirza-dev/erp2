@@ -5,7 +5,7 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 3 REVIEW DÜZELTMELERİ — Bulgular P1-P3, 2 tur, 3815 test, COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 3 REVIEW DÜZELTMELERİ — Bulgular P1-P3, 2 tur, 3815 test, COMMIT+PUSH 6366cbd + migration 072 APPLY BEKLİYOR)
 
 **Round 1 (5 bulgu) + Round 2 (4 bulgu) kod karşısında doğrulandı + kapatıldı** (önce doğrula sonra düzelt). Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -25,7 +25,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **P3 (doc):** memory "lint 3 baseline error" yanlıştı (o QuoteForm dosya-bazlıydı) → **repo geneli `npm run lint` = 32 error / 0 warning** (React Hooks set-state-in-effect/exhaustive-deps, eslint-disable'lı). Bu turda yeni hata YOK (eklenenler validator/helper, hook değil).
 - **Numbering kayması:** 072 bu turda iskonto CHECK aldı → **Faz 5 = 073** (status CHECK/revision/prefix), downstream 074-078. **QUOTES_V2_PLAN.md "Migration Sırası" bu turda hizalandı** (072=iskonto CHECK, Faz5→073, Faz4→074-075, Faz6→076, Faz7→077-078) → V7-A6 Faz 5 başında master plan tutarlı.
 - **Test (round1):** `quotes-faz3-discount` +13 + `quote-convert-service` +2 + faz4b payload regex. (Round2 ekleri yukarıda.) **3799 → 3815 (round2 dahil) yeşil.**
-- **DURUM: COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR** (round2 dahil; üstteki round2 bloğuna bkz).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`6366cbd` → main, `b44ba39..6366cbd`, 15 dosya/072 dahil, Coolify redeploy) **+ migration 072 APPLY BEKLİYOR** (round1+round2 tek commit'te; round1 hiç commit edilmemişti). Sıradaki: 072 Supabase apply + UI smoke + Faz 5 (073).
 
 ## Önceki — 2026-05-29 (Teklif V7 Faz 3 IMPLEMENT EDİLDİ — header iskonto, 3799 test, COMMIT+PUSH c5d8267 + migration APPLY EDİLDİ)
 

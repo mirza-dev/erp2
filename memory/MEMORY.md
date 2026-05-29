@@ -11,7 +11,7 @@
 - [project_integrations.md](project_integrations.md) — Paraşüt Faz 1-10 ✅ (1914 test), Faz 11 sırada; AI kolon eşleştirme, Sentry ✅, k6, smoke 24
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Son: Teklif V7 Faz 3 REVIEW düzeltmeleri (Bulgular P1-P3, 2 tur, 3815 test, COMMIT+072 APPLY BEKLİYOR) — convert iskonto BLOCK + validateDiscount 422 (non-finite guard) + 072 CHECK idempotent + autosave restore + TR parse fix + UI mesaj; önceki: Faz 3 impl c5d8267
+- [current_focus.md](current_focus.md) — Son: Teklif V7 Faz 3 REVIEW düzeltmeleri (Bulgular P1-P3, 2 tur, 3815 test, COMMIT+PUSH 6366cbd, 072 APPLY BEKLİYOR) — convert iskonto BLOCK + validateDiscount 422 (non-finite guard) + 072 CHECK idempotent + autosave restore + TR parse fix + UI mesaj; önceki: Faz 3 impl c5d8267
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)

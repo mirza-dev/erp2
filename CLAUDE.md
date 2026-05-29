@@ -3,7 +3,7 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif V7 **Faz 3 review düzeltmeleri** (Bulgular P1-P3, 2 tur) — 3815 test, COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR (2026-05-29)
+**Son tamamlanan iş:** Teklif V7 **Faz 3 review düzeltmeleri** (Bulgular P1-P3, 2 tur) — 3815 test, COMMIT+PUSH `6366cbd` + migration 072 APPLY BEKLİYOR (2026-05-29)
 
 - **Round 1 (5 bulgu) + Round 2 (4 bulgu) kod karşısında doğrulandı + kapatıldı:**
   - **P1 (finansal):** `serviceConvertQuoteToOrder` iskontoyu yok sayıp order toplamını yüksek yazıyordu. `sales_orders`'ta header iskonto kolonu YOK (Faz 6/076) → "koru" imkânsız → **BLOCK**: `quote.discount_amount > 0` ise convert engellenir (clear error, convert route mevcut 400 yolu). UI: `[id]/page.tsx` iskontolu accepted → buton yerine not. Faz 6'da kalkar. +2 test.
@@ -14,7 +14,7 @@ _Son güncelleme: 2026-05-29_
   - **P3 (doc):** lint kaydı düzeltildi (repo geneli 32 error / 0 warning; memory "3" QuoteForm dosya-bazlıydı).
 - **Numbering:** 072 iskonto CHECK aldı → **Faz 5 = 073**, downstream +1. **QUOTES_V2_PLAN.md "Migration Sırası" hizalandı** (Faz3 070-072, Faz5→073, Faz4→074-075, Faz6→076, Faz7→077-078).
 - **Test:** `quotes-faz3-discount` (round1 +13, round2 +malformed/idempotent/mesaj) + `quote-convert-service` +2 + faz4b/faz4a regex güncel. **3799 → 3815 yeşil** · tsc temiz · build OK (`ƒ Proxy`) · **lint 32 repo-geneli baseline / 0 warning** (bu turda yeni hata YOK — eklenenler validator/helper).
-- **DURUM: COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR.** **Sıradaki:** commit+push (explicit `git add`, 072 staged doğrula) + 072 Supabase apply (idempotent) + UI smoke (iskontolu convert engeli+yeni mesaj; discount -10/subtotal-üstü/`"abc"` → 422; `""`→201; autosave restore; `1.234,56` focus→`1234.56`) + **Faz 5** (073).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`6366cbd` → main, `b44ba39..6366cbd`, Coolify redeploy; 072 dahil 15 dosya) **+ migration 072 APPLY BEKLİYOR.** **Sıradaki:** 072 Supabase apply (idempotent) + UI smoke (iskontolu convert engeli+yeni mesaj; discount -10/subtotal-üstü/`"abc"` → 422; `""`→201; autosave restore; `1.234,56` focus→`1234.56`) + **Faz 5** (073).
 
 <details><summary>Faz 3 ilk implement (`c5d8267`, migration 070/071 APPLY EDİLDİ)</summary>
 
