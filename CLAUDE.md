@@ -3,14 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif V7 **Faz 1a** implement edildi — DB foundation (3702 test, COMMIT BEKLİYOR, 2026-05-29)
+**Son tamamlanan iş:** Teklif V7 **Faz 1a** implement edildi — DB foundation (3702 test, commit `106686c`, push/apply EDİLMEDİ, 2026-05-29)
 
 - **Karar:** Faz 1 → **1a (DB foundation, UI'sız)** + **1b (QuoteForm/UI)** bölündü (kullanıcı kararı). Seller freeze 1b'de çözülecek.
 - **4 migration:** `066` products.hs_code+size_text (V4-B3) · `067` quotes.customer_address + seller_*×7 (V4-A2/A3) · `068` quote_line_items.unit_weight_kg + kg_manual_override (V3-B5/V4-A7; mevcut weight_kg korunur) · `069` create/update_quote_with_lines payload ext (065'ten kopya + yeni alanlar; **V7-A1 SECURITY DEFINER YOK / INVOKER**, **V7-A2 NULLIF guard'lar korundu**, customer_id + delivery/payment/size aynen).
 - **TS katmanı:** `database.types.ts` (3 interface), `mock-data.ts` (Product/QuoteDetail/QuoteLineItem), `api-mappers.ts` (3 mapper), `supabase/quotes.ts` (CreateQuoteInput+LineInput), `supabase/products.ts` (CreateProductInput + dbCreateProduct insert satırı; dbUpdateProduct spread → otomatik).
 - **+20 test** (`quotes-faz1a-migration.test.ts` + `quotes-faz1a-helper-mapper.test.ts`) · tsc temiz · **3702 test yeşil** (3682+20) · 0 yeni lint (32 hata tamamı önceki set-state-in-effect, plan dışı) · build OK + `ƒ Proxy (Middleware)`.
-- **DURUM: COMMIT EDİLMEDİ · migration apply EDİLMEDİ** (kullanıcı onayı bekliyor).
-- **Sıradaki:** (1) commit, (2) migration apply + smoke (`\df+ create_quote_with_lines`→INVOKER; `quote_date:''`→200/NULL), (3) **Faz 1b** ayrı plan modu (productId V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate+freeze V4-A3).
+- **DURUM: COMMIT EDİLDİ `106686c` (main) · push EDİLMEDİ · migration apply EDİLMEDİ.**
+- **Sıradaki:** (1) push (Coolify redeploy), (2) migration apply + smoke (`\df+ create_quote_with_lines`→INVOKER; `quote_date:''`→200/NULL), (3) **Faz 1b** ayrı plan modu (productId V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate+freeze V4-A3).
 
 **Önceki:** Bekleyen Teklifler UI/UX fix commit/push + Teklif V7 master plan bulguları kod karşısında doğrulandı (6. tur, 2026-05-29)
 

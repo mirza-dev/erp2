@@ -14,8 +14,8 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **TS katmanı:** `database.types.ts` (ProductRow hs_code/size_text; QuoteRow customer_address+seller_*×7; QuoteLineItemRow unit_weight_kg/kg_manual_override), `mock-data.ts` (Product.hsCode/sizeText; QuoteDetail.customerAddress+seller*×7; QuoteLineItem.unitWeightKg/kgManualOverride), `api-mappers.ts` (mapProduct/mapQuoteDetail/mapQuoteLineItem), `quotes.ts` (CreateQuoteInput+CreateQuoteLineInput), `products.ts` (CreateProductInput + dbCreateProduct insert — explicit insert olduğu için satır eklendi; dbUpdateProduct spread → otomatik).
 - **+20 test:** `quotes-faz1a-migration.test.ts` (066-069 SQL source-regex, 069 yorum-strip ile DEFINER kontrolü), `quotes-faz1a-helper-mapper.test.ts` (mapper null/dolu + dbCreateQuote/dbCreateProduct payload forward).
 - **Doğrulama:** tsc temiz · **3702 test yeşil** (3682+20) · 0 yeni lint (32 hata tamamı önceki set-state-in-effect, plan dışı) · build OK + `ƒ Proxy (Middleware)`.
-- **DURUM: COMMIT EDİLMEDİ** (kullanıcı onayı bekliyor). DB migration'ları henüz Supabase'e apply EDİLMEDİ (lokal dosya).
-- **Sıradaki:** (1) commit, (2) migration apply + smoke (`\df+ create_quote_with_lines`→INVOKER; quote_date:''→NULL), (3) **Faz 1b** ayrı plan modu (productId capture V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate V4-A3 + freeze).
+- **DURUM: COMMIT EDİLDİ `106686c` (main, push EDİLMEDİ).** DB migration'ları henüz Supabase'e apply EDİLMEDİ (lokal dosya).
+- **Sıradaki:** (1) push (Coolify redeploy), (2) migration apply + smoke (`\df+ create_quote_with_lines`→INVOKER; quote_date:''→NULL), (3) **Faz 1b** ayrı plan modu (productId capture V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate V4-A3 + freeze).
 
 ## Önceki — 2026-05-29 (6. tur: bekleyen UI fix commit/push + V7 bulgu doğrulama)
 

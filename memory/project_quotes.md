@@ -4,12 +4,12 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 1a IMPLEMENT EDİLDİ (2026-05-29) — DB foundation, COMMIT BEKLİYOR
+## Faz 1a IMPLEMENT EDİLDİ (2026-05-29) — DB foundation, commit `106686c` (push/apply EDİLMEDİ)
 
 Faz 1 → **1a (DB foundation, UI'sız)** + **1b (QuoteForm/UI)** bölündü. 1a uygulandı:
 - Migration 066 (products.hs_code+size_text), 067 (quotes.customer_address + seller_*×7), 068 (quote_line_items.unit_weight_kg+kg_manual_override, weight_kg korunur), 069 (RPC payload ext — V7-A1 INVOKER, V7-A2 NULLIF korundu, 065'ten kopya).
 - TS: database.types/mock-data/api-mappers/quotes.ts/products.ts genişletildi. +20 test (`quotes-faz1a-*.test.ts`). tsc temiz · 3702 test · build OK.
-- **Commit EDİLMEDİ · migration apply EDİLMEDİ.** Sıradaki: commit + apply + **Faz 1b** ayrı plan (productId V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate+freeze V4-A3).
+- **Commit EDİLDİ `106686c` (main) · push EDİLMEDİ · migration apply EDİLMEDİ.** Sıradaki: push + apply + **Faz 1b** ayrı plan (productId V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate+freeze V4-A3).
 - Faz 1b seller freeze kararı: yeni teklif→company_settings; mevcut/sent→snapshot hydrate + company_settings fetch ATLA (QuoteForm.tsx:242-257 mevcut canlı-fetch tuzağı).
 
 ## V7 Master Plan — diskte mevcut, 6 bulgu kod karşısında DOĞRULANDI (2026-05-29 6. tur) — Implement EDİLMEDİ
