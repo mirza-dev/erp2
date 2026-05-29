@@ -54,6 +54,9 @@ export interface Product {
     orderDeadline?: string | null;   // ISO date: siparişin en geç verileceği tarih
     productTypeId?: string | null;
     attributes?: Record<string, unknown>;
+    // Faz 1a (V4-B3): teklif satırı auto-fill için master GTİP + ölçü.
+    hsCode?: string | null;
+    sizeText?: string | null;
 }
 
 export type ProductFieldType =
@@ -212,6 +215,9 @@ export interface QuoteLineItem {
     weightKg: number | null;
     // Faz 4a: PMT formunda "Ölçü / Size" kolonu (serbest text).
     sizeText: string;
+    // Faz 1a (V3-B5, V4-A7): birim ağırlık + KG manuel override flag.
+    unitWeightKg: number | null;
+    kgManualOverride: boolean;
 }
 
 export interface QuoteSummary {
@@ -231,6 +237,8 @@ export interface QuoteDetail extends QuoteSummary {
     customerContact: string;
     customerPhone: string;
     customerEmail: string;
+    // Faz 1a (V4-A2): müşteri adresi snapshot.
+    customerAddress: string;
     salesRep: string;
     salesPhone: string;
     salesEmail: string;
@@ -245,6 +253,14 @@ export interface QuoteDetail extends QuoteSummary {
     // Serbest text — auto-build/preset Faz 4b/4c'de gelir.
     deliveryMethod: string;
     paymentMethod: string;
+    // Faz 1a (V4-A3): satıcı (PMT) snapshot — sent'te dondurulur.
+    sellerName: string;
+    sellerPhone: string;
+    sellerEmail: string;
+    sellerAddress: string;
+    sellerTaxId: string;
+    sellerWebsite: string;
+    sellerLogoUrl: string;
     lines: QuoteLineItem[];
 }
 

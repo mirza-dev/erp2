@@ -16,6 +16,9 @@ export interface CreateQuoteLineInput {
     weight_kg?: number;
     // Faz 4a (2026-05-23): PMT formunda "Ölçü / Size" kolonu (serbest text).
     size_text?: string;
+    // Faz 1a (V3-B5, V4-A7): birim ağırlık + KG manuel override flag.
+    unit_weight_kg?: number;
+    kg_manual_override?: boolean;
 }
 
 export interface CreateQuoteInput {
@@ -25,6 +28,8 @@ export interface CreateQuoteInput {
     customer_contact?: string;
     customer_phone?: string;
     customer_email?: string;
+    // Faz 1a (V4-A2): müşteri adresi snapshot.
+    customer_address?: string;
     sales_rep?: string;
     sales_phone?: string;
     sales_email?: string;
@@ -42,6 +47,14 @@ export interface CreateQuoteInput {
     // Faz 4a (2026-05-23): PMT brand teklif formunda "Teslimat Şekli" + "Ödeme Şekli".
     delivery_method?: string;
     payment_method?: string;
+    // Faz 1a (V4-A3): satıcı (PMT) snapshot — sent'te dondurulur.
+    seller_name?: string;
+    seller_phone?: string;
+    seller_email?: string;
+    seller_address?: string;
+    seller_tax_id?: string;
+    seller_website?: string;
+    seller_logo_url?: string;
     lines: CreateQuoteLineInput[];
 }
 

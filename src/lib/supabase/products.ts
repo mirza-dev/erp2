@@ -36,6 +36,9 @@ export interface CreateProductInput {
     product_type_id?: string | null;
     /** Faz 1 review — dinamik tip altyapısı: tipe özgü alanlar JSON. */
     attributes?: Record<string, unknown>;
+    /** Teklif Faz 1a (V4-B3): teklif satırı auto-fill için master GTİP + ölçü. */
+    hs_code?: string;
+    size_text?: string;
 }
 
 export interface ListProductsFilter {
@@ -176,6 +179,9 @@ export async function dbCreateProduct(input: CreateProductInput): Promise<Produc
             product_notes: input.product_notes ?? null,
             product_type_id: input.product_type_id ?? null,
             attributes: input.attributes ?? {},
+            // Teklif Faz 1a (V4-B3): master GTİP + ölçü.
+            hs_code: input.hs_code ?? null,
+            size_text: input.size_text ?? null,
         })
         .select("*")
         .single();

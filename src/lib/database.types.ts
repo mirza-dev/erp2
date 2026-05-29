@@ -171,6 +171,9 @@ export interface ProductRow {
     parasut_product_creating_owner: string | null
     product_type_id: string | null
     attributes: Record<string, unknown>
+    // Faz 1a (V4-B3): teklif satırı auto-fill için master GTİP + ölçü alanları.
+    hs_code: string | null
+    size_text: string | null
 }
 
 export interface ProductAttachmentRow {
@@ -447,6 +450,8 @@ export interface QuoteRow {
     customer_contact: string | null
     customer_phone: string | null
     customer_email: string | null
+    // Faz 1a (V4-A2): müşteri adresi snapshot — seçimde dondurulur.
+    customer_address: string | null
     sales_rep: string | null
     sales_phone: string | null
     sales_email: string | null
@@ -466,6 +471,14 @@ export interface QuoteRow {
     // brand PDF render Faz 4b/4c'de gelir.
     delivery_method: string | null
     payment_method: string | null
+    // Faz 1a (V4-A3): satıcı (PMT) snapshot — sent'te dondurulur (1b hydrate).
+    seller_name: string | null
+    seller_phone: string | null
+    seller_email: string | null
+    seller_address: string | null
+    seller_tax_id: string | null
+    seller_website: string | null
+    seller_logo_url: string | null
     created_at: string
     updated_at: string
 }
@@ -486,6 +499,10 @@ export interface QuoteLineItemRow {
     // Faz 4a (2026-05-23): PMT formunda "Ölçü / Size" kolonu için satır
     // bazlı serbest text (örn. "3/4''", "DN50", "8\"").
     size_text: string | null
+    // Faz 1a (V3-B5, V4-A7): birim ağırlık + KG manuel override flag.
+    // weight_kg (satır toplamı) korunur; unit_weight_kg per-unit (recompute).
+    unit_weight_kg: number | null
+    kg_manual_override: boolean
     created_at: string
 }
 

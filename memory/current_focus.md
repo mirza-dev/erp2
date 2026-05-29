@@ -5,7 +5,19 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-29 (6. tur: bekleyen UI fix commit/push + V7 bulgu doğrulama)
+## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 1a IMPLEMENT EDİLDİ — DB foundation, 3702 test, COMMIT BEKLİYOR)
+
+**Karar:** Faz 1 → **1a (DB foundation)** + **1b (QuoteForm/UI)** bölündü (kullanıcı kararı). Seller freeze 1b'de çözülecek (yeni teklif company_settings'ten; mevcut/sent snapshot'tan hydrate + fetch ATLA).
+
+**Faz 1a uygulandı (faz başı V7-A6 ile kod yeniden doğrulandı):**
+- **4 migration:** `066_products_hs_size.sql` (products.hs_code+size_text), `067_quotes_customer_address_seller.sql` (quotes.customer_address + seller_* ×7), `068_quote_line_items_unit_weight.sql` (unit_weight_kg numeric + kg_manual_override boolean DEFAULT false; mevcut weight_kg korunur), `069_quotes_rpc_payload_ext.sql` (create/update_quote_with_lines 065'ten kopya + yeni alanlar; **V7-A1 SECURITY DEFINER YOK**, **V7-A2 NULLIF guard'lar korundu**, customer_id + delivery/payment/size aynen).
+- **TS katmanı:** `database.types.ts` (ProductRow hs_code/size_text; QuoteRow customer_address+seller_*×7; QuoteLineItemRow unit_weight_kg/kg_manual_override), `mock-data.ts` (Product.hsCode/sizeText; QuoteDetail.customerAddress+seller*×7; QuoteLineItem.unitWeightKg/kgManualOverride), `api-mappers.ts` (mapProduct/mapQuoteDetail/mapQuoteLineItem), `quotes.ts` (CreateQuoteInput+CreateQuoteLineInput), `products.ts` (CreateProductInput + dbCreateProduct insert — explicit insert olduğu için satır eklendi; dbUpdateProduct spread → otomatik).
+- **+20 test:** `quotes-faz1a-migration.test.ts` (066-069 SQL source-regex, 069 yorum-strip ile DEFINER kontrolü), `quotes-faz1a-helper-mapper.test.ts` (mapper null/dolu + dbCreateQuote/dbCreateProduct payload forward).
+- **Doğrulama:** tsc temiz · **3702 test yeşil** (3682+20) · 0 yeni lint (32 hata tamamı önceki set-state-in-effect, plan dışı) · build OK + `ƒ Proxy (Middleware)`.
+- **DURUM: COMMIT EDİLMEDİ** (kullanıcı onayı bekliyor). DB migration'ları henüz Supabase'e apply EDİLMEDİ (lokal dosya).
+- **Sıradaki:** (1) commit, (2) migration apply + smoke (`\df+ create_quote_with_lines`→INVOKER; quote_date:''→NULL), (3) **Faz 1b** ayrı plan modu (productId capture V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate V4-A3 + freeze).
+
+## Önceki — 2026-05-29 (6. tur: bekleyen UI fix commit/push + V7 bulgu doğrulama)
 
 **1) Bekleyen Teklifler UI/UX audit fix commit + push edildi (3682 test)**
 - Önceki oturumdan main'de commit'siz duruyordu (DOM mutation→hoveredId state, hex→CSS var, a11y). Doğrulama: `tsc --noEmit` temiz + `npm test` **3682 yeşil**.

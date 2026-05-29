@@ -82,6 +82,9 @@ export function mapProduct(row: ProductWithStock): Product {
     orderDeadline: row.orderDeadline ?? null,
     productTypeId: row.product_type_id ?? null,
     attributes: row.attributes ?? {},
+    // Faz 1a (V4-B3): master GTİP + ölçü.
+    hsCode: row.hs_code ?? null,
+    sizeText: row.size_text ?? null,
   };
 }
 
@@ -258,6 +261,9 @@ function mapQuoteLineItem(line: QuoteLineItemRow): QuoteLineItem {
     weightKg: line.weight_kg ?? null,
     // Faz 4a: PMT formunda "Ölçü / Size" kolonu (serbest text).
     sizeText: line.size_text ?? "",
+    // Faz 1a (V3-B5, V4-A7): birim ağırlık + KG manuel override.
+    unitWeightKg: line.unit_weight_kg ?? null,
+    kgManualOverride: line.kg_manual_override ?? false,
   };
 }
 
@@ -286,6 +292,8 @@ export function mapQuoteDetail(row: QuoteWithLines): QuoteDetail {
     customerContact: row.customer_contact ?? "",
     customerPhone: row.customer_phone ?? "",
     customerEmail: row.customer_email ?? "",
+    // Faz 1a (V4-A2): müşteri adresi snapshot.
+    customerAddress: row.customer_address ?? "",
     salesRep: row.sales_rep ?? "",
     salesPhone: row.sales_phone ?? "",
     salesEmail: row.sales_email ?? "",
@@ -299,6 +307,14 @@ export function mapQuoteDetail(row: QuoteWithLines): QuoteDetail {
     // Faz 4a: PMT brand teklif formunda "Teslimat Şekli" + "Ödeme Şekli".
     deliveryMethod: row.delivery_method ?? "",
     paymentMethod: row.payment_method ?? "",
+    // Faz 1a (V4-A3): satıcı (PMT) snapshot.
+    sellerName: row.seller_name ?? "",
+    sellerPhone: row.seller_phone ?? "",
+    sellerEmail: row.seller_email ?? "",
+    sellerAddress: row.seller_address ?? "",
+    sellerTaxId: row.seller_tax_id ?? "",
+    sellerWebsite: row.seller_website ?? "",
+    sellerLogoUrl: row.seller_logo_url ?? "",
     lines: row.lines.map(mapQuoteLineItem),
   };
 }
