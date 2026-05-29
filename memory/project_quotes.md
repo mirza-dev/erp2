@@ -25,8 +25,15 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **V7-A4 netleşti (P2):** "409 ya da uyarı" belirsizliği → tek davranış: `discount_amount>0 → ParasutError("validation")`, invoice create çağrılmaz, marker yazılmaz.
 - **Test tablosu fix (P2):** Faz 6 "PDF guard 422" → "recover/generate + fail→502".
 
-**Toplam: V7 = V2(5)+V3(12)+V4(13)+V5(5)+V6(4)+V7(12) = 51 düzeltme.** ~186 test · 12 migration (066-077) · 7 faz.
-**Not:** V7 plan dosyası `d201c11`'de commit edildi (mesaj yanlışlıkla "V6" der; içerik V7); 2 P2 kararı `00dbc4f` sonrası ayrı commit'le işlendi. Memory V7'ye hizalı.
+**6. tur 3. okuma — 5 düzeltme daha (kod karşısında doğrulandı):**
+- **V7-A8 güçlendirme (P1):** JOIN tek başına bloklamaz, **sessizce satır düşürür**. `quote_line_items.product_id` ON DELETE SET NULL (034:107) → send sonrası ürün silinirse NULL → INNER JOIN o satırı atlar (eksik/finansal tutarsız order). Önceki "V4-A4 garanti ediyor" notu YANLIŞTI (send-time check post-send silmeyi kapsamaz). Fix: accept RPC insert öncesi `product_id IS NULL → RAISE 23502`; insert sonrası `GET DIAGNOSTICS ROW_COUNT` ≠ quote line count → RAISE+ROLLBACK (039 precedent). `v_inserted` V7-A10'a da source.
+- **V7-A4 güçlendirme (P1+P2):** Guard `parasut-service.ts:1092` catch'i `classifyAndPatch` parasut_step/error/sync_log yazıyor → throw "marker yazılmaz" sözünü bozar. Fix: guard `parasut_claim_sync` (1016) ÖNCESİ **early return** (throw değil) → claim alınmaz, catch path'ine düşmez. + Görünürlük: **ZORUNLU** sync_issue alert (opsiyonel değil; ship route:62 fire-and-forget olduğu için sessiz block görünmez).
+- **V7-A10 (P2):** Accept RPC `item_count` set etmiyor (create_order 023 ediyor) → sipariş liste/detay item_count=0. Fix: `item_count = v_inserted`.
+- **V7-A11 (P2):** order_lines.quantity integer (001:10) ⟂ quote numeric(12,4) (034:111) + QuoteForm step="any" (972) → küsürat sessiz yuvarlanır. Fix: Faz 2 validator pozitif integer + accept RPC `quantity <> trunc(quantity) → RAISE`.
+- **P3 housekeeping:** "Review V7 — 7 Düzeltme" + "eklenen 7" stale başlıklar 17'ye düzeltildi.
+
+**Toplam: V7 = V2(5)+V3(12)+V4(13)+V5(5)+V6(4)+V7(17) = 56 düzeltme.** ~192 test · 12 migration (066-077) · 7 faz.
+**Not:** V7 plan dosyası `d201c11`'de commit edildi (mesaj yanlışlıkla "V6" der; içerik V7); 2 P2 kararı + 2./3. okuma sonraki commit'lerle işlendi. Memory V7'ye hizalı.
 **Sıradaki:** Faz 1 başlama onayı bekleniyor (V7-A6 prosedürü: önce faz-spesifik self-contained tam plan).
 
 ---

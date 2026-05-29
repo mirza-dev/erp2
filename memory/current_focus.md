@@ -22,8 +22,14 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
   - V7-A5 (P2) accept öncesi PDF arşiv (quote_pdf_archives Faz4'te) ✅ — **KULLANICI KARARI (kesinleşti): RECOVER/GENERATE** (422 değil); accept route RPC öncesi eksik arşivi üretir, fail→502
   - V7-A7 order_lines tablo adı (001:110; sales_order_lines yok) ✅
   - V7-A6 faz başı tam plan prosedürü
-- **6. tur 2. okuma — 5 düzeltme daha (kod karşısında doğrulandı, plana işlendi):** V7-A8 (order line product_name/sku master products JOIN'den; quote-service:143-150 paterniyle), V7-A9 (SalesOrderRow+mapOrderDetail 4 alan Faz 6 kilidi), V7-A5 ek (RPC defansif RAISE 23514 route-bypass koruması), V7-A4 netleşti (discount>0→ParasutError validation, invoice/marker yok), test tablosu 422→502 fix.
-- **Toplam 51 düzeltme** (V2-V7; V7=12). ~186 test. Implement EDİLMEDİ. Plan modunda onaylandı + plan dosyası güncellendi.
+- **6. tur 2. okuma — 5 düzeltme (plana işlendi):** V7-A8 (order line product_name/sku master JOIN'den), V7-A9 (SalesOrderRow+mapOrderDetail 4 alan kilidi), V7-A5 ek (RPC defansif RAISE), V7-A4 netleşti, test 422→502.
+- **6. tur 3. okuma — 5 düzeltme daha (kod karşısında doğrulandı, plana işlendi):**
+  - **V7-A8 güçlendirme (P1):** INNER JOIN sessizce satır düşürür (product_id ON DELETE SET NULL 034:107; send sonrası ürün silinirse NULL → JOIN drop → eksik/finansal tutarsız order). Önceki "V4-A4 garanti ediyor" notu YANLIŞTI. Fix: insert öncesi product_id IS NULL → 23502 RAISE + insert sonrası GET DIAGNOSTICS ROW_COUNT verify (039 precedent).
+  - **V7-A4 güçlendirme (P1+P2):** Guard throw ederse parasut-service:1092 catch parasut_step/marker yazar → "marker yazılmaz" bozulur. Fix: parasut_claim_sync (1016) ÖNCESİ early return (throw değil) + **ZORUNLU** sync_issue alert (ship route:62 fire-and-forget; sessiz block görünmez).
+  - **V7-A10 (P2):** accept RPC item_count = v_inserted (yoksa sipariş item_count=0).
+  - **V7-A11 (P2):** order_lines.quantity integer ⟂ quote numeric(12,4) + QuoteForm step="any" (972) → Faz 2 pozitif integer validator + accept RPC trunc RAISE.
+  - **P3:** stale başlıklar (Review V7 — 7 / eklenen 7) → 17.
+- **Toplam 56 düzeltme** (V2-V7; V7=17). ~192 test. Implement EDİLMEDİ. Plan modunda onaylandı + plan dosyası güncellendi.
 - **Sıradaki:** Faz 1 başlama onayı (V7-A6: önce faz-spesifik self-contained tam plan).
 
 ## Önceki — Teklif Modülü V6 Master Plan (5. tur review, 2026-05-29)

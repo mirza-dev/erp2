@@ -14,8 +14,14 @@ _Son güncelleme: 2026-05-29_
   - V7-A5 (P2) accept öncesi PDF arşiv (quote_pdf_archives Faz 4'te) ✅ — **KULLANICI KARARI: RECOVER/GENERATE** (422 değil); accept route RPC öncesi eksik arşivi üretir, fail→502
   - V7-A7 order_lines tablo adı (001:110; sales_order_lines yok) ✅
   - V7-A6 faz başı tam plan prosedürü
-- **6. tur 2. okuma — 5 düzeltme daha (kod karşısında doğrulandı, plana işlendi):** V7-A8 (order line product_name/sku/unit master `JOIN products`'tan; qli.description DEĞİL — quote-service:143-150 paterni), V7-A9 (SalesOrderRow+mapOrderDetail 4 alan Faz 6 kilidi — discount_amount/vat_rate/source_quote_revision_no/quote_pdf_archive_id), V7-A5 ek (RPC defansif RAISE 23514 route-bypass koruması), V7-A4 netleşti (discount>0→ParasutError validation, invoice/marker yok), test tablosu 422→502.
-- **Toplam 51 düzeltme (V2-V7; V7=12).** ~186 test. Implement EDİLMEDİ. Plan modunda onaylandı. Detay: `memory/project_quotes.md` V7 başlığı.
+- **6. tur 2. okuma — 5 düzeltme (plana işlendi):** V7-A8 (order line master JOIN), V7-A9 (SalesOrderRow+mapOrderDetail 4 alan kilidi), V7-A5 ek (RPC RAISE), V7-A4 netleşti, test 422→502.
+- **6. tur 3. okuma — 5 düzeltme daha (kod karşısında doğrulandı, plana işlendi):**
+  - **V7-A8 güçlendirme (P1):** INNER JOIN sessizce satır düşürür — `quote_line_items.product_id` ON DELETE SET NULL (034:107); send sonrası ürün silinirse NULL → JOIN drop → eksik/finansal tutarsız order. Önceki "V4-A4 garanti ediyor" notu YANLIŞTI (send-time check post-send silmeyi kapsamaz). Fix: insert öncesi `product_id IS NULL → 23502 RAISE` + insert sonrası `GET DIAGNOSTICS ROW_COUNT` verify (039 precedent).
+  - **V7-A4 güçlendirme (P1+P2):** Guard throw ederse parasut-service:1092 catch parasut_step/marker yazar → "marker yazılmaz" bozulur. Fix: `parasut_claim_sync` (1016) ÖNCESİ early return (throw değil) + **ZORUNLU** sync_issue alert (ship route:62 fire-and-forget → sessiz block görünmez).
+  - **V7-A10 (P2):** accept RPC `item_count = v_inserted` (create_order 023 ediyor; accept etmiyordu → item_count=0).
+  - **V7-A11 (P2):** order_lines.quantity integer (001:10) ⟂ quote numeric(12,4) (034:111) + QuoteForm step="any" (972) → Faz 2 pozitif integer validator + accept RPC `trunc(quantity)` RAISE.
+  - **P3:** stale başlıklar (Review V7 — 7 / eklenen 7) → 17.
+- **Toplam 56 düzeltme (V2-V7; V7=17).** ~192 test. Implement EDİLMEDİ. Plan modunda onaylandı. Detay: `memory/project_quotes.md` V7 başlığı.
 - **commit mesajı notu:** `d201c11` "V6 master plan" der ama içerik V7; pushed main, history rewrite yapılmadı.
 - **Sıradaki:** Faz 1 başlama onayı (V7-A6: önce faz-spesifik self-contained tam plan).
 
