@@ -4,7 +4,7 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 2 IMPLEMENT EDİLDİ (2026-05-29) — validasyon katmanı, 3776 test, COMMIT BEKLİYOR
+## Faz 2 IMPLEMENT EDİLDİ (2026-05-29) — validasyon katmanı, 3778 test, COMMIT+PUSH afe936b
 
 **Faz 2 = tam master-plan Faz 2 (kullanıcı kararı: dar 2-madde değil, 4 düzeltme).** Migration YOK (alanlar Faz 1a/1b'de hazırdı). Yeni `src/lib/quote-validation.ts` (3 pure helper: validateQuoteLineQuantities / validateQuoteForSend / findMissingHsLines + QuoteLineForValidation interface) tek source-of-truth; route'lar + servis + form paylaşır. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -12,8 +12,8 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **V4-A2 (customer_address) + V4-A4 (product_id) send-time HARD check:** `validateQuoteForSend` — `serviceTransitionQuote`'ta **yalnız `target==="sent"`**. customer_address zorunlu; substantive satır (`unit_price>0 || quantity>0`) product_id null → blok. `QuoteTransitionResult.validationFailed:true` → PATCH transition mapping `notFound?404 : validationFailed?422 : 409`. accepted/rejected geçişleri etkilenmez (yalnız sent). **P2 fix (review): sent branch'inde `validateQuoteLineQuantities(quote.lines)` da çalışır** (validateQuoteForSend'den önce) → legacy/bypass draft küsüratlı/0 adetle sent OLAMAZ; qty validator 3 noktada (POST + PATCH doc-update + sent transition). Faz 6 accept RPC `product_id IS NULL → RAISE` backstop'u **planlı (henüz yok — Faz 6/075)**; bu send-time check kullanıcı-dostu erken kapı.
 - **V3-A1 (GTİP soft warn) — formda inline (kullanıcı kararı):** `findMissingHsLines` derived (state YOK); toolbar altı non-blocking `role="status"` + `var(--warning-text)` uyarı. **Hiçbir butonu disable etmez** (soft; regression test `not.toMatch(/disabled=\{[^}]*missingHs/)`). Send detay sayfasında transition ile yapıldığı için form-side warn = veri-tamlık önerisi (gönderim blokları send-time server-side).
 - **Substantive predicate kuraldan kurala farklı (plan'da kilitli):** qty → product||price; product_id send-check → price||qty; GTİP → product||price||qty. Üçü ayrı; helper'larda izole.
-- **Test:** `quote-validation-helpers.test.ts` (22 pure), `quotes-faz2-validation-routes.test.ts` (12 route — POST/PATCH qty + transition mapping; serviceTransitionQuote mock'lu), `quotes-faz2-form-warn.test.ts` (7 source-regex). `quote-service.test.ts` `stubQuote`'a customer_address eklendi (yeni send-check mevcut draft→sent başarı testlerini kırmasın) + 5 yeni send-validation testi. **3731 → 3776** · tsc temiz · build OK.
-- **DURUM: COMMIT BEKLİYOR.** Sıradaki: commit/push + UI smoke + Faz 3 (070-071 header discount).
+- **Test:** `quote-validation-helpers.test.ts` (22 pure), `quotes-faz2-validation-routes.test.ts` (12 route — POST/PATCH qty + transition mapping; serviceTransitionQuote mock'lu), `quotes-faz2-form-warn.test.ts` (7 source-regex). `quote-service.test.ts` `stubQuote`'a customer_address eklendi (yeni send-check mevcut draft→sent başarı testlerini kırmasın) + bu fazda quote-service **+7 test** (5 send-validation + 2 P2 bypass). **3731 → 3778** (targeted Faz 2 = 74) · tsc temiz · build OK.
+- **DURUM: COMMIT + PUSH EDİLDİ** (`afe936b` → main, `ff07a86..afe936b`, Coolify redeploy). React Doctor advisory baseline (skor 90/100, Faz 2'ye özel yeni bulgu yok). Sıradaki: UI smoke + Faz 3 (070-071 header discount).
 
 ---
 ## Faz 1b IMPLEMENT EDİLDİ (2026-05-29) — QuoteForm entegrasyon, 3729 test, COMMIT+PUSH+APPLY EDİLDİ

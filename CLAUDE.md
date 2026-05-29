@@ -3,14 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif V7 **Faz 2** implement edildi — validasyon katmanı (3776 test, COMMIT BEKLİYOR, 2026-05-29)
+**Son tamamlanan iş:** Teklif V7 **Faz 2** implement edildi — validasyon katmanı (3778 test, COMMIT+PUSH `afe936b`, 2026-05-29)
 
 - **Faz 2 = tam master-plan Faz 2 (kullanıcı kararı, 4 düzeltme).** Migration YOK — saf uygulama katmanı (alanlar Faz 1a/1b'de hazırdı). Yeni `src/lib/quote-validation.ts` (3 pure helper: validateQuoteLineQuantities / validateQuoteForSend / findMissingHsLines + QuoteLineForValidation interface) route'lar + servis + form tarafından paylaşılır. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 - **V7-A11 qty pozitif tam sayı:** `validateQuoteLineQuantities` — gerçek satırda (`product_id != null || unit_price > 0`) küsürat/0 → **422**. POST `/api/quotes` + PATCH document-update branch. Salt-açıklama/başlık satırı (qty 0) muaf (kullanıcı kararı). UI nudge qty input `min="1" step="1"`.
 - **V4-A2 + V4-A4 send-time HARD check:** `validateQuoteForSend` — `serviceTransitionQuote`'ta yalnız `target==="sent"`: customer_address zorunlu + substantive satır (`price>0||qty>0`) product_id null → blok. `validationFailed` flag → PATCH transition mapping `notFound?404 : validationFailed?422 : 409`. **P2 fix (review): sent branch `validateQuoteLineQuantities(quote.lines)` de çalışır** → legacy/bypass draft küsüratlı/0 adetle sent OLAMAZ (qty 3 noktada). Faz 6 accept RPC `product_id IS NULL → RAISE` backstop'u planlı (henüz yok — Faz 6/075).
 - **V3-A1 GTİP soft warn — formda inline (kullanıcı kararı):** `findMissingHsLines` derived; toolbar altı non-blocking `role="status"` + `var(--warning-text)` uyarı; **hiçbir butonu disable etmez** (regression test'li).
-- **Test:** `quote-validation-helpers` (22) + `quotes-faz2-validation-routes` (12) + `quotes-faz2-form-warn` (7) + quote-service +5 (stubQuote'a customer_address). **3731 → 3776 yeşil** · tsc temiz · build OK (`ƒ Proxy` korundu).
-- **DURUM: COMMIT BEKLİYOR** (kullanıcı henüz commit/push istemedi). **Sıradaki:** commit/push (onayla) + UI smoke + **Faz 3** (070-071 header discount).
+- **Test:** `quote-validation-helpers` (22) + `quotes-faz2-validation-routes` (12) + `quotes-faz2-form-warn` (7) + quote-service +7 (5 send-validation + 2 P2 bypass; stubQuote'a customer_address). **3731 → 3778 yeşil** (targeted Faz 2 = 74) · tsc temiz · build OK (`ƒ Proxy` korundu).
+- **DURUM: COMMIT + PUSH EDİLDİ** (`afe936b` → main, `ff07a86..afe936b`, Coolify redeploy tetiklendi). React Doctor advisory baseline (skor 90/100; Faz 2'ye özel yeni bulgu yok). **Sıradaki:** UI smoke + **Faz 3** (070-071 header discount).
 
 **Önceki:** Teklif V7 **Faz 1b** implement edildi — QuoteForm entegrasyon (3729 test, migration apply EDİLDİ, 2026-05-29)
 

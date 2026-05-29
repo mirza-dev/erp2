@@ -5,7 +5,7 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 2 IMPLEMENT EDİLDİ — validasyon katmanı, 3776 test, COMMIT BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 2 IMPLEMENT EDİLDİ — validasyon katmanı, 3778 test, COMMIT+PUSH afe936b)
 
 **Faz 2 = tam master-plan Faz 2 (4 düzeltme, kullanıcı kararı).** Migration YOK — saf uygulama katmanı (alanlar Faz 1a/1b'de eklendi). Yeni dosya `src/lib/quote-validation.ts` (3 pure helper: validateQuoteLineQuantities / validateQuoteForSend / findMissingHsLines + QuoteLineForValidation interface) + 2 route + servis + form + 3 test dosyası.
 
@@ -13,11 +13,11 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **V4-A2 + V4-A4 send-time hard check:** `validateQuoteForSend` — `serviceTransitionQuote` içinde **yalnız `target==="sent"`** iken: customer_address zorunlu (resmi PDF) + her substantive satır (`unit_price>0 || quantity>0`) ürüne bağlı olmalı (custom/manuel satır izinsiz). `QuoteTransitionResult.validationFailed` flag → PATCH transition mapping `notFound?404 : validationFailed?422 : 409`.
 - **P2 fix (review):** sent branch'inde `validateQuoteForSend`'den ÖNCE `validateQuoteLineQuantities(quote.lines)` de çalışır (defense-in-depth) → POST/PATCH qty guard'ından geçmemiş legacy/bypass draft küsüratlı (2.5)/0 adetle **sent OLAMAZ**. qty validator artık 3 noktada: POST, PATCH document-update, sent transition.
 - **V3-A1 GTİP soft warn (formda inline, kullanıcı kararı):** `findMissingHsLines` derived (state YOK); toolbar altında non-blocking `role="status"` + `var(--warning-text)` uyarı ("N satırda GTİP kodu eksik — gönderimi engellemez"). **Hiçbir butonu disable ETMEZ** (regression test ile kilitli).
-- **Fixture fix:** `quote-service.test.ts` `stubQuote`'a `customer_address` eklendi (yoksa yeni send-validation mevcut draft→sent başarı testlerini kırardı) + 5 yeni send-validation testi.
-- **Test:** 3 yeni dosya — `quote-validation-helpers.test.ts` (22 pure), `quotes-faz2-validation-routes.test.ts` (12 route behavior), `quotes-faz2-form-warn.test.ts` (7 source-regex) + quote-service +5. **3731 → 3776 yeşil** · tsc temiz · build OK (`ƒ Proxy` korundu).
+- **Fixture fix:** `quote-service.test.ts` `stubQuote`'a `customer_address` eklendi (yoksa yeni send-validation mevcut draft→sent başarı testlerini kırardı). quote-service bu fazda **+7 test** (5 send-validation başlangıç + 2 P2 bypass review).
+- **Test:** 3 yeni dosya — `quote-validation-helpers.test.ts` (22 pure), `quotes-faz2-validation-routes.test.ts` (12 route behavior), `quotes-faz2-form-warn.test.ts` (7 source-regex) + quote-service +7. **3731 → 3778 yeşil** (targeted Faz 2 = 74) · tsc temiz · build OK (`ƒ Proxy` korundu).
 - **Accept RPC `trunc(quantity)`/`product_id IS NULL` RAISE → Faz 6 (075), bu fazda DEĞİL.**
-- **DURUM: COMMIT BEKLİYOR** (kullanıcı henüz commit/push istemedi). Plan: `~/.claude/plans/clever-dancing-owl.md`.
-- **Sıradaki:** commit/push (kullanıcı onayıyla) + UI smoke (küsüratlı adet 422; HS boş→sarı uyarı kaydet çalışır; adressiz sent→engel; custom satırlı sent→engel) + **Faz 3** (header discount 070-071).
+- **DURUM: COMMIT + PUSH EDİLDİ** (`afe936b` → main, `ff07a86..afe936b`, Coolify redeploy). React Doctor advisory baseline (skor 90/100, Faz 2'ye özel yeni bulgu yok). Plan: `~/.claude/plans/clever-dancing-owl.md`.
+- **Sıradaki:** UI smoke (küsüratlı adet 422; HS boş→sarı uyarı kaydet çalışır; adressiz sent→engel; custom satırlı sent→engel; **pre-Faz-1b adressiz draft kurtarma**: aç→adres gir→gönder geçer) + **Faz 3** (header discount 070-071).
 
 ## Önceki — 2026-05-29 (Teklif V7 Faz 1b IMPLEMENT EDİLDİ — QuoteForm entegrasyon, 3729 test, COMMIT+PUSH+APPLY EDİLDİ)
 
