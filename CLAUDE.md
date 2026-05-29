@@ -10,7 +10,7 @@ _Son güncelleme: 2026-05-29_
 - **V4-A2 müşteri:** `custId`/`custAddress` + handleSelectCustomer capture + Address/Adres input + payload customer_id/customer_address + hydrate.
 - **V4-B3/V3-B5/V4-A7:** handleSelectProduct hs/size/unitWeightKg auto-fill; `patchRow`+`round3`; handleQtyChange KG=qty×birim recompute; handleKgChange→`kgManualOverride`; payload unit_weight_kg/kg_manual_override.
 - **V4-A3 satıcı freeze:** `hasSellerSnapshot` ayraç + company_settings effect `if(hasSellerSnapshot) return` (snapshot'lı quote'ta live fetch ATLA → donmuş gösterim); seller_* hydrate+persist; pre-1b snapshot'sız quote→live fetch fallback.
-- **Regression:** faz4b desc bloğu BİREBİR korundu (konsolide refactor yok). **+24 test** (`quotes-faz1b-form-integration.test.ts`) · tsc temiz · **3729 test yeşil** (3702→+27) · build OK.
+- **Regression:** faz4b desc bloğu BİREBİR korundu (konsolide refactor yok). **+27 test** (`quotes-faz1b-form-integration.test.ts`) · tsc temiz · **3729 test yeşil** (3702→+27) · build OK.
 - **Migration apply EDİLDİ** (066-069 Supabase editöründe çalıştırıldı, 2026-05-29). UI smoke kullanıcı tarafında bekliyor (yeni teklif ürün seç→hs/size/KG; kaydet→reload→korunur; eski sent→satıcı donmuş).
 - **Caveat:** hs/size auto-fill DORMANT (products'ta hs_code/size_text boş); handleSelectProduct hs'yi her seçimde set eder (dirty-guard YOK) → manuel HS yeniden-seçimde silinir. Products drawer hs/size edit UI 1b DIŞI.
 - **DURUM: COMMIT + PUSH EDİLDİ** (main, Coolify redeploy tetiklendi) · migration apply EDİLDİ.

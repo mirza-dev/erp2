@@ -295,7 +295,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 setLogoSrc(prev => prev === null && s.logo_url ? s.logo_url : prev);
             })
             .catch(() => {/* ağ hatası — form çalışmaya devam eder */});
-    }, []);
+    }, [hasSellerSnapshot]);
 
     // ── Customer autocomplete ─────────────────────────────────────────────────
     const handleCustCompanyChange = (value: string) => {
@@ -397,14 +397,17 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         updateRow(rowId, "size", p.sizeText ?? "");
         // Faz 1b (V3-B5/V4-A7): birim ağırlık + KG recompute. Yeni ürün seçimi
         // override'ı sıfırlar; KG = qty × birim ağırlık (qty 0 ise temizlenir,
-        // ağırlıksız üründe mevcut KG korunur).
+        // ağırlıksız üründe KG temizlenir — eski ürün KG'si taşınmaz).
         const unit = p.weightKg != null ? p.weightKg : null;
         const qtyN = parseFloat(rows.find(r => r.id === rowId)?.qty ?? "") || 0;
         const patch: Partial<QuoteRow> = {
             unitWeightKg: unit != null ? String(unit) : "",
             kgManualOverride: false,
+            // kg her durumda set edilir: unit+qty varsa recompute, yoksa temizle.
+            // (Önceki "if (unit != null)" koşulu ağırlıksız üründe eski KG'yi
+            //  satırda bırakıyordu → yanlış weight_kg persist; P1 fix.)
+            kg: unit != null && qtyN > 0 ? round3(qtyN * unit) : "",
         };
-        if (unit != null) patch.kg = qtyN > 0 ? round3(qtyN * unit) : "";
         patchRow(rowId, patch);
         setProdOpenRowId(null);
         setProdSuggestions([]);

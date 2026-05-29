@@ -112,7 +112,7 @@ describe("QuoteForm Faz 1b — V4-B3 hs/size auto-fill + KG recompute", () => {
 
     it("handleSelectProduct KG = qty × birim ağırlık recompute eder (override sıfırlı)", () => {
         expect(SOURCE).toMatch(
-            /const handleSelectProduct[\s\S]{0,1800}kgManualOverride:\s*false[\s\S]{0,200}qtyN > 0 \? round3\(qtyN \* unit\)/,
+            /const handleSelectProduct[\s\S]{0,1800}kgManualOverride:\s*false[\s\S]{0,500}qtyN > 0 \? round3\(qtyN \* unit\)/,
         );
     });
 
@@ -126,6 +126,15 @@ describe("QuoteForm Faz 1b — V4-B3 hs/size auto-fill + KG recompute", () => {
         expect(SOURCE).toMatch(
             /function handleKgChange[\s\S]{0,200}kgManualOverride:\s*true/,
         );
+    });
+
+    it("P1: handleSelectProduct kg'yi her durumda set eder (ağırlıksız üründe temizler, eski KG taşınmaz)", () => {
+        // patch.kg koşulsuz atanır → ağırlıksız üründe "" olur. Eski koşullu
+        // patern (`if (unit != null) patch.kg`) eski ürün KG'sini bırakıyordu.
+        expect(SOURCE).toMatch(
+            /kg:\s*unit != null && qtyN > 0 \? round3\(qtyN \* unit\) : "",/,
+        );
+        expect(SOURCE).not.toMatch(/if \(unit != null\) patch\.kg/);
     });
 
     it("buildQuotePayload satıra unit_weight_kg + kg_manual_override ekler", () => {
@@ -157,6 +166,12 @@ describe("QuoteForm Faz 1b — V4-A3 satıcı snapshot + freeze", () => {
         expect(SOURCE).toMatch(
             /if \(hasSellerSnapshot\) return;[\s\S]{0,120}fetch\("\/api\/settings\/company"\)/,
         );
+    });
+
+    it("P2: company_settings effect dep array hasSellerSnapshot içerir (lint warning yok)", () => {
+        // Effect hasSellerSnapshot okuyor → exhaustive-deps gereği dep array'de.
+        // `}, [hasSellerSnapshot]);` yalnız bu effect'e ait (benzersiz anchor).
+        expect(SOURCE).toMatch(/\}, \[hasSellerSnapshot\]\);/);
     });
 
     it("initialData satıcı snapshot'ını hydrate eder", () => {

@@ -6,7 +6,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
 ## Faz 1b IMPLEMENT EDİLDİ (2026-05-29) — QuoteForm entegrasyon, 3729 test, COMMIT+PUSH+APPLY EDİLDİ
 
-Faz 1 → **1a (DB foundation)** ✅ + **1b (QuoteForm/UI)** ✅ tamamlandı. 1b tek dosya `QuoteForm.tsx` + `quotes-faz1b-form-integration.test.ts` (+24 test, source-regex):
+Faz 1 → **1a (DB foundation)** ✅ + **1b (QuoteForm/UI)** ✅ tamamlandı. 1b tek dosya `QuoteForm.tsx` + `quotes-faz1b-form-integration.test.ts` (+27 test, source-regex):
 - **V3-A4** productId gizli yakalama (select→p.id, manuel kod→temizle, payload product_id, hydrate). **069 RPC tüketimi DOĞRULANDI** — product_id+unit_weight_kg+kg_manual_override her iki RPC'de INSERT kolon+value NULLIF guard'lı (kozmetik değil).
 - **V4-A2** custId/custAddress state + handleSelectCustomer capture + Address/Adres input + payload customer_id/customer_address + hydrate.
 - **V4-B3/V3-B5/V4-A7** handleSelectProduct hs/size/unitWeightKg auto-fill; patchRow+round3 helper; handleQtyChange KG=qty×birim recompute; handleKgChange→kgManualOverride; payload unit_weight_kg/kg_manual_override.
