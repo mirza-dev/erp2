@@ -5,7 +5,7 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Revizyon Zinciri — Faz 5'ten ertelenen, 3836 test, COMMIT BEKLİYOR + migration 074 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Revizyon Zinciri — Faz 5'ten ertelenen, 3837 test, COMMIT+PUSH cb061c8 + migration 074 APPLY BEKLİYOR)
 
 **Revizyon zinciri: sent/rejected/expired teklifin düzenlenebilir kopyası.** Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -20,7 +20,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Bilinen sınırlama:** tek revizyon R2 silinirse kök revised dead-end (nadir, kabul); revisedBy=en-yeni (bilinçli).
 - **Test:** `quotes-revision.test.ts` (13: service RPC mock + migration 074 drift-guard + UI source-regex + **071 omission regression** — advisor: revizyon draft edit→save 071 UPDATE üzerinden geçer, revision_no/root_quote_id o kolon listesinde OLMAMALI [omission koruması, yazılırsa meta sessizce ezilir]) + `quotes-revise-route.test.ts` (3: route 201/409/404). vi.mock global olduğu için route ayrı dosyada (aynı dosyada gerçek+mock service çakışır). **3821 → 3837 yeşil** · tsc temiz · build OK (`ƒ Proxy`) · lint 32 baseline / 0 warning.
 - **Numbering:** revizyon=074 → Faz 4 PDF=075-076, Faz 6=077, Faz 7=078-079. QUOTES_V2_PLAN.md hizalandı.
-- **DURUM: COMMIT BEKLİYOR + migration 074 APPLY BEKLİYOR.** **Sıradaki:** commit+push (explicit git add, 074 staged) + 074 Supabase apply (idempotent; `\df+ create_quote_revision` INVOKER) + manuel smoke (sent→Revize Et→TKL-2026-001-R2 draft valid_until boş; kaynak Revize Edildi+rozet; **R2 edit→kaydet→reload revision_no/root korunur+rozet çözülür** [advisor]; expired→revize→CRON expire ETMEZ; R2→R3=`-R3` kökten taban; draft/accepted buton YOK) + Faz 4 (075-076 PDF arşiv).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`cb061c8` → main, `dba754a..cb061c8`, 074 dahil 18 dosya, Coolify redeploy) **+ migration 074 APPLY BEKLİYOR.** **Sıradaki:** 074 Supabase apply (idempotent; `\df+ create_quote_revision` INVOKER) + manuel smoke (sent→Revize Et→TKL-2026-001-R2 draft valid_until boş; kaynak Revize Edildi+rozet; **R2 edit→kaydet→reload revision_no/root korunur+rozet çözülür** [advisor]; expired→revize→CRON expire ETMEZ; R2→R3=`-R3` kökten taban; draft/accepted buton YOK) + Faz 4 (075-076 PDF arşiv).
 
 ## Önceki — 2026-05-30 (Teklif V7 Faz 5 infra dilim — numara katmanı, 3821 test, COMMIT+PUSH 942ee0d + migration 073 APPLY EDİLDİ)
 

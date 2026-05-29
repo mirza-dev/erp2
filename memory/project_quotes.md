@@ -4,7 +4,7 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Revizyon Zinciri (2026-05-30) — Faz 5'ten ertelenen büyük özellik, 3836 test, COMMIT BEKLİYOR + migration 074 APPLY BEKLİYOR
+## Revizyon Zinciri (2026-05-30) — Faz 5'ten ertelenen büyük özellik, 3837 test, COMMIT+PUSH cb061c8 + migration 074 APPLY BEKLİYOR
 
 **sent/rejected/expired teklifin düzenlenebilir kopyası (revizyon).** Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -17,7 +17,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **Bilinen sınırlama:** tek revizyon silme kökü dead-end bırakır (nadir); revisedBy=en-yeni (bilinçli).
 - **Test:** quotes-revision (13, +071 omission regression) + quotes-revise-route (3). **3821→3837 yeşil** · tsc/build/lint temiz.
 - **Numbering:** revizyon=074 → Faz 4=075-076, Faz 6=077, Faz 7=078-079.
-- **DURUM: COMMIT BEKLİYOR + 074 APPLY BEKLİYOR.** Sıradaki: commit/push + 074 apply + smoke + Faz 4 (075-076 PDF arşiv).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`cb061c8`, 074 dahil 18 dosya) **+ 074 APPLY BEKLİYOR.** Sıradaki: 074 apply + smoke + Faz 4 (075-076 PDF arşiv).
 
 ---
 ## Faz 5 infra dilim (2026-05-30) — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT+PUSH 942ee0d + migration 073 APPLY EDİLDİ

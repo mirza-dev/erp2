@@ -3,7 +3,7 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif V7 **Revizyon zinciri** (Faz 5'ten ertelenen büyük özellik), 3837 test, COMMIT BEKLİYOR + migration 074 APPLY BEKLİYOR (2026-05-30)
+**Son tamamlanan iş:** Teklif V7 **Revizyon zinciri** (Faz 5'ten ertelenen büyük özellik), 3837 test, COMMIT+PUSH `cb061c8` + migration 074 APPLY BEKLİYOR (2026-05-30)
 
 - **İhtiyaç:** sent/rejected/expired teklifte müşteri değişiklik isteyince, mevcut teklifi bozmadan **düzenlenebilir kopya (revizyon)** yarat; eskisini kilitle + bağla. Önceden yol yoktu (non-draft düzenlenemez).
 - **Kullanıcı kararları:** revize edilebilir = **sent+rejected+expired**; kaynak → yeni **`revised`** status (terminal, kilitli, rozet); numara = **kök + suffix** (`TKL-2026-001` → `-R2`, `-R3`); revizyon `valid_until=NULL` (advisor blocker — expired kaynağın geçmiş tarihi yeni draft'ı CRON'da re-expire eder + mid-edit 409).
@@ -13,7 +13,7 @@ _Son güncelleme: 2026-05-29_
 - **TS:** `QuoteStatus += "revised"` (tsc touch-point'leri ortaya çıkardı: QuoteSummary.status union→QuoteStatus tipine çevrildi, detail/list/mapper Record'ları); QuoteRow += revision_no/root_quote_id; QuoteDetail+mapper revisionNo/rootQuoteId. `isQuoteEditable`(===draft)/`canDeleteQuote`(draft/sent)/`dbListExpiredQuotes`(draft/sent) → revised doğal kilitli/expiry-dışı (değişmedi).
 - **Bilinen sınırlama:** tek revizyon (R2) silinirse kök `revised` dead-end kalır (nadir, kabul); revisedBy=en-yeni (süperseden değil, bilinçli UX).
 - **Test:** `quotes-revision` (13: service RPC mock + migration drift-guard + UI source-regex + **071 omission regression** [advisor]) + `quotes-revise-route` (3: route mapping). **3821 → 3837 yeşil** · tsc temiz · build OK (`ƒ Proxy`) · lint 32 baseline / 0 warning.
-- **DURUM: COMMIT BEKLİYOR + migration 074 APPLY BEKLİYOR.** **Sıradaki:** commit+push (explicit `git add`, 074 staged) + 074 Supabase apply (idempotent; `\df+ create_quote_revision` INVOKER) + **manuel smoke** (sent→Revize Et→`TKL-2026-001-R2` draft, valid_until boş; kaynak Revize Edildi+rozet; **R2 draft'ı edit→kaydet→reload: revision_no=2/root_quote_id korunur, "Revizyon 2" rozeti çözülür** [advisor: 071 UPDATE omission ile korur, regression testi kilitledi]; expired→revize→CRON expire ETMEZ; R2→tekrar revize R3=`-R3` [kökten taban]; draft/accepted'ta buton YOK) + Faz 4 (PDF arşiv 075-076).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`cb061c8` → main, `dba754a..cb061c8`, Coolify redeploy; 074 dahil 18 dosya) **+ migration 074 APPLY BEKLİYOR.** **Sıradaki:** 074 Supabase apply (idempotent; `\df+ create_quote_revision` INVOKER) + **manuel smoke** (sent→Revize Et→`TKL-2026-001-R2` draft, valid_until boş; kaynak Revize Edildi+rozet; **R2 draft'ı edit→kaydet→reload: revision_no=2/root_quote_id korunur, "Revizyon 2" rozeti çözülür** [advisor: 071 UPDATE omission ile korur, regression testi kilitledi]; expired→revize→CRON expire ETMEZ; R2→tekrar revize R3=`-R3` [kökten taban]; draft/accepted'ta buton YOK) + Faz 4 (PDF arşiv 075-076).
 
 <details><summary>Faz 5 infra dilim — numara katmanı (`942ee0d`, migration 073 APPLY EDİLDİ)</summary>
 
