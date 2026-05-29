@@ -11,6 +11,7 @@ import { dbGetProductById } from "@/lib/supabase/products";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { serviceCreateOrder } from "@/lib/services/order-service";
+import { validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -20,6 +21,8 @@ export interface QuoteTransitionResult {
     success: boolean;
     error?: string;
     notFound?: boolean;
+    /** Faz 2 (V4-A2/V4-A4): send-time validasyon ihlali → route 422 maps. */
+    validationFailed?: boolean;
 }
 
 // ── Transition map ───────────────────────────────────────────
@@ -51,6 +54,18 @@ export async function serviceTransitionQuote(
             success: false,
             error: `'${quote.status}' durumundaki teklif '${target}' durumuna geçirilemez.`,
         };
+    }
+
+    // Faz 2 (V4-A2/V4-A4/V7-A11): sent'e geçmeden önce müşteri adresi + her gerçek
+    // kalemin ürüne bağlı olduğu + adet pozitif tam sayı hard check. qty kontrolü
+    // burada da çalışır (defense-in-depth): legacy/pre-Faz-2 draft'lar POST/PATCH
+    // qty guard'ından geçmemiş olabilir → küsüratlı/0 adetli teklif sent OLAMAZ.
+    // Soft GTİP uyarısı formda kalır.
+    if (target === "sent") {
+        const qtyErr = validateQuoteLineQuantities(quote.lines);
+        if (qtyErr) return { success: false, error: qtyErr, validationFailed: true };
+        const vErr = validateQuoteForSend(quote);
+        if (vErr) return { success: false, error: vErr, validationFailed: true };
     }
 
     const updated = await dbUpdateQuoteStatus(quoteId, target, quote.status as QuoteStatus);

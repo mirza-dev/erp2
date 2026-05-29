@@ -5,7 +5,21 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 1b IMPLEMENT EDİLDİ — QuoteForm entegrasyon, 3729 test, COMMIT+PUSH+APPLY EDİLDİ)
+## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 2 IMPLEMENT EDİLDİ — validasyon katmanı, 3776 test, COMMIT BEKLİYOR)
+
+**Faz 2 = tam master-plan Faz 2 (4 düzeltme, kullanıcı kararı).** Migration YOK — saf uygulama katmanı (alanlar Faz 1a/1b'de eklendi). Yeni dosya `src/lib/quote-validation.ts` (3 pure helper: validateQuoteLineQuantities / validateQuoteForSend / findMissingHsLines + QuoteLineForValidation interface) + 2 route + servis + form + 3 test dosyası.
+
+- **V7-A11 qty pozitif tam sayı:** `validateQuoteLineQuantities` — gerçek satırlarda (`product_id != null || unit_price > 0`) `Number.isInteger && >0`, değilse **422**. POST `/api/quotes` + PATCH `/api/quotes/[id]` document-update branch (validateStringLengths yanına). Salt-açıklama/başlık satırları (qty 0, product/fiyat yok) **muaf** (kullanıcı kararı). UI nudge: qty input `min="0" step="any"` → `min="1" step="1"` (KG/fiyat ondalık kalır).
+- **V4-A2 + V4-A4 send-time hard check:** `validateQuoteForSend` — `serviceTransitionQuote` içinde **yalnız `target==="sent"`** iken: customer_address zorunlu (resmi PDF) + her substantive satır (`unit_price>0 || quantity>0`) ürüne bağlı olmalı (custom/manuel satır izinsiz). `QuoteTransitionResult.validationFailed` flag → PATCH transition mapping `notFound?404 : validationFailed?422 : 409`.
+- **P2 fix (review):** sent branch'inde `validateQuoteForSend`'den ÖNCE `validateQuoteLineQuantities(quote.lines)` de çalışır (defense-in-depth) → POST/PATCH qty guard'ından geçmemiş legacy/bypass draft küsüratlı (2.5)/0 adetle **sent OLAMAZ**. qty validator artık 3 noktada: POST, PATCH document-update, sent transition.
+- **V3-A1 GTİP soft warn (formda inline, kullanıcı kararı):** `findMissingHsLines` derived (state YOK); toolbar altında non-blocking `role="status"` + `var(--warning-text)` uyarı ("N satırda GTİP kodu eksik — gönderimi engellemez"). **Hiçbir butonu disable ETMEZ** (regression test ile kilitli).
+- **Fixture fix:** `quote-service.test.ts` `stubQuote`'a `customer_address` eklendi (yoksa yeni send-validation mevcut draft→sent başarı testlerini kırardı) + 5 yeni send-validation testi.
+- **Test:** 3 yeni dosya — `quote-validation-helpers.test.ts` (22 pure), `quotes-faz2-validation-routes.test.ts` (12 route behavior), `quotes-faz2-form-warn.test.ts` (7 source-regex) + quote-service +5. **3731 → 3776 yeşil** · tsc temiz · build OK (`ƒ Proxy` korundu).
+- **Accept RPC `trunc(quantity)`/`product_id IS NULL` RAISE → Faz 6 (075), bu fazda DEĞİL.**
+- **DURUM: COMMIT BEKLİYOR** (kullanıcı henüz commit/push istemedi). Plan: `~/.claude/plans/clever-dancing-owl.md`.
+- **Sıradaki:** commit/push (kullanıcı onayıyla) + UI smoke (küsüratlı adet 422; HS boş→sarı uyarı kaydet çalışır; adressiz sent→engel; custom satırlı sent→engel) + **Faz 3** (header discount 070-071).
+
+## Önceki — 2026-05-29 (Teklif V7 Faz 1b IMPLEMENT EDİLDİ — QuoteForm entegrasyon, 3729 test, COMMIT+PUSH+APPLY EDİLDİ)
 
 **Faz 1b uygulandı — tek dosya `QuoteForm.tsx` + 1 test dosyası (faz başı V7-A6 kod doğrulaması yapıldı).** 1a DB foundation'ı (066-069 + type/mapper/input) forma bağlandı.
 
@@ -121,7 +135,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 - **Trigger:** Kullanıcı kökten revize istedi: ürün seçilince auto-fill (kod/ölçü/açıklama/fiyat/GTİP/KG), çift dilli kurumsal PDF, revizyon zinciri, immutable PDF arşivi, kabulde sipariş dönüşümü.
 - **3 paralel Explore agent + 1 Plan agent ile master plan çıkarıldı.** Kullanıcı 1. review turunda 6 kritik düzeltme istedi, hepsi entegre edildi.
-- **Net kararlar:** Server-side Puppeteer PDF (Docker chromium), expired enum'dan kaldırılır → UI rozet, GTİP HARD validation + KG SOFT warn, prepared/approved serbest text + audit için ayrı user FK, legacy expired → sent (rejected DEĞİL — satış raporları bozulmasın), root_quote_id paterni (revizyon zinciri R1-R2 bug fix), discount data migration KALDIRILDI (legacy snapshot korunur, iki katmanlı formül), preview hibrit (sessionStorage + DB).
+- **Net kararlar:** Server-side Puppeteer PDF (Docker chromium), expired enum'dan kaldırılır → UI rozet, GTİP HARD validation + KG SOFT warn [**NOT: GTİP V3-A1'de SOFT'a revize edildi, Faz 2'de SOFT uygulandı — bu V2 turunun tarihsel kaydı**], prepared/approved serbest text + audit için ayrı user FK, legacy expired → sent (rejected DEĞİL — satış raporları bozulmasın), root_quote_id paterni (revizyon zinciri R1-R2 bug fix), discount data migration KALDIRILDI (legacy snapshot korunur, iki katmanlı formül), preview hibrit (sessionStorage + DB).
 - **Master plan dosyası:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` (24KB, ~600 satır, kalıcı projeye yazıldı).
 - **Kapsam:** 7 faz · ~10 migration (066-074) · ~120 yeni test · ~30 yeni dosya · ~25 değişen dosya · 4-6 hafta tam zamanlı.
 - **Sıra:** 1 → 2 → 3 → 5 → 4 → 6 → 7 (Faz 4 PDF revision_no ve discount_amount'a bağımlı).

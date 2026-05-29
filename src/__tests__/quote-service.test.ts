@@ -36,6 +36,8 @@ const stubQuote = (status: string) => ({
     quote_number: "TKL-2026-001",
     status,
     customer_name: "Acme Ltd",
+    // Faz 2 (V4-A2): sendable quote için customer_address dolu olmalı.
+    customer_address: "Test Mah. No:123, İstanbul",
     currency: "USD",
     grand_total: 1200,
     valid_until: null,
@@ -135,6 +137,80 @@ describe("serviceTransitionQuote", () => {
         const result = await serviceTransitionQuote(QUOTE_ID, "sent");
         expect(result.success).toBe(false);
         expect(result.error).toContain("eşzamanlı");
+    });
+});
+
+// ─── Faz 2 (V4-A2/V4-A4): send-time hard check ───────────────────────────────
+
+describe("serviceTransitionQuote — Faz 2 send-time validasyon", () => {
+    it("customer_address boş + draft→sent → validationFailed, status değişmez", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote("draft"), customer_address: "" });
+        const result = await serviceTransitionQuote(QUOTE_ID, "sent");
+        expect(result.success).toBe(false);
+        expect(result.validationFailed).toBe(true);
+        expect(result.error).toMatch(/müşteri adresi/i);
+        expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
+    });
+
+    it("customer_address null → validationFailed", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote("draft"), customer_address: null });
+        const result = await serviceTransitionQuote(QUOTE_ID, "sent");
+        expect(result.success).toBe(false);
+        expect(result.validationFailed).toBe(true);
+        expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
+    });
+
+    it("substantive satır product_id null (custom satır) → validationFailed", async () => {
+        mockDbGetQuote.mockResolvedValue({
+            ...stubQuote("draft"),
+            lines: [{ product_id: null, quantity: 2, unit_price: 100 }],
+        });
+        const result = await serviceTransitionQuote(QUOTE_ID, "sent");
+        expect(result.success).toBe(false);
+        expect(result.validationFailed).toBe(true);
+        expect(result.error).toMatch(/ürüne bağlı/i);
+        expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
+    });
+
+    it("adres dolu + tüm kalemler ürüne bağlı → başarılı (sent)", async () => {
+        mockDbGetQuote.mockResolvedValue({
+            ...stubQuote("draft"),
+            lines: [{ product_id: "p-1", quantity: 3, unit_price: 100 }],
+        });
+        const result = await serviceTransitionQuote(QUOTE_ID, "sent");
+        expect(result.success).toBe(true);
+        expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith(QUOTE_ID, "sent", "draft");
+    });
+
+    it("P2 bypass: legacy draft satırı qty=2.5 (product bağlı) → sent ENGELLENİR (validationFailed)", async () => {
+        // POST/PATCH qty guard'ından geçmemiş legacy draft → sent branch yakalar.
+        mockDbGetQuote.mockResolvedValue({
+            ...stubQuote("draft"),
+            lines: [{ product_id: "p-1", quantity: 2.5, unit_price: 100 }],
+        });
+        const result = await serviceTransitionQuote(QUOTE_ID, "sent");
+        expect(result.success).toBe(false);
+        expect(result.validationFailed).toBe(true);
+        expect(result.error).toMatch(/pozitif tam sayı/i);
+        expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
+    });
+
+    it("P2 bypass: legacy draft satırı qty=0 (product bağlı) → sent ENGELLENİR", async () => {
+        mockDbGetQuote.mockResolvedValue({
+            ...stubQuote("draft"),
+            lines: [{ product_id: "p-1", quantity: 0, unit_price: 100 }],
+        });
+        const result = await serviceTransitionQuote(QUOTE_ID, "sent");
+        expect(result.success).toBe(false);
+        expect(result.validationFailed).toBe(true);
+        expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
+    });
+
+    it("send-validasyon yalnız 'sent' hedefinde çalışır — sent→accepted adressiz geçer", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote("sent"), customer_address: "" });
+        const result = await serviceTransitionQuote(QUOTE_ID, "accepted");
+        expect(result.success).toBe(true);
+        expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith(QUOTE_ID, "accepted", "sent");
     });
 });
 

@@ -3,7 +3,16 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif V7 **Faz 1b** implement edildi — QuoteForm entegrasyon (3729 test, migration apply EDİLDİ, 2026-05-29)
+**Son tamamlanan iş:** Teklif V7 **Faz 2** implement edildi — validasyon katmanı (3776 test, COMMIT BEKLİYOR, 2026-05-29)
+
+- **Faz 2 = tam master-plan Faz 2 (kullanıcı kararı, 4 düzeltme).** Migration YOK — saf uygulama katmanı (alanlar Faz 1a/1b'de hazırdı). Yeni `src/lib/quote-validation.ts` (3 pure helper: validateQuoteLineQuantities / validateQuoteForSend / findMissingHsLines + QuoteLineForValidation interface) route'lar + servis + form tarafından paylaşılır. Plan: `~/.claude/plans/clever-dancing-owl.md`.
+- **V7-A11 qty pozitif tam sayı:** `validateQuoteLineQuantities` — gerçek satırda (`product_id != null || unit_price > 0`) küsürat/0 → **422**. POST `/api/quotes` + PATCH document-update branch. Salt-açıklama/başlık satırı (qty 0) muaf (kullanıcı kararı). UI nudge qty input `min="1" step="1"`.
+- **V4-A2 + V4-A4 send-time HARD check:** `validateQuoteForSend` — `serviceTransitionQuote`'ta yalnız `target==="sent"`: customer_address zorunlu + substantive satır (`price>0||qty>0`) product_id null → blok. `validationFailed` flag → PATCH transition mapping `notFound?404 : validationFailed?422 : 409`. **P2 fix (review): sent branch `validateQuoteLineQuantities(quote.lines)` de çalışır** → legacy/bypass draft küsüratlı/0 adetle sent OLAMAZ (qty 3 noktada). Faz 6 accept RPC `product_id IS NULL → RAISE` backstop'u planlı (henüz yok — Faz 6/075).
+- **V3-A1 GTİP soft warn — formda inline (kullanıcı kararı):** `findMissingHsLines` derived; toolbar altı non-blocking `role="status"` + `var(--warning-text)` uyarı; **hiçbir butonu disable etmez** (regression test'li).
+- **Test:** `quote-validation-helpers` (22) + `quotes-faz2-validation-routes` (12) + `quotes-faz2-form-warn` (7) + quote-service +5 (stubQuote'a customer_address). **3731 → 3776 yeşil** · tsc temiz · build OK (`ƒ Proxy` korundu).
+- **DURUM: COMMIT BEKLİYOR** (kullanıcı henüz commit/push istemedi). **Sıradaki:** commit/push (onayla) + UI smoke + **Faz 3** (070-071 header discount).
+
+**Önceki:** Teklif V7 **Faz 1b** implement edildi — QuoteForm entegrasyon (3729 test, migration apply EDİLDİ, 2026-05-29)
 
 - **Faz 1 tamamlandı:** **1a (DB foundation)** ✅ commit `106686c` + **1b (QuoteForm/UI)** ✅ bu turda. 1b tek dosya `QuoteForm.tsx` — 1a alanlarını forma bağlar.
 - **V3-A4 productId:** `QuoteRow.productId` + handleSelectProduct set + handleCodeChange temizle + payload `product_id` + hydrate. **069 RPC tüketimi doğrulandı** (product_id/unit_weight_kg/kg_manual_override her iki RPC INSERT kolon+value NULLIF guard'lı → kozmetik değil).
@@ -151,10 +160,10 @@ _Son güncelleme: 2026-05-29_
   3. Revizyon zinciri bug → `root_quote_id uuid NULL` paterni; quote_number `root.quote_number || '-R' || revision_no` (zincir YOK, R1 → R2 değil R1-R2)
   4. Discount data migration KALDIRILDI; `quote_line_items.discount_pct` korunur (DEPRECATED comment); iki katmanlı formül (legacy compat + yeni header discount)
   5. Preview hibrit: Mod A sessionStorage (kaydedilmemiş) + Mod B server DB (kaydedilmiş)
-  6. GTİP HARD validation (boşsa 422); KG SOFT warn (boşsa uyarı, gönderme bloklanmaz)
+  6. GTİP HARD validation (boşsa 422); KG SOFT warn (boşsa uyarı, gönderme bloklanmaz) — **NOT: V3-A1'de GTİP SOFT'a revize edildi; Faz 2'de SOFT warn olarak uygulandı (HARD DEĞİL). Bu satır V2 turunun tarihsel kaydıdır.**
 - **Master plan:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` (24KB, ~600 satır)
 - **Kapsam:** 7 faz · ~10 migration (066-074) · ~120 yeni test · ~30 yeni dosya · ~25 değişen dosya · 4-6 hafta tam zamanlı
-- **Sıra:** Faz 1 (master alanlar) → 2 (validation: GTİP hard, KG soft) → 3 (header discount + settings VAT/currency) → 5 (revision + status enum + root_quote_id + expired→sent) → 4 (Puppeteer PDF + arşiv + preview hibrit) → 6 (kabul → sales_order taşıma) → 7 (liste UX + autosave kaldır + note_templates)
+- **Sıra:** Faz 1 (master alanlar) → 2 (validation: GTİP **soft** [V3-A1 revizyonu; V2'deki "hard" geçersiz], KG soft) → 3 (header discount + settings VAT/currency) → 5 (revision + status enum + root_quote_id + expired→sent) → 4 (Puppeteer PDF + arşiv + preview hibrit) → 6 (kabul → sales_order taşıma) → 7 (liste UX + autosave kaldır + note_templates)
 - **Implement EDİLMEDİ** — sadece master roadmap. Her faz öncesi ayrı detay plan modu açılır.
 - **Sıradaki:** Faz 1 başlama onayı bekleniyor.
 

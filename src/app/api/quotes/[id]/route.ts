@@ -5,6 +5,7 @@ import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { mapQuoteDetail } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
+import { validateQuoteLineQuantities, type QuoteLineForValidation } from "@/lib/quote-validation";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
 
 function getCachedQuote(id: string) {
@@ -63,7 +64,8 @@ export async function PATCH(
         if ("transition" in body) {
             const result = await serviceTransitionQuote(id, body.transition as "sent" | "accepted" | "rejected");
             if (!result.success) {
-                const httpStatus = result.notFound ? 404 : 409;
+                // Faz 2 (V4-A2/V4-A4): send-time validasyon → 422; transition map ihlali → 409.
+                const httpStatus = result.notFound ? 404 : result.validationFailed ? 422 : 409;
                 return NextResponse.json({ error: result.error }, { status: httpStatus });
             }
             const updated = await dbGetQuote(id);
@@ -84,6 +86,10 @@ export async function PATCH(
         // gibi nested alanları da kapsar.
         const lengthErr = validateStringLengths(body);
         if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
+
+        // Faz 2 (V7-A11): POST ile parity — gerçek satırlarda adet pozitif tam sayı.
+        const qtyErr = validateQuoteLineQuantities((body.lines ?? []) as QuoteLineForValidation[]);
+        if (qtyErr) return NextResponse.json({ error: qtyErr }, { status: 422 });
 
         const row = await dbUpdateQuote(id, body as unknown as CreateQuoteInput);
         revalidateTag("quotes", "max");

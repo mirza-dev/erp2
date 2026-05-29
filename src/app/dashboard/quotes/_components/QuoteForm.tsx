@@ -8,6 +8,7 @@ import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import type { QuoteStatus } from "@/lib/database.types";
 import { buildQuoteLineDescription } from "@/lib/quote-description-builder";
+import { findMissingHsLines } from "@/lib/quote-validation";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,13 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     const sym = SYM[currency];
     const compSub = rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
     const compKg  = rows.reduce((s, r) => s + (parseFloat(r.kg) || 0), 0);
+    // Faz 2 (V3-A1): GTİP soft warn — ürün/fiyatı olan ama HS boş satırlar (non-blocking).
+    const missingHsLines = findMissingHsLines(rows.map(r => ({
+        product_id: r.productId || null,
+        unit_price: parseFloat(r.price) || 0,
+        quantity: parseFloat(r.qty) || 0,
+        hs_code: r.hs,
+    })));
     const effSub   = ovSub   !== null ? ovSub   : compSub;
     const effVat   = ovVat   !== null ? ovVat   : effSub * vatRate / 100;
     const effGrand = ovGrand !== null ? ovGrand : effSub + effVat;
@@ -771,6 +779,23 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                     </div>
                 </div>
 
+                {/* Faz 2 (V3-A1): GTİP soft uyarı — non-blocking, hiçbir butonu disable etmez */}
+                {!readOnly && missingHsLines.length > 0 && (
+                    <div
+                        role="status"
+                        style={{
+                            display: "flex", alignItems: "center", gap: "8px",
+                            padding: "7px 12px", margin: "0 0 10px",
+                            fontSize: "12px", color: "var(--warning-text)",
+                            background: "var(--warning-bg)",
+                            border: "0.5px solid var(--warning-border)", borderRadius: "6px",
+                        }}
+                    >
+                        <span aria-hidden="true">⚠</span>
+                        <span>{missingHsLines.length} satırda GTİP kodu eksik (öneri — gönderimi engellemez).</span>
+                    </div>
+                )}
+
                 {/* ── Form Card ── */}
                 <div className="q-card" style={{
                     background: "var(--bg-primary)", border: "1px solid var(--border-secondary)",
@@ -1081,7 +1106,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                                     setDescDirtyRowIds(prev => prev.has(row.id) ? prev : new Set(prev).add(row.id));
                                                 }} /></td>
                                                 {/* Qty */}
-                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} adet`} style={{ ...cellInput, textAlign: "center" }} type="number" min="0" step="any" placeholder="0" value={row.qty} onChange={e => handleQtyChange(row.id, e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} adet`} style={{ ...cellInput, textAlign: "center" }} type="number" min="1" step="1" placeholder="0" value={row.qty} onChange={e => handleQtyChange(row.id, e.target.value)} /></td>
                                                 {/* Unit Price */}
                                                 <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} birim fiyat`} style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.price} onChange={e => updateRow(row.id, "price", e.target.value)} /></td>
                                                 {/* Line Total */}

@@ -4,6 +4,7 @@ import { dbCreateQuote, dbListQuotes } from "@/lib/supabase/quotes";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { mapQuoteDetail, mapQuoteSummary } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
+import { validateQuoteLineQuantities, type QuoteLineForValidation } from "@/lib/quote-validation";
 
 const getCachedQuotes = unstable_cache(
     async (status?: string) => {
@@ -34,6 +35,10 @@ export async function POST(req: NextRequest) {
 
         const lengthErr = validateStringLengths(body as unknown as Record<string, unknown>);
         if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
+
+        // Faz 2 (V7-A11): gerçek satırlarda adet pozitif tam sayı olmalı.
+        const qtyErr = validateQuoteLineQuantities((body.lines ?? []) as QuoteLineForValidation[]);
+        if (qtyErr) return NextResponse.json({ error: qtyErr }, { status: 422 });
 
         const row = await dbCreateQuote(body);
         revalidateTag("quotes", "max");

@@ -11,7 +11,7 @@
 - [project_integrations.md](project_integrations.md) — Paraşüt Faz 1-10 ✅ (1914 test), Faz 11 sırada; AI kolon eşleştirme, Sentry ✅, k6, smoke 24
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Son: bekleyen Teklifler UI fix commit/push (3682 test) + Teklif V7 plan 6 bulgu kod karşısında doğrulandı (2 P2 onay bekliyor); önceki: Sesli giriş V3
+- [current_focus.md](current_focus.md) — Son: Teklif V7 Faz 2 validasyon katmanı IMPLEMENT (3776 test, COMMIT BEKLİYOR) — qty 422 + send-time hard check + GTİP soft warn; önceki: Faz 1b
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)
