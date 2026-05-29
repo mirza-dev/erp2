@@ -19,7 +19,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **Bilinen sınırlama:** tek revizyon silme kökü dead-end bırakır (nadir); revisedBy=en-yeni (bilinçli).
 - **Test:** quotes-revision (13, +071 omission regression) + quotes-revise-route (3). **3821→3837 yeşil** · tsc/build/lint temiz.
 - **Numbering:** revizyon=074 → Faz 4=075-076, Faz 6=077, Faz 7=078-079.
-- **DURUM: COMMIT+PUSH EDİLDİ** (`cb061c8`, 074 dahil 18 dosya) **+ 074 APPLY BEKLİYOR.** Sıradaki: 074 apply + smoke + Faz 4 (075-076 PDF arşiv).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`cb061c8` ilk + `1d96211` review fix [P1/P3]) **+ 074 (DÜZELTİLMİŞ) APPLY BEKLİYOR.** Sıradaki: düzeltilmiş 074 apply + smoke + Faz 4 (075-076 PDF arşiv).
 
 ---
 ## Faz 5 infra dilim (2026-05-30) — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT+PUSH 942ee0d + migration 073 APPLY EDİLDİ
