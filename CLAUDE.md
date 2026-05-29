@@ -3,14 +3,14 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif V7 **Faz 5 (infra dilim)** — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT BEKLİYOR + migration 073 APPLY BEKLİYOR (2026-05-30)
+**Son tamamlanan iş:** Teklif V7 **Faz 5 (infra dilim)** — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT+PUSH `942ee0d` + migration 073 APPLY BEKLİYOR (2026-05-30)
 
 - **Kapsam = infra dilim (kullanıcı kararı):** revizyon zinciri (root_quote_id/revision_no/create_quote_revision RPC+UI+status) **ERTELENDİ** (büyük + underspec, kendi plan oturumu); sig_* rename **ERTELENDİ** (19 dosya/73 occ kozmetik ripple); status CHECK **no-op** (5 değer zaten var, yeni status yalnız revizyonda).
 - **Numara (kullanıcı: yıllık reset + configurable prefix):** `next_quote_number()` global `quotes_number_seq` kullanıyordu → `TKL-YYYY-NNN` ama NNN yılbaşında sıfırlanmıyordu (yıl kozmetik). **Migration 073:** company_settings += `quote_number_prefix`('TKL')/`quote_number_separator`('-'); `quote_yearly_counters(year pk, last_seq)` + RLS; `next_quote_number()` rewrite (atomik `ON CONFLICT ... last_seq+1` per-yıl + prefix company_settings'ten); **signature `() returns text` korundu** (create RPC + seed değişmez). V7-A1 SECURITY DEFINER YOK.
 - **Backfill güvenliği:** `quote_number` zaten UNIQUE (012:9) → backfill miscompute sessiz duplicate DEĞİL, create INSERT gürültülü UNIQUE violation (recoverable). Backfill **034:73-78 defansif precedent'i mirror** eder (`^TKL-\d{4}-\d+$` guard, non-conforming 0 katkı; gömülü-yıl `split_part(,2)` group — collision uzayı gömülü-yıl). Idempotent (add column/create table if not exists, policy duplicate_object guard).
 - **Frontend etkisi YOK:** quote_number server-üretimli read-only; consumer parser yok, `dbFindQuoteByNumber` `.eq()` equality. CompanySettingsRow TS += 2 alan (DB senkron; düzenleme UI ertelendi — admin SQL). Bilinen sınırlama: tek separator çift görev (`pfx∥sep∥yıl∥sep∥seq`).
 - **Test:** `quotes-faz5-numbering.test.ts` (6 source-regex) — **DRİFT-GUARD, correctness DEĞİL** (numara mantığı DB-side; gerçek doğrulama manuel smoke). **3815 → 3821 yeşil** · tsc temiz · build OK (`ƒ Proxy`) · lint 32 baseline / 0 warning.
-- **DURUM: COMMIT BEKLİYOR + migration 073 APPLY BEKLİYOR.** **Sıradaki:** commit+push (explicit `git add`, 073 staged) + 073 Supabase apply (idempotent; `\df+ next_quote_number` INVOKER) + **manuel smoke** (yeni teklif `TKL-2026-NNN` çakışmaz; prefix SQL'le 'OFR'→`OFR-2026-`; yıl reset 2027) + sonraki: revizyon zinciri / Faz 4 (PDF arşiv 074-075).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`942ee0d` → main, `11c5079..942ee0d`, Coolify redeploy; 073 dahil 8 dosya) **+ migration 073 APPLY BEKLİYOR.** **Sıradaki:** 073 Supabase apply (idempotent; `\df+ next_quote_number` INVOKER) + **manuel smoke** (yeni teklif `TKL-2026-NNN` çakışmaz; prefix SQL'le 'OFR'→`OFR-2026-`; yıl reset 2027) + sonraki: revizyon zinciri / Faz 4 (PDF arşiv 074-075).
 
 <details><summary>Faz 3 review düzeltmeleri (Bulgular P1-P3, 2 tur, `6366cbd`+`11c5079`, migration 070-072 APPLY EDİLDİ)</summary>
 

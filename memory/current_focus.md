@@ -5,7 +5,7 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 5 infra dilim — numara katmanı, 3821 test, COMMIT BEKLİYOR + migration 073 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 5 infra dilim — numara katmanı, 3821 test, COMMIT+PUSH 942ee0d + migration 073 APPLY BEKLİYOR)
 
 **Faz 5 = infra dilim (kullanıcı kararı): numara katmanı (yıllık reset + configurable prefix).** Revizyon zinciri + sig rename + status CHECK ERTELENDİ. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -15,7 +15,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Backfill güvenlik temeli (advisor):** `quote_number` zaten UNIQUE (012:9 + idx_quotes_number) → miscompute sessiz duplicate DEĞİL; next_quote_number mevcut numara üretirse create INSERT gürültülü UNIQUE violation (recoverable). Gömülü-yıl gruplama (created_at değil) çünkü next_quote_number now() yılını gömer → collision uzayı gömülü-yıl.
 - **Frontend etkisi YOK:** quote_number server-üretimli read-only; split/slice parser yok; `dbFindQuoteByNumber` (quotes.ts:162) `.eq()` equality. `CompanySettingsRow` (database.types:707) += `quote_number_prefix`/`quote_number_separator` (DB senkron; düzenleme UI ertelendi — admin SQL). purchase-order-document.test fixture'a 2 alan eklendi (tsc). **Bilinen sınırlama:** tek separator çift görev (`pfx∥sep∥yıl∥sep∥seq`).
 - **Test:** `quotes-faz5-numbering.test.ts` (6 source-regex) — **DRİFT-GUARD, correctness DEĞİL** (numara DB-side; "6 test geçti = numara çalışıyor" DENMEZ; gerçek doğrulama manuel smoke). **3815 → 3821 yeşil** · tsc temiz · build OK (`ƒ Proxy`) · lint 32 baseline / 0 warning.
-- **DURUM: COMMIT BEKLİYOR + migration 073 APPLY BEKLİYOR.** **Sıradaki:** commit+push (explicit git add, 073 staged) + 073 Supabase apply (idempotent; `\df+ next_quote_number` INVOKER) + manuel smoke (yeni teklif `TKL-2026-NNN` çakışmaz; company_settings prefix SQL'le 'OFR'→`OFR-2026-`; yıl reset 2027) + sonraki: revizyon zinciri / Faz 4 (074-075 PDF arşiv).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`942ee0d` → main, `11c5079..942ee0d`, 073 dahil 8 dosya, Coolify redeploy) **+ migration 073 APPLY BEKLİYOR.** **Sıradaki:** 073 Supabase apply (idempotent; `\df+ next_quote_number` INVOKER) + manuel smoke (yeni teklif `TKL-2026-NNN` çakışmaz; company_settings prefix SQL'le 'OFR'→`OFR-2026-`; yıl reset 2027) + sonraki: revizyon zinciri / Faz 4 (074-075 PDF arşiv).
 
 ## Önceki — 2026-05-29 (Teklif V7 Faz 3 REVIEW DÜZELTMELERİ — Bulgular P1-P3, 2 tur, 3815 test, COMMIT+PUSH 6366cbd+11c5079 + migration 070-072 APPLY EDİLDİ)
 

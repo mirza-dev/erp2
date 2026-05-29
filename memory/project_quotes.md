@@ -4,7 +4,7 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 5 infra dilim (2026-05-30) — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT BEKLİYOR + migration 073 APPLY BEKLİYOR
+## Faz 5 infra dilim (2026-05-30) — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT+PUSH 942ee0d + migration 073 APPLY BEKLİYOR
 
 **Faz 5 master-plan'da 5 parça (status CHECK + revizyon + sig backfill + prefix + yearly_counters) tek satır, detay yok.** Kullanıcı kararı: **infra dilim** = sadece numara katmanı. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -13,7 +13,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **Güvenlik:** quote_number UNIQUE (012:9) → backfill miscompute sessiz dup DEĞİL, gürültülü UNIQUE violation (recoverable). Gömülü-yıl group (created_at değil) — next_quote_number now() yılını gömer.
 - **Frontend YOK:** server-üretimli read-only; parser yok; dbFindQuoteByNumber .eq(). CompanySettingsRow TS += 2 alan. Sınırlama: tek separator çift görev.
 - **Test:** quotes-faz5-numbering (6 source-regex) — **DRİFT-GUARD değil correctness** (DB-side; gerçek doğrulama manuel smoke). **3815→3821 yeşil** · tsc/build/lint temiz.
-- **DURUM: COMMIT BEKLİYOR + 073 APPLY BEKLİYOR.** Sıradaki: commit/push + 073 apply + smoke + revizyon zinciri / Faz 4 (074-075).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`942ee0d`, 073 dahil 8 dosya) **+ 073 APPLY BEKLİYOR.** Sıradaki: 073 apply + smoke + revizyon zinciri / Faz 4 (074-075).
 
 ---
 ## Faz 3 REVIEW DÜZELTMELERİ (2026-05-29) — Bulgular P1-P3 (2 tur), 3815 test, COMMIT+PUSH 6366cbd+11c5079 + migration 070-072 APPLY EDİLDİ
