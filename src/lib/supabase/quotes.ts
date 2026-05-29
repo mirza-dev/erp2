@@ -38,6 +38,9 @@ export interface CreateQuoteInput {
     subtotal: number;
     vat_total: number;
     grand_total: number;
+    // Faz 3 (V7): header iskonto (KDV matrahından düşülür). dbCreate/dbUpdate
+    // header'ı RPC'ye spread eder → payload otomatik geçer.
+    discount_amount: number;
     notes?: string;
     sig_prepared?: string;
     sig_approved?: string;

@@ -347,6 +347,8 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
                         quote_date: data.quote_date ? String(data.quote_date).split("T")[0] : existing.quote_date ?? undefined,
                         grand_total: parseNumeric(data.total_amount) ?? existing.grand_total,
                         vat_rate: existing.vat_rate, subtotal: existing.subtotal, vat_total: existing.vat_total,
+                        // Faz 3 (V7): import iskontoyu işlemez → mevcut snapshot'ı koru (sıfırlama).
+                        discount_amount: existing.discount_amount,
                         lines: [],
                     });
                     refMap.quoteNumbers.set(quoteNumber, existing.id);
@@ -361,6 +363,8 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
                         quote_date: data.quote_date ? String(data.quote_date).split("T")[0] : new Date().toISOString().split("T")[0],
                         grand_total: parseNumeric(data.total_amount) ?? 0,
                         vat_rate: 0, subtotal: 0, vat_total: 0,
+                        // Faz 3 (V7): import iskontoyu işlemez → 0.
+                        discount_amount: 0,
                         lines: [],
                     });
                     refMap.quoteNumbers.set(quoteNumber, quote.id);

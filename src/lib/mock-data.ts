@@ -245,6 +245,8 @@ export interface QuoteDetail extends QuoteSummary {
     vatRate: number;
     subtotal: number;
     vatTotal: number;
+    // Faz 3 (V7): header iskonto (KDV öncesi matrahtan düşülür).
+    discountAmount: number;
     notes: string;
     sigPrepared: string;
     sigApproved: string;

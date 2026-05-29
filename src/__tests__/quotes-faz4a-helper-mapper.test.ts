@@ -233,7 +233,8 @@ describe("Faz 4a Review — preview/PDF contract", () => {
 
     it("QuoteForm autoSave() payload deliveryMethod + paymentMethod yazıyor (preview kontratı)", () => {
         // autoSave fullData içinde delivery + payment field var
-        expect(FORM_SOURCE).toMatch(/const autoSave = useCallback[\s\S]{0,2000}deliveryMethod,\s*\n\s*paymentMethod/);
+        // Faz 3: iskonto IIFE'leri autoSave bloğunu uzattı → pencere 2000→2600.
+        expect(FORM_SOURCE).toMatch(/const autoSave = useCallback[\s\S]{0,2600}deliveryMethod,\s*\n\s*paymentMethod/);
     });
 
     it("QuoteForm savePreviewData() payload deliveryMethod + paymentMethod yazıyor", () => {

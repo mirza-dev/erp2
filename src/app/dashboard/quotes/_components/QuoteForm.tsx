@@ -103,6 +103,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     const [ovVat, setOvVat] = useState<number | null>(null);
     const [ovGrand, setOvGrand] = useState<number | null>(null);
 
+    // Faz 3 (V7): header iskonto — doğrudan girilen değer (override paterni DEĞİL,
+    // ↻/revert YOK). KDV matrahından düşülür: matrah = subtotal − discount.
+    const [discount, setDiscount] = useState(0);
+    const [discDisp, setDiscDisp] = useState("");
+    const [discFocused, setDiscFocused] = useState(false);
+
     // Edit buffers + focus tracking for total inputs (avoids useEffect-based sync)
     const [subDisp, setSubDisp] = useState("");
     const [vatDisp, setVatDisp] = useState("");
@@ -186,8 +192,11 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         hs_code: r.hs,
     })));
     const effSub   = ovSub   !== null ? ovSub   : compSub;
-    const effVat   = ovVat   !== null ? ovVat   : effSub * vatRate / 100;
-    const effGrand = ovGrand !== null ? ovGrand : effSub + effVat;
+    // Faz 3 (V7): iskonto KDV ÖNCESİ matrahtan düşülür (Türk fatura standardı).
+    // 0 ≤ disc ≤ subtotal soft clamp (negatif/aşırı değer otomatik sınırlanır).
+    const effDisc  = Math.min(Math.max(discount, 0), effSub);
+    const effVat   = ovVat   !== null ? ovVat   : (effSub - effDisc) * vatRate / 100;
+    const effGrand = ovGrand !== null ? ovGrand : (effSub - effDisc) + effVat;
 
     // ── Init ─────────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -198,6 +207,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             setQuoteNo(initialData.quoteNumber);
             setCurrency(initialData.currency as Currency);
             setVatRate(initialData.vatRate);
+            // Faz 3 (V7) KRİTİK: iskonto hydrate — atlanırsa iskontolu mevcut
+            // teklif edit+kaydet'te sessizce 0'a düşer ve grand_total değişir.
+            setDiscount(initialData.discountAmount ?? 0);
             setCustCompany(initialData.customerName);
             setCustContact(initialData.customerContact);
             setCustPhone(initialData.customerPhone);
@@ -462,14 +474,21 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
                 currency, vatRate, rows,
                 subtotal: ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0),
+                // Faz 3 (V7): header iskonto (0 ≤ disc ≤ subtotal clamp); KDV öncesi matrahtan düşülür.
+                discountAmount: (() => {
+                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    return Math.min(Math.max(discount, 0), sub);
+                })(),
                 vatTotal: (() => {
                     const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
-                    return ovVat !== null ? ovVat : sub * vatRate / 100;
+                    const disc = Math.min(Math.max(discount, 0), sub);
+                    return ovVat !== null ? ovVat : (sub - disc) * vatRate / 100;
                 })(),
                 grandTotal: (() => {
                     const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
-                    const vat = ovVat !== null ? ovVat : sub * vatRate / 100;
-                    return ovGrand !== null ? ovGrand : sub + vat;
+                    const disc = Math.min(Math.max(discount, 0), sub);
+                    const vat = ovVat !== null ? ovVat : (sub - disc) * vatRate / 100;
+                    return ovGrand !== null ? ovGrand : (sub - disc) + vat;
                 })(),
                 totalKg: rows.reduce((s, r) => s + (parseFloat(r.kg) || 0), 0),
                 notes,
@@ -487,7 +506,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         } catch { /* noop */ }
     }, [readOnly, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
         custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
-        salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand,
+        salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand, discount,
         notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title,
         descDirtyRowIds]);
 
@@ -501,14 +520,21 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
                 currency, vatRate, rows,
                 subtotal: ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0),
+                // Faz 3 (V7): header iskonto (0 ≤ disc ≤ subtotal clamp); KDV öncesi matrahtan düşülür.
+                discountAmount: (() => {
+                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    return Math.min(Math.max(discount, 0), sub);
+                })(),
                 vatTotal: (() => {
                     const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
-                    return ovVat !== null ? ovVat : sub * vatRate / 100;
+                    const disc = Math.min(Math.max(discount, 0), sub);
+                    return ovVat !== null ? ovVat : (sub - disc) * vatRate / 100;
                 })(),
                 grandTotal: (() => {
                     const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
-                    const vat = ovVat !== null ? ovVat : sub * vatRate / 100;
-                    return ovGrand !== null ? ovGrand : sub + vat;
+                    const disc = Math.min(Math.max(discount, 0), sub);
+                    const vat = ovVat !== null ? ovVat : (sub - disc) * vatRate / 100;
+                    return ovGrand !== null ? ovGrand : (sub - disc) + vat;
                 })(),
                 totalKg: rows.reduce((s, r) => s + (parseFloat(r.kg) || 0), 0),
                 notes,
@@ -526,7 +552,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         } catch { /* noop */ }
     }, [status, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
         custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
-        salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand,
+        salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand, discount,
         notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
 
     useEffect(() => { autoSave(); }, [rows, currency, autoSave]);
@@ -612,6 +638,8 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             subtotal: effSub,
             vat_total: effVat,
             grand_total: effGrand,
+            // Faz 3 (V7): subtotal iskonto-öncesi kalır; iskonto ayrı; grand iskonto-dahil.
+            discount_amount: effDisc,
             notes: notes || undefined,
             sig_prepared: sig1 || undefined,
             sig_approved: sig2 || undefined,
@@ -1174,6 +1202,28 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     <td className="q-no-print" style={{ width: "28px", padding: "0 4px", textAlign: "center" }}>
                                         {ovSub !== null && <button type="button" aria-label="Ara toplamı otomatik hesaplamaya döndür" style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvSub(null)} title="Otomatik hesaplamaya dön">↻</button>}
                                     </td>
+                                </tr>
+                                {/* Faz 3 (V7): İskonto — doğrudan giriş, ↻ revert YOK */}
+                                <tr style={totalRowBg}>
+                                    <td colSpan={6} className="q-total-label" style={totalLabel}>Discount / İskonto</td>
+                                    <td style={tdBase}>
+                                        <input
+                                            className="q-total-inp"
+                                            aria-label="İskonto"
+                                            style={totalInput}
+                                            placeholder="—"
+                                            value={discFocused ? discDisp : (effDisc > 0 ? `${sym} ${fmt(effDisc)}` : "")}
+                                            onFocus={() => { setDiscFocused(true); setDiscDisp(effDisc > 0 ? `${sym} ${fmt(effDisc)}` : ""); }}
+                                            onChange={e => {
+                                                setDiscDisp(e.target.value);
+                                                const v = parseFloat(e.target.value.replace(/[^0-9.,\-]/g, "").replace(",", "."));
+                                                setDiscount(isNaN(v) ? 0 : v);
+                                            }}
+                                            onBlur={() => setDiscFocused(false)}
+                                        />
+                                    </td>
+                                    <td colSpan={2}>&nbsp;</td>
+                                    <td className="q-no-print" style={{ width: "28px", padding: "0 4px" }}>&nbsp;</td>
                                 </tr>
                                 {/* VAT */}
                                 <tr style={totalRowBg}>

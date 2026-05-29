@@ -52,6 +52,8 @@ export interface QuoteData {
 
     // Totals (pre-computed)
     subtotal: number;
+    // Faz 3 (V7): header iskonto (KDV öncesi matrahtan düşülür). 0 ise PDF'de gizlenir.
+    discountAmount: number;
     vatTotal: number;
     grandTotal: number;
     totalKg: number;

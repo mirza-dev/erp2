@@ -300,6 +300,8 @@ export function mapQuoteDetail(row: QuoteWithLines): QuoteDetail {
     vatRate: Number(row.vat_rate),
     subtotal: Number(row.subtotal),
     vatTotal: Number(row.vat_total),
+    // Faz 3 (V7): header iskonto snapshot.
+    discountAmount: Number(row.discount_amount),
     notes: row.notes ?? "",
     sigPrepared: row.sig_prepared ?? "",
     sigApproved: row.sig_approved ?? "",

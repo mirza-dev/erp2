@@ -460,6 +460,8 @@ export interface QuoteRow {
     subtotal: number
     vat_total: number
     grand_total: number
+    // Faz 3 (V7): header iskonto — KDV matrahından düşülür (subtotal − discount).
+    discount_amount: number
     notes: string | null
     sig_prepared: string | null
     sig_approved: string | null

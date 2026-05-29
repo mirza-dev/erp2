@@ -604,6 +604,16 @@ export default function QuoteDocument({ data }: Props) {
                                 </td>
                                 <td style={totalValueTdStyle}>{sym} {fmt(data.subtotal)}</td>
                             </tr>
+                            {/* Faz 3 (V7): header iskonto — yalnız >0 iken (eski teklifler temiz kalır) */}
+                            {data.discountAmount > 0 && (
+                                <tr>
+                                    <td style={totalLabelTdStyle}>
+                                        {L.discount.tr}
+                                        <span style={totalLabelEnStyle}>{L.discount.en}</span>
+                                    </td>
+                                    <td style={totalValueTdStyle}>−{sym} {fmt(data.discountAmount)}</td>
+                                </tr>
+                            )}
                             <tr>
                                 <td style={totalLabelTdStyle}>
                                     {L.vat.tr} ({data.vatRate}%)

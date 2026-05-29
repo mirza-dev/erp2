@@ -43,6 +43,7 @@ export const BILINGUAL_LABELS = {
     weight:       { tr: "Ağırlık",               en: "Weight (Kg)" },
     // Totals
     subtotal:     { tr: "Ara Toplam",            en: "Subtotal" },
+    discount:     { tr: "İskonto",               en: "Discount" },
     vat:          { tr: "KDV",                   en: "VAT" },
     totalWeight:  { tr: "Toplam Ağırlık",        en: "Total Weight" },
     grandTotal:   { tr: "GENEL TOPLAM",          en: "GRAND TOTAL" },

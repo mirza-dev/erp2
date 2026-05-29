@@ -4,6 +4,19 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
+## Faz 3 IMPLEMENT EDİLDİ (2026-05-29) — header iskonto, 3799 test, COMMIT BEKLİYOR + migration APPLY BEKLİYOR
+
+**Faz 3 = header iskonto (`discount_amount`).** quotes'a İLK iskonto alanı (mevcut `discount_pct` order_lines'a ait, quote'a değildi). Türk fatura standardı: Ara Toplam → İskonto → KDV Matrahı (subtotal − discount) → KDV → Genel Toplam (iskonto **KDV ÖNCESİ**; standart, kullanıcı seçimi değil). Plan: `~/.claude/plans/clever-dancing-owl.md`.
+
+- **Kullanıcı kararı:** kapsam **yalnız iskonto**; `company_settings.default_vat_rate` bu fazdan ÇIKARILDI (iskontodan bağımsız + form KDV select sabit 0/10/20 → friction → ayrı "ayarlar" fazı). Migration 070 = sadece `quotes.discount_amount`. (Master-plan 070 satırı default_vat_rate öngörüyordu — ileride QUOTES_V2_PLAN.md:325 hizalanmalı.)
+- **Migration (APPLY EDİLMEDİ — kullanıcı Supabase editöründe çalıştıracak):** `070_quotes_discount.sql` (`alter table quotes add column discount_amount numeric(15,2) not null default 0`; mevcut teklifler 0 → legacy snapshot korunur, subtotal iskonto-ÖNCESİ kalır, grand=subtotal−discount+vat). `071_quotes_rpc_discount.sql` (069 create/update RPC üzerine CREATE OR REPLACE — `discount_amount` payload COALESCE 0 + **V3-A6 draft guard**: update_quote_with_lines başı `status<>'draft' → 42501 RAISE`, route 409 ön-kapısının belt-and-suspenders'ı; create_* guard'sız; V7-A1 INVOKER, V7-A2 NULLIF korundu).
+- **Form toplam modeli:** mevcut `comp*`/`ov*`→`eff*` iki katman korundu. İskonto **override paterni DEĞİL** (↻/ov üçlüsü YOK) — doğrudan `discount` state. `effDisc = Math.min(Math.max(discount,0), effSub)` clamp (0 ≤ disc ≤ subtotal); `effVat = ov ?? (effSub-effDisc)*rate/100`; `effGrand = ov ?? (effSub-effDisc)+effVat`.
+- **KRİTİK hydrate (advisor must-have):** `setDiscount(initialData.discountAmount ?? 0)` init'te. Atlanırsa iskontolu mevcut teklif edit+kaydet'te **sessizce 0'a düşer + grand_total değişir** (finansal hata) — re-save source-regex testi kilitledi.
+- **Dokunulan dosyalar:** 070+071 migration; database.types (QuoteRow.discount_amount); mock-data (QuoteDetail.discountAmount); quotes.ts (CreateQuoteInput.discount_amount required — dbCreate/dbUpdate `...header` spread otomatik geçirir, gövde değişmedi); api-mappers (mapQuoteDetail); QuoteForm (state+formül+hydrate+payload+autoSave/savePreviewData IIFE+dep+İskonto satırı); quote-types (QuoteData.discountAmount); quote-document-helpers (BILINGUAL_LABELS.discount=İskonto/Discount); QuoteDocument (koşullu satır `discountAmount>0`, eksi işaretli); import-service (2 literal: update existing.discount_amount koru, create 0). preview/page.tsx değişmedi (localStorage cast otomatik; eski payload undefined>0=false → satır gizli).
+- **Test:** `quotes-faz3-discount.test.ts` (21: POST/PATCH passthrough + non-draft 409 regression + formül referans + form/document/types/migration source-regex). faz4a autoSave regex penceresi 2000→2600 (iskonto IIFE'leri bloğu uzattı; amaç korundu, zayıflatma değil). **3778 → 3799 yeşil** (faz3=21) · tsc temiz · build OK (`ƒ Proxy`) · lint 3 baseline error 0 warning.
+- **DURUM: COMMIT BEKLİYOR + migration APPLY BEKLİYOR.** Sıradaki: commit/push onayı + 070/071 apply + UI smoke + Faz 5 (072) / Faz 4 (PDF arşiv).
+
+---
 ## Faz 2 IMPLEMENT EDİLDİ (2026-05-29) — validasyon katmanı, 3778 test, COMMIT+PUSH afe936b
 
 **Faz 2 = tam master-plan Faz 2 (kullanıcı kararı: dar 2-madde değil, 4 düzeltme).** Migration YOK (alanlar Faz 1a/1b'de hazırdı). Yeni `src/lib/quote-validation.ts` (3 pure helper: validateQuoteLineQuantities / validateQuoteForSend / findMissingHsLines + QuoteLineForValidation interface) tek source-of-truth; route'lar + servis + form paylaşır. Plan: `~/.claude/plans/clever-dancing-owl.md`.
