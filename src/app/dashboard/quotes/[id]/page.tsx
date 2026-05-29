@@ -208,6 +208,9 @@ export default function QuoteDetailPage() {
     const statusCfg = quoteStatusConfig[status];
     const actions = getQuoteActions(status, quote.quoteNumber);
     const editable = isQuoteEditable(status);
+    // UI hardening: herhangi bir mutasyon (transition/convert/revise) sürerken
+    // tüm aksiyon butonları disable → eşzamanlı çift mutasyon kafa karışıklığı önlenir.
+    const anyMutating = loading !== null || converting || revising;
 
     return (
         <div style={{ position: "relative" }}>
@@ -263,7 +266,7 @@ export default function QuoteDetailPage() {
                                 key={action.transition}
                                 variant={action.variant}
                                 onClick={() => requestTransition(action)}
-                                disabled={isDemo || loading !== null}
+                                disabled={isDemo || anyMutating}
                                 loading={loading === action.transition}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             >
@@ -294,7 +297,7 @@ export default function QuoteDetailPage() {
                                 variant: "primary",
                             });
                         }}
-                        disabled={isDemo || converting}
+                        disabled={isDemo || anyMutating}
                         loading={converting}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                     >
@@ -337,7 +340,7 @@ export default function QuoteDetailPage() {
                                 variant: "primary",
                             });
                         }}
-                        disabled={isDemo || revising}
+                        disabled={isDemo || anyMutating}
                         loading={revising}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                     >

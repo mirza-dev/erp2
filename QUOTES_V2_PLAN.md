@@ -336,8 +336,8 @@ Faz 5 infra dilim (UYGULANDI 2026-05-30):
 
 Revizyon zinciri (UYGULANDI 2026-05-30):
   074 → revision_no/root_quote_id kolonları + status CHECK +revised +
-        create_quote_revision RPC (V7-A1 INVOKER, FOR UPDATE, kök+suffix -R,
-        valid_until=NULL). [apply edildi]
+        create_quote_revision RPC (V7-A1 INVOKER, atomik source consume +
+        kök FOR UPDATE, kök+suffix -R, valid_until=NULL). [kod push edildi; APPLY BEKLİYOR]
 
 Faz 4 (eski 073-074 → 075-076):
   075 → quote_pdf_archives + RLS

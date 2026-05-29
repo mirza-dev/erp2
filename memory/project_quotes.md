@@ -9,7 +9,9 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 **sent/rejected/expired teklifin düzenlenebilir kopyası (revizyon).** Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
 - **Kullanıcı kararları:** revize edilebilir=sent+rejected+expired; kaynak→`revised` (terminal); numara=kök+suffix (-R2/-R3); revizyon valid_until=NULL (CRON re-expire + mid-edit 409 önlemi).
-- **Migration 074 (APPLY BEKLİYOR):** revision_no/root_quote_id + status CHECK +revised + `create_quote_revision` RPC (atomik, V7-A1 INVOKER, kök FOR UPDATE serialize, status guard 42501, chain max+1, header+satır kopya, kaynak→revised). V2 flat chain (köke işaret). quote_number UNIQUE backstop.
+- **Migration 074 (APPLY BEKLİYOR):** revision_no/root_quote_id + status CHECK +revised + `create_quote_revision` RPC (V7-A1 INVOKER, chain max+1, header+satır kopya). V2 flat chain (köke işaret). quote_number UNIQUE backstop.
+- **Review P1 fix (atomik consume):** ilk versiyon kaynağı kilitsiz okuyup sonda flip ediyordu → aynı kaynağa eşzamanlı çift revize mümkündü. Fix: `update quotes set status='revised' where id=p_source_id and status in (...) returning * into v_src` (eligibility+flip atomik; ikinci eşzamanlı → 42501) + kök FOR UPDATE (revision_no serialize). 074 apply edilmediği için yerinde düzeltildi.
+- **Review P3 UI hardening:** anyMutating (loading/converting/revising) → 3 buton grubu da disable.
 - **Service/route:** serviceCreateQuoteRevision (42501→invalidStatus/409, P0002→notFound/404); POST /api/quotes/[id]/revise → 201 {newQuoteId}; dbCreateQuoteRevision + dbListQuoteChain.
 - **GET enrichment:** revisedBy (revised→zincir en yenisi) + revisionOf (revision_no>1→kök).
 - **UI:** getQuoteReviseEligible → Revize Et butonu → router.push(yeni draft); revisedBy/revisionOf rozetleri. STATUS_META+tab revised; QUOTE_TRANSITIONS revised:[] terminal.
@@ -25,11 +27,11 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 **Faz 5 master-plan'da 5 parça (status CHECK + revizyon + sig backfill + prefix + yearly_counters) tek satır, detay yok.** Kullanıcı kararı: **infra dilim** = sadece numara katmanı. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
 - **ERTELENEN:** revizyon zinciri (root_quote_id/revision_no/`create_quote_revision` RPC+UI+status — büyük + underspec, kendi oturumu); sig_* rename (19 dosya/73 occ kozmetik); status CHECK (034:91 zaten 5 değer, yeni status yalnız revizyonda → no-op).
-- **Migration 073 (YENİ, APPLY BEKLİYOR):** company_settings += quote_number_prefix('TKL')/separator('-'); quote_yearly_counters(year pk,last_seq)+RLS; backfill (034 defansif precedent `^TKL-\d{4}-\d+$` + gömülü-yıl split_part(,2) group + on conflict greatest); next_quote_number() rewrite (atomik on conflict last_seq+1 + prefix company_settings'ten). Signature `() returns text` KORUNDU (create RPC+seed değişmez). V7-A1 DEFINER YOK. Idempotent.
+- **Migration 073 (APPLY EDİLDİ):** company_settings += quote_number_prefix('TKL')/separator('-'); quote_yearly_counters(year pk,last_seq)+RLS; backfill (034 defansif precedent `^TKL-\d{4}-\d+$` + gömülü-yıl split_part(,2) group + on conflict greatest); next_quote_number() rewrite (atomik on conflict last_seq+1 + prefix company_settings'ten). Signature `() returns text` KORUNDU (create RPC+seed değişmez). V7-A1 DEFINER YOK. Idempotent.
 - **Güvenlik:** quote_number UNIQUE (012:9) → backfill miscompute sessiz dup DEĞİL, gürültülü UNIQUE violation (recoverable). Gömülü-yıl group (created_at değil) — next_quote_number now() yılını gömer.
 - **Frontend YOK:** server-üretimli read-only; parser yok; dbFindQuoteByNumber .eq(). CompanySettingsRow TS += 2 alan. Sınırlama: tek separator çift görev.
 - **Test:** quotes-faz5-numbering (6 source-regex) — **DRİFT-GUARD değil correctness** (DB-side; gerçek doğrulama manuel smoke). **3815→3821 yeşil** · tsc/build/lint temiz.
-- **DURUM: COMMIT+PUSH EDİLDİ** (`942ee0d`, 073 dahil 8 dosya) **+ 073 APPLY BEKLİYOR.** Sıradaki: 073 apply + smoke + revizyon zinciri / Faz 4 (074-075).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`942ee0d`, 073 dahil 8 dosya) **+ 073 APPLY EDİLDİ + smoke geçti.** Sonraki: revizyon zinciri (074, yukarı bkz).
 
 ---
 ## Faz 3 REVIEW DÜZELTMELERİ (2026-05-29) — Bulgular P1-P3 (2 tur), 3815 test, COMMIT+PUSH 6366cbd+11c5079 + migration 070-072 APPLY EDİLDİ
@@ -44,7 +46,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **P3 doc:** lint repo geneli 32 error / 0 warning (memory "3" QuoteForm dosya-bazlıydı); bu turda yeni hata yok.
 - **Numbering:** 072 iskonto CHECK aldı → Faz 5 = 073, downstream +1. QUOTES_V2_PLAN.md "Migration Sırası" hizalandı.
 - **Test:** quotes-faz3-discount (r1 +13, r2 malformed/idempotent/mesaj) + quote-convert-service +2 + faz4b/faz4a regex. **3799 → 3815 yeşil** · tsc temiz · build OK · lint 32 baseline.
-- **DURUM: COMMIT+PUSH EDİLDİ** (`6366cbd`, 072 dahil 15 dosya) **+ migration 072 APPLY BEKLİYOR.** Sıradaki: 072 apply (idempotent) + UI smoke + Faz 5 (073).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`6366cbd`, 072 dahil 15 dosya) **+ migration 070-072 APPLY EDİLDİ.** Sonraki: Faz 5 (073, yukarı bkz).
 
 ---
 ## Faz 3 IMPLEMENT EDİLDİ (2026-05-29) — header iskonto, 3799 test, COMMIT+PUSH c5d8267 + migration APPLY EDİLDİ

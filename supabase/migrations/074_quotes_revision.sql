@@ -40,20 +40,31 @@ declare
     v_number text;
     v_new_id uuid;
 begin
-    select * into v_src from quotes where id = p_source_id;
-    if not found then
-        raise exception 'Kaynak teklif bulunamadı.' using errcode = 'P0002';
-    end if;
+    -- Kaynağı ATOMİK consume et: eligibility kontrolü + 'revised' flip tek UPDATE'te.
+    -- Eşzamanlı ikinci revize aynı satırda bloklanır; ilk commit'ten sonra status
+    -- artık 'revised' → WHERE eşleşmez → 0 satır → 42501. Böylece aynı kaynaktan
+    -- ÇİFT revizyon üretilemez (eski kilitsiz SELECT+guard yarışı kapandı).
+    update quotes
+       set status = 'revised', updated_at = now()
+     where id = p_source_id and status in ('sent','rejected','expired')
+    returning * into v_src;
 
-    -- Yalnız sent/rejected/expired revize edilebilir
-    if v_src.status not in ('sent','rejected','expired') then
-        raise exception 'Bu durumdaki teklif revize edilemez: %', v_src.status
-            using errcode = '42501';
+    if not found then
+        -- Ya kaynak yok ya da uygun statüde değil (zaten revised/draft/accepted ya da
+        -- eşzamanlı revize tarafından tüketildi). Varlık kontrolüyle ayırt et:
+        perform 1 from quotes where id = p_source_id;
+        if found then
+            raise exception 'Bu durumdaki teklif revize edilemez veya zaten revize edildi.'
+                using errcode = '42501';
+        else
+            raise exception 'Kaynak teklif bulunamadı.' using errcode = 'P0002';
+        end if;
     end if;
 
     v_root := coalesce(v_src.root_quote_id, v_src.id);
 
-    -- Kök satırı kilitle: eşzamanlı revize → revision_no çakışması serialize
+    -- Kök satırı kilitle: farklı source'lar aynı kökten eşzamanlı revize edilirse
+    -- revision_no çakışmasını serialize et (source==root ise zaten yukarıda kilitli).
     perform 1 from quotes where id = v_root for update;
 
     select max(revision_no) + 1
@@ -107,8 +118,7 @@ begin
       from quote_line_items
      where quote_id = p_source_id;
 
-    -- Kaynağı kilitle
-    update quotes set status = 'revised', updated_at = now() where id = p_source_id;
+    -- (Kaynak status='revised' yukarıda atomik consume'da yazıldı — burada tekrar YOK.)
 
     return v_new_id;
 end;

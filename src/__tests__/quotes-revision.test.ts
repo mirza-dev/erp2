@@ -79,18 +79,20 @@ describe("Migration 074 (drift-guard)", () => {
         expect(M74).toMatch(/drop constraint if exists quotes_status_check/);
         expect(M74).toMatch(/check \(status in \('draft','sent','accepted','rejected','expired','revised'\)\)/);
     });
-    it("create_quote_revision: guard 42501 + FOR UPDATE + root coalesce + max+1 + suffix -R + source→revised", () => {
+    it("create_quote_revision: ATOMİK consume (UPDATE WHERE status IN + RETURNING) + FOR UPDATE root + 42501 + max+1 + suffix -R", () => {
         expect(M74).toMatch(/create or replace function create_quote_revision/);
-        expect(M74).toMatch(/not in \('sent','rejected','expired'\)/);
+        // P1 fix: eligibility kontrolü atomik UPDATE WHERE'de (kilitsiz SELECT+guard DEĞİL) →
+        // aynı kaynaktan çift revizyon yarışı kapalı.
+        expect(M74).toMatch(/update quotes[\s\S]*?set status = 'revised'[\s\S]*?where id = p_source_id and status in \('sent','rejected','expired'\)[\s\S]*?returning \* into v_src/);
         expect(M74).toMatch(/errcode = '42501'/);
-        expect(M74).toMatch(/for update/i);
+        expect(M74).toMatch(/for update/i);                       // kök kilit — revision_no serialize
         expect(M74).toMatch(/coalesce\(v_src\.root_quote_id, v_src\.id\)/);
         expect(M74).toMatch(/max\(revision_no\) \+ 1/);
         expect(M74).toMatch(/'-R' \|\| v_rev/);
-        expect(M74).toMatch(/update quotes set status = 'revised'/);
-        // valid_until=NULL (re-expire önlemi) + V7-A1 DEFINER YOK
-        expect(M74).toMatch(/current_date, null,/);
+        expect(M74).toMatch(/current_date, null,/);               // valid_until=NULL
         expect(M74).not.toMatch(/SECURITY DEFINER(?! YOK)/i);
+        // Regression: eski kilitsiz pattern (SELECT * INTO v_src + sondaki ayrı flip) OLMAMALI
+        expect(M74).not.toMatch(/select \* into v_src from quotes where id = p_source_id;/);
     });
     it("idempotent", () => {
         expect(M74).toMatch(/add column if not exists/);
