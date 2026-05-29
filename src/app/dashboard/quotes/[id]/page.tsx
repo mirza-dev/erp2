@@ -245,8 +245,13 @@ export default function QuoteDetailPage() {
                     </div>
                 )}
 
-                {/* Siparişe Dönüştür — sadece accepted + henüz dönüştürülmemiş */}
-                {status === "accepted" && !convertedOrderId && (
+                {/* Siparişe Dönüştür — sadece accepted + henüz dönüştürülmemiş + iskontosuz */}
+                {status === "accepted" && !convertedOrderId && quote.discountAmount > 0 && (
+                    <div role="status" style={{ fontSize: "12px", color: "var(--warning-text)", maxWidth: "320px", lineHeight: 1.4 }}>
+                        İskontolu teklif siparişe dönüştürülemiyor — sipariş tarafı iskonto desteği sonraki fazda gelecek.
+                    </div>
+                )}
+                {status === "accepted" && !convertedOrderId && quote.discountAmount <= 0 && (
                     <Button
                         variant="primary"
                         onClick={() => {

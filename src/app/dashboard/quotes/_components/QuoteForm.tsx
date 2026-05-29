@@ -267,6 +267,8 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const saved = JSON.parse(localStorage.getItem("teklif_v3") || "{}") as any;
                 if (saved.currency) setCurrency(saved.currency as Currency);
+                // Faz 3 (V7) review: iskonto restore — kaydetmeden refresh'te 0'a düşmesin.
+                if (typeof saved.discount === "number") setDiscount(saved.discount);
                 if (saved.rows?.length) {
                     // Faz 1b: eski localStorage payload'ında yeni alanlar (productId,
                     // unitWeightKg, kgManualOverride) yok → emptyRow default'larıyla
@@ -467,7 +469,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             // yoksa restore'da tüm non-empty desc'ler dirty kabul edilir ve
             // auto-build override edilemez hale gelir (yanlış ürün açıklaması).
             const descDirty = rows.map(r => descDirtyRowIds.has(r.id));
-            localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows, descDirty }));
+            localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows, descDirty, discount }));
             const fullData: QuoteData = {
                 sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
                 custCompany, custContact, custPhone, custEmail,
@@ -1187,7 +1189,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                             style={totalInput}
                                             placeholder="—"
                                             value={subFocused ? subDisp : (effSub > 0 ? `${sym} ${fmt(effSub)}` : "")}
-                                            onFocus={() => { setSubFocused(true); setSubDisp(effSub > 0 ? `${sym} ${fmt(effSub)}` : ""); }}
+                                            onFocus={() => { setSubFocused(true); setSubDisp(effSub > 0 ? String(Math.round(effSub * 100) / 100) : ""); }}
                                             onChange={e => {
                                                 setSubDisp(e.target.value);
                                                 const v = parseFloat(e.target.value.replace(/[^0-9.,\-]/g, "").replace(",", "."));
@@ -1213,7 +1215,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                             style={totalInput}
                                             placeholder="—"
                                             value={discFocused ? discDisp : (effDisc > 0 ? `${sym} ${fmt(effDisc)}` : "")}
-                                            onFocus={() => { setDiscFocused(true); setDiscDisp(effDisc > 0 ? `${sym} ${fmt(effDisc)}` : ""); }}
+                                            onFocus={() => { setDiscFocused(true); setDiscDisp(effDisc > 0 ? String(Math.round(effDisc * 100) / 100) : ""); }}
                                             onChange={e => {
                                                 setDiscDisp(e.target.value);
                                                 const v = parseFloat(e.target.value.replace(/[^0-9.,\-]/g, "").replace(",", "."));
@@ -1244,7 +1246,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                             style={totalInput}
                                             placeholder="—"
                                             value={vatFocused ? vatDisp : (effVat > 0 ? `${sym} ${fmt(effVat)}` : "")}
-                                            onFocus={() => { setVatFocused(true); setVatDisp(effVat > 0 ? `${sym} ${fmt(effVat)}` : ""); }}
+                                            onFocus={() => { setVatFocused(true); setVatDisp(effVat > 0 ? String(Math.round(effVat * 100) / 100) : ""); }}
                                             onChange={e => {
                                                 setVatDisp(e.target.value);
                                                 const v = parseFloat(e.target.value.replace(/[^0-9.,\-]/g, "").replace(",", "."));
@@ -1268,7 +1270,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                             style={{ ...totalInput, fontSize: "13px", fontWeight: 600, color: "var(--accent-text)" }}
                                             placeholder="—"
                                             value={grandFocused ? grandDisp : (effGrand > 0 ? `${sym} ${fmt(effGrand)}` : "")}
-                                            onFocus={() => { setGrandFocused(true); setGrandDisp(effGrand > 0 ? `${sym} ${fmt(effGrand)}` : ""); }}
+                                            onFocus={() => { setGrandFocused(true); setGrandDisp(effGrand > 0 ? String(Math.round(effGrand * 100) / 100) : ""); }}
                                             onChange={e => {
                                                 setGrandDisp(e.target.value);
                                                 const v = parseFloat(e.target.value.replace(/[^0-9.,\-]/g, "").replace(",", "."));

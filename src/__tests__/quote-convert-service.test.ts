@@ -222,6 +222,25 @@ describe("serviceConvertQuoteToOrder", () => {
         );
     });
 
+    // ── Faz 3 (V7) interim guard: header iskontolu teklif convert bloklanır ──
+
+    it("T01b: discount_amount > 0 → convert bloklanır, sipariş yaratılmaz", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote("accepted"), discount_amount: 100 });
+        const result = await serviceConvertQuoteToOrder(QUOTE_ID);
+        expect(result.success).toBe(false);
+        expect(result.error).toMatch(/iskonto/i);
+        expect(result.notFound).toBeUndefined();
+        expect(result.alreadyConverted).toBeUndefined();
+        expect(mockDbCreateOrder).not.toHaveBeenCalled();
+    });
+
+    it("T01c: discount_amount = 0 → convert normal çalışır (regression)", async () => {
+        mockDbGetQuote.mockResolvedValue({ ...stubQuote("accepted"), discount_amount: 0 });
+        const result = await serviceConvertQuoteToOrder(QUOTE_ID);
+        expect(result.success).toBe(true);
+        expect(mockDbCreateOrder).toHaveBeenCalled();
+    });
+
     it("T02: customer_id null → müşteri zenginleştirmesi atlanır, sipariş yine oluşur", async () => {
         const quote = { ...stubQuote("accepted"), customer_id: null };
         mockDbGetQuote.mockResolvedValue(quote);

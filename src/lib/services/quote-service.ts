@@ -141,6 +141,17 @@ export async function serviceConvertQuoteToOrder(quoteId: string, createdBy?: st
         };
     }
 
+    // 3b. Faz 3 (V7) interim guard: header iskontolu teklif siparişe dönüştürülemez.
+    // sales_orders'ta header iskonto kolonu YOK (Faz 6/075'te gelecek) → convert
+    // iskontoyu sessizce düşürür ve order grand_total'ı quote'tan yüksek olur
+    // (sessiz finansal hata). "Koru" kolon olmadan imkânsız → BLOCK. Faz 6'da kalkar.
+    if (Number(quote.discount_amount) > 0) {
+        return {
+            success: false,
+            error: `İskontolu teklif (iskonto: ${quote.discount_amount}) şu an siparişe dönüştürülemez — sipariş tarafı iskonto alanı sonraki fazda gelecek. İskontoyu kaldırıp tekrar deneyin.`,
+        };
+    }
+
     // 4. Satırları filtrele
     const validLines = quote.lines.filter(l => l.product_id != null);
     const skippedLines = quote.lines.filter(l => l.product_id == null);

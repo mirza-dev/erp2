@@ -44,6 +44,7 @@ vi.mock("@/lib/supabase/orders", () => ({
 
 import { POST } from "@/app/api/quotes/route";
 import { PATCH } from "@/app/api/quotes/[id]/route";
+import { validateDiscount } from "@/lib/quote-validation";
 
 const QUOTE_ID = "quote-faz3-uuid";
 
@@ -102,6 +103,33 @@ describe("POST /api/quotes — discount_amount passthrough", () => {
         expect(res.status).toBe(201);
         expect(mockDbCreateQuote.mock.calls[0][0].discount_amount).toBe(0);
     });
+
+    it("negatif discount → 422 + dbCreateQuote çağrılmaz (P2)", async () => {
+        const res = await POST(postReq(base({ discount_amount: -10, subtotal: 1000, lines: [] })));
+        expect(res.status).toBe(422);
+        expect((await res.json()).error).toMatch(/negatif/i);
+        expect(mockDbCreateQuote).not.toHaveBeenCalled();
+    });
+
+    it("subtotal-üstü discount → 422 (P2)", async () => {
+        const res = await POST(postReq(base({ discount_amount: 5000, subtotal: 1000, lines: [] })));
+        expect(res.status).toBe(422);
+        expect((await res.json()).error).toMatch(/ara toplam/i);
+        expect(mockDbCreateQuote).not.toHaveBeenCalled();
+    });
+
+    it("malformed discount ('abc') → 422 + dbCreateQuote çağrılmaz (P2 round2)", async () => {
+        const res = await POST(postReq(base({ discount_amount: "abc", subtotal: 1000, lines: [] })));
+        expect(res.status).toBe(422);
+        expect((await res.json()).error).toMatch(/geçerli bir sayı/i);
+        expect(mockDbCreateQuote).not.toHaveBeenCalled();
+    });
+
+    it("boş string discount ('') → 0 sayılır, 201 (opsiyonel alan)", async () => {
+        const res = await POST(postReq(base({ discount_amount: "", subtotal: 1000, lines: [] })));
+        expect(res.status).toBe(201);
+        expect(mockDbCreateQuote).toHaveBeenCalled();
+    });
 });
 
 describe("PATCH /api/quotes/[id] — discount_amount passthrough", () => {
@@ -116,6 +144,16 @@ describe("PATCH /api/quotes/[id] — discount_amount passthrough", () => {
         mockDbGetQuote.mockResolvedValue({ ...fullRow, status: "sent" });
         const res = await PATCH(patchReq(base({ discount_amount: 150, lines: [] })), ctx());
         expect(res.status).toBe(409);
+        expect(mockDbUpdateQuote).not.toHaveBeenCalled();
+    });
+
+    it("negatif / subtotal-üstü / malformed discount → 422 (P2)", async () => {
+        const neg = await PATCH(patchReq(base({ discount_amount: -5, subtotal: 1000, lines: [] })), ctx());
+        expect(neg.status).toBe(422);
+        const over = await PATCH(patchReq(base({ discount_amount: 9999, subtotal: 1000, lines: [] })), ctx());
+        expect(over.status).toBe(422);
+        const bad = await PATCH(patchReq(base({ discount_amount: "abc", subtotal: 1000, lines: [] })), ctx());
+        expect(bad.status).toBe(422);
         expect(mockDbUpdateQuote).not.toHaveBeenCalled();
     });
 });
@@ -242,5 +280,65 @@ describe("TS katmanı — discount alanları (source-regex)", () => {
         expect(m71).toMatch(/Sadece taslak teklifler düzenlenebilir/);
         // V7-A1: SECURITY DEFINER clause YOK (açıklamadaki "... YOK" ifadesi hariç).
         expect(m71).not.toMatch(/SECURITY DEFINER(?! YOK)/);
+    });
+});
+
+// ═══ Review düzeltmeleri (Bulgular P2/P3) ════════════════════════════════════
+
+describe("validateDiscount — pure helper (P2)", () => {
+    it("negatif → hata", () => {
+        expect(validateDiscount(-1, 1000)).toMatch(/negatif/i);
+    });
+    it("subtotal-üstü → hata", () => {
+        expect(validateDiscount(1500, 1000)).toMatch(/ara toplam/i);
+    });
+    it("0 ≤ disc ≤ subtotal → null", () => {
+        expect(validateDiscount(0, 1000)).toBeNull();
+        expect(validateDiscount(250, 1000)).toBeNull();
+        expect(validateDiscount(1000, 1000)).toBeNull(); // sınır dahil
+    });
+    it("NaN / Infinity → hata (malformed payload guard)", () => {
+        expect(validateDiscount(NaN, 1000)).toMatch(/geçerli bir sayı/i);
+        expect(validateDiscount(Infinity, 1000)).toMatch(/geçerli bir sayı/i);
+        expect(validateDiscount(Number("abc"), 1000)).toMatch(/geçerli bir sayı/i); // Number("abc")=NaN
+        expect(validateDiscount(100, NaN)).toMatch(/ara toplam geçersiz/i);
+    });
+});
+
+describe("QuoteForm — review fix source-regex (P2/P3)", () => {
+    it("autosave teklif_v3 payload'ında discount + restore setDiscount(saved.discount)", () => {
+        expect(FORM_SRC).toMatch(/JSON\.stringify\(\{ currency, rows, descDirty, discount \}\)/);
+        expect(FORM_SRC).toMatch(/setDiscount\(saved\.discount\)/);
+    });
+
+    it("4 toplam input onFocus'ta ham sayı (yuvarlı String) — formatlı template DEĞİL", () => {
+        // String(Math.round(eff*100)/100): binlik ayraç yok (parse fix) + hesaplanan
+        // alanlarda uzun ondalık (246.912) görünmesin.
+        expect(FORM_SRC).toMatch(/setSubDisp\(effSub > 0 \? String\(Math\.round\(effSub \* 100\) \/ 100\)/);
+        expect(FORM_SRC).toMatch(/setVatDisp\(effVat > 0 \? String\(Math\.round\(effVat \* 100\) \/ 100\)/);
+        expect(FORM_SRC).toMatch(/setGrandDisp\(effGrand > 0 \? String\(Math\.round\(effGrand \* 100\) \/ 100\)/);
+        expect(FORM_SRC).toMatch(/setDiscDisp\(effDisc > 0 \? String\(Math\.round\(effDisc \* 100\) \/ 100\)/);
+        // Regression: onFocus'ta artık `${sym} ${fmt(eff*)}` YOK.
+        expect(FORM_SRC).not.toMatch(/setSubDisp\(effSub > 0 \? `\$\{sym\}/);
+    });
+});
+
+describe("Convert iskonto block (P1) + migration 072 CHECK", () => {
+    it("quote-service convert discount_amount > 0 → block", () => {
+        const src = readFileSync(join(process.cwd(), "src/lib/services/quote-service.ts"), "utf8");
+        expect(src).toMatch(/Number\(quote\.discount_amount\) > 0/);
+    });
+    it("[id]/page.tsx iskontolu accepted → buton yerine not (P3: imkânsız aksiyon önermez)", () => {
+        const p = readFileSync(join(process.cwd(), "src/app/dashboard/quotes/[id]/page.tsx"), "utf8");
+        expect(p).toMatch(/quote\.discountAmount > 0/);
+        expect(p).toMatch(/quote\.discountAmount <= 0/);
+        // P3 round2: accepted düzenlenemez → "kaldırırsanız dönüştürebilirsiniz" yanıltıcı, kaldırıldı.
+        expect(p).not.toMatch(/kaldırırsanız dönüştürebilirsiniz/);
+    });
+    it("migration 072 discount_amount >= 0 CHECK + idempotent guard (P3 round2)", () => {
+        const m72 = readFileSync(join(process.cwd(), "supabase/migrations/072_quotes_discount_check.sql"), "utf8");
+        expect(m72).toMatch(/check \(discount_amount >= 0\)/);
+        // Idempotent: pg_constraint guard → manuel double-apply patlamaz.
+        expect(m72).toMatch(/pg_constraint where conname = 'quotes_discount_nonneg'/);
     });
 });

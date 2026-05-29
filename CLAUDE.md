@@ -3,7 +3,20 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif V7 **Faz 3** implement edildi — header iskonto (3799 test, COMMIT+PUSH `c5d8267` + migration APPLY EDİLDİ, 2026-05-29)
+**Son tamamlanan iş:** Teklif V7 **Faz 3 review düzeltmeleri** (Bulgular P1-P3, 2 tur) — 3815 test, COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR (2026-05-29)
+
+- **Round 1 (5 bulgu) + Round 2 (4 bulgu) kod karşısında doğrulandı + kapatıldı:**
+  - **P1 (finansal):** `serviceConvertQuoteToOrder` iskontoyu yok sayıp order toplamını yüksek yazıyordu. `sales_orders`'ta header iskonto kolonu YOK (Faz 6/076) → "koru" imkânsız → **BLOCK**: `quote.discount_amount > 0` ise convert engellenir (clear error, convert route mevcut 400 yolu). UI: `[id]/page.tsx` iskontolu accepted → buton yerine not. Faz 6'da kalkar. +2 test.
+  - **P2 (bütünlük):** `validateDiscount(disc, subtotal)` (quote-validation.ts) → negatif/subtotal-üstü/**non-finite (round2)** **422**. **Round2:** `Number.isFinite` guard (NaN/Infinity/`"abc"` helper'dan geçip RPC numeric cast'inde 500'e düşmesin) + POST call site `Number()` cast (PATCH parity). POST `""`→0 (sıfır iskonto, 201); `"abc"`→422. **Migration 072** `quotes_discount_nonneg check (discount_amount >= 0)` — **round2: pg_constraint guard'lı DO block (idempotent, manuel double-apply patlamaz)**. `<= subtotal` route kuralı. **APPLY BEKLİYOR.**
+  - **P2/P3:** autosave `teklif_v3` payload'ına `discount` eklendi (yazım+restore) → kaydetmeden refresh'te iskonto korunur.
+  - **P3 (TR parse):** 4 toplam input (sub/vat/grand/discount) onFocus'ta **ham yuvarlı sayı** (`String(Math.round(eff*100)/100)`, formatlı değil) → `1.234,56`→`1.234` binlik-ayraç parse hatası giderildi + hesaplanan vat/grand'da uzun ondalık (246.912) görünmez.
+  - **P3 (UI mesaj, round2):** iskontolu accepted not'undan "İskontoyu kaldırırsanız dönüştürebilirsiniz" kaldırıldı (accepted düzenlenemez — `isQuoteEditable("accepted")===false`, imkânsız aksiyon) → sade "sonraki fazda gelecek".
+  - **P3 (doc):** lint kaydı düzeltildi (repo geneli 32 error / 0 warning; memory "3" QuoteForm dosya-bazlıydı).
+- **Numbering:** 072 iskonto CHECK aldı → **Faz 5 = 073**, downstream +1. **QUOTES_V2_PLAN.md "Migration Sırası" hizalandı** (Faz3 070-072, Faz5→073, Faz4→074-075, Faz6→076, Faz7→077-078).
+- **Test:** `quotes-faz3-discount` (round1 +13, round2 +malformed/idempotent/mesaj) + `quote-convert-service` +2 + faz4b/faz4a regex güncel. **3799 → 3815 yeşil** · tsc temiz · build OK (`ƒ Proxy`) · **lint 32 repo-geneli baseline / 0 warning** (bu turda yeni hata YOK — eklenenler validator/helper).
+- **DURUM: COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR.** **Sıradaki:** commit+push (explicit `git add`, 072 staged doğrula) + 072 Supabase apply (idempotent) + UI smoke (iskontolu convert engeli+yeni mesaj; discount -10/subtotal-üstü/`"abc"` → 422; `""`→201; autosave restore; `1.234,56` focus→`1234.56`) + **Faz 5** (073).
+
+<details><summary>Faz 3 ilk implement (`c5d8267`, migration 070/071 APPLY EDİLDİ)</summary>
 
 - **Faz 3 = header iskonto (`discount_amount`).** Türk fatura standardı: Ara Toplam → İskonto → KDV Matrahı (subtotal − discount) → KDV → Genel Toplam (iskonto **KDV öncesi**). Plan: `~/.claude/plans/clever-dancing-owl.md`.
 - **Kullanıcı kararı:** kapsam yalnız iskonto; `company_settings.default_vat_rate` **bu fazdan ÇIKARILDI** (iskontodan bağımsız + form KDV select sabit 0/10/20 → configurable default friction; ayrı "ayarlar" fazına ertelendi). Migration 070 = sadece `quotes.discount_amount`.
@@ -11,7 +24,9 @@ _Son güncelleme: 2026-05-29_
 - **Form (QuoteForm.tsx):** `discount` state (override paterni DEĞİL, ↻ YOK); `effDisc = Math.min(Math.max(discount,0), effSub)` clamp; `effVat/effGrand = (effSub - effDisc)...`; **hydrate `setDiscount(initialData.discountAmount ?? 0)` (advisor must-have — atlanırsa edit+kaydet iskontoyu sessizce 0'a düşürür)**; payload `discount_amount: effDisc`; Subtotal–VAT arası İskonto `<tr>` (`aria-label="İskonto"`). autoSave+savePreviewData QuoteData bloklarına `discountAmount` enjekte + dep array'lere `discount`.
 - **TS/PDF:** QuoteRow.discount_amount, QuoteDetail.discountAmount, CreateQuoteInput.discount_amount, mapQuoteDetail, QuoteData.discountAmount, BILINGUAL_LABELS.discount (İskonto/Discount); QuoteDocument koşullu İskonto satırı (`discountAmount > 0`, eksi işaretli — eski teklifler temiz). import-service iki literal'e discount_amount (update: existing koru, create: 0).
 - **Test:** `quotes-faz3-discount.test.ts` (21: route passthrough + draft guard + formül referans + form/document/types source-regex). faz4a autoSave regex penceresi 2000→2600 (iskonto IIFE'leri uzattı). **3778 → 3799 yeşil** · tsc temiz · build OK (`ƒ Proxy`) · lint 3 baseline error 0 warning (yeni uyarı yok).
-- **DURUM: COMMIT+PUSH EDİLDİ** (`c5d8267` → main, `62eeb8e..c5d8267`, Coolify redeploy) + migration APPLY EDİLDİ. **Sıradaki:** UI smoke (iskontolu yeni teklif KDV matrahtan düşer; iskontolu mevcut teklif edit→kaydet iskonto korunur; PDF İskonto satırı; non-draft edit 409) + **Faz 5** (072 status CHECK/revision/prefix) veya Faz 4 (PDF arşiv).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`c5d8267` → main, `62eeb8e..c5d8267`, Coolify redeploy) + migration 070/071 APPLY EDİLDİ.
+
+</details>
 
 <details><summary>Faz 2 (önceki, `afe936b`)</summary>
 

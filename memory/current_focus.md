@@ -5,7 +5,29 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 3 IMPLEMENT EDİLDİ — header iskonto, 3799 test, COMMIT+PUSH c5d8267 + migration APPLY EDİLDİ)
+## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 3 REVIEW DÜZELTMELERİ — Bulgular P1-P3, 2 tur, 3815 test, COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR)
+
+**Round 1 (5 bulgu) + Round 2 (4 bulgu) kod karşısında doğrulandı + kapatıldı** (önce doğrula sonra düzelt). Plan: `~/.claude/plans/clever-dancing-owl.md`.
+
+**Round 2 (commit öncesi, 4 bulgu):**
+- **P2 (072 untracked):** migration git'te untracked → commit'te explicit `git add` zorunlu (yoksa CI'da test+CHECK ship olmaz). Commit adımında `git status` ile 072 staged doğrulanacak.
+- **P2 (validateDiscount non-finite):** `NaN`/`"abc"`/`Infinity` helper'dan geçip RPC numeric cast'inde 500'e düşüyordu (`NaN<0`=false, `NaN>subtotal`=false → null). Fix: `Number.isFinite` guard (disc + subtotal) → 422. POST call site `Number()` cast eklendi (PATCH parity). `""`→0 (201, opsiyonel), `"abc"`→422.
+- **P3 (072 idempotent):** plain `add constraint` → `pg_constraint where conname='quotes_discount_nonneg'` guard'lı DO block → Supabase manuel double-apply patlamaz.
+- **P3 (UI mesaj):** "İskontoyu kaldırırsanız dönüştürebilirsiniz" kaldırıldı (`isQuoteEditable("accepted")===false`, imkânsız aksiyon) → sade "sonraki fazda gelecek".
+- **Round2 test:** validateDiscount NaN/Infinity pure + POST/PATCH `"abc"`→422 + `""`→201 + 072 pg_constraint guard regex + mesaj negatif regex. **3812 → 3815 yeşil** · tsc temiz · build OK · lint 32 baseline.
+
+**Round 1 (5 bulgu):**
+
+- **P1 (kritik, finansal):** `serviceConvertQuoteToOrder` (`quote-service.ts:193-195`) order toplamını subtotal+vat ile hesaplayıp `quote.discount_amount`'ı yok sayıyordu → iskontolu accepted teklif siparişe dönüşünce iskonto kaybolup grand_total quote'tan **yüksek** oluyordu. **Kısıt:** `sales_orders`/`CreateOrderInput`'ta header iskonto kolonu YOK (Faz 6/075) → "koru" imkânsız. **Karar: BLOCK** — `Number(quote.discount_amount) > 0` ise convert engellenir (already-converted kontrolünden sonra, clear error). Convert route mevcut generic→400 yoluna düşer (flag yok). UI `[id]/page.tsx`: iskontolu accepted → "Siparişe Dönüştür" butonu yerine not (`quote.discountAmount > 0` vs `<= 0` ayrımı). Faz 6'da kalkar. +2 test (T01b block, T01c regression).
+- **P2 (bütünlük):** UI clamp bypass edilebiliyordu (POST/PATCH/RPC negatif/subtotal-üstü yazabilir). Yeni pure `validateDiscount(discountAmount, subtotal)` (quote-validation.ts) — negatif → "İskonto negatif olamaz"; subtotal-üstü → "İskonto ara toplamı aşamaz"; sınır (disc==subtotal) dahil OK. POST (`route.ts`) + PATCH document-update (`[id]/route.ts`) → **422** (qty validator yanına; PATCH'te `Number(body.x)` cast). **Migration 072** (YENİ `072_quotes_discount_check.sql`): `alter table quotes add constraint quotes_discount_nonneg check (discount_amount >= 0)` (belt-and-suspenders; `<= subtotal` DB'de DEĞİL, route kuralı — subtotal override esnekliği). **APPLY BEKLİYOR.**
+- **P2/P3:** autosave `teklif_v3` payload (`:470`) `{currency, rows, descDirty}` → `discount` eklendi; restore (`:269`) `if (typeof saved.discount === "number") setDiscount(...)`. Kaydetmeden refresh'te iskonto artık korunur. (autoSave dep'inde discount zaten vardı.)
+- **P3 (TR parse):** 4 toplam input (sub/vat/grand/discount) onFocus'ta `${sym} ${fmt(eff*)}` formatlı değeri koyuyordu → parser `replace(",",".")` binlik `.`'i decimal sanıp `1.234,56`→`1.234` okuyordu. **Fix: onFocus'ta ham sayı `String(Math.round(eff*100)/100)`** → binlik ayraç edit buffer'ına hiç girmez (parse fix) + hesaplanan vat/grand'da uzun ondalık (246.912) görünmez (advisor notu). Blur'da yine `fmt` formatlı. Parser (onChange) değişmedi.
+- **P3 (doc):** memory "lint 3 baseline error" yanlıştı (o QuoteForm dosya-bazlıydı) → **repo geneli `npm run lint` = 32 error / 0 warning** (React Hooks set-state-in-effect/exhaustive-deps, eslint-disable'lı). Bu turda yeni hata YOK (eklenenler validator/helper, hook değil).
+- **Numbering kayması:** 072 bu turda iskonto CHECK aldı → **Faz 5 = 073** (status CHECK/revision/prefix), downstream 074-078. **QUOTES_V2_PLAN.md "Migration Sırası" bu turda hizalandı** (072=iskonto CHECK, Faz5→073, Faz4→074-075, Faz6→076, Faz7→077-078) → V7-A6 Faz 5 başında master plan tutarlı.
+- **Test (round1):** `quotes-faz3-discount` +13 + `quote-convert-service` +2 + faz4b payload regex. (Round2 ekleri yukarıda.) **3799 → 3815 (round2 dahil) yeşil.**
+- **DURUM: COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR** (round2 dahil; üstteki round2 bloğuna bkz).
+
+## Önceki — 2026-05-29 (Teklif V7 Faz 3 IMPLEMENT EDİLDİ — header iskonto, 3799 test, COMMIT+PUSH c5d8267 + migration APPLY EDİLDİ)
 
 **Faz 3 = header iskonto (`discount_amount`).** Türk fatura standardı: Ara Toplam → İskonto → KDV Matrahı (subtotal − discount) → KDV → Genel Toplam (iskonto **KDV ÖNCESİ** — kullanıcı seçimi değil, standart). Plan: `~/.claude/plans/clever-dancing-owl.md`.
 

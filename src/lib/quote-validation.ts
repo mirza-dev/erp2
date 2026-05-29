@@ -61,6 +61,30 @@ export function validateQuoteForSend(quote: {
 }
 
 /**
+ * Faz 3 (V7) — header iskonto server-side validasyon (create/edit). UI clamp
+ * (0 ≤ disc ≤ subtotal) bypass edilebilir; sunucu tek yetki. Hata mesajı | null.
+ *   - negatif iskonto yasak
+ *   - iskonto ara toplamı (subtotal) aşamaz (matrah negatife düşmesin)
+ */
+export function validateDiscount(discountAmount: number, subtotal: number): string | null {
+    // Review P2: NaN/Infinity (malformed payload "abc" → Number → NaN) helper'dan
+    // geçip RPC numeric cast'inde 500'e düşmesin → route 422.
+    if (!Number.isFinite(discountAmount)) {
+        return "İskonto geçerli bir sayı olmalı.";
+    }
+    if (!Number.isFinite(subtotal) || subtotal < 0) {
+        return "Ara toplam geçersiz.";
+    }
+    if (discountAmount < 0) {
+        return "İskonto negatif olamaz.";
+    }
+    if (discountAmount > subtotal) {
+        return `İskonto ara toplamı aşamaz (iskonto: ${discountAmount}, ara toplam: ${subtotal}).`;
+    }
+    return null;
+}
+
+/**
  * V3-A1 — GTİP soft warn (form inline). Eksik-GTİP gerçek satır indekslerini
  * (1-based) döner; gönderimi ENGELLEMEZ, yalnız UI bilgilendirmesi.
  */

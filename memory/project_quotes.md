@@ -4,6 +4,21 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
+## Faz 3 REVIEW DÜZELTMELERİ (2026-05-29) — Bulgular P1-P3, 3812 test, COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR
+
+İlk implement (c5d8267) sonrası kullanıcı review'unda 5 bulgu; hepsi kod karşısında doğrulandı + kapatıldı. Plan: `~/.claude/plans/clever-dancing-owl.md`.
+
+- **P1 convert iskonto block:** `serviceConvertQuoteToOrder` iskontoyu yok sayıp order toplamını yüksek yazıyordu; `sales_orders`'ta header iskonto kolonu Faz 6'ya kadar yok → "koru" imkânsız → `discount_amount > 0` ise convert BLOCK (already-converted kontrolünden sonra). UI `[id]/page.tsx` iskontolu accepted → buton yerine not. Faz 6'da kalkar.
+- **P2 server/DB validasyon:** `validateDiscount(disc, subtotal)` (quote-validation.ts) negatif/subtotal-üstü/**non-finite (round2)** → route 422 (POST+PATCH). **Round2:** `Number.isFinite` guard (NaN/`"abc"` RPC numeric 500'e düşmesin) + POST `Number()` cast. migration 072 `check (discount_amount >= 0)` — **round2: pg_constraint guard'lı DO block (idempotent)**. `<= subtotal` DB değil route kuralı.
+- **P2/P3 autosave restore:** teklif_v3 payload'a `discount` eklendi (yazım+restore) → kaydetmeden refresh'te korunur.
+- **P3 TR parse:** 4 toplam input onFocus'ta ham `String(Math.round(eff*100)/100)` (formatlı değil) → `1.234,56`→`1.234` binlik parse hatası + uzun ondalık görünümü giderildi. Parser değişmedi.
+- **P3 UI mesaj (round2):** iskontolu accepted not'undan "kaldırırsanız dönüştürebilirsiniz" çıktı (accepted düzenlenemez, imkânsız aksiyon).
+- **P3 doc:** lint repo geneli 32 error / 0 warning (memory "3" QuoteForm dosya-bazlıydı); bu turda yeni hata yok.
+- **Numbering:** 072 iskonto CHECK aldı → Faz 5 = 073, downstream +1. QUOTES_V2_PLAN.md "Migration Sırası" hizalandı.
+- **Test:** quotes-faz3-discount (r1 +13, r2 malformed/idempotent/mesaj) + quote-convert-service +2 + faz4b/faz4a regex. **3799 → 3815 yeşil** · tsc temiz · build OK · lint 32 baseline.
+- **DURUM: COMMIT BEKLİYOR + migration 072 APPLY BEKLİYOR.** Sıradaki: commit/push (explicit git add, 072 staged doğrula) + 072 apply (idempotent) + UI smoke + Faz 5 (073).
+
+---
 ## Faz 3 IMPLEMENT EDİLDİ (2026-05-29) — header iskonto, 3799 test, COMMIT+PUSH c5d8267 + migration APPLY EDİLDİ
 
 **Faz 3 = header iskonto (`discount_amount`).** quotes'a İLK iskonto alanı (mevcut `discount_pct` order_lines'a ait, quote'a değildi). Türk fatura standardı: Ara Toplam → İskonto → KDV Matrahı (subtotal − discount) → KDV → Genel Toplam (iskonto **KDV ÖNCESİ**; standart, kullanıcı seçimi değil). Plan: `~/.claude/plans/clever-dancing-owl.md`.

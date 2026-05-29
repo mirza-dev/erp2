@@ -69,9 +69,10 @@ describe("QuoteForm Faz 4b integration — auto-build description + dirty tracki
         expect(SOURCE).toMatch(
             /const descDirty\s*=\s*rows\.map\(r\s*=>\s*descDirtyRowIds\.has\(r\.id\)\)/,
         );
-        // setItem JSON.stringify({ currency, rows, descDirty })
+        // setItem JSON.stringify({ currency, rows, descDirty, discount })
+        // Faz 3 review: payload'a discount eklendi (kaydetmeden refresh'te iskonto restore).
         expect(SOURCE).toMatch(
-            /setItem\("teklif_v3",\s*JSON\.stringify\(\{\s*currency,\s*rows,\s*descDirty\s*\}\)\)/,
+            /setItem\("teklif_v3",\s*JSON\.stringify\(\{\s*currency,\s*rows,\s*descDirty,\s*discount\s*\}\)\)/,
         );
     });
 

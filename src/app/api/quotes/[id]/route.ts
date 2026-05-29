@@ -5,7 +5,7 @@ import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { mapQuoteDetail } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { validateQuoteLineQuantities, type QuoteLineForValidation } from "@/lib/quote-validation";
+import { validateQuoteLineQuantities, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
 
 function getCachedQuote(id: string) {
@@ -90,6 +90,10 @@ export async function PATCH(
         // Faz 2 (V7-A11): POST ile parity — gerçek satırlarda adet pozitif tam sayı.
         const qtyErr = validateQuoteLineQuantities((body.lines ?? []) as QuoteLineForValidation[]);
         if (qtyErr) return NextResponse.json({ error: qtyErr }, { status: 422 });
+
+        // Faz 3 (V7): header iskonto sınırı (negatif / subtotal-üstü → 422).
+        const discErr = validateDiscount(Number(body.discount_amount ?? 0), Number(body.subtotal ?? 0));
+        if (discErr) return NextResponse.json({ error: discErr }, { status: 422 });
 
         const row = await dbUpdateQuote(id, body as unknown as CreateQuoteInput);
         revalidateTag("quotes", "max");
