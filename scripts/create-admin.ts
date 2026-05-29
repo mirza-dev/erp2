@@ -30,6 +30,8 @@ async function main() {
         email,
         password,
         email_confirm: true,
+        // RBAC: bootstrap admin'i explicit roller ile yarat (ADMIN_EMAILS'e bağlı kalma).
+        app_metadata: { roles: ["admin"] },
     });
 
     if (error) {

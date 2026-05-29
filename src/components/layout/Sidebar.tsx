@@ -1,10 +1,12 @@
 "use client";
 
-import { memo, useState, useMemo } from "react";
+import { memo, useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
+import { requiredPermissionForPath } from "@/lib/auth/page-access";
+import type { Permission } from "@/lib/auth/permissions";
 
 interface NavItem {
     label: string;
@@ -27,6 +29,27 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
     const { reorderSuggestions, orders, activeAlertCount } = useData();
 
     const [isDemo] = useState(() => isDemoMode());
+
+    // RBAC Faz 2 — permission'a göre menü filtresi (UX katmanı; gerçek koruma
+    // proxy.ts page-gate'te). null = henüz yüklenmedi → tüm item'lar gösterilir
+    // (yüklenince filtrelenir; server gate zaten erişimi engeller).
+    const [perms, setPerms] = useState<Set<Permission> | null>(null);
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await fetch("/api/auth/me");
+                if (!res.ok || cancelled) return;
+                const data = await res.json();
+                if (!cancelled && Array.isArray(data.permissions)) {
+                    setPerms(new Set<Permission>(data.permissions));
+                }
+            } catch {
+                // sessiz — perms null kalır, tüm item'lar gösterilir (server gate korur)
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
@@ -87,6 +110,22 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
         },
     ], [reorderCount, pendingOrderCount, activeAlertCount]);
 
+    // Permission filtresi — her item'ın gerekli permission'ı page-access matrisinden
+    // türetilir (Sidebar'da ayrı liste YOK → gate ile garantili tutarlı). Filtrelenince
+    // boş kalan grup başlığı da gizlenir.
+    const visibleGroups = useMemo(() => {
+        if (perms === null) return navGroups;
+        return navGroups
+            .map(g => ({
+                ...g,
+                items: g.items.filter(it => {
+                    const req = requiredPermissionForPath(it.href);
+                    return req === null || perms.has(req);
+                }),
+            }))
+            .filter(g => g.items.length > 0);
+    }, [navGroups, perms]);
+
     const isActive = (href: string) =>
         href === "/dashboard"
             ? pathname === href
@@ -105,7 +144,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                 height: "100%",
             }}
         >
-            {navGroups.map((group) => (
+            {visibleGroups.map((group) => (
                 <div key={group.label}>
                     <div
                         style={{

@@ -7,6 +7,9 @@ import {
     detectSupabaseAuthCookie,
     type RateCheckResult,
 } from "@/lib/rate-limit";
+// RBAC Faz 2 — pure helper'lar (next/supabase import etmez → middleware-safe).
+import { parseRoles, permissionsForRoles } from "@/lib/auth/permissions";
+import { canAccessPath } from "@/lib/auth/page-access";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
@@ -34,6 +37,30 @@ function withRateHeaders(response: NextResponse, rate: RateCheckResult): NextRes
     response.headers.set("X-RateLimit-Limit", String(rate.limit));
     response.headers.set("X-RateLimit-Remaining", String(rate.remaining));
     return response;
+}
+
+function adminEmailsFromEnv(): string[] {
+    return (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+}
+
+/**
+ * RBAC Faz 2 page-gate. /dashboard/** için kullanıcının permission'ı yetmezse
+ * /dashboard?forbidden=<path>'e redirect döner; yeterli/ilgisiz path → null.
+ * Güvenlik enforcement burada (Sidebar filtre yalnız UX). Ek getUser çağrısı
+ * yapmaz — perms zaten elde edilen rollerden türetilir.
+ */
+function pageGateRedirect(
+    request: NextRequest,
+    pathname: string,
+    perms: Set<import("@/lib/auth/permissions").Permission>,
+    rate: RateCheckResult,
+): NextResponse | null {
+    if (!pathname.startsWith("/dashboard")) return null;
+    if (canAccessPath(pathname, perms)) return null;
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    url.searchParams.set("forbidden", pathname);
+    return withRateHeaders(NextResponse.redirect(url), rate);
 }
 
 // proxy.ts convention: Next 16 named export `proxy` veya default export bekler.
@@ -159,8 +186,12 @@ export async function proxy(request: NextRequest) {
                     rate,
                 );
             }
-            // Dashboard sayfaları → izin ver
+            // Dashboard sayfaları → izin ver (RBAC: demo = viewer muamelesi;
+            // viewer'a kapalı sayfalar — settings/parasut/import vb. — demo'ya da kapalı)
             if (pathname.startsWith("/dashboard")) {
+                const demoPerms = permissionsForRoles(["viewer"]);
+                const gated = pageGateRedirect(request, pathname, demoPerms, rate);
+                if (gated) return gated;
                 return withRateHeaders(NextResponse.next(), rate);
             }
             // GET API → izin ver (DataProvider veri çekebilsin)
@@ -200,6 +231,13 @@ export async function proxy(request: NextRequest) {
         url.pathname = "/dashboard";
         return withRateHeaders(NextResponse.redirect(url), rate);
     }
+
+    // RBAC Faz 2 page-gate — auth'lu kullanıcının rol→permission'ına göre
+    // /dashboard/** erişimi. user.app_metadata authoritative (user_metadata DEĞİL).
+    const roles = parseRoles(user.app_metadata, user.email, adminEmailsFromEnv());
+    const perms = permissionsForRoles(roles);
+    const gated = pageGateRedirect(request, pathname, perms, rate);
+    if (gated) return gated;
 
     return withRateHeaders(supabaseResponse, rate);
 }
