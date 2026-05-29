@@ -4,6 +4,26 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
+## V7 Master Plan — diskte mevcut, 6 bulgu kod karşısında DOĞRULANDI (2026-05-29 6. tur) — Implement EDİLMEDİ
+
+**Dosya:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` zaten V7 (02:02'de yazılmış, bu oturumdan önce). Kullanıcının "Kısa Review" 6 bulgusu (3 P1 + 3 P2) + 1 bonus = **7 düzeltme** V7-A1…A7 olarak plana işlenmiş. Bu oturumda 6 bulgunun tamamı kod karşısında doğrulandı (geçerli):
+
+- **V7-A1 (P1) SECURITY DEFINER kaldırılır:** `036_fix_quote_rpc_security.sql:1-3` bilinçli kaldırmış; 065 RPC'lerinde de DEFINER yok → V7 SECURITY INVOKER (default) korur. ✅ doğrulandı.
+- **V7-A2 (P1) quote_date NULLIF guard:** `065:71,132` `NULLIF(p_header->>'quote_date','')::date`. ✅ doğrulandı (direkt cast boş string'te patlar).
+- **V7-A3 (P1) order_lines satır vat_rate snapshot:** `039:57` `order_lines.vat_rate numeric(5,2) NOT NULL DEFAULT 20`; `parasut-service.ts:686` `vat_rate: line.vat_rate ?? 20`. Accept RPC `v_quote.vat_rate`'i her satıra yazmalı. ✅ doğrulandı.
+- **V7-A4 (P2) header discount Paraşüt:** `parasut-service.ts:688` `discount_value: line.discount_pct`. ✅ doğrulandı. **DİKKAT:** Kullanıcı bunu SORU sordu ("bu faz sadece SO snapshot mı, Paraşüt fatura da tutmalı mı?"); V7-A4 "gelecek faza ertelendi" KARARI verdi — kullanıcı bu kararı henüz onaylamadı.
+- **V7-A5 (P2) accept öncesi PDF arşiv guard:** `quote_pdf_archives` henüz yok (Faz 4 migration 073). ✅ bulgu geçerli. **DİKKAT:** Kullanıcı "recover/generate VEYA 409" önerdi; V7-A5 **422 hard-fail** KARARI verdi — kullanıcı onayı bekliyor.
+- **V7-A7 (bonus) order_lines tablo adı:** `001:110 create table order_lines`; `sales_order_lines` hiçbir migration'da YOK. ✅ doğrulandı (V6 örneği yanlış tablo adı kullanmış).
+- **V7-A6 (P2) faz başı tam plan prosedürü:** delta plan → Faz 1'de self-contained tam plan yaz (3 adım).
+
+**Açık onay bekleyen 2 P2 kararı:** (A4) Paraşüt header discount erteleme, (A5) PDF arşiv 422 hard-fail. İkisi de "spirit"e uygun ama kullanıcı bunları soru/seçenek olarak sundu → memory'de "kesinleşti" sayılmaz.
+
+**Toplam: V7 = V2(5)+V3(12)+V4(13)+V5(5)+V6(4)+V7(7) = 46 düzeltme.** ~182 test · 12 migration (066-077) · 7 faz.
+**Not:** V7 plan dosyası bu oturumda commit edildi (`d201c11`) ama commit mesajı yanlışlıkla "V6" der; içerik V7. Memory bu girişle V7'ye hizalandı.
+**Sıradaki:** Faz 1 başlama onayı + yukarıdaki 2 P2 kararının teyidi bekleniyor.
+
+---
+
 ## V6 Master Plan ONAYLANDI (2026-05-29 5. tur) — Implement EDİLMEDİ
 
 **Dosya:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` — V6 versiyona güncellendi

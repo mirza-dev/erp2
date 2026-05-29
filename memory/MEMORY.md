@@ -11,12 +11,12 @@
 - [project_integrations.md](project_integrations.md) — Paraşüt Faz 1-10 ✅ (1914 test), Faz 11 sırada; AI kolon eşleştirme, Sentry ✅, k6, smoke 24
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Son: Sesli giriş V3 tamamlandı (3657 test); önceki: React Doctor turu 51→57
+- [current_focus.md](current_focus.md) — Son: bekleyen Teklifler UI fix commit/push (3682 test) + Teklif V7 plan 6 bulgu kod karşısında doğrulandı (2 P2 onay bekliyor); önceki: Sesli giriş V3
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)
 - [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
-- [project_quotes.md](project_quotes.md) — Teklif modülü: Faz 1-8 TAMAMEN tamamlandı (sipariş dönüşümü, race condition fix dahil)
+- [project_quotes.md](project_quotes.md) — Teklif modülü: Faz 1-8 tamamlandı; V7 master plan (46 düzeltme, diskte hazır, IMPLEMENT EDİLMEDİ) — Faz 1 onayı + 2 P2 karar teyidi bekliyor
 - [project_frontend_renewal.md](project_frontend_renewal.md) — Frontend yenileme planı (frontend-renewal.md): DOM mutation fix, component lib, a11y — PLAN HAZIR, uygulama başlamadı
 
 ## Feedback

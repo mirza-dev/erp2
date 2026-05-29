@@ -5,7 +5,27 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-29 (5. tur review)
+## Son Tamamlanan İş — 2026-05-29 (6. tur: bekleyen UI fix commit/push + V7 bulgu doğrulama)
+
+**1) Bekleyen Teklifler UI/UX audit fix commit + push edildi (3682 test)**
+- Önceki oturumdan main'de commit'siz duruyordu (DOM mutation→hoveredId state, hex→CSS var, a11y). Doğrulama: `tsc --noEmit` temiz + `npm test` **3682 yeşil**.
+- 2 commit: `12f7e23` fix(quotes) UI/UX audit (4 quotes dosyası + `quotes-ui-audit-fix.test.ts`) + `d201c11` docs (QUOTES_V2_PLAN.md + memory + CLAUDE.md). `d201c11..` main'e push edildi, Coolify redeploy tetiklendi. Untracked lokal skill dizinleri (`.agents/`, `.claude/skills/`, `skills/`) commit DIŞI bırakıldı.
+- **React Doctor pre-commit hook uyarı verdi (bloklamadı)** — `react-doctor --staged --fail-on warning` ile sonra incelenebilir.
+- **commit mesajı hatası:** `d201c11` "V6 master plan" der ama plan dosyası içeriği V7 (aşağı bkz). Pushed main, history rewrite yapılmadı; memory bu turda V7'ye hizalandı.
+
+**2) Diskteki QUOTES_V2_PLAN.md zaten V7 — kullanıcının 6 bulgusu kod karşısında DOĞRULANDI**
+- Plan dosyası 02:02'de (bu oturumdan önce) V7'ye yazılmış; memory V6'da kalmıştı (stale). Kullanıcı bu turda 6 bulgu (3 P1 + 3 P2) iletti; hepsi V7-A1…A7 olarak plana zaten işlenmiş + kod karşısında geçerli olduğu teyit edildi:
+  - V7-A1 SECURITY DEFINER kaldır (036:1-3 + 065 DEFINER yok) ✅
+  - V7-A2 quote_date NULLIF guard (065:71,132) ✅
+  - V7-A3 order_lines satır vat_rate snapshot (039:57 + parasut-service:686) ✅
+  - V7-A4 (P2) Paraşüt header discount (parasut-service:688 discount_pct) — **kullanıcı SORU sordu; V7 "ertelendi" KARARI verdi → onay bekliyor** ✅bulgu
+  - V7-A5 (P2) accept öncesi PDF arşiv guard (quote_pdf_archives henüz yok) — **kullanıcı "recover/generate VEYA 409" önerdi; V7 422 hard-fail seçti → onay bekliyor** ✅bulgu
+  - V7-A7 order_lines tablo adı (001:110; sales_order_lines yok) ✅
+  - V7-A6 faz başı tam plan prosedürü
+- **Toplam 46 düzeltme** (V2-V7). Implement EDİLMEDİ.
+- **Sıradaki:** Faz 1 başlama onayı + 2 P2 kararının (A4 erteleme, A5 422) teyidi.
+
+## Önceki — Teklif Modülü V6 Master Plan (5. tur review, 2026-05-29)
 
 **Teklif Modülü V6 Master Plan ONAYLANDI (implement edilmedi)**
 

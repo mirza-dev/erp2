@@ -3,7 +3,22 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif Modülü V6 Master Plan onaylandı (5. tur review), implement EDİLMEDİ (2026-05-29)
+**Son tamamlanan iş:** Bekleyen Teklifler UI/UX fix commit/push + Teklif V7 master plan bulguları kod karşısında doğrulandı (6. tur, 2026-05-29)
+
+- **1) Bekleyen UI fix push edildi:** Teklifler UI/UX audit fix (DOM mutation→hoveredId state, hex→CSS var, a11y) önceki oturumdan main'de commit'siz duruyordu. `tsc --noEmit` temiz + **3682 test yeşil** doğrulandı. 2 commit (`12f7e23` fix + `d201c11` docs) → main push → Coolify redeploy. Lokal skill dizinleri (`.agents/`, `.claude/skills/`, `skills/`) commit dışı. React Doctor pre-commit hook uyarısı bloklamadı.
+- **2) QUOTES_V2_PLAN.md zaten V7 (02:02'de, oturumdan önce yazılmış); memory V6'da staleydi.** Kullanıcının 6 bulgusu (3 P1 + 3 P2) + 1 bonus = V7-A1…A7 olarak plana zaten işlenmiş; bu turda hepsi kod karşısında doğrulandı:
+  - V7-A1 SECURITY DEFINER kaldır (036:1-3 + 065 DEFINER yok) ✅
+  - V7-A2 quote_date NULLIF guard (065:71,132) ✅
+  - V7-A3 order_lines satır vat_rate snapshot (039:57 + parasut-service:686 `vat_rate: line.vat_rate ?? 20`) ✅
+  - V7-A4 (P2) Paraşüt header discount (parasut-service:688) — kullanıcı SORU sordu; V7 "ertelendi" KARARI → **onay bekliyor**
+  - V7-A5 (P2) accept öncesi PDF arşiv guard (quote_pdf_archives Faz 4'te) — kullanıcı "recover/generate VEYA 409" önerdi; V7 **422 hard-fail** seçti → **onay bekliyor**
+  - V7-A7 order_lines tablo adı (001:110; sales_order_lines yok) ✅
+  - V7-A6 faz başı tam plan prosedürü
+- **Toplam 46 düzeltme (V2-V7).** Implement EDİLMEDİ. Detay: `memory/project_quotes.md` V7 başlığı.
+- **commit mesajı notu:** `d201c11` "V6 master plan" der ama içerik V7; pushed main, history rewrite yapılmadı.
+- **Sıradaki:** Faz 1 başlama onayı + 2 P2 kararının (A4 erteleme / A5 422) teyidi bekleniyor.
+
+**Önceki:** Teklif Modülü V6 Master Plan onaylandı (5. tur review), implement EDİLMEDİ (2026-05-29)
 
 - **Trigger:** Kullanıcı V5 plan üzerinde 5. tur review yaptı; 4 schema uyum blocker. V5 RPC SQL örnekleri mevcut schema ile çelişiyordu.
 - **Schema gerçekliği DOĞRULANDI (5. tur yeni):**
