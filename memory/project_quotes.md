@@ -4,13 +4,20 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 1a IMPLEMENT EDİLDİ (2026-05-29) — DB foundation, commit `106686c` (push/apply EDİLMEDİ)
+## Faz 1b IMPLEMENT EDİLDİ (2026-05-29) — QuoteForm entegrasyon, 3729 test, COMMIT+PUSH+APPLY EDİLDİ
 
-Faz 1 → **1a (DB foundation, UI'sız)** + **1b (QuoteForm/UI)** bölündü. 1a uygulandı:
-- Migration 066 (products.hs_code+size_text), 067 (quotes.customer_address + seller_*×7), 068 (quote_line_items.unit_weight_kg+kg_manual_override, weight_kg korunur), 069 (RPC payload ext — V7-A1 INVOKER, V7-A2 NULLIF korundu, 065'ten kopya).
-- TS: database.types/mock-data/api-mappers/quotes.ts/products.ts genişletildi. +20 test (`quotes-faz1a-*.test.ts`). tsc temiz · 3702 test · build OK.
-- **Commit EDİLDİ `106686c` (main) · push EDİLMEDİ · migration apply EDİLMEDİ.** Sıradaki: push + apply + **Faz 1b** ayrı plan (productId V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate+freeze V4-A3).
-- Faz 1b seller freeze kararı: yeni teklif→company_settings; mevcut/sent→snapshot hydrate + company_settings fetch ATLA (QuoteForm.tsx:242-257 mevcut canlı-fetch tuzağı).
+Faz 1 → **1a (DB foundation)** ✅ + **1b (QuoteForm/UI)** ✅ tamamlandı. 1b tek dosya `QuoteForm.tsx` + `quotes-faz1b-form-integration.test.ts` (+24 test, source-regex):
+- **V3-A4** productId gizli yakalama (select→p.id, manuel kod→temizle, payload product_id, hydrate). **069 RPC tüketimi DOĞRULANDI** — product_id+unit_weight_kg+kg_manual_override her iki RPC'de INSERT kolon+value NULLIF guard'lı (kozmetik değil).
+- **V4-A2** custId/custAddress state + handleSelectCustomer capture + Address/Adres input + payload customer_id/customer_address + hydrate.
+- **V4-B3/V3-B5/V4-A7** handleSelectProduct hs/size/unitWeightKg auto-fill; patchRow+round3 helper; handleQtyChange KG=qty×birim recompute; handleKgChange→kgManualOverride; payload unit_weight_kg/kg_manual_override.
+- **V4-A3 satıcı freeze:** `hasSellerSnapshot` ayraç + company effect `if(hasSellerSnapshot) return` (snapshot'lı quote'ta live fetch ATLA → donmuş); seller_* hydrate + persist; snapshot'sız eski quote→live fetch fallback.
+- **Regression:** faz4b desc bloğu BİREBİR korundu (konsolide refactor yok) — faz4b:30 + guard test yeşil. tsc temiz · 3729 test · build OK.
+- **Migration apply EDİLDİ** (066-069 Supabase editöründe). Runtime UI smoke kullanıcı tarafında bekliyor.
+- **Caveat:** hs/size auto-fill DORMANT (products'ta veri yok); handleSelectProduct hs'yi her seçimde set eder (dirty-guard YOK) → manuel HS yeniden-seçimde silinir. Products drawer hs/size edit UI 1b DIŞI (Faz 2/products-page).
+- **DURUM: COMMIT + PUSH EDİLDİ** (main, Coolify redeploy) · migration apply EDİLDİ. Sıradaki: UI smoke + **Faz 2** (V3-A1 GTİP soft warn, V7-A11 qty validator).
+
+### Faz 1a (önceki dilim) — commit `106686c` + doc-sync `c9f2bc8`, push/apply EDİLMEDİ
+- Migration 066-069 + TS (database.types/mock-data/api-mappers/quotes/products) + 20 test. V7-A1 INVOKER, V7-A2 NULLIF korundu.
 
 ## V7 Master Plan — diskte mevcut, 6 bulgu kod karşısında DOĞRULANDI (2026-05-29 6. tur) — Implement EDİLMEDİ
 

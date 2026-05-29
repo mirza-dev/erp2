@@ -13,6 +13,9 @@ import { buildQuoteLineDescription } from "@/lib/quote-description-builder";
 
 interface QuoteRow {
     id: number;
+    // Faz 1b (V3-A4): autocomplete'ten seçilen ürünün id'si (gizli). "" = manuel
+    // kod (kullanıcı listeden seçmedi) → payload'da null'a çevrilir.
+    productId: string;
     code: string;
     lead: string;
     desc: string;
@@ -23,6 +26,10 @@ interface QuoteRow {
     // Faz 4a (2026-05-23): PMT formunda "Ölçü / Size" kolonu (örn. "3/4''",
     // "DN50", "8\""). Serbest text; auto-build description Faz 4b'de gelir.
     size: string;
+    // Faz 1b (V3-B5, V4-A7): birim ağırlık (master'dan) + KG manuel override.
+    // unitWeightKg dolu & !kgManualOverride iken KG = qty × unitWeightKg recompute.
+    unitWeightKg: string;
+    kgManualOverride: boolean;
 }
 
 type Currency = "TRY" | "USD" | "EUR";
@@ -33,8 +40,11 @@ function fmt(n: number) {
 }
 
 function emptyRow(id: number): QuoteRow {
-    return { id, code: "", lead: "", desc: "", qty: "", price: "", hs: "", kg: "", size: "" };
+    return { id, productId: "", code: "", lead: "", desc: "", qty: "", price: "", hs: "", kg: "", size: "", unitWeightKg: "", kgManualOverride: false };
 }
+
+// Faz 1b: numeric(10,3) hedefi için 3 ondalığa yuvarla (float kalıntısını temizler).
+const round3 = (n: number) => String(Math.round(n * 1000) / 1000);
 
 // ── Injected styles (hover states + print) ────────────────────────────────────
 
@@ -104,6 +114,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     const [custContact, setCustContact] = useState("");
     const [custPhone, setCustPhone] = useState("");
     const [custEmail, setCustEmail] = useState("");
+    // Faz 1b (V4-A2): müşteri id (autocomplete'ten) + adres snapshot.
+    const [custId, setCustId] = useState("");
+    const [custAddress, setCustAddress] = useState("");
 
     // Quote detail fields
     const [salesRep, setSalesRep] = useState("");
@@ -141,6 +154,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     // Router
     const router = useRouter();
 
+    // Faz 1b (V4-A3): satıcı snapshot ayraç'ı. Mevcut quote'ta sellerName dolu
+    // ise → snapshot var → company_settings fetch ATLANIR (donmuş gösterim).
+    // sellerName her zaman non-empty persist edilir; pre-1b quote'larda "" →
+    // live fetch fallback (eski tekliflerde satıcı yine de görünür).
+    const hasSellerSnapshot = !!initialData && (initialData.sellerName?.trim() ?? "") !== "";
+
     // Autocomplete state — customer
     const [custSuggestions, setCustSuggestions] = useState<Customer[]>([]);
     const [custDropdownOpen, setCustDropdownOpen] = useState(false);
@@ -174,6 +193,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             setCustContact(initialData.customerContact);
             setCustPhone(initialData.customerPhone);
             setCustEmail(initialData.customerEmail);
+            // Faz 1b (V4-A2): müşteri id + adres hydrate
+            setCustId(initialData.customerId ?? "");
+            setCustAddress(initialData.customerAddress);
             setSalesRep(initialData.salesRep);
             setSalesPhone(initialData.salesPhone);
             setSalesEmail(initialData.salesEmail);
@@ -184,9 +206,20 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             setSig1(initialData.sigPrepared);
             setSig2(initialData.sigApproved);
             setSig3(initialData.sigManager);
+            // Faz 1b (V4-A3): satıcı snapshot hydrate. sellerName boşsa "PMT…"
+            // default'a düş; snapshot'sız eski quote'ta company effect doldurur.
+            setSellerName(initialData.sellerName || "PMT Endüstri A.Ş.");
+            setSellerTel(initialData.sellerPhone);
+            setSellerEmail(initialData.sellerEmail);
+            setSellerAddr(initialData.sellerAddress);
+            setSellerTaxId(initialData.sellerTaxId);
+            setSellerWeb(initialData.sellerWebsite);
+            if (initialData.sellerLogoUrl) setLogoSrc(initialData.sellerLogoUrl);
             if (initialData.lines.length > 0) {
                 const mapped = initialData.lines.map((l, i) => ({
                     id: i + 1,
+                    // Faz 1b (V3-A4, V3-B5, V4-A7): productId + birim ağırlık + override hydrate
+                    productId: l.productId ?? "",
                     code: l.productCode,
                     lead: l.leadTime,
                     desc: l.description,
@@ -195,6 +228,8 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                     hs: l.hsCode,
                     kg: l.weightKg !== null ? String(l.weightKg) : "",
                     size: l.sizeText,
+                    unitWeightKg: l.unitWeightKg !== null ? String(l.unitWeightKg) : "",
+                    kgManualOverride: l.kgManualOverride,
                 }));
                 setRows(mapped);
                 setNextId(initialData.lines.length + 1);
@@ -212,7 +247,10 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 const saved = JSON.parse(localStorage.getItem("teklif_v3") || "{}") as any;
                 if (saved.currency) setCurrency(saved.currency as Currency);
                 if (saved.rows?.length) {
-                    const restored: QuoteRow[] = saved.rows.map((r: QuoteRow, i: number) => ({ ...r, id: i + 1 }));
+                    // Faz 1b: eski localStorage payload'ında yeni alanlar (productId,
+                    // unitWeightKg, kgManualOverride) yok → emptyRow default'larıyla
+                    // merge et (undefined alan tuzağını önler).
+                    const restored: QuoteRow[] = saved.rows.map((r: QuoteRow, i: number) => ({ ...emptyRow(i + 1), ...r, id: i + 1 }));
                     setRows(restored);
                     setNextId(saved.rows.length + 1);
                     // Faz 4b Review P2-B: saved.descDirty index-aligned boolean[]
@@ -239,8 +277,11 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Firma ayarlarını çek — satıcı alanları DB'de saklanmaz, her modda company_settings'ten gelir
+    // Firma ayarlarını çek — yeni teklif / snapshot'sız eski quote'ta company_settings'ten gelir.
+    // Faz 1b (V4-A3): snapshot'lı quote'ta ATLA — satıcı bilgisi donmuş gösterilir
+    // (company_settings sonradan değişse bile teklif değişmez).
     useEffect(() => {
+        if (hasSellerSnapshot) return;
         fetch("/api/settings/company")
             .then(r => r.ok ? r.json() : null)
             .then(s => {
@@ -259,6 +300,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     // ── Customer autocomplete ─────────────────────────────────────────────────
     const handleCustCompanyChange = (value: string) => {
         setCustCompany(value);
+        // Faz 1b (V4-A2): manuel firma yazımı → seçili müşteri id bütünlüğü bozulur,
+        // id temizlenir (kullanıcı listeden seçmediyse customer_id null kalır).
+        setCustId("");
         if (value.trim().length < 1) {
             setCustSuggestions([]);
             setCustDropdownOpen(false);
@@ -281,6 +325,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         setCustCompany(c.name);
         setCustPhone(c.phone || "");
         setCustEmail(c.email || "");
+        // Faz 1b (V4-A2): müşteri id + adres yakala
+        setCustId(c.id);
+        setCustAddress(c.address || "");
         setCustDropdownOpen(false);
         setCustSuggestions([]);
     };
@@ -314,6 +361,8 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     // ── Product autocomplete ──────────────────────────────────────────────────
     const handleCodeChange = (rowId: number, value: string) => {
         updateRow(rowId, "code", value);
+        // Faz 1b (V3-A4): manuel kod yazımı → artık seçili ürün değil, productId temizle.
+        updateRow(rowId, "productId", "");
         if (value.trim().length < 1) {
             setProdSuggestions([]);
             setProdOpenRowId(null);
@@ -341,9 +390,22 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             updateRow(rowId, "desc", buildQuoteLineDescription(p) || p.name);
         }
         updateRow(rowId, "price", p.currency === currency ? String(p.price) : "");
-        if (p.weightKg) {
-            updateRow(rowId, "kg", String(p.weightKg));
-        }
+        // Faz 1b (V3-A4): seçili ürünün gizli id'si
+        updateRow(rowId, "productId", p.id);
+        // Faz 1b (V4-B3): GTİP + ölçü master'dan auto-fill (boşsa boş dolar — dormant)
+        updateRow(rowId, "hs", p.hsCode ?? "");
+        updateRow(rowId, "size", p.sizeText ?? "");
+        // Faz 1b (V3-B5/V4-A7): birim ağırlık + KG recompute. Yeni ürün seçimi
+        // override'ı sıfırlar; KG = qty × birim ağırlık (qty 0 ise temizlenir,
+        // ağırlıksız üründe mevcut KG korunur).
+        const unit = p.weightKg != null ? p.weightKg : null;
+        const qtyN = parseFloat(rows.find(r => r.id === rowId)?.qty ?? "") || 0;
+        const patch: Partial<QuoteRow> = {
+            unitWeightKg: unit != null ? String(unit) : "",
+            kgManualOverride: false,
+        };
+        if (unit != null) patch.kg = qtyN > 0 ? round3(qtyN * unit) : "";
+        patchRow(rowId, patch);
         setProdOpenRowId(null);
         setProdSuggestions([]);
     };
@@ -466,6 +528,27 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     function updateRow(id: number, field: keyof QuoteRow, value: string) {
         setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
     }
+    // Faz 1b: çok-alanlı / boolean güncelleme (updateRow string-only kalır).
+    function patchRow(id: number, patch: Partial<QuoteRow>) {
+        setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
+    }
+    // Faz 1b (V3-B5): qty değişince KG recompute (override yoksa & birim ağırlık varsa).
+    function handleQtyChange(rowId: number, value: string) {
+        setRows(prev => prev.map(r => {
+            if (r.id !== rowId) return r;
+            const next = { ...r, qty: value };
+            if (!r.kgManualOverride && r.unitWeightKg) {
+                const q = parseFloat(value) || 0;
+                const u = parseFloat(r.unitWeightKg) || 0;
+                next.kg = q > 0 && u > 0 ? round3(q * u) : "";
+            }
+            return next;
+        }));
+    }
+    // Faz 1b (V4-A7): KG elle değişince override flag açılır → recompute durur.
+    function handleKgChange(rowId: number, value: string) {
+        patchRow(rowId, { kg: value, kgManualOverride: true });
+    }
     function clearAll() {
         if (!confirm("Tüm satırlar silinecek. Devam edilsin mi?")) return;
         setRows([emptyRow(1), emptyRow(2), emptyRow(3)]);
@@ -498,6 +581,17 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             customer_contact: custContact || undefined,
             customer_phone: custPhone || undefined,
             customer_email: custEmail || undefined,
+            // Faz 1b (V4-A2): müşteri id + adres
+            customer_id: custId || null,
+            customer_address: custAddress || undefined,
+            // Faz 1b (V4-A3): satıcı snapshot (kaydetme anında dondurulur)
+            seller_name: sellerName || undefined,
+            seller_phone: sellerTel || undefined,
+            seller_email: sellerEmail || undefined,
+            seller_address: sellerAddr || undefined,
+            seller_tax_id: sellerTaxId || undefined,
+            seller_website: sellerWeb || undefined,
+            seller_logo_url: logoSrc || undefined,
             sales_rep: salesRep || undefined,
             sales_phone: salesPhone || undefined,
             sales_email: salesEmail || undefined,
@@ -519,6 +613,8 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 .filter(r => r.code.trim() || r.desc.trim())
                 .map((r, i) => ({
                     position: i + 1,
+                    // Faz 1b (V3-A4): seçili ürün id (manuel kodda null)
+                    product_id: r.productId || null,
                     product_code: r.code,
                     lead_time: r.lead || undefined,
                     description: r.desc,
@@ -528,6 +624,9 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                     hs_code: r.hs || undefined,
                     weight_kg: r.kg ? parseFloat(r.kg) : undefined,
                     size_text: r.size || undefined,
+                    // Faz 1b (V3-B5/V4-A7): birim ağırlık + KG manuel override
+                    unit_weight_kg: r.unitWeightKg ? parseFloat(r.unitWeightKg) : undefined,
+                    kg_manual_override: r.kgManualOverride,
                 })),
         };
     }
@@ -795,11 +894,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                 </div>
                             </div>
 
-                            {/* Contact, Phone, Email */}
+                            {/* Contact, Phone, Email, Address (Faz 1b V4-A2) */}
                             {([
                                 ["Contact",  "İrtibat Kişisi",  custContact, setCustContact, "Ad Soyad",           "text"],
                                 ["Phone",    "Telefon",         custPhone,   setCustPhone,   "+90 532 …",          "text"],
                                 ["Email",    "E-posta",         custEmail,   setCustEmail,   "ornek@firma.com",    "email"],
+                                ["Address",  "Adres",           custAddress, setCustAddress, "Müşteri adresi…",    "text"],
                             ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])
                                 .map(([en, tr, val, set, ph, type]) => (
                                     <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
@@ -969,7 +1069,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                                     setDescDirtyRowIds(prev => prev.has(row.id) ? prev : new Set(prev).add(row.id));
                                                 }} /></td>
                                                 {/* Qty */}
-                                                <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "center" }} type="number" min="0" step="any" placeholder="0" value={row.qty} onChange={e => updateRow(row.id, "qty", e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "center" }} type="number" min="0" step="any" placeholder="0" value={row.qty} onChange={e => handleQtyChange(row.id, e.target.value)} /></td>
                                                 {/* Unit Price */}
                                                 <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.price} onChange={e => updateRow(row.id, "price", e.target.value)} /></td>
                                                 {/* Line Total */}
@@ -979,7 +1079,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                                 {/* HS Code */}
                                                 <td style={tdBase}><input className="q-cell" style={cellInput} placeholder="8481.80" value={row.hs} onChange={e => updateRow(row.id, "hs", e.target.value)} /></td>
                                                 {/* Kg */}
-                                                <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.kg} onChange={e => updateRow(row.id, "kg", e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.kg} onChange={e => handleKgChange(row.id, e.target.value)} /></td>
                                                 {/* Delete */}
                                                 {!readOnly && (
                                                 <td style={{ ...tdBase, width: "28px", textAlign: "center", padding: "0 4px" }} className="q-no-print">

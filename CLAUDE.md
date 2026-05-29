@@ -3,14 +3,18 @@
 ## Mevcut Durum
 _Son güncelleme: 2026-05-29_
 
-**Son tamamlanan iş:** Teklif V7 **Faz 1a** implement edildi — DB foundation (3702 test, commit `106686c`, push/apply EDİLMEDİ, 2026-05-29)
+**Son tamamlanan iş:** Teklif V7 **Faz 1b** implement edildi — QuoteForm entegrasyon (3729 test, migration apply EDİLDİ, 2026-05-29)
 
-- **Karar:** Faz 1 → **1a (DB foundation, UI'sız)** + **1b (QuoteForm/UI)** bölündü (kullanıcı kararı). Seller freeze 1b'de çözülecek.
-- **4 migration:** `066` products.hs_code+size_text (V4-B3) · `067` quotes.customer_address + seller_*×7 (V4-A2/A3) · `068` quote_line_items.unit_weight_kg + kg_manual_override (V3-B5/V4-A7; mevcut weight_kg korunur) · `069` create/update_quote_with_lines payload ext (065'ten kopya + yeni alanlar; **V7-A1 SECURITY DEFINER YOK / INVOKER**, **V7-A2 NULLIF guard'lar korundu**, customer_id + delivery/payment/size aynen).
-- **TS katmanı:** `database.types.ts` (3 interface), `mock-data.ts` (Product/QuoteDetail/QuoteLineItem), `api-mappers.ts` (3 mapper), `supabase/quotes.ts` (CreateQuoteInput+LineInput), `supabase/products.ts` (CreateProductInput + dbCreateProduct insert satırı; dbUpdateProduct spread → otomatik).
-- **+20 test** (`quotes-faz1a-migration.test.ts` + `quotes-faz1a-helper-mapper.test.ts`) · tsc temiz · **3702 test yeşil** (3682+20) · 0 yeni lint (32 hata tamamı önceki set-state-in-effect, plan dışı) · build OK + `ƒ Proxy (Middleware)`.
-- **DURUM: COMMIT EDİLDİ `106686c` (main) · push EDİLMEDİ · migration apply EDİLMEDİ.**
-- **Sıradaki:** (1) push (Coolify redeploy), (2) migration apply + smoke (`\df+ create_quote_with_lines`→INVOKER; `quote_date:''`→200/NULL), (3) **Faz 1b** ayrı plan modu (productId V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate+freeze V4-A3).
+- **Faz 1 tamamlandı:** **1a (DB foundation)** ✅ commit `106686c` + **1b (QuoteForm/UI)** ✅ bu turda. 1b tek dosya `QuoteForm.tsx` — 1a alanlarını forma bağlar.
+- **V3-A4 productId:** `QuoteRow.productId` + handleSelectProduct set + handleCodeChange temizle + payload `product_id` + hydrate. **069 RPC tüketimi doğrulandı** (product_id/unit_weight_kg/kg_manual_override her iki RPC INSERT kolon+value NULLIF guard'lı → kozmetik değil).
+- **V4-A2 müşteri:** `custId`/`custAddress` + handleSelectCustomer capture + Address/Adres input + payload customer_id/customer_address + hydrate.
+- **V4-B3/V3-B5/V4-A7:** handleSelectProduct hs/size/unitWeightKg auto-fill; `patchRow`+`round3`; handleQtyChange KG=qty×birim recompute; handleKgChange→`kgManualOverride`; payload unit_weight_kg/kg_manual_override.
+- **V4-A3 satıcı freeze:** `hasSellerSnapshot` ayraç + company_settings effect `if(hasSellerSnapshot) return` (snapshot'lı quote'ta live fetch ATLA → donmuş gösterim); seller_* hydrate+persist; pre-1b snapshot'sız quote→live fetch fallback.
+- **Regression:** faz4b desc bloğu BİREBİR korundu (konsolide refactor yok). **+24 test** (`quotes-faz1b-form-integration.test.ts`) · tsc temiz · **3729 test yeşil** (3702→+27) · build OK.
+- **Migration apply EDİLDİ** (066-069 Supabase editöründe çalıştırıldı, 2026-05-29). UI smoke kullanıcı tarafında bekliyor (yeni teklif ürün seç→hs/size/KG; kaydet→reload→korunur; eski sent→satıcı donmuş).
+- **Caveat:** hs/size auto-fill DORMANT (products'ta hs_code/size_text boş); handleSelectProduct hs'yi her seçimde set eder (dirty-guard YOK) → manuel HS yeniden-seçimde silinir. Products drawer hs/size edit UI 1b DIŞI.
+- **DURUM: COMMIT + PUSH EDİLDİ** (main, Coolify redeploy tetiklendi) · migration apply EDİLDİ.
+- **Sıradaki:** (1) UI smoke (yukarıda), (2) **Faz 2** (V3-A1 GTİP soft warn, V7-A11 qty pozitif integer validator).
 
 **Önceki:** Bekleyen Teklifler UI/UX fix commit/push + Teklif V7 master plan bulguları kod karşısında doğrulandı (6. tur, 2026-05-29)
 

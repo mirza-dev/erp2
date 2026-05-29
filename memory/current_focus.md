@@ -5,17 +5,25 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 1a IMPLEMENT EDİLDİ — DB foundation, 3702 test, COMMIT BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-29 (Teklif V7 Faz 1b IMPLEMENT EDİLDİ — QuoteForm entegrasyon, 3729 test, COMMIT+PUSH+APPLY EDİLDİ)
 
-**Karar:** Faz 1 → **1a (DB foundation)** + **1b (QuoteForm/UI)** bölündü (kullanıcı kararı). Seller freeze 1b'de çözülecek (yeni teklif company_settings'ten; mevcut/sent snapshot'tan hydrate + fetch ATLA).
+**Faz 1b uygulandı — tek dosya `QuoteForm.tsx` + 1 test dosyası (faz başı V7-A6 kod doğrulaması yapıldı).** 1a DB foundation'ı (066-069 + type/mapper/input) forma bağlandı.
 
-**Faz 1a uygulandı (faz başı V7-A6 ile kod yeniden doğrulandı):**
-- **4 migration:** `066_products_hs_size.sql` (products.hs_code+size_text), `067_quotes_customer_address_seller.sql` (quotes.customer_address + seller_* ×7), `068_quote_line_items_unit_weight.sql` (unit_weight_kg numeric + kg_manual_override boolean DEFAULT false; mevcut weight_kg korunur), `069_quotes_rpc_payload_ext.sql` (create/update_quote_with_lines 065'ten kopya + yeni alanlar; **V7-A1 SECURITY DEFINER YOK**, **V7-A2 NULLIF guard'lar korundu**, customer_id + delivery/payment/size aynen).
-- **TS katmanı:** `database.types.ts` (ProductRow hs_code/size_text; QuoteRow customer_address+seller_*×7; QuoteLineItemRow unit_weight_kg/kg_manual_override), `mock-data.ts` (Product.hsCode/sizeText; QuoteDetail.customerAddress+seller*×7; QuoteLineItem.unitWeightKg/kgManualOverride), `api-mappers.ts` (mapProduct/mapQuoteDetail/mapQuoteLineItem), `quotes.ts` (CreateQuoteInput+CreateQuoteLineInput), `products.ts` (CreateProductInput + dbCreateProduct insert — explicit insert olduğu için satır eklendi; dbUpdateProduct spread → otomatik).
-- **+20 test:** `quotes-faz1a-migration.test.ts` (066-069 SQL source-regex, 069 yorum-strip ile DEFINER kontrolü), `quotes-faz1a-helper-mapper.test.ts` (mapper null/dolu + dbCreateQuote/dbCreateProduct payload forward).
-- **Doğrulama:** tsc temiz · **3702 test yeşil** (3682+20) · 0 yeni lint (32 hata tamamı önceki set-state-in-effect, plan dışı) · build OK + `ƒ Proxy (Middleware)`.
-- **DURUM: COMMIT EDİLDİ `106686c` (main, push EDİLMEDİ).** DB migration'ları henüz Supabase'e apply EDİLMEDİ (lokal dosya).
-- **Sıradaki:** (1) push (Coolify redeploy), (2) migration apply + smoke (`\df+ create_quote_with_lines`→INVOKER; quote_date:''→NULL), (3) **Faz 1b** ayrı plan modu (productId capture V3-A4, customer_id/address V4-A2, hs/size/kg auto-fill V4-B3, seller persist+hydrate V4-A3 + freeze).
+- **V3-A4 productId:** local `QuoteRow`'a `productId` alanı; `handleSelectProduct`→`p.id` set, `handleCodeChange` manuel yazımda temizler; `buildQuotePayload`→`product_id: r.productId || null`; initialData hydrate `l.productId`.
+- **V4-A2 müşteri:** `custId`/`custAddress` state; `handleSelectCustomer`→`c.id`+`c.address`; `handleCustCompanyChange` manuel yazımda custId temizler; meta grid'e **Address/Adres** input; payload `customer_id`+`customer_address`; hydrate.
+- **V4-B3 + V3-B5/V4-A7 hs/size/KG:** `handleSelectProduct`→`hs=p.hsCode`, `size=p.sizeText`, `unitWeightKg=p.weightKg` (override sıfırlanır); yeni `patchRow` helper + `round3`; `handleQtyChange` KG=qty×birim recompute (`!kgManualOverride && unitWeightKg`); `handleKgChange` manuel→`kgManualOverride=true`; payload `unit_weight_kg`/`kg_manual_override`.
+- **V4-A3 satıcı freeze:** `hasSellerSnapshot = !!initialData && sellerName.trim()!==""`; company_settings effect başına `if(hasSellerSnapshot) return` (snapshot'lı quote'ta live fetch ATLANIR → donmuş); initialData seller_* hydrate; payload seller_* (7). Pre-1b snapshot'sız quote → live fetch fallback.
+- **Regression koruması:** faz4b desc bloğu **BİREBİR** korundu (konsolide refactor YAPILMADI) — faz4b:30 regex + yeni guard test ikisi de yeşil. faz4a-patch-validation tam-alan assert'i yok → additive güvenli (doğrulandı).
+- **069 RPC tüketimi DOĞRULANDI (advisor blocker):** `product_id`+`unit_weight_kg`+`kg_manual_override` her iki RPC'de (create+update) satır INSERT kolon listesi VE value'larında NULLIF guard'lı → V3-A4 round-trip uçtan uca bağlı, kozmetik DEĞİL.
+- **+24 test** `quotes-faz1b-form-integration.test.ts` (source-regex, faz4b modeli).
+- **Doğrulama:** tsc temiz · **3729 test yeşil** (3702→+27) · build OK.
+- **Migration apply EDİLDİ** (066-069 Supabase editöründe çalıştırıldı). Runtime UI smoke kullanıcı tarafında bekliyor — koddan kanıtlı round-trip henüz çalışma anında test edilmedi.
+- **hs/size auto-fill DORMANT + caveat:** products'ta hs_code/size_text boş (1a backfill yok, products drawer edit UI 1b DIŞI). `handleSelectProduct` hs'yi `p.hsCode ?? ""` ile **her seçimde set eder** (dirty-guard YOK, desc'ten farklı) → manuel girilmiş HS, ürün yeniden seçilirse silinir. Products bu alanları taşıyana dek beklenen; ileride dirty-guard gerekebilir.
+- **DURUM: COMMIT + PUSH EDİLDİ** (main, Coolify redeploy) · migration apply EDİLDİ.
+- **Sıradaki:** (1) UI smoke (yeni teklif ürün seç→hs/size/KG; kaydet→reload→korunur; eski sent→satıcı donmuş), (2) **Faz 2** (V3-A1 GTİP soft warn, V7-A11 qty validator).
+
+### Önceki dilim — Faz 1a (DB foundation, commit `106686c`, doc-sync `c9f2bc8`)
+- 4 migration (066-069) + TS katmanı (database.types/mock-data/api-mappers/quotes/products) + 20 test. **V7-A1** SECURITY DEFINER YOK, **V7-A2** NULLIF guard korundu. Commit edildi (main), push/apply EDİLMEDİ.
 
 ## Önceki — 2026-05-29 (6. tur: bekleyen UI fix commit/push + V7 bulgu doğrulama)
 
