@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache, revalidateTag } from "next/cache";
-import { dbGetQuote, dbUpdateQuote, dbDeleteQuote } from "@/lib/supabase/quotes";
+import { dbGetQuote, dbUpdateQuote, dbDeleteQuote, dbListQuoteChain } from "@/lib/supabase/quotes";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { mapQuoteDetail } from "@/lib/api-mappers";
@@ -40,7 +40,28 @@ export async function GET(
             }
         }
 
-        return NextResponse.json({ ...data, convertedOrderId, convertedOrderNumber });
+        // Faz 5: revizyon zinciri bağları. revisedBy = bu teklif 'revised' ise
+        // zincirin en yeni üyesi (en güncele git); revisionOf = revizyonsa kök.
+        let revisedBy: { id: string; quoteNumber: string } | null = null;
+        let revisionOf: { id: string; quoteNumber: string } | null = null;
+        const isRevised = data.status === "revised";
+        const isRevision = data.revisionNo > 1;
+        if (isRevised || isRevision) {
+            const root = data.rootQuoteId ?? id;
+            const chain = await dbListQuoteChain(root);
+            if (isRevised) {
+                const latest = chain[chain.length - 1];
+                if (latest && latest.id !== id) {
+                    revisedBy = { id: latest.id, quoteNumber: latest.quote_number };
+                }
+            }
+            if (isRevision) {
+                const rootRow = chain.find(c => c.id === root);
+                if (rootRow) revisionOf = { id: rootRow.id, quoteNumber: rootRow.quote_number };
+            }
+        }
+
+        return NextResponse.json({ ...data, convertedOrderId, convertedOrderNumber, revisedBy, revisionOf });
     } catch (err) {
         return handleApiError(err, "GET /api/quotes/[id]");
     }

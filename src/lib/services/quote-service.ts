@@ -6,7 +6,7 @@
  */
 
 import type { QuoteStatus } from "@/lib/database.types";
-import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes } from "@/lib/supabase/quotes";
+import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision } from "@/lib/supabase/quotes";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
@@ -33,6 +33,7 @@ const QUOTE_TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
     accepted: [],
     rejected: [],
     expired:  [],
+    revised:  [],   // Faz 5: terminal — revize edilmiş kaynak (geçiş yok)
 };
 
 export function isValidQuoteTransition(from: QuoteStatus, to: QuoteStatus): boolean {
@@ -73,6 +74,40 @@ export async function serviceTransitionQuote(
         return { success: false, error: "Teklif durumu eşzamanlı olarak değiştirilmiş. Sayfayı yenileyip tekrar deneyin." };
     }
     return { success: true };
+}
+
+// ── Revizyon (Faz 5) ─────────────────────────────────────────
+
+export interface QuoteRevisionResult {
+    success: boolean;
+    error?: string;
+    notFound?: boolean;
+    /** Kaynak revize edilebilir durumda değil (draft/accepted/revised) → route 409. */
+    invalidStatus?: boolean;
+    newQuoteId?: string;
+    newQuoteNumber?: string;
+}
+
+/**
+ * Faz 5: sent/rejected/expired teklifin düzenlenebilir kopyasını (revizyon)
+ * yaratır; kaynağı 'revised' yapar. Kopya + status mantığı create_quote_revision
+ * RPC'sinde (074, atomik). Burada RPC hata kodları HTTP'ye map'lenir.
+ *   - 42501 → invalidStatus (revize edilemez durum)
+ *   - P0002 → notFound (kaynak yok)
+ */
+export async function serviceCreateQuoteRevision(sourceId: string): Promise<QuoteRevisionResult> {
+    let newId: string;
+    try {
+        newId = await dbCreateQuoteRevision(sourceId);
+    } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (code === "42501") return { success: false, error: msg, invalidStatus: true };
+        if (code === "P0002") return { success: false, error: "Kaynak teklif bulunamadı.", notFound: true };
+        throw err;
+    }
+    const created = await dbGetQuote(newId);
+    return { success: true, newQuoteId: newId, newQuoteNumber: created?.quote_number };
 }
 
 // ── Quote Expiry (CRON) ──────────────────────────────────────

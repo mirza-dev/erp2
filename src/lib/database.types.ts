@@ -439,12 +439,16 @@ export interface ImportBatchRow {
     confirmed_at: string | null
 }
 
-export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired"
+export type QuoteStatus = "draft" | "sent" | "accepted" | "rejected" | "expired" | "revised"
 
 export interface QuoteRow {
     id: string
     quote_number: string
     status: QuoteStatus
+    // Faz 5 (revizyon zinciri): original=1, revizyonlar artar; root_quote_id
+    // tüm revizyonları köke bağlar (original'da NULL).
+    revision_no: number
+    root_quote_id: string | null
     customer_id: string | null
     customer_name: string
     customer_contact: string | null

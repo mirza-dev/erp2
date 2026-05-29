@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import { getQuoteActions, isQuoteEditable, getQuoteConvertAction, type QuoteAction } from "../_utils/quote-display";
+import { getQuoteActions, isQuoteEditable, getQuoteConvertAction, getQuoteReviseEligible, type QuoteAction } from "../_utils/quote-display";
 import QuoteForm from "../_components/QuoteForm";
 import type { QuoteDetail } from "@/lib/mock-data";
 import type { QuoteStatus } from "@/lib/database.types";
@@ -19,12 +19,20 @@ const quoteStatusConfig: Record<QuoteStatus, { label: string; bg: string; color:
     accepted: { label: "Kabul Edildi", bg: "var(--success-bg)",     color: "var(--success-text)",   border: "var(--success-border)",   description: "Müşteri kabul etti" },
     rejected: { label: "Reddedildi",   bg: "var(--danger-bg)",      color: "var(--danger-text)",    border: "var(--danger-border)",    description: "Müşteri reddetti" },
     expired:  { label: "Süresi Doldu", bg: "var(--warning-bg)",     color: "var(--warning-text)",   border: "var(--warning-border)",   description: "Geçerlilik süresi geçti" },
+    revised:  { label: "Revize Edildi", bg: "var(--bg-tertiary)",   color: "var(--text-secondary)", border: "var(--border-secondary)", description: "Yeni revizyonla değiştirildi" },
 };
 
 // Faz 8: GET /api/quotes/[id] bu alanları da döndürüyor
+// Faz 5: revizyon zinciri bağları (revisedBy/revisionOf)
+interface QuoteChainRef {
+    id: string;
+    quoteNumber: string;
+}
 interface QuoteDetailWithConversion extends QuoteDetail {
     convertedOrderId?: string;
     convertedOrderNumber?: string;
+    revisedBy?: QuoteChainRef | null;
+    revisionOf?: QuoteChainRef | null;
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -35,11 +43,12 @@ export default function QuoteDetailPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
 
-    const [quote, setQuote] = useState<QuoteDetail | null>(null);
+    const [quote, setQuote] = useState<QuoteDetailWithConversion | null>(null);
     const [quoteLoading, setQuoteLoading] = useState(true);
     const [status, setStatus] = useState<QuoteStatus>("draft");
     const [loading, setLoading] = useState<string | null>(null);
     const [converting, setConverting] = useState(false);
+    const [revising, setRevising] = useState(false);
     const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null);
     const [convertedOrderNumber, setConvertedOrderNumber] = useState<string | null>(null);
     const [confirmDialog, setConfirmDialog] = useState<{
@@ -149,6 +158,27 @@ export default function QuoteDetailPage() {
             toast({ type: "error", message: err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu." });
         } finally {
             setConverting(false);
+        }
+    };
+
+    // ── Revize handler (Faz 5) ───────────────────────────────────────────────
+
+    const handleRevise = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setRevising(true);
+        try {
+            const res = await fetch(`/api/quotes/${params.id}/revise`, { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) {
+                toast({ type: "error", message: data.error || "Revizyon oluşturulamadı." });
+                return;
+            }
+            toast({ type: "success", message: `Revizyon oluşturuldu: ${data.newQuoteNumber}` });
+            router.push(`/dashboard/quotes/${data.newQuoteId}`);
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu." });
+        } finally {
+            setRevising(false);
         }
     };
 
@@ -293,6 +323,59 @@ export default function QuoteDetailPage() {
                         ✓ Sipariş oluşturuldu: {convertedOrderNumber}
                     </Link>
                 )}
+
+                {/* Faz 5: Revize Et — sent/rejected/expired */}
+                {getQuoteReviseEligible(status) && (
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
+                            setConfirmDialog({
+                                action: "revise_quote",
+                                title: "Teklifi Revize Et",
+                                message: `${quote.quoteNumber} numaralı teklifin düzenlenebilir bir kopyası oluşturulacak; bu teklif "Revize Edildi" olarak kilitlenecek. Devam edilsin mi?`,
+                                confirmLabel: "Evet, Revize Et",
+                                variant: "primary",
+                            });
+                        }}
+                        disabled={isDemo || revising}
+                        loading={revising}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                    >
+                        {revising ? "Revize ediliyor..." : "Revize Et"}
+                    </Button>
+                )}
+
+                {/* Faz 5: revize edildi rozeti (kaynak → en yeni revizyon) */}
+                {quote.revisedBy && (
+                    <Link
+                        href={`/dashboard/quotes/${quote.revisedBy.id}`}
+                        role="status"
+                        style={{
+                            display: "inline-flex", alignItems: "center", gap: "6px",
+                            padding: "4px 12px", borderRadius: "4px", fontSize: "12px", fontWeight: 500,
+                            background: "var(--warning-bg)", color: "var(--warning-text)",
+                            border: "0.5px solid var(--warning-border)", textDecoration: "none",
+                        }}
+                    >
+                        ↻ Bu teklif revize edildi → {quote.revisedBy.quoteNumber}
+                    </Link>
+                )}
+
+                {/* Faz 5: revizyon rozeti (kaynağa link) */}
+                {quote.revisionOf && (
+                    <Link
+                        href={`/dashboard/quotes/${quote.revisionOf.id}`}
+                        role="status"
+                        style={{
+                            display: "inline-flex", alignItems: "center", gap: "6px",
+                            padding: "4px 12px", borderRadius: "4px", fontSize: "12px", fontWeight: 500,
+                            background: "var(--accent-bg)", color: "var(--accent-text)",
+                            border: "0.5px solid var(--accent-border)", textDecoration: "none",
+                        }}
+                    >
+                        Revizyon {quote.revisionNo} — kaynak: {quote.revisionOf.quoteNumber}
+                    </Link>
+                )}
             </div>
 
             {/* ── Quote Form ── */}
@@ -374,6 +457,8 @@ export default function QuoteDetailPage() {
                                     setConfirmDialog(null);
                                     if (action === "convert_to_order") {
                                         handleConvert();
+                                    } else if (action === "revise_quote") {
+                                        handleRevise();
                                     } else {
                                         handleTransition(action);
                                     }

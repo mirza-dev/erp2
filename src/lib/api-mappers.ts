@@ -288,6 +288,9 @@ export function mapQuoteSummary(row: QuoteRow): QuoteSummary {
 export function mapQuoteDetail(row: QuoteWithLines): QuoteDetail {
   return {
     ...mapQuoteSummary(row),
+    // Faz 5 (revizyon zinciri)
+    revisionNo: Number(row.revision_no ?? 1),
+    rootQuoteId: row.root_quote_id ?? null,
     customerId: row.customer_id ?? null,
     customerContact: row.customer_contact ?? "",
     customerPhone: row.customer_phone ?? "",

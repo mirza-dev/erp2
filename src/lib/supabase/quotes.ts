@@ -169,3 +169,30 @@ export async function dbFindQuoteByNumber(quoteNumber: string): Promise<QuoteRow
     if (error) throw error;
     return data as QuoteRow | null;
 }
+
+/**
+ * Faz 5: create_quote_revision RPC (074) — kaynak teklifin düzenlenebilir
+ * kopyasını yaratır (atomik), kaynağı 'revised' yapar. Yeni quote id döner.
+ * RPC hata kodları service katmanında map'lenir (42501=invalid status, P0002=not found).
+ */
+export async function dbCreateQuoteRevision(sourceId: string): Promise<string> {
+    const sb = createServiceClient();
+    const { data, error } = await sb.rpc("create_quote_revision", { p_source_id: sourceId });
+    if (error) throw error;
+    return data as string;
+}
+
+/**
+ * Faz 5: revizyon zincirinin tüm üyeleri (kök + revizyonlar), revision_no artan.
+ * root = coalesce(root_quote_id, id). Detail enrichment (revisedBy/revisionOf) için.
+ */
+export async function dbListQuoteChain(rootId: string): Promise<Array<Pick<QuoteRow, "id" | "quote_number" | "revision_no" | "status">>> {
+    const sb = createServiceClient();
+    const { data, error } = await sb
+        .from("quotes")
+        .select("id, quote_number, revision_no, status")
+        .or(`id.eq.${rootId},root_quote_id.eq.${rootId}`)
+        .order("revision_no", { ascending: true });
+    if (error) throw error;
+    return (data ?? []) as Array<Pick<QuoteRow, "id" | "quote_number" | "revision_no" | "status">>;
+}

@@ -1,5 +1,7 @@
 // Mock data for development — will be replaced with Supabase queries
 
+import type { QuoteStatus } from "@/lib/database.types";
+
 export interface UretimKaydi {
     id: string;
     productId: string;
@@ -223,7 +225,7 @@ export interface QuoteLineItem {
 export interface QuoteSummary {
     id: string;
     quoteNumber: string;
-    status: "draft" | "sent" | "accepted" | "rejected" | "expired";
+    status: QuoteStatus;
     customerName: string;
     currency: string;
     grandTotal: number;
@@ -233,6 +235,9 @@ export interface QuoteSummary {
 }
 
 export interface QuoteDetail extends QuoteSummary {
+    // Faz 5 (revizyon zinciri): revision_no + kök bağı.
+    revisionNo: number;
+    rootQuoteId: string | null;
     customerId: string | null;
     customerContact: string;
     customerPhone: string;

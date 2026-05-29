@@ -4,7 +4,23 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 5 infra dilim (2026-05-30) — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT+PUSH 942ee0d + migration 073 APPLY BEKLİYOR
+## Revizyon Zinciri (2026-05-30) — Faz 5'ten ertelenen büyük özellik, 3836 test, COMMIT BEKLİYOR + migration 074 APPLY BEKLİYOR
+
+**sent/rejected/expired teklifin düzenlenebilir kopyası (revizyon).** Plan: `~/.claude/plans/clever-dancing-owl.md`.
+
+- **Kullanıcı kararları:** revize edilebilir=sent+rejected+expired; kaynak→`revised` (terminal); numara=kök+suffix (-R2/-R3); revizyon valid_until=NULL (CRON re-expire + mid-edit 409 önlemi).
+- **Migration 074 (APPLY BEKLİYOR):** revision_no/root_quote_id + status CHECK +revised + `create_quote_revision` RPC (atomik, V7-A1 INVOKER, kök FOR UPDATE serialize, status guard 42501, chain max+1, header+satır kopya, kaynak→revised). V2 flat chain (köke işaret). quote_number UNIQUE backstop.
+- **Service/route:** serviceCreateQuoteRevision (42501→invalidStatus/409, P0002→notFound/404); POST /api/quotes/[id]/revise → 201 {newQuoteId}; dbCreateQuoteRevision + dbListQuoteChain.
+- **GET enrichment:** revisedBy (revised→zincir en yenisi) + revisionOf (revision_no>1→kök).
+- **UI:** getQuoteReviseEligible → Revize Et butonu → router.push(yeni draft); revisedBy/revisionOf rozetleri. STATUS_META+tab revised; QUOTE_TRANSITIONS revised:[] terminal.
+- **TS:** QuoteStatus +revised (tsc touch-point: QuoteSummary.status union→QuoteStatus tipine); QuoteRow/QuoteDetail/mapper revision alanları.
+- **Bilinen sınırlama:** tek revizyon silme kökü dead-end bırakır (nadir); revisedBy=en-yeni (bilinçli).
+- **Test:** quotes-revision (13, +071 omission regression) + quotes-revise-route (3). **3821→3837 yeşil** · tsc/build/lint temiz.
+- **Numbering:** revizyon=074 → Faz 4=075-076, Faz 6=077, Faz 7=078-079.
+- **DURUM: COMMIT BEKLİYOR + 074 APPLY BEKLİYOR.** Sıradaki: commit/push + 074 apply + smoke + Faz 4 (075-076 PDF arşiv).
+
+---
+## Faz 5 infra dilim (2026-05-30) — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT+PUSH 942ee0d + migration 073 APPLY EDİLDİ
 
 **Faz 5 master-plan'da 5 parça (status CHECK + revizyon + sig backfill + prefix + yearly_counters) tek satır, detay yok.** Kullanıcı kararı: **infra dilim** = sadece numara katmanı. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 

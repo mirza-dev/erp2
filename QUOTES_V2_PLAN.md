@@ -328,16 +328,23 @@ Faz 3 (UYGULANDI 2026-05-29; numbering güncellendi):
   072 → quotes.discount_amount CHECK >= 0 (review P2 belt-and-suspenders;
         <= subtotal route kuralı validateDiscount). [070/071 apply edildi; 072 apply bekliyor]
 
-Faz 5 (numbering +1 kaydı: eski 072 → 073):
-  073 → status CHECK + revision + sig backfill + prefix + quote_yearly_counters
-        + RPC'ler V7-A1: SECURITY INVOKER
+Faz 5 infra dilim (UYGULANDI 2026-05-30):
+  073 → numara katmanı: company_settings prefix/separator + quote_yearly_counters
+        (yıllık reset) + next_quote_number() rewrite (V7-A1 INVOKER). [apply edildi]
+        NOT: sig backfill + status CHECK bu dilimden ÇIKARILDI (sig rename ertelendi;
+        status CHECK revizyon fazına alındı).
 
-Faz 4 (eski 073-074 → 074-075):
-  074 → quote_pdf_archives + RLS
-  075 → storage quote-pdfs bucket
+Revizyon zinciri (UYGULANDI 2026-05-30):
+  074 → revision_no/root_quote_id kolonları + status CHECK +revised +
+        create_quote_revision RPC (V7-A1 INVOKER, FOR UPDATE, kök+suffix -R,
+        valid_until=NULL). [apply edildi]
 
-Faz 6 (eski 075 → 076):
-  076 → sales_orders meta (+ V6-A3 vat_rate header snapshot)
+Faz 4 (eski 073-074 → 075-076):
+  075 → quote_pdf_archives + RLS
+  076 → storage quote-pdfs bucket
+
+Faz 6 (eski 075 → 077):
+  077 → sales_orders meta (+ V6-A3 vat_rate header snapshot)
         + accept_quote_and_create_order RPC:
           - V5-A4 atomik transaction
           - V6-A2 generate_order_number()
@@ -355,9 +362,9 @@ Faz 6 (eski 075 → 076):
           (throw değil; marker yazılmaz) + ZORUNLU sync_issue alert
         + V7-A9 SalesOrderRow TS + api-mappers (discount_amount/vat_rate/source_quote_revision_no/quote_pdf_archive_id)
 
-Faz 7 (eski 076-077 → 077-078):
-  077 → note_templates + RLS
-  078 → quote_line_items_sort_order (koşullu)
+Faz 7 (eski 076-077 → 078-079):
+  078 → note_templates + RLS
+  079 → quote_line_items_sort_order (koşullu)
 ```
 
 ## Risk Noktaları (V7 Güncel)

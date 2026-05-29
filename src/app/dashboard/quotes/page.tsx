@@ -24,6 +24,7 @@ const filterTabs: { id: FilterTab; label: string }[] = [
     { id: "accepted", label: "Kabul Edildi" },
     { id: "rejected", label: "Reddedildi" },
     { id: "expired",  label: "Süresi Doldu" },
+    { id: "revised",  label: "Revize Edildi" },
 ];
 
 const quoteStatusConfig: Record<QuoteStatus, { label: string; cls: string }> = {
@@ -32,6 +33,7 @@ const quoteStatusConfig: Record<QuoteStatus, { label: string; cls: string }> = {
     accepted: { label: "Kabul Edildi", cls: "badge-success" },
     rejected: { label: "Reddedildi",  cls: "badge-danger"  },
     expired:  { label: "Süresi Doldu", cls: "badge-warning" },
+    revised:  { label: "Revize Edildi", cls: "badge-neutral" },
 };
 
 const thStyle: React.CSSProperties = {

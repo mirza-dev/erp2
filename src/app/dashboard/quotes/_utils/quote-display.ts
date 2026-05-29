@@ -63,6 +63,13 @@ export function isQuoteEditable(status: QuoteStatus): boolean {
     return status === "draft";
 }
 
+// ── Revizyon (Faz 5) ─────────────────────────────────────────
+// sent/rejected/expired teklif revize edilebilir (düzenlenebilir kopya yaratır).
+// draft zaten düzenlenebilir; accepted sipariş bağı taşır; revised terminal.
+export function getQuoteReviseEligible(status: QuoteStatus): boolean {
+    return status === "sent" || status === "rejected" || status === "expired";
+}
+
 // ── Siparişe Dönüştür ────────────────────────────────────────
 
 export interface QuoteConvertInfo {
