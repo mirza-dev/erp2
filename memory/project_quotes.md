@@ -18,7 +18,14 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 
 **2 P2 kararı KESİNLEŞTİ (2026-05-29):** (A4) snapshot taşı + Paraşüt discount>0 sessiz fatura YOK; (A5) accept route recover/generate (422 değil). Plan dosyası bu kararlarla güncellendi.
 
-**Toplam: V7 = V2(5)+V3(12)+V4(13)+V5(5)+V6(4)+V7(7) = 46 düzeltme.** ~182 test · 12 migration (066-077) · 7 faz.
+**6. tur 2. okuma — 5 düzeltme daha (kullanıcı, kod karşısında doğrulandı):**
+- **V7-A8 (P1/P2):** Accept RPC order line `product_name`/`product_sku`/`unit` → `JOIN products p` master'dan (qli.description/product_code DEĞİL). Mevcut `quote-service.ts:143-150` zaten master'dan çekiyor; atomik RPC bu semantiği korumalı. Quote açıklaması order line'a taşınmaz (order_line_description ayrı faz).
+- **V7-A9 (P2):** Migration 075 sonrası `SalesOrderRow` (database.types.ts:278-314) + `mapOrderDetail` (api-mappers.ts) 4 yeni alan (discount_amount/vat_rate/source_quote_revision_no/quote_pdf_archive_id) Faz 6'da kilitli. V7-A4 guard `order.discount_amount` okuyacak → tip şart.
+- **V7-A5 ek (P1):** Route recover/generate'e EK olarak RPC içinde `quote_pdf_archive_id IS NULL → RAISE 23514 ROLLBACK` (route bypass koruması, belt-and-suspenders).
+- **V7-A4 netleşti (P2):** "409 ya da uyarı" belirsizliği → tek davranış: `discount_amount>0 → ParasutError("validation")`, invoice create çağrılmaz, marker yazılmaz.
+- **Test tablosu fix (P2):** Faz 6 "PDF guard 422" → "recover/generate + fail→502".
+
+**Toplam: V7 = V2(5)+V3(12)+V4(13)+V5(5)+V6(4)+V7(12) = 51 düzeltme.** ~186 test · 12 migration (066-077) · 7 faz.
 **Not:** V7 plan dosyası `d201c11`'de commit edildi (mesaj yanlışlıkla "V6" der; içerik V7); 2 P2 kararı `00dbc4f` sonrası ayrı commit'le işlendi. Memory V7'ye hizalı.
 **Sıradaki:** Faz 1 başlama onayı bekleniyor (V7-A6 prosedürü: önce faz-spesifik self-contained tam plan).
 

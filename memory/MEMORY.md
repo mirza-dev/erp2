@@ -16,7 +16,7 @@
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)
 - [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
-- [project_quotes.md](project_quotes.md) — Teklif modülü: Faz 1-8 tamamlandı; V7 master plan (46 düzeltme, diskte hazır, IMPLEMENT EDİLMEDİ) — Faz 1 onayı + 2 P2 karar teyidi bekliyor
+- [project_quotes.md](project_quotes.md) — Teklif modülü: Faz 1-8 tamamlandı; V7 master plan (51 düzeltme, diskte hazır, IMPLEMENT EDİLMEDİ) — Faz 1 başlama onayı bekliyor (2 P2 kararı + 6. tur 2. okuma 5 düzeltme işlendi)
 - [project_frontend_renewal.md](project_frontend_renewal.md) — Frontend yenileme planı (frontend-renewal.md): DOM mutation fix, component lib, a11y — PLAN HAZIR, uygulama başlamadı
 
 ## Feedback

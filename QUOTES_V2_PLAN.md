@@ -1,6 +1,6 @@
 # Master Plan: Teklif Modülü Kapsamlı Revize (V7) — DÜZELTİLMİŞ 6. TUR
 
-> **Durum:** Bu plan kullanıcı review 6. tur (2026-05-29) sonrası 7 düzeltme ile güncellendi (3 P1 + 3 P2 + 1 bonus tablo adı). Güvenlik kararı korunur, satır vat_rate snapshot eklenir. **2 P2 kararı kullanıcı tarafından kesinleşti (2026-05-29):** (A5) PDF arşivi yoksa accept route'ta **recover/generate** (422 değil); (A4) header discount snapshot taşınır ama discount_amount>0'da Paraşüt **sessiz yanlış fatura göndermez** (bloklar/uyarır, gerçek aktarım ayrı faz). **IMPLEMENT EDİLMEYECEK** — sadece referans.
+> **Durum:** Bu plan kullanıcı review 6. tur (2026-05-29) ile güncellendi — ilk okuma 7 düzeltme (3 P1 + 3 P2 + 1 bonus) + 2. okuma 5 düzeltme (V7-A8 order line master product, V7-A9 SalesOrderRow TS+mapper, V7-A5 RPC defansif RAISE, V7-A4 tek-davranış Paraşüt guard, test tablosu 422→502) = **12 V7 düzeltmesi**. Güvenlik kararı korunur, satır vat_rate snapshot eklenir. **2 P2 kararı kullanıcı tarafından kesinleşti (2026-05-29):** (A5) PDF arşivi yoksa accept route'ta **recover/generate** (422 değil); (A4) header discount snapshot taşınır ama discount_amount>0'da Paraşüt **sessiz yanlış fatura göndermez** (bloklar/uyarır, gerçek aktarım ayrı faz). **IMPLEMENT EDİLMEYECEK** — sadece referans.
 
 ## Context
 
@@ -13,8 +13,8 @@ V6 planı 5. tur düzeltmelerini içeriyordu (4 schema uyum); 6. tur review V6'n
 - V4 (3. tur): 13
 - V5 (4. tur): 5
 - V6 (5. tur): 4
-- **V7 (6. tur): 7** (3 P1 + 3 P2 + 1 bonus)
-- **Toplam: 46 düzeltme entegre**
+- **V7 (6. tur): 12** (ilk okuma 7: 3 P1 + 3 P2 + 1 bonus; 2. okuma +5: V7-A8 master product name/sku [P1/P2], V7-A9 SalesOrderRow TS+mapper [P2], V7-A5 RPC defansif RAISE [P1], V7-A4 tek-davranış guard [P2], test tablosu 422→502 fix [P2])
+- **Toplam: 51 düzeltme entegre**
 
 ## Schema Doğrulamaları (6. tur — yeni)
 
@@ -94,9 +94,9 @@ Migration 075:
 - `sales_orders.vat_rate` header snapshot eklenir (V6-A3 korunur)
 - **`order_lines` schema değişimi GEREK YOK** (vat_rate zaten 039'da var, DEFAULT 20)
 
-Accept RPC `accept_quote_and_create_order` order line insert (V7 düzelmiş):
+Accept RPC `accept_quote_and_create_order` order line insert (V7-A3 vat_rate + V7-A8 master product + V7-A7 tablo adı):
 ```sql
--- BONUS: tablo adı order_lines (sales_order_lines DEĞİL, V7-A7)
+-- V7-A7: tablo adı order_lines (sales_order_lines DEĞİL)
 INSERT INTO order_lines (
   order_id, product_id, product_name, product_sku, unit,
   quantity, unit_price, discount_pct, line_total,
@@ -104,14 +104,15 @@ INSERT INTO order_lines (
 )
 SELECT v_order_id,
   qli.product_id,
-  qli.description,                       -- V6-A1: quote.description → order.product_name
-  qli.product_code,                      -- V6-A1: quote.product_code → order.product_sku
-  (SELECT unit FROM products WHERE id = qli.product_id LIMIT 1),
+  p.name,                                -- V7-A8: master product (qli.description DEĞİL)
+  p.sku,                                 -- V7-A8: master product (qli.product_code DEĞİL)
+  p.unit,                                -- V7-A8: master product
   qli.quantity, qli.unit_price,
   0,                                     -- V3-A4: satır discount kaldırıldı (header'da)
   qli.line_total,
   v_quote.vat_rate                       -- V7-A3: quote header vat_rate → her satıra
 FROM quote_line_items qli
+JOIN products p ON p.id = qli.product_id  -- V7-A8: order line kimliği master'dan
 WHERE qli.quote_id = p_quote_id
 ORDER BY qli.position;
 ```
@@ -119,6 +120,18 @@ ORDER BY qli.position;
 **Karar:** Tek vat_rate header'dan her satıra kopyalanır. Çoklu VAT senaryosu yok (kullanıcı kararı #1: tek para birimi + #13: KDV ayarlardan tek default + teklif özelinde).
 
 **Test:** Accept → order_lines.vat_rate her satırda quote.vat_rate'e eşit; Paraşüt sync `vat_rate: line.vat_rate` doğru taşır.
+
+### V7-A8 (P1/P2, 6. tur 2. okuma) — Order line adı/SKU master product'tan (quote satırından DEĞİL)
+
+**Sorun:** V7-A3'ün ilk snippet'i `qli.description → product_name`, `qli.product_code → product_sku` yazıyordu. `order_lines.product_name`/`product_sku` satış siparişi + Paraşüt fatura **kimliği** olarak kullanılıyor; `qli.description` ise kullanıcı tarafından override edilebilir + uzun teklif açıklaması (örn. "GATE VALVE A105 GÖVDE, CLASS 600 SW, SS TRİM") olabilir → fatura/sipariş kimliği bozulur.
+
+**Mevcut doğru davranış:** `serviceConvertQuoteToOrder` (`quote-service.ts:143-150`) her satır için `dbGetProductById` → `{ name, sku, unit }` master product'tan çekiyor. Atomik RPC bu semantiği KORUMALI.
+
+**Düzeltme:** Yukarıdaki V7-A3 snippet'i `JOIN products p ON p.id = qli.product_id` ile güncellendi → `p.name`/`p.sku`/`p.unit` yazılır. `JOIN` (LEFT değil): productId NULL/silinmiş satır accept'i bloklamalı — V4-A4 send-time productId hard check + V5-A4 RPC öncesi productId defensive check zaten garanti ediyor; JOIN son kademe sigorta.
+
+**Quote açıklaması:** `order_lines`'ta ayrı açıklama alanı yok → bu fazda quote description order line'a taşınMAZ (master product adı authoritative; mevcut convert davranışıyla birebir). İstenirse ileride `order_line_description` alanı **ayrı faz** (scope dışı).
+
+**Test:** Accept → order_lines.product_name/product_sku master product'a eşit (qli.description/product_code değil); productId silinmiş → JOIN sonucu satır yok / accept bloklanır.
 
 ### V7-A4 (P2) — Header discount Paraşüt scope kararı
 
@@ -134,7 +147,7 @@ Tam Paraşüt iskonto implementasyonu (orantılı dağıtım vs ayrı iskonto sa
 
 **Bu fazda yapılacak:**
 1. `quotes.discount_amount → sales_orders.discount_amount` snapshot **mutlaka taşınır** (V4-A8 korunur; ERP içi veri doğru).
-2. Paraşüt sync **guard**: `sales_orders.discount_amount > 0` olan siparişlerde Paraşüt fatura **sessizce oluşturulMAZ**. Bunun yerine ya validation/409 ile bloklanır ya da açık alert/uyarı: **"Paraşüt iskonto aktarımı henüz desteklenmiyor (ayrı faz)"**. Böylece muhasebeye yanlış toplam gitmez.
+2. Paraşüt sync **guard (tek net davranış):** `serviceSyncOrderToParasut` (ilgili sync giriş noktası) başında, invoice create çağrısından ÖNCE: `if (order.discount_amount > 0) → throw ParasutError("validation", "Paraşüt iskonto aktarımı ayrı faz")`. **invoice create çağrılMAZ**, `parasut_step`/attempted marker **yazılMAZ** (yarım/kirli kayıt kalmaz). Opsiyonel: ayrıca `sync_issue` alert / manual review kaydı üretilebilir (zorunlu değil; test ayrı assert eder). Böylece muhasebeye yanlış toplam gitmez.
 3. order_lines.discount_pct = 0 kalır (V3-A4 header discount).
 
 **Gelecek ayrı faz (scope dışı):** Paraşüt'e aktarım yöntemi seçilir — Seçenek A: orantılı satır iskontosu (`line.discount_pct = headerDiscount / subtotal * 100`); Seçenek B: negatif "İskonto" line item; Seçenek C: Paraşüt header discount API (varsa).
@@ -147,7 +160,7 @@ Tam Paraşüt iskonto implementasyonu (orantılı dağıtım vs ayrı iskonto sa
 -- Sessizce yanlış toplamlı fatura oluşturmak YASAK (ERP ≠ muhasebe riski).
 ```
 
-**Test:** discount_amount=0 → Paraşüt sync normal; discount_amount>0 → sync bloklanır/uyarı (sessiz fatura YOK), sales_orders.discount_amount snapshot doğru taşınmış.
+**Test:** discount_amount=0 → Paraşüt sync normal; discount_amount>0 → `ParasutError("validation")` + invoice create **çağrılmaz** + parasut_step/marker **yazılmaz**; sales_orders.discount_amount snapshot doğru taşınmış.
 
 ### V7-A5 (P2) — Accept öncesi PDF arşiv kontrolü zorunlu
 
@@ -175,9 +188,17 @@ Null dönerse `quote_pdf_archive_id = NULL` ile order yaratılır → kabul edil
      RPC içinde v_pdf_archive_id artık her zaman dolu (LIMIT 1 güvenli)
 ```
 
-**RPC tarafı:** Atomik RPC arşivin var olduğunu varsayar (route garanti etti); defansif olarak NULL kalırsa yine de order yaratılır (`quote_pdf_archive_id = NULL` kabul) — recover route'ta çözüldüğü için RPC'de hard-fail YOK.
+**RPC tarafı (son savunma — belt-and-suspenders):** Route normal akışta arşivi garanti eder; ama başka caller/bypass (manuel SQL, gelecekteki endpoint) route recover'ı atlayabilir. Bu yüzden atomik RPC **defansif hard-guard** içerir:
+```sql
+-- accept_quote_and_create_order, v_pdf_archive_id lookup'tan sonra:
+IF v_pdf_archive_id IS NULL THEN
+  RAISE EXCEPTION 'Quote has no PDF archive (recover route bypassed)'
+    USING ERRCODE = '23514', DETAIL = 'quote_id:' || p_quote_id::text;
+END IF;  -- tüm transaction ROLLBACK → PDF-arşivsiz accepted order İMKANSIZ
+```
+Net davranış: **Normal kullanıcı 422 görmez** (route PDF'i üretir → arşiv hazır). Yalnızca route recover'ı baypas eden yol RPC'de 23514 alır (route handler bunu da 422'ye map edebilir ama normal akışta tetiklenmez).
 
-**Test:** Accept öncesi quote_pdf_archives boş → route PDF üretir + arşivler → accept başarılı + order.quote_pdf_archive_id dolu; PDF üretimi throw → 502, accept çağrılmaz.
+**Test:** (a) Accept öncesi quote_pdf_archives boş → route PDF üretir + arşivler → accept başarılı + order.quote_pdf_archive_id dolu; (b) PDF üretimi throw → 502, accept çağrılmaz; (c) RPC'ye doğrudan (route baypas) NULL arşivle gidilirse → 23514 RAISE + ROLLBACK (defansif guard testi).
 
 ### V7-A6 (P2) — Faz 1 başlangıcında ayrı tam plan zorunlu
 
@@ -213,6 +234,19 @@ INSERT INTO order_lines (...)  -- ✓ 001:110 + 039 vat_rate eklemesiyle uyumlu
 ```
 
 **Tüm RPC + service kodlarında:** `sales_order_lines` → `order_lines` (V7-A3 örneğinde zaten düzeltildi).
+
+### V7-A9 (P2, 6. tur 2. okuma) — SalesOrderRow TS + mapper Faz 6 kilidi
+
+**Mevcut:** `database.types.ts:278-314` `SalesOrderRow` interface'inde Migration 075'in ekleyeceği alanlar YOK: `discount_amount`, `vat_rate`, `source_quote_revision_no`, `quote_pdf_archive_id`.
+
+**Sorun:** Migration DB kolonlarını ekler ama TS tipi + mapper güncellenmezse: (a) V7-A4 Paraşüt guard'ı `order.discount_amount` okuyamaz (derlenmez), (b) V7-A5 `quote_pdf_archive_id` order detayında erişilemez.
+
+**V7-A9 — Faz 6 görev listesine açıkça eklenir:**
+- `src/lib/database.types.ts` → `SalesOrderRow`'a 4 alan (`discount_amount: number`, `vat_rate: number`, `source_quote_revision_no: number | null`, `quote_pdf_archive_id: string | null`).
+- `src/lib/api-mappers.ts` → `mapOrderDetail` (gerekirse `mapOrder`) yeni alanları map eder.
+- `src/lib/mock-data.ts` → frontend `OrderDetail` interface'i (UI'da gösterilecekse).
+
+**Test:** mapper round-trip (DB row → OrderDetail 4 alan) + source-regex (SalesOrderRow 4 alan mevcut). Faz 6'ya +2-3 test.
 
 ## Önceki Düzeltmeler Korundu
 
@@ -252,8 +286,11 @@ Faz 6:
           - V7-A1 SECURITY INVOKER (DEFINER DEĞİL)
           - V7-A3 satır vat_rate quote'tan taşı
           - V7-A7 order_lines (sales_order_lines DEĞİL)
-        + V7-A5 (karar) accept route'ta recover/generate PDF arşivi (RPC öncesi; 422 değil)
-        + V7-A4 (karar) Paraşüt guard yorum bloğu: discount_amount>0 sessiz fatura YOK
+          - V7-A8 order line product_name/sku/unit master products JOIN'den (qli.description DEĞİL)
+          - V7-A5 RPC defansif RAISE (quote_pdf_archive_id NULL → 23514 ROLLBACK, bypass koruması)
+        + V7-A5 (karar) accept route'ta recover/generate PDF arşivi (RPC öncesi; fail→502)
+        + V7-A4 (karar) Paraşüt guard: discount_amount>0 → ParasutError validation, invoice create yok
+        + V7-A9 SalesOrderRow TS + api-mappers (discount_amount/vat_rate/source_quote_revision_no/quote_pdf_archive_id)
 
 Faz 7:
   076 → note_templates + RLS
@@ -271,6 +308,9 @@ Faz 7:
 | **PDF arşivsiz kabul edilen sipariş** | **V7-A5 (karar): route accept öncesi recover/generate; üretim fail → 502** |
 | **Delta plan implementation belirsizliği** | **V7-A6: faz başı 3-adım prosedür** |
 | **order_lines tablo adı** | **V7-A7: sales_order_lines DEĞİL** |
+| **Order line adı/SKU quote açıklamasından (yanlış kimlik)** | **V7-A8: master products JOIN → p.name/p.sku/p.unit** |
+| **PDF arşiv route bypass'ında arşivsiz order** | **V7-A5: RPC defansif RAISE (23514) + ROLLBACK** |
+| **Yeni sales_order alanları TS/mapper'da yok (derleme/okuma fail)** | **V7-A9: Faz 6 SalesOrderRow + mapOrderDetail kilidi** |
 | Önceki V6/V5/V4/V3/V2 düzeltmeler | Korundu |
 
 ## Faz Etkileri (V7 Test Sayıları)
@@ -284,10 +324,10 @@ V6 ile aynı migration sayısı (12); V7 sadece içerik düzeltmesi. Test sayıl
 | 3 | 070-071 | ~17 |
 | 5 | 072 | ~35 |
 | 4 | 073-074 | ~32 |
-| 6 | 075 | ~33 (V6'dan +5: V7-A3 satır vat_rate snapshot, V7-A5 PDF guard 422, V7-A7 order_lines tablo adı, V7-A1 SECURITY INVOKER) |
+| 6 | 075 | ~37 (V7-A3 satır vat_rate, V7-A5 PDF recover/generate + fail→502 + RPC defansif RAISE, V7-A7 order_lines tablo adı, V7-A1 SECURITY INVOKER, V7-A8 master product name/sku, V7-A9 SalesOrderRow TS+mapper) |
 | 7 | 076-077 | ~15 |
 
-**Toplam test:** ~182 (V6'dan +7)
+**Toplam test:** ~186 (V6'dan +11; 2. okuma Faz 6'ya +4)
 
 ## V7 Verification Eklemeler
 
@@ -340,8 +380,12 @@ Faz 1'e başlanırken (yeni Plan modu oturumu):
 | V7-A5 (P2) | Accept route recover/generate (422 değil) | PDF arşivsiz kabul + akış kesintisi |
 | V7-A6 (P2) | Faz başı tam plan prosedürü | Implementation kapsam belirsizliği |
 | V7-A7 (Bonus) | order_lines tablo adı (sales_order_lines DEĞİL) | RPC patlar |
+| V7-A8 (P1/P2) | Order line adı/SKU master products JOIN'den | Yanlış sipariş/Paraşüt kimliği |
+| V7-A9 (P2) | SalesOrderRow + mapOrderDetail 4 yeni alan kilidi | Derleme/okuma fail (guard çalışmaz) |
 
-**Toplam:** V7 = V2 (5) + V3 (12) + V4 (13) + V5 (5) + V6 (4) + V7 (7) = **46 düzeltme** entegre. **Kapsam:** 7 faz, 12 migration (066-077), ~182 yeni test, ~30 dosya.
+**2. okuma (6. tur) ek 5 düzeltme:** V7-A8, V7-A9 (yeni) + V7-A5 RPC defansif RAISE + V7-A4 tek-davranış guard + test tablosu 422→502 fix.
+
+**Toplam:** V7 = V2 (5) + V3 (12) + V4 (13) + V5 (5) + V6 (4) + V7 (12) = **51 düzeltme** entegre. **Kapsam:** 7 faz, 12 migration (066-077), ~186 yeni test, ~30 dosya.
 
 ## Bu Plan Sonrası Süreç
 

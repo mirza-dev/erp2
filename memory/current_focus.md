@@ -22,7 +22,8 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
   - V7-A5 (P2) accept öncesi PDF arşiv (quote_pdf_archives Faz4'te) ✅ — **KULLANICI KARARI (kesinleşti): RECOVER/GENERATE** (422 değil); accept route RPC öncesi eksik arşivi üretir, fail→502
   - V7-A7 order_lines tablo adı (001:110; sales_order_lines yok) ✅
   - V7-A6 faz başı tam plan prosedürü
-- **Toplam 46 düzeltme** (V2-V7). Implement EDİLMEDİ. 2 P2 kararı kesinleşti → plan dosyası güncellendi.
+- **6. tur 2. okuma — 5 düzeltme daha (kod karşısında doğrulandı, plana işlendi):** V7-A8 (order line product_name/sku master products JOIN'den; quote-service:143-150 paterniyle), V7-A9 (SalesOrderRow+mapOrderDetail 4 alan Faz 6 kilidi), V7-A5 ek (RPC defansif RAISE 23514 route-bypass koruması), V7-A4 netleşti (discount>0→ParasutError validation, invoice/marker yok), test tablosu 422→502 fix.
+- **Toplam 51 düzeltme** (V2-V7; V7=12). ~186 test. Implement EDİLMEDİ. Plan modunda onaylandı + plan dosyası güncellendi.
 - **Sıradaki:** Faz 1 başlama onayı (V7-A6: önce faz-spesifik self-contained tam plan).
 
 ## Önceki — Teklif Modülü V6 Master Plan (5. tur review, 2026-05-29)

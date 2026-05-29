@@ -14,7 +14,8 @@ _Son güncelleme: 2026-05-29_
   - V7-A5 (P2) accept öncesi PDF arşiv (quote_pdf_archives Faz 4'te) ✅ — **KULLANICI KARARI: RECOVER/GENERATE** (422 değil); accept route RPC öncesi eksik arşivi üretir, fail→502
   - V7-A7 order_lines tablo adı (001:110; sales_order_lines yok) ✅
   - V7-A6 faz başı tam plan prosedürü
-- **Toplam 46 düzeltme (V2-V7).** Implement EDİLMEDİ. 2 P2 kararı kesinleşti → plan güncellendi. Detay: `memory/project_quotes.md` V7 başlığı.
+- **6. tur 2. okuma — 5 düzeltme daha (kod karşısında doğrulandı, plana işlendi):** V7-A8 (order line product_name/sku/unit master `JOIN products`'tan; qli.description DEĞİL — quote-service:143-150 paterni), V7-A9 (SalesOrderRow+mapOrderDetail 4 alan Faz 6 kilidi — discount_amount/vat_rate/source_quote_revision_no/quote_pdf_archive_id), V7-A5 ek (RPC defansif RAISE 23514 route-bypass koruması), V7-A4 netleşti (discount>0→ParasutError validation, invoice/marker yok), test tablosu 422→502.
+- **Toplam 51 düzeltme (V2-V7; V7=12).** ~186 test. Implement EDİLMEDİ. Plan modunda onaylandı. Detay: `memory/project_quotes.md` V7 başlığı.
 - **commit mesajı notu:** `d201c11` "V6 master plan" der ama içerik V7; pushed main, history rewrite yapılmadı.
 - **Sıradaki:** Faz 1 başlama onayı (V7-A6: önce faz-spesifik self-contained tam plan).
 
