@@ -247,6 +247,8 @@ function makeCompanyFixture(overrides: { logo_url?: string | null } = {}): Compa
         website: "https://test.example",
         logo_url: overrides.logo_url !== undefined ? overrides.logo_url : "https://cdn.example/logo.png",
         currency: "TRY",
+        quote_number_prefix: "TKL",
+        quote_number_separator: "-",
         updated_at: "2026-01-01T00:00:00Z",
     };
 }

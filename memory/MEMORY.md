@@ -11,12 +11,12 @@
 - [project_integrations.md](project_integrations.md) — Paraşüt Faz 1-10 ✅ (1914 test), Faz 11 sırada; AI kolon eşleştirme, Sentry ✅, k6, smoke 24
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Son: Teklif V7 Faz 3 REVIEW düzeltmeleri (Bulgular P1-P3, 2 tur, 3815 test, COMMIT+PUSH 6366cbd, 072 APPLY BEKLİYOR) — convert iskonto BLOCK + validateDiscount 422 (non-finite guard) + 072 CHECK idempotent + autosave restore + TR parse fix + UI mesaj; önceki: Faz 3 impl c5d8267
+- [current_focus.md](current_focus.md) — Son: Teklif V7 Faz 5 infra dilim — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT+073 APPLY BEKLİYOR; revizyon zinciri+sig rename ERTELENDİ; önceki: Faz 3 review (070-072 APPLY EDİLDİ)
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)
 - [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
-- [project_quotes.md](project_quotes.md) — Teklif modülü: V7 master plan (56 düzeltme); Faz 1a/1b/2/3 ✅ (header iskonto c5d8267); **Faz 3 review düzeltmeleri** (P1 convert block + P2 422/CHECK 072 + P3 autosave/parse, COMMIT+072 APPLY BEKLİYOR); sıradaki Faz 5 (073, numbering kaydı 072→iskonto CHECK)
+- [project_quotes.md](project_quotes.md) — Teklif modülü: V7 master plan (56 düzeltme); Faz 1a/1b/2/3 ✅ + Faz 3 review (070-072 APPLY EDİLDİ); **Faz 5 infra dilim** numara katmanı 073 (yıllık reset+prefix, COMMIT+073 APPLY BEKLİYOR); ERTELENEN: revizyon zinciri, sig rename; sıradaki Faz 4 (074-075 PDF arşiv)
 - [project_frontend_renewal.md](project_frontend_renewal.md) — Frontend yenileme planı (frontend-renewal.md): DOM mutation fix, component lib, a11y — PLAN HAZIR, uygulama başlamadı
 
 ## Feedback

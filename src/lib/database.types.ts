@@ -715,6 +715,9 @@ export interface CompanySettingsRow {
     website: string
     logo_url: string | null
     currency: string
+    // Faz 5 (V3-B3): teklif numarası prefix/separator — next_quote_number() okur.
+    quote_number_prefix: string
+    quote_number_separator: string
     updated_at: string
 }
 

@@ -4,7 +4,19 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 3 REVIEW DÜZELTMELERİ (2026-05-29) — Bulgular P1-P3 (2 tur), 3815 test, COMMIT+PUSH 6366cbd + migration 072 APPLY BEKLİYOR
+## Faz 5 infra dilim (2026-05-30) — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT BEKLİYOR + migration 073 APPLY BEKLİYOR
+
+**Faz 5 master-plan'da 5 parça (status CHECK + revizyon + sig backfill + prefix + yearly_counters) tek satır, detay yok.** Kullanıcı kararı: **infra dilim** = sadece numara katmanı. Plan: `~/.claude/plans/clever-dancing-owl.md`.
+
+- **ERTELENEN:** revizyon zinciri (root_quote_id/revision_no/`create_quote_revision` RPC+UI+status — büyük + underspec, kendi oturumu); sig_* rename (19 dosya/73 occ kozmetik); status CHECK (034:91 zaten 5 değer, yeni status yalnız revizyonda → no-op).
+- **Migration 073 (YENİ, APPLY BEKLİYOR):** company_settings += quote_number_prefix('TKL')/separator('-'); quote_yearly_counters(year pk,last_seq)+RLS; backfill (034 defansif precedent `^TKL-\d{4}-\d+$` + gömülü-yıl split_part(,2) group + on conflict greatest); next_quote_number() rewrite (atomik on conflict last_seq+1 + prefix company_settings'ten). Signature `() returns text` KORUNDU (create RPC+seed değişmez). V7-A1 DEFINER YOK. Idempotent.
+- **Güvenlik:** quote_number UNIQUE (012:9) → backfill miscompute sessiz dup DEĞİL, gürültülü UNIQUE violation (recoverable). Gömülü-yıl group (created_at değil) — next_quote_number now() yılını gömer.
+- **Frontend YOK:** server-üretimli read-only; parser yok; dbFindQuoteByNumber .eq(). CompanySettingsRow TS += 2 alan. Sınırlama: tek separator çift görev.
+- **Test:** quotes-faz5-numbering (6 source-regex) — **DRİFT-GUARD değil correctness** (DB-side; gerçek doğrulama manuel smoke). **3815→3821 yeşil** · tsc/build/lint temiz.
+- **DURUM: COMMIT BEKLİYOR + 073 APPLY BEKLİYOR.** Sıradaki: commit/push + 073 apply + smoke + revizyon zinciri / Faz 4 (074-075).
+
+---
+## Faz 3 REVIEW DÜZELTMELERİ (2026-05-29) — Bulgular P1-P3 (2 tur), 3815 test, COMMIT+PUSH 6366cbd+11c5079 + migration 070-072 APPLY EDİLDİ
 
 İlk implement (c5d8267) sonrası kullanıcı review'unda 5 bulgu; hepsi kod karşısında doğrulandı + kapatıldı. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
