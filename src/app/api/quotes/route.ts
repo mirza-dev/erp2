@@ -41,8 +41,12 @@ export async function POST(req: NextRequest) {
         if (qtyErr) return NextResponse.json({ error: qtyErr }, { status: 422 });
 
         // Faz 3 (V7): header iskonto sınırı (negatif / subtotal-üstü → 422).
-        const discErr = validateDiscount(Number(body.discount_amount ?? 0), Number(body.subtotal ?? 0));
+        const discountAmount = Number(body.discount_amount ?? 0);
+        const discErr = validateDiscount(discountAmount, Number(body.subtotal ?? 0));
         if (discErr) return NextResponse.json({ error: discErr }, { status: 422 });
+        // Payload'ı normalize et: validasyon sonrası finite garanti → number'a çevir
+        // ("" → 0, "100" → 100). RPC COALESCE((...)::numeric) string'de patlamasın (NULLIF yok).
+        body.discount_amount = discountAmount;
 
         const row = await dbCreateQuote(body);
         revalidateTag("quotes", "max");

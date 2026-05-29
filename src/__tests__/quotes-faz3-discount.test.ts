@@ -125,10 +125,12 @@ describe("POST /api/quotes — discount_amount passthrough", () => {
         expect(mockDbCreateQuote).not.toHaveBeenCalled();
     });
 
-    it("boş string discount ('') → 0 sayılır, 201 (opsiyonel alan)", async () => {
+    it("boş string discount ('') → number 0'a normalize edilir + 201 (RPC numeric cast patlamaz)", async () => {
         const res = await POST(postReq(base({ discount_amount: "", subtotal: 1000, lines: [] })));
         expect(res.status).toBe(201);
-        expect(mockDbCreateQuote).toHaveBeenCalled();
+        // Route normalize eder: dbCreateQuote'a "" değil number 0 gider (RPC ''::numeric 500'ünü önler).
+        expect(mockDbCreateQuote.mock.calls[0][0].discount_amount).toBe(0);
+        expect(typeof mockDbCreateQuote.mock.calls[0][0].discount_amount).toBe("number");
     });
 });
 

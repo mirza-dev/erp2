@@ -148,7 +148,7 @@ export async function serviceConvertQuoteToOrder(quoteId: string, createdBy?: st
     if (Number(quote.discount_amount) > 0) {
         return {
             success: false,
-            error: `İskontolu teklif (iskonto: ${quote.discount_amount}) şu an siparişe dönüştürülemez — sipariş tarafı iskonto alanı sonraki fazda gelecek. İskontoyu kaldırıp tekrar deneyin.`,
+            error: `İskontolu teklif (iskonto: ${quote.discount_amount}) şu an siparişe dönüştürülemez — sipariş tarafı iskonto desteği sonraki fazda gelecek.`,
         };
     }
 
