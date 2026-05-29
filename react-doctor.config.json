@@ -5,6 +5,8 @@
     "react-doctor/prefer-useReducer": "off",
     "react-doctor/no-fetch-in-effect": "off",
     "react-doctor/no-initialize-state": "off",
-    "react-doctor/no-derived-state": "off"
+    "react-doctor/no-derived-state": "off",
+    "react-doctor/no-inline-exhaustive-style": "off",
+    "react-doctor/design-no-em-dash-in-jsx-text": "off"
   }
 }
