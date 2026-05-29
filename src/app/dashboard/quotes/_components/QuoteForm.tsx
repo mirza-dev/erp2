@@ -42,7 +42,7 @@ const INJECTED_CSS = `
 .q-del-btn { opacity: 0; transition: opacity .1s; }
 tr:hover .q-del-btn { opacity: 1; }
 .q-del-btn:hover { background: var(--danger-bg) !important; color: var(--danger-text) !important; }
-.q-card table tbody tr:hover td { background: var(--bg-hover, #2a2e37) !important; }
+.q-card table tbody tr:hover td { background: var(--bg-secondary) !important; }
 .q-cell:hover { border-color: var(--border-secondary) !important; background: var(--bg-secondary) !important; }
 .q-cell:focus { border-color: var(--accent-border) !important; background: var(--bg-secondary) !important; outline: none; }
 .q-total-inp:hover { border-color: var(--border-secondary) !important; background: var(--bg-secondary) !important; }
@@ -54,7 +54,7 @@ tr:hover .q-del-btn { opacity: 1; }
 .q-field-inp:focus { border-color: var(--accent-border) !important; outline: none; }
 .q-notes:focus { border-color: var(--accent-border) !important; outline: none; }
 .q-logo-ph:hover { border-color: var(--accent) !important; }
-.q-cust-opt:hover { background: var(--bg-hover, #2a2e37) !important; }
+.q-cust-opt:hover { background: var(--bg-secondary) !important; }
 `;
 
 // ── Props ─────────────────────────────────────────────────────────────────────

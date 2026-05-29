@@ -306,6 +306,9 @@ export default function QuoteDetailPage() {
                         }}
                     />
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="quote-confirm-dialog-title"
                         style={{
                             position: "fixed",
                             top: "50%",
@@ -333,11 +336,11 @@ export default function QuoteDetailPage() {
                                     flexShrink: 0,
                                 }}
                             >
-                                <svg width="10" height="10" viewBox="0 0 10 10">
+                                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
                                     <path d="M5 1L9 9H1z" fill={confirmDialog.variant === "danger" ? "var(--danger-text)" : "var(--warning-text)"} />
                                 </svg>
                             </div>
-                            <div style={{
+                            <div id="quote-confirm-dialog-title" style={{
                                 fontSize: "13px",
                                 fontWeight: 600,
                                 color: confirmDialog.variant === "danger" ? "var(--danger-text)" : "var(--text-primary)",

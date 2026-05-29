@@ -71,6 +71,7 @@ function QuotesList() {
     const [dateTo, setDateTo] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
     const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -183,6 +184,7 @@ function QuotesList() {
                     <button
                         onClick={handleRefresh}
                         disabled={refreshing}
+                        aria-label="Teklifleri yenile"
                         style={{
                             fontSize: "12px",
                             padding: "6px 12px",
@@ -197,7 +199,7 @@ function QuotesList() {
                             gap: "5px",
                         }}
                     >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                             <path d="M10 6A4 4 0 1 1 6 2a4 4 0 0 1 3.5 2M10 2v2.5H7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                         {refreshing ? "Yenileniyor…" : "Yenile"}
@@ -423,37 +425,18 @@ function QuotesList() {
                                     : null;
                                 const deletable = canDeleteQuote(q.status);
 
+                                const isHovered = hoveredId === q.id;
+                                const rowBg = isHovered ? "var(--bg-secondary)" : "transparent";
                                 return (
                                     <tr
                                         key={q.id}
                                         style={{ cursor: "pointer" }}
                                         onClick={() => router.push(`/dashboard/quotes/${q.id}`)}
-                                        onMouseEnter={(e) => {
-                                            const tds = e.currentTarget.querySelectorAll("td");
-                                            tds.forEach((td, i) => {
-                                                td.style.background = "var(--bg-secondary)";
-                                                if (i === 0) td.style.borderLeft = "2px solid var(--accent)";
-                                            });
-                                            const chevron = e.currentTarget.querySelector("[data-chevron]") as HTMLElement;
-                                            if (chevron) chevron.style.opacity = "1";
-                                            const deleteBtn = e.currentTarget.querySelector("[data-delete]") as HTMLElement;
-                                            if (deleteBtn) deleteBtn.style.opacity = "1";
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            const tds = e.currentTarget.querySelectorAll("td");
-                                            tds.forEach((td, i) => {
-                                                td.style.background = "transparent";
-                                                if (i === 0) td.style.borderLeft = "2px solid transparent";
-                                            });
-                                            const chevron = e.currentTarget.querySelector("[data-chevron]") as HTMLElement;
-                                            if (chevron) chevron.style.opacity = "0";
-                                            const deleteBtn = e.currentTarget.querySelector("[data-delete]") as HTMLElement;
-                                            if (deleteBtn) deleteBtn.style.opacity = "0";
-                                            if (confirmId === q.id) setConfirmId(null);
-                                        }}
+                                        onMouseEnter={() => setHoveredId(q.id)}
+                                        onMouseLeave={() => setHoveredId(null)}
                                     >
                                         <td
-                                            style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
+                                            style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px", background: rowBg }}
                                             onClick={e => e.stopPropagation()}
                                         >
                                             <input
@@ -465,16 +448,21 @@ function QuotesList() {
                                                 aria-label={`${q.quoteNumber} seç`}
                                             />
                                         </td>
-                                        <td style={{ ...tdStyle, fontWeight: 500, borderLeft: "2px solid transparent" }}>
+                                        <td style={{
+                                            ...tdStyle,
+                                            fontWeight: 500,
+                                            background: rowBg,
+                                            borderLeft: isHovered ? "2px solid var(--accent)" : "2px solid transparent",
+                                        }}>
                                             {q.quoteNumber}
                                         </td>
-                                        <td style={tdStyle}>
+                                        <td style={{ ...tdStyle, background: rowBg }}>
                                             {q.customerName}
                                         </td>
-                                        <td style={{ ...tdStyle, textAlign: "center" }}>
+                                        <td style={{ ...tdStyle, textAlign: "center", background: rowBg }}>
                                             <span className={`badge ${statusCfg.cls}`}>{statusCfg.label}</span>
                                         </td>
-                                        <td style={{ ...tdStyle, textAlign: "center" }}>
+                                        <td style={{ ...tdStyle, textAlign: "center", background: rowBg }}>
                                             {badge && (
                                                 <span style={{
                                                     display: "inline-block",
@@ -490,14 +478,14 @@ function QuotesList() {
                                                 </span>
                                             )}
                                         </td>
-                                        <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
+                                        <td style={{ ...tdStyle, color: "var(--text-secondary)", background: rowBg }}>
                                             {formatDate(q.createdAt)}
                                         </td>
-                                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
+                                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500, background: rowBg }}>
                                             {formatCurrency(q.grandTotal, q.currency)}
                                         </td>
                                         <td
-                                            style={{ ...tdStyle, width: "64px", textAlign: "right", padding: "10px 8px" }}
+                                            style={{ ...tdStyle, width: "64px", textAlign: "right", padding: "10px 8px", background: rowBg }}
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
@@ -517,26 +505,27 @@ function QuotesList() {
                                                         </button>
                                                     ) : (
                                                         <button
-                                                            data-delete=""
                                                             onClick={(e) => handleDelete(e, q.id)}
                                                             disabled={isDemo || deletingId === q.id}
                                                             title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                                                            aria-label="Teklifi sil"
                                                             style={{
-                                                                opacity: 0, background: "transparent", border: "none",
+                                                                opacity: isHovered ? 1 : 0,
+                                                                background: "transparent", border: "none",
                                                                 cursor: isDemo ? "not-allowed" : "pointer", color: "var(--text-tertiary)",
                                                                 padding: "2px 4px", borderRadius: "3px",
                                                                 display: "flex", alignItems: "center",
                                                                 transition: "opacity 0.1s, color 0.1s",
                                                             }}
                                                         >
-                                                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                                                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
                                                                 <path d="M2 3.5h9M5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v3.5M7.5 6v3.5M3 3.5l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7"
                                                                     stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
                                                             </svg>
                                                         </button>
                                                     )
                                                 )}
-                                                <span data-chevron="" style={{ opacity: 0, color: "var(--text-tertiary)" }}>
+                                                <span aria-hidden="true" style={{ opacity: isHovered ? 1 : 0, color: "var(--text-tertiary)" }}>
                                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                                         <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                                                     </svg>

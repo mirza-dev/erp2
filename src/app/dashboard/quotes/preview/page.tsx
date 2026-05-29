@@ -29,8 +29,8 @@ export default function QuotePreviewPage() {
         alignItems: "center",
         justifyContent: "space-between",
         padding: "10px 24px",
-        background: "#1e2330",
-        borderBottom: "0.5px solid #2d3347",
+        background: "var(--bg-primary)",
+        borderBottom: "0.5px solid var(--border-tertiary)",
         boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
     };
 
@@ -48,7 +48,9 @@ export default function QuotePreviewPage() {
 
     const btnPrimary: React.CSSProperties = {
         ...btnBase,
-        background: "#0072BC",
+        background: "var(--accent)",
+        // Beyaz, accent zemin üzerinde okunaklı; var(--accent-text) projede
+        // accent **rengi** olarak (badge text vs.) farklı amaçla kullanılıyor.
         color: "white",
         border: "none",
     };
@@ -56,15 +58,15 @@ export default function QuotePreviewPage() {
     const btnSecondary: React.CSSProperties = {
         ...btnBase,
         background: "transparent",
-        color: "#9ca3b0",
-        border: "0.5px solid #373e47",
+        color: "var(--text-secondary)",
+        border: "0.5px solid var(--border-secondary)",
     };
 
     if (notFound) {
         return (
-            <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#1a1d23", display: "grid", placeItems: "center" }}>
-                <div style={{ textAlign: "center", color: "#9ca3b0" }}>
-                    <div style={{ fontSize: "16px", marginBottom: "8px", color: "#e6edf3" }}>Önizleme verisi bulunamadı</div>
+            <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg-primary)", display: "grid", placeItems: "center" }}>
+                <div style={{ textAlign: "center", color: "var(--text-secondary)" }}>
+                    <div style={{ fontSize: "16px", marginBottom: "8px", color: "var(--text-primary)" }}>Önizleme verisi bulunamadı</div>
                     <div style={{ fontSize: "12px", marginBottom: "20px" }}>Formu doldurup tekrar deneyin.</div>
                     <button style={btnPrimary} onClick={() => router.push("/dashboard/quotes/new")}>
                         ← Forma Dön
@@ -76,8 +78,8 @@ export default function QuotePreviewPage() {
 
     if (!data) {
         return (
-            <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#1a1d23", display: "grid", placeItems: "center" }}>
-                <div style={{ color: "#9ca3b0", fontSize: "13px" }}>Yükleniyor…</div>
+            <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg-primary)", display: "grid", placeItems: "center" }}>
+                <div style={{ color: "var(--text-secondary)", fontSize: "13px" }}>Yükleniyor…</div>
             </div>
         );
     }
@@ -103,6 +105,9 @@ export default function QuotePreviewPage() {
             ` }} />
             <div
                 className={`${montserrat.variable} ${inter.variable} qpw-outer`}
+                // #d0d5dd: PDF kağıdını taklit eden açık gri scroll arkaplanı —
+                // bilinçli olarak CSS variable kullanılmadı (dark theme'de gri
+                // tonu print önizleme bağlamını bozardı).
                 style={{ position: "fixed", inset: 0, zIndex: 9999, background: "#d0d5dd", overflowY: "auto" }}
             >
                 {/* ── Toolbar (hidden on print) ── */}
@@ -114,13 +119,13 @@ export default function QuotePreviewPage() {
                             </svg>
                             Formu Düzenle
                         </button>
-                        <span style={{ fontSize: "11px", color: "#636d7c" }}>
+                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
                             {data.quoteNo} · {{ draft: "Taslak", sent: "Gönderildi", accepted: "Kabul Edildi", rejected: "Reddedildi", expired: "Süresi Doldu" }[data.status] ?? data.status}
                         </span>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "11px", color: "#636d7c" }}>Ctrl+P ile de yazdırabilirsiniz</span>
+                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Ctrl+P ile de yazdırabilirsiniz</span>
                         <button
                             style={btnPrimary}
                             onClick={() => window.print()}
