@@ -5,9 +5,93 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-28
+## Son Tamamlanan İş — 2026-05-29 (5. tur review)
 
-**SMTP smoke endpoint + deploy runbook (3667 test)**
+**Teklif Modülü V6 Master Plan ONAYLANDI (implement edilmedi)**
+
+- **Trigger:** Kullanıcı V5 plan üzerinde 5. tur review yaptı; 4 schema uyum blocker. V5 RPC SQL örnekleri mevcut schema'yla uyumsuzdu (yanlış kolon adları + yanlış fonksiyon adı + mevcut RPC alanları silinmiş gibi gösteriliyordu).
+- **4 düzeltme V6:**
+  - V6-A1: quote_line_items mevcut kolon adları — `product_code` (034:108, product_sku DEĞİL), `description` (034:110, product_name DEĞİL); discount_pct/notes/product_sku/product_name kolonları DB'de YOK; mapper UI alanlarına translate.
+  - V6-A2: `generate_order_number()` doğru fonksiyon adı (003/007 + orders.ts:59); next_order_number YOK.
+  - V6-A3: `sales_orders.vat_rate` snapshot kolonu Migration 075'e eklendi (NOT NULL DEFAULT 20, CHECK 0-100). Mevcut tabloda yoktu; finansal snapshot eksik kalırdı.
+  - V6-A4: RPC tam rewrite DEĞİL — mevcut 065 create_quote_with_lines (27 alan: quote_number/sales_rep/sig_*/delivery/payment) korunur, sadece yeni alanlar (customer_address, seller_*, unit_weight_kg, kg_manual_override) eklenir.
+- **Migration:** 12 toplam (V5 ile aynı); sadece içerik düzeltildi.
+- **Toplam düzeltme:** V2 (5) + V3 (12) + V4 (13) + V5 (5) + V6 (4) = **39**.
+- **Test:** ~175 (V5'ten +5).
+- **Master plan:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` V6 versiyonu.
+- **Implement EDİLMEDİ** — master roadmap; her faz öncesi ayrı detay plan modu.
+- **Sıradaki:** Faz 1 başlama onayı bekleniyor.
+
+## Önceki — Teklif Modülü V5 Master Plan (4. tur review, 2026-05-29)
+
+**Teklif Modülü V5 Master Plan ONAYLANDI (implement edilmedi)**
+
+- **Trigger:** Kullanıcı V4 plan üzerinde 4. tur review yaptı; 5 sıralama/atomicity düzeltmesi. Hepsi plan içi tutarsızlıklardı (RPC payload vs DB schema sırası).
+- **5 düzeltme V5:**
+  - V5-A1: Migration sırası — Faz 1+2 ihtiyacı olan tüm DB alanları Faz 1 grubunda (066-069). customer_address ve seller_* artık Faz 1 067'de, unit_weight_kg 068'de. Eski V4'te 069 (Faz 5) ve 075'te dağınıktı.
+  - V5-A2: Faz 1 yeni Migration 069 — RPC'lere yeni alan payload genişletmesi (DB hazır, RPC tutarlı).
+  - V5-A3: Faz 2 validation order tutarlı — DB Faz 1'de hazır olduğundan validator güvenle ekler.
+  - V5-A4: `/accept` atomik RPC `accept_quote_and_create_order` — tek PL/pgSQL transaction (lock + idempotency + status + productId + insert + audit). Hata → ROLLBACK.
+  - V5-A5: Yıllık counter backfill prefix/separator bağımsız — created_at yılı + regex `\d+$` son rakam.
+- **Migration:** 10 → 12 (V4'te 10; V5'te 12 — 066-077). Faz 1 grubu 4 migration, Faz 6 atomik RPC eklendi.
+- **Toplam düzeltme:** V2 (5) + V3 (12) + V4 (13) + V5 (5) = 35.
+- **Test:** ~170 (V4'ten +25).
+- **Master plan:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` V5 versiyonu.
+- **Implement EDİLMEDİ** — master roadmap; her faz öncesi ayrı detay plan modu.
+- **Sıradaki:** Faz 1 başlama onayı bekleniyor.
+
+## Önceki — Teklif Modülü V4 Master Plan (3. tur review, 2026-05-29)
+
+**Teklif Modülü V4 Master Plan ONAYLANDI (implement edilmedi)**
+
+- **Trigger:** Kullanıcı V3 plan üzerinde 3. tur review yaptı; 8 ana + 5 ikincil = 13 yeni düzeltme. Hepsi kod referansıyla doğrulandı.
+- **Yeni schema bulguları:** audit_log.source enum sınırlı ("ui"|"system"|"ai"|"integration"; literal 'migration_069' patlardı); quotes.customer_address YOK (034:27-30); QuoteForm:242 firma bilgisi DB'de saklanmaz; route.ts:62 PATCH transition accepted ayrı + /convert ayrı (iki yol); route.ts:106 DELETE sent izinli; 034:10 quotes_number_seq global (yıllık reset yok).
+- **8 ana düzeltme V4:** audit source='system' + after_state'e migration adı; customer_address DB+validator+backfill; seller_* 7 snapshot alanı; productId send-time hard check; PDF arşiv 3 path resume (idempotent/resume/fresh); DELETE sadece draft; unit_weight_kg + kg_manual_override DB persist; /accept tek yol + eski 410 Gone.
+- **5 ikincil düzeltme V4:** quote_yearly_counters yıllık reset; RLS ENABLE her yeni tabloya; CreateProductInput hs/size geniş entegrasyon; audit source enum coverage testi; memory checklist.
+- **Master plan:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` V4 versiyonuna güncellendi (449 satır).
+- **Toplam düzeltme:** V2 (5) + V3 (12) + V4 (13) = 30.
+- **Kapsam:** 7 faz · 10 migration (066-075) · ~145 yeni test · 4-6 hafta tam zamanlı.
+- **Implement EDİLMEDİ** — master roadmap; her faz öncesi ayrı detay plan modu.
+- **Sıradaki:** Faz 1 başlama onayı bekleniyor.
+
+## Önceki — Teklif Modülü V3 Master Plan (2. tur review, 2026-05-29)
+
+**Teklif Modülü V3 Master Plan ONAYLANDI (implement edilmedi)**
+
+- **Trigger:** Kullanıcı V2 plan üzerinde 2. tur review yaptı; schema gerçekliği uyuşmazlıkları + 6 ana + 6 ikincil = 12 düzeltme.
+- **Schema gerçekliği doğrulandı:** quotes.status = text+CHECK (enum DEĞİL), audit_log = entity_type/entity_id/before_state/after_state (target_* YANLIŞ), QuoteRow.productId YOK, sig_prepared/sig_approved mevcut, company_settings.currency mevcut, middleware src/proxy.ts (NOT middleware.ts).
+- **6 ana düzeltme V3:** GTİP soft warn (HARD değil); status CHECK constraint update (enum swap değil); audit_log kolon isimleri doğru; QuoteRow.productId hidden field Faz 1'de; PDF immutable arşiv INSERT-only (upsert=false); non-draft update/delete HARD guard (helper + RPC).
+- **6 ikincil düzeltme V3:** sig_* backfill prepared_by_name'e; company_settings.currency reuse (default_currency duplicate etme); quote_number_prefix/separator migration SQL'e dahil; src/proxy.ts (NOT middleware.ts); unitWeightKg gizli alan KG recompute için; 0 fiyat PDF "0.00".
+- **Master plan:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` V3 versiyonuna güncellendi.
+- **Implement EDİLMEDİ** — sadece master roadmap. Her faz öncesi ayrı detay plan modu açılır.
+- **Sıradaki:** Faz 1 başlama onayı bekleniyor.
+
+## Önceki — Teklif Modülü V2 Master Plan (1. tur review, 2026-05-29)
+
+**Teklif Modülü V2 Master Plan ONAYLANDI (implement edilmedi)**
+
+- **Trigger:** Kullanıcı kökten revize istedi: ürün seçilince auto-fill (kod/ölçü/açıklama/fiyat/GTİP/KG), çift dilli kurumsal PDF, revizyon zinciri, immutable PDF arşivi, kabulde sipariş dönüşümü.
+- **3 paralel Explore agent + 1 Plan agent ile master plan çıkarıldı.** Kullanıcı 1. review turunda 6 kritik düzeltme istedi, hepsi entegre edildi.
+- **Net kararlar:** Server-side Puppeteer PDF (Docker chromium), expired enum'dan kaldırılır → UI rozet, GTİP HARD validation + KG SOFT warn, prepared/approved serbest text + audit için ayrı user FK, legacy expired → sent (rejected DEĞİL — satış raporları bozulmasın), root_quote_id paterni (revizyon zinciri R1-R2 bug fix), discount data migration KALDIRILDI (legacy snapshot korunur, iki katmanlı formül), preview hibrit (sessionStorage + DB).
+- **Master plan dosyası:** `/Users/mirzasaribiyik/Projects/erp2/QUOTES_V2_PLAN.md` (24KB, ~600 satır, kalıcı projeye yazıldı).
+- **Kapsam:** 7 faz · ~10 migration (066-074) · ~120 yeni test · ~30 yeni dosya · ~25 değişen dosya · 4-6 hafta tam zamanlı.
+- **Sıra:** 1 → 2 → 3 → 5 → 4 → 6 → 7 (Faz 4 PDF revision_no ve discount_amount'a bağımlı).
+- **Implement EDİLMEDİ** — sadece master roadmap. Her faz öncesi ayrı detay plan modu açılır.
+- **Sıradaki:** Faz 1 (products.hs_code + size_text master alan, QuoteForm auto-fill genişletme, dirtyField refactor) başlama onayı.
+
+## Önceki — Teklifler modülü UI/UX eksiksiz düzeltme (3682 test, 2026-05-28)
+
+- **Trigger:** Kullanıcı "teklifler sayfası üzerine, mevcut sorunları herhangi bir yerde eksiksiz düzelt" istedi. 7 dosyalık audit yapıldı (Explore agent), 5 yüksek + 11 orta sorun bulundu; print PDF (`QuoteDocument.tsx`) bilinçli hex paleti — kapsam dışı.
+- **A — DOM mutation antipattern fix** (`quotes/page.tsx:429-454`): `<tr>` `onMouseEnter`/`onMouseLeave` `querySelectorAll("td")` + `.style.background`, `querySelector("[data-chevron]").style.opacity`, `querySelector("[data-delete]").style.opacity` ile doğrudan DOM yazıyordu. **Fix:** `hoveredId` state + `setHoveredId(q.id)` / `setHoveredId(null)`; tüm TD `background` ve borderLeft koşullu inline (`isHovered ? "var(--bg-secondary)" : "transparent"`); chevron + delete button opacity React state'den. `data-chevron`/`data-delete` attribute'ları silindi.
+- **B — UX bug** (`quotes/page.tsx:452`): `onMouseLeave` içinde `if (confirmId === q.id) setConfirmId(null)` vardı — kullanıcı "Sil" basıp "Evet, sil" görünce fareyi başka satıra kaydırınca onay sıfırlanıyordu. **Fix:** A maddesiyle birlikte handler `() => setHoveredId(null)`'a indirgenince satır otomatik gitti.
+- **C — preview/page.tsx 9 hex → CSS var:** `#1e2330/#2d3347/#0072BC/#9ca3b0/#373e47/#1a1d23/#e6edf3/#636d7c` → `var(--bg-primary/border-tertiary/accent/text-secondary/border-secondary/text-primary/text-tertiary)`. **Bilinçli korunan:** `#d0d5dd` (PDF kağıt taklidi scroll arkaplanı — yorum eklendi) ve `color: "white"` (accent zemin üstü okunaklılık; `--accent-text` projede farklı amaçta).
+- **D — QuoteForm.tsx INJECTED_CSS:** `var(--bg-hover, #2a2e37)` (2 yer) → `var(--bg-secondary)`. `--bg-hover` globals.css'te tanımlı değildi → her zaman hex fallback'ine düşüyordu.
+- **E — A11y aria-label'lar:** `page.tsx` refresh button + delete trash button → `aria-label`; chevron `<span>` → `aria-hidden="true"`. `[id]/page.tsx` confirm dialog: `role="dialog"` + `aria-modal="true"` + `aria-labelledby="quote-confirm-dialog-title"` (başlık div'ine de `id` eklendi); SVG'ye `aria-hidden`.
+- **+15 source-regex test** (`quotes-ui-audit-fix.test.ts`): DOM mutation kaldırma (3), hoveredId state (1), handler simplification (1), data-attr temizliği (1), confirmId UX fix (1), aria-label (2), dialog a11y (3), preview hex temizliği (1), preview CSS var kullanımı (1), bilinçli #d0d5dd korunması (1), QuoteForm bg-hover temizliği (1).
+- 5 dosya · **3682 test yeşil** (önceki 3667 + 15) · TS clean · 0 yeni warning · build OK
+- **Sıradaki:** Push + Coolify redeploy + manuel smoke (satır hover + "Evet, sil" stabilite testi + preview renkleri dark theme tutarlı + screen reader confirm dialog "dialog" olarak okur).
+
+## Önceki — SMTP smoke endpoint + deploy runbook (3667 test, 2026-05-28)
 
 - **Trigger:** SMTP/Resend entegrasyonu 2026-05-06'dan beri kod hazır; production deploy yapılmadı. Müşteri domain'i belirsiz → Resend hesap + DNS verify bloklu. Bu turda kod tarafını deploy-ready yap + runbook yaz.
 - **Kod 100% hazırdı (doğrulandı):** Migration 047, `resend@^6.12.2`, `.env.example` (RESEND_API_KEY/EMAIL_FROM/NEXT_PUBLIC_APP_URL/ADMIN_EMAILS), email-service (fail-safe), email-logs (dedup+retry), templates (5 tip), retry-failed cron, trigger entegrasyonları (alert-service vb.).
