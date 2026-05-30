@@ -95,6 +95,14 @@ export async function serviceTransitionQuote(
         }
     }
 
+    // Bilinen kabul edilen boşluk (Bulgu 3 / P2-B, 2026-05-30): arşiv yalnız SEND
+    // anında üretilir; accept belgeyi değiştirmez. Send arşivi başarısız olur
+    // (archiveWarning) ve kullanıcı yine "Kabul Et" derse accepted teklif arşivsiz
+    // kalabilir. Burada accept'i BLOKLAMIYORUZ — bu, "arşiv send'te non-blocking"
+    // kararı A ile tutarlı (send geçer ama accept bloklanırsa asimetri olur). Gerçek
+    // çözüm = Faz 6 accept recover/generate (V7-A5, serviceArchiveQuotePdf reuse);
+    // o güne dek arşivi tüketen bir akış yok → bugünkü etki sıfır.
+
     return { success: true, archiveWarning };
 }
 

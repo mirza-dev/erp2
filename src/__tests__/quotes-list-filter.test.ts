@@ -3,7 +3,7 @@
  * Also tests inline filter/search logic.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { getValidUntilBadge, canDeleteQuote, getQuoteActions, isQuoteEditable } from "@/app/dashboard/quotes/_utils/quote-display";
+import { getValidUntilBadge, canDeleteQuote, getQuoteActions, isQuoteEditable, pickSucceededIds } from "@/app/dashboard/quotes/_utils/quote-display";
 
 // ─── getValidUntilBadge ───────────────────────────────────────────────────────
 
@@ -73,6 +73,35 @@ describe("canDeleteQuote", () => {
     it("rejected → false", () => expect(canDeleteQuote("rejected")).toBe(false));
     it("expired → false", () => expect(canDeleteQuote("expired")).toBe(false));
     it("revised → false", () => expect(canDeleteQuote("revised")).toBe(false));
+});
+
+// ─── pickSucceededIds (Bulgu 3 / P2-A) ────────────────────────────────────────
+
+describe("pickSucceededIds", () => {
+    const ok = { status: "fulfilled" as const, value: { ok: true } };
+    const notOk = { status: "fulfilled" as const, value: { ok: false } };
+    const rejected = { status: "rejected" as const, reason: new Error("net") };
+
+    it("1 başarılı (ok) + 1 409 (!ok) → yalnız başarılı id döner (yanıltıcı UI temizliği fix)", () => {
+        // Senaryo: draft silinir (ok), sent 409 alır (!ok) → sent ekranda kalmalı.
+        expect(pickSucceededIds(["draft-1", "sent-1"], [ok, notOk])).toEqual(["draft-1"]);
+    });
+
+    it("rejected (network fail) → o id düşürülmez", () => {
+        expect(pickSucceededIds(["a", "b"], [ok, rejected])).toEqual(["a"]);
+    });
+
+    it("hepsi başarılı → tümü döner", () => {
+        expect(pickSucceededIds(["a", "b"], [ok, ok])).toEqual(["a", "b"]);
+    });
+
+    it("hepsi başarısız → boş (local state'ten hiçbiri düşmez)", () => {
+        expect(pickSucceededIds(["a", "b"], [notOk, rejected])).toEqual([]);
+    });
+
+    it("boş giriş → boş", () => {
+        expect(pickSucceededIds([], [])).toEqual([]);
+    });
 });
 
 // ─── Tab filtreleme (inline logic) ────────────────────────────────────────────

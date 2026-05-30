@@ -5,7 +5,18 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 2. review tur, 3960 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 3. review tur, 3969 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY BEKLİYOR)
+
+**3. review tur (Bulgular, "önce doğrula sonra düzelt") — 3 bulgu; 1 gerçek regresyon, 1 doc-only, 1 kabul edilen boşluk:**
+- **P2-A (regresyon — 2. turun yan etkisi) Toplu silme yanıltıcı UI temizliği:** sent draft-only kilidi sonrası, liste checkbox'ı hâlâ tüm statüleri seçiyordu + `handleBulkDelete` `succeeded>0` ise **tüm** seçili id'leri local state'ten düşürüyordu → 1 draft + 1 sent seçilince sent 409 alıyor ama UI ikisini de kaldırıyor (refresh'te geri gelir). **Fix (advisor: ikisi de):** (a) **load-bearing** — `pickSucceededIds(ids, results)` pure helper → yalnız fulfilled+`res.ok` id'ler düşürülür (sent 409 + network fail dahil tüm hata modları); (b) seçim yalnız silinebilir (draft) satırlarla sınırlı — per-row checkbox `{deletable && ...}`, select-all `deletablePageIds` (3 helper de; hepsi `length>0` guard'lı). Test: `pickSucceededIds` 5 davranış (1 ok+1 !ok→yalnız ok) + page source-regex.
+- **P2-B (kabul edilen boşluk, BLOKLAMAZ) Faz 6 öncesi accepted arşivsiz kalabilir:** arşiv yalnız SEND'te üretilir; send fail (archiveWarning) + kullanıcı yine "Kabul Et" → accepted arşivsiz. **Karar: kabul + dokümante** (kod yorumu `quote-service.ts` accept gap + bu not). Accept'i bloklamak, "send'te arşiv non-blocking" kararı A ile asimetrik olur; gerçek çözüm = Faz 6 recover/generate (V7-A5 serviceArchiveQuotePdf reuse). Bugünkü etki sıfır (arşivi tüketen akış yok). **AskUserQuestion sorulmadı** (advisor: "yes" seçeneği önceki karar A ile çelişirdi).
+- **P3 (doc-only) Stale "COMMIT+PUSH BEKLİYOR":** 2. tur push edilmişti (`bb3b3f2`) ama memory/CLAUDE.md "BEKLİYOR" diyordu → hizalandı.
+- **Test:** pickSucceededIds (5) + selection-gating source-regex (4) = +9. **3960 → 3969 yeşil** · tsc/build temiz · eslint src 31/0.
+- **Smoke (kullanıcı):** liste: sadece draft satırlarda checkbox; 1 draft+1 sent seçilemez (sent checkbox yok); çoklu draft sil → başarısız olan ekranda kalır.
+
+---
+
+## Önceki — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 2. review tur, COMMIT+PUSH `bb3b3f2` + migration 075/076 APPLY BEKLİYOR)
 
 **2. review tur (Bulgular, "önce doğrula sonra düzelt") — 5 bulgu doğrulandı; 2 ürün kararı (AskUserQuestion):**
 - **B1 (P2) — Müşteri adresi resmi belgede yok:** `validateQuoteForSend` (quote-validation.ts:50) `customer_address`'i ZORUNLU tutar (gerekçe koddaki yorumda: "resmi PDF") ama `QuoteData`'da `custAddress` alanı YOKtu → arşiv + canlı önizleme + PDF müşteri bloğunda adres hiç görünmüyordu. **Kullanıcı kararı: EKLE.** **4 nokta** (advisor "drift trap" yakaladı — yalnız arşivi yamamak Faz 4a Review P3-A drift'ini geri getirirdi): `quote-types.ts QuoteData.custAddress` + `quote-document-helpers.ts BILINGUAL_LABELS.address` (Adres/Address) + `QuoteDocument` müşteri satırı `[L.address, data.custAddress]` (boş→render yok) + `quote-archive-html.ts buildQuoteDataFromDetail` (`detail.customerAddress`) + **`QuoteForm.tsx` autoSave + savePreviewData payload + her iki dep array** (canlı önizleme; state zaten vardı). Veri: `QuoteDetail.customerAddress` (mock-data.ts:246).

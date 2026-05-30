@@ -19,6 +19,22 @@ export function canDeleteQuote(status: string): boolean {
     return status === "draft";
 }
 
+/**
+ * Bulgu 3 / P2-A (2026-05-30): toplu silmede YALNIZ başarılı (fulfilled + res.ok)
+ * id'leri döndürür. Local state'ten yalnız bunlar düşürülür — 409 (sent draft-only
+ * kilidi) veya network fail eden satır ekranda kalır (refresh'te geri gelip
+ * UI'ı yanıltmasın). `results`, `ids` ile index-hizalı olmalıdır.
+ */
+export function pickSucceededIds(
+    ids: string[],
+    results: PromiseSettledResult<{ ok: boolean }>[],
+): string[] {
+    return ids.filter((_, i) => {
+        const r = results[i];
+        return r.status === "fulfilled" && r.value.ok;
+    });
+}
+
 // ── Status transition helpers ────────────────────────────────────────────────
 
 import type { QuoteStatus } from "@/lib/database.types";

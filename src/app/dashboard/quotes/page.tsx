@@ -12,7 +12,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
-import { getValidUntilBadge, canDeleteQuote } from "./_utils/quote-display";
+import { getValidUntilBadge, canDeleteQuote, pickSucceededIds } from "./_utils/quote-display";
 
 type QuoteStatus = QuoteSummary["status"];
 type FilterTab = "ALL" | QuoteStatus;
@@ -136,7 +136,11 @@ function QuotesList() {
 
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
         useSelection(`${activeTab}|${search}|${currencyFilter}|${dateFrom}|${dateTo}`);
-    const pageIds = pagedItems.map(q => q.id);
+    // Bulgu 3 / P2-A (2026-05-30): seçim yalnız silinebilir (draft) satırlarla
+    // sınırlı — sent draft-only kilidi sonrası seçilip silinememe karışıklığını
+    // önler; per-row delete affordance'ı (canDeleteQuote) ile tutarlı. Üç seçim
+    // helper'ı da bu set üzerinden çalışır (hepsi pageIds.length>0 guard'lı).
+    const deletablePageIds = pagedItems.filter(q => canDeleteQuote(q.status)).map(q => q.id);
 
     const handleBulkDelete = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -145,11 +149,14 @@ function QuotesList() {
         const results = await Promise.allSettled(
             ids.map(id => fetch(`/api/quotes/${id}`, { method: "DELETE" })),
         );
-        const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
-        const succeeded = ids.length - failed;
-        if (succeeded > 0) {
-            setQuotes(prev => prev.filter(q => !ids.includes(q.id)));
-            toast({ type: "success", message: `${succeeded} teklif silindi.` });
+        // Bulgu 3 / P2-A: YALNIZ başarılı id'ler local state'ten düşürülür.
+        // 409 (sent) / network fail eden satır ekranda kalır → "succeeded>0 ise
+        // hepsini düşür" yanıltıcı UI'ı düzeltildi. (pickSucceededIds: pure + test'li.)
+        const succeededIds = pickSucceededIds(ids, results);
+        const failed = ids.length - succeededIds.length;
+        if (succeededIds.length > 0) {
+            setQuotes(prev => prev.filter(q => !succeededIds.includes(q.id)));
+            toast({ type: "success", message: `${succeededIds.length} teklif silindi.` });
         }
         if (failed > 0) toast({ type: "error", message: `${failed} teklif silinemedi.` });
         clearAll();
@@ -384,9 +391,9 @@ function QuotesList() {
                             <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
                                 <input
                                     type="checkbox"
-                                    checked={isPageAllSelected(pageIds)}
-                                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
-                                    onChange={() => toggleAll(pageIds)}
+                                    checked={isPageAllSelected(deletablePageIds)}
+                                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(deletablePageIds); }}
+                                    onChange={() => toggleAll(deletablePageIds)}
                                     onClick={e => e.stopPropagation()}
                                     style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
                                     aria-label="Sayfadaki tüm teklifleri seç"
@@ -441,14 +448,17 @@ function QuotesList() {
                                             style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px", background: rowBg }}
                                             onClick={e => e.stopPropagation()}
                                         >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.has(q.id)}
-                                                onChange={() => toggleOne(q.id)}
-                                                onClick={e => e.stopPropagation()}
-                                                style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                                aria-label={`${q.quoteNumber} seç`}
-                                            />
+                                            {/* Bulgu 3 / P2-A: yalnız silinebilir (draft) satırlar seçilebilir. */}
+                                            {deletable && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(q.id)}
+                                                    onChange={() => toggleOne(q.id)}
+                                                    onClick={e => e.stopPropagation()}
+                                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                                    aria-label={`${q.quoteNumber} seç`}
+                                                />
+                                            )}
                                         </td>
                                         <td style={{
                                             ...tdStyle,

@@ -34,6 +34,29 @@ const FORM_SRC = readFileSync(
     "utf8",
 );
 
+describe("quotes/page.tsx — Bulgu 3 / P2-A: toplu silme yalnız silinebilir satır + başarılı id", () => {
+    it("seçim yalnız silinebilir (draft) satırlarla sınırlı — deletablePageIds", () => {
+        expect(LIST_SRC).toMatch(/const deletablePageIds = pagedItems\.filter\(q => canDeleteQuote\(q\.status\)\)/);
+    });
+
+    it("select-all üç helper'ı da deletablePageIds üzerinden çalışır (pageIds değil)", () => {
+        expect(LIST_SRC).toMatch(/isPageAllSelected\(deletablePageIds\)/);
+        expect(LIST_SRC).toMatch(/isPageIndeterminate\(deletablePageIds\)/);
+        expect(LIST_SRC).toMatch(/toggleAll\(deletablePageIds\)/);
+    });
+
+    it("per-row checkbox yalnız deletable satırda render edilir", () => {
+        expect(LIST_SRC).toMatch(/\{deletable && \(/);
+    });
+
+    it("handleBulkDelete yalnız başarılı id'leri local state'ten düşürür (pickSucceededIds)", () => {
+        expect(LIST_SRC).toMatch(/const succeededIds = pickSucceededIds\(ids, results\)/);
+        expect(LIST_SRC).toMatch(/prev\.filter\(q => !succeededIds\.includes\(q\.id\)\)/);
+        // Eski yanıltıcı "tüm ids'i düşür" kalmadı
+        expect(LIST_SRC).not.toMatch(/prev\.filter\(q => !ids\.includes\(q\.id\)\)/);
+    });
+});
+
 describe("quotes/page.tsx — DOM mutation + UX + a11y fixes", () => {
     it("querySelectorAll DOM mutation pattern'i kaldırıldı", () => {
         expect(LIST_SRC).not.toMatch(/querySelectorAll\(["']td["']\)/);

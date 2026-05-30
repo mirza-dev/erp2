@@ -4,9 +4,11 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 4 — PDF Arşiv (2026-05-30) — dondurulmuş HTML snapshot + Bulgular review pass, 3951 test, COMMIT+PUSH b8c1613 + migration 075/076 APPLY BEKLİYOR
+## Faz 4 — PDF Arşiv (2026-05-30) — dondurulmuş HTML snapshot + Bulgular 1.+2.+3. review tur, 3969 test, COMMIT+PUSH BEKLİYOR (1. `b8c1613` + 2. `bb3b3f2` push edildi; 3. tur commit edilmedi) + migration 075/076 APPLY BEKLİYOR
 
-**Review pass (5 bulgu doğrulandı+düzeltildi):** P1 upload MIME `text/html` (charset drop; bucket allowlist eşleşmesi). P2 send arşiv fail → görünür `archiveWarning` toast (kullanıcı kararı A, non-blocking+sessiz değil). P2 concurrency: serviceArchiveQuotePdf create fail → re-read existing (UNIQUE 23505 idempotent). P2 doc drift: QUOTES_V2_PLAN V7-A5 Puppeteer→frozen-HTML (Faz 6 reuse). P3 explicit git add. **3880→3951.**
+**Review 3. tur (3 bulgu):** **P2-A (regresyon)** toplu silme yalnız başarılı id'yi düşürsün (`pickSucceededIds`) + seçim sadece draft (sent draft-only kilidinin yan etkisi). **P2-B (kabul edilen boşluk)** send-archive fail + accept → arşivsiz accepted; Faz 6 recover kapatacak (kod yorumu, bloklamaz — karar A asimetrisi). **P3 (doc-only)** stale "BEKLİYOR" hizalandı. **3960 → 3969.**
+
+**Review 1. tur (5 bulgu doğrulandı+düzeltildi):** P1 upload MIME `text/html` (charset drop; bucket allowlist eşleşmesi). P2 send arşiv fail → görünür `archiveWarning` toast (kullanıcı kararı A, non-blocking+sessiz değil). P2 concurrency: serviceArchiveQuotePdf create fail → re-read existing (UNIQUE 23505 idempotent). P2 doc drift: QUOTES_V2_PLAN V7-A5 Puppeteer→frozen-HTML (Faz 6 reuse). P3 explicit git add. **3880→3951.**
 
 
 **Gönderilmiş teklifin immutable "kilitli arşivi".** Mimari karar (kullanıcı): **dondurulmuş HTML snapshot** (Puppeteer/binary-PDF DEĞİL — Coolify chromium yükü + Faz 6'nın erken yükü; JSON snapshot DEĞİL — template drift). Plan: `~/.claude/plans/clever-dancing-owl.md`.
