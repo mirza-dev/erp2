@@ -5,7 +5,7 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** — migration 079, 4094 test, COMMIT+PUSH BEKLİYOR · 079 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** — migration 079, 4094 test, COMMIT+PUSH EDİLDİ (3551302) · 079 APPLY BEKLİYOR)
 
 **Faz 7 = V7 master-plan'ın SON fazı. Not şablonları CRUD + QuoteForm picker.**
 - **080 KALICI DÜŞÜRÜLDÜ:** master-plan `079 → quote_line_items_sort_order (koşullu)` diyordu; doğrulandı ki `quote_line_items.position` zaten var (034:106), `quotes.ts:88` ona göre sıralıyor, accept RPC ona göre order'lıyor → yeni kolon koşulsuz gereksiz. Drag-reorder UX **ertelendi** (eklenirse `position` yeniden atama, şema değişikliği DEĞİL). → Faz 7 = **tek migration 079** (memory'deki "079-080" güncellendi: 080 yok).
@@ -16,7 +16,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Settings sayfası** `/dashboard/settings/note-templates`: kind filtre sekmeleri + liste + create/edit modal + pasifleştir confirm; demo guard + a11y; Sidebar "Not Şablonları" linki.
 - **QuoteForm picker:** 3 textarea (Notlar/Teslimat/Ödeme) üstünde "+ Şablon ekle…" select; mount'ta `/api/note-templates` fetch (cancelled guard); `templatesForField` (kind+general filtre); `applyTemplateToField` (boş→doldur / dolu→append `\n`, sessiz üzerine-yazma YOK); readOnly'de picker gizli. Setter'lar zaten autoSave/savePreviewData dep array'inde → drift trap yok.
 - **Test (+51):** migration drift-guard (8) + picker pure+wiring (12) + helper/validation/mapper (16) + route (15). **4043→4094** · tsc temiz · npm run lint 0 · build OK (`ƒ /api/note-templates` + `[id]` + settings sayfası + `ƒ Proxy`).
-- **DURUM: COMMIT+PUSH BEKLİYOR · migration 079 APPLY BEKLİYOR.** Manuel smoke: admin Not Şablonları CRUD; seed görünür; teklif formunda 3 alan picker doğru kind filtreler (boş→doldur, dolu→append); non-draft picker kilitli; viewer POST→403.
+- **DURUM: COMMIT+PUSH EDİLDİ (3551302) · migration 079 APPLY BEKLİYOR.** Manuel smoke: admin Not Şablonları CRUD; seed görünür; teklif formunda 3 alan picker doğru kind filtreler (boş→doldur, dolu→append); non-draft picker kilitli; viewer POST→403.
 - **V7 master-plan TAMAMLANDI** (Faz 1-7 + tüm Bulgular turları). Ertelenen borçlar: Paraşüt iskonto aktarım, order_line_description, serviceConvert temizlik, quotes audit katmanı (modül-geneli), drag-reorder UX.
 
 ---
