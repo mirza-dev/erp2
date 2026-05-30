@@ -119,7 +119,7 @@ export default function QuoteDetailPage() {
 
             // Faz 4: send başarılı ama arşiv üretilemediyse görünür uyarı (sessiz değil).
             if (transition === "sent" && data.archiveWarning) {
-                toast({ type: "warning", message: "Teklif gönderildi ancak arşiv oluşturulamadı; daha sonra otomatik denenecek." });
+                toast({ type: "warning", message: "Teklif gönderildi ancak arşiv oluşturulamadı." });
             } else {
                 const labels: Record<string, string> = {
                     sent: "Teklif gönderildi",

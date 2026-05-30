@@ -140,7 +140,7 @@ export async function DELETE(
         const { id } = await params;
         const existing = await dbGetQuote(id);
         if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-        if (!["draft", "sent"].includes(existing.status)) {
+        if (existing.status !== "draft") {
             return NextResponse.json(
                 { error: `Cannot delete a quote with status '${existing.status}'` },
                 { status: 409 }

@@ -67,10 +67,12 @@ describe("getValidUntilBadge", () => {
 
 describe("canDeleteQuote", () => {
     it("draft → true", () => expect(canDeleteQuote("draft")).toBe(true));
-    it("sent → true", () => expect(canDeleteQuote("sent")).toBe(true));
+    // Bulgu 2 (2. review tur): sent artık silinemez (immutable arşiv koruması).
+    it("sent → false", () => expect(canDeleteQuote("sent")).toBe(false));
     it("accepted → false", () => expect(canDeleteQuote("accepted")).toBe(false));
     it("rejected → false", () => expect(canDeleteQuote("rejected")).toBe(false));
     it("expired → false", () => expect(canDeleteQuote("expired")).toBe(false));
+    it("revised → false", () => expect(canDeleteQuote("revised")).toBe(false));
 });
 
 // ─── Tab filtreleme (inline logic) ────────────────────────────────────────────

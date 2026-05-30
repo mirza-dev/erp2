@@ -13,7 +13,10 @@ export function getValidUntilBadge(validUntil: string | null): ValidUntilBadge |
 }
 
 export function canDeleteQuote(status: string): boolean {
-    return status === "draft" || status === "sent";
+    // Bulgu 2 (2. review tur, 2026-05-30): sadece draft silinebilir. Faz 4'te
+    // sent teklifin immutable arşivi var (quote_pdf_archives ON DELETE CASCADE);
+    // sent silinince arşiv de düşerdi. Sent değişmek istenirse revize edilir.
+    return status === "draft";
 }
 
 // ── Status transition helpers ────────────────────────────────────────────────

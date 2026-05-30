@@ -262,6 +262,25 @@ describe("Faz 4a Review — preview/PDF contract", () => {
         expect(DOC_HELPERS_SOURCE).toMatch(/Geçerlilik Tarihi/);
     });
 
+    // ── Bulgu 1 (2. review tur, 2026-05-30): müşteri adresi resmi belgede ──────
+    it("QuoteData interface custAddress alanını içerir", () => {
+        expect(TYPES_SOURCE).toMatch(/custAddress:\s*string;/);
+    });
+
+    it("BILINGUAL_LABELS address (Adres/Address) tanımlı", () => {
+        expect(DOC_HELPERS_SOURCE).toMatch(/address:\s*\{[^}]*tr:\s*"Adres"[^}]*en:\s*"Address"/);
+    });
+
+    it("QuoteDocument müşteri bloğu L.address + data.custAddress satırı içerir", () => {
+        expect(DOC_SOURCE).toMatch(/\[L\.address,\s*data\.custAddress\]/);
+    });
+
+    it("QuoteForm her iki QuoteData builder'ı + her iki dep array custAddress taşır (preview/arşiv drift'siz)", () => {
+        // 2 fullData payload (autoSave + savePreviewData) + 2 useCallback dep array = 4
+        const occ = FORM_SOURCE.match(/custEmail, custAddress/g) ?? [];
+        expect(occ.length).toBe(4);
+    });
+
     it("QuoteDocument lines tablosu row.size render eder + colSpan empty 10'a güncel", () => {
         expect(DOC_SOURCE).toMatch(/\{row\.size \|\| "—"\}/);
         // Faz 4c güncellemesi: Size header BILINGUAL_LABELS.size'den geliyor (quote-document-helpers.ts).

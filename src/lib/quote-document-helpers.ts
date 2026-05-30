@@ -23,6 +23,7 @@ export const BILINGUAL_LABELS = {
     contact:      { tr: "İlgili",                en: "Contact" },
     phone:        { tr: "Telefon",               en: "Phone" },
     email:        { tr: "E-Posta",               en: "Email" },
+    address:      { tr: "Adres",                 en: "Address" },
     // Meta rows (quote)
     salesRep:     { tr: "Satış Temsilcisi",      en: "Sales Rep" },
     // Faz 4c Review: plan §503 — "Teklif No / Offer No"

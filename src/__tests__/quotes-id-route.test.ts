@@ -289,11 +289,12 @@ describe("DELETE /api/quotes/[id]", () => {
         expect(mockDbDeleteQuote).not.toHaveBeenCalled();
     });
 
-    it("status=sent → 200, silinir", async () => {
+    // Bulgu 2 (2. review tur): sent artık silinemez (immutable arşiv koruması).
+    it("status=sent → 409, silinmez", async () => {
         mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "sent" });
         const res = await DELETE(makeReq("DELETE"), idCtx());
-        expect(res.status).toBe(200);
-        expect(mockDbDeleteQuote).toHaveBeenCalledWith(QUOTE_ID);
+        expect(res.status).toBe(409);
+        expect(mockDbDeleteQuote).not.toHaveBeenCalled();
     });
 
     it("başarılı silme → revalidateTag çağrılır", async () => {

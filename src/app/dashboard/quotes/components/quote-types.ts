@@ -36,6 +36,10 @@ export interface QuoteData {
     custContact: string;
     custPhone: string;
     custEmail: string;
+    // Bulgu 1 (2. review tur, 2026-05-30): müşteri adresi gönderimde zorunlu
+    // (validateQuoteForSend — "resmi PDF") ama belgede görünmüyordu. Resmi
+    // belgeye + canlı önizlemeye taşınır (drift'siz).
+    custAddress: string;
 
     // Quote details
     quoteNo: string;

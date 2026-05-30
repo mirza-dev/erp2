@@ -472,7 +472,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows, descDirty, discount }));
             const fullData: QuoteData = {
                 sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
-                custCompany, custContact, custPhone, custEmail,
+                custCompany, custContact, custPhone, custEmail, custAddress,
                 quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
                 currency, vatRate, rows,
                 subtotal: ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0),
@@ -507,7 +507,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             localStorage.setItem("teklif_v3_full", JSON.stringify(fullData));
         } catch { /* noop */ }
     }, [readOnly, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
-        custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
+        custCompany, custContact, custPhone, custEmail, custAddress, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand, discount,
         notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title,
         descDirtyRowIds]);
@@ -518,7 +518,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         try {
             const fullData: QuoteData = {
                 sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
-                custCompany, custContact, custPhone, custEmail,
+                custCompany, custContact, custPhone, custEmail, custAddress,
                 quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
                 currency, vatRate, rows,
                 subtotal: ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0),
@@ -553,7 +553,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             localStorage.setItem("teklif_v3_full", JSON.stringify(fullData));
         } catch { /* noop */ }
     }, [status, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
-        custCompany, custContact, custPhone, custEmail, quoteNo, quoteDate, validUntil,
+        custCompany, custContact, custPhone, custEmail, custAddress, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand, discount,
         notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
 

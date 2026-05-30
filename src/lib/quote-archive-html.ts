@@ -62,6 +62,7 @@ export function buildQuoteDataFromDetail(detail: QuoteDetail, company?: CompanyS
         custContact: detail.customerContact ?? "",
         custPhone: detail.customerPhone ?? "",
         custEmail: detail.customerEmail ?? "",
+        custAddress: detail.customerAddress ?? "",
 
         // Quote details
         quoteNo: detail.quoteNumber ?? "",

@@ -259,6 +259,11 @@ describe("archiveWarning wiring (send arşiv fail görünür)", () => {
         expect(detailPage).toMatch(/data\.archiveWarning/);
         expect(detailPage).toMatch(/arşiv oluşturulamadı/i);
     });
+    // Bulgu 3 (2. review tur): yanıltıcı "otomatik denenecek" vaadi kaldırıldı
+    // (gerçek recover yalnız Faz 6 accept'te — reject/expire'da hiç denenmez).
+    it("UI: archive-fail toast yanıltıcı 'otomatik denenecek' vaadi İÇERMEZ", () => {
+        expect(detailPage).not.toMatch(/otomatik denenecek/i);
+    });
 });
 
 describe("Phase 0 lock: QuoteDocument server-render edilebilir", () => {

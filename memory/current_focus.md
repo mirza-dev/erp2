@@ -5,9 +5,22 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — PDF Arşiv: dondurulmuş HTML snapshot + Bulgular review pass, 3951 test, COMMIT+PUSH b8c1613 + migration 075/076 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 2. review tur, 3960 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY BEKLİYOR)
 
-**Review pass (Bulgular, "önce doğrula sonra düzelt") — 5 bulgu doğrulandı + düzeltildi:**
+**2. review tur (Bulgular, "önce doğrula sonra düzelt") — 5 bulgu doğrulandı; 2 ürün kararı (AskUserQuestion):**
+- **B1 (P2) — Müşteri adresi resmi belgede yok:** `validateQuoteForSend` (quote-validation.ts:50) `customer_address`'i ZORUNLU tutar (gerekçe koddaki yorumda: "resmi PDF") ama `QuoteData`'da `custAddress` alanı YOKtu → arşiv + canlı önizleme + PDF müşteri bloğunda adres hiç görünmüyordu. **Kullanıcı kararı: EKLE.** **4 nokta** (advisor "drift trap" yakaladı — yalnız arşivi yamamak Faz 4a Review P3-A drift'ini geri getirirdi): `quote-types.ts QuoteData.custAddress` + `quote-document-helpers.ts BILINGUAL_LABELS.address` (Adres/Address) + `QuoteDocument` müşteri satırı `[L.address, data.custAddress]` (boş→render yok) + `quote-archive-html.ts buildQuoteDataFromDetail` (`detail.customerAddress`) + **`QuoteForm.tsx` autoSave + savePreviewData payload + her iki dep array** (canlı önizleme; state zaten vardı). Veri: `QuoteDetail.customerAddress` (mock-data.ts:246).
+- **B2 (P2) — Sent silinebiliyor:** `canDeleteQuote` draft+sent (quote-display.ts:15) + DELETE route `["draft","sent"]` (route.ts:143); migration 075 arşiv FK `ON DELETE CASCADE` → sent silinince immutable arşiv metadata da düşer. **Kullanıcı kararı: SADECE DRAFT.** `canDeleteQuote`→`status==="draft"`; DELETE route→`!== "draft"` (409); sent-deletable regression testi (quotes-id-route.test.ts) tersine çevrildi (sent→409). **DOKUNULMADI:** `dbListExpiredQuotes` (`.in(["draft","sent"])`) — bu expiry akışı, silme değil.
+- **B3 (P2/P3) — Yanıltıcı "otomatik denenecek":** archive GET route lookup-only (üretmez), gerçek recover yalnız Faz 6 accept'te (reject/expire'da hiç denenmez). page.tsx:122 toast → vaadi kaldırıldı: "Teklif gönderildi ancak arşiv oluşturulamadı."
+- **B4 (P3) — Buton arşivsiz statüde 404:** CRON draft→expired yapabilir → hiç gönderilmemiş expired teklifin arşivi yok ama buton görünür. `handleViewArchive` 404'ü ZATEN graceful (info toast). Ucuz status-gate yok (`sentAt` QuoteDetail'a map'siz; sadece `parasutSentAt`). **Kod değişmez** — P3 kabul.
+- **B5 (P3) — Doc test sayısı drift:** detay satırlar 3837→3880, üst 3951 → nihai **3960**'a hizalandı.
+- **Test:** quote-archive-html custAddress builder/render (3) + quotes-faz4a-helper-mapper Bulgu 1 source-regex (4: QuoteData/BILINGUAL_LABELS/QuoteDocument satır/QuoteForm 4-nokta) + canDeleteQuote revised (1) + faz4 toast no-"otomatik denenecek" (1); sent-delete testi flip. **3951 → 3960 yeşil** · tsc/build temiz (`ƒ Proxy` + archive route) · eslint src 31/0.
+- **Smoke (kullanıcı):** sent teklif arşivinde **Adres/Address satırı dolu**; canlı önizlemede adres görünür (drift yok); draft hariç Sil butonu yok (sent→409); arşiv fail→warning toast ("otomatik denenecek" YOK); eski adressiz teklif→arşivde Adres satırı yok.
+
+---
+
+## Önceki — 2026-05-30 (Teklif V7 Faz 4 — PDF Arşiv: dondurulmuş HTML snapshot + Bulgular 1. review tur, 3951 test, COMMIT+PUSH b8c1613 + migration 075/076 APPLY BEKLİYOR)
+
+**1. review tur (Bulgular, "önce doğrula sonra düzelt") — 5 bulgu doğrulandı + düzeltildi:**
 - **P1 Storage MIME:** upload `contentType: "text/html; charset=utf-8"` ⟂ bucket allowlist `['text/html']` → Supabase exact-match'te her upload fail + send hook yutar (sent ama arşivsiz). **Fix:** contentType → `"text/html"` (charset zaten `<meta charset>`'te). Test güncellendi.
 - **P2 Send arşiv (sessiz yutma):** **Kullanıcı kararı A** — non-blocking AMA görünür: `QuoteTransitionResult.archiveWarning` flag → route sent response → UI **warning toast** ("gönderildi ancak arşiv oluşturulamadı"). serviceTransitionQuote catch'te `archiveWarning=true`. Faz 6 recover backstop korunur.
 - **P2 Concurrency idempotency:** `serviceArchiveQuotePdf` create'i try/catch'e alındı → UNIQUE(23505) yarışında **re-read** (`dbGetQuoteArchive`); varsa idempotent `existing:true`, yoksa gerçek hata rethrow. Faz 6 recovery güvenli.

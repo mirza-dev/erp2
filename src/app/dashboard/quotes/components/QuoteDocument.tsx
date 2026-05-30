@@ -466,6 +466,7 @@ export default function QuoteDocument({ data }: Props) {
                             [L.contact, data.custContact],
                             [L.phone,   data.custPhone],
                             [L.email,   data.custEmail],
+                            [L.address, data.custAddress],
                         ].map(([label, value]) => {
                             const lab = label as { tr: string; en: string };
                             const val = value as string;

@@ -148,6 +148,12 @@ describe("buildQuoteDataFromDetail", () => {
         expect(d.currency).toBe("TRY");
         expect(d.status).toBe("sent");
     });
+
+    // Bulgu 1 (2. review tur): müşteri adresi (gönderimde zorunlu) belgeye taşınır.
+    it("custAddress: detail.customerAddress'ten alınır; boş → boş string", () => {
+        expect(buildQuoteDataFromDetail(makeDetail(), null).custAddress).toBe("İzmit");
+        expect(buildQuoteDataFromDetail(makeDetail({ customerAddress: "" }), null).custAddress).toBe("");
+    });
 });
 
 describe("renderQuoteArchiveHtml (Phase 0: server-side gerçek render)", () => {
@@ -183,6 +189,18 @@ describe("renderQuoteArchiveHtml (Phase 0: server-side gerçek render)", () => {
         expect(html).not.toContain("var(--bg-primary)");
         expect(html).not.toContain("var(--text-primary)");
         expect(html).not.toContain("var(--accent)");
+    });
+
+    // Bulgu 1 (2. review tur): müşteri adresi + bilingual Adres/Address etiketi belgede.
+    it("müşteri adresi dolu → değer + 'Adres'/'Address' bilingual etiket render edilir", () => {
+        expect(html).toContain("İzmit");
+        expect(html).toContain("Adres");
+        expect(html).toContain("Address");
+    });
+
+    it("müşteri adresi boş → adres satırı render edilmez", async () => {
+        const noAddr = await renderQuoteArchiveHtml(buildQuoteDataFromDetail(makeDetail({ customerAddress: "" }), null));
+        expect(noAddr).not.toContain("İzmit");
     });
 });
 
