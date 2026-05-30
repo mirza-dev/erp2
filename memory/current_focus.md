@@ -5,7 +5,7 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — PDF Arşiv: dondurulmuş HTML snapshot + Bulgular review pass, 3951 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — PDF Arşiv: dondurulmuş HTML snapshot + Bulgular review pass, 3951 test, COMMIT+PUSH b8c1613 + migration 075/076 APPLY BEKLİYOR)
 
 **Review pass (Bulgular, "önce doğrula sonra düzelt") — 5 bulgu doğrulandı + düzeltildi:**
 - **P1 Storage MIME:** upload `contentType: "text/html; charset=utf-8"` ⟂ bucket allowlist `['text/html']` → Supabase exact-match'te her upload fail + send hook yutar (sent ama arşivsiz). **Fix:** contentType → `"text/html"` (charset zaten `<meta charset>`'te). Test güncellendi.
@@ -33,7 +33,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **V3-B6:** QuoteDocument satır fiyat/toplam — `isRealRow` gate'i (içerikli satırda 0 fiyat "0,00", boş filler "—").
 - **Logo faithfulness (advisor):** `logo_url` = company-assets **public** bucket getPublicUrl → tam public absolute URL → donmuş arşivde `<img>` standalone çalışır (faithful). Minör caveat: aynı path'e logo re-upload eski arşivlerin logosunu değiştirir (nadir).
 - **Test (+43):** quote-archive-html (13: builder + render/self-containment + Phase 0 gerçek render + V3-B6) + quote-pdf-archives (10: helper orphan-safe/signed) + quotes-faz4-archive (21: service idempotent/notFound/revizyon + send hook non-fatal + route 200/404/no-leak + migration 075/076 + UI source-regex + Phase 0 lock). **3837 → 3880 yeşil** · tsc temiz · build OK (`ƒ Proxy` + archive route) · lint 32 baseline/0 warning (`eslint src`; bare `eslint` .next artefaktı tarar).
-- **DURUM: COMMIT BEKLİYOR** (kod diskte, kullanıcı onayı bekliyor) **+ migration 075/076 APPLY BEKLİYOR.** **Sıradaki — kullanıcı:** commit+push + Supabase'de 075/076 apply + **manuel smoke (load-bearing gate, build/test kapsamı DIŞI):** teklif gönder→detay "Arşivlenmiş Teklif"→signed URL yeni sekmede donmuş HTML **inline render eder** (download DEĞİL — Supabase Content-Disposition kontrolü) + renkler/fontlar/logo doğru + A4 yazdırılır; template sonradan değişse arşiv aynen (drift); tekrar gönder/revize→ikinci arşiv yok (idempotent)/revizyon ayrı; draft→buton yok/route 404. Sonra: Faz 6 (accept→sipariş, 077).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`b8c1613` → main; Faz 4 + Bulgular review pass tek commit; React Doctor pre-commit advisory bloklamadı) **+ migration 075/076 APPLY BEKLİYOR.** **Sıradaki — kullanıcı:** commit+push + Supabase'de 075/076 apply + **manuel smoke (load-bearing gate, build/test kapsamı DIŞI):** teklif gönder→detay "Arşivlenmiş Teklif"→signed URL yeni sekmede donmuş HTML **inline render eder** (download DEĞİL — Supabase Content-Disposition kontrolü) + renkler/fontlar/logo doğru + A4 yazdırılır; template sonradan değişse arşiv aynen (drift); tekrar gönder/revize→ikinci arşiv yok (idempotent)/revizyon ayrı; draft→buton yok/route 404. Sonra: Faz 6 (accept→sipariş, 077).
 
 ## Önceki — 2026-05-30 (Teklif V7 Revizyon Zinciri — Faz 5'ten ertelenen, 3837 test, COMMIT+PUSH 1d96211 + migration 074 APPLY EDİLDİ + review pass)
 
