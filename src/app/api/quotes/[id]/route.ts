@@ -83,7 +83,14 @@ export async function PATCH(
 
         // Status transition branch
         if ("transition" in body) {
-            const result = await serviceTransitionQuote(id, body.transition as "sent" | "accepted" | "rejected");
+            // Faz 6 (V4-A8): accept artık atomik POST /api/quotes/[id]/accept yolu.
+            if (body.transition === "accepted") {
+                return NextResponse.json(
+                    { error: "Accept artık POST /api/quotes/[id]/accept üzerinden yapılır (atomik sipariş oluşturma)." },
+                    { status: 410 },
+                );
+            }
+            const result = await serviceTransitionQuote(id, body.transition as "sent" | "rejected");
             if (!result.success) {
                 // Faz 2 (V4-A2/V4-A4): send-time validasyon → 422; transition map ihlali → 409.
                 const httpStatus = result.notFound ? 404 : result.validationFailed ? 422 : 409;

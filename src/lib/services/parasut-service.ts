@@ -1010,6 +1010,30 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
         return { success: false, error: "Müşteri bilgisi eksik — Paraşüt sync için zorunlu." };
     }
 
+    // Faz 6 (V7-A4): header iskontolu sipariş Paraşüt'e SESSİZ yanlış toplamla
+    // GİTMEZ. discount_amount > 0 → claim'den (parasut_claim_sync) ÖNCE early return
+    // (throw DEĞİL → catch path'i + parasut_step/error/retry marker'ları + lease
+    // churn YOK) + ZORUNLU sync_issue alert (ship route fire-and-forget olduğu için
+    // tek görünür sinyal; opsiyonel değil). İskonto aktarım yöntemi (orantılı/ayrı
+    // satır) ayrı faz; burada yalnız sessiz finansal hata (ERP ≠ fatura) engellenir.
+    if (Number(order.discount_amount ?? 0) > 0) {
+        const msg = "Paraşüt iskonto aktarımı ayrı faz — fatura oluşturulmadı.";
+        try {
+            await dbCreateAlert({
+                type:        "sync_issue",
+                severity:    "warning",
+                title:       "İskontolu sipariş Paraşüt'e aktarılmadı",
+                description: `${order.order_number}: ${msg} (iskonto: ${order.discount_amount})`,
+                entity_type: "sales_order",
+                entity_id:   orderId,
+                source:      "system",
+            });
+        } catch (alertErr) {
+            console.error(JSON.stringify({ parasut_discount_alert_fail: String(alertErr), orderId }));
+        }
+        return { success: false, skipped: true, reason: "discount_unsupported", error: msg };
+    }
+
     const supabase = createServiceClient();
     const owner    = crypto.randomUUID();
 

@@ -155,8 +155,9 @@ describe("PATCH /api/quotes/[id] — transition mapping", () => {
     });
 
     it("transition map ihlali (validationFailed yok) → 409", async () => {
+        // Faz 6: "accepted" artık 410 (atomik /accept) → map ihlali 'rejected' ile test edilir.
         mockTransition.mockResolvedValue({ success: false, error: "geçirilemez" });
-        const res = await PATCH(patchReq({ transition: "accepted" }), ctx());
+        const res = await PATCH(patchReq({ transition: "rejected" }), ctx());
         expect(res.status).toBe(409);
     });
 

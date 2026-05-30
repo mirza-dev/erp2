@@ -220,6 +220,11 @@ export function mapOrderDetail(row: SalesOrderWithLines): OrderDetail {
     aiReason: row.ai_reason ?? undefined,
     aiRiskLevel: row.ai_risk_level ?? undefined,
     quoteId: row.quote_id ?? undefined,
+    // Faz 6 (V7-A9): teklif → sipariş snapshot alanları
+    discountAmount: Number(row.discount_amount ?? 0),
+    vatRate: Number(row.vat_rate ?? 20),
+    sourceQuoteRevisionNo: row.source_quote_revision_no ?? undefined,
+    quotePdfArchiveId: row.quote_pdf_archive_id ?? undefined,
   };
 }
 

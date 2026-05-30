@@ -63,13 +63,14 @@ export function getQuoteActions(status: QuoteStatus, quoteNumber: string): Quote
                     },
                 },
                 {
+                    // Faz 6: accept + taslak sipariş tek atomik işlem (POST /accept).
                     transition: "accepted",
-                    label: "Kabul Et",
+                    label: "Kabul Et ve Siparişe Dönüştür",
                     variant: "primary",
                     confirm: {
-                        title: "Teklifi Kabul Et",
-                        message: `${quoteNumber} numaralı teklifi kabul etmek istediğinize emin misiniz?`,
-                        confirmLabel: "Kabul Et",
+                        title: "Teklifi Kabul Et ve Siparişe Dönüştür",
+                        message: `${quoteNumber} numaralı teklif kabul edilip taslak sipariş olarak oluşturulacak. Devam etmek istiyor musunuz?`,
+                        confirmLabel: "Kabul Et ve Dönüştür",
                     },
                 },
             ];

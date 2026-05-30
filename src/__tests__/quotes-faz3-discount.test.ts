@@ -330,11 +330,12 @@ describe("Convert iskonto block (P1) + migration 072 CHECK", () => {
         const src = readFileSync(join(process.cwd(), "src/lib/services/quote-service.ts"), "utf8");
         expect(src).toMatch(/Number\(quote\.discount_amount\) > 0/);
     });
-    it("[id]/page.tsx iskontolu accepted → buton yerine not (P3: imkânsız aksiyon önermez)", () => {
+    it("[id]/page.tsx Faz 6: iskonto convert-block notu KALDIRILDI (sipariş artık iskonto destekli)", () => {
         const p = readFileSync(join(process.cwd(), "src/app/dashboard/quotes/[id]/page.tsx"), "utf8");
-        expect(p).toMatch(/quote\.discountAmount > 0/);
-        expect(p).toMatch(/quote\.discountAmount <= 0/);
-        // P3 round2: accepted düzenlenemez → "kaldırırsanız dönüştürebilirsiniz" yanıltıcı, kaldırıldı.
+        // Faz 6 (077): sales_orders.discount_amount geldi → iskontolu teklif de
+        // atomik /accept ile siparişe dönüşür; Faz 3 interim blok notu kalkar.
+        expect(p).not.toMatch(/quote\.discountAmount > 0/);
+        expect(p).not.toMatch(/dönüştürülemiyor/);
         expect(p).not.toMatch(/kaldırırsanız dönüştürebilirsiniz/);
     });
     it("migration 072 discount_amount >= 0 CHECK + idempotent guard (P3 round2)", () => {

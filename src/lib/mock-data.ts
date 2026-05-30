@@ -199,6 +199,11 @@ export interface OrderDetail extends Order {
     aiReason?: string;
     aiRiskLevel?: "low" | "medium" | "high";
     quoteId?: string;
+    // Faz 6 (V7-A9): teklif → sipariş snapshot alanları
+    discountAmount?: number;
+    vatRate?: number;
+    sourceQuoteRevisionNo?: number;
+    quotePdfArchiveId?: string;
 }
 
 // ── Quotes ────────────────────────────────────────────────────

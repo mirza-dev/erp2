@@ -136,28 +136,28 @@ export default function QuoteDetailPage() {
         }
     };
 
-    // ── Convert handler (Faz 8) ──────────────────────────────────────────────
+    // ── Accept + sipariş handler (Faz 6, atomik) ─────────────────────────────
+    // Eski "Kabul Et" (PATCH transition) + "Siparişe Dönüştür" (/convert) iki
+    // adımının yerine TEK atomik POST /accept (RPC 077). Hem sent (kabul+sipariş)
+    // hem legacy accepted+siparişsiz (recover) durumunu kapsar.
 
-    const handleConvert = async () => {
+    const handleAccept = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setConverting(true);
         try {
-            const res = await fetch(`/api/quotes/${params.id}/convert`, { method: "POST" });
+            const res = await fetch(`/api/quotes/${params.id}/accept`, { method: "POST" });
             const data = await res.json();
             if (!res.ok) {
-                if (data.existingOrderId) {
-                    setConvertedOrderId(data.existingOrderId);
-                    setConvertedOrderNumber(data.existingOrderNumber ?? null);
-                    toast({ type: "info", message: "Bu teklif zaten siparişe dönüştürülmüş." });
-                } else {
-                    toast({ type: "error", message: data.error || "Dönüştürme başarısız." });
-                }
+                toast({ type: "error", message: data.error || "İşlem başarısız." });
                 return;
             }
-            if (data.warnings?.length) {
-                toast({ type: "warning", message: `Sipariş oluşturuldu. ${data.warnings.length} satır atlandı.` });
+            setStatus("accepted");
+            setConvertedOrderId(data.orderId ?? null);
+            setConvertedOrderNumber(data.orderNumber ?? null);
+            if (data.already) {
+                toast({ type: "info", message: `Bu teklif zaten siparişe dönüştürülmüş: ${data.orderNumber}` });
             } else {
-                toast({ type: "success", message: "Teklif siparişe dönüştürüldü." });
+                toast({ type: "success", message: `Teklif kabul edildi, sipariş oluşturuldu: ${data.orderNumber}` });
             }
             router.push(`/dashboard/orders/${data.orderId}`);
         } catch (err) {
@@ -294,24 +294,22 @@ export default function QuoteDetailPage() {
                                 variant={action.variant}
                                 onClick={() => requestTransition(action)}
                                 disabled={isDemo || anyMutating}
-                                loading={loading === action.transition}
+                                loading={action.transition === "accepted" ? converting : loading === action.transition}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             >
-                                {loading === action.transition
-                                    ? (action.transition === "sent" ? "Gönderiliyor..." : action.transition === "accepted" ? "Kabul ediliyor..." : "Reddediliyor...")
+                                {action.transition === "accepted" && converting
+                                    ? "Kabul ediliyor, sipariş oluşturuluyor..."
+                                    : loading === action.transition
+                                    ? (action.transition === "sent" ? "Gönderiliyor..." : "Reddediliyor...")
                                     : action.label}
                             </Button>
                         ))}
                     </div>
                 )}
 
-                {/* Siparişe Dönüştür — sadece accepted + henüz dönüştürülmemiş + iskontosuz */}
-                {status === "accepted" && !convertedOrderId && quote.discountAmount > 0 && (
-                    <div role="status" style={{ fontSize: "12px", color: "var(--warning-text)", maxWidth: "320px", lineHeight: 1.4 }}>
-                        İskontolu teklif siparişe dönüştürülemiyor — sipariş tarafı iskonto desteği sonraki fazda gelecek.
-                    </div>
-                )}
-                {status === "accepted" && !convertedOrderId && quote.discountAmount <= 0 && (
+                {/* Siparişe Dönüştür — legacy accepted + henüz siparişi yok (Faz 6: iskonto
+                    artık destekli; atomik /accept ile recover). */}
+                {status === "accepted" && !convertedOrderId && (
                     <Button
                         variant="primary"
                         onClick={() => {
@@ -497,8 +495,10 @@ export default function QuoteDetailPage() {
                                 onClick={() => {
                                     const action = confirmDialog.action;
                                     setConfirmDialog(null);
-                                    if (action === "convert_to_order") {
-                                        handleConvert();
+                                    // Faz 6: hem sent "accepted" hem legacy "convert_to_order"
+                                    // → tek atomik /accept (handleAccept).
+                                    if (action === "convert_to_order" || action === "accepted") {
+                                        handleAccept();
                                     } else if (action === "revise_quote") {
                                         handleRevise();
                                     } else {

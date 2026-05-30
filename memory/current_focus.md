@@ -5,7 +5,24 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 4. review tur, 3974 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY EDİLDİ ✅)
+## Son Tamamlanan İş — 2026-05-30 (Teklif V7 **Faz 6 — Accept → Sipariş (atomik)**, 4021 test, COMMIT+PUSH EDİLDİ + migration 077 APPLY BEKLİYOR)
+
+**Faz 6 = V7 master-plan'ın son büyük halkası: kabul edilen teklifi TEK atomik işlemde taslak siparişe dönüştürmek (V5-A4 + V4-A8).** Eski iki adım (PATCH `transition:accepted` + POST `/convert`) birleştirildi; ikisi de **410 Gone**.
+
+- **Migration 077** (`077_quotes_accept_order.sql`, kullanıcı apply eder): `sales_orders` += `discount_amount`/`vat_rate`/`source_quote_revision_no`/`quote_pdf_archive_id` (V7-A9). `accept_quote_and_create_order(p_quote_id, p_actor)` atomik RPC (V7-A1 SECURITY INVOKER): FOR UPDATE quote → idempotency (mevcut sipariş→`already:true`) → status guard `sent|accepted` (else 42501) → null product_id (23502) + küsürat qty (22003) pre-check → arşiv defansif `v_pdf NULL→23514` → order INSERT (**donmuş totaller kopyalanır**, recompute YOK — `sales_orders`'ta totals trigger'ı yok, doğrulandı; `LEFT JOIN customers` ile country/tax) → order_lines INSERT…SELECT `JOIN products` (V7-A8 master kimlik) + `v_quote.vat_rate` satır snapshot (V7-A3) → ROW_COUNT verify (mismatch→ROLLBACK, V7-A8) → `item_count=v_inserted` (V7-A10) → quote sent→accepted flip → audit_log (`quote_accepted_order_created`). REVOKE/GRANT service_role + idempotent + ROLLBACK.
+- **Kritik karar (advisor + doğrulandı):** order totalleri quote'tan **birebir kopyalanır** (arşiv PDF ile bayt-bayt tutarlı; yeniden hesap yuvarlama drift'i getirir). Faz 3 iskonto-convert-bloğu KALKTI (sipariş artık `discount_amount` taşır).
+- **TS/mapper (V7-A9):** `SalesOrderRow` +4 alan; `mapOrderDetail` map; `OrderDetail` interface UI alanları.
+- **Service/route:** `dbAcceptQuoteAndCreateOrder` helper (RPC) + `serviceAcceptQuoteToOrder` (status guard → valid_until kontrolü → **V7-A5 arşiv recover/generate** `serviceArchiveQuotePdf` reuse [eksikse üret, throw→502] → RPC → hata kodu HTTP map: P0002→404/42501→409/23502,22003,23514→422) + `POST /api/quotes/[id]/accept`.
+- **Deprecation (V4-A8):** PATCH `transition:accepted`→410; `/convert` route→410; `serviceTransitionQuote` `QuoteTransition` "accepted" çıkarıldı (`sent: ["rejected"]`); `serviceConvertQuoteToOrder` **silinmedi** (deprecate+korundu, JSDoc not).
+- **Paraşüt iskonto guard (V7-A4, COUPLED):** `serviceSyncOrderToParasut` — `discount_amount>0` → `parasut_claim_sync` ÖNCESİ **early return** (throw değil, marker/lease/sync_log yazılmaz) + **ZORUNLU sync_issue alert** (entity=sales_order). İskonto aktarım yöntemi ayrı faz.
+- **UI:** tek "Kabul Et ve Siparişe Dönüştür" butonu → `/accept`; `already`→mevcut order; legacy accepted+siparişsiz "Siparişe Dönüştür" de `/accept` (recover); Faz 3 iskonto-not kaldırıldı.
+- **Test (+47 net):** migration drift-guard (~14) + service (sent/accepted/already/recover/archiveFailed/valid_until/RPC kodları) + route (status map + revalidateTag) + parasut-discount-guard (3) + order-mapper-faz6 + accept-ui source-regex; flip'ler: quote-convert-route→410, quote-service accepted-transition geçersiz, quotes-id-route transition:accepted→410, quotes-faz2-validation 'rejected' ile 409, quotes-faz3-discount UI-not kaldırıldı. **3974 → 4021 yeşil** · tsc temiz · build OK (`ƒ Proxy` + `/api/quotes/[id]/accept`) · eslint src 31/0.
+- **DURUM: COMMIT+PUSH EDİLDİ; migration 077 APPLY BEKLİYOR (kullanıcı).** Sonraki — **manuel smoke (load-bearing):** sent→tek buton→atomik draft order; order totalleri=arşiv PDF (iskonto dahil); `order_lines.vat_rate`=quote; `item_count`=satır; legacy arşivsiz→otomatik üretilir; tekrar accept→`already`; iskontolu order ship→Paraşüt fatura YOK + sync_issue alert; silinmiş-ürün→422; PATCH transition:accepted→410; /convert→410.
+- **Ertelenen (kayıt):** Paraşüt iskonto AKTARIM yöntemi (orantılı/ayrı satır) ayrı faz; `order_line_description`; `serviceConvertQuoteToOrder` tam temizlik; quotes audit katmanı (modül-geneli); RBAC accept route.
+
+---
+
+## Önceki — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 4. review tur, COMMIT+PUSH `6c9c317` + migration 075/076 APPLY EDİLDİ ✅)
 
 **4. review tur (Bulgular, "önce doğrula sonra düzelt") — 3 P3 bulgu; convergence (5→5→3→3-P3):**
 - **P3-1 (doc-only) Stale status:** 3. tur (`da09dce`) push edildi + 075/076 APPLY EDİLDİ (kullanıcı), ama 4 doc hâlâ "COMMIT+PUSH BEKLİYOR / APPLY BEKLİYOR" diyordu → hizalandı.

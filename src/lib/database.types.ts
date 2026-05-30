@@ -310,6 +310,11 @@ export interface SalesOrderRow {
     quote_id: string | null
     original_order_number: string | null
     quote_valid_until: string | null
+    // Faz 6 (V7-A9): accept_quote_and_create_order snapshot alanları
+    discount_amount: number
+    vat_rate: number
+    source_quote_revision_no: number | null
+    quote_pdf_archive_id: string | null
     shipped_at: string | null
     shipment_tracking_number: string | null
     shipment_carrier: string | null

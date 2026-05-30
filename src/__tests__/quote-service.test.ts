@@ -56,7 +56,8 @@ beforeEach(() => {
 describe("isValidQuoteTransition", () => {
     // Valid transitions
     it("draft → sent ✓", () => expect(isValidQuoteTransition("draft", "sent")).toBe(true));
-    it("sent → accepted ✓", () => expect(isValidQuoteTransition("sent", "accepted")).toBe(true));
+    // Faz 6 (V4-A8): accept artık transition değil — atomik /accept yolu.
+    it("sent → accepted ✗ (Faz 6: /accept atomik)", () => expect(isValidQuoteTransition("sent", "accepted")).toBe(false));
     it("sent → rejected ✓", () => expect(isValidQuoteTransition("sent", "rejected")).toBe(true));
 
     // Invalid from draft
@@ -85,11 +86,12 @@ describe("serviceTransitionQuote", () => {
         expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith(QUOTE_ID, "sent", "draft");
     });
 
-    it("sent → accepted başarılı", async () => {
+    it("sent → accepted artık geçersiz transition (Faz 6: atomik /accept)", async () => {
         mockDbGetQuote.mockResolvedValue(stubQuote("sent"));
-        const result = await serviceTransitionQuote(QUOTE_ID, "accepted");
-        expect(result.success).toBe(true);
-        expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith(QUOTE_ID, "accepted", "sent");
+        // "accepted" QuoteTransition tipinden çıkarıldı; runtime'da geçersiz transition.
+        const result = await serviceTransitionQuote(QUOTE_ID, "accepted" as "rejected");
+        expect(result.success).toBe(false);
+        expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
     });
 
     it("sent → rejected başarılı", async () => {
@@ -206,11 +208,13 @@ describe("serviceTransitionQuote — Faz 2 send-time validasyon", () => {
         expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
     });
 
-    it("send-validasyon yalnız 'sent' hedefinde çalışır — sent→accepted adressiz geçer", async () => {
+    it("send-validasyon yalnız 'sent' hedefinde çalışır — 'rejected' adressiz geçer", async () => {
+        // Faz 6: accept artık transition değil; send-validasyonun yalnız 'sent'e
+        // özgü olduğunu 'rejected' ile doğrularız (adressiz sent→rejected geçer).
         mockDbGetQuote.mockResolvedValue({ ...stubQuote("sent"), customer_address: "" });
-        const result = await serviceTransitionQuote(QUOTE_ID, "accepted");
+        const result = await serviceTransitionQuote(QUOTE_ID, "rejected");
         expect(result.success).toBe(true);
-        expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith(QUOTE_ID, "accepted", "sent");
+        expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith(QUOTE_ID, "rejected", "sent");
     });
 });
 

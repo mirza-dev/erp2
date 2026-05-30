@@ -196,3 +196,29 @@ export async function dbListQuoteChain(rootId: string): Promise<Array<Pick<Quote
     if (error) throw error;
     return (data ?? []) as Array<Pick<QuoteRow, "id" | "quote_number" | "revision_no" | "status">>;
 }
+
+/** Faz 6 (V5-A4): accept_quote_and_create_order RPC dönüşü. */
+export interface AcceptOrderResult {
+    order_id: string;
+    order_number: string;
+    /** Bu teklif için sipariş zaten vardı (idempotent — yeni üretilmedi). */
+    already: boolean;
+}
+
+/**
+ * Faz 6 (V7): kabul edilen teklifi TEK atomik transaction'da taslak siparişe
+ * dönüştürür (077). RPC hata kodları (P0002/42501/23502/22003/23514) servis
+ * katmanında HTTP'ye map'lenir. p_actor null olabilir (created_by/audit NULL).
+ */
+export async function dbAcceptQuoteAndCreateOrder(
+    quoteId: string,
+    actor: string | null,
+): Promise<AcceptOrderResult> {
+    const sb = createServiceClient();
+    const { data, error } = await sb.rpc("accept_quote_and_create_order", {
+        p_quote_id: quoteId,
+        p_actor: actor,
+    });
+    if (error) throw error;
+    return data as AcceptOrderResult;
+}

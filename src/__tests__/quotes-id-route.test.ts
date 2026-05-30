@@ -161,22 +161,13 @@ describe("PATCH /api/quotes/[id] — status transitions", () => {
         expect(body.status).toBe("sent");
     });
 
-    it("draft → accepted (geçersiz) → 409", async () => {
-        mockServiceTransitionQuote.mockResolvedValue({
-            success: false,
-            error: "'draft' durumundaki teklif 'accepted' durumuna geçirilemez.",
-        });
+    // Faz 6 (V4-A8): transition:"accepted" deprecate → 410 (atomik /accept yolu).
+    it("transition:accepted → 410 Gone, serviceTransitionQuote çağrılmaz", async () => {
         const res = await PATCH(makeReq("PATCH", { transition: "accepted" }), idCtx());
-        expect(res.status).toBe(409);
+        expect(res.status).toBe(410);
         const body = await res.json() as { error: string };
-        expect(body.error).toContain("geçirilemez");
-    });
-
-    it("sent → accepted: 200", async () => {
-        mockServiceTransitionQuote.mockResolvedValue({ success: true });
-        mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "accepted" });
-        const res = await PATCH(makeReq("PATCH", { transition: "accepted" }), idCtx());
-        expect(res.status).toBe(200);
+        expect(body.error).toContain("/accept");
+        expect(mockServiceTransitionQuote).not.toHaveBeenCalled();
     });
 
     it("sent → rejected: 200", async () => {
@@ -208,7 +199,7 @@ describe("PATCH /api/quotes/[id] — status transitions", () => {
 
     it("başarısız transition → revalidateTag çağrılmaz", async () => {
         mockServiceTransitionQuote.mockResolvedValue({ success: false, error: "hata" });
-        await PATCH(makeReq("PATCH", { transition: "accepted" }), idCtx());
+        await PATCH(makeReq("PATCH", { transition: "rejected" }), idCtx());
         expect(revalidateTag).not.toHaveBeenCalled();
     });
 });

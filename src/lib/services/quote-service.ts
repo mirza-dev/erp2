@@ -7,7 +7,7 @@
 
 import { createHash } from "crypto";
 import type { QuoteStatus } from "@/lib/database.types";
-import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision } from "@/lib/supabase/quotes";
+import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision, dbAcceptQuoteAndCreateOrder } from "@/lib/supabase/quotes";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
@@ -20,7 +20,10 @@ import { validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-v
 
 // ── Types ────────────────────────────────────────────────────
 
-export type QuoteTransition = "sent" | "accepted" | "rejected";
+// Faz 6 (V4-A8): "accepted" transition kaldırıldı — accept artık atomik
+// POST /api/quotes/[id]/accept (serviceAcceptQuoteToOrder). Bu yol yalnız
+// draft→sent ve sent→rejected geçişlerini yönetir.
+export type QuoteTransition = "sent" | "rejected";
 
 export interface QuoteTransitionResult {
     success: boolean;
@@ -36,7 +39,7 @@ export interface QuoteTransitionResult {
 
 const QUOTE_TRANSITIONS: Record<QuoteStatus, QuoteStatus[]> = {
     draft:    ["sent"],
-    sent:     ["accepted", "rejected"],
+    sent:     ["rejected"],   // Faz 6: accepted ayrı atomik yol (/accept)
     accepted: [],
     rejected: [],
     expired:  [],
@@ -162,6 +165,91 @@ export async function serviceArchiveQuotePdf(
     return { archived: true, existing: false, revisionNo };
 }
 
+// ── Accept → Sipariş (Faz 6, atomik) ─────────────────────────
+
+export interface AcceptQuoteResult {
+    success: boolean;
+    orderId?: string;
+    orderNumber?: string;
+    /** Bu teklif için sipariş zaten vardı (idempotent → mevcut order döner). */
+    already?: boolean;
+    error?: string;
+    notFound?: boolean;
+    /** sent/accepted dışı durum → route 409. */
+    invalidStatus?: boolean;
+    /** valid_until geçmiş → route 400. */
+    expired?: boolean;
+    /** RPC iş kuralı ihlali (silinmiş ürün/küsürat qty/arşiv bypass) → route 422. */
+    unprocessable?: boolean;
+    /** Arşiv recover/generate throw → route 502 (geçici; kullanıcı tekrar dener). */
+    archiveFailed?: boolean;
+}
+
+/**
+ * Faz 6 (V5-A4 + V4-A8 + V7-A5): kabul edilen teklifi TEK atomik işlemde taslak
+ * siparişe dönüştürür. Eski iki yolu (PATCH transition:accepted + /convert)
+ * birleştirir; ikisi de 410 ile deprecate edildi.
+ *
+ * Akış: status guard (sent|accepted) → valid_until kontrolü →
+ *   serviceArchiveQuotePdf recover/generate (V7-A5; eksikse üret, fail→502) →
+ *   accept_quote_and_create_order RPC (077, atomik) → RPC hata kodu → HTTP map.
+ */
+export async function serviceAcceptQuoteToOrder(
+    quoteId: string,
+    actor?: string | null,
+): Promise<AcceptQuoteResult> {
+    const quote = await dbGetQuote(quoteId);
+    if (!quote) return { success: false, error: "Teklif bulunamadı.", notFound: true };
+
+    // Erken status kontrolü (kullanıcı-dostu; RPC de FOR UPDATE altında guard'lar).
+    // 'accepted' izinli: eski akışta accept edilip convert edilmemiş legacy teklif
+    // /accept ile tamamlanır (RPC idempotency mevcut order'ı döndürür).
+    if (quote.status !== "sent" && quote.status !== "accepted") {
+        return {
+            success: false,
+            invalidStatus: true,
+            error: `'${quote.status}' durumundaki teklif siparişe dönüştürülemez. Yalnızca gönderilmiş veya kabul edilmiş teklifler.`,
+        };
+    }
+
+    // valid_until geçmiş → blokla (convert ile aynı; string karşılaştırma kuralı).
+    if (quote.valid_until) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (quote.valid_until < today) {
+            return {
+                success: false,
+                expired: true,
+                error: `Teklifin geçerlilik tarihi geçmiş (${quote.valid_until}). Dönüştürmeden önce teklifi revize edin.`,
+            };
+        }
+    }
+
+    // V7-A5 recover/generate: arşiv eksikse üret (idempotent — varsa no-op). Fail
+    // → 502 (geçici hata, accept RPC çağrılmaz). Normal sent akışında arşiv send'te
+    // üretilmiştir → bu çağrı no-op; legacy/arşiv-fail teklifte burada telafi edilir.
+    try {
+        await serviceArchiveQuotePdf(quoteId, actor ?? null);
+    } catch (err) {
+        console.error(`[quote-accept] arşiv recover/generate başarısız (quote ${quoteId}):`, err);
+        return { success: false, archiveFailed: true, error: "Teklif arşivi üretilemedi. Lütfen tekrar deneyin." };
+    }
+
+    // Atomik accept + sipariş (077 RPC).
+    try {
+        const res = await dbAcceptQuoteAndCreateOrder(quoteId, actor ?? null);
+        return { success: true, orderId: res.order_id, orderNumber: res.order_number, already: res.already };
+    } catch (err: unknown) {
+        const code = (err as { code?: string })?.code;
+        const msg = err instanceof Error ? err.message : String(err);
+        if (code === "P0002") return { success: false, notFound: true, error: "Teklif bulunamadı." };
+        if (code === "42501") return { success: false, invalidStatus: true, error: msg };
+        if (code === "23502") return { success: false, unprocessable: true, error: "Teklifte ürünü silinmiş satır var. Teklifi revize edip tekrar deneyin." };
+        if (code === "22003") return { success: false, unprocessable: true, error: "Teklif satır adedi tam sayı olmalı." };
+        if (code === "23514") return { success: false, unprocessable: true, error: "Teklif arşivi bulunamadı." };
+        throw err;
+    }
+}
+
 // ── Revizyon (Faz 5) ─────────────────────────────────────────
 
 export interface QuoteRevisionResult {
@@ -230,6 +318,10 @@ export interface ConvertResult {
 }
 
 /**
+ * @deprecated Faz 6 (V4-A8): /convert route'u 410 Gone döner; accept artık atomik
+ * `serviceAcceptQuoteToOrder` (RPC 077) ile yapılır. Bu fonksiyon referans/geri-uyum
+ * için korunur (route'tan çağrılmaz). Tam temizlik ayrı tur.
+ *
  * Kabul edilmiş teklifi taslak siparişe dönüştürür.
  *   - Sadece accepted teklifler dönüştürülebilir.
  *   - quote_id FK üzerinden idempotency kontrolü yapılır.
