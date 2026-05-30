@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { dbUpdateCompanySettings } from "@/lib/supabase/company-settings";
 import { handleApiError } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 const ALLOWED_MIME = ["image/png", "image/jpeg", "image/svg+xml", "image/webp"];
@@ -11,6 +12,9 @@ const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 // Content-Type: multipart/form-data — field: "file"
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_settings");
+        if (guard) return guard;
+
         const formData = await req.formData();
         const file = formData.get("file");
         if (!(file instanceof File)) {

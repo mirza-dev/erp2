@@ -5,7 +5,7 @@ import {
     dbReorderProductTypes,
 } from "@/lib/supabase/product-types";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { requireRole } from "@/lib/auth/role-guard";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 const getCachedTypes = unstable_cache(
@@ -26,7 +26,7 @@ export async function GET() {
 
 // POST /api/product-types  (admin only)
 export async function POST(req: NextRequest) {
-    const forbidden = await requireRole(req, ["admin"]);
+    const forbidden = await requirePermission(req, "manage_product_types");
     if (forbidden) return forbidden;
 
     try {
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
 // PUT /api/product-types — reorder (admin only)
 export async function PUT(req: NextRequest) {
-    const forbidden = await requireRole(req, ["admin"]);
+    const forbidden = await requirePermission(req, "manage_product_types");
     if (forbidden) return forbidden;
 
     try {

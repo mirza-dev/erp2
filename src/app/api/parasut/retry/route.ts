@@ -5,6 +5,7 @@ import {
     type RetryableParasutStep,
 } from "@/lib/services/parasut-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 const VALID_STEPS = new Set<RetryableParasutStep | "all">([
     "contact", "product", "shipment", "invoice", "edoc", "all",
@@ -15,6 +16,9 @@ const VALID_STEPS = new Set<RetryableParasutStep | "all">([
 // Body (geriye dönük — sync_log):   { sync_log_id: string }
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_parasut");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Record<string, unknown>;

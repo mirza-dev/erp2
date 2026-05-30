@@ -7,7 +7,7 @@ import {
 } from "@/lib/supabase/product-types";
 import type { ProductFieldType } from "@/lib/database.types";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { requireRole } from "@/lib/auth/role-guard";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // GET /api/product-types/[id]/fields
@@ -33,7 +33,7 @@ export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
-    const forbidden = await requireRole(req, ["admin"]);
+    const forbidden = await requirePermission(req, "manage_product_types");
     if (forbidden) return forbidden;
 
     try {
@@ -93,7 +93,7 @@ export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
-    const forbidden = await requireRole(req, ["admin"]);
+    const forbidden = await requirePermission(req, "manage_product_types");
     if (forbidden) return forbidden;
 
     try {

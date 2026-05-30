@@ -5,7 +5,7 @@ import {
 } from "@/lib/supabase/product-types";
 import type { ProductFieldType } from "@/lib/database.types";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { requireRole } from "@/lib/auth/role-guard";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // PATCH /api/product-types/[id]/fields/[fieldId]  (admin only)
@@ -13,7 +13,7 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string; fieldId: string }> },
 ) {
-    const forbidden = await requireRole(req, ["admin"]);
+    const forbidden = await requirePermission(req, "manage_product_types");
     if (forbidden) return forbidden;
 
     try {
@@ -70,7 +70,7 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string; fieldId: string }> },
 ) {
-    const forbidden = await requireRole(req, ["admin"]);
+    const forbidden = await requirePermission(req, "manage_product_types");
     if (forbidden) return forbidden;
 
     try {

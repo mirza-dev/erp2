@@ -60,6 +60,10 @@ import { POST as productionPost } from "@/app/api/production/route";
 import { DELETE as productionDelete } from "@/app/api/production/[id]/route";
 import { PATCH as alertPatch } from "@/app/api/alerts/[id]/route";
 import { POST as alertSyncRetry } from "@/app/api/alerts/[id]/sync-retry/route";
+import { PATCH as companyPatch } from "@/app/api/settings/company/route";
+import { POST as parasutSync } from "@/app/api/parasut/sync/route";
+import { POST as parasutRetry } from "@/app/api/parasut/retry/route";
+import { POST as productTypesPost } from "@/app/api/product-types/route";
 
 const params = (id = "00000000-0000-4000-8000-000000000001") => ({ params: Promise.resolve({ id }) });
 function postReq(url = "http://localhost/api/x", body: unknown = {}): NextRequest {
@@ -193,5 +197,20 @@ describe("R1/R2 guards — viewer → 403 (Batch B2: PO/commitments/öneri/üret
     });
     it("alerts [id]/sync-retry → 403 (manage_alerts)", async () => {
         expect((await alertSyncRetry(postReq(), params())).status).toBe(403);
+    });
+});
+
+describe("R1 guards — viewer → 403 (Batch C: settings + parasut + product-types)", () => {
+    it("settings/company PATCH → 403 (manage_settings)", async () => {
+        expect((await companyPatch(patchReq({ name: "X" }))).status).toBe(403);
+    });
+    it("parasut/sync POST → 403 (manage_parasut)", async () => {
+        expect((await parasutSync(postReq("http://localhost/api/parasut/sync", { order_id: "x" }))).status).toBe(403);
+    });
+    it("parasut/retry POST → 403 (manage_parasut)", async () => {
+        expect((await parasutRetry(postReq("http://localhost/api/parasut/retry", { orderId: "x" }))).status).toBe(403);
+    });
+    it("product-types POST → 403 (manage_product_types — viewer'da yok; admin+purchasing'e açık)", async () => {
+        expect((await productTypesPost(postReq())).status).toBe(403);
     });
 });
