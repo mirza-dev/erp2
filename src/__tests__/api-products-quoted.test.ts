@@ -32,6 +32,14 @@ vi.mock("@/lib/supabase/purchase-commitments", () => ({
     dbCancelCommitment:      vi.fn(),
 }));
 
+// RBAC R3: GET artık per-request redaction yapıyor → getCurrentUserPermissions
+// çağrılıyor. Tam finansal yetki dön (redaction no-op) ki mevcut fiyat/cost
+// assertion'ları korunsun + createClient/cookies throw etmesin.
+vi.mock("@/lib/auth/role-guard", () => ({
+    getCurrentUserPermissions: vi.fn(async () =>
+        new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
+}));
+
 import { GET, POST } from "@/app/api/products/route";
 
 // ── Helpers ───────────────────────────────────────────────────

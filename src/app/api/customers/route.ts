@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListCustomers, dbCreateCustomer, type CreateCustomerInput } from "@/lib/supabase/customers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
+import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { redactCustomersForPerms } from "@/lib/auth/redact";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 const getCachedCustomers = unstable_cache(
@@ -13,7 +15,9 @@ const getCachedCustomers = unstable_cache(
 export async function GET() {
     try {
         const customers = await getCachedCustomers();
-        return NextResponse.json(customers);
+        // RBAC R3: redaction cache SONRASI, per-request (perms cache key'ine girmez).
+        const perms = await getCurrentUserPermissions();
+        return NextResponse.json(redactCustomersForPerms(customers, perms));
     } catch (err) {
         return handleApiError(err, "GET /api/customers");
     }

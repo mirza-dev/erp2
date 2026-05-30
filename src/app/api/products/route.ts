@@ -4,6 +4,8 @@ import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 import { computeOrderDeadline } from "@/lib/stock-utils";
+import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { redactProductsForPerms } from "@/lib/auth/redact";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 type EnrichedProduct = Awaited<ReturnType<typeof dbListProducts>>[number] & {
@@ -89,13 +91,15 @@ export async function GET(req: NextRequest) {
         const category = searchParams.get("category") ?? "";
         const productType = searchParams.get("product_type") ?? "";
         const isActive = searchParams.get("is_active") !== "false";
+        // RBAC R3: redaction cache SONRASI, per-request (perms cache key'ine girmez).
+        const perms = await getCurrentUserPermissions(req);
         if (searchParams.get("all") === "1") {
             const enriched = await getCachedAllProducts(category, productType, isActive);
-            return NextResponse.json(enriched);
+            return NextResponse.json(redactProductsForPerms(enriched, perms));
         }
         const page = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
         const enriched = await getCachedProducts(category, productType, isActive, page);
-        return NextResponse.json(enriched);
+        return NextResponse.json(redactProductsForPerms(enriched, perms));
     } catch (err) {
         return handleApiError(err, "GET /api/products");
     }

@@ -55,9 +55,17 @@ export function requiredPermissionForPath(pathname: string): Permission | null {
     return null;
 }
 
-/** Verilen permission setiyle pathname'e erişilebilir mi (null kural → serbest). */
-export function canAccessPath(pathname: string, perms: Set<Permission>): boolean {
+/**
+ * Verilen permission setiyle pathname'e erişilebilir mi.
+ *  - Bilinen kural → perms.has(required)
+ *  - /dashboard dışı → serbest (true)
+ *  - **Bilinmeyen /dashboard/* → FAIL-CLOSED (P2 #5):** yalnız admin erişir.
+ *    Matriste olmayan yeni hassas sayfa sessizce açık kalmasın. Yeni sayfa
+ *    eklenince PAGE_ACCESS'e satır eklenmeli.
+ */
+export function canAccessPath(pathname: string, perms: Set<Permission>, isAdmin = false): boolean {
     const required = requiredPermissionForPath(pathname);
-    if (required === null) return true;
-    return perms.has(required);
+    if (required !== null) return perms.has(required);
+    if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) return isAdmin;
+    return true; // /dashboard dışı (zaten proxy /dashboard ile sınırlı)
 }

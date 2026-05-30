@@ -10,6 +10,8 @@ import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
 // GET /api/orders?commercial_status=approved&customer_id=xxx&page=1
@@ -26,7 +28,9 @@ export async function GET(req: NextRequest) {
             page,
         });
 
-        return NextResponse.json(orders);
+        // RBAC R3: redaction per-request (serviceListOrders cache'siz; yine de perms ayrı).
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(redactOrdersForPerms(orders, perms));
     } catch (err) {
         return handleApiError(err, "GET /api/orders");
     }

@@ -22,9 +22,14 @@ async function requireAdmin(): Promise<{ error: NextResponse } | null> {
     if (parseRoles(user.app_metadata, user.email, emails).includes("admin")) return null;
     // Zero-admin bootstrap: sistemde hiç admin yoksa ilk authd kullanıcıya izin ver
     // (first-run / migration sonrası). İlk admin atanınca otomatik kapanır → brick-proof.
+    // P1 #3 fix: listUsers HATASI fail-CLOSED — hata varsa "admin yok" varsayıp
+    // izin verme (eski hâl: data undefined → boş → fail-open).
     const svc = createServiceClient();
-    const { data } = await svc.auth.admin.listUsers();
-    const anyAdmin = (data?.users ?? []).some(u => parseRoles(u.app_metadata, u.email, emails).includes("admin"));
+    const { data, error } = await svc.auth.admin.listUsers();
+    if (error || !data) {
+        return { error: NextResponse.json({ error: "Yetki doğrulanamadı." }, { status: 500 }) };
+    }
+    const anyAdmin = data.users.some(u => parseRoles(u.app_metadata, u.email, emails).includes("admin"));
     if (!anyAdmin) return null;
     return { error: NextResponse.json({ error: "Bu işlem için admin yetkisi gereklidir." }, { status: 403 }) };
 }

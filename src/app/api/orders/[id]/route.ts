@@ -9,6 +9,8 @@ import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
+import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { redactOrderForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
 // GET /api/orders/[id]
@@ -22,7 +24,9 @@ export async function GET(
         if (!order) {
             return NextResponse.json({ error: "Sipariş bulunamadı." }, { status: 404 });
         }
-        return NextResponse.json(order);
+        // RBAC R3: detail finansal alanlar + satır fiyatları view_sales_prices'a tabi.
+        const perms = await getCurrentUserPermissions();
+        return NextResponse.json(redactOrderForPerms(order, perms));
     } catch (err) {
         return handleApiError(err, "GET /api/orders/[id]");
     }

@@ -24,6 +24,9 @@ vi.mock("@/lib/supabase/service", () => ({
             },
         },
     }),
+    // handleApiError `err instanceof ConfigError` kontrolü için gerekli (R4 throw
+    // path'i handleApiError'a düşer).
+    ConfigError: class ConfigError extends Error {},
 }));
 
 import { GET, POST } from "@/app/api/admin/users/route";
@@ -193,5 +196,40 @@ describe("DELETE — last-admin guard", () => {
         const res = await DELETE(new NextRequest("http://localhost/api/admin/users/u9", { method: "DELETE" }), params("u9"));
         expect(res.status).toBe(200);
         expect(mockDeleteUser).toHaveBeenCalledWith("u9");
+    });
+});
+
+describe("R4 — bootstrap fail-open fix (listUsers hatası fail-closed)", () => {
+    it("main GET requireAdmin: non-admin + listUsers ERROR → 500 (admin yok varsayma)", async () => {
+        mockGetUser.mockResolvedValue(SALES);
+        mockListUsers.mockResolvedValue({ data: null, error: { message: "boom" } });
+        const res = await GET();
+        expect(res.status).toBe(500); // fail-closed: hata varsa bootstrap'a düşme
+    });
+
+    it("[id] PATCH requireAdmin: non-admin + listUsers ERROR → 500", async () => {
+        mockGetUser.mockResolvedValue(SALES);
+        mockListUsers.mockResolvedValue({ data: null, error: { message: "boom" } });
+        const req = new NextRequest("http://localhost/api/admin/users/u2", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roles: ["sales"] }),
+        });
+        const res = await PATCH(req, params("u2"));
+        expect(res.status).toBe(500);
+        expect(mockUpdateUserById).not.toHaveBeenCalled();
+    });
+
+    it("[id] PATCH countAdmins: admin + listUsers ERROR → 500 (last-admin lockout bypass önlenir)", async () => {
+        mockGetUser.mockResolvedValue(ADMIN); // requireAdmin kısa devre → listUsers'ı countAdmins çağırır
+        mockListUsers.mockResolvedValue({ data: null, error: { message: "boom" } });
+        const req = new NextRequest("http://localhost/api/admin/users/admin-1", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ roles: ["sales"] }),
+        });
+        const res = await PATCH(req, params("admin-1"));
+        expect(res.status).toBe(500);
+        expect(mockUpdateUserById).not.toHaveBeenCalled();
     });
 });
