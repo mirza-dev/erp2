@@ -64,6 +64,9 @@ import { PATCH as companyPatch } from "@/app/api/settings/company/route";
 import { POST as parasutSync } from "@/app/api/parasut/sync/route";
 import { POST as parasutRetry } from "@/app/api/parasut/retry/route";
 import { POST as productTypesPost } from "@/app/api/product-types/route";
+import { POST as importPost } from "@/app/api/import/route";
+import { PATCH as importBatchPatch, DELETE as importBatchDelete } from "@/app/api/import/[batchId]/route";
+import { PATCH as importDraftPatch } from "@/app/api/import/drafts/[id]/route";
 
 const params = (id = "00000000-0000-4000-8000-000000000001") => ({ params: Promise.resolve({ id }) });
 function postReq(url = "http://localhost/api/x", body: unknown = {}): NextRequest {
@@ -212,5 +215,19 @@ describe("R1 guards — viewer → 403 (Batch C: settings + parasut + product-ty
     });
     it("product-types POST → 403 (manage_product_types — viewer'da yok; admin+purchasing'e açık)", async () => {
         expect((await productTypesPost(postReq())).status).toBe(403);
+    });
+    it("import POST → 403 (manage_import)", async () => {
+        expect((await importPost(postReq())).status).toBe(403);
+    });
+    it("import [batchId] PATCH → 403 (manage_import)", async () => {
+        const bp = { params: Promise.resolve({ batchId: "b1" }) };
+        expect((await importBatchPatch(patchReq({ status: "review" }), bp)).status).toBe(403);
+    });
+    it("import [batchId] DELETE → 403 (manage_import)", async () => {
+        const bp = { params: Promise.resolve({ batchId: "b1" }) };
+        expect((await importBatchDelete(delReq(), bp)).status).toBe(403);
+    });
+    it("import drafts/[id] PATCH → 403 (manage_import)", async () => {
+        expect((await importDraftPatch(patchReq({ status: "confirmed" }), params())).status).toBe(403);
     });
 });

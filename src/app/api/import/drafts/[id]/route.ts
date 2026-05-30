@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetDraft, dbUpdateDraft } from "@/lib/supabase/import";
 import type { ImportDraftStatus } from "@/lib/database.types";
 import { safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/import/drafts/[id]
 export async function GET(
@@ -26,6 +27,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_import");
+        if (guard) return guard;
+
         const { id } = await params;
         const safeParsed = await safeParseJson(req);
         if (!safeParsed.ok) return safeParsed.response;

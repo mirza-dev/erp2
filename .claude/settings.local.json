@@ -68,7 +68,9 @@
       "Bash(sed -n 1,16p src/app/api/purchase-orders/[id]/__TRACKED_VAR__/route.ts)",
       "Bash(sed -n '1,16p' 'src/app/api/purchase-orders/[id]/lines/route.ts')",
       "Bash(sed -n '1,20p' src/app/api/parasut/sync/route.ts)",
-      "Bash(sed -n '1,20p' src/app/api/parasut/retry/route.ts)"
+      "Bash(sed -n '1,20p' src/app/api/parasut/retry/route.ts)",
+      "Bash(rg -n 'export async function \\(POST|PATCH|DELETE|PUT\\)' src/app/api/import/__TRACKED_VAR__/route.ts)",
+      "Bash(rg -n 'req: NextRequest|_req: NextRequest|request: NextRequest|: Request|^import \\\\{ NextRequest' src/app/api/import/__TRACKED_VAR__/route.ts)"
     ],
     "additionalDirectories": [
       "/Users/mirzasaribiyik/Projects/erp2",

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbCreateBatch, dbListBatches } from "@/lib/supabase/import";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/import — batch listesi
 export async function GET() {
@@ -16,6 +17,9 @@ export async function GET() {
 // Body: { file_name?, file_size?, created_by? }
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_import");
+        if (guard) return guard;
+
         const body = await req.json().catch(() => ({}));
         const batch = await dbCreateBatch({
             file_name: body.file_name,
