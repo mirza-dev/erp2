@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbListRecommendations } from "@/lib/supabase/recommendations";
 import { mapRecommendation } from "@/lib/api-mappers";
 import { handleApiError } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import type { RecommendationType, RecommendationStatus } from "@/lib/database.types";
 
 export async function GET(req: NextRequest) {
+    const guard = await requirePermission(req, "view_purchase_suggestions");
+    if (guard) return guard;
+
     const { searchParams } = req.nextUrl;
     const entity_type = searchParams.get("entity_type") ?? undefined;
     const entity_id = searchParams.get("entity_id") ?? undefined;

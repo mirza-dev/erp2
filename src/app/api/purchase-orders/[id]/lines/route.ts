@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetPurchaseOrderById, dbReplacePurchaseOrderLines, validatePoLines } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // PUT /api/purchase-orders/[id]/lines — atomik replace (B3)
@@ -9,6 +10,9 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(req, "manage_purchase_orders");
+        if (guard) return guard;
+
         const { id } = await params;
 
         const existing = await dbGetPurchaseOrderById(id);

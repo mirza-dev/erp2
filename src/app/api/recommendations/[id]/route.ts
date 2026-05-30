@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetRecommendationById, dbUpdateRecommendationStatus } from "@/lib/supabase/recommendations";
 import { mapRecommendation } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import type { RecommendationStatus } from "@/lib/database.types";
 
 export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const guard = await requirePermission(_req, "view_purchase_suggestions");
+    if (guard) return guard;
+
     const { id } = await params;
     try {
         const row = await dbGetRecommendationById(id);
@@ -26,6 +30,9 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const guard = await requirePermission(req, "manage_purchase_suggestions");
+    if (guard) return guard;
+
     const { id } = await params;
     const safeParsed = await safeParseJson(req);
     if (!safeParsed.ok) return safeParsed.response;

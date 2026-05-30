@@ -53,6 +53,9 @@ const mockRequireRole = vi.fn();
 vi.mock("@/lib/auth/role-guard", () => ({
     getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    // RBAC R1/R2: PO route'larına requirePermission guard eklendi → allow.
+    requirePermission: vi.fn().mockResolvedValue(null),
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_purchase_orders", "manage_purchase_orders"])),
 }));
 
 const mockRevalidateTag = vi.fn();

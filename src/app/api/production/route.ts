@@ -4,6 +4,7 @@ import { dbListProductionEntries } from "@/lib/supabase/production";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/production?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
@@ -22,6 +23,9 @@ export async function GET(req: NextRequest) {
 // Body: { product_id, produced_qty, scrap_qty?, waste_reason?, production_date?, notes?, related_order_id? }
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_production");
+        if (guard) return guard;
+
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
 

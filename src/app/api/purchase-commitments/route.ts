@@ -4,10 +4,14 @@ import {
     dbCreateCommitment,
 } from "@/lib/supabase/purchase-commitments";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/purchase-commitments?product_id=xxx&status=pending
 export async function GET(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "view_purchase_orders");
+        if (guard) return guard;
+
         const { searchParams } = req.nextUrl;
         const product_id = searchParams.get("product_id") ?? undefined;
         const status     = searchParams.get("status") ?? undefined;
@@ -23,6 +27,9 @@ export async function GET(req: NextRequest) {
 // Body: { product_id, quantity, expected_date, supplier_name?, notes? }
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_purchase_orders");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Record<string, unknown>;

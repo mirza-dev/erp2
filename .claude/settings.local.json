@@ -63,7 +63,10 @@
       "Bash(rg -n '^import|export async function \\(POST|PATCH|DELETE|PUT\\)' src/app/api/__TRACKED_VAR__.ts)",
       "Bash(cd *)",
       "Bash(sed -n '1,6p' 'src/app/api/products/[id]/route.ts')",
-      "Bash(sed -n '1,6p' 'src/app/api/vendors/[id]/route.ts')"
+      "Bash(sed -n '1,6p' 'src/app/api/vendors/[id]/route.ts')",
+      "Bash(rg -n '^import.*role-guard|export async function \\(GET|POST|PATCH|PUT|DELETE\\)|requireRole' src/app/api/purchase-orders/__TRACKED_VAR__.ts)",
+      "Bash(sed -n 1,16p src/app/api/purchase-orders/[id]/__TRACKED_VAR__/route.ts)",
+      "Bash(sed -n '1,16p' 'src/app/api/purchase-orders/[id]/lines/route.ts')"
     ],
     "additionalDirectories": [
       "/Users/mirzasaribiyik/Projects/erp2",

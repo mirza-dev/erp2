@@ -27,12 +27,16 @@ import {
     PARASUT_ALERT_ENTITY_TYPES,
 } from "@/lib/parasut-constants";
 import { handleApiError } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 export async function POST(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(_req, "manage_alerts");
+        if (guard) return guard;
+
         const { id } = await params;
         const alert = await dbGetAlertById(id);
         if (!alert) {
