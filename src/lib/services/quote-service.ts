@@ -5,12 +5,17 @@
  * Faz 8: serviceConvertQuoteToOrder — accepted teklif → draft sipariş.
  */
 
+import { createHash } from "crypto";
 import type { QuoteStatus } from "@/lib/database.types";
 import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision } from "@/lib/supabase/quotes";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
+import { dbGetCompanySettings } from "@/lib/supabase/company-settings";
+import { dbGetQuoteArchive, dbCreateQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
 import { serviceCreateOrder } from "@/lib/services/order-service";
+import { buildQuoteDataFromDetail, renderQuoteArchiveHtml } from "@/lib/quote-archive-html";
+import { mapQuoteDetail } from "@/lib/api-mappers";
 import { validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
 
 // ── Types ────────────────────────────────────────────────────
@@ -23,6 +28,8 @@ export interface QuoteTransitionResult {
     notFound?: boolean;
     /** Faz 2 (V4-A2/V4-A4): send-time validasyon ihlali → route 422 maps. */
     validationFailed?: boolean;
+    /** Faz 4: send başarılı ama arşiv üretilemedi → UI warning toast (sessiz değil). */
+    archiveWarning?: boolean;
 }
 
 // ── Transition map ───────────────────────────────────────────
@@ -73,7 +80,78 @@ export async function serviceTransitionQuote(
     if (!updated) {
         return { success: false, error: "Teklif durumu eşzamanlı olarak değiştirilmiş. Sayfayı yenileyip tekrar deneyin." };
     }
-    return { success: true };
+
+    // Faz 4 (V7-A5): send anında dondurulmuş HTML arşivi üret. NON-FATAL —
+    // arşiv başarısız olsa da send başarılı kalır (eksik arşiv Faz 6 accept'te
+    // recover/generate ile telafi edilir), AMA SESSİZ DEĞİL: archiveWarning flag'i
+    // route → UI'a taşınır (warning toast). Kullanıcı kararı (2026-05-30): A.
+    let archiveWarning = false;
+    if (target === "sent") {
+        try {
+            await serviceArchiveQuotePdf(quoteId);
+        } catch (err) {
+            console.error(`[quote-archive] sent arşivi başarısız (quote ${quoteId}):`, err);
+            archiveWarning = true;
+        }
+    }
+
+    return { success: true, archiveWarning };
+}
+
+// ── PDF Arşiv (Faz 4) ────────────────────────────────────────
+
+export interface QuoteArchiveResult {
+    archived: boolean;
+    /** Arşiv zaten vardı (V3-A5 idempotent — yeniden üretilmedi). */
+    existing: boolean;
+    revisionNo?: number;
+    error?: string;
+    notFound?: boolean;
+}
+
+/**
+ * Faz 4 (V7): gönderilmiş teklifin dondurulmuş HTML snapshot arşivini üretir.
+ * V3-A5 idempotent: aynı (quote, revision_no) için arşiv VARSA yeniden üretmez.
+ * Send hook'undan ve (gelecekte) Faz 6 accept recover/generate'ten reusable.
+ */
+export async function serviceArchiveQuotePdf(
+    quoteId: string,
+    actorUserId?: string | null,
+): Promise<QuoteArchiveResult> {
+    const quote = await dbGetQuote(quoteId);
+    if (!quote) return { archived: false, existing: false, error: "Teklif bulunamadı.", notFound: true };
+
+    const revisionNo = Number(quote.revision_no ?? 1);
+
+    const existing = await dbGetQuoteArchive(quoteId, revisionNo);
+    if (existing) return { archived: true, existing: true, revisionNo };
+
+    const detail = mapQuoteDetail(quote);
+    const company = await dbGetCompanySettings().catch(() => null);
+    const data = buildQuoteDataFromDetail(detail, company);
+    const html = await renderQuoteArchiveHtml(data);
+    const contentHash = createHash("sha256").update(html).digest("hex");
+    const byteSize = Buffer.byteLength(html, "utf-8");
+
+    try {
+        await dbCreateQuoteArchive({
+            quoteId,
+            revisionNo,
+            html,
+            contentHash,
+            byteSize,
+            createdBy: actorUserId ?? null,
+        });
+    } catch (err) {
+        // Concurrency: paralel istek aynı (quote, revision_no) arşivini commit etmiş
+        // olabilir (UNIQUE 23505). Re-read → varsa idempotent existing döner; yoksa
+        // gerçek hata (storage down vb.) propagate eder. Faz 6 recovery güvenli.
+        const racedExisting = await dbGetQuoteArchive(quoteId, revisionNo);
+        if (racedExisting) return { archived: true, existing: true, revisionNo };
+        throw err;
+    }
+
+    return { archived: true, existing: false, revisionNo };
 }
 
 // ── Revizyon (Faz 5) ─────────────────────────────────────────

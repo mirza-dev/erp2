@@ -11,12 +11,12 @@
 - [project_integrations.md](project_integrations.md) — Paraşüt Faz 1-10 ✅ (1914 test), Faz 11 sırada; AI kolon eşleştirme, Sentry ✅, k6, smoke 24
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Son: Teklif V7 Revizyon Zinciri (sent/rejected/expired→düzenlenebilir kopya, kök+suffix -R2, kaynak→revised, valid_until NULL) + review pass (4 bulgu doğrulandı; audit+RBAC borcu dokümante), 3837 test, COMMIT+PUSH 1d96211, 073+074 APPLY EDİLDİ; önceki: Faz 5 numara katmanı
+- [current_focus.md](current_focus.md) — Son: Teklif V7 **Faz 4 PDF Arşiv** (dondurulmuş HTML snapshot; send→renderToStaticMarkup→quote-pdfs immutable .html; "use client" kaldırıldı [Phase 0], react-dom/server dinamik import) **+ Bulgular review pass** (P1 MIME text/html, P2 archiveWarning görünür, P2 concurrency re-read, P2 doc drift, P3 explicit add), 3951 test, **COMMIT+PUSH BEKLİYOR + 075/076 APPLY BEKLİYOR**; önceki: Revizyon Zinciri (074 ✅)
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)
 - [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
-- [project_quotes.md](project_quotes.md) — Teklif modülü: V7 master plan; Faz 1a/1b/2/3 ✅ + Faz 3 review (070-072) + Faz 5 numara katmanı (073) ✅ + **Revizyon zinciri** 074 (kök+suffix, revised status) APPLY EDİLDİ + review pass; ERTELENEN: sig rename, **quotes audit katmanı** (modül-geneli, gelecek faz); sıradaki Faz 4 (075-076 PDF arşiv)
+- [project_quotes.md](project_quotes.md) — Teklif modülü: V7 master plan; Faz 1a/1b/2/3 ✅ + Faz 5 numara (073) ✅ + Revizyon zinciri (074) ✅ + **Faz 4 PDF Arşiv** (075-076, dondurulmuş HTML snapshot, COMMIT+075/076 APPLY BEKLİYOR); ERTELENEN: sig rename, **quotes audit katmanı** (modül-geneli), Puppeteer/binary-PDF (frozen HTML seçildi); sıradaki Faz 6 (accept→sipariş, 077)
 - [project_frontend_renewal.md](project_frontend_renewal.md) — Frontend yenileme planı (frontend-renewal.md): DOM mutation fix, component lib, a11y — PLAN HAZIR, uygulama başlamadı
 
 ## Feedback

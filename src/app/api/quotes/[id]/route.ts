@@ -92,7 +92,10 @@ export async function PATCH(
             const updated = await dbGetQuote(id);
             revalidateTag("quotes", "max");
             revalidateTag(`quote-${id}`, "max");
-            return NextResponse.json(updated ? mapQuoteDetail(updated) : null);
+            // Faz 4: send'te arşiv üretilemezse archiveWarning taşınır (UI warning toast).
+            return NextResponse.json(
+                updated ? { ...mapQuoteDetail(updated), archiveWarning: result.archiveWarning } : null,
+            );
         }
 
         // Document update branch (existing behavior)

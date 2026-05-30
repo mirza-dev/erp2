@@ -49,6 +49,7 @@ export default function QuoteDetailPage() {
     const [loading, setLoading] = useState<string | null>(null);
     const [converting, setConverting] = useState(false);
     const [revising, setRevising] = useState(false);
+    const [archiveLoading, setArchiveLoading] = useState(false);
     const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null);
     const [convertedOrderNumber, setConvertedOrderNumber] = useState<string | null>(null);
     const [confirmDialog, setConfirmDialog] = useState<{
@@ -116,12 +117,17 @@ export default function QuoteDetailPage() {
             setStatus(data.status);
             setQuote(data);
 
-            const labels: Record<string, string> = {
-                sent: "Teklif gönderildi",
-                accepted: "Teklif kabul edildi",
-                rejected: "Teklif reddedildi",
-            };
-            toast({ type: transition === "rejected" ? "warning" : "success", message: labels[transition] || "Durum güncellendi" });
+            // Faz 4: send başarılı ama arşiv üretilemediyse görünür uyarı (sessiz değil).
+            if (transition === "sent" && data.archiveWarning) {
+                toast({ type: "warning", message: "Teklif gönderildi ancak arşiv oluşturulamadı; daha sonra otomatik denenecek." });
+            } else {
+                const labels: Record<string, string> = {
+                    sent: "Teklif gönderildi",
+                    accepted: "Teklif kabul edildi",
+                    rejected: "Teklif reddedildi",
+                };
+                toast({ type: transition === "rejected" ? "warning" : "success", message: labels[transition] || "Durum güncellendi" });
+            }
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.";
             toast({ type: "error", message: msg });
@@ -179,6 +185,27 @@ export default function QuoteDetailPage() {
             toast({ type: "error", message: err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu." });
         } finally {
             setRevising(false);
+        }
+    };
+
+    // ── Arşiv görüntüle (Faz 4, V2-5 Mod B) ──────────────────────────────────
+    // Gönderilmiş teklifin dondurulmuş HTML arşivinin signed URL'ini açar.
+    // Read-only → demo modda izinli.
+
+    const handleViewArchive = async () => {
+        setArchiveLoading(true);
+        try {
+            const res = await fetch(`/api/quotes/${params.id}/archive`);
+            const data = await res.json();
+            if (!res.ok || !data.url) {
+                toast({ type: "info", message: data.error || "Arşiv bulunamadı." });
+                return;
+            }
+            window.open(data.url, "_blank", "noopener");
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Arşiv açılamadı." });
+        } finally {
+            setArchiveLoading(false);
         }
     };
 
@@ -345,6 +372,18 @@ export default function QuoteDetailPage() {
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                     >
                         {revising ? "Revize ediliyor..." : "Revize Et"}
+                    </Button>
+                )}
+
+                {/* Faz 4 (V2-5 Mod B): gönderilmiş teklifin dondurulmuş arşivi */}
+                {status !== "draft" && (
+                    <Button
+                        variant="secondary"
+                        onClick={handleViewArchive}
+                        loading={archiveLoading}
+                        title="Gönderilen teklifin dondurulmuş (immutable) kopyası"
+                    >
+                        {archiveLoading ? "Açılıyor..." : "📄 Arşivlenmiş Teklif"}
                     </Button>
                 )}
 

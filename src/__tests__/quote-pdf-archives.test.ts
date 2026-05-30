@@ -1,0 +1,128 @@
+/**
+ * Faz 4 (V7) — quote-pdf-archives helper testleri.
+ *   dbGetQuoteArchive (eq+eq+maybeSingle), dbCreateQuoteArchive (orphan-safe),
+ *   dbGetArchiveSignedUrl (createSignedUrl).
+ */
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const mockFrom = vi.fn();
+const mockInsert = vi.fn();
+const mockDelete = vi.fn();
+const mockSelect = vi.fn();
+const mockEq = vi.fn();
+const mockMaybeSingle = vi.fn();
+const mockSingle = vi.fn();
+const mockStorageUpload = vi.fn();
+const mockStorageSigned = vi.fn();
+
+let _terminal: { data: unknown; error: unknown } = { data: null, error: null };
+function setTerminal(v: { data: unknown; error: unknown }) { _terminal = v; }
+
+const makeChain = () => {
+    const c: Record<string, unknown> = {
+        then: (resolve: (v: unknown) => unknown) => Promise.resolve(_terminal).then(resolve),
+    };
+    c.insert = (v: unknown) => { mockInsert(v); return c; };
+    c.delete = () => { mockDelete(); return c; };
+    c.select = (v?: unknown) => { mockSelect(v); return c; };
+    c.eq = (k: unknown, v: unknown) => { mockEq(k, v); return c; };
+    c.maybeSingle = () => mockMaybeSingle();
+    c.single = () => mockSingle();
+    return c;
+};
+
+const mockSupabase = {
+    from: (table: string) => { mockFrom(table); return makeChain(); },
+    storage: {
+        from: (_bucket: string) => ({
+            upload: (...a: unknown[]) => mockStorageUpload(...a),
+            createSignedUrl: (...a: unknown[]) => mockStorageSigned(...a),
+        }),
+    },
+};
+
+vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => mockSupabase }));
+
+import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl } from "@/lib/supabase/quote-pdf-archives";
+
+const QID = "00000000-0000-4000-8000-000000000001";
+
+beforeEach(() => {
+    [mockFrom, mockInsert, mockDelete, mockSelect, mockEq, mockMaybeSingle, mockSingle, mockStorageUpload, mockStorageSigned]
+        .forEach((m) => m.mockReset());
+    setTerminal({ data: null, error: null });
+});
+
+describe("dbGetQuoteArchive", () => {
+    it("quote_id + revision_no eq + maybeSingle ile sorgular; varsa döner", async () => {
+        const row = { id: "a1", quote_id: QID, revision_no: 1, file_path: "quotes/x/r1.html" };
+        mockMaybeSingle.mockResolvedValueOnce({ data: row, error: null });
+        const r = await dbGetQuoteArchive(QID, 1);
+        expect(r).toEqual(row);
+        expect(mockFrom).toHaveBeenCalledWith("quote_pdf_archives");
+        expect(mockEq).toHaveBeenCalledWith("quote_id", QID);
+        expect(mockEq).toHaveBeenCalledWith("revision_no", 1);
+    });
+
+    it("yoksa null", async () => {
+        mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+        expect(await dbGetQuoteArchive(QID, 2)).toBeNull();
+    });
+
+    it("DB hatası → throw", async () => {
+        mockMaybeSingle.mockResolvedValueOnce({ data: null, error: { message: "db fail" } });
+        await expect(dbGetQuoteArchive(QID, 1)).rejects.toThrow(/db fail/);
+    });
+});
+
+describe("dbCreateQuoteArchive", () => {
+    const base = { quoteId: QID, revisionNo: 1, html: "<html>x</html>", contentHash: "abc", byteSize: 14 };
+
+    it("insert + upload başarılı → satır döner; file_path deterministik", async () => {
+        const row = { id: "a1", quote_id: QID, revision_no: 1, file_path: `quotes/${QID}/r1.html` };
+        mockSingle.mockResolvedValueOnce({ data: row, error: null });
+        mockStorageUpload.mockResolvedValueOnce({ error: null });
+        const r = await dbCreateQuoteArchive(base);
+        expect(r).toEqual(row);
+        expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+            quote_id: QID, revision_no: 1, file_path: `quotes/${QID}/r1.html`, content_hash: "abc", byte_size: 14,
+        }));
+        // P1 fix: bucket allowlist ['text/html'] ile eşleşmesi için charset parametresi YOK.
+        expect(mockStorageUpload).toHaveBeenCalledWith(
+            `quotes/${QID}/r1.html`, expect.anything(), expect.objectContaining({ upsert: false, contentType: "text/html" }),
+        );
+    });
+
+    it("upload başarısız → DB satırı silinir (orphan-safe) + throw", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { id: "a1" }, error: null });
+        mockStorageUpload.mockResolvedValueOnce({ error: { message: "upload boom" } });
+        await expect(dbCreateQuoteArchive(base)).rejects.toThrow(/upload boom/);
+        expect(mockDelete).toHaveBeenCalled();
+        expect(mockEq).toHaveBeenCalledWith("id", "a1");
+    });
+
+    it("insert hatası (örn. UNIQUE ihlali) → throw, upload çağrılmaz", async () => {
+        mockSingle.mockResolvedValueOnce({ data: null, error: { message: "duplicate key" } });
+        await expect(dbCreateQuoteArchive(base)).rejects.toThrow(/duplicate key/);
+        expect(mockStorageUpload).not.toHaveBeenCalled();
+    });
+
+    it("boş html / geçersiz revizyon → erken throw (DB çağrılmaz)", async () => {
+        await expect(dbCreateQuoteArchive({ ...base, html: "", byteSize: 0 })).rejects.toThrow(/içeriği boş/);
+        await expect(dbCreateQuoteArchive({ ...base, revisionNo: 0 })).rejects.toThrow(/revizyon/);
+        expect(mockInsert).not.toHaveBeenCalled();
+    });
+});
+
+describe("dbGetArchiveSignedUrl", () => {
+    it("signed URL döner", async () => {
+        mockStorageSigned.mockResolvedValueOnce({ data: { signedUrl: "https://signed/x" }, error: null });
+        expect(await dbGetArchiveSignedUrl("quotes/x/r1.html")).toBe("https://signed/x");
+        expect(mockStorageSigned).toHaveBeenCalledWith("quotes/x/r1.html", 3600);
+    });
+
+    it("hata → null", async () => {
+        mockStorageSigned.mockResolvedValueOnce({ data: null, error: { message: "no" } });
+        expect(await dbGetArchiveSignedUrl("quotes/x/r1.html")).toBeNull();
+    });
+});

@@ -199,15 +199,17 @@ Null dönerse `quote_pdf_archive_id = NULL` ile order yaratılır → kabul edil
 
 **Kullanıcı isteği:** "Resmi PDF arşivlenmiş sent teklif kilitli arşiv olmalı" (V4 review).
 
-**KULLANICI KARARI (2026-05-29, 6. tur kesinleşti): RECOVER/GENERATE** — 422 hard-fail DEĞİL. Accept anında PDF arşivi eksikse otomatik üretilir, sonra sipariş oluşur. Kullanıcı akışı kesilmez.
+**KULLANICI KARARI (2026-05-29, 6. tur kesinleşti): RECOVER/GENERATE** — 422 hard-fail DEĞİL. Accept anında arşiv eksikse otomatik üretilir, sonra sipariş oluşur. Kullanıcı akışı kesilmez.
 
-**Mimari sonuç (önemli):** PDF üretimi server-side (Puppeteer/Docker chromium) → atomik SQL RPC İÇİNDE yapılamaz. Recover/generate **route/service katmanında**, `accept_quote_and_create_order` RPC çağrısından ÖNCE yapılır:
+> **⚠️ FAZ 4 İMPLEMENT NOTU (2026-05-30) — mimari güncellendi:** Faz 4'te kullanıcı kararıyla **Puppeteer/Docker chromium + binary PDF REDDEDİLDİ**; arşiv = **dondurulmuş HTML snapshot** (`QuoteDocument` server-side `renderToStaticMarkup` → self-contained `.html` → `quote-pdfs` private bucket, immutable). Üretim `serviceArchiveQuotePdf(quoteId)` (quote-service.ts) — `dbCreateQuoteArchive` 075/076 üzerinden, INSERT-only + UNIQUE(quote_id, revision_no) + concurrency re-read. **Chromium imaja eklenmez.** Bu bölümdeki "PDF üretimi/Puppeteer" ifadeleri = **HTML render**; "quote_pdf_archive_id" guard'ı = arşiv satırı (HTML) varlığı. Faz 6 accept recover/generate **aynı `serviceArchiveQuotePdf`'i reuse eder** (yeni Puppeteer servisi YOK).
+
+**Mimari sonuç (önemli):** HTML render server-side (`renderToStaticMarkup`, dinamik `react-dom/server` import — App Router route graph statik import'u reddeder) → atomik SQL RPC İÇİNDE yapılamaz. Recover/generate **route/service katmanında**, `accept_quote_and_create_order` RPC çağrısından ÖNCE yapılır:
 
 ```
 /api/quotes/[id]/accept route (V5-A4 atomik RPC'den önce):
   1. quote_pdf_archives son revizyon lookup
-  2. NULL ise → serviceGenerateAndArchiveQuotePdf(quoteId)
-     (Puppeteer render + quote_pdf_archives INSERT, V3-A5 immutable upsert=false)
+  2. NULL ise → serviceArchiveQuotePdf(quoteId)   (Faz 4'te yazıldı; reuse)
+     (renderToStaticMarkup → HTML + quote_pdf_archives INSERT, V3-A5 immutable upsert=false)
   3. Üretim başarısız → 502 (accept çağrılmaz; geçici hata, kullanıcı tekrar dener)
   4. Arşiv hazır (mevcut veya yeni üretildi) → accept_quote_and_create_order RPC
      RPC içinde v_pdf_archive_id artık her zaman dolu (LIMIT 1 güvenli)
@@ -223,7 +225,7 @@ END IF;  -- tüm transaction ROLLBACK → PDF-arşivsiz accepted order İMKANSIZ
 ```
 Net davranış: **Normal kullanıcı 422 görmez** (route PDF'i üretir → arşiv hazır). Yalnızca route recover'ı baypas eden yol RPC'de 23514 alır (route handler bunu da 422'ye map edebilir ama normal akışta tetiklenmez).
 
-**Test:** (a) Accept öncesi quote_pdf_archives boş → route PDF üretir + arşivler → accept başarılı + order.quote_pdf_archive_id dolu; (b) PDF üretimi throw → 502, accept çağrılmaz; (c) RPC'ye doğrudan (route baypas) NULL arşivle gidilirse → 23514 RAISE + ROLLBACK (defansif guard testi).
+**Test:** (a) Accept öncesi quote_pdf_archives boş → route `serviceArchiveQuotePdf` ile HTML arşivi üretir → accept başarılı + order.quote_pdf_archive_id dolu; (b) arşiv üretimi throw → 502, accept çağrılmaz; (c) RPC'ye doğrudan (route baypas) NULL arşivle gidilirse → 23514 RAISE + ROLLBACK (defansif guard testi).
 
 ### V7-A6 (P2) — Faz 1 başlangıcında ayrı tam plan zorunlu
 
@@ -412,7 +414,7 @@ Faz 1 manuel smoke V7:
 
 Faz 6 manuel smoke V7:
 - Accept RPC SECURITY INVOKER
-- Accept öncesi quote_pdf_archives boş → route PDF üretir + arşivler → accept başarılı (V7-A5 recover/generate); PDF üretimi fail → 502
+- Accept öncesi quote_pdf_archives boş → route `serviceArchiveQuotePdf` ile HTML arşivi üretir → accept başarılı (V7-A5 recover/generate); arşiv üretimi fail → 502
 - Accept sonrası order_lines.vat_rate her satırda quote.vat_rate'e eşit (Paraşüt sync doğru)
 - Accept sonrası order.item_count = quote satır sayısı (V7-A10; 0 değil)
 - Silinmiş ürünlü teklif (product_id NULL) → accept 23502 RAISE; ROW_COUNT mismatch → ROLLBACK (V7-A8)

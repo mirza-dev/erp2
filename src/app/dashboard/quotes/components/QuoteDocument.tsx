@@ -1,4 +1,9 @@
-"use client";
+// Faz 4 (V7): "use client" KALDIRILDI — bu component saf fonksiyon (hook YOK,
+// browser API YOK; yalnız inline style + dangerouslySetInnerHTML CSS = SSR-safe).
+// Server graph'te renderToStaticMarkup ile arşiv HTML üretimi için (quote-archive-html.ts)
+// gerçek fonksiyon olarak import edilebilmesi gerekiyor — "use client" olsaydı bundler
+// onu client-reference proxy'ye çevirip render'ı boşaltırdı. Client preview sayfası (Mod A)
+// bu shared component'i sorunsuz import etmeye devam eder (tek template korunur).
 
 import type { QuoteData } from "./quote-types";
 
@@ -47,7 +52,7 @@ function fmtDate(s: string) {
 // ── @page rule (top-level, NOT inside @media print) ──────────────────────────
 // margin: 0 → browser has no space to show its default headers/footers (title, URL, date)
 
-const PAGE_CSS = `
+export const PAGE_CSS = `
 @page {
     size: A4 portrait;
     margin: 8mm;
@@ -56,7 +61,7 @@ const PAGE_CSS = `
 
 // ── Print CSS (scoped to #quote-document) ────────────────────────────────────
 
-const PRINT_CSS = `
+export const PRINT_CSS = `
 @media print {
     #quote-document, #quote-document * {
         -webkit-print-color-adjust: exact !important;
@@ -563,6 +568,9 @@ export default function QuoteDocument({ data }: Props) {
                                 const qty = parseFloat(row.qty) || 0;
                                 const price = parseFloat(row.price) || 0;
                                 const lineTotal = qty * price;
+                                // V3-B6: gerçek (içerikli) satırda 0 fiyat "0.00" gösterilir
+                                // ("—" değil); tamamen boş filler satırlar "—" kalır.
+                                const isRealRow = !!(row.code || row.desc || row.qty || row.size || row.lead || row.hs || row.kg);
                                 const isEven = idx % 2 === 1;
                                 const rowBg = isEven ? C.zebraEven : C.white;
                                 return (
@@ -574,8 +582,8 @@ export default function QuoteDocument({ data }: Props) {
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.size || "—"}</td>
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.desc || "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "center" as const }}>{row.qty || "—"}</td>
-                                        <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{price > 0 ? `${sym} ${fmt(price)}` : "—"}</td>
-                                        <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const, fontWeight: 600 }}>{lineTotal > 0 ? `${sym} ${fmt(lineTotal)}` : "—"}</td>
+                                        <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{isRealRow ? `${sym} ${fmt(price)}` : "—"}</td>
+                                        <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const, fontWeight: 600 }}>{isRealRow ? `${sym} ${fmt(lineTotal)}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.hs || "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{row.kg || "—"}</td>
                                     </tr>

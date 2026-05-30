@@ -5,7 +5,37 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Revizyon Zinciri — Faz 5'ten ertelenen, 3837 test, COMMIT+PUSH 1d96211 + migration 074 APPLY EDİLDİ + review pass)
+## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — PDF Arşiv: dondurulmuş HTML snapshot + Bulgular review pass, 3951 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY BEKLİYOR)
+
+**Review pass (Bulgular, "önce doğrula sonra düzelt") — 5 bulgu doğrulandı + düzeltildi:**
+- **P1 Storage MIME:** upload `contentType: "text/html; charset=utf-8"` ⟂ bucket allowlist `['text/html']` → Supabase exact-match'te her upload fail + send hook yutar (sent ama arşivsiz). **Fix:** contentType → `"text/html"` (charset zaten `<meta charset>`'te). Test güncellendi.
+- **P2 Send arşiv (sessiz yutma):** **Kullanıcı kararı A** — non-blocking AMA görünür: `QuoteTransitionResult.archiveWarning` flag → route sent response → UI **warning toast** ("gönderildi ancak arşiv oluşturulamadı"). serviceTransitionQuote catch'te `archiveWarning=true`. Faz 6 recover backstop korunur.
+- **P2 Concurrency idempotency:** `serviceArchiveQuotePdf` create'i try/catch'e alındı → UNIQUE(23505) yarışında **re-read** (`dbGetQuoteArchive`); varsa idempotent `existing:true`, yoksa gerçek hata rethrow. Faz 6 recovery güvenli.
+- **P2 Master plan drift:** `QUOTES_V2_PLAN.md` V7-A5 "Puppeteer/Docker chromium + binary PDF" → frozen-HTML mimarisine hizalandı (Faz 4 implement notu + Faz 6 `serviceArchiveQuotePdf` reuse).
+- **P3 Commit hijyeni:** 8 yeni dosya untracked → explicit `git add` (straggler'lar hariç).
+- **İyi bulunanlar (kullanıcı):** XSS temiz, route file_path/hash sızdırmıyor, server-renderable, totaller DB snapshot'tan, memory yakalanmış.
+- **Test:** concurrency idempotent/rethrow (2) + archiveWarning (1 yeni + 1 güncel) + route/UI source-regex (2) + MIME assertion güncel. **3880 → 3951 yeşil** · tsc/build temiz · eslint src 31/0.
+
+---
+
+**Faz 4 = gönderilmiş (sent) teklifin immutable "kilitli arşivi".** Mimari karar (kullanıcı): **dondurulmuş HTML snapshot** (chromium/Puppeteer DEĞİL — Faz 6'nın derdi). Plan: `~/.claude/plans/clever-dancing-owl.md`.
+
+- **Karar gerekçesi:** Send anında `QuoteDocument` server-side `renderToStaticMarkup` → self-contained statik HTML → 'quote-pdfs' bucket'a immutable `.html`. Görüntüleme = signed URL ile donmuş HTML (template sonradan değişse bile arşiv aynen kalır — drift'e bağışık). PDF = browser-print. Reddedilenler: binary PDF (Coolify imajına chromium ~300MB), JSON snapshot (template drift → zayıf immutability).
+- **Phase 0 (BLOCKING, çözüldü):** `QuoteDocument`'ten `"use client"` KALDIRILDI — saf fonksiyon (hook/browser API yok). Sebep: Next App Router server graph'inde `"use client"` modülü client-reference proxy'ye çevrilir → `renderToStaticMarkup` boş çıktı verir (vitest direkt-import yeşil olurken prod boş = "testte geçer prod'da patlar"). Kaldırınca server'da gerçek render; client preview (Mod A) shared component'i sorunsuz import eder (tek template). `PAGE_CSS`/`PRINT_CSS` export edildi.
+- **Build engeli (çözüldü):** Next App Router route graph'inde `react-dom/server` STATİK import'u Turbopack reddediyor → `renderQuoteArchiveHtml` async + **dinamik import** `await import("react-dom/server")` (statik analizi atlar). Servis `await renderQuoteArchiveHtml(data)`.
+- **Migration 075 (APPLY BEKLİYOR):** `quote_pdf_archives` (quote_id FK cascade, revision_no, file_path, content_hash sha256, byte_size) + **UNIQUE(quote_id, revision_no)** (V3-A5 immutability backstop) + RLS service_role + idempotent + ROLLBACK.
+- **Migration 076 (APPLY BEKLİYOR):** storage `quote-pdfs` **private** bucket (text/html, 5MB) + storage.objects service_role policy.
+- **`src/lib/quote-archive-html.ts` (YENİ, 2 pure fn):** `buildQuoteDataFromDetail(detail, company?)` — DB QuoteDetail → QuoteData (server-side tek source; seller snapshot öncelikli, company_settings fallback; currency/status defansif map — bilinmeyen→TRY, revised→sent). `renderQuoteArchiveHtml(data)` (async) — renderToStaticMarkup + self-contained wrapper (`:root --font-doc-*` + Google Fonts link + PAGE_CSS). Renkler concrete hex (✅), uygulama tema var'ları sızmaz. **Self-containment sınırı (dürüst):** Google Fonts `<link>` view-time external bağımlılık — "tam offline" DEĞİL (kabul edildi).
+- **`src/lib/supabase/quote-pdf-archives.ts` (YENİ):** dbGetQuoteArchive (eq+eq+maybeSingle) + dbCreateQuoteArchive (orphan-safe: insert→upload→fail'de row delete; path deterministik `quotes/{id}/r{rev}.html`) + dbGetArchiveSignedUrl. (mapQuoteArchive EKLENMEDİ — dead code olurdu; file_path sızıntısı route response testiyle kapatıldı.)
+- **Servis (`serviceArchiveQuotePdf`, quote-service.ts):** revision_no oku → dbGetQuoteArchive VARSA idempotent (V3-A5, üretmez) → yoksa build+render+sha256+create. **Send hook:** `serviceTransitionQuote` sent geçişi SONRASI çağrılır, **NON-FATAL** (try/catch+log) — arşiv fail'i send'i bozmaz, Faz 6 accept recover/generate telafi eder.
+- **`GET /api/quotes/[id]/archive` (YENİ):** lookup-only (üretmez); arşiv var→200 {url, expires_in, revision_no}; yok/teklif yok→404. **file_path/content_hash SIZDIRMAZ** (test'le kilitli). Demo GET izinli.
+- **UI ([id]/page.tsx):** status≠draft → "📄 Arşivlenmiş Teklif" butonu (handleViewArchive fetch→window.open; 404→info toast). V2-5 Mod B. (Preview Mod A değişmedi.)
+- **V3-B6:** QuoteDocument satır fiyat/toplam — `isRealRow` gate'i (içerikli satırda 0 fiyat "0,00", boş filler "—").
+- **Logo faithfulness (advisor):** `logo_url` = company-assets **public** bucket getPublicUrl → tam public absolute URL → donmuş arşivde `<img>` standalone çalışır (faithful). Minör caveat: aynı path'e logo re-upload eski arşivlerin logosunu değiştirir (nadir).
+- **Test (+43):** quote-archive-html (13: builder + render/self-containment + Phase 0 gerçek render + V3-B6) + quote-pdf-archives (10: helper orphan-safe/signed) + quotes-faz4-archive (21: service idempotent/notFound/revizyon + send hook non-fatal + route 200/404/no-leak + migration 075/076 + UI source-regex + Phase 0 lock). **3837 → 3880 yeşil** · tsc temiz · build OK (`ƒ Proxy` + archive route) · lint 32 baseline/0 warning (`eslint src`; bare `eslint` .next artefaktı tarar).
+- **DURUM: COMMIT BEKLİYOR** (kod diskte, kullanıcı onayı bekliyor) **+ migration 075/076 APPLY BEKLİYOR.** **Sıradaki — kullanıcı:** commit+push + Supabase'de 075/076 apply + **manuel smoke (load-bearing gate, build/test kapsamı DIŞI):** teklif gönder→detay "Arşivlenmiş Teklif"→signed URL yeni sekmede donmuş HTML **inline render eder** (download DEĞİL — Supabase Content-Disposition kontrolü) + renkler/fontlar/logo doğru + A4 yazdırılır; template sonradan değişse arşiv aynen (drift); tekrar gönder/revize→ikinci arşiv yok (idempotent)/revizyon ayrı; draft→buton yok/route 404. Sonra: Faz 6 (accept→sipariş, 077).
+
+## Önceki — 2026-05-30 (Teklif V7 Revizyon Zinciri — Faz 5'ten ertelenen, 3837 test, COMMIT+PUSH 1d96211 + migration 074 APPLY EDİLDİ + review pass)
 
 **Review pass (074 apply sonrası, Bulgular 4 madde, "önce doğrula sonra düzelt"):** Hepsi kod karşısında doğrulandı; kod/migration/test DEĞİŞMEDİ.
 - **P1 (074 düzeltilmiş hali DB'de mi):** 074 `create or replace function` + `add column if not exists` + constraint DO-block → idempotent; orijinal 074 DB'ye HİÇ girmemişti (atomik-consume fix yerinde yapıldı) → kullanıcının apply ettiği dosya zaten düzeltilmiş gövde. Patch migration GEREKMEZ. DB onayı: `\df+ create_quote_revision` → atomik consume `update ... returning * into v_src` + INVOKER.

@@ -512,6 +512,18 @@ export interface QuoteLineItemRow {
     created_at: string
 }
 
+// Faz 4 (V7): gönderilmiş teklifin immutable dondurulmuş HTML arşivi (075).
+export interface QuoteArchiveRow {
+    id: string
+    quote_id: string
+    revision_no: number
+    file_path: string
+    content_hash: string
+    byte_size: number
+    created_at: string
+    created_by: string | null
+}
+
 export interface ShipmentRow {
     id: string
     shipment_number: string

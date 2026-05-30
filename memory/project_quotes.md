@@ -4,6 +4,24 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
+## Faz 4 — PDF Arşiv (2026-05-30) — dondurulmuş HTML snapshot + Bulgular review pass, 3951 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY BEKLİYOR
+
+**Review pass (5 bulgu doğrulandı+düzeltildi):** P1 upload MIME `text/html` (charset drop; bucket allowlist eşleşmesi). P2 send arşiv fail → görünür `archiveWarning` toast (kullanıcı kararı A, non-blocking+sessiz değil). P2 concurrency: serviceArchiveQuotePdf create fail → re-read existing (UNIQUE 23505 idempotent). P2 doc drift: QUOTES_V2_PLAN V7-A5 Puppeteer→frozen-HTML (Faz 6 reuse). P3 explicit git add. **3880→3951.**
+
+
+**Gönderilmiş teklifin immutable "kilitli arşivi".** Mimari karar (kullanıcı): **dondurulmuş HTML snapshot** (Puppeteer/binary-PDF DEĞİL — Coolify chromium yükü + Faz 6'nın erken yükü; JSON snapshot DEĞİL — template drift). Plan: `~/.claude/plans/clever-dancing-owl.md`.
+
+- **Akış:** send → `QuoteDocument` server-side `renderToStaticMarkup` → self-contained `.html` → 'quote-pdfs' private bucket (immutable). View = signed URL ile donmuş HTML (template drift'e bağışık). PDF = browser-print.
+- **Phase 0 (kritik):** `QuoteDocument` `"use client"` KALDIRILDI (saf fonksiyon). Next App Router server graph `"use client"` → client-reference proxy → renderToStaticMarkup BOŞ çıktı (vitest direkt-import maskeler). Kaldırma deterministik çözer; client preview shared component'i import etmeye devam (tek template). `PAGE_CSS`/`PRINT_CSS` export.
+- **Build engeli:** route graph'inde `react-dom/server` statik import Turbopack reddi → async + dinamik `await import("react-dom/server")`.
+- **Migration 075:** `quote_pdf_archives` + **UNIQUE(quote_id, revision_no)** (V3-A5 INSERT-only backstop) + RLS. **076:** `quote-pdfs` private bucket (text/html).
+- **Kod:** `quote-archive-html.ts` (buildQuoteDataFromDetail [QuoteDetail→QuoteData server tek source; seller snapshot/company fallback; currency/status defansif map] + renderQuoteArchiveHtml [async, font wrapper]); `quote-pdf-archives.ts` (dbGetQuoteArchive/dbCreateQuoteArchive orphan-safe/dbGetArchiveSignedUrl); `serviceArchiveQuotePdf` (idempotent; send hook NON-FATAL → Faz 6 recover telafi); `GET /api/quotes/[id]/archive` (lookup-only, file_path SIZMAZ); UI Mod B buton (status≠draft). V3-B6 (isRealRow 0→"0,00").
+- **Logo:** company-assets PUBLIC bucket → public absolute URL → arşivde faithful (caveat: aynı path re-upload eski arşivi etkiler, nadir).
+- **Self-containment sınırı:** Google Fonts `<link>` view-time external (tam offline değil — kabul). İleride @font-face inline ile kapatılabilir.
+- **Test:** quote-archive-html (13) + quote-pdf-archives (10) + quotes-faz4-archive (21) = +43. **3837→3880** · tsc/build temiz · lint 32 baseline (`eslint src`).
+- **DURUM: COMMIT BEKLİYOR + 075/076 APPLY BEKLİYOR.** Sıradaki: smoke (signed URL inline render? Content-Disposition; logo/font/drift/idempotent) + Faz 6 (077 accept→sipariş; serviceArchiveQuotePdf orada reusable — V7-A5 recover/generate).
+
+---
 ## Revizyon Zinciri (2026-05-30) — Faz 5'ten ertelenen büyük özellik, 3837 test, COMMIT+PUSH 1d96211 + migration 074 APPLY EDİLDİ + review pass
 
 **sent/rejected/expired teklifin düzenlenebilir kopyası (revizyon).** Plan: `~/.claude/plans/clever-dancing-owl.md`.
