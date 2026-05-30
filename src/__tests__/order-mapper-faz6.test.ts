@@ -67,3 +67,18 @@ describe("SalesOrderRow / OrderDetail TS kilidi", () => {
         expect(src).toMatch(/quote_pdf_archive_id: string \| null/);
     });
 });
+
+describe("Sipariş detay finansal özet — Bulgu #2 (iskonto + dinamik KDV)", () => {
+    const PAGE = readFileSync(join(process.cwd(), "src/app/dashboard/orders/[id]/page.tsx"), "utf8");
+    it("hardcoded 'KDV (%20)' kaldırıldı → dinamik vatRate", () => {
+        expect(PAGE).not.toMatch(/KDV \(%20\)/);
+        expect(PAGE).toMatch(/KDV \(%\$\{vatRate\}\)/);
+        expect(PAGE).toMatch(/order\.vatRate \?\? 20/);
+    });
+    it("İskonto satırı koşullu (discountAmount > 0) + KDV Matrahı", () => {
+        expect(PAGE).toMatch(/order\.discountAmount \?\? 0/);
+        expect(PAGE).toMatch(/İskonto/);
+        expect(PAGE).toMatch(/KDV Matrahı/);
+        expect(PAGE).toMatch(/order\.subtotal - discount/);
+    });
+});

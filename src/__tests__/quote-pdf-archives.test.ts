@@ -15,6 +15,7 @@ const mockSingle = vi.fn();
 const mockStorageUpload = vi.fn();
 const mockStorageSigned = vi.fn();
 const mockStorageList = vi.fn();
+const mockStorageRemove = vi.fn();
 
 let _terminal: { data: unknown; error: unknown } = { data: null, error: null };
 function setTerminal(v: { data: unknown; error: unknown }) { _terminal = v; }
@@ -39,19 +40,21 @@ const mockSupabase = {
             upload: (...a: unknown[]) => mockStorageUpload(...a),
             createSignedUrl: (...a: unknown[]) => mockStorageSigned(...a),
             list: (...a: unknown[]) => mockStorageList(...a),
+            remove: (...a: unknown[]) => mockStorageRemove(...a),
         }),
     },
 };
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => mockSupabase }));
 
-import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists } from "@/lib/supabase/quote-pdf-archives";
+import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists, dbArchiveObjectConfirmedMissing, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
 
 const QID = "00000000-0000-4000-8000-000000000001";
 
 beforeEach(() => {
-    [mockFrom, mockInsert, mockDelete, mockSelect, mockEq, mockMaybeSingle, mockSingle, mockStorageUpload, mockStorageSigned, mockStorageList]
+    [mockFrom, mockInsert, mockDelete, mockSelect, mockEq, mockMaybeSingle, mockSingle, mockStorageUpload, mockStorageSigned, mockStorageList, mockStorageRemove]
         .forEach((m) => m.mockReset());
+    mockStorageRemove.mockResolvedValue({ data: [], error: null });
     setTerminal({ data: null, error: null });
 });
 
@@ -150,5 +153,59 @@ describe("dbArchiveObjectExists", () => {
     it("storage hatası → false (defansif, kırık sekme yerine graceful 404)", async () => {
         mockStorageList.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
         expect(await dbArchiveObjectExists("quotes/x/r1.html")).toBe(false);
+    });
+});
+
+// ── Faz 6 / P2 (advisor): dbArchiveObjectConfirmedMissing ─────────────────────
+// KRİTİK fark: list HATASI "yok" SAYILMAZ (geçici blip sağlam arşivi yok etmesin).
+describe("dbArchiveObjectConfirmedMissing", () => {
+    it("list OK + obje listede yok → true (KESİN yok)", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: [], error: null });
+        expect(await dbArchiveObjectConfirmedMissing("quotes/x/r1.html")).toBe(true);
+    });
+
+    it("list OK + obje var → false", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: [{ name: "r1.html" }], error: null });
+        expect(await dbArchiveObjectConfirmedMissing("quotes/x/r1.html")).toBe(false);
+    });
+
+    it("list HATASI → false (fail-safe: KESİN yok DEĞİL — arşive dokunma)", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: null, error: { message: "transient blip" } });
+        expect(await dbArchiveObjectConfirmedMissing("quotes/x/r1.html")).toBe(false);
+    });
+
+    it("gevşek eşleşme (r10.html ≠ r1.html) → true (r1 KESİN yok)", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: [{ name: "r10.html" }], error: null });
+        expect(await dbArchiveObjectConfirmedMissing("quotes/x/r1.html")).toBe(true);
+    });
+});
+
+// ── Faz 6 / P2: dbDeleteQuoteArchive (phantom recover) ────────────────────────
+describe("dbDeleteQuoteArchive", () => {
+    it("filePath verilince storage remove + DB satır delete (id ile)", async () => {
+        setTerminal({ data: null, error: null });
+        await dbDeleteQuoteArchive("arch-1", "quotes/x/r1.html");
+        expect(mockStorageRemove).toHaveBeenCalledWith(["quotes/x/r1.html"]);
+        expect(mockDelete).toHaveBeenCalled();
+        expect(mockEq).toHaveBeenCalledWith("id", "arch-1");
+    });
+
+    it("filePath yoksa storage remove ÇAĞRILMAZ, yalnız DB delete", async () => {
+        setTerminal({ data: null, error: null });
+        await dbDeleteQuoteArchive("arch-1");
+        expect(mockStorageRemove).not.toHaveBeenCalled();
+        expect(mockEq).toHaveBeenCalledWith("id", "arch-1");
+    });
+
+    it("storage remove patlasa bile DB delete devam eder (best-effort)", async () => {
+        mockStorageRemove.mockRejectedValueOnce(new Error("obje yok"));
+        setTerminal({ data: null, error: null });
+        await expect(dbDeleteQuoteArchive("arch-1", "quotes/x/r1.html")).resolves.toBeUndefined();
+        expect(mockEq).toHaveBeenCalledWith("id", "arch-1");
+    });
+
+    it("DB delete hatası → throw", async () => {
+        setTerminal({ data: null, error: { message: "db fail" } });
+        await expect(dbDeleteQuoteArchive("arch-1")).rejects.toThrow(/db fail/);
     });
 });

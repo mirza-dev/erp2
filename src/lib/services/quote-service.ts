@@ -12,7 +12,7 @@ import { dbGetProductById } from "@/lib/supabase/products";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { dbGetCompanySettings } from "@/lib/supabase/company-settings";
-import { dbGetQuoteArchive, dbCreateQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
+import { dbGetQuoteArchive, dbCreateQuoteArchive, dbArchiveObjectConfirmedMissing, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
 import { serviceCreateOrder } from "@/lib/services/order-service";
 import { buildQuoteDataFromDetail, renderQuoteArchiveHtml } from "@/lib/quote-archive-html";
 import { mapQuoteDetail } from "@/lib/api-mappers";
@@ -134,8 +134,21 @@ export async function serviceArchiveQuotePdf(
 
     const revisionNo = Number(quote.revision_no ?? 1);
 
+    // Faz 6 (P2 phantom recover): DB satırı varsa storage objesini DE doğrula.
+    // `dbGetQuoteArchive` yalnız satıra bakar; nadir crash/timeout penceresinde
+    // satır var ama dosya yok ("phantom") olabilir → accept eksik-dosyalı arşive
+    // sipariş bağlamasın. ⚠️ Yıkıcı recover (sil+yeniden üret) yalnız KESİN yokluk
+    // üzerine: `dbArchiveObjectConfirmedMissing` list HATASINI "yok" SAYMAZ (geçici
+    // .list() blip'i SAĞLAM arşivi yok etmesin — fail-safe → existing dön). Not:
+    // yeniden üretim BUGÜNKÜ template'i kullanır (orijinal snapshot değil; deploy'lar
+    // arası QuoteDocument değişebilir) — ama dosyasız phantom'dan iyidir; çok nadir.
     const existing = await dbGetQuoteArchive(quoteId, revisionNo);
-    if (existing) return { archived: true, existing: true, revisionNo };
+    if (existing) {
+        const confirmedMissing = await dbArchiveObjectConfirmedMissing(existing.file_path);
+        if (!confirmedMissing) return { archived: true, existing: true, revisionNo };
+        await dbDeleteQuoteArchive(existing.id, existing.file_path);
+        // fall-through → render + dbCreateQuoteArchive (yeniden üretim)
+    }
 
     const detail = mapQuoteDetail(quote);
     const company = await dbGetCompanySettings().catch(() => null);
@@ -244,8 +257,13 @@ export async function serviceAcceptQuoteToOrder(
         if (code === "P0002") return { success: false, notFound: true, error: "Teklif bulunamadı." };
         if (code === "42501") return { success: false, invalidStatus: true, error: msg };
         if (code === "23502") return { success: false, unprocessable: true, error: "Teklifte ürünü silinmiş satır var. Teklifi revize edip tekrar deneyin." };
-        if (code === "22003") return { success: false, unprocessable: true, error: "Teklif satır adedi tam sayı olmalı." };
-        if (code === "23514") return { success: false, unprocessable: true, error: "Teklif arşivi bulunamadı." };
+        if (code === "22003") return { success: false, unprocessable: true, error: "Teklif satır adedi pozitif tam sayı olmalı." };
+        // 078 Bulgu: 23514 (check_violation) jenerik bir koddur — order_lines'ın
+        // quantity>0 / unit_price>=0 / discount_pct gibi TÜM check constraint'leri
+        // bu kodu üretir. Bu yüzden 23514'ü "arşiv bulunamadı"ya MAP ETMİYORUZ
+        // (yanıltıcı olur). Arşiv-yok guard'ı (RPC 23514) zaten yalnız doğrudan-RPC
+        // bypass'ında tetiklenir (service her zaman önce recover/generate eder) →
+        // o nadir durum + diğer check ihlalleri dürüstçe 500'e (throw) düşer.
         throw err;
     }
 }

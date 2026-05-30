@@ -5,7 +5,21 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 **Faz 6 — Accept → Sipariş (atomik)**, 4021 test, COMMIT+PUSH EDİLDİ + migration 077 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 6 Bulgular — 5 bulgu review tur**, 4034 test, COMMIT+PUSH BEKLİYOR + migration 077 APPLY EDİLDİ ✅ / 078 APPLY BEKLİYOR)
+
+**Faz 6 Bulgular ("önce doğrula sonra düzelt") — 5 bulgu (4×P2 + 1×P3), hepsi kod karşısında doğrulandı:**
+- **#1 (P2) Phantom recover Faz 6'da kapanmamıştı:** Faz 4 GET route `dbArchiveObjectExists` ile graceful 404 dönüyordu, ama accept yolundaki `serviceArchiveQuotePdf` (line 137) yalnız DB satırına bakıp `existing` dönüyordu → phantom (satır var/obje yok) teklifte accept eksik-dosyalı arşive sipariş bağlıyordu. **Fix:** existing-row path'inde `dbArchiveObjectExists(existing.file_path)` doğrulaması; obje yoksa yeni `dbDeleteQuoteArchive(id, filePath)` (stale row sil, storage remove best-effort) → fall-through render+create (sent quote donmuş → HTML birebir). Hem send hem accept'i iyileştirir. Test: phantom → delete+regenerate.
+- **#2 (P2) Sipariş detay finansal özet eksik:** `orders/[id]/page.tsx` "KDV (%20)" hardcoded + iskonto satırı yok; Faz 6 `order.discountAmount`/`vatRate` mapper'da hazırdı ama UI göstermiyordu. **Fix:** dinamik özet (IIFE) — Ara Toplam → İskonto (discountAmount>0) → KDV Matrahı → KDV (%{vatRate}) → Genel Toplam. Türk fatura standardı.
+- **#3 (P2) Accept route RBAC'siz:** `POST /accept` yalnız auth user alıp servisi çağırıyordu; proxy sadece `/dashboard/**` page-gate yapar → viewer (view_quotes) API'ye POST atıp sipariş açabilirdi. **Fix:** `requirePermission(req, "manage_quotes")` (admin+sales var; viewer/accounting/production/purchasing → 403). Test mock blast-radius: requirePermission→null default + viewer 403.
+- **#4 (P2/P3) RPC qty yalnız küsürat kontrolü + 23514 yanlış map:** RPC `quantity <> trunc` (yalnız küsürat) → legacy qty=0/negatif satır order_lines `check(quantity>0)` → 23514; service TÜM 23514'ü "arşiv bulunamadı" diye map ediyordu (23514 = jenerik check_violation). **Fix:** Migration 078 (CREATE OR REPLACE) qty check `<= 0 OR <> trunc` → 22003 "pozitif tam sayı"; service'ten 23514→archive map'i KALDIRILDI (kalan check ihlalleri dürüstçe 500'e throw; arşiv-yok RPC guard zaten yalnız bypass'ta tetiklenir).
+- **#5 (P3) Memory drift:** "077 APPLY BEKLİYOR" → kullanıcı 077'yi uyguladı → "077 ✅ + 078 BEKLİYOR" hizalandı.
+- **Test (+13):** phantom recover (service + faz4-archive + dbDeleteQuoteArchive helper 4) + order summary source-regex (2) + accept route 403 (1) + 078 migration drift-guard (4) + service 23514-throw/22003-msg güncel. **4021 → 4034 yeşil** · tsc temiz · build OK (`ƒ Proxy` + `/api/quotes/[id]/accept`) · eslint src 31/0.
+- **⚠️ Deploy sırası:** 078 apply edilene kadar legacy qty<=0 satır eski RPC'de 23514 → artık unmapped → 500 (nice 422 yerine). Düşük risk (legacy data). 078'i bu deploy'la apply et.
+- **DURUM: COMMIT+PUSH BEKLİYOR; 077 APPLY EDİLDİ ✅, 078 APPLY BEKLİYOR.** Faz 7 → migration 079-080 (note_templates; 078 bu fix'e gitti).
+
+---
+
+## Önceki — 2026-05-30 (Teklif V7 **Faz 6 — Accept → Sipariş (atomik)**, 4021 test, COMMIT+PUSH EDİLDİ + migration 077 APPLY EDİLDİ ✅)
 
 **Faz 6 = V7 master-plan'ın son büyük halkası: kabul edilen teklifi TEK atomik işlemde taslak siparişe dönüştürmek (V5-A4 + V4-A8).** Eski iki adım (PATCH `transition:accepted` + POST `/convert`) birleştirildi; ikisi de **410 Gone**.
 
@@ -17,7 +31,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Paraşüt iskonto guard (V7-A4, COUPLED):** `serviceSyncOrderToParasut` — `discount_amount>0` → `parasut_claim_sync` ÖNCESİ **early return** (throw değil, marker/lease/sync_log yazılmaz) + **ZORUNLU sync_issue alert** (entity=sales_order). İskonto aktarım yöntemi ayrı faz.
 - **UI:** tek "Kabul Et ve Siparişe Dönüştür" butonu → `/accept`; `already`→mevcut order; legacy accepted+siparişsiz "Siparişe Dönüştür" de `/accept` (recover); Faz 3 iskonto-not kaldırıldı.
 - **Test (+47 net):** migration drift-guard (~14) + service (sent/accepted/already/recover/archiveFailed/valid_until/RPC kodları) + route (status map + revalidateTag) + parasut-discount-guard (3) + order-mapper-faz6 + accept-ui source-regex; flip'ler: quote-convert-route→410, quote-service accepted-transition geçersiz, quotes-id-route transition:accepted→410, quotes-faz2-validation 'rejected' ile 409, quotes-faz3-discount UI-not kaldırıldı. **3974 → 4021 yeşil** · tsc temiz · build OK (`ƒ Proxy` + `/api/quotes/[id]/accept`) · eslint src 31/0.
-- **DURUM: COMMIT+PUSH EDİLDİ; migration 077 APPLY BEKLİYOR (kullanıcı).** Sonraki — **manuel smoke (load-bearing):** sent→tek buton→atomik draft order; order totalleri=arşiv PDF (iskonto dahil); `order_lines.vat_rate`=quote; `item_count`=satır; legacy arşivsiz→otomatik üretilir; tekrar accept→`already`; iskontolu order ship→Paraşüt fatura YOK + sync_issue alert; silinmiş-ürün→422; PATCH transition:accepted→410; /convert→410.
+- **DURUM: COMMIT+PUSH EDİLDİ (`d4988ca`); migration 077 APPLY EDİLDİ ✅.** (Bulgular turu yukarıda — 078 + 5 fix.)
 - **Ertelenen (kayıt):** Paraşüt iskonto AKTARIM yöntemi (orantılı/ayrı satır) ayrı faz; `order_line_description`; `serviceConvertQuoteToOrder` tam temizlik; quotes audit katmanı (modül-geneli); RBAC accept route.
 
 ---

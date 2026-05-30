@@ -1,18 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { serviceAcceptQuoteToOrder } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
 
 // POST /api/quotes/[id]/accept
 // Faz 6 (V5-A4 / V4-A8): kabul + taslak sipariş TEK atomik işlem (RPC 077).
 // Eski iki yol — PATCH { transition: "accepted" } ve POST /convert — 410 Gone.
-// Güvenlik: auth + demo mode middleware tarafından korunur (POST demo → 403).
+// Güvenlik: auth + demo mode middleware + RBAC. Proxy yalnız /dashboard/** page-gate
+// yaptığı için (proxy.ts), API mutasyonu route'ta korunmalı — viewer rolü
+// (view_quotes/view_sales_orders) teklif kabul edip sipariş AÇAMAMALI.
 export async function POST(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // manage_quotes: teklifi kabul eden = teklif yönetim yetkisi (admin+sales).
+        // (sales rolü manage_sales_orders'a da sahip; viewer/accounting/production
+        // /purchasing → manage_quotes YOK → 403.)
+        const guard = await requirePermission(req, "manage_quotes");
+        if (guard) return guard;
+
         const { id } = await params;
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();

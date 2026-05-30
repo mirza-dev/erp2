@@ -41,7 +41,10 @@ describe("Migration 077 — accept_quote_and_create_order RPC sözleşmesi", () 
         expect(SQL).toMatch(/product_id IS NULL/);
         expect(SQL).toMatch(/ERRCODE = '23502'/);
     });
-    it("küsüratlı qty pre-check → 22003 (V7-A11)", () => {
+    it("qty pre-check 22003 mevcut (V7-A11) — pozitiflik 078'de güçlendirildi", () => {
+        // 077 dosyası küsürat kontrolü içerir; `quantity <= 0` eki 078'de
+        // (quotes-accept-order-fix-migration.test.ts). Burada 077'nin literal
+        // içeriği doğrulanır (apply edilen base).
         expect(SQL).toMatch(/quantity <> trunc\(quantity\)/);
         expect(SQL).toMatch(/ERRCODE = '22003'/);
     });

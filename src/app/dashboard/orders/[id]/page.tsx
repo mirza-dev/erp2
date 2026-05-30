@@ -640,10 +640,22 @@ export default function OrderDetailPage() {
                                 Finansal Özet
                             </div>
                             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                {[
-                                    { label: "Ara Toplam", value: formatCurrency(order.subtotal, order.currency) },
-                                    { label: "KDV (%20)", value: formatCurrency(order.vatTotal, order.currency) },
-                                ].map(row => (
+                                {(() => {
+                                    // Faz 6: header iskonto + dinamik KDV oranı (sipariş teklif snapshot'ından
+                                    // discount_amount/vat_rate taşır). Türk fatura standardı:
+                                    // Ara Toplam → İskonto → KDV Matrahı → KDV (%oran) → Genel Toplam.
+                                    const discount = order.discountAmount ?? 0;
+                                    const vatRate = order.vatRate ?? 20;
+                                    const rows: { label: string; value: string }[] = [
+                                        { label: "Ara Toplam", value: formatCurrency(order.subtotal, order.currency) },
+                                    ];
+                                    if (discount > 0) {
+                                        rows.push({ label: "İskonto", value: `−${formatCurrency(discount, order.currency)}` });
+                                        rows.push({ label: "KDV Matrahı", value: formatCurrency(order.subtotal - discount, order.currency) });
+                                    }
+                                    rows.push({ label: `KDV (%${vatRate})`, value: formatCurrency(order.vatTotal, order.currency) });
+                                    return rows;
+                                })().map(row => (
                                     <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
                                         <span style={{ color: "var(--text-secondary)" }}>{row.label}</span>
                                         <span style={{ color: "var(--text-primary)" }}>{row.value}</span>

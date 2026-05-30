@@ -3,7 +3,7 @@
  * serviceAcceptQuoteToOrder sonucu → HTTP status eşleme + revalidateTag.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -17,6 +17,11 @@ vi.mock("@/lib/services/quote-service", () => ({
     serviceAcceptQuoteToOrder: (...a: unknown[]) => mockAccept(...a),
 }));
 
+const mockRequirePermission = vi.fn();
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: (...a: unknown[]) => mockRequirePermission(...a),
+}));
+
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
 
 import { POST } from "@/app/api/quotes/[id]/accept/route";
@@ -25,9 +30,22 @@ const QID = "quote-test-uuid";
 const makeReq = () => new NextRequest(`http://localhost/api/quotes/${QID}/accept`, { method: "POST" });
 const idCtx = () => ({ params: Promise.resolve({ id: QID }) });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequirePermission.mockResolvedValue(null);  // default: yetki var
+});
 
 describe("POST /api/quotes/[id]/accept", () => {
+    it("RBAC: manage_quotes yoksa (viewer) → 403, servis çağrılmaz", async () => {
+        mockRequirePermission.mockResolvedValue(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+        const res = await POST(makeReq(), idCtx());
+        expect(res.status).toBe(403);
+        expect(mockRequirePermission).toHaveBeenCalledWith(expect.anything(), "manage_quotes");
+        expect(mockAccept).not.toHaveBeenCalled();
+    });
+
     it("başarılı → 201 orderId/orderNumber + actor geçilir", async () => {
         mockAccept.mockResolvedValue({ success: true, orderId: "ord-1", orderNumber: "SIP-2026-001", already: false });
         const res = await POST(makeReq(), idCtx());

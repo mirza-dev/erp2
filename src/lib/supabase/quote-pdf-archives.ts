@@ -81,6 +81,24 @@ export async function dbCreateQuoteArchive(input: CreateQuoteArchiveInput): Prom
     return row;
 }
 
+/**
+ * Faz 6 (P2 phantom recover): stale arşiv satırını siler (DB row + best-effort
+ * storage remove). DB satırı var ama storage objesi yok ("phantom") durumunda
+ * accept öncesi recover için: stale row silinir → serviceArchiveQuotePdf yeniden
+ * üretir (UNIQUE(quote_id,revision_no) çakışması önlenir). Storage remove no-op
+ * olabilir (obje zaten yok) — hata yutulur, asıl amaç DB satırını temizlemek.
+ */
+export async function dbDeleteQuoteArchive(id: string, filePath?: string): Promise<void> {
+    const supabase = createServiceClient();
+    if (filePath) {
+        try {
+            await supabase.storage.from(STORAGE_BUCKET).remove([filePath]);
+        } catch { /* obje zaten yok olabilir — best-effort */ }
+    }
+    const { error } = await supabase.from("quote_pdf_archives").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+}
+
 /** İmzalı (signed) URL — donmuş HTML'in geçici erişim linki (default 1 saat). */
 export async function dbGetArchiveSignedUrl(filePath: string, expiresIn = 3600): Promise<string | null> {
     const supabase = createServiceClient();
@@ -109,4 +127,25 @@ export async function dbArchiveObjectExists(filePath: string): Promise<boolean> 
         .list(folder, { search: name });
     if (error || !data) return false;
     return data.some(obj => obj.name === name);
+}
+
+/**
+ * Faz 6 (P2 recover — advisor): obje KESİN yok mu? `dbArchiveObjectExists`'ten
+ * FARKI: list HATASI (geçici .list() blip) "yok" SAYILMAZ. Yıkıcı recover yolu
+ * (stale row sil + storage remove) yalnız KESİN yokluk üzerine tetiklenmeli;
+ * aksi halde geçici bir storage hatası SAĞLAM bir immutable arşivi yok eder.
+ * Dönüş: true YALNIZCA list başarılı + obje listede yok ise. Hata/belirsizlik → false
+ * (fail-safe: arşive dokunma, existing dön). GET route lenient versiyonu kullanmaya
+ * devam eder (404-on-ambiguity zararsız).
+ */
+export async function dbArchiveObjectConfirmedMissing(filePath: string): Promise<boolean> {
+    const supabase = createServiceClient();
+    const slash = filePath.lastIndexOf("/");
+    const folder = slash >= 0 ? filePath.slice(0, slash) : "";
+    const name = slash >= 0 ? filePath.slice(slash + 1) : filePath;
+    const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .list(folder, { search: name });
+    if (error || !data) return false;          // belirsiz → KESİN yok DEĞİL
+    return !data.some(obj => obj.name === name); // yalnız list OK + obje yok
 }

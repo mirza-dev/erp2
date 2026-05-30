@@ -14,6 +14,8 @@ const mockGetArchive = vi.fn();
 const mockCreateArchive = vi.fn();
 const mockGetSignedUrl = vi.fn();
 const mockObjectExists = vi.fn();
+const mockConfirmedMissing = vi.fn();
+const mockDeleteArchive = vi.fn();
 const mockGetCompany = vi.fn();
 
 vi.mock("@/lib/supabase/quotes", () => ({
@@ -27,6 +29,8 @@ vi.mock("@/lib/supabase/quote-pdf-archives", () => ({
     dbCreateQuoteArchive: (...a: unknown[]) => mockCreateArchive(...a),
     dbGetArchiveSignedUrl: (...a: unknown[]) => mockGetSignedUrl(...a),
     dbArchiveObjectExists: (...a: unknown[]) => mockObjectExists(...a),
+    dbArchiveObjectConfirmedMissing: (...a: unknown[]) => mockConfirmedMissing(...a),
+    dbDeleteQuoteArchive: (...a: unknown[]) => mockDeleteArchive(...a),
 }));
 vi.mock("@/lib/supabase/company-settings", () => ({
     dbGetCompanySettings: (...a: unknown[]) => mockGetCompany(...a),
@@ -64,21 +68,46 @@ const stubQuote = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-    [mockDbGetQuote, mockDbUpdateStatus, mockGetArchive, mockCreateArchive, mockGetSignedUrl, mockObjectExists, mockGetCompany]
+    [mockDbGetQuote, mockDbUpdateStatus, mockGetArchive, mockCreateArchive, mockGetSignedUrl, mockObjectExists, mockConfirmedMissing, mockDeleteArchive, mockGetCompany]
         .forEach((m) => m.mockReset());
     mockDbUpdateStatus.mockResolvedValue(true);
-    mockObjectExists.mockResolvedValue(true);  // P3-2: varsayılan dosya var
+    mockObjectExists.mockResolvedValue(true);       // GET route: varsayılan dosya var
+    mockConfirmedMissing.mockResolvedValue(false);  // service: varsayılan KESİN yok değil
+    mockDeleteArchive.mockResolvedValue(undefined);
     mockGetCompany.mockResolvedValue(null);
 });
 
 // ── serviceArchiveQuotePdf ───────────────────────────────────
 describe("serviceArchiveQuotePdf", () => {
-    it("arşiv VARSA idempotent: yeniden üretmez (existing:true)", async () => {
+    it("arşiv VARSA + storage obje VARSA idempotent: yeniden üretmez (existing:true)", async () => {
         mockDbGetQuote.mockResolvedValue(stubQuote());
         mockGetArchive.mockResolvedValue({ id: "a1", file_path: "quotes/x/r1.html" });
         const r = await serviceArchiveQuotePdf(QID);
         expect(r).toMatchObject({ archived: true, existing: true, revisionNo: 1 });
+        expect(mockConfirmedMissing).toHaveBeenCalledWith("quotes/x/r1.html");
+        expect(mockDeleteArchive).not.toHaveBeenCalled();
         expect(mockCreateArchive).not.toHaveBeenCalled();
+    });
+
+    it("Faz 6 P2 phantom: obje KESİN yok → stale sil + yeniden üret", async () => {
+        mockDbGetQuote.mockResolvedValue(stubQuote());
+        mockGetArchive.mockResolvedValue({ id: "stale-1", file_path: "quotes/x/r1.html" });
+        mockConfirmedMissing.mockResolvedValue(true);   // KESİN yok
+        mockCreateArchive.mockResolvedValue({ id: "a-new" });
+        const r = await serviceArchiveQuotePdf(QID, "user-1");
+        expect(mockDeleteArchive).toHaveBeenCalledWith("stale-1", "quotes/x/r1.html");
+        expect(mockCreateArchive).toHaveBeenCalled();          // yeniden üretildi
+        expect(r).toMatchObject({ archived: true, existing: false, revisionNo: 1 });
+    });
+
+    it("Faz 6 P2 fail-safe: storage belirsiz (confirmedMissing=false) → arşiv KORUNUR", async () => {
+        mockDbGetQuote.mockResolvedValue(stubQuote());
+        mockGetArchive.mockResolvedValue({ id: "ok-1", file_path: "quotes/x/r1.html" });
+        mockConfirmedMissing.mockResolvedValue(false);  // geçici .list() hatası → KESİN yok DEĞİL
+        const r = await serviceArchiveQuotePdf(QID);
+        expect(mockDeleteArchive).not.toHaveBeenCalled();
+        expect(mockCreateArchive).not.toHaveBeenCalled();
+        expect(r).toMatchObject({ archived: true, existing: true, revisionNo: 1 });
     });
 
     it("arşiv YOKSA üretir: dbCreateQuoteArchive doğru argümanlarla (sha256 hash)", async () => {

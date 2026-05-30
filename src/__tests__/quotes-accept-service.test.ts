@@ -8,6 +8,8 @@ const mockDbGetQuote          = vi.fn();
 const mockDbAccept            = vi.fn();
 const mockDbGetArchive        = vi.fn();
 const mockDbCreateArchive     = vi.fn();
+const mockDbConfirmedMissing  = vi.fn();
+const mockDbDeleteArchive     = vi.fn();
 
 vi.mock("@/lib/supabase/quotes", () => ({
     dbGetQuote:                 (...a: unknown[]) => mockDbGetQuote(...a),
@@ -21,6 +23,8 @@ vi.mock("@/lib/supabase/quotes", () => ({
 vi.mock("@/lib/supabase/quote-pdf-archives", () => ({
     dbGetQuoteArchive:    (...a: unknown[]) => mockDbGetArchive(...a),
     dbCreateQuoteArchive: (...a: unknown[]) => mockDbCreateArchive(...a),
+    dbArchiveObjectConfirmedMissing:(...a: unknown[]) => mockDbConfirmedMissing(...a),
+    dbDeleteQuoteArchive: (...a: unknown[]) => mockDbDeleteArchive(...a),
 }));
 vi.mock("@/lib/supabase/products", () => ({ dbGetProductById: vi.fn() }));
 vi.mock("@/lib/supabase/customers", () => ({ dbGetCustomerById: vi.fn() }));
@@ -44,8 +48,9 @@ const stub = (status: string, extra: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
     vi.clearAllMocks();
-    // Varsayılan: arşiv mevcut (recover no-op) + RPC başarılı yeni sipariş.
+    // Varsayılan: arşiv mevcut + obje KESİN yok DEĞİL (recover no-op) + RPC başarılı.
     mockDbGetArchive.mockResolvedValue({ id: "arch-1", file_path: "x/r1.html" });
+    mockDbConfirmedMissing.mockResolvedValue(false);
     mockDbAccept.mockResolvedValue({ order_id: "ord-1", order_number: "SIP-2026-001", already: false });
 });
 
@@ -119,6 +124,33 @@ describe("serviceAcceptQuoteToOrder — arşiv recover/generate (V7-A5)", () => 
         expect(r.archiveFailed).toBe(true);
         expect(mockDbAccept).not.toHaveBeenCalled();
     });
+
+    // Bulgu #1 (P2): DB arşiv satırı VAR ama storage objesi YOK ("phantom").
+    // Accept, stale satırı silip yeniden üretmeden sipariş açmamalı.
+    it("phantom (DB row var, obje KESİN yok) → stale sil + yeniden üret, sonra accept", async () => {
+        mockDbGetQuote.mockResolvedValue(stub("sent"));
+        mockDbGetArchive.mockResolvedValue({ id: "stale-1", file_path: "x/r1.html" });
+        mockDbConfirmedMissing.mockResolvedValue(true);    // KESİN yok
+        mockDbDeleteArchive.mockResolvedValue(undefined);
+        mockDbCreateArchive.mockResolvedValue({ id: "arch-new" });
+        const r = await serviceAcceptQuoteToOrder(QID, "u1");
+        expect(mockDbDeleteArchive).toHaveBeenCalledWith("stale-1", "x/r1.html");
+        expect(mockDbCreateArchive).toHaveBeenCalled();  // yeniden üretildi
+        expect(r.success).toBe(true);
+        expect(mockDbAccept).toHaveBeenCalled();
+    });
+
+    // Advisor regresyon koruması: geçici .list() hatası "yok" SAYILMAMALI →
+    // confirmedMissing=false → SAĞLAM arşiv silinmez/yeniden üretilmez (fail-safe).
+    it("storage belirsiz (confirmedMissing=false) → arşiv KORUNUR (sil/üret YOK)", async () => {
+        mockDbGetQuote.mockResolvedValue(stub("sent"));
+        mockDbGetArchive.mockResolvedValue({ id: "ok-1", file_path: "x/r1.html" });
+        mockDbConfirmedMissing.mockResolvedValue(false);   // hata/belirsiz → KESİN yok değil
+        const r = await serviceAcceptQuoteToOrder(QID, "u1");
+        expect(mockDbDeleteArchive).not.toHaveBeenCalled();
+        expect(mockDbCreateArchive).not.toHaveBeenCalled();
+        expect(r.success).toBe(true);
+    });
 });
 
 describe("serviceAcceptQuoteToOrder — RPC hata kodu eşleme", () => {
@@ -127,7 +159,6 @@ describe("serviceAcceptQuoteToOrder — RPC hata kodu eşleme", () => {
         ["42501", "invalidStatus"],
         ["23502", "unprocessable"],
         ["22003", "unprocessable"],
-        ["23514", "unprocessable"],
     ];
     it.each(cases)("RPC %s → %s", async (code, flag) => {
         mockDbGetQuote.mockResolvedValue(stub("sent"));
@@ -141,5 +172,14 @@ describe("serviceAcceptQuoteToOrder — RPC hata kodu eşleme", () => {
         mockDbGetQuote.mockResolvedValue(stub("sent"));
         mockDbAccept.mockRejectedValue(Object.assign(new Error("boom"), { code: "XX999" }));
         await expect(serviceAcceptQuoteToOrder(QID, "u1")).rejects.toThrow(/boom/);
+    });
+
+    // 078 Bulgu: 23514 (jenerik check_violation) artık MAP EDİLMEZ → throw (500).
+    // order_lines'ın qty>0/unit_price>=0/discount check'leri hep 23514 üretir;
+    // "arşiv bulunamadı" diye yanlış etiketlenmemeli.
+    it("RPC 23514 (check_violation) → MAP EDİLMEZ, throw (honest 500)", async () => {
+        mockDbGetQuote.mockResolvedValue(stub("sent"));
+        mockDbAccept.mockRejectedValue(Object.assign(new Error("check fail"), { code: "23514" }));
+        await expect(serviceAcceptQuoteToOrder(QID, "u1")).rejects.toThrow(/check fail/);
     });
 });

@@ -4,7 +4,20 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 6 — Accept → Sipariş (atomik) (2026-05-30) — `accept_quote_and_create_order` RPC (077), 4021 test, COMMIT+PUSH EDİLDİ + migration 077 APPLY BEKLİYOR
+## Faz 6 Bulgular — 5 bulgu review tur (2026-05-31) — 4034 test, COMMIT+PUSH BEKLİYOR + migration 077 APPLY EDİLDİ ✅ / 078 APPLY BEKLİYOR
+
+**"Önce doğrula sonra düzelt" — 5 bulgu (4×P2 + 1×P3), hepsi kod karşısında doğrulandı + kapatıldı:**
+- **#1 (P2) Phantom recover accept'te:** Faz 4 "kalıcı recover Faz 6'da" vaadi tam kapanmamıştı. `serviceArchiveQuotePdf` existing-row path yalnız DB satırına bakıyordu → phantom (satır var/obje yok) accept'te eksik-dosyalı arşive sipariş bağlıyordu. **Fix:** existing path `dbArchiveObjectExists` doğrular; obje yoksa `dbDeleteQuoteArchive(id,filePath)` (stale sil + best-effort storage remove) → fall-through yeniden üret (sent donmuş → HTML birebir). Hem send hem accept iyileşti.
+- **#2 (P2) Sipariş detay finansal özet:** `orders/[id]/page.tsx` "KDV (%20)" hardcoded + iskonto satırı yoktu (Faz 6 discountAmount/vatRate mapper'da hazır). **Fix:** dinamik IIFE — Ara Toplam → İskonto (>0) → KDV Matrahı → KDV (%vatRate) → Genel Toplam.
+- **#3 (P2) Accept route RBAC:** proxy yalnız page-gate → viewer API'ye POST atıp sipariş açabilirdi. **Fix:** `requirePermission(req, "manage_quotes")` (admin+sales; diğerleri 403).
+- **#4 (P2/P3) RPC qty + 23514 map:** RPC yalnız küsürat kontrol → qty=0/negatif order_lines check(quantity>0)→23514; service jenerik 23514'ü "arşiv bulunamadı" diye map ediyordu. **Fix:** Migration 078 (CREATE OR REPLACE) qty `<=0 OR <>trunc`→22003; service 23514→archive map'i kaldırıldı (kalan check ihlalleri dürüstçe 500).
+- **#5 (P3) Doc drift:** "077 APPLY BEKLİYOR" → kullanıcı uyguladı → "077 ✅ + 078 BEKLİYOR".
+- **Test (+13):** phantom (service+faz4-archive) + dbDeleteQuoteArchive helper (4) + order summary regex (2) + accept 403 (1) + 078 drift-guard (4) + service map güncel. **4021→4034** · tsc/build temiz · eslint src 31/0.
+- **⚠️ Deploy:** 078 apply edilene kadar legacy qty<=0 → eski RPC 23514 → unmapped → 500 (422 yerine; düşük risk). 078'i bu deploy'la apply et.
+- **DURUM: COMMIT+PUSH BEKLİYOR; 077 ✅ / 078 BEKLİYOR.** Faz 7 → 079-080.
+
+---
+## Faz 6 — Accept → Sipariş (atomik) (2026-05-30) — `accept_quote_and_create_order` RPC (077), 4021 test, COMMIT+PUSH EDİLDİ (`d4988ca`) + migration 077 APPLY EDİLDİ ✅
 
 **V7 master-plan'ın son büyük halkası (V5-A4 + V4-A8): kabul edilen teklifi TEK atomik transaction'da taslak siparişe dönüştür.** Eski iki adım (PATCH `transition:accepted` + POST `/convert`) birleştirildi → ikisi de **410 Gone**. Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -16,7 +29,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **UI:** tek "Kabul Et ve Siparişe Dönüştür"→`/accept`; already→mevcut order; legacy accepted+siparişsiz→`/accept` (recover); Faz 3 iskonto-not kaldırıldı.
 - **TS/mapper (V7-A9):** SalesOrderRow +4 alan; mapOrderDetail map; OrderDetail interface UI alanları.
 - **Test (+47 net):** quotes-accept-order-migration (drift-guard ~14) + quotes-accept-service + quotes-accept-route + parasut-discount-guard (3) + order-mapper-faz6 + quotes-accept-ui; flip'ler: quote-convert-route→410, quote-service accepted geçersiz, quotes-id-route transition:accepted→410, quotes-faz2-validation 'rejected'→409, quotes-faz3-discount UI-not kaldırıldı. **3974→4021 yeşil** · tsc temiz · build OK (`ƒ Proxy` + `/api/quotes/[id]/accept`) · eslint src 31/0.
-- **DURUM: COMMIT+PUSH EDİLDİ + 077 APPLY BEKLİYOR.** Sıradaki: manuel smoke (totaller=arşiv PDF iskonto dahil; order_lines.vat_rate=quote; item_count; legacy recover; already; iskontolu ship→fatura yok+alert; silinmiş ürün→422; 410'lar) + Faz 7 (note_templates 078-079).
+- **DURUM: COMMIT+PUSH EDİLDİ (`d4988ca`) + 077 APPLY EDİLDİ ✅.** (Bulgular turu yukarıda: 078 + 5 fix.) Sıradaki: manuel smoke + Faz 7 (note_templates 079-080).
 
 ---
 ## Faz 4 — PDF Arşiv (2026-05-30) — dondurulmuş HTML snapshot + Bulgular 1.+2.+3.+4. review tur, 3974 test, COMMIT+PUSH EDİLDİ (`6c9c317`) + migration 075/076 APPLY EDİLDİ ✅
