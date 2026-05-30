@@ -5,7 +5,17 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 3. review tur, 3969 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 4. review tur, 3974 test, COMMIT+PUSH BEKLİYOR + migration 075/076 APPLY EDİLDİ ✅)
+
+**4. review tur (Bulgular, "önce doğrula sonra düzelt") — 3 P3 bulgu; convergence (5→5→3→3-P3):**
+- **P3-1 (doc-only) Stale status:** 3. tur (`da09dce`) push edildi + 075/076 APPLY EDİLDİ (kullanıcı), ama 4 doc hâlâ "COMMIT+PUSH BEKLİYOR / APPLY BEKLİYOR" diyordu → hizalandı.
+- **P3-2 (orphan phantom — contained fix) Arşiv DB-satırı/dosya tutarlılığı:** `dbCreateQuoteArchive` insert-sonra-upload (concurrency için bilinçli — round-1 23505 re-read mantığı korunmalı, **reorder ETMEDİK**). Nadir crash/timeout penceresinde DB satırı var ama dosya yok ("phantom"). **Advisor düzeltmesi:** P2-B'den FARKLI — phantom **bugün kullanıcı-görünür** (archive butonu signed URL üretir, 404 storage'da window.open SONRASI patlar → kırık sekme; `handleViewArchive` graceful toast'ı KAPSAMAZ). **Contained fix:** yeni `dbArchiveObjectExists(filePath)` (storage `.list` + ad eşleşmesi) → archive GET route signed URL'den ÖNCE varlık kontrolü → phantom'da graceful 404 (UI info toast). Create-path/concurrency DOKUNULMADI. Kalıcı recover/generate (eksik dosyayı yeniden üret, **row-existence DEĞİL object-existence**) Faz 6'da.
+- **P3-3 (kullanıcı kararı: caveat kabul) Logo byte-freeze:** arşiv logo URL'sini saklar, byte'ını gömmez; logo aynı path'e `upsert:true` → eski arşiv yeni logoyu gösterebilir. **AskUserQuestion → "caveat kabul"** (frozen-HTML pragmatik tercihiyle tutarlı; Google Fonts link'i de external; logo değişimi nadir). Kod değişmez. (base64-inline alternatifi reddedildi.)
+- **Test:** dbArchiveObjectExists helper (4) + archive route phantom→404 (1) = +5. **3969 → 3974 yeşil** · tsc/build temiz · eslint src 31/0.
+
+---
+
+## Önceki — 2026-05-30 (Teklif V7 Faz 4 — Bulgular 3. review tur, COMMIT+PUSH `da09dce`)
 
 **3. review tur (Bulgular, "önce doğrula sonra düzelt") — 3 bulgu; 1 gerçek regresyon, 1 doc-only, 1 kabul edilen boşluk:**
 - **P2-A (regresyon — 2. turun yan etkisi) Toplu silme yanıltıcı UI temizliği:** sent draft-only kilidi sonrası, liste checkbox'ı hâlâ tüm statüleri seçiyordu + `handleBulkDelete` `succeeded>0` ise **tüm** seçili id'leri local state'ten düşürüyordu → 1 draft + 1 sent seçilince sent 409 alıyor ama UI ikisini de kaldırıyor (refresh'te geri gelir). **Fix (advisor: ikisi de):** (a) **load-bearing** — `pickSucceededIds(ids, results)` pure helper → yalnız fulfilled+`res.ok` id'ler düşürülür (sent 409 + network fail dahil tüm hata modları); (b) seçim yalnız silinebilir (draft) satırlarla sınırlı — per-row checkbox `{deletable && ...}`, select-all `deletablePageIds` (3 helper de; hepsi `length>0` guard'lı). Test: `pickSucceededIds` 5 davranış (1 ok+1 !ok→yalnız ok) + page source-regex.

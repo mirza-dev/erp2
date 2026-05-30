@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetQuote } from "@/lib/supabase/quotes";
-import { dbGetQuoteArchive, dbGetArchiveSignedUrl } from "@/lib/supabase/quote-pdf-archives";
+import { dbGetQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists } from "@/lib/supabase/quote-pdf-archives";
 import { handleApiError } from "@/lib/api-error";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +27,19 @@ export async function GET(
         if (!archive) {
             return NextResponse.json(
                 { error: "Bu teklif için arşiv bulunamadı (henüz gönderilmemiş olabilir)." },
+                { status: 404 },
+            );
+        }
+
+        // Bulgu 4 / P3-2: DB satırı var ama storage dosyası yoksa ("phantom" —
+        // nadir crash/timeout penceresi) signed URL üretip window.open'da kırık
+        // sekme açmak yerine graceful 404 dön (UI info toast'a düşer). Kalıcı
+        // recover/generate (eksik dosyayı yeniden üret) Faz 6'da serviceArchiveQuotePdf
+        // üzerinden gelecek — burada lookup-only sözleşme korunur.
+        const objectExists = await dbArchiveObjectExists(archive.file_path);
+        if (!objectExists) {
+            return NextResponse.json(
+                { error: "Arşiv dosyası bulunamadı (yeniden gönderim gerekebilir)." },
                 { status: 404 },
             );
         }

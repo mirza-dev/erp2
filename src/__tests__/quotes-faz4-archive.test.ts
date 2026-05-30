@@ -13,6 +13,7 @@ const mockDbUpdateStatus = vi.fn();
 const mockGetArchive = vi.fn();
 const mockCreateArchive = vi.fn();
 const mockGetSignedUrl = vi.fn();
+const mockObjectExists = vi.fn();
 const mockGetCompany = vi.fn();
 
 vi.mock("@/lib/supabase/quotes", () => ({
@@ -25,6 +26,7 @@ vi.mock("@/lib/supabase/quote-pdf-archives", () => ({
     dbGetQuoteArchive: (...a: unknown[]) => mockGetArchive(...a),
     dbCreateQuoteArchive: (...a: unknown[]) => mockCreateArchive(...a),
     dbGetArchiveSignedUrl: (...a: unknown[]) => mockGetSignedUrl(...a),
+    dbArchiveObjectExists: (...a: unknown[]) => mockObjectExists(...a),
 }));
 vi.mock("@/lib/supabase/company-settings", () => ({
     dbGetCompanySettings: (...a: unknown[]) => mockGetCompany(...a),
@@ -62,9 +64,10 @@ const stubQuote = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-    [mockDbGetQuote, mockDbUpdateStatus, mockGetArchive, mockCreateArchive, mockGetSignedUrl, mockGetCompany]
+    [mockDbGetQuote, mockDbUpdateStatus, mockGetArchive, mockCreateArchive, mockGetSignedUrl, mockObjectExists, mockGetCompany]
         .forEach((m) => m.mockReset());
     mockDbUpdateStatus.mockResolvedValue(true);
+    mockObjectExists.mockResolvedValue(true);  // P3-2: varsayılan dosya var
     mockGetCompany.mockResolvedValue(null);
 });
 
@@ -188,6 +191,16 @@ describe("GET /api/quotes/[id]/archive", () => {
         mockGetArchive.mockResolvedValue(null);
         const res = await call();
         expect(res.status).toBe(404);
+    });
+
+    // Bulgu 4 / P3-2: phantom satır (DB var, dosya yok) → graceful 404, signed URL ÜRETİLMEZ.
+    it("phantom (DB satırı var, storage dosyası yok) → 404, signed URL üretilmez", async () => {
+        mockDbGetQuote.mockResolvedValue(stubQuote());
+        mockGetArchive.mockResolvedValue({ id: "a1", file_path: "quotes/x/r1.html" });
+        mockObjectExists.mockResolvedValue(false);
+        const res = await call();
+        expect(res.status).toBe(404);
+        expect(mockGetSignedUrl).not.toHaveBeenCalled();
     });
 });
 

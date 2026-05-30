@@ -90,3 +90,23 @@ export async function dbGetArchiveSignedUrl(filePath: string, expiresIn = 3600):
     if (error || !data) return null;
     return data.signedUrl;
 }
+
+/**
+ * Bulgu 4 / P3-2 (2026-05-30): storage'da dosya GERÇEKTEN var mı?
+ * `createSignedUrl` obje yokluğunu kontrol etmez — yok olan path için bile
+ * geçerli görünen URL üretir, 404 erişim anında (window.open sonrası) patlar.
+ * dbCreateQuoteArchive insert-sonrası-upload (concurrency için bilinçli) →
+ * nadir crash/timeout penceresinde DB satırı var ama dosya yok ("phantom") olabilir.
+ * Bu kontrol GET route'un phantom'ı graceful 404'e (info toast) düşürmesini sağlar.
+ */
+export async function dbArchiveObjectExists(filePath: string): Promise<boolean> {
+    const supabase = createServiceClient();
+    const slash = filePath.lastIndexOf("/");
+    const folder = slash >= 0 ? filePath.slice(0, slash) : "";
+    const name = slash >= 0 ? filePath.slice(slash + 1) : filePath;
+    const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .list(folder, { search: name });
+    if (error || !data) return false;
+    return data.some(obj => obj.name === name);
+}

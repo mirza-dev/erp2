@@ -4,7 +4,9 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 4 — PDF Arşiv (2026-05-30) — dondurulmuş HTML snapshot + Bulgular 1.+2.+3. review tur, 3969 test, COMMIT+PUSH BEKLİYOR (1. `b8c1613` + 2. `bb3b3f2` push edildi; 3. tur commit edilmedi) + migration 075/076 APPLY BEKLİYOR
+## Faz 4 — PDF Arşiv (2026-05-30) — dondurulmuş HTML snapshot + Bulgular 1.+2.+3.+4. review tur, 3974 test, COMMIT+PUSH BEKLİYOR (1. `b8c1613` + 2. `bb3b3f2` + 3. `da09dce` push edildi; 4. tur commit edilmedi) + migration 075/076 APPLY EDİLDİ ✅
+
+**Review 4. tur (3 P3, convergence):** **P3-1 (doc-only)** stale "BEKLİYOR" → da09dce push + 075/076 apply EDİLDİ, hizalandı. **P3-2 (orphan phantom, contained fix)** insert-sonra-upload (concurrency bilinçli, reorder yok) → nadir crash'te DB satırı/dosya tutarsızlığı; phantom bugün kullanıcı-görünür (signed URL → 404 window.open sonrası → kırık sekme). Fix: `dbArchiveObjectExists` → archive GET varlık kontrolü → graceful 404. Kalıcı recover (object-existence) Faz 6. **P3-3 (kullanıcı: caveat kabul)** logo byte-freeze: arşiv URL saklar (byte değil), `upsert:true` overwrite riski → caveat kabul (base64-inline reddedildi). **3969 → 3974.**
 
 **Review 3. tur (3 bulgu):** **P2-A (regresyon)** toplu silme yalnız başarılı id'yi düşürsün (`pickSucceededIds`) + seçim sadece draft (sent draft-only kilidinin yan etkisi). **P2-B (kabul edilen boşluk)** send-archive fail + accept → arşivsiz accepted; Faz 6 recover kapatacak (kod yorumu, bloklamaz — karar A asimetrisi). **P3 (doc-only)** stale "BEKLİYOR" hizalandı. **3960 → 3969.**
 
@@ -22,7 +24,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **Self-containment sınırı:** Google Fonts `<link>` view-time external (tam offline değil — kabul). İleride @font-face inline ile kapatılabilir.
 - **Test:** Faz 4 (43) + 1. review + 2. review. **2. review (+9):** quote-archive-html custAddress (3) + quotes-faz4a-helper-mapper Bulgu 1 (4) + canDeleteQuote revised (1) + faz4 toast (1); sent-delete flip. **→ 3960** · tsc/build temiz · eslint src 31/0.
 - **Review 2. tur (Bulgular, 2026-05-30) — 5 bulgu, 2 ürün kararı:** **B1 (P2)** müşteri adresi gönderimde zorunlu ("resmi PDF") ama belgede yoktu → **EKLE** (4 nokta: QuoteData.custAddress + BILINGUAL_LABELS.address + QuoteDocument satır + buildQuoteDataFromDetail + **QuoteForm autoSave/savePreviewData** — advisor drift trap yakaladı). **B2 (P2)** sent silinebiliyordu → **SADECE DRAFT** (canDeleteQuote + DELETE route; immutable arşiv ON DELETE CASCADE koruması; regression flip). **B3 (P2/P3)** archive-fail toast yanıltıcı "otomatik denenecek" kaldırıldı (recover yalnız Faz 6). **B4 (P3)** buton arşivsiz statüde → graceful 404 zaten var (`sentAt` map'siz, P3 kabul). **B5 (P3)** doc sayı hizalandı.
-- **DURUM: COMMIT+PUSH BEKLİYOR (Faz 4 `b8c1613` push edildi; 2. review tur commit edilmedi) + 075/076 APPLY BEKLİYOR.** Sıradaki: smoke (Adres/Address satırı + önizleme drift yok; signed URL inline render; draft hariç Sil yok; arşiv fail→warning toast) + Faz 6 (077 accept→sipariş; serviceArchiveQuotePdf reusable — V7-A5).
+- **DURUM (güncel başlık satır 7'de): 1.+2.+3. tur push edildi (`da09dce`) + 075/076 APPLY EDİLDİ ✅; 4. tur COMMIT+PUSH BEKLİYOR.** Sıradaki: smoke (Adres/Address satırı + önizleme drift yok; signed URL inline render; draft hariç Sil yok; bulk delete yalnız draft + başarısız ekranda kalır; phantom→graceful 404) + Faz 6 (077 accept→sipariş; serviceArchiveQuotePdf reusable, object-existence recover — V7-A5).
 
 ---
 ## Revizyon Zinciri (2026-05-30) — Faz 5'ten ertelenen büyük özellik, 3837 test, COMMIT+PUSH 1d96211 + migration 074 APPLY EDİLDİ + review pass

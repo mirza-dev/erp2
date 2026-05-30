@@ -14,6 +14,7 @@ const mockMaybeSingle = vi.fn();
 const mockSingle = vi.fn();
 const mockStorageUpload = vi.fn();
 const mockStorageSigned = vi.fn();
+const mockStorageList = vi.fn();
 
 let _terminal: { data: unknown; error: unknown } = { data: null, error: null };
 function setTerminal(v: { data: unknown; error: unknown }) { _terminal = v; }
@@ -37,18 +38,19 @@ const mockSupabase = {
         from: (_bucket: string) => ({
             upload: (...a: unknown[]) => mockStorageUpload(...a),
             createSignedUrl: (...a: unknown[]) => mockStorageSigned(...a),
+            list: (...a: unknown[]) => mockStorageList(...a),
         }),
     },
 };
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => mockSupabase }));
 
-import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl } from "@/lib/supabase/quote-pdf-archives";
+import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists } from "@/lib/supabase/quote-pdf-archives";
 
 const QID = "00000000-0000-4000-8000-000000000001";
 
 beforeEach(() => {
-    [mockFrom, mockInsert, mockDelete, mockSelect, mockEq, mockMaybeSingle, mockSingle, mockStorageUpload, mockStorageSigned]
+    [mockFrom, mockInsert, mockDelete, mockSelect, mockEq, mockMaybeSingle, mockSingle, mockStorageUpload, mockStorageSigned, mockStorageList]
         .forEach((m) => m.mockReset());
     setTerminal({ data: null, error: null });
 });
@@ -124,5 +126,29 @@ describe("dbGetArchiveSignedUrl", () => {
     it("hata → null", async () => {
         mockStorageSigned.mockResolvedValueOnce({ data: null, error: { message: "no" } });
         expect(await dbGetArchiveSignedUrl("quotes/x/r1.html")).toBeNull();
+    });
+});
+
+// ── Bulgu 4 / P3-2: dbArchiveObjectExists ─────────────────────────────────────
+describe("dbArchiveObjectExists", () => {
+    it("klasörü dosya adıyla list eder; dosya varsa true", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: [{ name: "r1.html" }], error: null });
+        expect(await dbArchiveObjectExists("quotes/x/r1.html")).toBe(true);
+        expect(mockStorageList).toHaveBeenCalledWith("quotes/x", { search: "r1.html" });
+    });
+
+    it("liste boş (phantom: DB satırı var, dosya yok) → false", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: [], error: null });
+        expect(await dbArchiveObjectExists("quotes/x/r1.html")).toBe(false);
+    });
+
+    it("farklı dosya döner (search gevşek eşleşmesi) → ad birebir değilse false", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: [{ name: "r10.html" }], error: null });
+        expect(await dbArchiveObjectExists("quotes/x/r1.html")).toBe(false);
+    });
+
+    it("storage hatası → false (defansif, kırık sekme yerine graceful 404)", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: null, error: { message: "boom" } });
+        expect(await dbArchiveObjectExists("quotes/x/r1.html")).toBe(false);
     });
 });
