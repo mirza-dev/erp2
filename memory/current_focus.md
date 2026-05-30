@@ -5,7 +5,16 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 6 Bulgular 2. tur — 5 bulgu**, 4043 test, COMMIT+PUSH BEKLİYOR + 077/078 APPLY BEKLİYOR [078])
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 6 Bulgular 3. tur — 3 P3 bulgu** + 2. tur, 4043 test, COMMIT+PUSH EDİLDİ + 077/078 APPLY EDİLDİ ✅)
+
+**3. tur (kullanıcı review, 3 P3 — convergence, hepsi kod karşısında doğrulandı):**
+- **#1 (P3) Doc drift:** `9a57d66` push edildi (HEAD=origin/main) ama CLAUDE.md/current_focus/project_quotes hâlâ "COMMIT+PUSH BEKLİYOR" + 078 "APPLY BEKLİYOR" diyordu → tümü "EDİLDİ" olarak hizalandı (078 kullanıcı tarafından uygulandı).
+- **#2 (P3) Archive route stale yorum:** `archive/route.ts:34` yorumu "recover/generate Faz 6'da gelecek" diyordu — Faz 6'da geldi (`serviceArchiveQuotePdf` tri-state ile self-heal eder). Davranış doğru, yorum güncellendi (lookup-only sözleşme gerekçesiyle).
+- **#3 (P3, kullanıcı kararı: emoji kalsın) Order arşiv butonu emoji:** `📄 Belgeyi Aç →` — doğrulama emoji'nin proje-geneli konvansiyon olduğunu (`📄 Arşivlenmiş Teklif` kardeş buton, `📄 Yazdır/PDF`, `📦`/`↻`/`✦ AI`) + `lucide-react`'in 0 kullanımı (Tailwind/Framer gibi kurulu-ama-kullanılmaz) gösterdi → emoji konvansiyonla tutarlı, kod değişmez. **Kod değişimi yalnız #2 (yorum).**
+
+---
+
+## Önceki — 2026-05-31 (Teklif V7 **Faz 6 Bulgular 2. tur — 5 bulgu**, 4043 test, COMMIT+PUSH EDİLDİ `9a57d66` + 077/078 APPLY EDİLDİ ✅)
 
 **"Önce doğrula sonra düzelt" — 5 bulgu (2×P2 + 1×P2/P3 + 2×P3), hepsi kod karşısında doğrulandı:**
 - **#1 (P2) Arşiv create-race obje doğrulamadan başarı dönüyordu:** `serviceArchiveQuotePdf` create-catch'inde UNIQUE 23505 → re-read → satır görünce direkt success dönüyordu. Kazanan istek satırı insert edip henüz upload etmemiş/upload fail edip silmek üzere olabilir → accept arşivsiz/404'lü referansa kayar. **Fix:** catch'te satır + **OBJE present** birlikte doğrulanır; present değilse throw (accept 502→retry, self-heal). Yeniden ÜRETMEZ (kazananın satırı UNIQUE slot'u tutar → 23505 re-collide; advisor).
@@ -14,8 +23,8 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **#4 (P3) Doc drift:** `dddb1f9` push edildi ama MEMORY.md/project_quotes.md/CLAUDE.md/current_focus.md:27 hâlâ "COMMIT+PUSH BEKLİYOR" + 4034 (gerçek 4040→şimdi 4043) diyordu → tümü hizalandı.
 - **#5 (P3) Lint iddiası:** kullanıcı `b17181e`'de (lint fix `dddb1f9` ÖNCESİ) review yaptığı için orders sayfasında 3 set-state-in-effect görmüş. HEAD'de `npm run lint` = 0; `b17181e` kapanışındaki "31/0" o commit için dürüsttü. Kod değişmez (açıklama).
 - **Test:** tri-state helper + create-race obje + unknown→throw (service+faz4-archive) + #3 UI regex. **4040 → 4043 yeşil** · tsc temiz · `npm run lint` 0 · build OK.
-- **⚠️ 078 hâlâ APPLY BEKLİYOR** (qty<=0 edge live'da 078 olmadan tam kapanmaz; bu deploy'la apply).
-- **DURUM: COMMIT+PUSH BEKLİYOR.** Faz 6 yakınsadı (advisor: bu turdan sonra kapalı). Faz 7 → 079-080.
+- **078 APPLY EDİLDİ ✅** (qty<=0 edge live'da kapalı).
+- **DURUM: COMMIT+PUSH EDİLDİ (`9a57d66`).** Faz 6 yakınsadı. Faz 7 → 079-080.
 
 ---
 

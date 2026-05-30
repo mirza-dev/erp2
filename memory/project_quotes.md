@@ -4,7 +4,17 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 6 Bulgular 2. tur — 5 bulgu (2026-05-31) — 4043 test, COMMIT+PUSH BEKLİYOR + 077 ✅/078 APPLY BEKLİYOR
+## Faz 6 Bulgular 3. tur — 3 P3 bulgu (2026-05-31) — 4043 test, COMMIT+PUSH EDİLDİ + 077/078 APPLY EDİLDİ ✅
+
+**Kullanıcı review (3 P3 — convergence; hepsi kod karşısında doğrulandı):**
+- **#1 (P3) Doc drift:** `9a57d66` push edildi (HEAD=origin/main) ama CLAUDE.md/current_focus/project_quotes hâlâ "COMMIT+PUSH BEKLİYOR" + 078 "APPLY BEKLİYOR" diyordu → "EDİLDİ" hizalandı (078 kullanıcı tarafından uygulandı).
+- **#2 (P3) Archive route stale yorum:** `archive/route.ts:34` "recover/generate Faz 6'da gelecek" diyordu — Faz 6'da geldi (`serviceArchiveQuotePdf` tri-state self-heal). Yorum güncellendi (lookup-only sözleşme gerekçesiyle; bu GET route üretmez, accept yolu self-heal eder).
+- **#3 (P3, kullanıcı kararı: emoji kalsın) Order arşiv buton emoji:** `📄 Belgeyi Aç →` — doğrulama emoji'nin proje-geneli konvansiyon (`📄 Arşivlenmiş Teklif` kardeş buton, `📄 Yazdır/PDF`, `📦`/`↻`/`✦ AI`) + `lucide-react` 0 kullanım (Tailwind/Framer gibi kurulu-ama-kullanılmaz) gösterdi → emoji tutarlı, kod değişmez.
+- **DURUM: COMMIT+PUSH EDİLDİ; 077/078 APPLY EDİLDİ ✅.** Kod değişimi yalnız #2 (yorum); test 4043 sabit. Faz 6 tam kapandı. Faz 7 → note_templates 079-080.
+
+---
+
+## Faz 6 Bulgular 2. tur — 5 bulgu (2026-05-31) — 4043 test, COMMIT+PUSH EDİLDİ `9a57d66` + 077/078 APPLY EDİLDİ ✅
 
 **"Önce doğrula sonra düzelt" — 5 bulgu doğrulandı; arşiv invariant'ı sıkılaştırıldı:**
 - **#1 (P2) Arşiv create-race obje-doğrulamadan başarı:** `serviceArchiveQuotePdf` create-catch'i UNIQUE 23505'te satır görünce direkt success dönüyordu; kazanan henüz upload etmemiş/fail edip silmek üzere olabilir → accept arşivsiz referansa kayar. Fix: catch'te satır + OBJE present birlikte; değilse throw (accept 502→retry self-heal); yeniden ÜRETMEZ (UNIQUE slot dolu).
@@ -12,8 +22,8 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **#3 (P3) Order detail arşiv PDF linki:** `quotePdfArchiveId` taşınıyordu ama UI'da yoktu → "Arşivlenmiş Teklif → 📄 Belgeyi Aç" (GET /api/quotes/{quoteId}/archive signed URL, handleViewArchive reuse).
 - **#4 (P3) Doc drift:** dddb1f9 push'tan sonra hâlâ BEKLİYOR + 4034 diyen tüm doc'lar hizalandı.
 - **#5 (P3) Lint:** kullanıcı b17181e'de (lint fix öncesi) review yapmış → 3 set-state hata görmüş; HEAD'de npm run lint=0; b17181e "31/0" o commit için dürüsttü. Kod değişmez.
-- **Test:** tri-state helper + create-race obje + unknown→throw + #3 UI. **4040→4043** · tsc temiz · npm run lint 0 · build OK. **⚠️ 078 APPLY BEKLİYOR.**
-- **DURUM: COMMIT+PUSH BEKLİYOR.** Faz 6 yakınsadı. Faz 7 → 079-080.
+- **Test:** tri-state helper + create-race obje + unknown→throw + #3 UI. **4040→4043** · tsc temiz · npm run lint 0 · build OK.
+- **DURUM: COMMIT+PUSH EDİLDİ (`9a57d66`); 077/078 APPLY EDİLDİ ✅.** Faz 6 yakınsadı. Faz 7 → 079-080. (3. tur yukarıda.)
 
 ---
 ## Faz 6 Bulgular 1. tur — 5 bulgu review tur (2026-05-31) — 4034 test, COMMIT+PUSH EDİLDİ (`b17181e`) + migration 077 APPLY EDİLDİ ✅ / 078 APPLY BEKLİYOR

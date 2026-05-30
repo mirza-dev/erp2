@@ -35,7 +35,9 @@ export async function GET(
         // nadir crash/timeout penceresi) signed URL üretip window.open'da kırık
         // sekme açmak yerine graceful 404 dön (UI info toast'a düşer). Kalıcı
         // recover/generate (eksik dosyayı yeniden üret) Faz 6'da serviceArchiveQuotePdf
-        // üzerinden gelecek — burada lookup-only sözleşme korunur.
+        // (tri-state dbArchiveObjectStatus: missing→sil+üret / unknown→502) ile geldi;
+        // accept yolunda self-heal eder. Bu GET route lookup-only sözleşmeyi korur
+        // (üretmez) — accept dışı görüntülemede phantom'u yeniden üretmek istemeyiz.
         const objectExists = await dbArchiveObjectExists(archive.file_path);
         if (!objectExists) {
             return NextResponse.json(
