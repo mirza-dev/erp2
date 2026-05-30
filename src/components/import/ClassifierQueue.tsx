@@ -127,7 +127,9 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
     // çünkü Strict Mode'da render iki kez çalışır ve fetch tetiklenirse
     // duplicate POST/storage row/AI cost olur.
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- bilinçli: idempotent guard (yeni dosya yoksa setState atılmaz); render-phase fetch'i önlemek için useEffect içinde olmak ZORUNDA (Strict Mode safety)
+        // Bilinçli: idempotent guard (yeni dosya yoksa setState atılmaz); render-phase
+        // fetch'i önlemek için useEffect içinde olmak ZORUNDA (Strict Mode safety).
+        // (set-state-in-effect kuralı config'te kapalı — eslint.config.mjs gerekçesi.)
         setQueue(prev => {
             const existing = new Set(prev.map(q => q.file));
             const additions: QueuedFile[] = [];
@@ -165,7 +167,8 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
         if (candidates.length === 0) return;
 
         const candidateIds = new Set(candidates.map(c => c.id));
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- bilinçli: classifying patch dedup için; fetch tetiklenecek adayları işaretler, kural yalın setter çağrılarını uyarır, burada yan etki tetiklemesinin parçası
+        // Bilinçli: classifying patch dedup için; fetch tetiklenecek adayları işaretler.
+        // (set-state-in-effect kuralı config'te kapalı — eslint.config.mjs gerekçesi.)
         setQueue(prev => prev.map(q =>
             candidateIds.has(q.id) ? { ...q, status: "classifying", started: true } : q,
         ));

@@ -5,7 +5,16 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 6 Bulgular — 5 bulgu review tur**, 4034 test, COMMIT+PUSH BEKLİYOR + migration 077 APPLY EDİLDİ ✅ / 078 APPLY BEKLİYOR)
+## Lint sinyali düzeltmesi — 2026-05-31 (npm run lint artık güvenilir + 0 sorun)
+
+- **Sorun:** `npm run lint` (`eslint .`) ~32.108 sorun üretiyordu; 32.077'si `.claude/worktrees/<x>/.next` (stale worktree build artifact'ı) kaynaklı sahte. Kök `.next/**` ignore yalnız kökü kapsıyordu. Gerçek `src` = 31.
+- **Fix 1 (artifact noise):** `eslint.config.mjs` globalIgnores += `**/.next/**`, `.claude/**`, `.agents/**`, `skills/**` → `npm run lint` == `eslint src`.
+- **Fix 2 (31 baseline, kullanıcı kararı: config justify+suppress → yeşil):** react-hooks@7.1.1 (React Compiler-era) `set-state-in-effect` (28) + `refs` (2) + `purity` (1) kuralları config'te `"off"` + gerekçe yorumu. Proje SWR/React Query KULLANMIYOR (CLAUDE.md) → mount-time fetch-in-effect bilinçli konvansiyon; react-doctor kardeş kural `no-fetch-in-effect` zaten suppress'liydi. ClassifierQueue.tsx'teki 2 artık-ölü `eslint-disable-next-line` direktifi temizlendi (gerekçe yorumu korundu).
+- **Sonuç:** `npm run lint` **EXIT 0, 0 sorun.** tsc temiz · 4040 test · build OK. **Gelecek için:** `npm run lint` artık güvenilir tek sinyal; "eslint src 31/0 baseline" notu eskidi. Gerçek hook düzeltmeleri [[project_frontend_renewal]] planında.
+
+---
+
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 6 Bulgular — 5 bulgu review tur**, 4034 test, COMMIT+PUSH EDİLDİ + migration 077 APPLY EDİLDİ ✅ / 078 APPLY BEKLİYOR)
 
 **Faz 6 Bulgular ("önce doğrula sonra düzelt") — 5 bulgu (4×P2 + 1×P3), hepsi kod karşısında doğrulandı:**
 - **#1 (P2) Phantom recover Faz 6'da kapanmamıştı:** Faz 4 GET route `dbArchiveObjectExists` ile graceful 404 dönüyordu, ama accept yolundaki `serviceArchiveQuotePdf` (line 137) yalnız DB satırına bakıp `existing` dönüyordu → phantom (satır var/obje yok) teklifte accept eksik-dosyalı arşive sipariş bağlıyordu. **Fix:** existing-row path'inde `dbArchiveObjectExists(existing.file_path)` doğrulaması; obje yoksa yeni `dbDeleteQuoteArchive(id, filePath)` (stale row sil, storage remove best-effort) → fall-through render+create (sent quote donmuş → HTML birebir). Hem send hem accept'i iyileştirir. Test: phantom → delete+regenerate.
