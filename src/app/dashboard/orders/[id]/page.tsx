@@ -122,7 +122,28 @@ export default function OrderDetailPage() {
     const [shortageDialogOpen, setShortageDialogOpen] = useState(false);
     const [shortages, setShortages] = useState<ShortageItem[]>([]);
     const [loading, setLoading] = useState<string | null>(null);
+    const [archiveLoading, setArchiveLoading] = useState(false);
     const [justTransitionedCommercial, setJustTransitionedCommercial] = useState<CommercialStatus | null>(null);
+
+    // Faz 6 (Bulgu #3): kabulde dondurulan teklif arşivinin (PDF/HTML) signed URL'ini
+    // açar. Arşiv quote'a bağlı (GET /api/quotes/[id]/archive son revizyonu döner;
+    // kabul edilen teklifin revizyonu sabit → doğru donmuş belge). Read-only → demo OK.
+    const handleViewArchive = useCallback(async (quoteId: string) => {
+        setArchiveLoading(true);
+        try {
+            const res = await fetch(`/api/quotes/${quoteId}/archive`);
+            const data = await res.json();
+            if (!res.ok || !data.url) {
+                toast({ type: "info", message: data.error || "Arşiv bulunamadı." });
+                return;
+            }
+            window.open(data.url, "_blank", "noopener");
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Arşiv açılamadı." });
+        } finally {
+            setArchiveLoading(false);
+        }
+    }, [toast]);
     const [justTransitionedFulfillment, setJustTransitionedFulfillment] = useState<FulfillmentStatus | null>(null);
 
     // Confirmation dialog state
@@ -548,6 +569,23 @@ export default function OrderDetailPage() {
                                         />
                                     )}
                                     {order.notes && <InfoRow label="Not" value={order.notes} />}
+                                    {order.quoteId && order.quotePdfArchiveId && (
+                                        <div style={{ display: "flex", gap: "6px", fontSize: "12px" }}>
+                                            <span style={{ color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Arşivlenmiş Teklif</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleViewArchive(order.quoteId!)}
+                                                disabled={archiveLoading}
+                                                aria-label="Kabulde dondurulan teklif belgesini aç"
+                                                style={{
+                                                    background: "none", border: "none", padding: 0, cursor: archiveLoading ? "default" : "pointer",
+                                                    color: "var(--accent-text)", font: "inherit", textAlign: "left",
+                                                }}
+                                            >
+                                                {archiveLoading ? "Açılıyor…" : "📄 Belgeyi Aç →"}
+                                            </button>
+                                        </div>
+                                    )}
                                     {order.quoteId && (
                                         <div style={{ display: "flex", gap: "6px", fontSize: "12px" }}>
                                             <span style={{ color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Kaynak Teklif</span>

@@ -4,7 +4,19 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 6 Bulgular — 5 bulgu review tur (2026-05-31) — 4034 test, COMMIT+PUSH BEKLİYOR + migration 077 APPLY EDİLDİ ✅ / 078 APPLY BEKLİYOR
+## Faz 6 Bulgular 2. tur — 5 bulgu (2026-05-31) — 4043 test, COMMIT+PUSH BEKLİYOR + 077 ✅/078 APPLY BEKLİYOR
+
+**"Önce doğrula sonra düzelt" — 5 bulgu doğrulandı; arşiv invariant'ı sıkılaştırıldı:**
+- **#1 (P2) Arşiv create-race obje-doğrulamadan başarı:** `serviceArchiveQuotePdf` create-catch'i UNIQUE 23505'te satır görünce direkt success dönüyordu; kazanan henüz upload etmemiş/fail edip silmek üzere olabilir → accept arşivsiz referansa kayar. Fix: catch'te satır + OBJE present birlikte; değilse throw (accept 502→retry self-heal); yeniden ÜRETMEZ (UNIQUE slot dolu).
+- **#2 (P2/P3) Accept fail-open → fail-closed (advisor: tek doğru cevap):** RPC 23514 guard'ı arşiv SATIRINA bakar, OBJEYE erişemez → `serviceArchiveQuotePdf` "dosya gerçekten var mı" invariant'ının TEK noktası. Üç-durumlu `dbArchiveObjectStatus` (present|missing|unknown): present→ok, missing→sil+üret, **unknown→throw (502 retryable)**. Yıkma yalnız missing (sağlam arşiv korunur). `dbArchiveObjectConfirmedMissing` kaldırıldı→tri-state; `dbArchiveObjectExists` (GET lenient) tri-state'ten türer.
+- **#3 (P3) Order detail arşiv PDF linki:** `quotePdfArchiveId` taşınıyordu ama UI'da yoktu → "Arşivlenmiş Teklif → 📄 Belgeyi Aç" (GET /api/quotes/{quoteId}/archive signed URL, handleViewArchive reuse).
+- **#4 (P3) Doc drift:** dddb1f9 push'tan sonra hâlâ BEKLİYOR + 4034 diyen tüm doc'lar hizalandı.
+- **#5 (P3) Lint:** kullanıcı b17181e'de (lint fix öncesi) review yapmış → 3 set-state hata görmüş; HEAD'de npm run lint=0; b17181e "31/0" o commit için dürüsttü. Kod değişmez.
+- **Test:** tri-state helper + create-race obje + unknown→throw + #3 UI. **4040→4043** · tsc temiz · npm run lint 0 · build OK. **⚠️ 078 APPLY BEKLİYOR.**
+- **DURUM: COMMIT+PUSH BEKLİYOR.** Faz 6 yakınsadı. Faz 7 → 079-080.
+
+---
+## Faz 6 Bulgular 1. tur — 5 bulgu review tur (2026-05-31) — 4034 test, COMMIT+PUSH EDİLDİ (`b17181e`) + migration 077 APPLY EDİLDİ ✅ / 078 APPLY BEKLİYOR
 
 **"Önce doğrula sonra düzelt" — 5 bulgu (4×P2 + 1×P3), hepsi kod karşısında doğrulandı + kapatıldı:**
 - **#1 (P2) Phantom recover accept'te:** Faz 4 "kalıcı recover Faz 6'da" vaadi tam kapanmamıştı. `serviceArchiveQuotePdf` existing-row path yalnız DB satırına bakıyordu → phantom (satır var/obje yok) accept'te eksik-dosyalı arşive sipariş bağlıyordu. **Fix:** existing path `dbArchiveObjectExists` doğrular; obje yoksa `dbDeleteQuoteArchive(id,filePath)` (stale sil + best-effort storage remove) → fall-through yeniden üret (sent donmuş → HTML birebir). Hem send hem accept iyileşti.
@@ -14,7 +26,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **#5 (P3) Doc drift:** "077 APPLY BEKLİYOR" → kullanıcı uyguladı → "077 ✅ + 078 BEKLİYOR".
 - **Test (+13):** phantom (service+faz4-archive) + dbDeleteQuoteArchive helper (4) + order summary regex (2) + accept 403 (1) + 078 drift-guard (4) + service map güncel. **4021→4034** · tsc/build temiz · eslint src 31/0.
 - **⚠️ Deploy:** 078 apply edilene kadar legacy qty<=0 → eski RPC 23514 → unmapped → 500 (422 yerine; düşük risk). 078'i bu deploy'la apply et.
-- **DURUM: COMMIT+PUSH BEKLİYOR; 077 ✅ / 078 BEKLİYOR.** Faz 7 → 079-080.
+- **DURUM: COMMIT+PUSH EDİLDİ (`b17181e`); 077 ✅ / 078 BEKLİYOR.** (2. tur yukarıda.) Faz 7 → 079-080.
 
 ---
 ## Faz 6 — Accept → Sipariş (atomik) (2026-05-30) — `accept_quote_and_create_order` RPC (077), 4021 test, COMMIT+PUSH EDİLDİ (`d4988ca`) + migration 077 APPLY EDİLDİ ✅

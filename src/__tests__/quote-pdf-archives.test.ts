@@ -47,7 +47,7 @@ const mockSupabase = {
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => mockSupabase }));
 
-import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists, dbArchiveObjectConfirmedMissing, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
+import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists, dbArchiveObjectStatus, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
 
 const QID = "00000000-0000-4000-8000-000000000001";
 
@@ -156,27 +156,29 @@ describe("dbArchiveObjectExists", () => {
     });
 });
 
-// ── Faz 6 / P2 (advisor): dbArchiveObjectConfirmedMissing ─────────────────────
-// KRİTİK fark: list HATASI "yok" SAYILMAZ (geçici blip sağlam arşivi yok etmesin).
-describe("dbArchiveObjectConfirmedMissing", () => {
-    it("list OK + obje listede yok → true (KESİN yok)", async () => {
-        mockStorageList.mockResolvedValueOnce({ data: [], error: null });
-        expect(await dbArchiveObjectConfirmedMissing("quotes/x/r1.html")).toBe(true);
-    });
-
-    it("list OK + obje var → false", async () => {
+// ── Faz 6 / Bulgular #1+#2 (advisor): dbArchiveObjectStatus (üç-durumlu) ───────
+// present/missing/unknown ayrımı — "unknown" (list HATASI) ne yıkıcı aksiyon ne
+// başarı sinyali olmalı (sağlam arşivi koru + arşivsiz siparişe izin verme).
+describe("dbArchiveObjectStatus", () => {
+    it("list OK + obje var → present", async () => {
         mockStorageList.mockResolvedValueOnce({ data: [{ name: "r1.html" }], error: null });
-        expect(await dbArchiveObjectConfirmedMissing("quotes/x/r1.html")).toBe(false);
+        expect(await dbArchiveObjectStatus("quotes/x/r1.html")).toBe("present");
+        expect(mockStorageList).toHaveBeenCalledWith("quotes/x", { search: "r1.html" });
     });
 
-    it("list HATASI → false (fail-safe: KESİN yok DEĞİL — arşive dokunma)", async () => {
+    it("list OK + obje listede yok → missing (KESİN yok)", async () => {
+        mockStorageList.mockResolvedValueOnce({ data: [], error: null });
+        expect(await dbArchiveObjectStatus("quotes/x/r1.html")).toBe("missing");
+    });
+
+    it("list HATASI → unknown (belirsiz — ne yık ne başarı dön)", async () => {
         mockStorageList.mockResolvedValueOnce({ data: null, error: { message: "transient blip" } });
-        expect(await dbArchiveObjectConfirmedMissing("quotes/x/r1.html")).toBe(false);
+        expect(await dbArchiveObjectStatus("quotes/x/r1.html")).toBe("unknown");
     });
 
-    it("gevşek eşleşme (r10.html ≠ r1.html) → true (r1 KESİN yok)", async () => {
+    it("gevşek eşleşme (r10.html ≠ r1.html) → missing", async () => {
         mockStorageList.mockResolvedValueOnce({ data: [{ name: "r10.html" }], error: null });
-        expect(await dbArchiveObjectConfirmedMissing("quotes/x/r1.html")).toBe(true);
+        expect(await dbArchiveObjectStatus("quotes/x/r1.html")).toBe("missing");
     });
 });
 

@@ -109,15 +109,23 @@ export async function dbGetArchiveSignedUrl(filePath: string, expiresIn = 3600):
     return data.signedUrl;
 }
 
+export type ArchiveObjectStatus = "present" | "missing" | "unknown";
+
 /**
- * Bulgu 4 / P3-2 (2026-05-30): storage'da dosya GERÇEKTEN var mı?
- * `createSignedUrl` obje yokluğunu kontrol etmez — yok olan path için bile
- * geçerli görünen URL üretir, 404 erişim anında (window.open sonrası) patlar.
- * dbCreateQuoteArchive insert-sonrası-upload (concurrency için bilinçli) →
- * nadir crash/timeout penceresinde DB satırı var ama dosya yok ("phantom") olabilir.
- * Bu kontrol GET route'un phantom'ı graceful 404'e (info toast) düşürmesini sağlar.
+ * Faz 6 (Bulgular #1/#2 — advisor): storage objesinin ÜÇ-DURUMLU varlık kontrolü.
+ * `createSignedUrl` obje yokluğunu kontrol etmez (yok olan path'e bile geçerli
+ * görünen URL üretir; 404 erişim anında patlar) → varlığı `.list` ile doğrularız.
+ *
+ *   present  = list başarılı + obje listede VAR
+ *   missing  = list başarılı + obje listede YOK (KESİN yok)
+ *   unknown  = list HATASI (geçici blip / izin / ağ) — varlık doğrulanamadı
+ *
+ * Tek source-of-truth: `dbArchiveObjectExists` (GET route, lenient) + accept yolu
+ * (fail-closed) bundan türer. KRİTİK ayrım (advisor): "missing" yıkıcı aksiyonu
+ * (sil+yeniden üret) tetikler; "unknown" ASLA yıkıcı/başarı sinyali OLMAMALI —
+ * sağlam arşivi yok etmemek + arşivsiz siparişe izin vermemek için.
  */
-export async function dbArchiveObjectExists(filePath: string): Promise<boolean> {
+export async function dbArchiveObjectStatus(filePath: string): Promise<ArchiveObjectStatus> {
     const supabase = createServiceClient();
     const slash = filePath.lastIndexOf("/");
     const folder = slash >= 0 ? filePath.slice(0, slash) : "";
@@ -125,27 +133,15 @@ export async function dbArchiveObjectExists(filePath: string): Promise<boolean> 
     const { data, error } = await supabase.storage
         .from(STORAGE_BUCKET)
         .list(folder, { search: name });
-    if (error || !data) return false;
-    return data.some(obj => obj.name === name);
+    if (error || !data) return "unknown";                       // belirsiz
+    return data.some(obj => obj.name === name) ? "present" : "missing";
 }
 
 /**
- * Faz 6 (P2 recover — advisor): obje KESİN yok mu? `dbArchiveObjectExists`'ten
- * FARKI: list HATASI (geçici .list() blip) "yok" SAYILMAZ. Yıkıcı recover yolu
- * (stale row sil + storage remove) yalnız KESİN yokluk üzerine tetiklenmeli;
- * aksi halde geçici bir storage hatası SAĞLAM bir immutable arşivi yok eder.
- * Dönüş: true YALNIZCA list başarılı + obje listede yok ise. Hata/belirsizlik → false
- * (fail-safe: arşive dokunma, existing dön). GET route lenient versiyonu kullanmaya
- * devam eder (404-on-ambiguity zararsız).
+ * Lenient varlık kontrolü (GET route): present → true; missing/unknown → false.
+ * `dbArchiveObjectStatus`'tan türer. 404-on-ambiguity GET tarafında zararsız —
+ * kullanıcı arşivi tekrar açabilir; yıkıcı/invariant etkisi yok.
  */
-export async function dbArchiveObjectConfirmedMissing(filePath: string): Promise<boolean> {
-    const supabase = createServiceClient();
-    const slash = filePath.lastIndexOf("/");
-    const folder = slash >= 0 ? filePath.slice(0, slash) : "";
-    const name = slash >= 0 ? filePath.slice(slash + 1) : filePath;
-    const { data, error } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .list(folder, { search: name });
-    if (error || !data) return false;          // belirsiz → KESİN yok DEĞİL
-    return !data.some(obj => obj.name === name); // yalnız list OK + obje yok
+export async function dbArchiveObjectExists(filePath: string): Promise<boolean> {
+    return (await dbArchiveObjectStatus(filePath)) === "present";
 }

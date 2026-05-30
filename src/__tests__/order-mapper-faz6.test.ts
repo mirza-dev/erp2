@@ -82,3 +82,13 @@ describe("Sipariş detay finansal özet — Bulgu #2 (iskonto + dinamik KDV)", (
         expect(PAGE).toMatch(/order\.subtotal - discount/);
     });
 });
+
+describe("Sipariş detay arşiv PDF linki — Bulgu #3", () => {
+    const PAGE = readFileSync(join(process.cwd(), "src/app/dashboard/orders/[id]/page.tsx"), "utf8");
+    it("quotePdfArchiveId varsa arşiv belgesi linki + handleViewArchive", () => {
+        expect(PAGE).toMatch(/order\.quoteId && order\.quotePdfArchiveId/);
+        expect(PAGE).toMatch(/const handleViewArchive = useCallback/);
+        expect(PAGE).toMatch(/fetch\(`\/api\/quotes\/\$\{quoteId\}\/archive`\)/);
+        expect(PAGE).toMatch(/Arşivlenmiş Teklif/);
+    });
+});

@@ -12,7 +12,7 @@ import { dbGetProductById } from "@/lib/supabase/products";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { dbGetCompanySettings } from "@/lib/supabase/company-settings";
-import { dbGetQuoteArchive, dbCreateQuoteArchive, dbArchiveObjectConfirmedMissing, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
+import { dbGetQuoteArchive, dbCreateQuoteArchive, dbArchiveObjectStatus, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
 import { serviceCreateOrder } from "@/lib/services/order-service";
 import { buildQuoteDataFromDetail, renderQuoteArchiveHtml } from "@/lib/quote-archive-html";
 import { mapQuoteDetail } from "@/lib/api-mappers";
@@ -134,18 +134,27 @@ export async function serviceArchiveQuotePdf(
 
     const revisionNo = Number(quote.revision_no ?? 1);
 
-    // Faz 6 (P2 phantom recover): DB satırı varsa storage objesini DE doğrula.
-    // `dbGetQuoteArchive` yalnız satıra bakar; nadir crash/timeout penceresinde
-    // satır var ama dosya yok ("phantom") olabilir → accept eksik-dosyalı arşive
-    // sipariş bağlamasın. ⚠️ Yıkıcı recover (sil+yeniden üret) yalnız KESİN yokluk
-    // üzerine: `dbArchiveObjectConfirmedMissing` list HATASINI "yok" SAYMAZ (geçici
-    // .list() blip'i SAĞLAM arşivi yok etmesin — fail-safe → existing dön). Not:
-    // yeniden üretim BUGÜNKÜ template'i kullanır (orijinal snapshot değil; deploy'lar
-    // arası QuoteDocument değişebilir) — ama dosyasız phantom'dan iyidir; çok nadir.
+    // Faz 6 (Bulgular #1/#2 — advisor): DB satırı varsa storage OBJESİNİ üç-durumlu
+    // doğrula. `dbGetQuoteArchive` yalnız satıra bakar; nadir crash/timeout
+    // penceresinde satır var/dosya yok ("phantom") olabilir → accept eksik-dosyalı
+    // arşive sipariş bağlamasın. RPC'nin 23514 guard'ı arşiv SATIRINI kontrol eder,
+    // storage OBJESİNE erişemez → bu, "dosya gerçekten var mı" invariant'ının TEK
+    // uygulama noktası.
+    //   present → idempotent existing dön.
+    //   missing → KESİN yok: stale satırı sil + yeniden üret (fall-through). Yeniden
+    //     üretim bugünkü template'i kullanır (deploy'lar arası QuoteDocument değişebilir;
+    //     dosyasız phantom'dan iyidir, çok nadir).
+    //   unknown → list HATASI (geçici blip): YIKMA (sağlam arşivi koru) + BAŞARI DÖNME
+    //     (fail-closed). throw → accept 502 (kullanıcı tekrar dener; tasarımca
+    //     retryable). Send hook bunu try/catch'le archiveWarning'e indirir (non-fatal).
     const existing = await dbGetQuoteArchive(quoteId, revisionNo);
     if (existing) {
-        const confirmedMissing = await dbArchiveObjectConfirmedMissing(existing.file_path);
-        if (!confirmedMissing) return { archived: true, existing: true, revisionNo };
+        const status = await dbArchiveObjectStatus(existing.file_path);
+        if (status === "present") return { archived: true, existing: true, revisionNo };
+        if (status === "unknown") {
+            throw new Error(`Arşiv dosyası varlığı doğrulanamadı (geçici storage hatası, quote ${quoteId}). Tekrar deneyin.`);
+        }
+        // status === "missing" → KESİN yok
         await dbDeleteQuoteArchive(existing.id, existing.file_path);
         // fall-through → render + dbCreateQuoteArchive (yeniden üretim)
     }
@@ -167,11 +176,21 @@ export async function serviceArchiveQuotePdf(
             createdBy: actorUserId ?? null,
         });
     } catch (err) {
-        // Concurrency: paralel istek aynı (quote, revision_no) arşivini commit etmiş
-        // olabilir (UNIQUE 23505). Re-read → varsa idempotent existing döner; yoksa
-        // gerçek hata (storage down vb.) propagate eder. Faz 6 recovery güvenli.
+        // Concurrency (UNIQUE 23505): paralel istek aynı (quote, revision_no) satırını
+        // açmış olabilir. ⚠️ Bulgular #1: re-read'de SADECE satırı görüp başarı dönmek
+        // YETMEZ — kazanan istek satırı insert edip henüz upload etmemiş olabilir VEYA
+        // upload'ı fail edip satırı silmek üzere olabilir → accept arşivsiz/404'lü
+        // referansa kayar. Bu yüzden satır + OBJE present birlikte doğrulanır.
+        //   present → kazanan tamamladı, idempotent başarı.
+        //   missing/unknown → kazanan henüz bitirmedi ya da fail etti → throw (accept
+        //     502 → retry; retry'de kazanan biter, self-heal). Burada YENİDEN ÜRETME:
+        //     kazananın satırı UNIQUE slot'u hâlâ tutuyor → regenerate 23505'e
+        //     yeniden çarpar (advisor).
         const racedExisting = await dbGetQuoteArchive(quoteId, revisionNo);
-        if (racedExisting) return { archived: true, existing: true, revisionNo };
+        if (racedExisting) {
+            const status = await dbArchiveObjectStatus(racedExisting.file_path);
+            if (status === "present") return { archived: true, existing: true, revisionNo };
+        }
         throw err;
     }
 

@@ -8,7 +8,7 @@ const mockDbGetQuote          = vi.fn();
 const mockDbAccept            = vi.fn();
 const mockDbGetArchive        = vi.fn();
 const mockDbCreateArchive     = vi.fn();
-const mockDbConfirmedMissing  = vi.fn();
+const mockDbObjectStatus      = vi.fn();
 const mockDbDeleteArchive     = vi.fn();
 
 vi.mock("@/lib/supabase/quotes", () => ({
@@ -23,7 +23,7 @@ vi.mock("@/lib/supabase/quotes", () => ({
 vi.mock("@/lib/supabase/quote-pdf-archives", () => ({
     dbGetQuoteArchive:    (...a: unknown[]) => mockDbGetArchive(...a),
     dbCreateQuoteArchive: (...a: unknown[]) => mockDbCreateArchive(...a),
-    dbArchiveObjectConfirmedMissing:(...a: unknown[]) => mockDbConfirmedMissing(...a),
+    dbArchiveObjectStatus:(...a: unknown[]) => mockDbObjectStatus(...a),
     dbDeleteQuoteArchive: (...a: unknown[]) => mockDbDeleteArchive(...a),
 }));
 vi.mock("@/lib/supabase/products", () => ({ dbGetProductById: vi.fn() }));
@@ -48,9 +48,9 @@ const stub = (status: string, extra: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
     vi.clearAllMocks();
-    // Varsayılan: arşiv mevcut + obje KESİN yok DEĞİL (recover no-op) + RPC başarılı.
+    // Varsayılan: arşiv mevcut + obje present (recover no-op) + RPC başarılı.
     mockDbGetArchive.mockResolvedValue({ id: "arch-1", file_path: "x/r1.html" });
-    mockDbConfirmedMissing.mockResolvedValue(false);
+    mockDbObjectStatus.mockResolvedValue("present");
     mockDbAccept.mockResolvedValue({ order_id: "ord-1", order_number: "SIP-2026-001", already: false });
 });
 
@@ -125,12 +125,12 @@ describe("serviceAcceptQuoteToOrder — arşiv recover/generate (V7-A5)", () => 
         expect(mockDbAccept).not.toHaveBeenCalled();
     });
 
-    // Bulgu #1 (P2): DB arşiv satırı VAR ama storage objesi YOK ("phantom").
+    // Bulgu #1 (P2): DB arşiv satırı VAR ama storage objesi KESİN yok ("missing").
     // Accept, stale satırı silip yeniden üretmeden sipariş açmamalı.
-    it("phantom (DB row var, obje KESİN yok) → stale sil + yeniden üret, sonra accept", async () => {
+    it("phantom (obje status=missing) → stale sil + yeniden üret, sonra accept", async () => {
         mockDbGetQuote.mockResolvedValue(stub("sent"));
         mockDbGetArchive.mockResolvedValue({ id: "stale-1", file_path: "x/r1.html" });
-        mockDbConfirmedMissing.mockResolvedValue(true);    // KESİN yok
+        mockDbObjectStatus.mockResolvedValue("missing");   // KESİN yok
         mockDbDeleteArchive.mockResolvedValue(undefined);
         mockDbCreateArchive.mockResolvedValue({ id: "arch-new" });
         const r = await serviceAcceptQuoteToOrder(QID, "u1");
@@ -140,16 +140,30 @@ describe("serviceAcceptQuoteToOrder — arşiv recover/generate (V7-A5)", () => 
         expect(mockDbAccept).toHaveBeenCalled();
     });
 
-    // Advisor regresyon koruması: geçici .list() hatası "yok" SAYILMAMALI →
-    // confirmedMissing=false → SAĞLAM arşiv silinmez/yeniden üretilmez (fail-safe).
-    it("storage belirsiz (confirmedMissing=false) → arşiv KORUNUR (sil/üret YOK)", async () => {
+    // Bulgu #2 (advisor): obje status=unknown (geçici .list() hatası) → İKİ kural:
+    // (a) SAĞLAM arşivi YIKMA (sil/üret YOK — fail-safe), (b) BAŞARI DÖNME — accept
+    // fail-closed → archiveFailed (502, retryable). RPC çağrılmaz.
+    it("storage belirsiz (status=unknown) → arşiv KORUNUR + accept fail-closed (502)", async () => {
         mockDbGetQuote.mockResolvedValue(stub("sent"));
         mockDbGetArchive.mockResolvedValue({ id: "ok-1", file_path: "x/r1.html" });
-        mockDbConfirmedMissing.mockResolvedValue(false);   // hata/belirsiz → KESİN yok değil
+        mockDbObjectStatus.mockResolvedValue("unknown");   // list hatası
+        const r = await serviceAcceptQuoteToOrder(QID, "u1");
+        expect(mockDbDeleteArchive).not.toHaveBeenCalled();   // yıkma yok
+        expect(mockDbCreateArchive).not.toHaveBeenCalled();   // üret yok
+        expect(r.success).toBe(false);
+        expect(r.archiveFailed).toBe(true);                   // 502 fail-closed
+        expect(mockDbAccept).not.toHaveBeenCalled();
+    });
+
+    it("obje status=present → idempotent existing, accept başarılı", async () => {
+        mockDbGetQuote.mockResolvedValue(stub("sent"));
+        mockDbGetArchive.mockResolvedValue({ id: "ok-1", file_path: "x/r1.html" });
+        mockDbObjectStatus.mockResolvedValue("present");
         const r = await serviceAcceptQuoteToOrder(QID, "u1");
         expect(mockDbDeleteArchive).not.toHaveBeenCalled();
         expect(mockDbCreateArchive).not.toHaveBeenCalled();
         expect(r.success).toBe(true);
+        expect(mockDbAccept).toHaveBeenCalled();
     });
 });
 

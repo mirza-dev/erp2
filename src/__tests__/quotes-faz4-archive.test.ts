@@ -14,7 +14,7 @@ const mockGetArchive = vi.fn();
 const mockCreateArchive = vi.fn();
 const mockGetSignedUrl = vi.fn();
 const mockObjectExists = vi.fn();
-const mockConfirmedMissing = vi.fn();
+const mockObjectStatus = vi.fn();
 const mockDeleteArchive = vi.fn();
 const mockGetCompany = vi.fn();
 
@@ -29,7 +29,7 @@ vi.mock("@/lib/supabase/quote-pdf-archives", () => ({
     dbCreateQuoteArchive: (...a: unknown[]) => mockCreateArchive(...a),
     dbGetArchiveSignedUrl: (...a: unknown[]) => mockGetSignedUrl(...a),
     dbArchiveObjectExists: (...a: unknown[]) => mockObjectExists(...a),
-    dbArchiveObjectConfirmedMissing: (...a: unknown[]) => mockConfirmedMissing(...a),
+    dbArchiveObjectStatus: (...a: unknown[]) => mockObjectStatus(...a),
     dbDeleteQuoteArchive: (...a: unknown[]) => mockDeleteArchive(...a),
 }));
 vi.mock("@/lib/supabase/company-settings", () => ({
@@ -68,11 +68,11 @@ const stubQuote = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-    [mockDbGetQuote, mockDbUpdateStatus, mockGetArchive, mockCreateArchive, mockGetSignedUrl, mockObjectExists, mockConfirmedMissing, mockDeleteArchive, mockGetCompany]
+    [mockDbGetQuote, mockDbUpdateStatus, mockGetArchive, mockCreateArchive, mockGetSignedUrl, mockObjectExists, mockObjectStatus, mockDeleteArchive, mockGetCompany]
         .forEach((m) => m.mockReset());
     mockDbUpdateStatus.mockResolvedValue(true);
     mockObjectExists.mockResolvedValue(true);       // GET route: varsayılan dosya var
-    mockConfirmedMissing.mockResolvedValue(false);  // service: varsayılan KESİN yok değil
+    mockObjectStatus.mockResolvedValue("present");  // service: varsayılan obje present
     mockDeleteArchive.mockResolvedValue(undefined);
     mockGetCompany.mockResolvedValue(null);
 });
@@ -84,15 +84,15 @@ describe("serviceArchiveQuotePdf", () => {
         mockGetArchive.mockResolvedValue({ id: "a1", file_path: "quotes/x/r1.html" });
         const r = await serviceArchiveQuotePdf(QID);
         expect(r).toMatchObject({ archived: true, existing: true, revisionNo: 1 });
-        expect(mockConfirmedMissing).toHaveBeenCalledWith("quotes/x/r1.html");
+        expect(mockObjectStatus).toHaveBeenCalledWith("quotes/x/r1.html");
         expect(mockDeleteArchive).not.toHaveBeenCalled();
         expect(mockCreateArchive).not.toHaveBeenCalled();
     });
 
-    it("Faz 6 P2 phantom: obje KESİN yok → stale sil + yeniden üret", async () => {
+    it("Faz 6 P2 phantom: obje status=missing → stale sil + yeniden üret", async () => {
         mockDbGetQuote.mockResolvedValue(stubQuote());
         mockGetArchive.mockResolvedValue({ id: "stale-1", file_path: "quotes/x/r1.html" });
-        mockConfirmedMissing.mockResolvedValue(true);   // KESİN yok
+        mockObjectStatus.mockResolvedValue("missing");   // KESİN yok
         mockCreateArchive.mockResolvedValue({ id: "a-new" });
         const r = await serviceArchiveQuotePdf(QID, "user-1");
         expect(mockDeleteArchive).toHaveBeenCalledWith("stale-1", "quotes/x/r1.html");
@@ -100,14 +100,13 @@ describe("serviceArchiveQuotePdf", () => {
         expect(r).toMatchObject({ archived: true, existing: false, revisionNo: 1 });
     });
 
-    it("Faz 6 P2 fail-safe: storage belirsiz (confirmedMissing=false) → arşiv KORUNUR", async () => {
+    it("Faz 6 #2 fail-safe+fail-closed: status=unknown → arşiv KORUNUR + throw", async () => {
         mockDbGetQuote.mockResolvedValue(stubQuote());
         mockGetArchive.mockResolvedValue({ id: "ok-1", file_path: "quotes/x/r1.html" });
-        mockConfirmedMissing.mockResolvedValue(false);  // geçici .list() hatası → KESİN yok DEĞİL
-        const r = await serviceArchiveQuotePdf(QID);
-        expect(mockDeleteArchive).not.toHaveBeenCalled();
-        expect(mockCreateArchive).not.toHaveBeenCalled();
-        expect(r).toMatchObject({ archived: true, existing: true, revisionNo: 1 });
+        mockObjectStatus.mockResolvedValue("unknown");  // geçici .list() hatası
+        await expect(serviceArchiveQuotePdf(QID)).rejects.toThrow(/doğrulanamadı/);
+        expect(mockDeleteArchive).not.toHaveBeenCalled();  // yıkma yok (fail-safe)
+        expect(mockCreateArchive).not.toHaveBeenCalled();  // üret yok (fail-closed)
     });
 
     it("arşiv YOKSA üretir: dbCreateQuoteArchive doğru argümanlarla (sha256 hash)", async () => {
@@ -145,13 +144,26 @@ describe("serviceArchiveQuotePdf", () => {
         expect(mockCreateArchive).toHaveBeenCalledWith(expect.objectContaining({ revisionNo: 2 }));
     });
 
-    it("concurrency: create UNIQUE ihlali → re-read existing → idempotent (throw etmez)", async () => {
+    it("concurrency: create UNIQUE ihlali → re-read existing + OBJE present → idempotent", async () => {
         mockDbGetQuote.mockResolvedValue(stubQuote());
         // precheck null (yarış kaybedilmeden önce), create fail, re-read'de kazanan satır
-        mockGetArchive.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "a-winner" });
+        mockGetArchive.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "a-winner", file_path: "quotes/x/r1.html" });
         mockCreateArchive.mockRejectedValue(Object.assign(new Error("duplicate key"), { code: "23505" }));
+        mockObjectStatus.mockResolvedValue("present");   // kazanan upload'ı bitirmiş
         const r = await serviceArchiveQuotePdf(QID);
         expect(r).toMatchObject({ archived: true, existing: true, revisionNo: 1 });
+    });
+
+    // Bulgu #1 (P2): re-read'de satır VAR ama OBJE present DEĞİL (kazanan henüz
+    // upload etmedi / upload fail edip silmek üzere) → başarı DÖNME, throw (accept
+    // 502 → retry, self-heal). Aksi halde accept arşivsiz referansa kayardı.
+    it("concurrency: create fail + re-read satır var ama obje missing → throw (başarı dönmez)", async () => {
+        mockDbGetQuote.mockResolvedValue(stubQuote());
+        mockGetArchive.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "a-winner", file_path: "quotes/x/r1.html" });
+        mockCreateArchive.mockRejectedValue(Object.assign(new Error("duplicate key"), { code: "23505" }));
+        mockObjectStatus.mockResolvedValue("missing");   // kazanan henüz/hiç upload etmedi
+        await expect(serviceArchiveQuotePdf(QID)).rejects.toThrow(/duplicate key/);
+        expect(mockCreateArchive).toHaveBeenCalledTimes(1);  // yeniden üretmeye çalışmaz (UNIQUE slot dolu)
     });
 
     it("concurrency: create fail + re-read hâlâ null (gerçek hata) → rethrow", async () => {

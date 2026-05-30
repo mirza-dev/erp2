@@ -5,6 +5,20 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 6 Bulgular 2. tur — 5 bulgu**, 4043 test, COMMIT+PUSH BEKLİYOR + 077/078 APPLY BEKLİYOR [078])
+
+**"Önce doğrula sonra düzelt" — 5 bulgu (2×P2 + 1×P2/P3 + 2×P3), hepsi kod karşısında doğrulandı:**
+- **#1 (P2) Arşiv create-race obje doğrulamadan başarı dönüyordu:** `serviceArchiveQuotePdf` create-catch'inde UNIQUE 23505 → re-read → satır görünce direkt success dönüyordu. Kazanan istek satırı insert edip henüz upload etmemiş/upload fail edip silmek üzere olabilir → accept arşivsiz/404'lü referansa kayar. **Fix:** catch'te satır + **OBJE present** birlikte doğrulanır; present değilse throw (accept 502→retry, self-heal). Yeniden ÜRETMEZ (kazananın satırı UNIQUE slot'u tutar → 23505 re-collide; advisor).
+- **#2 (P2/P3) Accept storage belirsizliğinde fail-open'dı:** `dbArchiveObjectConfirmedMissing` list hatasında false dönüyordu (yıkma açısından doğru) ama existing-row path'te false→success → "arşiv varlığını doğrulayamadık ama sipariş açıyoruz". RPC'nin 23514 guard'ı arşiv SATIRINA bakar, OBJEYE erişemez → bu, "dosya gerçekten var mı" invariant'ının TEK uygulama noktası. **Karar (advisor: tek doğru cevap, AskUserQuestion yok): accept fail-closed.** Üç-durumlu `dbArchiveObjectStatus` (present|missing|unknown): present→ok, missing→sil+yeniden üret, **unknown→throw** (accept 502 retryable; send hook archiveWarning'e indirir non-fatal). Yıkma yalnız missing (sağlam arşiv korunur — advisor'ın önceki fail-safe kararı). `dbArchiveObjectConfirmedMissing` kaldırıldı (tri-state'e taşındı); `dbArchiveObjectExists` (GET route lenient) tri-state'ten türer.
+- **#3 (P3) Order detail arşiv PDF linki yoktu:** `quotePdfArchiveId` mapper'da taşınıyor ama UI kullanmıyordu. **Fix:** `orders/[id]/page.tsx` `quotePdfArchiveId` varsa "Arşivlenmiş Teklif → 📄 Belgeyi Aç" butonu → `GET /api/quotes/{quoteId}/archive` signed URL → window.open (`handleViewArchive` reuse; demo OK read-only).
+- **#4 (P3) Doc drift:** `dddb1f9` push edildi ama MEMORY.md/project_quotes.md/CLAUDE.md/current_focus.md:27 hâlâ "COMMIT+PUSH BEKLİYOR" + 4034 (gerçek 4040→şimdi 4043) diyordu → tümü hizalandı.
+- **#5 (P3) Lint iddiası:** kullanıcı `b17181e`'de (lint fix `dddb1f9` ÖNCESİ) review yaptığı için orders sayfasında 3 set-state-in-effect görmüş. HEAD'de `npm run lint` = 0; `b17181e` kapanışındaki "31/0" o commit için dürüsttü. Kod değişmez (açıklama).
+- **Test:** tri-state helper + create-race obje + unknown→throw (service+faz4-archive) + #3 UI regex. **4040 → 4043 yeşil** · tsc temiz · `npm run lint` 0 · build OK.
+- **⚠️ 078 hâlâ APPLY BEKLİYOR** (qty<=0 edge live'da 078 olmadan tam kapanmaz; bu deploy'la apply).
+- **DURUM: COMMIT+PUSH BEKLİYOR.** Faz 6 yakınsadı (advisor: bu turdan sonra kapalı). Faz 7 → 079-080.
+
+---
+
 ## Lint sinyali düzeltmesi — 2026-05-31 (npm run lint artık güvenilir + 0 sorun)
 
 - **Sorun:** `npm run lint` (`eslint .`) ~32.108 sorun üretiyordu; 32.077'si `.claude/worktrees/<x>/.next` (stale worktree build artifact'ı) kaynaklı sahte. Kök `.next/**` ignore yalnız kökü kapsıyordu. Gerçek `src` = 31.
@@ -24,7 +38,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **#5 (P3) Memory drift:** "077 APPLY BEKLİYOR" → kullanıcı 077'yi uyguladı → "077 ✅ + 078 BEKLİYOR" hizalandı.
 - **Test (+13):** phantom recover (service + faz4-archive + dbDeleteQuoteArchive helper 4) + order summary source-regex (2) + accept route 403 (1) + 078 migration drift-guard (4) + service 23514-throw/22003-msg güncel. **4021 → 4034 yeşil** · tsc temiz · build OK (`ƒ Proxy` + `/api/quotes/[id]/accept`) · eslint src 31/0.
 - **⚠️ Deploy sırası:** 078 apply edilene kadar legacy qty<=0 satır eski RPC'de 23514 → artık unmapped → 500 (nice 422 yerine). Düşük risk (legacy data). 078'i bu deploy'la apply et.
-- **DURUM: COMMIT+PUSH BEKLİYOR; 077 APPLY EDİLDİ ✅, 078 APPLY BEKLİYOR.** Faz 7 → migration 079-080 (note_templates; 078 bu fix'e gitti).
+- **DURUM: COMMIT+PUSH EDİLDİ (`b17181e`); 077 APPLY EDİLDİ ✅, 078 APPLY BEKLİYOR.** Faz 7 → migration 079-080 (note_templates; 078 bu fix'e gitti).
 
 ---
 
