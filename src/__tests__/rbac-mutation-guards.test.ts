@@ -41,6 +41,10 @@ import { POST as orderShip } from "@/app/api/orders/[id]/ship/route";
 import { POST as customersPost } from "@/app/api/customers/route";
 import { PATCH as customerPatch, DELETE as customerDelete } from "@/app/api/customers/[id]/route";
 import { POST as inventoryPost } from "@/app/api/inventory/movements/route";
+import { POST as productsPost } from "@/app/api/products/route";
+import { PATCH as productPatch, DELETE as productDelete } from "@/app/api/products/[id]/route";
+import { GET as vendorsGet, POST as vendorsPost } from "@/app/api/vendors/route";
+import { PATCH as vendorPatch, DELETE as vendorDelete } from "@/app/api/vendors/[id]/route";
 
 const params = (id = "00000000-0000-4000-8000-000000000001") => ({ params: Promise.resolve({ id }) });
 function postReq(url = "http://localhost/api/x", body: unknown = {}): NextRequest {
@@ -92,5 +96,30 @@ describe("R1 mutation guards — viewer → 403 (Batch A: sales domain)", () => 
     });
     it("inventory/movements POST → 403 (stock_adjust_*)", async () => {
         expect((await inventoryPost(postReq())).status).toBe(403);
+    });
+});
+
+describe("R1/R2 guards — viewer → 403 (Batch B1: products + vendors)", () => {
+    it("products POST → 403 (manage_product_master)", async () => {
+        expect((await productsPost(postReq())).status).toBe(403);
+    });
+    it("products [id] PATCH → 403 (manage_product_master)", async () => {
+        expect((await productPatch(patchReq({ name: "X" }), params())).status).toBe(403);
+    });
+    it("products [id] DELETE → 403 (manage_product_master)", async () => {
+        expect((await productDelete(delReq(), params())).status).toBe(403);
+    });
+    it("vendors GET → 403 (view_vendors — viewer'da yok)", async () => {
+        const req = new NextRequest("http://localhost/api/vendors", { method: "GET" });
+        expect((await vendorsGet(req)).status).toBe(403);
+    });
+    it("vendors POST → 403 (manage_vendors)", async () => {
+        expect((await vendorsPost(postReq())).status).toBe(403);
+    });
+    it("vendors [id] PATCH → 403 (manage_vendors)", async () => {
+        expect((await vendorPatch(patchReq(), params())).status).toBe(403);
+    });
+    it("vendors [id] DELETE → 403 (manage_vendors)", async () => {
+        expect((await vendorDelete(delReq(), params())).status).toBe(403);
     });
 });

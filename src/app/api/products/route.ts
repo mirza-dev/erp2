@@ -4,7 +4,7 @@ import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 import { computeOrderDeadline } from "@/lib/stock-utils";
-import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
 import { redactProductsForPerms } from "@/lib/auth/redact";
 import { unstable_cache, revalidateTag } from "next/cache";
 
@@ -108,6 +108,9 @@ export async function GET(req: NextRequest) {
 // POST /api/products
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_product_master");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as CreateProductInput;

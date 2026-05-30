@@ -11,6 +11,7 @@ import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
 import { dbExpireEntityRecommendations } from "@/lib/supabase/recommendations";
 import type { AlertType } from "@/lib/database.types";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 const PRODUCT_ALERT_TYPES: AlertType[] = [
@@ -58,6 +59,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_product_master");
+        if (guard) return guard;
+
         const { id } = await params;
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
@@ -81,6 +85,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(_req, "manage_product_master");
+        if (guard) return guard;
+
         const { id } = await params;
         await dbDeleteProduct(id);
         // Silinen ürünün aktif uyarılarını ve önerilerini hemen kapat

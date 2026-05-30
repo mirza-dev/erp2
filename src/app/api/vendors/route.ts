@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListVendors, dbCreateVendor } from "@/lib/supabase/vendors";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 const getCachedVendors = unstable_cache(
@@ -12,6 +13,9 @@ const getCachedVendors = unstable_cache(
 // GET /api/vendors?search=...&all=1
 export async function GET(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "view_vendors");
+        if (guard) return guard;
+
         const { searchParams } = new URL(req.url);
         const search = searchParams.get("search") ?? undefined;
         const showAll = searchParams.get("all") === "1";
@@ -34,6 +38,9 @@ export async function GET(req: NextRequest) {
 // POST /api/vendors
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_vendors");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
 

@@ -61,7 +61,9 @@
       "Bash(rg -n 'export async function GET' src/app/api/__TRACKED_VAR__/route.ts)",
       "Bash(rg -rln 'from \"@/app/api/__TRACKED_VAR__\"' src/__tests__)",
       "Bash(rg -n '^import|export async function \\(POST|PATCH|DELETE|PUT\\)' src/app/api/__TRACKED_VAR__.ts)",
-      "Bash(cd *)"
+      "Bash(cd *)",
+      "Bash(sed -n '1,6p' 'src/app/api/products/[id]/route.ts')",
+      "Bash(sed -n '1,6p' 'src/app/api/vendors/[id]/route.ts')"
     ],
     "additionalDirectories": [
       "/Users/mirzasaribiyik/Projects/erp2",

@@ -5,6 +5,7 @@ import {
     dbDeactivateVendor,
 } from "@/lib/supabase/vendors";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // GET /api/vendors/[id]
@@ -13,6 +14,9 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(_req, "view_vendors");
+        if (guard) return guard;
+
         const { id } = await params;
         const vendor = await dbGetVendorById(id);
         if (!vendor) return NextResponse.json({ error: "Tedarikçi bulunamadı." }, { status: 404 });
@@ -28,6 +32,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(req, "manage_vendors");
+        if (guard) return guard;
+
         const { id } = await params;
 
         const existing = await dbGetVendorById(id);
@@ -78,6 +85,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(_req, "manage_vendors");
+        if (guard) return guard;
+
         const { id } = await params;
 
         const existing = await dbGetVendorById(id);
