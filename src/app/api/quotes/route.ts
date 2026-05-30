@@ -5,6 +5,7 @@ import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { mapQuoteDetail, mapQuoteSummary } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { validateQuoteLineQuantities, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 const getCachedQuotes = unstable_cache(
     async (status?: string) => {
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
 // POST /api/quotes
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_quotes");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as CreateQuoteInput;

@@ -2,15 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { serviceCreateQuoteRevision } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // POST /api/quotes/[id]/revise
 // Faz 5: sent/rejected/expired teklifin düzenlenebilir kopyasını (revizyon) yaratır;
-// kaynağı 'revised' yapar. Güvenlik: auth + demo mode middleware tarafından korunur.
+// kaynağı 'revised' yapar. Güvenlik: auth + demo mode middleware + manage_quotes (RBAC R1).
 export async function POST(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(_req, "manage_quotes");
+        if (guard) return guard;
+
         const { id } = await params;
         const result = await serviceCreateQuoteRevision(id);
 

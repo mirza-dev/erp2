@@ -6,6 +6,7 @@ import {
     type RecordMovementInput,
 } from "@/lib/supabase/products";
 import { safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/inventory/movements?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
@@ -29,6 +30,9 @@ export async function GET(req: NextRequest) {
 // POST /api/inventory/movements — manual stock adjustment or receipt
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, ["stock_adjust_general", "stock_adjust_sales_context"]);
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as RecordMovementInput;

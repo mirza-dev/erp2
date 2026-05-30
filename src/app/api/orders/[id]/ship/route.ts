@@ -9,6 +9,7 @@ import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_FIELD_LEN = 100;
@@ -21,6 +22,9 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(req, "ship_sales_orders");
+        if (guard) return guard;
+
         const { id } = await params;
 
         const parsed = await safeParseJson(req);

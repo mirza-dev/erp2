@@ -10,7 +10,7 @@ import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
 import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
@@ -39,6 +39,9 @@ export async function GET(req: NextRequest) {
 // POST /api/orders — creates a new order (draft or pending_approval)
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_sales_orders");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as CreateOrderInput;

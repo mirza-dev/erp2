@@ -57,7 +57,11 @@
       "Bash(npx vitest *)",
       "Bash(git add *)",
       "Bash(git commit -q -m ' *)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(rg -n 'export async function GET' src/app/api/__TRACKED_VAR__/route.ts)",
+      "Bash(rg -rln 'from \"@/app/api/__TRACKED_VAR__\"' src/__tests__)",
+      "Bash(rg -n '^import|export async function \\(POST|PATCH|DELETE|PUT\\)' src/app/api/__TRACKED_VAR__.ts)",
+      "Bash(cd *)"
     ],
     "additionalDirectories": [
       "/Users/mirzasaribiyik/Projects/erp2",

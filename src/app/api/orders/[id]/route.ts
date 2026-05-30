@@ -9,7 +9,7 @@ import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
-import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
 import { redactOrderForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
@@ -40,6 +40,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_sales_orders");
+        if (guard) return guard;
+
         const { id } = await params;
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
@@ -102,6 +105,9 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    const guard = await requirePermission(req, "manage_sales_orders");
+    if (guard) return guard;
+
     const { id } = await params;
     const permanent = req.nextUrl.searchParams.get("permanent") === "1";
 

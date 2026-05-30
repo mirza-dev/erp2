@@ -3,15 +3,19 @@ import { revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { serviceConvertQuoteToOrder } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // POST /api/quotes/[id]/convert
 // Kabul edilmiş teklifi taslak siparişe dönüştürür.
-// Güvenlik: auth + demo mode middleware tarafından korunur.
+// Güvenlik: auth + demo mode middleware + manage_quotes (RBAC R1).
 export async function POST(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(_req, "manage_quotes");
+        if (guard) return guard;
+
         const { id } = await params;
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();

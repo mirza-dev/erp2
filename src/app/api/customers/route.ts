@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListCustomers, dbCreateCustomer, type CreateCustomerInput } from "@/lib/supabase/customers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
 import { redactCustomersForPerms } from "@/lib/auth/redact";
 import { unstable_cache, revalidateTag } from "next/cache";
 
@@ -26,6 +26,9 @@ export async function GET() {
 // POST /api/customers
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_customers");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as CreateCustomerInput;

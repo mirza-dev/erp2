@@ -7,6 +7,7 @@ import { mapQuoteDetail } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { validateQuoteLineQuantities, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 function getCachedQuote(id: string) {
     return unstable_cache(
@@ -76,6 +77,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_quotes");
+        if (guard) return guard;
+
         const { id } = await params;
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
@@ -134,6 +138,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(_req, "manage_quotes");
+        if (guard) return guard;
+
         const { id } = await params;
         const existing = await dbGetQuote(id);
         if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
