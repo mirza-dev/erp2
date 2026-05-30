@@ -11,7 +11,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **P1 (074 düzeltilmiş hali DB'de mi):** 074 `create or replace function` + `add column if not exists` + constraint DO-block → idempotent; orijinal 074 DB'ye HİÇ girmemişti (atomik-consume fix yerinde yapıldı) → kullanıcının apply ettiği dosya zaten düzeltilmiş gövde. Patch migration GEREKMEZ. DB onayı: `\df+ create_quote_revision` → atomik consume `update ... returning * into v_src` + INVOKER.
 - **P2 (audit):** Doğrulandı — 069/071/074'te sıfır `audit_log`; convert/create/update RPC'leri de yazmıyor → **modül-geneli mevcut borç**, revizyona özel regresyon değil. **Kullanıcı kararı: kabul + dokümante** (sadece revizyona eklemek yarım/tutarsız iz olur) → "quotes audit katmanı" gelecek faz (create+update+convert+revise birden). Bkz. project_quotes.md.
 - **P2 (RBAC):** Doğrulandı — hiçbir quotes route `requireRole` kullanmıyor; revise route convert'in birebir aynası (ikisi de proxy.ts auth+demo ile korunuyor) → tutarlı pattern. RBAC merge'de `POST /api/quotes/[id]/revise` permission matrix'e eklenecek. Bkz. project_rbac.md.
-- **P3 (memory drift):** 073+074 artık APPLY EDİLDİ; CLAUDE.md/current_focus/MEMORY.md/QUOTES_V2_PLAN.md hizalandı (commit `cb061c8`→`1d96211`).
+- **P3 (memory drift):** 073+074 (ve 072) artık APPLY EDİLDİ; CLAUDE.md/current_focus/MEMORY.md/QUOTES_V2_PLAN.md hizalandı (kod commit `1d96211`; bu doc hijyeni commit'i **`70c4a12`** → main). RBAC stragglers (MEMORY.md project_rbac ref + project_rbac.md) bilinçli hariç tutuldu — RBAC branch merge'ine ait.
 
 **Revizyon zinciri: sent/rejected/expired teklifin düzenlenebilir kopyası.** Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
