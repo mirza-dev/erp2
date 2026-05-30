@@ -4,12 +4,14 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Revizyon Zinciri (2026-05-30) — Faz 5'ten ertelenen büyük özellik, 3837 test, COMMIT+PUSH cb061c8 + migration 074 APPLY BEKLİYOR
+## Revizyon Zinciri (2026-05-30) — Faz 5'ten ertelenen büyük özellik, 3837 test, COMMIT+PUSH 1d96211 + migration 074 APPLY EDİLDİ + review pass
 
 **sent/rejected/expired teklifin düzenlenebilir kopyası (revizyon).** Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
+> **ERTELENEN — Quotes audit katmanı (modül-geneli, gelecek faz):** Doğrulandı (074 review): quotes modülünün HİÇBİR RPC'si (create/update/convert/revise) `audit_log` yazmıyor — 001 domain kuralı state-change için audit ister, quotes baştan beri bu borcu taşıyor. `create_quote_revision` (kaynağı `revised` yapar + yeni teklif yaratır) de yazmıyor; bu revizyona özel regresyon DEĞİL. Sadece revizyona audit eklemek yarım/tutarsız iz üretir (revize loglanır ama oluştur/dönüştür loglanmaz). **Kullanıcı kararı (2026-05-30): kabul + dokümante** → modül-geneli tek faz olarak ele alınmalı (create+update+convert+revise audit_log insert'leri birden, AuditSource enum uyumlu — V4-A1 deseni).
+
 - **Kullanıcı kararları:** revize edilebilir=sent+rejected+expired; kaynak→`revised` (terminal); numara=kök+suffix (-R2/-R3); revizyon valid_until=NULL (CRON re-expire + mid-edit 409 önlemi).
-- **Migration 074 (APPLY BEKLİYOR):** revision_no/root_quote_id + status CHECK +revised + `create_quote_revision` RPC (V7-A1 INVOKER, chain max+1, header+satır kopya). V2 flat chain (köke işaret). quote_number UNIQUE backstop.
+- **Migration 074 (APPLY EDİLDİ):** revision_no/root_quote_id + status CHECK +revised + `create_quote_revision` RPC (V7-A1 INVOKER, chain max+1, header+satır kopya). V2 flat chain (köke işaret). quote_number UNIQUE backstop.
 - **Review P1 fix (atomik consume):** ilk versiyon kaynağı kilitsiz okuyup sonda flip ediyordu → aynı kaynağa eşzamanlı çift revize mümkündü. Fix: `update quotes set status='revised' where id=p_source_id and status in (...) returning * into v_src` (eligibility+flip atomik; ikinci eşzamanlı → 42501) + kök FOR UPDATE (revision_no serialize). 074 apply edilmediği için yerinde düzeltildi.
 - **Review P3 UI hardening:** anyMutating (loading/converting/revising) → 3 buton grubu da disable.
 - **Service/route:** serviceCreateQuoteRevision (42501→invalidStatus/409, P0002→notFound/404); POST /api/quotes/[id]/revise → 201 {newQuoteId}; dbCreateQuoteRevision + dbListQuoteChain.
@@ -19,7 +21,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **Bilinen sınırlama:** tek revizyon silme kökü dead-end bırakır (nadir); revisedBy=en-yeni (bilinçli).
 - **Test:** quotes-revision (13, +071 omission regression) + quotes-revise-route (3). **3821→3837 yeşil** · tsc/build/lint temiz.
 - **Numbering:** revizyon=074 → Faz 4=075-076, Faz 6=077, Faz 7=078-079.
-- **DURUM: COMMIT+PUSH EDİLDİ** (`cb061c8` ilk + `1d96211` review fix [P1/P3]) **+ 074 (DÜZELTİLMİŞ) APPLY BEKLİYOR.** Sıradaki: düzeltilmiş 074 apply + smoke + Faz 4 (075-076 PDF arşiv).
+- **DURUM: COMMIT+PUSH EDİLDİ** (`cb061c8` ilk + `1d96211` review fix [P1/P3]) **+ 074 (DÜZELTİLMİŞ) APPLY EDİLDİ + review pass** (4 bulgu doğrulandı; audit borcu kabul+dokümante; RBAC merge notu; doc hijyeni). Sıradaki: manuel smoke + Faz 4 (075-076 PDF arşiv).
 
 ---
 ## Faz 5 infra dilim (2026-05-30) — numara katmanı (yıllık reset + configurable prefix), 3821 test, COMMIT+PUSH 942ee0d + migration 073 APPLY EDİLDİ

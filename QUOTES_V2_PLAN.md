@@ -311,7 +311,7 @@ UPDATE sales_orders SET item_count = v_inserted WHERE id = v_order_id;
 
 ## Migration Sırası (V7 final)
 
-V6 ile aynı (12 migration, 066-077); sadece içerik düzeltmeleri:
+V6 planı 12 migration (066-077) öngörüyordu; V7'de revizyon zinciri ayrı migration olunca 14'e çıktı (066-079). Sadece içerik düzeltmeleri:
 
 ```
 Faz 1 — DB foundation:
@@ -326,7 +326,7 @@ Faz 3 (UYGULANDI 2026-05-29; numbering güncellendi):
         ÇIKARILDI — iskontodan bağımsız, ayrı "ayarlar" fazına ertelendi)
   071 → RPC header discount + V3-A6 draft guard (V7-A1: SECURITY INVOKER)
   072 → quotes.discount_amount CHECK >= 0 (review P2 belt-and-suspenders;
-        <= subtotal route kuralı validateDiscount). [070/071 apply edildi; 072 apply bekliyor]
+        <= subtotal route kuralı validateDiscount). [070/071/072 apply edildi]
 
 Faz 5 infra dilim (UYGULANDI 2026-05-30):
   073 → numara katmanı: company_settings prefix/separator + quote_yearly_counters
@@ -337,7 +337,7 @@ Faz 5 infra dilim (UYGULANDI 2026-05-30):
 Revizyon zinciri (UYGULANDI 2026-05-30):
   074 → revision_no/root_quote_id kolonları + status CHECK +revised +
         create_quote_revision RPC (V7-A1 INVOKER, atomik source consume +
-        kök FOR UPDATE, kök+suffix -R, valid_until=NULL). [kod push edildi; APPLY BEKLİYOR]
+        kök FOR UPDATE, kök+suffix -R, valid_until=NULL). [APPLY EDİLDİ 2026-05-30]
 
 Faz 4 (eski 073-074 → 075-076):
   075 → quote_pdf_archives + RLS
@@ -394,11 +394,12 @@ V6 ile aynı migration sayısı (12); V7 sadece içerik düzeltmesi. Test sayıl
 |-----|-----------|-----------|
 | 1 | 066-069 | ~29 (V6'dan +2: V7-A1 SECURITY INVOKER source-regex, V7-A2 boş quote_date 200) |
 | 2 | YOK | ~22 (V7-A11 qty pozitif integer validator +1) |
-| 3 | 070-071 | ~17 |
-| 5 | 072 | ~35 |
-| 4 | 073-074 | ~32 |
-| 6 | 075 | ~41 (V7-A3 satır vat_rate, V7-A5 PDF recover/generate+502+RPC RAISE, V7-A7 tablo adı, V7-A1 INVOKER, V7-A8 master product + JOIN-drop NULL/ROW_COUNT, V7-A9 TS+mapper, V7-A10 item_count, V7-A11 qty integer RAISE, V7-A4 early-return no-marker + zorunlu alert) |
-| 7 | 076-077 | ~15 |
+| 3 | 070-072 | ~17 (072 = discount CHECK, review) |
+| 5 | 073 | ~6 (numara katmanı drift-guard) |
+| Rev | 074 | ~16 (revizyon zinciri service/route/UI/migration drift-guard) |
+| 4 | 075-076 | ~32 (PDF arşiv) |
+| 6 | 077 | ~41 (V7-A3 satır vat_rate, V7-A5 PDF recover/generate+502+RPC RAISE, V7-A7 tablo adı, V7-A1 INVOKER, V7-A8 master product + JOIN-drop NULL/ROW_COUNT, V7-A9 TS+mapper, V7-A10 item_count, V7-A11 qty integer RAISE, V7-A4 early-return no-marker + zorunlu alert) |
+| 7 | 078-079 | ~15 |
 
 **Toplam test:** ~192 (V6'dan +17; 2. okuma +4, 3. okuma +5: Faz 6 +4 + Faz 2 +1)
 
