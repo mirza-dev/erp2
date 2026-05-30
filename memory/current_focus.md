@@ -5,7 +5,23 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 6 Bulgular 3. tur — 3 P3 bulgu** + 2. tur, 4043 test, COMMIT+PUSH EDİLDİ + 077/078 APPLY EDİLDİ ✅)
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** — migration 079, 4094 test, COMMIT+PUSH BEKLİYOR · 079 APPLY BEKLİYOR)
+
+**Faz 7 = V7 master-plan'ın SON fazı. Not şablonları CRUD + QuoteForm picker.**
+- **080 KALICI DÜŞÜRÜLDÜ:** master-plan `079 → quote_line_items_sort_order (koşullu)` diyordu; doğrulandı ki `quote_line_items.position` zaten var (034:106), `quotes.ts:88` ona göre sıralıyor, accept RPC ona göre order'lıyor → yeni kolon koşulsuz gereksiz. Drag-reorder UX **ertelendi** (eklenirse `position` yeniden atama, şema değişikliği DEĞİL). → Faz 7 = **tek migration 079** (memory'deki "079-080" güncellendi: 080 yok).
+- **Migration 079** (`079_note_templates.sql`, kullanıcı apply eder): `note_templates` tablosu (kind `notes|delivery|payment|general` CHECK + title/body non-empty + sort_order + is_active soft-delete) + RLS ENABLE + updated_at trigger + kind/sort_order partial index + **PMT standart seed** (deterministik UUID a-prefix band, ON CONFLICT DO NOTHING): delivery "İSTANBUL PMT DEPO TESLİMİ"/"EXWORKS…", payment "%50 AVANS %50 SEVK"/"%100 PEŞİN"/"30 GÜN VADELİ", notes geçerlilik/KDV/teslim metinleri.
+- **TS/mapper:** `NoteTemplateKind`+`NoteTemplateRow` (database.types), `NoteTemplate` (mock-data), `mapNoteTemplate` (api-mappers).
+- **Helper** `note-templates.ts`: dbList(kind/includeInactive)/dbGet/dbCreate/dbUpdate/dbDeactivate (soft-delete, hard-delete YOK) + isValidNoteTemplateKind + audit_log + validation (title 120 / body 5000 / sort_order int≥0).
+- **Route** (erişim ayrımı LOAD-BEARING): `GET /api/note-templates` **requireRole YOK** (satış kullanıcısı picker'da okur) + `?kind=`; `POST/PATCH/DELETE` `requireRole(["admin"])`; DELETE soft-delete (404/409 zaten pasif).
+- **Settings sayfası** `/dashboard/settings/note-templates`: kind filtre sekmeleri + liste + create/edit modal + pasifleştir confirm; demo guard + a11y; Sidebar "Not Şablonları" linki.
+- **QuoteForm picker:** 3 textarea (Notlar/Teslimat/Ödeme) üstünde "+ Şablon ekle…" select; mount'ta `/api/note-templates` fetch (cancelled guard); `templatesForField` (kind+general filtre); `applyTemplateToField` (boş→doldur / dolu→append `\n`, sessiz üzerine-yazma YOK); readOnly'de picker gizli. Setter'lar zaten autoSave/savePreviewData dep array'inde → drift trap yok.
+- **Test (+51):** migration drift-guard (8) + picker pure+wiring (12) + helper/validation/mapper (16) + route (15). **4043→4094** · tsc temiz · npm run lint 0 · build OK (`ƒ /api/note-templates` + `[id]` + settings sayfası + `ƒ Proxy`).
+- **DURUM: COMMIT+PUSH BEKLİYOR · migration 079 APPLY BEKLİYOR.** Manuel smoke: admin Not Şablonları CRUD; seed görünür; teklif formunda 3 alan picker doğru kind filtreler (boş→doldur, dolu→append); non-draft picker kilitli; viewer POST→403.
+- **V7 master-plan TAMAMLANDI** (Faz 1-7 + tüm Bulgular turları). Ertelenen borçlar: Paraşüt iskonto aktarım, order_line_description, serviceConvert temizlik, quotes audit katmanı (modül-geneli), drag-reorder UX.
+
+---
+
+## Önceki — 2026-05-31 (Teklif V7 **Faz 6 Bulgular 3. tur — 3 P3 bulgu** + 2. tur, 4043 test, COMMIT+PUSH EDİLDİ + 077/078 APPLY EDİLDİ ✅)
 
 **3. tur (kullanıcı review, 3 P3 — convergence, hepsi kod karşısında doğrulandı):**
 - **#1 (P3) Doc drift:** `9a57d66` push edildi (HEAD=origin/main) ama CLAUDE.md/current_focus/project_quotes hâlâ "COMMIT+PUSH BEKLİYOR" + 078 "APPLY BEKLİYOR" diyordu → tümü "EDİLDİ" olarak hizalandı (078 kullanıcı tarafından uygulandı).

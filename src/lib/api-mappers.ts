@@ -20,6 +20,7 @@ import type {
   ProductTypeRow,
   ProductTypeFieldRow,
   ProductAttachmentRow,
+  NoteTemplateRow,
 } from "./database.types";
 
 import type {
@@ -36,6 +37,7 @@ import type {
   ProductType,
   ProductTypeField,
   ProductAttachment,
+  NoteTemplate,
 } from "./mock-data";
 
 // ── Product ───────────────────────────────────────────────
@@ -117,6 +119,19 @@ export function mapProductTypeField(row: ProductTypeFieldRow): ProductTypeField 
     placeholder: row.placeholder,
     helpText: row.help_text,
     sortOrder: row.sort_order,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function mapNoteTemplate(row: NoteTemplateRow): NoteTemplate {
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    body: row.body,
+    sortOrder: row.sort_order,
+    isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

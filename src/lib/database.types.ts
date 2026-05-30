@@ -54,8 +54,20 @@ export type ParasutInvoiceType = "e_invoice" | "e_archive" | "manual"
 export type ParasutEDocStatus = "running" | "done" | "error" | "skipped"
 export type ProductFieldType = "text" | "number" | "select" | "multiselect" | "date" | "boolean" | "longtext"
 export type ProductAttachmentKind = "image" | "datasheet" | "certificate" | "manual" | "drawing" | "other"
+export type NoteTemplateKind = "notes" | "delivery" | "payment" | "general"
 
 // ── Row Types ────────────────────────────────────────────────
+
+export interface NoteTemplateRow {
+    id: string
+    kind: NoteTemplateKind
+    title: string
+    body: string
+    sort_order: number
+    is_active: boolean
+    created_at: string
+    updated_at: string
+}
 
 export interface ProductTypeRow {
     id: string

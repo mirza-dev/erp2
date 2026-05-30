@@ -105,6 +105,19 @@ export interface ProductTypeWithFields extends ProductType {
 export type ProductAttachmentKind =
     | "image" | "datasheet" | "certificate" | "manual" | "drawing" | "other";
 
+export type NoteTemplateKind = "notes" | "delivery" | "payment" | "general";
+
+export interface NoteTemplate {
+    id: string;
+    kind: NoteTemplateKind;
+    title: string;
+    body: string;
+    sortOrder: number;
+    isActive: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface ProductAttachment {
     id: string;
     productId: string;

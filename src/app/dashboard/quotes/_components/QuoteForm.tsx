@@ -9,6 +9,8 @@ import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import type { QuoteStatus } from "@/lib/database.types";
 import { buildQuoteLineDescription } from "@/lib/quote-description-builder";
 import { findMissingHsLines } from "@/lib/quote-validation";
+import { applyTemplateToField, templatesForField } from "@/lib/quote-note-templates";
+import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -155,6 +157,10 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     const [sig1Title, setSig1Title] = useState("");
     const [sig2Title, setSig2Title] = useState("");
     const [sig3Title, setSig3Title] = useState("");
+
+    // Faz 7: not şablonları (picker). Read-only fetch — readOnly/demo'da da yüklenir,
+    // picker render'ı readOnly'de gizlenir.
+    const [noteTemplates, setNoteTemplates] = useState<NoteTemplate[]>([]);
 
     // Toast
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
@@ -379,6 +385,22 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    // Faz 7: not şablonlarını yükle (fetch-in-effect proje konvansiyonu; cancelled guard).
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await fetch("/api/note-templates");
+                if (!res.ok) return;
+                const data = (await res.json()) as NoteTemplate[];
+                if (!cancelled) setNoteTemplates(data);
+            } catch {
+                // sessiz: picker olmadan da form çalışır
+            }
+        })();
+        return () => { cancelled = true; };
     }, []);
 
     // ── Product autocomplete ──────────────────────────────────────────────────
@@ -745,6 +767,40 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         color: "var(--text-secondary)", textAlign: "right",
         border: "0.5px solid var(--border-secondary)",
     };
+
+    // Faz 7: not şablonu picker'ı. readOnly'de veya ilgili kind'da şablon yoksa
+    // render edilmez. Seçim → applyTemplateToField (boş→doldur, dolu→append).
+    function renderTemplatePicker(
+        fieldKind: Exclude<NoteTemplateKind, "general">,
+        current: string,
+        setter: (v: string) => void,
+    ) {
+        if (readOnly) return null;
+        const opts = templatesForField(noteTemplates, fieldKind);
+        if (opts.length === 0) return null;
+        return (
+            <select
+                className="q-no-print"
+                aria-label={`${fieldKind} için not şablonu ekle`}
+                value=""
+                onChange={(e) => {
+                    const tpl = opts.find((t) => t.id === e.target.value);
+                    if (tpl) setter(applyTemplateToField(current, tpl.body));
+                    e.target.value = "";
+                }}
+                style={{
+                    fontSize: "11px", padding: "3px 6px", borderRadius: "4px",
+                    border: "0.5px solid var(--border-secondary)", background: "var(--bg-tertiary)",
+                    color: "var(--text-secondary)", cursor: "pointer", marginBottom: "6px",
+                }}
+            >
+                <option value="">+ Şablon ekle…</option>
+                {opts.map((t) => (
+                    <option key={t.id} value={t.id}>{t.title}</option>
+                ))}
+            </select>
+        );
+    }
 
     // ── JSX ──────────────────────────────────────────────────────────────────
     return (
@@ -1294,6 +1350,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                             <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
                                 Delivery Method <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Teslimat Şekli</span>
                             </div>
+                            {renderTemplatePicker("delivery", deliveryMethod, setDeliveryMethod)}
                             <textarea
                                 className="q-notes"
                                 aria-label="Teslimat şekli"
@@ -1307,6 +1364,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                             <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
                                 Payment Method <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Ödeme Şekli</span>
                             </div>
+                            {renderTemplatePicker("payment", paymentMethod, setPaymentMethod)}
                             <textarea
                                 className="q-notes"
                                 aria-label="Ödeme şekli"
@@ -1323,6 +1381,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                         <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
                             Notes &amp; Terms <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Notlar</span>
                         </div>
+                        {renderTemplatePicker("notes", notes, setNotes)}
                         <textarea
                             className="q-notes"
                             aria-label="Notlar ve şartlar"
