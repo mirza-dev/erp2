@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListSyncLogs } from "@/lib/supabase/sync-log";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/parasut/logs?entity_type=sales_order&step=invoice&error_kind=validation&status=error&limit=50
 export async function GET(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "view_parasut");
+        if (guard) return guard;
+
         const { searchParams } = req.nextUrl;
         const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 500);
         const logs = await dbListSyncLogs({

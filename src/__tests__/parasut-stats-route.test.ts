@@ -4,6 +4,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// RBAC R2: parasut/stats GET'e view_parasut guard eklendi → allow.
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+    requireRole: vi.fn().mockResolvedValue(null),
+    requireAnyRole: vi.fn().mockResolvedValue(null),
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_parasut"])),
+    getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
+    getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
+}));
+
 // ─── Mock ─────────────────────────────────────────────────────────────────────
 
 const counts: Record<string, number> = {};

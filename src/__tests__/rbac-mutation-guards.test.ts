@@ -67,6 +67,9 @@ import { POST as productTypesPost } from "@/app/api/product-types/route";
 import { POST as importPost } from "@/app/api/import/route";
 import { PATCH as importBatchPatch, DELETE as importBatchDelete } from "@/app/api/import/[batchId]/route";
 import { PATCH as importDraftPatch } from "@/app/api/import/drafts/[id]/route";
+import { GET as parasutInvoicesGet } from "@/app/api/parasut/invoices/route";
+import { GET as parasutStatsGet } from "@/app/api/parasut/stats/route";
+import { GET as parasutLogsGet } from "@/app/api/parasut/logs/route";
 
 const params = (id = "00000000-0000-4000-8000-000000000001") => ({ params: Promise.resolve({ id }) });
 function postReq(url = "http://localhost/api/x", body: unknown = {}): NextRequest {
@@ -229,5 +232,20 @@ describe("R1 guards — viewer → 403 (Batch C: settings + parasut + product-ty
     });
     it("import drafts/[id] PATCH → 403 (manage_import)", async () => {
         expect((await importDraftPatch(patchReq({ status: "confirmed" }), params())).status).toBe(403);
+    });
+});
+
+describe("R2 read-guards — viewer → 403 (Batch E: parasut finansal GET)", () => {
+    function getReq(url: string): NextRequest {
+        return new NextRequest(url, { method: "GET" });
+    }
+    it("parasut/invoices GET → 403 (view_parasut — viewer'da yok)", async () => {
+        expect((await parasutInvoicesGet(getReq("http://localhost/api/parasut/invoices"))).status).toBe(403);
+    });
+    it("parasut/stats GET → 403 (view_parasut)", async () => {
+        expect((await parasutStatsGet(getReq("http://localhost/api/parasut/stats"))).status).toBe(403);
+    });
+    it("parasut/logs GET → 403 (view_parasut)", async () => {
+        expect((await parasutLogsGet(getReq("http://localhost/api/parasut/logs"))).status).toBe(403);
     });
 });

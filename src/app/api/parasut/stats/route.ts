@@ -1,11 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { handleApiError } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/parasut/stats
 // Faz 11.4 — token durumu + step + error_kind dağılımları + aggregate counts
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "view_parasut");
+        if (guard) return guard;
+
         const supabase = createServiceClient();
 
         const [customersRes, syncedRes, pendingRes, inProgressRes, failedRes, blockedRes, distRes, tokenRes] = await Promise.all([
