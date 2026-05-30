@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import { DataProvider } from "@/lib/data-context";
 import { ToastProvider } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
+import ForbiddenBanner from "@/components/ui/ForbiddenBanner";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
 import { useRouter } from "next/navigation";
 
@@ -69,6 +70,9 @@ export default function DashboardLayout({
                                 </a>.
                             </DemoBanner>
                         )}
+                        <Suspense fallback={null}>
+                            <ForbiddenBanner />
+                        </Suspense>
                         {children}
                     </main>
                 </div>

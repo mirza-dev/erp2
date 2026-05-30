@@ -4,12 +4,61 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { createClient } from "@/lib/supabase/client";
+import { ROLES, ROLE_LABELS, type Role } from "@/lib/auth/permissions";
 
 interface User {
     id: string;
     email: string;
     created_at: string;
     last_sign_in_at: string | null;
+    roles: Role[];
+}
+
+// Atanabilir roller (viewer dahil; normalize backend'de viewer-dedup yapar)
+const ASSIGNABLE_ROLES = ROLES;
+
+function RoleCheckboxes({
+    selected,
+    onToggle,
+    disabled,
+}: {
+    selected: Role[];
+    onToggle: (role: Role) => void;
+    disabled?: boolean;
+}) {
+    return (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {ASSIGNABLE_ROLES.map((r) => {
+                const checked = selected.includes(r);
+                return (
+                    <label
+                        key={r}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            fontSize: "12px",
+                            color: "var(--text-secondary)",
+                            cursor: disabled ? "not-allowed" : "pointer",
+                            padding: "3px 8px",
+                            border: `0.5px solid ${checked ? "var(--accent-border)" : "var(--border-tertiary)"}`,
+                            background: checked ? "var(--accent-bg)" : "transparent",
+                            borderRadius: "6px",
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() => onToggle(r)}
+                            aria-label={`${ROLE_LABELS[r]} rolü`}
+                        />
+                        {ROLE_LABELS[r]}
+                    </label>
+                );
+            })}
+        </div>
+    );
 }
 
 const inputStyle: React.CSSProperties = {
@@ -51,9 +100,47 @@ export default function UsersPage() {
     const [showForm, setShowForm] = useState(false);
     const [newEmail, setNewEmail] = useState("");
     const [newPassword, setNewPassword] = useState("");
+    const [newRoles, setNewRoles] = useState<Role[]>(["viewer"]);
     const [submitting, setSubmitting] = useState(false);
     const [currentEmail, setCurrentEmail] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [editingRolesId, setEditingRolesId] = useState<string | null>(null);
+    const [editRolesDraft, setEditRolesDraft] = useState<Role[]>([]);
+    const [savingRoles, setSavingRoles] = useState(false);
+
+    const toggleNewRole = (r: Role) =>
+        setNewRoles(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+    const toggleEditRole = (r: Role) =>
+        setEditRolesDraft(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+
+    const startEditRoles = (user: User) => {
+        setEditingRolesId(user.id);
+        setEditRolesDraft(user.roles.length ? user.roles : ["viewer"]);
+    };
+
+    const handleSaveRoles = async (user: User) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setSavingRoles(true);
+        try {
+            const res = await fetch(`/api/admin/users/${user.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ roles: editRolesDraft }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                toast({ type: "success", message: "Roller güncellendi." });
+                setEditingRolesId(null);
+                await fetchUsers();
+            } else {
+                toast({ type: "error", message: data.error || "Roller güncellenemedi." });
+            }
+        } catch {
+            toast({ type: "error", message: "Beklenmeyen bir hata oluştu." });
+        } finally {
+            setSavingRoles(false);
+        }
+    };
 
     const fetchUsers = useCallback(async () => {
         setLoading(true);
@@ -89,13 +176,14 @@ export default function UsersPage() {
             const res = await fetch("/api/admin/users", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: newEmail, password: newPassword }),
+                body: JSON.stringify({ email: newEmail, password: newPassword, roles: newRoles }),
             });
             const data = await res.json();
             if (res.ok) {
                 toast({ type: "success", message: `Kullanıcı oluşturuldu: ${data.email}` });
                 setNewEmail("");
                 setNewPassword("");
+                setNewRoles(["viewer"]);
                 setShowForm(false);
                 await fetchUsers();
             } else {
@@ -207,6 +295,10 @@ export default function UsersPage() {
                         </label>
                     </div>
                     <div>
+                        <span style={labelStyle}>Roller</span>
+                        <RoleCheckboxes selected={newRoles} onToggle={toggleNewRole} disabled={isDemo} />
+                    </div>
+                    <div>
                         <button
                             type="submit"
                             disabled={submitting}
@@ -249,7 +341,7 @@ export default function UsersPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
                             <tr>
-                                {["E-posta", "Son Giriş", "Oluşturulma", ""].map((h) => (
+                                {["E-posta", "Roller", "Son Giriş", "Oluşturulma", ""].map((h) => (
                                     <th
                                         key={h}
                                         style={{
@@ -296,6 +388,74 @@ export default function UsersPage() {
                                                 >
                                                     siz
                                                 </span>
+                                            )}
+                                        </td>
+                                        <td
+                                            style={{
+                                                padding: "10px 14px",
+                                                fontSize: "12px",
+                                                color: "var(--text-secondary)",
+                                                borderBottom: "0.5px solid var(--border-tertiary)",
+                                                minWidth: "220px",
+                                            }}
+                                        >
+                                            {editingRolesId === user.id ? (
+                                                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                                    <RoleCheckboxes selected={editRolesDraft} onToggle={toggleEditRole} disabled={isDemo} />
+                                                    <div style={{ display: "flex", gap: "8px" }}>
+                                                        <button
+                                                            onClick={() => handleSaveRoles(user)}
+                                                            disabled={isDemo || savingRoles}
+                                                            style={{
+                                                                padding: "4px 12px", fontSize: "12px", color: "#fff",
+                                                                background: "var(--accent)", border: "none", borderRadius: "5px",
+                                                                cursor: isDemo || savingRoles ? "not-allowed" : "pointer",
+                                                                opacity: savingRoles ? 0.6 : 1,
+                                                            }}
+                                                        >
+                                                            {savingRoles ? "Kaydediliyor..." : "Kaydet"}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingRolesId(null)}
+                                                            style={{
+                                                                padding: "4px 12px", fontSize: "12px", color: "var(--text-secondary)",
+                                                                background: "transparent", border: "0.5px solid var(--border-tertiary)",
+                                                                borderRadius: "5px", cursor: "pointer",
+                                                            }}
+                                                        >
+                                                            İptal
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                                                    {user.roles.map((r) => (
+                                                        <span
+                                                            key={r}
+                                                            style={{
+                                                                fontSize: "11px", color: "var(--text-secondary)",
+                                                                background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)",
+                                                                padding: "1px 7px", borderRadius: "4px",
+                                                            }}
+                                                        >
+                                                            {ROLE_LABELS[r] ?? r}
+                                                        </span>
+                                                    ))}
+                                                    <button
+                                                        onClick={() => startEditRoles(user)}
+                                                        disabled={isDemo}
+                                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Rolleri düzenle"}
+                                                        aria-label={`${user.email} rollerini düzenle`}
+                                                        style={{
+                                                            fontSize: "11px", color: "var(--accent-text)",
+                                                            background: "transparent", border: "none",
+                                                            cursor: isDemo ? "not-allowed" : "pointer", padding: "1px 4px",
+                                                            opacity: isDemo ? 0.5 : 1, textDecoration: "underline",
+                                                        }}
+                                                    >
+                                                        Düzenle
+                                                    </button>
+                                                </div>
                                             )}
                                         </td>
                                         <td

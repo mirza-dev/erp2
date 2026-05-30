@@ -4,10 +4,10 @@
  * P1.1: role getCurrentUserRole `user.app_metadata.role` üzerinden okur.
  * `user_metadata` kullanıcı-yazılabilir; `app_metadata` sadece service_role ile yazılır.
  *
- * Covers:
+ * Covers (RBAC Faz 1 sonrası güncel):
  *   - app_metadata.role === "admin" → "admin"
- *   - app_metadata.role === "purchaser" → "purchaser"
- *   - app_metadata.role yok (auth'd user) → fallback "purchaser"
+ *   - app_metadata.role === "purchaser" → "purchasing" (legacy alias normalize)
+ *   - app_metadata.role yok (auth'd user) → fallback "viewer" (eski "purchaser" DEĞİL)
  *   - user null → "viewer"
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -22,7 +22,7 @@ vi.mock("@/lib/supabase/server", () => ({
     }),
 }));
 
-import { getCurrentUserRole } from "@/lib/auth/role-guard";
+import { getCurrentUserRole, requireRole } from "@/lib/auth/role-guard";
 import type { NextRequest } from "next/server";
 
 const fakeReq = {} as NextRequest;
@@ -40,26 +40,57 @@ describe("getCurrentUserRole — app_metadata read (P1.1)", () => {
         expect(role).toBe("admin");
     });
 
-    it("app_metadata.role === 'purchaser' → 'purchaser'", async () => {
+    it("app_metadata.role === 'purchaser' → 'purchasing' (legacy alias normalize)", async () => {
         mockGetUser.mockResolvedValue({
             data: { user: { id: "u-1", app_metadata: { role: "purchaser" }, user_metadata: {} } },
         });
         const role = await getCurrentUserRole(fakeReq);
-        expect(role).toBe("purchaser");
+        expect(role).toBe("purchasing");
     });
 
-    it("app_metadata.role yok (auth'd) → fallback 'purchaser'", async () => {
+    it("app_metadata.role yok (auth'd) → fallback 'viewer' (RBAC Faz 1: eski 'purchaser' default kaldırıldı)", async () => {
         mockGetUser.mockResolvedValue({
             data: { user: { id: "u-1", app_metadata: {}, user_metadata: { role: "admin" } } },
         });
-        // user_metadata.role='admin' OKUNMAMALI; sadece app_metadata bakılır → fallback purchaser
+        // user_metadata.role='admin' OKUNMAMALI; app_metadata boş + ADMIN_EMAILS yok → viewer
         const role = await getCurrentUserRole(fakeReq);
-        expect(role).toBe("purchaser");
+        expect(role).toBe("viewer");
     });
 
     it("user null (anon) → 'viewer'", async () => {
         mockGetUser.mockResolvedValue({ data: { user: null } });
         const role = await getCurrentUserRole(fakeReq);
         expect(role).toBe("viewer");
+    });
+});
+
+describe("requireRole — çoklu-rol kesişim (sıra-bağımsız, legacy normalize)", () => {
+    const setRoles = (roles: string[]) =>
+        mockGetUser.mockResolvedValue({ data: { user: { id: "u", email: "x@pmt.com", app_metadata: { roles } } } });
+
+    it("['sales','purchasing'] kullanıcı → requireRole(['admin','purchaser']) GEÇER (null)", async () => {
+        setRoles(["sales", "purchasing"]);
+        expect(await requireRole(fakeReq, ["admin", "purchaser"])).toBeNull();
+    });
+
+    it("sıra-bağımsız: ['purchasing','sales'] da GEÇER", async () => {
+        setRoles(["purchasing", "sales"]);
+        expect(await requireRole(fakeReq, ["admin", "purchaser"])).toBeNull();
+    });
+
+    it("['sales'] kullanıcı → requireRole(['admin','purchaser']) 403", async () => {
+        setRoles(["sales"]);
+        const res = await requireRole(fakeReq, ["admin", "purchaser"]);
+        expect(res?.status).toBe(403);
+    });
+
+    it("tek-rol ['purchasing'] → requireRole(['admin','purchaser']) GEÇER", async () => {
+        setRoles(["purchasing"]);
+        expect(await requireRole(fakeReq, ["admin", "purchaser"])).toBeNull();
+    });
+
+    it("admin → her guard'dan geçer", async () => {
+        setRoles(["admin"]);
+        expect(await requireRole(fakeReq, ["admin", "purchaser"])).toBeNull();
     });
 });
