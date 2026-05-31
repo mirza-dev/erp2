@@ -18,6 +18,12 @@ const mockObjectStatus = vi.fn();
 const mockDeleteArchive = vi.fn();
 const mockGetCompany = vi.fn();
 
+// Faz 8a: RBAC guard — varsayılan izinli (mevcut testler davranışı korur).
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+    requireRole: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("@/lib/supabase/quotes", () => ({
     dbGetQuote: (...a: unknown[]) => mockDbGetQuote(...a),
     dbUpdateQuoteStatus: (...a: unknown[]) => mockDbUpdateStatus(...a),

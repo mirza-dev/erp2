@@ -10,6 +10,12 @@ import { revalidateTag } from "next/cache";
 const mockDbListQuotes  = vi.fn();
 const mockDbCreateQuote = vi.fn();
 
+// Faz 8a: RBAC guard — varsayılan izinli (mevcut testler davranışı korur).
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+    requireRole: vi.fn().mockResolvedValue(null),
+}));
+
 vi.mock("@/lib/supabase/quotes", () => ({
     dbListQuotes:        (...args: unknown[]) => mockDbListQuotes(...args),
     dbCreateQuote:       (...args: unknown[]) => mockDbCreateQuote(...args),

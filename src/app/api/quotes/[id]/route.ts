@@ -7,6 +7,7 @@ import { mapQuoteDetail } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { validateQuoteLineQuantities, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 function getCachedQuote(id: string) {
     return unstable_cache(
@@ -75,6 +76,10 @@ export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    // Faz 8a: teklif güncelleme + durum geçişi = manage_quotes (admin+sales).
+    const guard = await requirePermission(req, "manage_quotes");
+    if (guard) return guard;
+
     try {
         const { id } = await params;
         const parsed = await safeParseJson(req);
@@ -140,9 +145,13 @@ export async function PATCH(
 
 // DELETE /api/quotes/[id]
 export async function DELETE(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
+    // Faz 8a: teklif silme = delete_quotes (admin+sales).
+    const guard = await requirePermission(req, "delete_quotes");
+    if (guard) return guard;
+
     try {
         const { id } = await params;
         const existing = await dbGetQuote(id);

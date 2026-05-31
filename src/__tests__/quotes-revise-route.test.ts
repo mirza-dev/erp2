@@ -6,6 +6,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
+// Faz 8a: RBAC guard — varsayılan izinli (mevcut testler davranışı korur).
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+    requireRole: vi.fn().mockResolvedValue(null),
+}));
+
 const mockService = vi.fn();
 vi.mock("@/lib/services/quote-service", () => ({
     serviceCreateQuoteRevision: (...a: unknown[]) => mockService(...a),
