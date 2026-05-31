@@ -1,12 +1,12 @@
 "use client";
 
-import { memo, useState, useMemo, useEffect } from "react";
+import { memo, useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
 import { requiredPermissionForPath } from "@/lib/auth/page-access";
-import type { Permission } from "@/lib/auth/permissions";
+import { usePermissions } from "@/lib/auth/use-permissions";
 
 interface NavItem {
     label: string;
@@ -31,25 +31,9 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
     const [isDemo] = useState(() => isDemoMode());
 
     // RBAC Faz 2 — permission'a göre menü filtresi (UX katmanı; gerçek koruma
-    // proxy.ts page-gate'te). null = henüz yüklenmedi → tüm item'lar gösterilir
-    // (yüklenince filtrelenir; server gate zaten erişimi engeller).
-    const [perms, setPerms] = useState<Set<Permission> | null>(null);
-    useEffect(() => {
-        let cancelled = false;
-        void (async () => {
-            try {
-                const res = await fetch("/api/auth/me");
-                if (!res.ok || cancelled) return;
-                const data = await res.json();
-                if (!cancelled && Array.isArray(data.permissions)) {
-                    setPerms(new Set<Permission>(data.permissions));
-                }
-            } catch {
-                // sessiz — perms null kalır, tüm item'lar gösterilir (server gate korur)
-            }
-        })();
-        return () => { cancelled = true; };
-    }, []);
+    // proxy.ts page-gate'te). Faz 7: ad-hoc fetch yerine merkezi PermissionProvider.
+    // perms === null = henüz yüklenmedi → tüm item'lar gösterilir (server gate korur).
+    const { perms } = usePermissions();
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });

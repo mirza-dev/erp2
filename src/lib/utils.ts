@@ -16,6 +16,20 @@ export function formatCurrency(
   }).format(amount);
 }
 
+/**
+ * RBAC Faz 7 — finansal değer maskeleme (KOZMETİK ikinci katman).
+ * Gerçek koruma API redaction'da (`src/lib/auth/redact.ts`); bu helper yalnız
+ * yetkisiz role için yanıltıcı "₺0,00" yerine "—" gösterir. `canView` permission
+ * tabanlı karar verir (null değere göre DEĞİL) → redact.ts ile aynı yetki sınıfı.
+ */
+export function maskCurrency(
+  amount: number,
+  currency: string = "TRY",
+  canView: boolean = true
+): string {
+  return canView ? formatCurrency(amount, currency) : "—";
+}
+
 export function formatDate(date: string | Date): string {
   return new Intl.DateTimeFormat("tr-TR", {
     day: "2-digit",

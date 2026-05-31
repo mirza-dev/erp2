@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { formatCurrency } from "@/lib/utils";
+import { maskCurrency } from "@/lib/utils";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import type { AgingCategory, AgingRow } from "@/lib/supabase/aging";
 
 // ── Badge config ──────────────────────────────────────────────
@@ -60,6 +61,7 @@ function fmtDate(iso: string | null): string {
 // ── Page ──────────────────────────────────────────────────────
 
 export default function AgingPage() {
+    const { canViewPurchaseCosts } = usePermissions();
     const [reportType, setReportType] = useState<ReportType>("manufactured");
     const [rowsMfg, setRowsMfg]       = useState<AgingRow[]>([]);
     const [rowsCom, setRowsCom]       = useState<AgingRow[]>([]);
@@ -106,7 +108,7 @@ export default function AgingPage() {
     const CURRENCY_ORDER = ["EUR", "TRY", "USD"];
     const capitalByCurrency = new Map<string, number>();
     for (const r of rows) {
-        capitalByCurrency.set(r.currency, (capitalByCurrency.get(r.currency) ?? 0) + r.boundCapital);
+        capitalByCurrency.set(r.currency, (capitalByCurrency.get(r.currency) ?? 0) + (r.boundCapital ?? 0));
     }
     const capitalEntries = [...capitalByCurrency.entries()].sort(([a], [b]) => {
         const ai = CURRENCY_ORDER.indexOf(a), bi = CURRENCY_ORDER.indexOf(b);
@@ -199,9 +201,9 @@ export default function AgingPage() {
                     borderRadius: "8px",
                 }}>
                     <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.2 }}>
-                        {loading ? "—" : capitalEntries.length === 0
+                        {loading || !canViewPurchaseCosts ? "—" : capitalEntries.length === 0
                             ? "—"
-                            : capitalEntries.map(([cur, total]) => formatCurrency(total, cur)).join(" · ")}
+                            : capitalEntries.map(([cur, total]) => maskCurrency(total, cur, true)).join(" · ")}
                     </div>
                     <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
                         Bağlanan Sermaye
@@ -364,8 +366,8 @@ export default function AgingPage() {
                                         <td style={{ padding: "8px 12px", textAlign: "right", color: "var(--text-secondary)" }}>
                                             {row.onHand} {row.unit}
                                         </td>
-                                        <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: row.boundCapital > 0 ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-                                            {formatCurrency(row.boundCapital, row.currency)}
+                                        <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: (row.boundCapital ?? 0) > 0 ? "var(--text-primary)" : "var(--text-tertiary)" }}>
+                                            {maskCurrency(row.boundCapital ?? 0, row.currency, canViewPurchaseCosts)}
                                         </td>
                                         <td style={{ padding: "8px 12px", textAlign: "right", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
                                             {fmtDate(date5)}

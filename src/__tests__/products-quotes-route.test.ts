@@ -16,6 +16,12 @@ vi.mock("@/lib/supabase/products", () => ({
     dbLookupUserEmails: (...args: unknown[]) => mockDbLookupUserEmails(...args),
 }));
 
+// RBAC Faz 7: route unitPrice'ı view_sales_prices ile redakte eder. Mevcut testler
+// tam yetkili kullanıcı varsayar (unitPrice görünür). Redaction: aging-quotes-redaction.test.ts.
+vi.mock("@/lib/auth/role-guard", () => ({
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_sales_prices"])),
+}));
+
 import { GET } from "@/app/api/products/[id]/quotes/route";
 import type { QuotedBreakdownRow } from "@/lib/supabase/products";
 

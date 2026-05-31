@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { maskCurrency, formatNumber } from "@/lib/utils";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapProduct } from "@/lib/api-mappers";
 import type { Product } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
@@ -94,6 +95,7 @@ export default function ProductsPage() {
     const router = useRouter();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { has, canViewSalesPrices } = usePermissions();
     const [mockProducts, setMockProducts] = useState<Product[]>([]);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
@@ -505,7 +507,9 @@ export default function ProductsPage() {
                             textDecoration: "none", whiteSpace: "nowrap",
                         }}
                     >Eskime Raporu →</Link>
-                    <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", productTypeId: "", attributes: {} }); setCreateTypeFields([]); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
+                    {has("manage_product_master") && (
+                        <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", productTypeId: "", attributes: {} }); setCreateTypeFields([]); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
+                    )}
                 </div>
             </div>
 
@@ -859,7 +863,7 @@ export default function ProductsPage() {
                                     </td>
                                     {!isMobile && (
                                         <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-secondary)" }}>
-                                            {product.price != null ? formatCurrency(product.price, product.currency) : "—"}
+                                            {product.price != null ? maskCurrency(product.price, product.currency, canViewSalesPrices) : "—"}
                                         </td>
                                     )}
                                     {!isMobile && (
@@ -871,7 +875,7 @@ export default function ProductsPage() {
                                         style={{ ...tdStyle, textAlign: "right", paddingRight: "12px" }}
                                         onClick={e => e.stopPropagation()}
                                     >
-                                        {confirmDeleteId === product.id ? (
+                                        {has("manage_product_master") && (confirmDeleteId === product.id ? (
                                             <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
                                                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Emin misin?</span>
                                                 <button
@@ -932,7 +936,7 @@ export default function ProductsPage() {
                                             >
                                                 Sil
                                             </button>
-                                        )}
+                                        ))}
                                     </td>
                                 </tr>
                             );

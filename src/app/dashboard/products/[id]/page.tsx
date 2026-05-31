@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency, maskCurrency, formatNumber } from "@/lib/utils";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapProduct } from "@/lib/api-mappers";
 import type { Product, ProductAttachment, ProductAttachmentKind } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
@@ -44,7 +45,7 @@ interface QuotedItem {
     customerId: string;
     customerName: string;
     quantity: number;
-    unitPrice: number;
+    unitPrice: number | null; // RBAC: view_sales_prices yoksa API null döner
     currency: string;
     commercialStatus: "draft" | "pending_approval";
     orderCreatedAt: string;
@@ -323,6 +324,7 @@ export default function ProductDetailPage() {
     const router = useRouter();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { canViewSalesPrices, canViewPurchaseCosts } = usePermissions();
 
     const productId = typeof params.id === "string" ? params.id : Array.isArray(params.id) ? params.id[0] : "";
 
@@ -1282,7 +1284,7 @@ export default function ProductDetailPage() {
                             <>
                                 <FieldView label="Tercihli Tedarikçi" value={product.preferredVendor} />
                                 <FieldView label="Tedarik Süresi (gün)" value={product.leadTimeDays ?? null} />
-                                <FieldView label="Maliyet Fiyatı" value={product.costPrice != null ? formatCurrency(product.costPrice, product.currency) : null} />
+                                <FieldView label="Maliyet Fiyatı" value={canViewPurchaseCosts && product.costPrice != null ? formatCurrency(product.costPrice, product.currency) : null} />
                                 <FieldView label="Para Birimi" value={product.currency} />
                             </>
                         )}
@@ -1311,7 +1313,7 @@ export default function ProductDetailPage() {
                                 </>
                             ) : (
                                 <>
-                                    <FieldView label="Satış Fiyatı" value={product.price != null ? formatCurrency(product.price, product.currency) : null} />
+                                    <FieldView label="Satış Fiyatı" value={canViewSalesPrices && product.price != null ? formatCurrency(product.price, product.currency) : null} />
                                     <FieldView label="Para Birimi" value={product.currency} />
                                     <FieldView label="Ürün Notları" value={product.productNotes} />
                                 </>
@@ -1344,7 +1346,7 @@ export default function ProductDetailPage() {
                                                 <td style={{ padding: "6px 8px", borderBottom: "0.5px solid var(--border-tertiary)" }}>{q.customerName}</td>
                                                 <td style={{ padding: "6px 8px", borderBottom: "0.5px solid var(--border-tertiary)", textAlign: "right" }}>{formatNumber(q.quantity)}</td>
                                                 <td style={{ padding: "6px 8px", borderBottom: "0.5px solid var(--border-tertiary)", textAlign: "right" }}>
-                                                    {formatCurrency(q.quantity * q.unitPrice, q.currency)}
+                                                    {maskCurrency(q.quantity * (q.unitPrice ?? 0), q.currency, canViewSalesPrices)}
                                                 </td>
                                             </tr>
                                         ))}

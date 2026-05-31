@@ -36,7 +36,7 @@ const FORM_SRC = readFileSync(
 
 describe("quotes/page.tsx — Bulgu 3 / P2-A: toplu silme yalnız silinebilir satır + başarılı id", () => {
     it("seçim yalnız silinebilir (draft) satırlarla sınırlı — deletablePageIds", () => {
-        expect(LIST_SRC).toMatch(/const deletablePageIds = pagedItems\.filter\(q => canDeleteQuote\(q\.status\)\)/);
+        expect(LIST_SRC).toMatch(/const deletablePageIds = canDeleteQuotes \? pagedItems\.filter\(q => canDeleteQuote\(q\.status\)\)/);
     });
 
     it("select-all üç helper'ı da deletablePageIds üzerinden çalışır (pageIds değil)", () => {
@@ -45,8 +45,8 @@ describe("quotes/page.tsx — Bulgu 3 / P2-A: toplu silme yalnız silinebilir sa
         expect(LIST_SRC).toMatch(/toggleAll\(deletablePageIds\)/);
     });
 
-    it("per-row checkbox yalnız deletable satırda render edilir", () => {
-        expect(LIST_SRC).toMatch(/\{deletable && \(/);
+    it("per-row checkbox yalnız deletable (+ RBAC Faz 7 delete yetkisi) satırda render edilir", () => {
+        expect(LIST_SRC).toMatch(/\{deletable && canDeleteQuotes && \(/);
     });
 
     it("handleBulkDelete yalnız başarılı id'leri local state'ten düşürür (pickSucceededIds)", () => {

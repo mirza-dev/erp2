@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { maskCurrency, formatDate } from "@/lib/utils";
 import type { Customer } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 
@@ -54,6 +55,7 @@ export default function CustomerDetailPanel({
     const { orders, updateCustomer } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { canViewSalesPrices, canViewFinancialSummary } = usePermissions();
     const [editMode, setEditMode] = useState(false);
     const [editSaved, setEditSaved] = useState(false);
     const [editSaving, setEditSaving] = useState(false);
@@ -312,7 +314,7 @@ export default function CustomerDetailPanel({
                             <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "10px 12px" }}>
                                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Toplam Ciro</div>
                                 <div style={{ fontSize: "16px", fontWeight: 500, color: "var(--success-text)" }}>
-                                    {totalRevenue > 0 ? formatCurrency(totalRevenue, customer.currency) : "—"}
+                                    {canViewFinancialSummary && totalRevenue > 0 ? maskCurrency(totalRevenue, customer.currency, true) : "—"}
                                 </div>
                             </div>
                         </div>
@@ -380,7 +382,7 @@ export default function CustomerDetailPanel({
                                             </div>
                                             <div style={{ textAlign: "right" }}>
                                                 <div style={{ fontSize: "12px", fontWeight: 500, color: "var(--success-text)" }}>
-                                                    {formatCurrency(order.grandTotal, order.currency)}
+                                                    {maskCurrency(order.grandTotal, order.currency, canViewSalesPrices)}
                                                 </div>
                                                 <div style={{ fontSize: "11px", color: STATUS_COLOR[order.commercial_status] ?? "var(--text-secondary)" }}>
                                                     {STATUS_LABEL[order.commercial_status] ?? order.commercial_status}

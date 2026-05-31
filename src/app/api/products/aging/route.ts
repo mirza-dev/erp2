@@ -7,6 +7,7 @@ import {
     pickMax,
     computeAgingCategoryFinished,
 } from "@/lib/supabase/aging";
+import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
 
 // GET /api/products/aging?type=manufactured|commercial|all
@@ -17,6 +18,12 @@ import { handleApiError } from "@/lib/api-error";
 export async function GET(req: NextRequest) {
     try {
         const type = req.nextUrl.searchParams.get("type") ?? "all";
+
+        // RBAC R3: boundCapital/costPrice purchase-financial; price sales-financial.
+        // Per-request redaction (cache yok zaten). Yetki yoksa null → UI "—" gösterir.
+        const perms = await getCurrentUserPermissions(req);
+        const canCost = perms.has("view_purchase_costs");
+        const canSales = perms.has("view_sales_prices");
 
         // DB-level filter: sadece on_hand > 0 olan aktif ürünler (idx_products_active_onhand)
         const products = await dbListProducts({ is_active: true, on_hand_gt: 0, pageSize: 10_000 });
@@ -61,7 +68,7 @@ export async function GET(req: NextRequest) {
                     category:           p.category,
                     unit:               p.unit,
                     onHand:             p.on_hand,
-                    price:              p.price ?? 0,
+                    price:              canSales ? (p.price ?? 0) : null,
                     currency:           p.currency,
                     productType:        p.product_type as "manufactured" | "commercial",
                     lastMovementDate:   lastMovement,
@@ -70,8 +77,8 @@ export async function GET(req: NextRequest) {
                     lastProductionDate: productionDate,
                     daysWaiting,
                     agingCategory,
-                    costPrice:          p.cost_price ?? null,
-                    boundCapital:       p.on_hand * (p.cost_price ?? p.price ?? 0),
+                    costPrice:          canCost ? (p.cost_price ?? null) : null,
+                    boundCapital:       canCost ? p.on_hand * (p.cost_price ?? p.price ?? 0) : null,
                 };
             });
 

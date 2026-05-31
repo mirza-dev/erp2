@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import { DataProvider } from "@/lib/data-context";
+import { PermissionProvider } from "@/lib/auth/use-permissions";
 import { ToastProvider } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import ForbiddenBanner from "@/components/ui/ForbiddenBanner";
@@ -29,6 +30,7 @@ export default function DashboardLayout({
 
     return (
         <DataProvider>
+            <PermissionProvider>
             <ToastProvider>
                 <div
                     className="dashboard-grid"
@@ -111,6 +113,7 @@ export default function DashboardLayout({
                     </>
                 )}
             </ToastProvider>
+            </PermissionProvider>
         </DataProvider>
     );
 }

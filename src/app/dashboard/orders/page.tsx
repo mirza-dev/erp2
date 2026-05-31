@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { maskCurrency, formatDate } from "@/lib/utils";
 import { useData, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapOrderSummary } from "@/lib/api-mappers";
 import type { Order } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
@@ -72,6 +73,7 @@ function OrdersList() {
     const searchParams = useSearchParams();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { has, canViewSalesPrices } = usePermissions();
     const { orders: contextOrders } = useData();
     const [mockOrders, setMockOrders] = useState<Order[]>(contextOrders);
     const contextInitRef = useRef(contextOrders.length > 0);
@@ -250,9 +252,11 @@ function OrdersList() {
                         </svg>
                         {refreshing ? "Yenileniyor…" : "Yenile"}
                     </button>
-                    <Link href="/dashboard/orders/new">
-                        <Button variant="primary">+ Yeni Sipariş</Button>
-                    </Link>
+                    {has("manage_sales_orders") && (
+                        <Link href="/dashboard/orders/new">
+                            <Button variant="primary">+ Yeni Sipariş</Button>
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -556,14 +560,14 @@ function OrdersList() {
                                             {order.itemCount}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
-                                            {formatCurrency(order.grandTotal, order.currency)}
+                                            {maskCurrency(order.grandTotal, order.currency, canViewSalesPrices)}
                                         </td>
                                         <td
                                             style={{ ...tdStyle, width: "64px", textAlign: "right", padding: "10px 8px" }}
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
-                                                {confirmId === order.id ? (
+                                                {has("delete_sales_orders") && (confirmId === order.id ? (
                                                     <button
                                                         onClick={(e) => handleDelete(e, order.id)}
                                                         disabled={deletingId === order.id}
@@ -595,7 +599,7 @@ function OrdersList() {
                                                                 stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
                                                         </svg>
                                                     </button>
-                                                )}
+                                                ))}
                                                 <span data-chevron="" style={{ opacity: 0, color: "var(--text-tertiary)" }}>
                                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                                         <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />

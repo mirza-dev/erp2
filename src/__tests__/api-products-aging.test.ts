@@ -27,6 +27,15 @@ vi.mock("@/lib/supabase/aging", async (importOriginal) => {
     };
 });
 
+// RBAC Faz 7: route artık getCurrentUserPermissions ile boundCapital/costPrice/price
+// redakte ediyor. Mevcut testler tam yetkili kullanıcı varsayar (değerler görünür).
+// Redaction davranışı ayrı test eder: aging-quotes-redaction.test.ts.
+vi.mock("@/lib/auth/role-guard", () => ({
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(
+        new Set(["view_purchase_costs", "view_sales_prices"]),
+    ),
+}));
+
 import { GET } from "@/app/api/products/aging/route";
 
 // ── Helpers ───────────────────────────────────────────────────

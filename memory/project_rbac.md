@@ -1,6 +1,6 @@
 ---
 name: project_rbac
-description: "Rol bazlı erişim (RBAC) — 6 rol, permission/page-gate/kullanıcı yönetimi/redaction/delete-policy; Faz 1-6 MAIN'DE TAM (Faz 4 redaction + Faz 6 delete dahil), yalnız Faz 7 (dashboard UI maskeleme) ertelendi"
+description: "Rol bazlı erişim (RBAC) — 6 rol, permission/page-gate/kullanıcı yönetimi/redaction/delete-policy/UI-maskeleme; Faz 1-7 TAM. UI maskeleme tamam; yalnız quote preview/print server-redaction (named) ertelendi"
 metadata: 
   node_type: memory
   type: project
@@ -39,14 +39,22 @@ ERP2 rol bazlı erişim sistemi. Kaynak plan: `role-based-access-plan.md` (kulla
 - **Kapsam dışı**: `delete_purchase_orders` tanımlı ama kullanılmıyor (PO iptal edilir, DELETE uç yok); products soft-delete (`is_active:false`, manage_product_master); attachments requireRole(admin/purchaser).
 - **Migration YOK** (`audit_log.actor text` 001'de mevcut). **Test**: +delete-audit.test.ts (10: snapshot→delete→audit sırası + actor/before_state + no-row no-op + DELETE-fail→throw+audit YAZILMAZ) + rbac-mutation-guards delete_* ayırt edicilik (5: manage_* tek başına→403) + rol→delete_* eşleme regresyon kilidi + 3 route testine getCurrentUserId mock. **4212 test · tsc temiz · lint 0 · build OK (ƒ Proxy).** Plan: `~/.claude/plans/piped-crunching-bubble.md`.
 
-- **KALAN (ayrı tur)**: parasut oauth/start+refresh hâlâ ADMIN_EMAILS env-gate (güvenli, policy modeli farklı); customers/orders redaction'a end-to-end diskriminatif test (opsiyonel); product-types purchasing→200 positive test; Faz 6 invoices/shipments 409 refinement (yukarıda). **Yalnız Faz 7 (dashboard kart maskeleme + null finansal `--` UI) ertelendi.**
+- **KALAN (ayrı tur)**: parasut oauth/start+refresh hâlâ ADMIN_EMAILS env-gate (güvenli, policy modeli farklı); customers/orders redaction'a end-to-end diskriminatif test (opsiyonel); product-types purchasing→200 positive test; Faz 6 invoices/shipments 409 refinement (yukarıda).
+
+**Faz 7 (dashboard & UI maskeleme — SON FAZ) TAMAMLANDI (2026-05-31, worktree `rbac-faz7-ui-masking`).** Kozmetik ikinci-katman maskeleme: yetkisiz role yanıltıcı "₺0,00" yerine "—". Gerçek koruma zaten API redaction'da (Faz 4) — bu faz UI'ı doğru gösterir + birincil mutasyon CTA'larını gizler.
+- **Mimari:** `api-mappers.ts`'e DOKUNULMADI (redakte null→0 mapper'da kalır); maskeleme **permission tabanlı** (null değere göre değil). `src/lib/auth/use-permissions.tsx` (`PermissionProvider` + `usePermissions()` — `/api/auth/me`'yi BİR KEZ fetch, Sidebar'ın ad-hoc fetch'i dedupe; `perms===null` iken `has()`→true, server gate korur). `src/lib/utils.ts` `maskCurrency(amount, currency, canView)` (false→"—"). Provider `dashboard/layout.tsx`'te DataProvider içine mount.
+- **Maskeleme (redact.ts ile AYNI yetki):** RecentOrders/orders list+detail/quotes list → `canViewSalesPrices`; products list+detail (price→sales, cost_price→cost); customers list + CustomerDetailPanel revenue → `canViewFinancialSummary` (per-order grandTotal→sales); products/aging boundCapital → `canViewPurchaseCosts`.
+- **Substrate honesty (advisor blocker):** 2 route Faz 7'de **server-side redaction kazandı** (önceden ham fiyat sızdırıyordu, kozmetik mask "tiyatro" olurdu): `GET /api/products/aging` (boundCapital/costPrice←view_purchase_costs, price←view_sales_prices) + `GET /api/products/[id]/quotes` (unitPrice←view_sales_prices). `?all=1` + quotes list zaten redakteydi (doğrulandı).
+- **Birincil CTA gating** (Faz 3 zaten 403 dönüyor, bu pür UX): Yeni Sipariş→`manage_sales_orders`, Yeni Teklif→`manage_quotes`, Yeni Müşteri→`manage_customers`, Yeni Ürün→`manage_product_master`, Yeni PO→`manage_purchase_orders` (accounting PO sayfasına erişir ama manage tutmaz→gizli), Yeni Tedarikçi→`manage_vendors`; Sil butonları `delete_*` (orders/customers/quotes). Purchase list/detail/suggested total-maskeleme ATLANDI (matris admin/purchasing/accounting → hepsi view_purchase_costs tutar → no-op).
+- **Test (+32):** mask-currency (pure), use-permissions (RTL fetch/loading/fallback), sidebar-permission-context (dedupe regression), aging-quotes-redaction (diskriminatif server redaction), faz7-ui-masking (source-lock mask+CTA). 3 mevcut test mock güncellendi (api-products-aging + products-quotes-route → getCurrentUserPermissions mock; quotes-ui-audit-fix → canDeleteQuotes regex). **4244 test yeşil · tsc temiz · lint 0 · build OK (`ƒ Proxy`).**
+- **KAPSAM DIŞI (named, sessiz değil):** quote canlı preview/print + PurchaseOrderDocument print kendi server fetch'lerini kullanır (route redaction bypass). PO print matris yalnız view_purchase_costs tutan roller → leak yok. Quote preview viewer için teorik gap (Mod A/localStorage + viewer manage_quotes yok → draft yaratamaz) → **server-side preview redaction ayrı follow-up** olarak ertelendi. Demo (=viewer) artık aging boundCapital + product-quotes widget'ında "—" görür (Faz 4 demo redaction'ıyla tutarlı).
 
 **ERTELENEN (Faz 3 zaten R1'e dahil edildi) — :**
 - Faz 3: 14 `requireRole` callsite → `requirePermission`; admin/parasut oauth permission map.
   - **ÇÖZÜLDÜ (2026-05-31):** Quotes route'ları (POST/PATCH/DELETE/revise) main'in **Faz 8a** turunda `requirePermission` ile guard'landı (POST/PATCH/revise→`manage_quotes`, DELETE→`delete_quotes`, GET→auth-only). Merge'de main'in bu versiyonu korundu. Eski not (route-level guard yoktu) artık geçersiz.
 - Faz 4: response redaction (`redactXForPermissions` — api-mappers/data-context/ürün/quote/order/PO/dashboard/parasut + PDF/preview). 3 veri sınıfı: sales-financial / purchase-financial / high-sensitivity. EN BÜYÜK + en riskli.
 - Faz 6: delete policy — **TAMAMLANDI** (yukarı bak; commit `5e0df84`). delete_* yetki bağlama + audit-after-success + mevcut 409'lar. invoices/shipments 409 refinement kaldı.
-- Faz 7: dashboard kart maskeleme — **TEK KALAN FAZ** (kart filtre + null finansal `--`/`Yetki gerekli` UI + buton gizle/disable).
+- Faz 7: dashboard & UI maskeleme — **TAMAMLANDI** (yukarı bak; worktree `rbac-faz7-ui-masking`). maskCurrency + PermissionProvider + CTA gating + 2 route server-redaction. **RBAC planının 8 fazı (1-7 + regresyon) kapandı.** Yalnız quote preview/print server-redaction named follow-up olarak kaldı.
 
 **Rollout (B2):** Faz 2 page-gate canlıya almadan ÖNCE mevcut gerçek kullanıcılara explicit rol ata (zero-admin bootstrap + ADMIN_EMAILS güvenlik ağı var ama yine de).
 **Doc:** CLAUDE.md "Mevcut Durum" + repo `memory/` BİLİNÇLİ güncellenmedi (paralel ajan o dosyaları düzenliyordu) — branch merge'inde güncellenecek.

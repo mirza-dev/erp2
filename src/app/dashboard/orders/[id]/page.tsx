@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, maskCurrency, formatDate } from "@/lib/utils";
 import { useData, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapOrderDetail } from "@/lib/api-mappers";
 import type { OrderDetail } from "@/lib/mock-data";
 import Button from "@/components/ui/Button";
@@ -88,6 +89,7 @@ export default function OrderDetailPage() {
     const { updateOrderStatus } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { canViewSalesPrices } = usePermissions();
     const [order, setOrder] = useState<OrderDetail | null>(null);
     const [orderLoading, setOrderLoading] = useState(true);
 
@@ -654,13 +656,13 @@ export default function OrderDetailPage() {
                                                 {line.quantity} {line.unit}
                                             </td>
                                             <td style={{ ...tdStyle, textAlign: "right" }}>
-                                                {formatCurrency(line.unitPrice, order.currency)}
+                                                {maskCurrency(line.unitPrice, order.currency, canViewSalesPrices)}
                                             </td>
                                             <td style={{ ...tdStyle, textAlign: "right", color: line.discountPct > 0 ? "var(--warning-text)" : "var(--text-tertiary)" }}>
                                                 {line.discountPct > 0 ? `%${line.discountPct}` : "—"}
                                             </td>
                                             <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>
-                                                {formatCurrency(line.lineTotal, order.currency)}
+                                                {maskCurrency(line.lineTotal, order.currency, canViewSalesPrices)}
                                             </td>
                                         </tr>
                                     ))}
@@ -690,13 +692,13 @@ export default function OrderDetailPage() {
                                     const discount = order.discountAmount ?? 0;
                                     const vatRate = order.vatRate ?? 20;
                                     const rows: { label: string; value: string }[] = [
-                                        { label: "Ara Toplam", value: formatCurrency(order.subtotal, order.currency) },
+                                        { label: "Ara Toplam", value: maskCurrency(order.subtotal, order.currency, canViewSalesPrices) },
                                     ];
                                     if (discount > 0) {
-                                        rows.push({ label: "İskonto", value: `−${formatCurrency(discount, order.currency)}` });
-                                        rows.push({ label: "KDV Matrahı", value: formatCurrency(order.subtotal - discount, order.currency) });
+                                        rows.push({ label: "İskonto", value: canViewSalesPrices ? `−${formatCurrency(discount, order.currency)}` : "—" });
+                                        rows.push({ label: "KDV Matrahı", value: maskCurrency(order.subtotal - discount, order.currency, canViewSalesPrices) });
                                     }
-                                    rows.push({ label: `KDV (%${vatRate})`, value: formatCurrency(order.vatTotal, order.currency) });
+                                    rows.push({ label: `KDV (%${vatRate})`, value: maskCurrency(order.vatTotal, order.currency, canViewSalesPrices) });
                                     return rows;
                                 })().map(row => (
                                     <div key={row.label} style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
@@ -716,7 +718,7 @@ export default function OrderDetailPage() {
                                 >
                                     <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>Genel Toplam</span>
                                     <span style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)" }}>
-                                        {formatCurrency(order.grandTotal, order.currency)}
+                                        {maskCurrency(order.grandTotal, order.currency, canViewSalesPrices)}
                                     </span>
                                 </div>
                             </div>

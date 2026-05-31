@@ -8,6 +8,7 @@ import RecentOrders from "@/components/dashboard/RecentOrders";
 import AIAlerts from "@/components/dashboard/AIAlerts";
 import AISummaryCard from "@/components/dashboard/AISummaryCard";
 import { useData } from "@/lib/data-context";
+import { usePermissions } from "@/lib/auth/use-permissions";
 
 const STATUS_OPTIONS = [
     { key: "", label: "Tümü" },
@@ -19,6 +20,8 @@ const STATUS_OPTIONS = [
 
 export default function DashboardPage() {
     const { products, refetchAll } = useData();
+    const { has } = usePermissions();
+    const canCreateOrder = has("manage_sales_orders");
     const [filterOpen, setFilterOpen] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -207,21 +210,23 @@ export default function DashboardPage() {
                         )}
                     </div>
 
-                    <Link href="/dashboard/orders/new">
-                        <button
-                            style={{
-                                fontSize: "12px",
-                                padding: "6px 14px",
-                                border: "0.5px solid var(--accent-border)",
-                                borderRadius: "6px",
-                                background: "var(--accent-bg)",
-                                color: "var(--accent-text)",
-                                cursor: "pointer",
-                            }}
-                        >
-                            + Yeni Sipariş
-                        </button>
-                    </Link>
+                    {canCreateOrder && (
+                        <Link href="/dashboard/orders/new">
+                            <button
+                                style={{
+                                    fontSize: "12px",
+                                    padding: "6px 14px",
+                                    border: "0.5px solid var(--accent-border)",
+                                    borderRadius: "6px",
+                                    background: "var(--accent-bg)",
+                                    color: "var(--accent-text)",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                + Yeni Sipariş
+                            </button>
+                        </Link>
+                    )}
                 </div>
             </div>
 

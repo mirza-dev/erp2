@@ -3,7 +3,8 @@
 import { memo } from "react";
 import { useData } from "@/lib/data-context";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/data-context";
-import { formatCurrency } from "@/lib/utils";
+import { maskCurrency } from "@/lib/utils";
+import { usePermissions } from "@/lib/auth/use-permissions";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",   cls: "badge-neutral" },
@@ -22,6 +23,7 @@ const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: s
 
 const RecentOrders = memo(function RecentOrders() {
     const { orders, loading } = useData();
+    const { canViewSalesPrices } = usePermissions();
 
     if (loading) {
         return (
@@ -107,7 +109,7 @@ const RecentOrders = memo(function RecentOrders() {
                         </div>
                         <div style={{ textAlign: "right" }}>
                             <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
-                                {formatCurrency(order.grandTotal, order.currency)}
+                                {maskCurrency(order.grandTotal, order.currency, canViewSalesPrices)}
                             </div>
                             {isShipped ? (
                                 <span className={`badge ${fulfillment.cls}`}>{fulfillment.label}</span>

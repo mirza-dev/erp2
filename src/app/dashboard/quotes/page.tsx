@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { maskCurrency, formatDate } from "@/lib/utils";
 import type { QuoteSummary } from "@/lib/mock-data";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import Button from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
@@ -63,6 +64,7 @@ function QuotesList() {
     const router = useRouter();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { has, canViewSalesPrices } = usePermissions();
     const [quotes, setQuotes] = useState<QuoteSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -140,7 +142,8 @@ function QuotesList() {
     // sınırlı — sent draft-only kilidi sonrası seçilip silinememe karışıklığını
     // önler; per-row delete affordance'ı (canDeleteQuote) ile tutarlı. Üç seçim
     // helper'ı da bu set üzerinden çalışır (hepsi pageIds.length>0 guard'lı).
-    const deletablePageIds = pagedItems.filter(q => canDeleteQuote(q.status)).map(q => q.id);
+    const canDeleteQuotes = has("delete_quotes");
+    const deletablePageIds = canDeleteQuotes ? pagedItems.filter(q => canDeleteQuote(q.status)).map(q => q.id) : [];
 
     const handleBulkDelete = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -213,9 +216,11 @@ function QuotesList() {
                         </svg>
                         {refreshing ? "Yenileniyor…" : "Yenile"}
                     </button>
-                    <Link href="/dashboard/quotes/new">
-                        <Button variant="primary">+ Yeni Teklif</Button>
-                    </Link>
+                    {has("manage_quotes") && (
+                        <Link href="/dashboard/quotes/new">
+                            <Button variant="primary">+ Yeni Teklif</Button>
+                        </Link>
+                    )}
                 </div>
             </div>
 
@@ -339,7 +344,7 @@ function QuotesList() {
             </div>
 
             {/* Bulk action bar */}
-            {selectedIds.size > 0 && (
+            {canDeleteQuotes && selectedIds.size > 0 && (
                 <div style={{
                     display: "flex", alignItems: "center", gap: "10px",
                     padding: "10px 14px",
@@ -389,15 +394,17 @@ function QuotesList() {
                     <thead>
                         <tr style={{ background: "var(--bg-secondary)" }}>
                             <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
-                                <input
-                                    type="checkbox"
-                                    checked={isPageAllSelected(deletablePageIds)}
-                                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(deletablePageIds); }}
-                                    onChange={() => toggleAll(deletablePageIds)}
-                                    onClick={e => e.stopPropagation()}
-                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                    aria-label="Sayfadaki tüm teklifleri seç"
-                                />
+                                {canDeleteQuotes && (
+                                    <input
+                                        type="checkbox"
+                                        checked={isPageAllSelected(deletablePageIds)}
+                                        ref={el => { if (el) el.indeterminate = isPageIndeterminate(deletablePageIds); }}
+                                        onChange={() => toggleAll(deletablePageIds)}
+                                        onClick={e => e.stopPropagation()}
+                                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                        aria-label="Sayfadaki tüm teklifleri seç"
+                                    />
+                                )}
                             </th>
                             <th style={thStyle}>Teklif No</th>
                             <th style={thStyle}>Müşteri</th>
@@ -449,7 +456,7 @@ function QuotesList() {
                                             onClick={e => e.stopPropagation()}
                                         >
                                             {/* Bulgu 3 / P2-A: yalnız silinebilir (draft) satırlar seçilebilir. */}
-                                            {deletable && (
+                                            {deletable && canDeleteQuotes && (
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedIds.has(q.id)}
@@ -494,14 +501,14 @@ function QuotesList() {
                                             {formatDate(q.createdAt)}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500, background: rowBg }}>
-                                            {formatCurrency(q.grandTotal, q.currency)}
+                                            {maskCurrency(q.grandTotal, q.currency, canViewSalesPrices)}
                                         </td>
                                         <td
                                             style={{ ...tdStyle, width: "64px", textAlign: "right", padding: "10px 8px", background: rowBg }}
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
-                                                {deletable && (
+                                                {deletable && canDeleteQuotes && (
                                                     confirmId === q.id ? (
                                                         <button
                                                             onClick={(e) => handleDelete(e, q.id)}

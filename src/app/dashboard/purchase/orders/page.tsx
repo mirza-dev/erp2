@@ -7,6 +7,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import type { PurchaseOrderRow, PurchaseOrderStatus, VendorRow } from "@/lib/database.types";
 
 const thStyle: React.CSSProperties = {
@@ -52,6 +53,7 @@ function formatCurrency(amount: number, currency: string): string {
 export default function PurchaseOrdersPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { has } = usePermissions();
     const [orders, setOrders] = useState<PurchaseOrderRow[]>([]);
     const [vendorMap, setVendorMap] = useState<Map<string, string>>(new Map());
     const [activeTab, setActiveTab] = useState<StatusFilter>("all");
@@ -143,21 +145,23 @@ export default function PurchaseOrdersPage() {
                         {filtered.length} sipariş
                     </p>
                 </div>
-                <Link
-                    href="/dashboard/purchase/orders/new"
-                    style={{
-                        padding: "8px 16px", fontSize: "13px",
-                        background: isDemo ? "var(--bg-tertiary)" : "var(--accent)",
-                        color: isDemo ? "var(--text-tertiary)" : "#fff",
-                        border: "none", borderRadius: "6px",
-                        cursor: isDemo ? "not-allowed" : "pointer",
-                        fontWeight: 500, textDecoration: "none", pointerEvents: isDemo ? "none" : "auto",
-                    }}
-                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                    aria-disabled={isDemo}
-                >
-                    + Yeni Sipariş
-                </Link>
+                {has("manage_purchase_orders") && (
+                    <Link
+                        href="/dashboard/purchase/orders/new"
+                        style={{
+                            padding: "8px 16px", fontSize: "13px",
+                            background: isDemo ? "var(--bg-tertiary)" : "var(--accent)",
+                            color: isDemo ? "var(--text-tertiary)" : "#fff",
+                            border: "none", borderRadius: "6px",
+                            cursor: isDemo ? "not-allowed" : "pointer",
+                            fontWeight: 500, textDecoration: "none", pointerEvents: isDemo ? "none" : "auto",
+                        }}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        aria-disabled={isDemo}
+                    >
+                        + Yeni Sipariş
+                    </Link>
+                )}
             </div>
 
             {/* Status tabs */}

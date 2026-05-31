@@ -6,6 +6,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import type { VendorRow } from "@/lib/database.types";
 
 // ── Styles ────────────────────────────────────────────────────
@@ -119,6 +120,7 @@ function formToPayload(form: FormState): Record<string, unknown> {
 export default function VendorsPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { has } = usePermissions();
 
     const [vendors, setVendors] = useState<VendorRow[]>([]);
     const [loading, setLoading] = useState(true);
@@ -295,23 +297,25 @@ export default function VendorsPage() {
                         {filtered.length} tedarikçi
                     </p>
                 </div>
-                <button
-                    onClick={openCreate}
-                    disabled={isDemo}
-                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                    style={{
-                        padding: "8px 16px",
-                        fontSize: "13px",
-                        background: isDemo ? "var(--bg-tertiary)" : "var(--accent)",
-                        color: isDemo ? "var(--text-tertiary)" : "#fff",
-                        border: "none",
-                        borderRadius: "6px",
-                        cursor: isDemo ? "not-allowed" : "pointer",
-                        fontWeight: 500,
-                    }}
-                >
-                    + Yeni Tedarikçi
-                </button>
+                {has("manage_vendors") && (
+                    <button
+                        onClick={openCreate}
+                        disabled={isDemo}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        style={{
+                            padding: "8px 16px",
+                            fontSize: "13px",
+                            background: isDemo ? "var(--bg-tertiary)" : "var(--accent)",
+                            color: isDemo ? "var(--text-tertiary)" : "#fff",
+                            border: "none",
+                            borderRadius: "6px",
+                            cursor: isDemo ? "not-allowed" : "pointer",
+                            fontWeight: 500,
+                        }}
+                    >
+                        + Yeni Tedarikçi
+                    </button>
+                )}
             </div>
 
             {/* Filters */}

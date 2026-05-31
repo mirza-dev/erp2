@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { formatCurrency } from "@/lib/utils";
+import { maskCurrency } from "@/lib/utils";
 import { type Customer } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import CustomerDetailPanel from "@/components/customers/CustomerDetailPanel";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -56,6 +57,7 @@ export default function CustomersPage() {
     const { customers: mockCustomers, addCustomer, deleteCustomer, loadError } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const { has, canViewFinancialSummary } = usePermissions();
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [search, setSearch] = useState("");
     const [activeFilter, setActiveFilter] = useState<"all" | "active" | "passive">("all");
@@ -182,9 +184,11 @@ export default function CustomersPage() {
                                 width: "220px",
                             }}
                         />
-                        <Button variant="primary" onClick={() => setShowAddModal(true)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                            + Yeni Müşteri
-                        </Button>
+                        {has("manage_customers") && (
+                            <Button variant="primary" onClick={() => setShowAddModal(true)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                + Yeni Müşteri
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -374,7 +378,7 @@ export default function CustomersPage() {
                                         {customer.totalOrders}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500, color: "var(--success-text)" }}>
-                                        {formatCurrency(customer.totalRevenue, customer.currency)}
+                                        {maskCurrency(customer.totalRevenue, customer.currency, canViewFinancialSummary)}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)", fontSize: "16px", paddingRight: "16px" }}>
                                         ›
@@ -383,7 +387,7 @@ export default function CustomersPage() {
                                         style={{ ...tdStyle, textAlign: "right", paddingRight: "12px" }}
                                         onClick={e => e.stopPropagation()}
                                     >
-                                        {confirmDeleteId === customer.id ? (
+                                        {has("delete_customers") && (confirmDeleteId === customer.id ? (
                                             <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
                                                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Kalıcı silinecek. Emin misin?</span>
                                                 <button
@@ -444,7 +448,7 @@ export default function CustomersPage() {
                                             >
                                                 Kalıcı Sil
                                             </button>
-                                        )}
+                                        ))}
                                     </td>
                                 </tr>
                             ))}

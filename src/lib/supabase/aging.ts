@@ -11,7 +11,7 @@ export interface AgingRow {
     category: string | null;
     unit: string;
     onHand: number;
-    price: number;
+    price: number | null;                // RBAC: view_sales_prices yoksa null
     currency: string;
     productType: "manufactured" | "commercial";
     lastMovementDate: string | null;         // ISO timestamptz, null = hiç hareket yok
@@ -20,8 +20,8 @@ export interface AgingRow {
     lastProductionDate: string | null;       // mamul: üretildiği tarih (production_entries)
     daysWaiting: number | null;          // null = no movement
     agingCategory: AgingCategory;
-    costPrice: number | null;            // maliyet fiyatı (null = girilmemiş)
-    boundCapital: number;                // on_hand * (cost_price ?? price)
+    costPrice: number | null;            // maliyet fiyatı (null = girilmemiş veya yetki yok)
+    boundCapital: number | null;         // on_hand * (cost_price ?? price); RBAC: view_purchase_costs yoksa null
 }
 
 // ── Pure helpers ─────────────────────────────────────────────
