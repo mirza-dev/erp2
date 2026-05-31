@@ -202,11 +202,17 @@ describe("send hook: draft→sent arşivi tetikler (non-fatal)", () => {
         errSpy.mockRestore();
     });
 
-    it("accepted geçişinde arşiv tetiklenmez (yalnız sent)", async () => {
+    // Arşiv hook'u yalnız target==="sent" dalında çalışır. accepted Faz 6'da /accept
+    // (RPC 077) atomik yoluna taşındı → QuoteTransition'dan çıkarıldı; bu testi geçerli
+    // bir non-sent geçişle (sent→rejected) yapıyoruz: success path'e ulaşır + arşiv
+    // tetiklenmediğini doğrular (eski accepted çağrısı invalid-transition dalına düşüp
+    // yanlış sebeple geçiyordu).
+    it("rejected geçişinde arşiv tetiklenmez (arşiv yalnız sent geçişinde)", async () => {
         mockDbGetQuote.mockResolvedValue(stubQuote({ status: "sent" }));
         mockGetArchive.mockResolvedValue(null);
         mockCreateArchive.mockResolvedValue({ id: "a1" });
-        await serviceTransitionQuote(QID, "accepted");
+        const r = await serviceTransitionQuote(QID, "rejected");
+        expect(r.success).toBe(true);
         expect(mockCreateArchive).not.toHaveBeenCalled();
     });
 });

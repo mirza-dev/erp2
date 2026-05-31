@@ -4,16 +4,26 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 8 — Ertelenen Borçlar Kapanışı (2026-05-31) — 5 alt-faz/5 commit, 4098 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY BEKLİYOR** — **V7 + tüm ertelenen borçlar TAMAMLANDI**
+## Faz 8 Bulgular 1. tur (2026-05-31) — Paraşüt reconcile retry-bypass + doc/P3 — 3 bulgu, 2 commit, 4215 test
+
+**"önce doğrula sonra düzelt" — 3 bulgu kod karşısında doğrulandı, üçü de geçerli.**
+- **P1/P2 (FİNANSAL, `f7fc9f8`):** Faz 8e reconciliation guard yalnız ana sync'teydi (`serviceSyncOrderToParasut`). Manuel invoice retry (`serviceRetryParasutStep`, step=invoice → `upsertInvoice` header iskontoyu `discount_value`'ya uygular) guard'sız claim alıp **sessiz yanlış fatura** üretebiliyordu (canlı ama `checkStepDeps("invoice")` shipment dep'i arkasında latent). **Fix (advisor):** `guardDiscountReconciliation` helper'ı çıkarıldı (inline blok birebir), her iki yolda claim ÖNCESİ; retry'da **`step==="invoice"` gating** (edoc'ta fatura zaten oluşmuş → strand etmemek). upsertInvoice'a GÖMÜLMEDİ (throw kontratı korundu). Test: invoice retry mismatch/subtotal=0 → claim YOK + alert (guard'a `parasut_shipment_document_id` ile honest reachability), discount=0 → claim çağrılır (no-regression).
+- **P2 (doc):** migration 080 APPLY EDİLDİ (kullanıcı onayı) → "BEKLİYOR" referansları hizalandı.
+- **P3 (kozmetik):** `convert/route.ts` "serviceConvertQuoteToOrder korunur" stale yorum (8b'de silindi) → tombstone netleşti; `quote-service.ts` üst yorum "sent→accepted" → accepted Faz 6'da /accept'e taşındı; `quotes-faz4-archive.test.ts:205` stale `accepted` çağrısı → `rejected` (geçerli non-sent geçiş, gerçek success path; eski accepted invalid-transition dalına düşüp yanlış sebeple geçiyordu — `src/__tests__` tsc-exclude olduğu için TS hatası vermiyordu).
+- **Doğrulama: 4215 test** · tsc temiz · lint 0 · build OK (`ƒ Proxy`).
+
+---
+
+## Faz 8 — Ertelenen Borçlar Kapanışı (2026-05-31) — 5 alt-faz/5 commit, 4098 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY EDİLDİ ✅** — **V7 + tüm ertelenen borçlar TAMAMLANDI**
 
 **Kullanıcı "ertelenenleri halledelim" → V7 fazları boyunca biriken bilinçli borçlar kapatıldı.** Kararlar: Paraşüt iskonto **orantılı per-satır yüzde** / sig rename **ATLA** / drag-reorder **ERTELE**. 5 bağımsız kalem, ayrı commit. Plan: `~/.claude/plans/clever-dancing-owl.md`. Advisor: audit RPC değil helper-seviyesi (migration elendi) + Paraşüt guard→reconciliation.
 
 - **8a — Quotes RBAC (`4935e88`, migration YOK):** accept precedent'i (requirePermission) yazma uçlarına: `POST /api/quotes` + `PATCH [id]` (update+transition) + `POST revise` → `manage_quotes`; `DELETE [id]` → `delete_quotes`. GET'ler **auth-only KALDI** (view_quotes geniş blast radius → ayrı pas). quotes-rbac.test.ts (5: viewer→403 + mutasyon helper çağrılmaz); 7 mevcut route testine role-guard mock (varsayılan izinli).
 - **8b — Convert ölü kod temizliği (`71a22cd`, migration YOK):** `serviceConvertQuoteToOrder` + `ConvertResult` kaldırıldı (çağrılmıyordu; yerini Faz 6 atomik accept aldı). 4 import temizlendi. **`dbFindOrderByQuoteId` KORUNDU** (quotes/[id] GET kullanıyor); **`/convert` 410 stub KALDI**. quote-convert-service.test.ts silindi; quotes-faz3 obsolete convert-block testi çıkarıldı.
 - **8c — Quotes audit katmanı (`034f8ea`, migration YOK):** **advisor: helper-seviyesi (RPC değil)** → RPC repro riski elendi. dbCreateQuote/dbUpdateQuote/dbCreateQuoteRevision → audit_log (quote_created/updated/revised, source ui, after_state, best-effort, **actor'sız**=codebase-tutarlı; trigger ayrı faz). quotes-audit.test.ts (3); faz4a mock'una audit chain.
-- **8d — order_line_description — Migration 080 (`4218d3e`, APPLY BEKLİYOR):** order_lines += description (nullable). accept RPC = **078 gövdesi BİREBİR + tek delta** (CREATE OR REPLACE, DROP yok): order_lines INSERT'e description + SELECT'e qli.description; master p.name/sku/unit KORUNDU. TS/mapper/order-detay-UI. Paraşüt fatura description'ı değişmedi. order-line-description.test.ts (6: tüm accept invariant source-assert + delta + mapper). İdempotent + ROLLBACK.
+- **8d — order_line_description — Migration 080 (`4218d3e`, APPLY EDİLDİ ✅):** order_lines += description (nullable). accept RPC = **078 gövdesi BİREBİR + tek delta** (CREATE OR REPLACE, DROP yok): order_lines INSERT'e description + SELECT'e qli.description; master p.name/sku/unit KORUNDU. TS/mapper/order-detay-UI. Paraşüt fatura description'ı değişmedi. order-line-description.test.ts (6: tüm accept invariant source-assert + delta + mapper). İdempotent + ROLLBACK.
 - **8e — Paraşüt iskonto orantılı (`4b9c938`, migration YOK):** Faz 6 V7-A4 blanket-guard → reconciliation. `computeHeaderDiscountPct`=discount/subtotal*100 → builder per-satır `line.discount_pct + headerPct` (order_lines MUTATE EDİLMEZ). `reconcileParasutDiscount`: orantılı toplam **kendi kodumuzda** (mock net_total iskonto yok sayıyor) vs grand_total tolerans (0.01×satır+0.01); aşım/subtotal=0 → claim öncesi early return + zorunlu sync_issue alert (throw değil), uyuşursa **fatura OLUŞUR**. parasut-discount-guard FLIP (pure 6 + integration 4).
-- **Doğrulama: 4098→4098 (8e builder drift-guard +2)** · tsc temiz · npm run lint 0 · build OK. **DURUM: 5 commit COMMIT+PUSH EDİLDİ · migration 080 APPLY BEKLİYOR (yalnız 8d).**
+- **Doğrulama: 4098→4098 (8e builder drift-guard +2)** · tsc temiz · npm run lint 0 · build OK. **DURUM: 5 commit COMMIT+PUSH EDİLDİ · migration 080 APPLY EDİLDİ ✅ (kullanıcı, 2026-05-31).**
 - **Kapsam dışı (kullanıcı kararı):** sig_* rename ATLA (kabul edilen isimlendirme); drag-reorder ERTELE. Kalan (quotes borcu DEĞİL): audit actor (trigger), GET view_quotes RBAC, Paraşüt Sandbox GATE.
 
 ---

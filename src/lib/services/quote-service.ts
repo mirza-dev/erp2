@@ -1,8 +1,9 @@
 /**
  * Quote Service — business logic layer for quote status lifecycle.
- * Transition map: draft→sent, sent→accepted|rejected.
- * Terminal states: accepted, rejected, expired (CRON-only).
- * Faz 6: accept → atomik serviceAcceptQuoteToOrder (RPC 077).
+ * serviceTransitionQuote geçişleri: draft→sent, sent→rejected.
+ * accepted Faz 6'da bu transition'dan çıkarıldı → atomik /accept yolu
+ * (serviceAcceptQuoteToOrder + RPC 077). Terminal: accepted, rejected,
+ * expired (CRON-only), revised (Faz 5).
  */
 
 import { createHash } from "crypto";
