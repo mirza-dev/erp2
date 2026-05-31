@@ -669,6 +669,14 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
         description:    string;
         product_id:     string;
     }> = [];
+    // Faz 8e: header iskonto → orantılı per-satır yüzde (tam precision; mock 2-ondalık
+    // zorlamıyor → drift minimize). order_lines.discount_pct quote-accept'te 0 olduğundan
+    // toplam = headerPct; ayrıca line.discount_pct varsa eklenir (compound-safe).
+    // serviceSyncOrderToParasut reconciliation'ı bunun grand_total ile tutarlılığını
+    // claim öncesi doğrular → sessiz yanlış fatura yok.
+    const headerDiscountPct = computeHeaderDiscountPct(
+        Number(order.discount_amount ?? 0), Number(order.subtotal ?? 0),
+    );
     for (const line of order.lines) {
         const product = await dbGetProductById(line.product_id);
         if (!product) {
@@ -685,7 +693,7 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
             unit_price:     line.unit_price,
             vat_rate:       line.vat_rate ?? 20,
             discount_type:  "percentage",
-            discount_value: line.discount_pct,
+            discount_value: Number(line.discount_pct ?? 0) + headerDiscountPct,
             description:    `${line.product_name} (${line.product_sku})`,
             product_id:     product.parasut_product_id,
             // warehouse: KASITLI OLARAK YOK — stok invariant
@@ -995,6 +1003,51 @@ export interface SyncOrderResult {
     reason?: string;
 }
 
+// ── Faz 8e: header iskonto → Paraşüt orantılı per-satır yüzde ─────────────
+// Order header discount_amount (KDV öncesi matrah; Türk fatura standardı, Faz 3)
+// faturaya orantılı bir per-satır yüzde olarak taşınır. order_lines MUTATE
+// EDİLMEZ (discount_pct=0 kalır) — yalnız Paraşüt payload'ında discount_value.
+
+interface ReconcileLine { quantity: number | string; unit_price: number | string; vat_rate?: number | string | null; discount_pct?: number | string | null; }
+interface ReconcileOrder { subtotal: number | string | null; discount_amount: number | string | null; grand_total: number | string | null; lines: ReconcileLine[]; }
+
+/** discount_amount / subtotal * 100 (tam precision). subtotal/discount ≤ 0 → 0. */
+export function computeHeaderDiscountPct(discountAmount: number, subtotal: number): number {
+    if (!(subtotal > 0) || !(discountAmount > 0)) return 0;
+    return (discountAmount / subtotal) * 100;
+}
+
+/**
+ * Orantılı pct uygulandığında Paraşüt'ün hesaplayacağı toplamı KENDİ kodumuzda
+ * yeniden kur (mock net_total iskontoyu yok sayıyor → mock'a güvenme) ve donmuş
+ * order.grand_total ile tolerans dahilinde karşılaştır. Guard'ın ruhu: tolerans
+ * aşılırsa (veya subtotal=0 & discount>0) sessiz yanlış fatura yerine blok.
+ */
+export function reconcileParasutDiscount(order: ReconcileOrder): {
+    ok: boolean; expected: number; grandTotal: number; tolerance: number; reason?: string;
+} {
+    const subtotal       = Number(order.subtotal ?? 0);
+    const discountAmount = Number(order.discount_amount ?? 0);
+    const grandTotal     = Number(order.grand_total ?? 0);
+    if (discountAmount > 0 && !(subtotal > 0)) {
+        return { ok: false, expected: NaN, grandTotal, tolerance: 0, reason: "subtotal_zero" };
+    }
+    const headerPct = computeHeaderDiscountPct(discountAmount, subtotal);
+    let expected = 0;
+    for (const l of order.lines) {
+        const qty   = Number(l.quantity);
+        const price = Number(l.unit_price);
+        const pct   = Number(l.discount_pct ?? 0) + headerPct;
+        const vat   = Number(l.vat_rate ?? 20);
+        const net   = qty * price * (1 - pct / 100);
+        expected += net * (1 + vat / 100);
+    }
+    expected = Math.round(expected * 100) / 100;
+    // Per-satır yuvarlama drift'i: satır başına ≤1 kuruş + 1 kuruş tampon.
+    const tolerance = 0.01 * order.lines.length + 0.01;
+    return { ok: Math.abs(expected - grandTotal) <= tolerance, expected, grandTotal, tolerance };
+}
+
 export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOrderResult> {
     if (!isParasutEnabled()) return { success: false, error: "Paraşüt entegrasyonu devre dışı." };
 
@@ -1010,28 +1063,35 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
         return { success: false, error: "Müşteri bilgisi eksik — Paraşüt sync için zorunlu." };
     }
 
-    // Faz 6 (V7-A4): header iskontolu sipariş Paraşüt'e SESSİZ yanlış toplamla
-    // GİTMEZ. discount_amount > 0 → claim'den (parasut_claim_sync) ÖNCE early return
-    // (throw DEĞİL → catch path'i + parasut_step/error/retry marker'ları + lease
-    // churn YOK) + ZORUNLU sync_issue alert (ship route fire-and-forget olduğu için
-    // tek görünür sinyal; opsiyonel değil). İskonto aktarım yöntemi (orantılı/ayrı
-    // satır) ayrı faz; burada yalnız sessiz finansal hata (ERP ≠ fatura) engellenir.
+    // Faz 8e (V7-A4 evrimi): header iskontolu sipariş artık Paraşüt'e GİDER —
+    // discount_amount orantılı per-satır yüzde olarak faturaya taşınır (builder'da
+    // discount_value). Ama guard'ın ruhu korunur: claim'den ÖNCE reconciliation —
+    // orantılı pct ile beklenen toplamı kendi kodumuzda kurup donmuş grand_total
+    // ile tolerans dahilinde karşılaştır. Tolerans aşılırsa (veya subtotal=0 &
+    // discount>0) sessiz yanlış fatura yerine early return + ZORUNLU sync_issue
+    // alert (throw DEĞİL → marker/lease churn yok). Tutarlıysa normal akış sürer.
     if (Number(order.discount_amount ?? 0) > 0) {
-        const msg = "Paraşüt iskonto aktarımı ayrı faz — fatura oluşturulmadı.";
-        try {
-            await dbCreateAlert({
-                type:        "sync_issue",
-                severity:    "warning",
-                title:       "İskontolu sipariş Paraşüt'e aktarılmadı",
-                description: `${order.order_number}: ${msg} (iskonto: ${order.discount_amount})`,
-                entity_type: "sales_order",
-                entity_id:   orderId,
-                source:      "system",
-            });
-        } catch (alertErr) {
-            console.error(JSON.stringify({ parasut_discount_alert_fail: String(alertErr), orderId }));
+        const recon = reconcileParasutDiscount(order);
+        if (!recon.ok) {
+            const msg = recon.reason === "subtotal_zero"
+                ? "Paraşüt iskonto aktarımı: subtotal sıfır, orantılı iskonto hesaplanamıyor — fatura oluşturulmadı."
+                : `Paraşüt iskonto aktarımı: orantılı toplam (${recon.expected}) sipariş toplamı (${recon.grandTotal}) ile uyuşmuyor (tolerans ${recon.tolerance.toFixed(2)}) — fatura oluşturulmadı.`;
+            try {
+                await dbCreateAlert({
+                    type:        "sync_issue",
+                    severity:    "warning",
+                    title:       "İskontolu sipariş Paraşüt'e aktarılamadı (reconcile)",
+                    description: `${order.order_number}: ${msg} (iskonto: ${order.discount_amount})`,
+                    entity_type: "sales_order",
+                    entity_id:   orderId,
+                    source:      "system",
+                });
+            } catch (alertErr) {
+                console.error(JSON.stringify({ parasut_discount_alert_fail: String(alertErr), orderId }));
+            }
+            return { success: false, skipped: true, reason: "discount_reconcile_failed", error: msg };
         }
-        return { success: false, skipped: true, reason: "discount_unsupported", error: msg };
+        // Reconcile OK → orantılı iskonto fatura builder'ında uygulanır.
     }
 
     const supabase = createServiceClient();
