@@ -4,7 +4,17 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 7 — Not Şablonları (note_templates) (2026-05-31) — migration 079, 4096 test, COMMIT+PUSH EDİLDİ (3551302 Faz 7 + Bulgular 1.tur) · 079 APPLY BEKLİYOR — **V7 master-plan TAMAMLANDI**
+## Faz 7 — Not Şablonları (note_templates) (2026-05-31) — migration 079, 4098 test, COMMIT+PUSH EDİLDİ (Faz 7 + Bulgular 1.+2.tur) · **079 APPLY EDİLDİ ✅** — **V7 master-plan TAMAMLANDI**
+
+**Bulgular 2. tur (kullanıcı review, P1 yok; 1 yeni P2 + 1 P3 fix + 3 zaten-düzeltilmiş doğrulama):**
+- **#1 (YENİ P2 FIX) Unsaved draft restore'da not/teslimat/ödeme kaybı:** `autoSave` `teklif_v3` draft key'ine yalnız `{currency,rows,descDirty,discount}` yazıyordu (`QuoteForm.tsx:494`); notes/deliveryMethod/paymentMethod sadece `teklif_v3_full`'da (preview için). Yeni teklif restore (`teklif_v3` okur, 272-304) bu 3 alanı yüklemiyordu → kullanıcı şablon seçip/yazıp kaydetmeden refresh veya "Formu Düzenle" (preview→/new) yapınca metin kayboluyordu. Faz 7'nin "hazır şablon + teklif özelinde düzenle" deneyimini doğrudan etkiliyordu. **Fix:** `teklif_v3` payload'a `notes/deliveryMethod/paymentMethod` eklendi + restore `setNotes/setDeliveryMethod/setPaymentMethod` (Faz 3 `discount` precedent'i, autoSave dep'leri zaten içeriyordu). **+2 drift-guard test** (autoSave payload + restore); 3 mevcut regex güncellendi (quotes-faz4b:75 `}` zorunluluğu kalktı, quotes-faz3:312 çok-satır, quotes-faz4a:237 pencere 2600→3100).
+- **#2 (P3 FIX) Settings liste tüm body'yi basıyordu:** `page.tsx` body max 5000 char pre-wrap → uzun şart metni ayar sayfasını şişiriyordu. **Fix:** `-webkit-line-clamp: 3` (display -webkit-box + box-orient vertical + overflow hidden) önizleme.
+- **#3-#5 (ZATEN DÜZELTİLDİ — `0b9398c` / Bulgular 1.tur):** Rapor P2 (DB hata→404 maskeleme), P3 (geçersiz ?kind→tüm liste), doc/plan migration drift'i **tekrar** gündeme getirdi. Bunlar 1. turda kapatılmıştı; kod karşısında yeniden doğrulandı: `note-templates.ts` maybeSingle (87/134/170), route `?kind` invalid→400 (24), QUOTES_V2_PLAN final numbering + historical SUPERSEDED markerlar mevcut. **Ek değişiklik gerekmedi** — rapor `0b9398c` öncesi snapshot'a dayanıyordu.
+- **#6 (P3 no-op, tekrar):** `[id]` GET inactive döndürüyor — tüketici yok + hassas değil → bırakıldı (1. tur kararı geçerli).
+- **Ek not (no-op):** audit insert error-kontrolsüz — mevcut pattern, Faz 7 regresyonu değil (1. turda da belirtildi).
+- **Doğrulama:** **4096→4098** · tsc temiz · npm run lint 0 · build OK. **079 kullanıcı tarafından APPLY EDİLDİ ✅.**
+
+---
 
 **Bulgular 1. tur (kullanıcı review, P1 yok; 2 fix + 3 double-check):**
 - **#1 (P2 FIX) DB hatası → 404 maskeleniyordu:** `dbGetNoteTemplate` + update/deactivate ön-okumaları `.single()` + `if(error||!data) return null` ile gerçek DB/RLS hatasını not-found'a düşürüyordu → route 500 yerine 404. **Fix:** `.maybeSingle()` + `if(error) throw` (not-found=null, gerçek hata=throw→500). +2 test (0 satır→null / permission denied→throw).
@@ -28,7 +38,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **Settings sayfası** `/dashboard/settings/note-templates`: `KIND_META` export + kind filtre sekmeleri (Tümü/Notlar/Teslimat/Ödeme/Genel) + liste (kind rozeti + body önizleme) + create/edit modal (kind select + title + body + sort_order) + pasifleştir confirm; demo guard + a11y (role=dialog/alert, aria-label). Sidebar "Ayarlar"a "Not Şablonları" linki.
 - **QuoteForm picker:** 3 textarea (Notlar/Teslimat/Ödeme) üstünde "+ Şablon ekle…" select (`renderTemplatePicker(kind, value, setter)`); mount'ta `/api/note-templates` fetch (fetch-in-effect konvansiyonu + cancelled guard); `templatesForField(templates, kind)` (kind+general filtre, sort_order sıralı); `applyTemplateToField(current, body)` (boş→doldur / dolu→append `\n`, **sessiz üzerine-yazma YOK**); `readOnly`'de picker gizli (early return). Setter'lar (`setNotes`/`setDeliveryMethod`/`setPaymentMethod`) zaten autoSave/savePreviewData dep array'inde → Faz 3/4'teki "UI alanı eklendi ama autoSave dep'inde yok → sessiz veri kaybı" drift trap'ine düşmez.
 - **Test (+51):** `note-templates-migration` (8 drift-guard: tablo/kind CHECK/index/RLS/trigger/seed/ROLLBACK) + `quote-note-templates` (12: applyTemplateToField + templatesForField pure + QuoteForm wiring source-regex [fetch + 3 picker call site + readOnly early return]) + `note-templates-helper` (16: isValidKind + mapNoteTemplate + validation throws + list/create/deactivate chain) + `note-templates-route` (15: GET requireRole-çağrılmaz + kind passthrough + POST/PATCH/DELETE admin/validation/404/409). **4043→4094** · tsc temiz · npm run lint 0 · build OK (`ƒ /api/note-templates` + `[id]` + settings + `ƒ Proxy`).
-- **DURUM: COMMIT+PUSH EDİLDİ (3551302) · migration 079 APPLY BEKLİYOR.** Manuel smoke: admin Not Şablonları CRUD; seed görünür; teklif formu 3 alan picker doğru kind (boş→doldur/dolu→append); non-draft picker kilitli; viewer POST→403.
+- **DURUM: COMMIT+PUSH EDİLDİ (3551302) · migration 079 APPLY EDİLDİ ✅.** Manuel smoke: admin Not Şablonları CRUD; seed görünür; teklif formu 3 alan picker doğru kind (boş→doldur/dolu→append); non-draft picker kilitli; viewer POST→403.
 - **V7 master-plan Faz 1-7 + tüm Bulgular turları TAMAMLANDI.** ERTELENEN borçlar: Paraşüt iskonto aktarım, order_line_description, serviceConvert tam temizlik, quotes audit katmanı (modül-geneli), drag-reorder UX.
 
 ---

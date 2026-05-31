@@ -5,7 +5,16 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** + Bulgular 1.tur — migration 079, 4096 test, COMMIT+PUSH EDİLDİ (3551302 Faz 7 + Bulgular) · 079 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** + Bulgular 1.+2.tur — migration 079, 4098 test, COMMIT+PUSH EDİLDİ · **079 APPLY EDİLDİ ✅**)
+
+**Bulgular 2. tur (P1 yok; 1 yeni P2 fix + 1 P3 fix + 3 zaten-düzeltilmiş doğrulama):**
+- **#1 (YENİ P2 FIX) Unsaved draft restore'da not/teslimat/ödeme kaybı:** `autoSave` `teklif_v3` draft key'ine yalnız `{currency,rows,descDirty,discount}` yazıyordu; notes/delivery/payment sadece `teklif_v3_full`'da (preview için). Yeni teklif restore `teklif_v3` okuduğundan, şablonla eklenen (veya elle yazılan) metin kaydetmeden refresh/preview-dönüşünde kayboluyordu. **Fix:** `teklif_v3` payload'a `notes/deliveryMethod/paymentMethod` eklendi + restore bunları geri yükler (Faz 3 `discount` precedent'i). +2 drift-guard test; 3 mevcut regex (faz4b/faz3/faz4a) yeni payload'a göre güncellendi.
+- **#2 (P3 FIX) Settings liste tüm body'yi basıyordu:** 5000 char'a kadar pre-wrap → uzun şart metni sayfayı şişiriyordu. **Fix:** `-webkit-line-clamp: 3` önizleme.
+- **#3-#5 (ZATEN DÜZELTİLDİ — `0b9398c`):** Rapor P2 (DB hata→404), P3 (geçersiz ?kind→tüm liste), doc/plan drift'i tekrar gündeme getirdi; bunlar 1. turda zaten düzeltildi (maybeSingle satır 87/134/170, ?kind→400 satır 24, QUOTES_V2_PLAN final + SUPERSEDED). Kod karşısında doğrulandı, ek değişiklik yok. (Rapor `0b9398c` öncesi snapshot'a dayanıyordu.)
+- **#6 (P3 no-op, tekrar)** `[id]` GET inactive: tüketici yok + hassas değil → bırakıldı (1. tur kararı).
+- **Doğrulama:** **4096→4098** · tsc temiz · npm run lint 0 · build OK.
+
+---
 
 **Bulgular 1. tur (P1 yok; 2 fix + double-check):** **#1 (P2 FIX)** `dbGetNoteTemplate`+update/deactivate ön-okuma `.single()`→`.maybeSingle()`+`if(error)throw` (gerçek DB/RLS hatası artık 404 değil 500). **#2 (P3 FIX)** geçersiz `?kind=`→**400** (fail-closed; eskiden sessizce tüm liste). **#3 (no-op)** `[id]` GET inactive döndürüyor ama tüketici yok + hassas değil → bırakıldı. **#4 (ertelendi)** pasif görme/reaktivate UI yok (soft-delete DB'de korunur; PATCH is_active gelecek tur). **#5 (FIX)** doc/plan migration drift hizalandı (QUOTES_V2_PLAN final + historical bloklar SUPERSEDED). **4094→4096** · tsc/lint/build temiz.
 
@@ -21,7 +30,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Settings sayfası** `/dashboard/settings/note-templates`: kind filtre sekmeleri + liste + create/edit modal + pasifleştir confirm; demo guard + a11y; Sidebar "Not Şablonları" linki.
 - **QuoteForm picker:** 3 textarea (Notlar/Teslimat/Ödeme) üstünde "+ Şablon ekle…" select; mount'ta `/api/note-templates` fetch (cancelled guard); `templatesForField` (kind+general filtre); `applyTemplateToField` (boş→doldur / dolu→append `\n`, sessiz üzerine-yazma YOK); readOnly'de picker gizli. Setter'lar zaten autoSave/savePreviewData dep array'inde → drift trap yok.
 - **Test (+51):** migration drift-guard (8) + picker pure+wiring (12) + helper/validation/mapper (16) + route (15). **4043→4094** · tsc temiz · npm run lint 0 · build OK (`ƒ /api/note-templates` + `[id]` + settings sayfası + `ƒ Proxy`).
-- **DURUM: COMMIT+PUSH EDİLDİ (3551302) · migration 079 APPLY BEKLİYOR.** Manuel smoke: admin Not Şablonları CRUD; seed görünür; teklif formunda 3 alan picker doğru kind filtreler (boş→doldur, dolu→append); non-draft picker kilitli; viewer POST→403.
+- **DURUM: COMMIT+PUSH EDİLDİ (3551302) · migration 079 APPLY EDİLDİ ✅.** Manuel smoke: admin Not Şablonları CRUD; seed görünür; teklif formunda 3 alan picker doğru kind filtreler (boş→doldur, dolu→append); non-draft picker kilitli; viewer POST→403.
 - **V7 master-plan TAMAMLANDI** (Faz 1-7 + tüm Bulgular turları). Ertelenen borçlar: Paraşüt iskonto aktarım, order_line_description, serviceConvert temizlik, quotes audit katmanı (modül-geneli), drag-reorder UX.
 
 ---

@@ -309,7 +309,8 @@ describe("validateDiscount — pure helper (P2)", () => {
 
 describe("QuoteForm — review fix source-regex (P2/P3)", () => {
     it("autosave teklif_v3 payload'ında discount + restore setDiscount(saved.discount)", () => {
-        expect(FORM_SRC).toMatch(/JSON\.stringify\(\{ currency, rows, descDirty, discount \}\)/);
+        // Faz 7 Bulgular 2.tur: payload çok-satırlı + notes/deliveryMethod/paymentMethod eklendi.
+        expect(FORM_SRC).toMatch(/JSON\.stringify\(\{\s*currency, rows, descDirty, discount\b/);
         expect(FORM_SRC).toMatch(/setDiscount\(saved\.discount\)/);
     });
 

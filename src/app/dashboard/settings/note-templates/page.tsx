@@ -190,7 +190,11 @@ export default function NoteTemplatesPage() {
                             <span style={badgeStyle}>{KIND_META[t.kind].badge}</span>
                             <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>{t.title}</span>
                         </div>
-                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "pre-wrap", lineHeight: 1.4 }}>{t.body}</div>
+                        <div style={{
+                            fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "pre-wrap", lineHeight: 1.4,
+                            // Uzun şart metinleri ayar sayfasını şişirmesin — 3 satır önizleme.
+                            display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+                        }}>{t.body}</div>
                     </div>
                     <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
                         <Button variant="ghost" onClick={() => openEdit(t)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Düzenle</Button>

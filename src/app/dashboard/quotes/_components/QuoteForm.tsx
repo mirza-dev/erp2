@@ -275,6 +275,11 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                 if (saved.currency) setCurrency(saved.currency as Currency);
                 // Faz 3 (V7) review: iskonto restore — kaydetmeden refresh'te 0'a düşmesin.
                 if (typeof saved.discount === "number") setDiscount(saved.discount);
+                // Faz 7 Bulgular 2.tur (P2): not/teslimat/ödeme restore — şablonla
+                // eklenen metin kaydetmeden refresh/preview-dönüşünde korunur.
+                if (typeof saved.notes === "string") setNotes(saved.notes);
+                if (typeof saved.deliveryMethod === "string") setDeliveryMethod(saved.deliveryMethod);
+                if (typeof saved.paymentMethod === "string") setPaymentMethod(saved.paymentMethod);
                 if (saved.rows?.length) {
                     // Faz 1b: eski localStorage payload'ında yeni alanlar (productId,
                     // unitWeightKg, kgManualOverride) yok → emptyRow default'larıyla
@@ -491,7 +496,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
             // yoksa restore'da tüm non-empty desc'ler dirty kabul edilir ve
             // auto-build override edilemez hale gelir (yanlış ürün açıklaması).
             const descDirty = rows.map(r => descDirtyRowIds.has(r.id));
-            localStorage.setItem("teklif_v3", JSON.stringify({ currency, rows, descDirty, discount }));
+            // Faz 7 Bulgular 2.tur (P2): notes/delivery/payment'ı da draft key'e
+            // yaz — şablonla doldurulan (veya elle yazılan) metin kaydetmeden
+            // refresh/preview-dönüşünde kaybolmasın (Faz 3 `discount` precedent'i).
+            localStorage.setItem("teklif_v3", JSON.stringify({
+                currency, rows, descDirty, discount, notes, deliveryMethod, paymentMethod,
+            }));
             const fullData: QuoteData = {
                 sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
                 custCompany, custContact, custPhone, custEmail, custAddress,

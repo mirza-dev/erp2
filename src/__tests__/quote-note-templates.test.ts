@@ -100,4 +100,16 @@ describe("QuoteForm not şablonu entegrasyonu", () => {
     it("readOnly modda picker render edilmez (early return)", () => {
         expect(SRC).toMatch(/function renderTemplatePicker[\s\S]*?if \(readOnly\) return null/);
     });
+
+    // Bulgular 2.tur (P2): şablonla eklenen not/teslimat/ödeme unsaved draft
+    // restore'da kaybolmasın — teklif_v3 draft key'e yazılır + restore okur.
+    it("autoSave teklif_v3 draft'ına notes/deliveryMethod/paymentMethod yazar", () => {
+        expect(SRC).toMatch(/setItem\("teklif_v3", JSON\.stringify\(\{[\s\S]*?notes, deliveryMethod, paymentMethod[\s\S]*?\}\)\)/);
+    });
+
+    it("teklif_v3 restore notes/deliveryMethod/paymentMethod'u geri yükler", () => {
+        expect(SRC).toMatch(/if \(typeof saved\.notes === "string"\) setNotes\(saved\.notes\)/);
+        expect(SRC).toMatch(/if \(typeof saved\.deliveryMethod === "string"\) setDeliveryMethod\(saved\.deliveryMethod\)/);
+        expect(SRC).toMatch(/if \(typeof saved\.paymentMethod === "string"\) setPaymentMethod\(saved\.paymentMethod\)/);
+    });
 });
