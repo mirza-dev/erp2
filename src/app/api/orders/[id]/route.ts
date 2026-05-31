@@ -9,7 +9,7 @@ import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
-import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
+import { getCurrentUserPermissions, getCurrentUserId, requirePermission } from "@/lib/auth/role-guard";
 import { redactOrderForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
@@ -105,7 +105,7 @@ export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
-    const guard = await requirePermission(req, "manage_sales_orders");
+    const guard = await requirePermission(req, "delete_sales_orders");
     if (guard) return guard;
 
     const { id } = await params;
@@ -136,7 +136,8 @@ export async function DELETE(
                 { status: 409 }
             );
         }
-        await dbHardDeleteOrder(id);
+        const actor = await getCurrentUserId();
+        await dbHardDeleteOrder(id, actor);
         revalidateTag("products", "max");
         return NextResponse.json({ success: true });
     } catch (err) {

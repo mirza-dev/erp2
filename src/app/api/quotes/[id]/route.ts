@@ -7,7 +7,7 @@ import { mapQuoteDetail } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { validateQuoteLineQuantities, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
-import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserPermissions, getCurrentUserId } from "@/lib/auth/role-guard";
 import { redactQuoteForPerms } from "@/lib/auth/redact";
 
 function getCachedQuote(id: string) {
@@ -168,7 +168,8 @@ export async function DELETE(
                 { status: 409 }
             );
         }
-        await dbDeleteQuote(id);
+        const actor = await getCurrentUserId();
+        await dbDeleteQuote(id, actor);
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");
         return NextResponse.json({ ok: true });

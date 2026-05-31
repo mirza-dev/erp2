@@ -27,10 +27,25 @@ export async function dbListCustomers(): Promise<CustomerRow[]> {
     return data ?? [];
 }
 
-export async function dbDeleteCustomer(id: string): Promise<void> {
+export async function dbDeleteCustomer(id: string, actor?: string | null): Promise<void> {
     const supabase = createServiceClient();
+    // Faz 6: before-snapshot silmeden ÖNCE çekilir (silinince satır yok olur);
+    // audit yalnız silme BAŞARILI olunca yazılır (FK restrict ile delete throw
+    // ederse "customer_deleted" yalan audit kalmasın). dbDeactivateVendor paterni.
+    const { data: existing } = await supabase
+        .from("customers").select("*").eq("id", id).maybeSingle();
     const { error } = await supabase.from("customers").delete().eq("id", id);
     if (error) throw new Error(error.message);
+    if (existing) {
+        await supabase.from("audit_log").insert({
+            actor: actor ?? null,
+            action: "customer_deleted",
+            entity_type: "customer",
+            entity_id: id,
+            before_state: existing,
+            source: "ui",
+        });
+    }
 }
 
 export async function dbGetCustomerById(id: string): Promise<CustomerRow | null> {

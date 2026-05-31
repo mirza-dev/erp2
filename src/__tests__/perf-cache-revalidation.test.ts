@@ -16,6 +16,7 @@ vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
     requireRole: vi.fn().mockResolvedValue(null),
     requireAnyRole: vi.fn().mockResolvedValue(null),
+    getCurrentUserId: vi.fn().mockResolvedValue(null),
     getCurrentUserPermissions: vi.fn().mockResolvedValue(
         new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),

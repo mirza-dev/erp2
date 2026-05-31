@@ -10,7 +10,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const guard = await requirePermission(_req, "manage_production");
+        const guard = await requirePermission(_req, "delete_production");
         if (guard) return guard;
 
         const { id } = await params;

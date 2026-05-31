@@ -35,6 +35,16 @@ export async function getCurrentUserPermissions(req?: NextRequest): Promise<Set<
 }
 
 /**
+ * Geçerli kullanıcının id'si (audit actor için). Oturum yoksa null.
+ * Yetki kararı vermez — yalnız "kim sildi" izini taşımak için.
+ */
+export async function getCurrentUserId(_req?: NextRequest): Promise<string | null> {
+    const sb = await createClient();
+    const { data: { user } } = await sb.auth.getUser();
+    return user?.id ?? null;
+}
+
+/**
  * Backward-compat tekil rol. Mevcut testler bunu mock'luyor + requireRole
  * bunun üzerinden çalışıyor. Çoklu rolde "primary" döner (admin > op > viewer).
  */

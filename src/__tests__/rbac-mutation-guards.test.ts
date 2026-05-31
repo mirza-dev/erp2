@@ -13,6 +13,8 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { permissionsForRoles, type Permission } from "@/lib/auth/permissions";
 
 // Gerçek requirePermission + permissionsForRoles; sadece effective perm setini
 // viewer'a sabitliyoruz (createClient/cookies'e gitmeden).
@@ -106,7 +108,7 @@ describe("R1 mutation guards — viewer → 403 (Batch A: sales domain)", () => 
     it("orders [id] PATCH → 403 (manage_sales_orders)", async () => {
         expect((await orderPatch(patchReq({ transition: "approved" }), params())).status).toBe(403);
     });
-    it("orders [id] DELETE → 403 (manage_sales_orders)", async () => {
+    it("orders [id] DELETE → 403 (delete_sales_orders)", async () => {
         expect((await orderDelete(delReq(), params())).status).toBe(403);
     });
     it("orders [id]/ship → 403 (ship_sales_orders)", async () => {
@@ -118,7 +120,7 @@ describe("R1 mutation guards — viewer → 403 (Batch A: sales domain)", () => 
     it("customers [id] PATCH → 403 (manage_customers)", async () => {
         expect((await customerPatch(patchReq(), params())).status).toBe(403);
     });
-    it("customers [id] DELETE → 403 (manage_customers)", async () => {
+    it("customers [id] DELETE → 403 (delete_customers)", async () => {
         expect((await customerDelete(delReq(), params())).status).toBe(403);
     });
     it("inventory/movements POST → 403 (stock_adjust_*)", async () => {
@@ -146,7 +148,7 @@ describe("R1/R2 guards — viewer → 403 (Batch B1: products + vendors)", () =>
     it("vendors [id] PATCH → 403 (manage_vendors)", async () => {
         expect((await vendorPatch(patchReq(), params())).status).toBe(403);
     });
-    it("vendors [id] DELETE → 403 (manage_vendors)", async () => {
+    it("vendors [id] DELETE → 403 (delete_vendors)", async () => {
         expect((await vendorDelete(delReq(), params())).status).toBe(403);
     });
 });
@@ -197,7 +199,7 @@ describe("R1/R2 guards — viewer → 403 (Batch B2: PO/commitments/öneri/üret
     it("production POST → 403 (manage_production)", async () => {
         expect((await productionPost(postReq())).status).toBe(403);
     });
-    it("production [id] DELETE → 403 (manage_production)", async () => {
+    it("production [id] DELETE → 403 (delete_production)", async () => {
         expect((await productionDelete(delReq(), params())).status).toBe(403);
     });
     it("alerts [id] PATCH → 403 (manage_alerts)", async () => {
@@ -249,5 +251,52 @@ describe("R2 read-guards — viewer → 403 (Batch E: parasut finansal GET)", ()
     });
     it("parasut/logs GET → 403 (view_parasut)", async () => {
         expect((await parasutLogsGet(getReq("http://localhost/api/parasut/logs"))).status).toBe(403);
+    });
+});
+
+// ── Faz 6: delete guard ayırt ediciliği ────────────────────────────────────
+// Silme uçları artık `delete_*` ister; `manage_*` TEK BAŞINA yetmez. Bu blok,
+// perm setini yalnız ilgili `manage_*` ile sabitleyip 403 bekleyerek guard'ın
+// gerçekten `delete_*`'e bağlandığını kanıtlar (etiket-only swap'a karşı kilit).
+describe("Faz 6 — delete guard delete_* ister (manage_* yetmez)", () => {
+    const mockedPerms = vi.mocked(getCurrentUserPermissions);
+    const only = (...p: string[]) => new Set(p) as Set<Permission>;
+
+    it("customers [id] DELETE: yalnız manage_customers → 403", async () => {
+        mockedPerms.mockResolvedValueOnce(only("manage_customers", "view_customers"));
+        expect((await customerDelete(delReq(), params())).status).toBe(403);
+    });
+    it("vendors [id] DELETE: yalnız manage_vendors → 403", async () => {
+        mockedPerms.mockResolvedValueOnce(only("manage_vendors", "view_vendors"));
+        expect((await vendorDelete(delReq(), params())).status).toBe(403);
+    });
+    it("production [id] DELETE: yalnız manage_production → 403", async () => {
+        mockedPerms.mockResolvedValueOnce(only("manage_production", "view_production"));
+        expect((await productionDelete(delReq(), params())).status).toBe(403);
+    });
+    it("orders [id] DELETE: yalnız manage_sales_orders → 403", async () => {
+        mockedPerms.mockResolvedValueOnce(only("manage_sales_orders", "view_sales_orders"));
+        expect((await orderDelete(delReq(), params())).status).toBe(403);
+    });
+    it("quotes [id] DELETE: yalnız manage_quotes → 403", async () => {
+        mockedPerms.mockResolvedValueOnce(only("manage_quotes", "view_quotes"));
+        expect((await quoteDelete(delReq(), params())).status).toBe(403);
+    });
+
+    // Rol → delete_* eşleme regresyon kilidi: ileride bir rolden delete_X
+    // düşerse (yetkili rol sessizce kilitlenir, route testleri yeşil kalır) bu
+    // assertion yakalar. Yetkilendiren yarıyı kanıtlar (manage-only blok ise
+    // route'un delete_* istediğini).
+    it("rol→delete_* eşlemesi korunur (yetki veren yarı)", () => {
+        const sales = permissionsForRoles(["sales"]);
+        expect(sales.has("delete_customers")).toBe(true);
+        expect(sales.has("delete_sales_orders")).toBe(true);
+        expect(sales.has("delete_quotes")).toBe(true);
+        expect(permissionsForRoles(["purchasing"]).has("delete_vendors")).toBe(true);
+        expect(permissionsForRoles(["production"]).has("delete_production")).toBe(true);
+        // viewer hiçbir delete_* tutmaz
+        const viewer = permissionsForRoles(["viewer"]);
+        expect(viewer.has("delete_customers")).toBe(false);
+        expect(viewer.has("delete_quotes")).toBe(false);
     });
 });

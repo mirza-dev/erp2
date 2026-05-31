@@ -17,6 +17,7 @@ vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
     requireRole: vi.fn().mockResolvedValue(null),
     getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_sales_prices"])),
+    getCurrentUserId: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/lib/supabase/quotes", () => ({

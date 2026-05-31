@@ -85,7 +85,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
-        const guard = await requirePermission(_req, "manage_vendors");
+        const guard = await requirePermission(_req, "delete_vendors");
         if (guard) return guard;
 
         const { id } = await params;

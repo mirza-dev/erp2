@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbDeleteCustomer, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbCountOrdersByCustomer } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
 
 // PATCH /api/customers/[id]
 export async function PATCH(
@@ -43,7 +43,7 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const guard = await requirePermission(_req, "manage_customers");
+        const guard = await requirePermission(_req, "delete_customers");
         if (guard) return guard;
 
         const { id } = await params;
@@ -54,7 +54,8 @@ export async function DELETE(
                 { status: 409 }
             );
         }
-        await dbDeleteCustomer(id);
+        const actor = await getCurrentUserId();
+        await dbDeleteCustomer(id, actor);
         return NextResponse.json({ ok: true });
     } catch (err) {
         return handleApiError(err, "DELETE /api/customers/[id]");

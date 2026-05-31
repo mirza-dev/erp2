@@ -142,10 +142,24 @@ export async function dbUpdateQuote(
     return updated;
 }
 
-export async function dbDeleteQuote(id: string): Promise<void> {
+export async function dbDeleteQuote(id: string, actor?: string | null): Promise<void> {
     const sb = createServiceClient();
+    // Faz 6: before-snapshot silmeden ÖNCE; audit yalnız silme BAŞARILI olunca
+    // (yalan "quote_deleted" audit'i önlenir — diğer delete helper'larıyla tutarlı).
+    const { data: existing } = await sb
+        .from("quotes").select("*").eq("id", id).maybeSingle();
     const { error } = await sb.from("quotes").delete().eq("id", id);
     if (error) throw error;
+    if (existing) {
+        await sb.from("audit_log").insert({
+            actor: actor ?? null,
+            action: "quote_deleted",
+            entity_type: "quote",
+            entity_id: id,
+            before_state: existing,
+            source: "ui",
+        });
+    }
 }
 
 export async function dbUpdateQuoteStatus(

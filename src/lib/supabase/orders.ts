@@ -417,10 +417,24 @@ export async function dbGetOpenOrderCountByProduct(): Promise<Map<string, number
 
 // ── Hard Delete ──────────────────────────────────────────────
 
-export async function dbHardDeleteOrder(id: string): Promise<void> {
+export async function dbHardDeleteOrder(id: string, actor?: string | null): Promise<void> {
     const supabase = createServiceClient();
+    // Faz 6: before-snapshot silmeden ÖNCE; audit yalnız silme BAŞARILI olunca
+    // (FK restrict — shipments/invoices — delete throw ederse yalan audit kalmasın).
+    const { data: existing } = await supabase
+        .from("sales_orders").select("*").eq("id", id).maybeSingle();
     const { error } = await supabase.from("sales_orders").delete().eq("id", id);
     if (error) throw new Error(error.message);
+    if (existing) {
+        await supabase.from("audit_log").insert({
+            actor: actor ?? null,
+            action: "order_hard_deleted",
+            entity_type: "sales_order",
+            entity_id: id,
+            before_state: existing,
+            source: "ui",
+        });
+    }
 }
 
 export async function dbCountOrdersByCustomer(customerId: string): Promise<number> {
