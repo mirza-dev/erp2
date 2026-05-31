@@ -211,6 +211,7 @@ function mapOrderLine(line: OrderLineRow): OrderLineItem {
     unitPrice: line.unit_price,
     discountPct: line.discount_pct,
     lineTotal: line.line_total,
+    description: line.description ?? null,
   };
 }
 

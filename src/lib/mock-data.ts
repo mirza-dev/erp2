@@ -176,6 +176,7 @@ export interface OrderLineItem {
     unitPrice: number;
     discountPct: number;
     lineTotal: number;
+    description?: string | null;
 }
 
 export interface AiRecommendation {

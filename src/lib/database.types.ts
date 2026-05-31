@@ -368,6 +368,7 @@ export interface OrderLineRow {
     line_total: number
     sort_order: number
     vat_rate: number
+    description: string | null
 }
 
 export interface StockReservationRow {

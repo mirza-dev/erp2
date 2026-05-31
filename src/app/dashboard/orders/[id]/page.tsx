@@ -644,6 +644,11 @@ export default function OrderDetailPage() {
                                             </td>
                                             <td style={{ ...tdStyle, fontWeight: 500 }}>
                                                 {line.productName}
+                                                {line.description && (
+                                                    <div style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                                        {line.description}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td style={{ ...tdStyle, textAlign: "right" }}>
                                                 {line.quantity} {line.unit}
