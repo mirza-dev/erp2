@@ -28,6 +28,8 @@ vi.mock("@/lib/supabase/products", () => ({ dbGetProductById: vi.fn() }));
 vi.mock("@/lib/services/email-service", () => ({ notifyUsersByEmail: vi.fn() }));
 vi.mock("@/lib/parasut", () => ({ getParasutAdapter: vi.fn() }));
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
     serviceSyncOrderToParasut,
     computeHeaderDiscountPct,
@@ -64,6 +66,23 @@ describe("computeHeaderDiscountPct", () => {
         expect(computeHeaderDiscountPct(20, 0)).toBe(0);
         expect(computeHeaderDiscountPct(0, 100)).toBe(0);
         expect(computeHeaderDiscountPct(-5, 100)).toBe(0);
+    });
+});
+
+// Builder source-regex: discount_value satırı reconcile'dan BAĞIMSIZ (reconcile
+// builder'dan önce, kendi toplamını kurar) → integration testi (claim=null)
+// builder'a hiç varmıyor. Bu satır regrese olursa (bare line.discount_pct'ye
+// dönerse) reconcile yine geçer, Paraşüt iskontosuz fatura alır = tam da bu fazın
+// önlediği sessiz hata. Bu yüzden builder'ın headerPct'yi yazdığını kilitle.
+describe("Paraşüt fatura builder — header iskonto orantılı (drift-guard)", () => {
+    const SRC = readFileSync(join(process.cwd(), "src/lib/services/parasut-service.ts"), "utf8");
+    it("builder headerDiscountPct'yi computeHeaderDiscountPct ile hesaplar", () => {
+        expect(SRC).toMatch(/const headerDiscountPct = computeHeaderDiscountPct\(/);
+    });
+    it("details discount_value = line.discount_pct + headerDiscountPct (bare line.discount_pct DEĞİL)", () => {
+        expect(SRC).toMatch(/discount_value:\s*Number\(line\.discount_pct[^)]*\)\s*\+\s*headerDiscountPct/);
+        // Regression: eski bare form geri gelmesin.
+        expect(SRC).not.toMatch(/discount_value:\s*line\.discount_pct,/);
     });
 });
 
