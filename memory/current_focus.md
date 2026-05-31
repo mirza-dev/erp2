@@ -5,7 +5,18 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 8 — Ertelenen Borçlar Kapanışı** — 5 alt-faz/5 commit, 4098 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY BEKLİYOR**)
+## Son Tamamlanan İş — 2026-05-31 (**RBAC Faz 4 (R1-R5) MAIN'E MERGE + PUSH** — merge commit `234d8d9`, 4174 test, build OK)
+
+**Rol bazlı erişim tamamlandı.** `worktree-rbac-foundation` (7 commit) güncel main'e merge edildi (foundation Faz 1+2+5 zaten main'deydi, merge-base `a0130de`).
+- **R3 finansal redaction** (route seviyesi, snake_case): products `price`/`cost_price`, customers `total_revenue`, orders `grand_total`/`subtotal`/`vat_total`+satır fiyatları → yetkiye göre null. Per-request, cache key'e girmez.
+- **R1** ~40 mutation `requirePermission` · **R2** vendors/PO/commitments/recommendations + parasut invoices/stats/logs GET · **R4/R5** fail-closed · product-types `requireRole(admin)`→`requirePermission(manage_product_types)`.
+- **Çakışma:** 11 quotes dosyası main'in **Faz 8a** RBAC'ını korudu (DELETE→`delete_quotes`, `/convert`→410, `accepted`→410, sent→409). Faz 4 quotes guard'ları gereksizdi. `rbac-mutation-guards` convert testi 403→410. Branch+worktree temizlendi.
+- **Bilinen kapsam:** quotes GET redaction YOK (`view_quotes` tam fiyat görür — Faz 4 bilinçli). **Faz 6 (delete policy) + Faz 7 (dashboard kart maskeleme) hâlâ ertelendi.** Detay: [[project_rbac]].
+- tsc temiz · **4174 test** · lint 0 · build OK (`ƒ Proxy`).
+
+---
+
+## Önceki — 2026-05-31 (Teklif V7 **Faz 8 — Ertelenen Borçlar Kapanışı** — 5 alt-faz/5 commit, 4098 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY BEKLİYOR**)
 
 **V7'nin tüm ertelenen borçları kapatıldı (5 bağımsız kalem, ayrı commit'ler). Kullanıcı kararları: Paraşüt orantılı / sig rename ATLA / drag-reorder ERTELE.**
 - **8a (`4935e88`) Quotes RBAC:** yazma uçlarına guard (accept precedent'i) — POST/PATCH/revise → `manage_quotes`, DELETE → `delete_quotes`; GET'ler auth-only. quotes-rbac.test.ts (5) + 7 mevcut route testine role-guard mock (varsayılan izinli).

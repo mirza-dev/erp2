@@ -1,0 +1,44 @@
+---
+name: project_rbac
+description: "Rol bazlı erişim (RBAC) — 6 rol, permission sistemi, page-gate, kullanıcı yönetimi; Faz 1+2+4+5 MAIN'DE, 6/7 ertelendi"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: d7bf4111-d53f-4940-93f2-b9b1aeed4ec0
+---
+
+ERP2 rol bazlı erişim sistemi. Kaynak plan: `role-based-access-plan.md` (kullanıcı) → rafine: `~/.claude/plans/nifty-humming-rose.md`.
+
+**Roller (6):** admin · sales · purchasing · production · accounting · viewer. Çoklu rol (`app_metadata.roles: Role[]`). Yetki kaynağı YALNIZ `app_metadata` (user_metadata değil — kullanıcı yazabilir). no-role → viewer (eski purchaser default kaldırıldı). Legacy `purchaser` → `purchasing` normalize. Patron = admin.
+
+**Faz 1+2+5 MAIN'E MERGE + PUSH EDİLDİ (2026-05-30, merge commit `ee00e58`, origin/main).** Kaynak branch `worktree-rbac-foundation` (`a0130de`) korunuyor. Merge teklif PDF arşiv işiyle SIFIR dosya çakışması → temiz 3-way merge. Doğrulandı: conflict marker yok · tsc temiz · 3947 test yeşil · build OK (`ƒ Proxy` kayıtlı). Bekleyen teklif arşiv işi (CLAUDE.md/memory/quotes, COMMIT BEKLİYOR) merge'den etkilenmedi, local working tree'de duruyor.
+- **Faz 1:** `src/lib/auth/permissions.ts` (pure: ROLE_PERMISSIONS/parseRoles/permissionsForRoles/normalizeRole/normalizeAssignedRoles/ROLE_LABELS) + `role-guard.ts` (getCurrentUserRoles/getCurrentUserPermissions/requirePermission/requireAnyRole; requireRole çoklu-rol kesişim, sıra-bağımsız köprü — 14 callsite Faz 3'e kadar dokunulmaz).
+- **Faz 2:** `src/lib/auth/page-access.ts` (route→permission matris, tek source-of-truth) + `proxy.ts` page-gate (authd + demo=viewer; yetersiz → `/dashboard?forbidden=` redirect; ek getUser yok; ƒ Proxy manifest korundu) + Sidebar filtre (`/api/auth/me`'den) + `ForbiddenBanner` + `/api/auth/me` route. **Demo = viewer (6 sayfa) — kullanıcı kararı (geniş-okuma reddedildi).**
+- **Faz 5:** admin/users GET roller + POST roller (viewer-dedup) + yeni PATCH rol + last-admin lockout (PATCH+DELETE 409) + requireAdmin rol-bazlı + **zero-admin bootstrap** (sistemde hiç admin yoksa ilk authd geçer, ilk admin atanınca kapanır → brick-proof) + create-admin.ts `roles:["admin"]` + settings/users UI (roller sütunu + checkbox + satır-içi düzenleme).
+- **Test:** +~95 (permissions/page-access/proxy-page-gate/admin-users-roles/role-guard multi-role). 3904 test yeşil · tsc temiz · build OK · eslint 0 warning.
+
+**Advisor fix (2 ship-blocker):** requireRole çoklu-rol doğru (sıra-bağımsız 403 footgun giderildi); zero-admin bootstrap (ADMIN_EMAILS boş + create-admin role yazmıyordu → brick riski kapatıldı).
+
+**Faz 4 (R1-R5) MAIN'E MERGE + PUSH EDİLDİ (2026-05-31, merge commit `234d8d9`, origin/main).** 7 commit (Slice 1 + 2A/B1/B2/C/D/E). Kaynak branch `worktree-rbac-foundation` merge sonrası SİLİNDİ (worktree de kaldırıldı). Tasarım: redaction route katmanında (api-mappers'a dokunmadı), mutation guard'ları additive tek-satır.
+
+**Merge çakışma çözümü (2026-05-31):** Foundation zaten main'deydi (merge-base `a0130de`); main bu arada Faz 8'e ilerlemiş + **Faz 8a kendi quotes RBAC'ını eklemişti**. 11 çakışan quotes dosyası (4 route + 7 test) → **main'in Faz 8a versiyonu korundu**: DELETE→`delete_quotes` (Faz 8a permissions.ts'e ekledi), PATCH→`manage_quotes`, `/convert`→410 deprecated tombstone (guard yok), `transition:accepted`→410, sent→409 (immutable arşiv). Faz 4'ün quotes guard'ları gereksizdi (main daha rafine + güncel quotes davranışı). `rbac-mutation-guards.test.ts` convert testi 403→410 + DELETE etiketi `delete_quotes` güncellendi. tsc temiz · **4174 test yeşil** · lint 0 · build OK (`ƒ Proxy`).
+- **R3 finansal redaction** (`src/lib/auth/redact.ts`, pure, SNAKE_CASE — KRİTİK: route'lar DB row'u snake_case döndürüyor, camelCase null'lamak sızdırırdı): products GET (price←view_sales_prices, cost_price←view_purchase_costs), customers GET (total_revenue←view_financial_summary), orders list+detail (grand_total/subtotal/vat_total + lines[].unit_price/line_total←view_sales_prices). Cache SONRASI per-request (perms cache key'ine girmez).
+- **R1 mutation guard** (~40 handler): quotes/orders/customers/inventory (manage_quotes/manage_sales_orders/ship_sales_orders/manage_customers/stock_adjust_*), products/vendors (manage_product_master/view_vendors/manage_vendors), PO/commitments/recommendations/scan (view+manage_purchase_orders/manage_purchase_suggestions), production/alerts (manage_production/manage_alerts), settings/parasut (manage_settings/manage_parasut), import (manage_import).
+- **R2 read-guard**: vendors/PO/commitments/recommendations GET + parasut invoices/stats/logs GET (view_*). products/customers/orders/production GET = DataProvider'a açık (R3 redaction korur).
+- **R4** admin/users/[id] requireAdmin + countAdmins listUsers hatası fail-CLOSED (main route ile hizalandı).
+- **R5** canAccessPath bilinmeyen /dashboard/* fail-closed test'i.
+- **Migration**: product-types requireRole(["admin"])→requirePermission("manage_product_types") (admin→admin+purchasing genişledi, page-gate tutarlılığı). PO cancel/receive/from-rec + import classify/extract/apply/document-lines zaten requireRole'lı, DOKUNULMADI.
+- **Test**: rbac-mutation-guards.test.ts (48, gerçek requirePermission + viewer perm → 403) + redact.test.ts (pure, snake_case regresyon) + products-get-redaction (per-request diskriminatif) + R4/R5. ~30 mevcut test dosyasına uniform role-guard mock. **3980 test yeşil · tsc temiz · build OK (ƒ Proxy) · eslint 0 warning.**
+- **KALAN (Faz 4 sonrası, ayrı tur)**: parasut oauth/start+refresh hâlâ ADMIN_EMAILS env-gate (manage_parasut'a alınmadı — güvenli, sadece policy modeli farklı); customers/orders redaction'a end-to-end diskriminatif test (products'ta var, opsiyonel); product-types purchasing→200 positive test (broadening wired ama test edilmedi). **quotes GET redaction YOK** (redact.ts products/customers/orders kapsar; `view_quotes` olan tam fiyat görür — Faz 4 bilinçli kapsamı, gelecek tur). Faz 6 (delete policy) + Faz 7 (dashboard kart maskeleme + null finansal `--` UI) hâlâ ertelendi.
+
+**ERTELENEN (Faz 3 zaten R1'e dahil edildi) — :**
+- Faz 3: 14 `requireRole` callsite → `requirePermission`; admin/parasut oauth permission map.
+  - **ÇÖZÜLDÜ (2026-05-31):** Quotes route'ları (POST/PATCH/DELETE/revise) main'in **Faz 8a** turunda `requirePermission` ile guard'landı (POST/PATCH/revise→`manage_quotes`, DELETE→`delete_quotes`, GET→auth-only). Merge'de main'in bu versiyonu korundu. Eski not (route-level guard yoktu) artık geçersiz.
+- Faz 4: response redaction (`redactXForPermissions` — api-mappers/data-context/ürün/quote/order/PO/dashboard/parasut + PDF/preview). 3 veri sınıfı: sales-financial / purchase-financial / high-sensitivity. EN BÜYÜK + en riskli.
+- Faz 6: delete policy — yan-etkisiz hard delete + ilişkili→409 + audit snapshot (iz taşıyan kayıt soft-delete kalır).
+- Faz 7: dashboard kart maskeleme.
+
+**Rollout (B2):** Faz 2 page-gate canlıya almadan ÖNCE mevcut gerçek kullanıcılara explicit rol ata (zero-admin bootstrap + ADMIN_EMAILS güvenlik ağı var ama yine de).
+**Doc:** CLAUDE.md "Mevcut Durum" + repo `memory/` BİLİNÇLİ güncellenmedi (paralel ajan o dosyaları düzenliyordu) — branch merge'inde güncellenecek.
+
+Bağlantılı: [[project_security.md]] [[project_auth.md]] [[current_focus.md]]
