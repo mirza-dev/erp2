@@ -2,18 +2,14 @@
  * Quote Service — business logic layer for quote status lifecycle.
  * Transition map: draft→sent, sent→accepted|rejected.
  * Terminal states: accepted, rejected, expired (CRON-only).
- * Faz 8: serviceConvertQuoteToOrder — accepted teklif → draft sipariş.
+ * Faz 6: accept → atomik serviceAcceptQuoteToOrder (RPC 077).
  */
 
 import { createHash } from "crypto";
 import type { QuoteStatus } from "@/lib/database.types";
 import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision, dbAcceptQuoteAndCreateOrder } from "@/lib/supabase/quotes";
-import { dbGetProductById } from "@/lib/supabase/products";
-import { dbGetCustomerById } from "@/lib/supabase/customers";
-import { dbFindOrderByQuoteId } from "@/lib/supabase/orders";
 import { dbGetCompanySettings } from "@/lib/supabase/company-settings";
 import { dbGetQuoteArchive, dbCreateQuoteArchive, dbArchiveObjectStatus, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
-import { serviceCreateOrder } from "@/lib/services/order-service";
 import { buildQuoteDataFromDetail, renderQuoteArchiveHtml } from "@/lib/quote-archive-html";
 import { mapQuoteDetail } from "@/lib/api-mappers";
 import { validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
@@ -340,196 +336,12 @@ export async function serviceExpireQuotes(): Promise<{ expired: number; expiredI
     return { expired: expiredIds.length, expiredIds };
 }
 
-// ── Quote → Order Conversion (Faz 8) ────────────────────────
-
-export interface ConvertResult {
-    success: boolean;
-    orderId?: string;
-    orderNumber?: string;
-    error?: string;
-    warnings?: string[];
-    notFound?: boolean;
-    alreadyConverted?: boolean;
-    existingOrderId?: string;
-    existingOrderNumber?: string;
-}
-
-/**
- * @deprecated Faz 6 (V4-A8): /convert route'u 410 Gone döner; accept artık atomik
- * `serviceAcceptQuoteToOrder` (RPC 077) ile yapılır. Bu fonksiyon referans/geri-uyum
- * için korunur (route'tan çağrılmaz). Tam temizlik ayrı tur.
- *
- * Kabul edilmiş teklifi taslak siparişe dönüştürür.
- *   - Sadece accepted teklifler dönüştürülebilir.
- *   - quote_id FK üzerinden idempotency kontrolü yapılır.
- *   - product_id null olan satırlar atlanır (uyarı ile).
- *   - Ürün adı/SKU/birimi products tablosundan çekilir.
- *   - Müşteri detayları (country/tax) customers tablosundan zenginleştirilir.
- */
-export async function serviceConvertQuoteToOrder(quoteId: string, createdBy?: string): Promise<ConvertResult> {
-    // 1. Teklif var mı?
-    const quote = await dbGetQuote(quoteId);
-    if (!quote) return { success: false, error: "Teklif bulunamadı.", notFound: true };
-
-    // 2. Sadece accepted teklifler
-    if (quote.status !== "accepted") {
-        return {
-            success: false,
-            error: `'${quote.status}' durumundaki teklif siparişe dönüştürülemez. Yalnızca kabul edilmiş teklifler dönüştürülebilir.`,
-        };
-    }
-
-    // 3. Daha önce dönüştürüldü mü?
-    const existing = await dbFindOrderByQuoteId(quoteId);
-    if (existing) {
-        return {
-            success: false,
-            error: "Bu teklif daha önce siparişe dönüştürülmüş.",
-            alreadyConverted: true,
-            existingOrderId: existing.id,
-            existingOrderNumber: existing.order_number,
-        };
-    }
-
-    // 3b. Faz 3 (V7) interim guard: header iskontolu teklif siparişe dönüştürülemez.
-    // sales_orders'ta header iskonto kolonu YOK (Faz 6/075'te gelecek) → convert
-    // iskontoyu sessizce düşürür ve order grand_total'ı quote'tan yüksek olur
-    // (sessiz finansal hata). "Koru" kolon olmadan imkânsız → BLOCK. Faz 6'da kalkar.
-    if (Number(quote.discount_amount) > 0) {
-        return {
-            success: false,
-            error: `İskontolu teklif (iskonto: ${quote.discount_amount}) şu an siparişe dönüştürülemez — sipariş tarafı iskonto desteği sonraki fazda gelecek.`,
-        };
-    }
-
-    // 4. Satırları filtrele
-    const validLines = quote.lines.filter(l => l.product_id != null);
-    const skippedLines = quote.lines.filter(l => l.product_id == null);
-
-    if (validLines.length === 0) {
-        return {
-            success: false,
-            error: "Teklifin hiçbir satırında ürün eşleşmesi yok. Siparişe dönüştürmek için en az bir satırda ürün seçili olmalıdır.",
-        };
-    }
-
-    // 5. Ürün detaylarını çek
-    const productMap = new Map<string, { name: string; sku: string; unit: string }>();
-    for (const line of validLines) {
-        const product = await dbGetProductById(line.product_id!);
-        if (!product) {
-            return {
-                success: false,
-                error: `Ürün bulunamadı: ${line.product_code} (satır ${line.position}). Ürün silinmiş olabilir.`,
-            };
-        }
-        productMap.set(line.product_id!, { name: product.name, sku: product.sku, unit: product.unit });
-    }
-
-    // 6. Müşteri detaylarını çek (opsiyonel zenginleştirme)
-    const warnings: string[] = [];
-    let customerCountry: string | undefined;
-    let customerTaxOffice: string | undefined;
-    let customerTaxNumber: string | undefined;
-    let customerEmail: string | undefined = quote.customer_email ?? undefined;
-
-    if (quote.customer_id) {
-        const customer = await dbGetCustomerById(quote.customer_id);
-        if (customer) {
-            customerCountry = customer.country ?? undefined;
-            customerTaxOffice = customer.tax_office ?? undefined;
-            customerTaxNumber = customer.tax_number ?? undefined;
-            customerEmail = quote.customer_email ?? customer.email ?? undefined;
-        } else {
-            warnings.push("Müşteri kaydı bulunamadı, müşteri detayları (ülke/vergi) aktarılmadı.");
-        }
-    }
-
-    // Atlanmış satırlar için uyarı
-    for (const l of skippedLines) {
-        warnings.push(`Satır ${l.position}: ürün eşleşmesi yok, atlandı.`);
-    }
-
-    // 7. Finansalları valid satırlardan yeniden hesapla
-    const subtotal = validLines.reduce((sum, l) => sum + Number(l.line_total), 0);
-    const vatTotal = Math.round(subtotal * (Number(quote.vat_rate) / 100) * 100) / 100;
-    const grandTotal = Math.round((subtotal + vatTotal) * 100) / 100;
-
-    // 8a. Geçerlilik tarihi kontrolü — geçmişse 400 döndür (serviceCreateOrder'a varmadan)
-    const validUntil = quote.valid_until ?? undefined;
-    if (validUntil) {
-        const today = new Date().toISOString().slice(0, 10);
-        if (validUntil < today) {
-            return {
-                success: false,
-                error: `Teklifin geçerlilik tarihi geçmiş (${validUntil}). Dönüştürmeden önce geçerlilik tarihini güncelleyin.`,
-            };
-        }
-    }
-
-    // 8b. Atlanmış satırları sipariş notuna ekle (kalıcı iz)
-    let orderNotes = quote.notes ?? undefined;
-    if (skippedLines.length > 0) {
-        const skippedNote = `[Dönüştürme: ${skippedLines.length} satır ürün eşleşmesi olmadığı için atlandı — ${skippedLines.map(l => `Satır ${l.position}`).join(", ")}]`;
-        orderNotes = orderNotes ? `${orderNotes}\n${skippedNote}` : skippedNote;
-    }
-
-    // 8c. Sipariş oluştur
-    const orderInput = {
-        customer_id: quote.customer_id ?? undefined,
-        customer_name: quote.customer_name,
-        customer_email: customerEmail,
-        customer_country: customerCountry,
-        customer_tax_office: customerTaxOffice,
-        customer_tax_number: customerTaxNumber,
-        commercial_status: "draft" as const,
-        fulfillment_status: "unallocated" as const,
-        currency: quote.currency,
-        subtotal,
-        vat_total: vatTotal,
-        grand_total: grandTotal,
-        notes: orderNotes,
-        quote_id: quoteId,
-        quote_valid_until: validUntil,
-        created_by: createdBy,
-        lines: validLines.map(line => ({
-            product_id: line.product_id!,
-            product_name: productMap.get(line.product_id!)!.name,
-            product_sku: productMap.get(line.product_id!)!.sku,
-            unit: productMap.get(line.product_id!)!.unit,
-            quantity: Number(line.quantity),
-            unit_price: Number(line.unit_price),
-            discount_pct: 0,
-            line_total: Number(line.line_total),
-        })),
-    };
-
-    let order: Awaited<ReturnType<typeof serviceCreateOrder>>;
-    try {
-        order = await serviceCreateOrder(orderInput);
-    } catch (err: unknown) {
-        // DB unique constraint violation: aynı quote_id zaten sipariş var (race condition)
-        const msg = err instanceof Error ? err.message : String(err);
-        if (msg.includes("23505") || msg.includes("uq_sales_orders_quote_id")) {
-            const raceExisting = await dbFindOrderByQuoteId(quoteId);
-            return {
-                success: false,
-                error: "Bu teklif daha önce siparişe dönüştürülmüş.",
-                alreadyConverted: true,
-                existingOrderId: raceExisting?.id,
-                existingOrderNumber: raceExisting?.order_number,
-            };
-        }
-        throw err;
-    }
-
-    return {
-        success: true,
-        orderId: order.id,
-        orderNumber: order.order_number,
-        warnings: warnings.length > 0 ? warnings : undefined,
-    };
-}
+// ── Quote → Order Conversion ────────────────────────────────
+// Faz 8b: serviceConvertQuoteToOrder + ConvertResult KALDIRILDI (ölü kod).
+// Yerini Faz 6 atomik accept aldı: serviceAcceptQuoteToOrder (RPC 077,
+// accept_quote_and_create_order) — tek transaction'da accept + draft order +
+// donmuş totaller + arşiv recover. /convert route'u 410 Gone döner (eski URL
+// uyumu). Eski iki-adımlı convert akışı tamamen emekli.
 
 // ── Query ────────────────────────────────────────────────────
 

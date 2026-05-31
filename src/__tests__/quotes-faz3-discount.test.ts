@@ -333,10 +333,9 @@ describe("QuoteForm — review fix source-regex (P2/P3)", () => {
 });
 
 describe("Convert iskonto block (P1) + migration 072 CHECK", () => {
-    it("quote-service convert discount_amount > 0 → block", () => {
-        const src = readFileSync(join(process.cwd(), "src/lib/services/quote-service.ts"), "utf8");
-        expect(src).toMatch(/Number\(quote\.discount_amount\) > 0/);
-    });
+    // Faz 8b: serviceConvertQuoteToOrder + Faz 3 interim discount-block KALDIRILDI
+    // (ölü kod; yerini Faz 6 atomik accept aldı). Eski "discount_amount > 0 → block"
+    // source-assert testi obsolete olduğu için çıkarıldı.
     it("[id]/page.tsx Faz 6: iskonto convert-block notu KALDIRILDI (sipariş artık iskonto destekli)", () => {
         const p = readFileSync(join(process.cwd(), "src/app/dashboard/quotes/[id]/page.tsx"), "utf8");
         // Faz 6 (077): sales_orders.discount_amount geldi → iskontolu teklif de
