@@ -5,7 +5,7 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 8 — Ertelenen Borçlar Kapanışı** — 5 alt-faz/5 commit, 4096 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY BEKLİYOR**)
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 8 — Ertelenen Borçlar Kapanışı** — 5 alt-faz/5 commit, 4098 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY BEKLİYOR**)
 
 **V7'nin tüm ertelenen borçları kapatıldı (5 bağımsız kalem, ayrı commit'ler). Kullanıcı kararları: Paraşüt orantılı / sig rename ATLA / drag-reorder ERTELE.**
 - **8a (`4935e88`) Quotes RBAC:** yazma uçlarına guard (accept precedent'i) — POST/PATCH/revise → `manage_quotes`, DELETE → `delete_quotes`; GET'ler auth-only. quotes-rbac.test.ts (5) + 7 mevcut route testine role-guard mock (varsayılan izinli).
@@ -13,7 +13,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **8c (`034f8ea`) Quotes audit katmanı:** helper seviyesi (RPC değil — product-types paterni; advisor) — dbCreateQuote/dbUpdateQuote/dbCreateQuoteRevision → audit_log (quote_created/updated/revised, source ui, best-effort, actor'sız [codebase-tutarlı]). RPC repro riski elendi. quotes-audit.test.ts (3).
 - **8d (`4218d3e`) order_line_description — Migration 080 (APPLY BEKLİYOR):** order_lines += description; accept RPC = 078 gövdesi BİREBİR + tek delta (qli.description taşı; master p.name KORUNDU). TS/mapper/order-detay-UI. order-line-description.test.ts (6: invariant koruması + delta + mapper).
 - **8e (`4b9c938`) Paraşüt iskonto orantılı aktarım:** guard → reconciliation. `computeHeaderDiscountPct` (discount/subtotal*100) builder'da per-satır discount_value; `reconcileParasutDiscount` orantılı toplamı kendi kodumuzda kurup grand_total ile tolerans dahilinde karşılaştırır (mock net_total iskonto yok sayıyor). Tolerans aşımı/subtotal=0 → blok+alert (guard ruhu); uyuşursa fatura OLUŞUR. order_lines mutate edilmez. parasut-discount-guard FLIP (pure 6 + integration 4).
-- **Doğrulama:** **4098→4096** (8b −22 convert-service +sonra net) · tsc temiz · npm run lint 0 · build OK (`ƒ /api/note-templates` + `ƒ Proxy`).
+- **Doğrulama:** **4098→4098 (8e builder drift-guard +2)** (8b −22 convert-service +sonra net) · tsc temiz · npm run lint 0 · build OK (`ƒ /api/note-templates` + `ƒ Proxy`).
 - **DURUM: 5 commit COMMIT+PUSH EDİLDİ · migration 080 APPLY BEKLİYOR (yalnız 8d).** Diğer 4 kalem migration'sız.
 - **Kapsam dışı (kullanıcı kararı):** sig_* rename ATLA (kabul edilen isimlendirme); drag-reorder ERTELE. **V7 master-plan + tüm ertelenen borçlar TAMAMLANDI** (kalan: audit actor [trigger ayrı faz], GET view_quotes RBAC, Paraşüt Sandbox GATE — hiçbiri quotes modülü borcu değil).
 

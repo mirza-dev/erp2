@@ -4,7 +4,7 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 8 — Ertelenen Borçlar Kapanışı (2026-05-31) — 5 alt-faz/5 commit, 4096 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY BEKLİYOR** — **V7 + tüm ertelenen borçlar TAMAMLANDI**
+## Faz 8 — Ertelenen Borçlar Kapanışı (2026-05-31) — 5 alt-faz/5 commit, 4098 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY BEKLİYOR** — **V7 + tüm ertelenen borçlar TAMAMLANDI**
 
 **Kullanıcı "ertelenenleri halledelim" → V7 fazları boyunca biriken bilinçli borçlar kapatıldı.** Kararlar: Paraşüt iskonto **orantılı per-satır yüzde** / sig rename **ATLA** / drag-reorder **ERTELE**. 5 bağımsız kalem, ayrı commit. Plan: `~/.claude/plans/clever-dancing-owl.md`. Advisor: audit RPC değil helper-seviyesi (migration elendi) + Paraşüt guard→reconciliation.
 
@@ -13,7 +13,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **8c — Quotes audit katmanı (`034f8ea`, migration YOK):** **advisor: helper-seviyesi (RPC değil)** → RPC repro riski elendi. dbCreateQuote/dbUpdateQuote/dbCreateQuoteRevision → audit_log (quote_created/updated/revised, source ui, after_state, best-effort, **actor'sız**=codebase-tutarlı; trigger ayrı faz). quotes-audit.test.ts (3); faz4a mock'una audit chain.
 - **8d — order_line_description — Migration 080 (`4218d3e`, APPLY BEKLİYOR):** order_lines += description (nullable). accept RPC = **078 gövdesi BİREBİR + tek delta** (CREATE OR REPLACE, DROP yok): order_lines INSERT'e description + SELECT'e qli.description; master p.name/sku/unit KORUNDU. TS/mapper/order-detay-UI. Paraşüt fatura description'ı değişmedi. order-line-description.test.ts (6: tüm accept invariant source-assert + delta + mapper). İdempotent + ROLLBACK.
 - **8e — Paraşüt iskonto orantılı (`4b9c938`, migration YOK):** Faz 6 V7-A4 blanket-guard → reconciliation. `computeHeaderDiscountPct`=discount/subtotal*100 → builder per-satır `line.discount_pct + headerPct` (order_lines MUTATE EDİLMEZ). `reconcileParasutDiscount`: orantılı toplam **kendi kodumuzda** (mock net_total iskonto yok sayıyor) vs grand_total tolerans (0.01×satır+0.01); aşım/subtotal=0 → claim öncesi early return + zorunlu sync_issue alert (throw değil), uyuşursa **fatura OLUŞUR**. parasut-discount-guard FLIP (pure 6 + integration 4).
-- **Doğrulama: 4098→4096** · tsc temiz · npm run lint 0 · build OK. **DURUM: 5 commit COMMIT+PUSH EDİLDİ · migration 080 APPLY BEKLİYOR (yalnız 8d).**
+- **Doğrulama: 4098→4098 (8e builder drift-guard +2)** · tsc temiz · npm run lint 0 · build OK. **DURUM: 5 commit COMMIT+PUSH EDİLDİ · migration 080 APPLY BEKLİYOR (yalnız 8d).**
 - **Kapsam dışı (kullanıcı kararı):** sig_* rename ATLA (kabul edilen isimlendirme); drag-reorder ERTELE. Kalan (quotes borcu DEĞİL): audit actor (trigger), GET view_quotes RBAC, Paraşüt Sandbox GATE.
 
 ---
