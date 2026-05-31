@@ -1,6 +1,6 @@
 ---
 name: project_rbac
-description: "Rol bazlı erişim (RBAC) — 6 rol, permission/page-gate/kullanıcı yönetimi/redaction; Faz 1-5 MAIN'DE TAM (Faz 4 quotes+PO+archive dahil), 6/7 ertelendi"
+description: "Rol bazlı erişim (RBAC) — 6 rol, permission/page-gate/kullanıcı yönetimi/redaction/delete-policy; Faz 1-6 MAIN'DE TAM (Faz 4 redaction + Faz 6 delete dahil), yalnız Faz 7 (dashboard UI maskeleme) ertelendi"
 metadata: 
   node_type: memory
   type: project
@@ -30,14 +30,23 @@ ERP2 rol bazlı erişim sistemi. Kaynak plan: `role-based-access-plan.md` (kulla
 - **Migration**: product-types requireRole(["admin"])→requirePermission("manage_product_types") (admin→admin+purchasing genişledi, page-gate tutarlılığı). PO cancel/receive/from-rec + import classify/extract/apply/document-lines zaten requireRole'lı, DOKUNULMADI.
 - **Test**: rbac-mutation-guards.test.ts (48, gerçek requirePermission + viewer perm → 403) + redact.test.ts (pure, snake_case regresyon) + products-get-redaction (per-request diskriminatif) + R4/R5. ~30 mevcut test dosyasına uniform role-guard mock. **3980 test yeşil · tsc temiz · build OK (ƒ Proxy) · eslint 0 warning.**
 - **Faz 4 TAMAMLANDI (2026-05-31, commit `1db5865`, FF→origin/main):** quotes + PO finansal GET redaction + archive gate eklendi (önceki tur sadece products/customers/orders'tı). `redact.ts` +4 fn: `redactQuotes/QuoteForPerms` (CAMELCASE — quotes route mapper'lı: grandTotal/subtotal/vatTotal/discountAmount+satır unitPrice/lineTotal ← view_sales_prices), `redactPurchaseOrders/OrderForPerms` (SNAKE_CASE raw row: subtotal/vat_total/grand_total+satır unit_price/line_total ← view_purchase_costs). Wiring: quotes+PO list/detail GET. quote **archive** (donmuş HTML PDF, seçici redaction imkânsız) → `requirePermission(view_sales_prices)` tüm belge gate. Sınıf ayrımı doğrulandı: sales PO maliyeti GÖRMEZ / purchasing quote fiyatı GÖRMEZ. **Sızıntı yüzeyi (advisor):** preview/page.tsx yalnız localStorage (Mod A, yazarın kendi taslağı); [id]/page.tsx inline PDF render ETMEZ → server-fetch saklı teklif PDF yolu YOK. +23 test (4197). **camelCase/snake_case ayrımı redact.ts yorumunda işaretli** (quotes camelCase = orders'ın tersi).
-- **KALAN (ayrı tur)**: parasut oauth/start+refresh hâlâ ADMIN_EMAILS env-gate (güvenli, policy modeli farklı); customers/orders redaction'a end-to-end diskriminatif test (opsiyonel); product-types purchasing→200 positive test. **Faz 6 (delete policy: domain `delete_*` perm + 409 ilişkili + audit snapshot) + Faz 7 (dashboard kart maskeleme + null finansal `--` UI) hâlâ ertelendi.**
+**Faz 6 (delete policy) MAIN'E FF + PUSH EDİLDİ (2026-05-31, commit `5e0df84`).** DELETE uçları domain `delete_*` yetkisine bağlandı (customers→delete_customers, vendors→delete_vendors, production→delete_production, orders→delete_sales_orders; quotes zaten delete_quotes/Faz 8a). **Davranış koruyucu** — her domain'de `manage_X` tutan rol `delete_X`'i de tutuyor (sales/purchasing/production) → kimse erişim kaybetmez, guard yalnız semantik doğrulanır (güvenlik sıkılaştırması DEĞİL).
+- **getCurrentUserId(req?)** (role-guard) — audit actor; `sb.auth.getUser().id ?? null`, yetki kararı vermez.
+- **audit-after-success pattern** (dbDeleteCustomer/dbHardDeleteOrder/dbDeleteQuote): before-snapshot silmeden ÖNCE çekilir (satır silinince yok olur), audit YALNIZ delete BAŞARILI olunca yazılır → **FK restrict throw ederse YALAN `*_deleted` audit kalmaz** (advisor blocker; dbDeactivateVendor'ın güvenli audit-after paterni). `audit_log{actor, action:customer_deleted|order_hard_deleted|quote_deleted, entity_type, entity_id, before_state, source:ui}`.
+- **409 ilişki kontrolleri zaten mevcuttu**: customers→sipariş sayısı (dbCountOrdersByCustomer), vendors→aktif PO, production→dbReverseProduction, orders→durum kapısı (draft/cancelled).
+- **KORUNAN SAPMA**: production DELETE `dbReverseProduction` ile stoğu **bilinçli geri alır** (üretim kaydı geri alma semantiği, pre-existing) — plan "ters stok/muhasebe YOK" der ama domain gereği korundu (reverse RPC zaten before_state audit'ler). Onaylı planda adlandırılmış sapma.
+- **BİLİNEN REFINEMENT (gelecek tur)**: customers→`invoices`, orders→`shipments`/`invoices` `on delete restrict` FK'leri (012/live tablolar) 409 pre-check'te DEĞİL → bu durumlarda **dürüst 500** (audit-after sayesinde yalan audit DEĞİL; correctness etkilenmez). Temiz 409 mesajı için dbCount* helper'ları + route pre-check eklenebilir.
+- **Kapsam dışı**: `delete_purchase_orders` tanımlı ama kullanılmıyor (PO iptal edilir, DELETE uç yok); products soft-delete (`is_active:false`, manage_product_master); attachments requireRole(admin/purchaser).
+- **Migration YOK** (`audit_log.actor text` 001'de mevcut). **Test**: +delete-audit.test.ts (10: snapshot→delete→audit sırası + actor/before_state + no-row no-op + DELETE-fail→throw+audit YAZILMAZ) + rbac-mutation-guards delete_* ayırt edicilik (5: manage_* tek başına→403) + rol→delete_* eşleme regresyon kilidi + 3 route testine getCurrentUserId mock. **4212 test · tsc temiz · lint 0 · build OK (ƒ Proxy).** Plan: `~/.claude/plans/piped-crunching-bubble.md`.
+
+- **KALAN (ayrı tur)**: parasut oauth/start+refresh hâlâ ADMIN_EMAILS env-gate (güvenli, policy modeli farklı); customers/orders redaction'a end-to-end diskriminatif test (opsiyonel); product-types purchasing→200 positive test; Faz 6 invoices/shipments 409 refinement (yukarıda). **Yalnız Faz 7 (dashboard kart maskeleme + null finansal `--` UI) ertelendi.**
 
 **ERTELENEN (Faz 3 zaten R1'e dahil edildi) — :**
 - Faz 3: 14 `requireRole` callsite → `requirePermission`; admin/parasut oauth permission map.
   - **ÇÖZÜLDÜ (2026-05-31):** Quotes route'ları (POST/PATCH/DELETE/revise) main'in **Faz 8a** turunda `requirePermission` ile guard'landı (POST/PATCH/revise→`manage_quotes`, DELETE→`delete_quotes`, GET→auth-only). Merge'de main'in bu versiyonu korundu. Eski not (route-level guard yoktu) artık geçersiz.
 - Faz 4: response redaction (`redactXForPermissions` — api-mappers/data-context/ürün/quote/order/PO/dashboard/parasut + PDF/preview). 3 veri sınıfı: sales-financial / purchase-financial / high-sensitivity. EN BÜYÜK + en riskli.
-- Faz 6: delete policy — yan-etkisiz hard delete + ilişkili→409 + audit snapshot (iz taşıyan kayıt soft-delete kalır).
-- Faz 7: dashboard kart maskeleme.
+- Faz 6: delete policy — **TAMAMLANDI** (yukarı bak; commit `5e0df84`). delete_* yetki bağlama + audit-after-success + mevcut 409'lar. invoices/shipments 409 refinement kaldı.
+- Faz 7: dashboard kart maskeleme — **TEK KALAN FAZ** (kart filtre + null finansal `--`/`Yetki gerekli` UI + buton gizle/disable).
 
 **Rollout (B2):** Faz 2 page-gate canlıya almadan ÖNCE mevcut gerçek kullanıcılara explicit rol ata (zero-admin bootstrap + ADMIN_EMAILS güvenlik ağı var ama yine de).
 **Doc:** CLAUDE.md "Mevcut Durum" + repo `memory/` BİLİNÇLİ güncellenmedi (paralel ajan o dosyaları düzenliyordu) — branch merge'inde güncellenecek.
