@@ -9,7 +9,8 @@ import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
+import { redactOrderForPerms } from "@/lib/auth/redact";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_FIELD_LEN = 100;
@@ -106,7 +107,10 @@ export async function POST(
         }
 
         revalidateTag("products", "max");
-        return NextResponse.json(updated ?? { ok: true });
+        // RBAC R3/F3a: ship_sales_orders tutan production view_sales_prices tutmaz
+        // → ship response'undaki satış finansalları redakte edilir (per-request).
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(updated ? redactOrderForPerms(updated, perms) : { ok: true });
     } catch (err) {
         return handleApiError(err, "POST /api/orders/[id]/ship");
     }

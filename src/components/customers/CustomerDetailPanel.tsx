@@ -55,7 +55,7 @@ export default function CustomerDetailPanel({
     const { orders, updateCustomer } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
-    const { canViewSalesPrices, canViewFinancialSummary } = usePermissions();
+    const { canViewSalesPrices, canViewFinancialSummary, has } = usePermissions();
     const [editMode, setEditMode] = useState(false);
     const [editSaved, setEditSaved] = useState(false);
     const [editSaving, setEditSaving] = useState(false);
@@ -406,8 +406,11 @@ export default function CustomerDetailPanel({
                             </div>
                         )}
 
-                        {/* Actions */}
+                        {/* Actions — RBAC F7: CTA'lar yetkiye göre gizlenir (API guard'ı
+                            zaten korur; bu UX tutarlılığı). İkisi de yoksa satır render edilmez. */}
+                        {(has("manage_sales_orders") || has("manage_customers")) && (
                         <div style={{ padding: "14px 16px", display: "flex", gap: "8px" }}>
+                            {has("manage_sales_orders") && (
                             <button
                                 onClick={() => {
                                     onClose();
@@ -426,6 +429,8 @@ export default function CustomerDetailPanel({
                             >
                                 Yeni Sipariş
                             </button>
+                            )}
+                            {has("manage_customers") && (
                             <button
                                 onClick={() => !isDemo && openEdit()}
                                 disabled={isDemo}
@@ -444,7 +449,9 @@ export default function CustomerDetailPanel({
                             >
                                 Düzenle
                             </button>
+                            )}
                         </div>
+                        )}
                     </>
                 )}
             </div>

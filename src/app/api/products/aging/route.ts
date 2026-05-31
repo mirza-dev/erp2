@@ -78,7 +78,10 @@ export async function GET(req: NextRequest) {
                     daysWaiting,
                     agingCategory,
                     costPrice:          canCost ? (p.cost_price ?? null) : null,
-                    boundCapital:       canCost ? p.on_hand * (p.cost_price ?? p.price ?? 0) : null,
+                    // RBAC F5: price fallback YALNIZ canSales true iken — yoksa
+                    // purchasing (canCost, !canSales) boundCapital/on_hand ile
+                    // satış fiyatını türetir. cost_price null + !canSales → 0.
+                    boundCapital:       canCost ? p.on_hand * (p.cost_price ?? (canSales ? (p.price ?? 0) : 0)) : null,
                 };
             });
 

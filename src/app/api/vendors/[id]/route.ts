@@ -5,7 +5,7 @@ import {
     dbDeactivateVendor,
 } from "@/lib/supabase/vendors";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { getCurrentUserId, requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // GET /api/vendors/[id]
@@ -94,7 +94,9 @@ export async function DELETE(
         if (!existing) return NextResponse.json({ error: "Tedarikçi bulunamadı." }, { status: 404 });
         if (!existing.is_active) return NextResponse.json({ error: "Tedarikçi zaten pasif." }, { status: 409 });
 
-        await dbDeactivateVendor(id);
+        // RBAC F6 — Faz 6 disiplini: deaktivasyon audit'i actor yazsın (diğer
+        // delete'lerle tutarlı; vendor soft-delete bilinçli — PO FK koruması).
+        await dbDeactivateVendor(id, await getCurrentUserId());
         revalidateTag("vendors", "max");
         return NextResponse.json({ success: true });
     } catch (err) {

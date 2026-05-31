@@ -89,7 +89,7 @@ export default function OrderDetailPage() {
     const { updateOrderStatus } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
-    const { canViewSalesPrices } = usePermissions();
+    const { canViewSalesPrices, has } = usePermissions();
     const [order, setOrder] = useState<OrderDetail | null>(null);
     const [orderLoading, setOrderLoading] = useState(true);
 
@@ -478,9 +478,11 @@ export default function OrderDetailPage() {
                                 <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => handleTransition("shipped")} disabled={isDemo || loading !== null} loading={loading === "shipped"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                                    {loading === "shipped" ? "Paraşüt'e gönderiliyor..." : "Sevket"}
-                                </Button>
+                                {has("ship_sales_orders") && (
+                                    <Button variant="primary" onClick={() => handleTransition("shipped")} disabled={isDemo || loading !== null} loading={loading === "shipped"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                        {loading === "shipped" ? "Paraşüt'e gönderiliyor..." : "Sevket"}
+                                    </Button>
+                                )}
                             </>
                         )}
                         {(fulfillmentStatus === "shipped" || commercialStatus === "cancelled") && (

@@ -46,6 +46,7 @@ vi.mock("@/lib/auth/role-guard", () => ({
         new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
     getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
+    getCurrentUserId: vi.fn().mockResolvedValue("u-test"), // F6: DELETE artık actor için çağırıyor
 }));
 
 // ── Mocks ─────────────────────────────────────────────────────
@@ -375,7 +376,8 @@ describe("DELETE /api/vendors/[id]", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.success).toBe(true);
-        expect(mockDbDeactivateVendor).toHaveBeenCalledWith("v-1");
+        // F6: route artık actor'ı (getCurrentUserId) ikinci argüman olarak geçer.
+        expect(mockDbDeactivateVendor).toHaveBeenCalledWith("v-1", "u-test");
     });
 });
 
@@ -400,5 +402,24 @@ describe("dbDeactivateVendor — active PO guard", () => {
             entity_type: "vendor",
             entity_id: "v-1",
         }));
+    });
+
+    // F6 — Faz 6 disiplini: deaktivasyon audit'i actor yazsın (diğer delete'lerle tutarlı).
+    it("F6: actor verilince audit_log.actor yazılır", async () => {
+        const { dbDeactivateVendor: realDeactivate } = await vi.importActual<typeof import("@/lib/supabase/vendors")>("@/lib/supabase/vendors");
+        setTerminalResult({ count: 0, error: null });
+        await realDeactivate("v-1", "u-42");
+        expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+            action: "vendor_deactivated",
+            entity_id: "v-1",
+            actor: "u-42",
+        }));
+    });
+
+    it("F6: actor verilmezse audit_log.actor null (geriye uyumlu)", async () => {
+        const { dbDeactivateVendor: realDeactivate } = await vi.importActual<typeof import("@/lib/supabase/vendors")>("@/lib/supabase/vendors");
+        setTerminalResult({ count: 0, error: null });
+        await realDeactivate("v-1");
+        expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ actor: null }));
     });
 });

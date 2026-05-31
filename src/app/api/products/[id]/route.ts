@@ -11,7 +11,8 @@ import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
 import { dbExpireEntityRecommendations } from "@/lib/supabase/recommendations";
 import type { AlertType } from "@/lib/database.types";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
+import { redactProductsForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
 const PRODUCT_ALERT_TYPES: AlertType[] = [
@@ -26,7 +27,7 @@ async function resolveProductAlerts(productId: string, reason: string): Promise<
 
 // GET /api/products/[id]
 export async function GET(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
@@ -41,13 +42,17 @@ export async function GET(
         ]);
         const quoted   = quotedMap.get(id)   ?? 0;
         const incoming = incomingMap.get(id) ?? 0;
-        return NextResponse.json({
+        const enriched = {
             ...product,
             quoted,
             incoming,
             promisable: product.available_now - quoted,
             forecasted: product.available_now + incoming - quoted,
-        });
+        };
+        // RBAC R3: price (view_sales_prices) + cost_price (view_purchase_costs)
+        // per-request redaksiyon — liste route'undaki pattern (cache DIŞINDA).
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(redactProductsForPerms([enriched], perms)[0]);
     } catch (err) {
         return handleApiError(err, "GET /api/products/[id]");
     }
@@ -73,7 +78,10 @@ export async function PATCH(
             await resolveProductAlerts(id, "product_deactivated");
             await dbExpireEntityRecommendations(id, "product").catch(() => {});
         }
-        return NextResponse.json(product);
+        // RBAC R3: PATCH yapan purchasing/sales kendi yetkisi dışındaki fiyatı
+        // response'ta görmesin (per-request, cache'siz).
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(redactProductsForPerms([product], perms)[0]);
     } catch (err) {
         return handleApiError(err, "PATCH /api/products/[id]");
     }

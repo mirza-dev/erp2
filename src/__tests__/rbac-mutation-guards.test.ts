@@ -300,3 +300,32 @@ describe("Faz 6 — delete guard delete_* ister (manage_* yetmez)", () => {
         expect(viewer.has("delete_quotes")).toBe(false);
     });
 });
+
+// ── F4: orders PATCH ship per-transition guard (ship_sales_orders) ──────────
+// PATCH {transition:"shipped"} artık ship_sales_orders ister (sales tutmaz →
+// sevk edemez); diğer geçişler manage_sales_orders. Detay "Sevket" butonu PATCH
+// kullandığından "shipped"i kaldırmak yerine per-transition guard uygulandı.
+describe("F4 — orders PATCH ship per-transition guard", () => {
+    const mockedPerms = vi.mocked(getCurrentUserPermissions);
+    const only = (...p: string[]) => new Set(p) as Set<Permission>;
+
+    it("sales-benzeri (manage_sales_orders var, ship_sales_orders YOK) + {transition:'shipped'} → 403", async () => {
+        mockedPerms.mockResolvedValueOnce(only("manage_sales_orders", "view_sales_orders", "view_sales_prices"));
+        expect((await orderPatch(patchReq({ transition: "shipped" }), params())).status).toBe(403);
+    });
+
+    // Authz-önce ordering kilidi: transition'sız body → manage_sales_orders'a düşer
+    // → viewer 403 (validation 400'den ÖNCE authz). Guard reorder regression'ı yakalar.
+    it("viewer + transition'sız body → 403 (validation değil authz önce)", async () => {
+        // module-level mock viewer döner; mockResolvedValueOnce ile sabitlemeye gerek yok
+        expect((await orderPatch(patchReq({ foo: "bar" }), params())).status).toBe(403);
+    });
+
+    // Rol→permission eşleme regresyonu (per-transition guard'ı doğru kılan yarı):
+    // production ship tutar, sales tutmaz; sales non-ship geçişler için manage tutar.
+    it("rol→ship_sales_orders eşlemesi: production var, sales YOK", () => {
+        expect(permissionsForRoles(["production"]).has("ship_sales_orders")).toBe(true);
+        expect(permissionsForRoles(["sales"]).has("ship_sales_orders")).toBe(false);
+        expect(permissionsForRoles(["sales"]).has("manage_sales_orders")).toBe(true);
+    });
+});

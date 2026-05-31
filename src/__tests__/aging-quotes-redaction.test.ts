@@ -4,7 +4,9 @@
  * Faz 7 UI maskelemesini "tiyatro"dan kurtarmak için bu iki route Faz 7'de
  * redaction kazandı (önceden ham cost/sales fiyatı sızdırıyordu):
  *   - GET /api/products/aging — boundCapital/costPrice ← view_purchase_costs; price ← view_sales_prices
- *   - GET /api/products/[id]/quotes — unitPrice ← view_sales_prices
+ *     (F5: boundCapital price-fallback YALNIZ view_sales_prices varken — purchasing satış fiyatı türetemez)
+ *   - GET /api/products/[id]/quotes — unitPrice + lineTotal ← view_sales_prices
+ *     (F2: lineTotal de null'lanmalı; lineTotal/quantity ile birim fiyat türetilebilirdi)
  * Diskriminatif: AYNI kaynak, FARKLI perm → farklı çıktı (per-request).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -61,8 +63,8 @@ beforeEach(() => {
     mockGetLastProduction.mockResolvedValue(new Map());
     mockGetQuotedBreakdown.mockResolvedValue([
         { orderId: "o1", orderNumber: "ORD-1", customerId: "c1", customerName: "X",
-          quantity: 5, unitPrice: 100, currency: "USD", commercialStatus: "draft",
-          orderCreatedAt: "2024-01-01", quoteValidUntil: null, createdBy: null },
+          quantity: 5, unitPrice: 100, lineTotal: 480, discountPct: 4, currency: "USD",
+          commercialStatus: "draft", orderCreatedAt: "2024-01-01", quoteValidUntil: null, createdBy: null },
     ]);
     mockLookupEmails.mockResolvedValue(new Map());
 });
@@ -94,19 +96,44 @@ describe("GET /api/products/aging — Faz 7 redaction", () => {
         expect(admin[0].boundCapital).toBe(600);
         expect(viewer[0].boundCapital).toBeNull();
     });
+
+    it("F5: cost_price null + SADECE view_purchase_costs → boundCapital 0 (price'tan TÜREMEZ)", async () => {
+        mockDbListProducts.mockResolvedValueOnce([{
+            id: "p1", name: "Vana", sku: "SKU-1", category: null, unit: "adet",
+            on_hand: 10, price: 100, currency: "USD", product_type: "commercial",
+            cost_price: null,
+        }]);
+        mockGetPerms.mockResolvedValue(P("view_purchase_costs")); // sales YOK
+        const data = await (await AGING_GET(agingReq())).json();
+        expect(data[0].boundCapital).toBe(0);   // cost null → 0; 10*price (1000) sızıntısı YOK
+        expect(data[0].price).toBeNull();        // sales yetkisi yok
+    });
+
+    it("F5: cost_price null + view_purchase_costs + view_sales_prices → price fallback (10*100)", async () => {
+        mockDbListProducts.mockResolvedValueOnce([{
+            id: "p1", name: "Vana", sku: "SKU-1", category: null, unit: "adet",
+            on_hand: 10, price: 100, currency: "USD", product_type: "commercial",
+            cost_price: null,
+        }]);
+        mockGetPerms.mockResolvedValue(P("view_purchase_costs", "view_sales_prices"));
+        const data = await (await AGING_GET(agingReq())).json();
+        expect(data[0].boundCapital).toBe(1000); // canSales true → cost null'da price fallback korunur
+    });
 });
 
 describe("GET /api/products/[id]/quotes — Faz 7 redaction", () => {
-    it("view_sales_prices → unitPrice görünür", async () => {
+    it("view_sales_prices → unitPrice + lineTotal görünür", async () => {
         mockGetPerms.mockResolvedValue(P("view_sales_prices"));
         const data = await (await QUOTES_GET(quotesReq(), { params: Promise.resolve({ id: "p1" }) })).json();
         expect(data.items[0].unitPrice).toBe(100);
+        expect(data.items[0].lineTotal).toBe(480);
     });
 
-    it("yetki yok → unitPrice null, qty korunur", async () => {
+    it("F2: yetki yok → unitPrice VE lineTotal null, qty korunur", async () => {
         mockGetPerms.mockResolvedValue(P("view_products"));
         const data = await (await QUOTES_GET(quotesReq(), { params: Promise.resolve({ id: "p1" }) })).json();
         expect(data.items[0].unitPrice).toBeNull();
+        expect(data.items[0].lineTotal).toBeNull(); // lineTotal/quantity → birim fiyat türetilemesin
         expect(data.items[0].quantity).toBe(5); // operasyonel alan korunur
         expect(data.totalQuoted).toBe(5);
     });

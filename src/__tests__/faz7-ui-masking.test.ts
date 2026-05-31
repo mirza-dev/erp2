@@ -59,4 +59,16 @@ describe("Faz 7 — birincil CTA permission gating", () => {
         expect(read("src/app/dashboard/customers/page.tsx")).toContain('has("delete_customers")');
         expect(read("src/app/dashboard/quotes/page.tsx")).toMatch(/canDeleteQuotes = has\("delete_quotes"\)/);
     });
+
+    // F7 — CustomerDetailPanel "Yeni Sipariş"/"Düzenle" CTA'ları perm-gate'li.
+    it("F7: CustomerDetailPanel CTA'ları manage_* ile gizlenir", () => {
+        const src = read("src/components/customers/CustomerDetailPanel.tsx");
+        expect(src).toContain('has("manage_sales_orders")');
+        expect(src).toContain('has("manage_customers")');
+    });
+
+    // F4 UX — orders detay "Sevket" butonu ship_sales_orders ister (sales görmesin).
+    it("F4: orders/[id] Sevket butonu ship_sales_orders ile gizlenir", () => {
+        expect(read("src/app/dashboard/orders/[id]/page.tsx")).toContain('has("ship_sales_orders")');
+    });
 });

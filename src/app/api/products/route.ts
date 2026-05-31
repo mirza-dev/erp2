@@ -148,7 +148,9 @@ export async function POST(req: NextRequest) {
             dbGetIncomingQuantities(),
         ]);
         const enriched = enrichProducts([product], quotedMap, incomingMap)[0];
-        return NextResponse.json(enriched, { status: 201 });
+        // RBAC R3: yeni ürün response'unda yetkisiz fiyat/maliyet sızmasın.
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(redactProductsForPerms([enriched], perms)[0], { status: 201 });
     } catch (err: unknown) {
         // ConfigError (missing env) → 503 before anything else
         if (err instanceof ConfigError) return handleApiError(err, "POST /api/products");

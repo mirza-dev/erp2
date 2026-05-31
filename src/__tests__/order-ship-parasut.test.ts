@@ -40,7 +40,15 @@ vi.mock("@/lib/services/email-service", () => ({
     notifyUsersByEmail: vi.fn(() => Promise.resolve({ sent: 0, skipped: 0, failed: 0 })),
 }));
 
+// /ship route dbBatchResolveAlerts kullanır (PATCH route kullanmaz) — F3a testi için mock'la.
+vi.mock("@/lib/supabase/alerts", () => ({
+    dbBatchResolveAlerts: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { PATCH } from "@/app/api/orders/[id]/route";
+import { POST as shipPost } from "@/app/api/orders/[id]/ship/route";
+import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import type { Permission } from "@/lib/auth/permissions";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -165,5 +173,58 @@ describe("PATCH /api/orders/[id] ship — failed transition", () => {
     it("serviceSyncOrderToParasut never called", async () => {
         await PATCH(makeRequest({ transition: "shipped" }), makeParams());
         expect(mockServiceSyncOrderToParasut).not.toHaveBeenCalled();
+    });
+});
+
+// ─── F3 — ship response redaction (production: ship_sales_orders, view_sales_prices YOK) ───
+// F4 production'a PATCH/ship sevk yolunu açtı; production view_sales_prices tutmaz.
+// redactOrderForPerms response'taki satış finansallarını null'lamalı. Bu testler
+// silinirse (redaction kaldırılırsa) leak geri döner → diskriminatif kilit (advisor).
+describe("F3 — ship response redaction (no view_sales_prices)", () => {
+    const PROD_PERMS = new Set<Permission>(["ship_sales_orders", "view_sales_orders"]);
+    const stubWithFinancials = {
+        ...stubOrderBase,
+        grand_total: 12000,
+        subtotal: 10000,
+        vat_total: 2000,
+        lines: [{ id: "l1", product_id: "p1", quantity: 2, unit_price: 5000, line_total: 10000 }],
+        parasut_invoice_id: null, parasut_sent_at: null, parasut_error: null,
+    };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockServiceTransitionOrder.mockResolvedValue(stubTransitionSuccess);
+        mockServiceSyncOrderToParasut.mockResolvedValue({ success: true, invoice_id: null, sent_at: null });
+        mockServiceGetOrder.mockResolvedValue(stubWithFinancials);
+    });
+
+    it("PATCH (F3b): production → grand_total + satır fiyatları null, qty korunur", async () => {
+        vi.mocked(getCurrentUserPermissions).mockResolvedValueOnce(PROD_PERMS);
+        const body = await (await PATCH(makeRequest({ transition: "shipped" }), makeParams())).json();
+        expect(body.grand_total).toBeNull();
+        expect(body.subtotal).toBeNull();
+        expect(body.vat_total).toBeNull();
+        expect(body.lines[0].unit_price).toBeNull();
+        expect(body.lines[0].line_total).toBeNull();
+        expect(body.lines[0].quantity).toBe(2); // operasyonel alan sızıntı değil
+    });
+
+    it("PATCH: view_sales_prices olan rol → grand_total + satır fiyatı görünür (diskriminatif)", async () => {
+        vi.mocked(getCurrentUserPermissions).mockResolvedValueOnce(
+            new Set<Permission>(["ship_sales_orders", "view_sales_prices"]));
+        const body = await (await PATCH(makeRequest({ transition: "shipped" }), makeParams())).json();
+        expect(body.grand_total).toBe(12000);
+        expect(body.lines[0].unit_price).toBe(5000);
+    });
+
+    it("POST /ship (F3a): production → grand_total + satır fiyatları null", async () => {
+        vi.mocked(getCurrentUserPermissions).mockResolvedValueOnce(PROD_PERMS);
+        const req = new NextRequest(`http://localhost/api/orders/${ORDER_ID}/ship`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ shipDate: "2026-06-01" }),
+        });
+        const body = await (await shipPost(req, makeParams())).json();
+        expect(body.grand_total).toBeNull();
+        expect(body.lines[0].unit_price).toBeNull();
     });
 });

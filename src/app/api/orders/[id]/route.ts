@@ -40,21 +40,30 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const guard = await requirePermission(req, "manage_sales_orders");
-        if (guard) return guard;
-
         const { id } = await params;
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Record<string, unknown>;
 
-        // Quote deadline update — separate from state-machine transitions
+        // Quote deadline update — separate from state-machine transitions.
+        // manage_sales_orders yeterli (sales teklif vadesini yönetir).
         if ("quote_valid_until" in body) {
+            const guard = await requirePermission(req, "manage_sales_orders");
+            if (guard) return guard;
             await serviceUpdateQuoteDeadline(id, (body.quote_valid_until as string | null) ?? null);
             return NextResponse.json({ ok: true });
         }
 
         const transition: OrderTransition = body.transition as OrderTransition;
+
+        // RBAC F4 — per-transition guard, validation'dan ÖNCE (authz önce gelir):
+        // sevk (shipped) ship_sales_orders ister (sales bu yetkiyi tutmaz → sevk
+        // edemez); diğer/eksik geçiş manage_sales_orders'a düşer. Eksik transition →
+        // viewer 403 (eski authz-önce davranışı korunur), yetkili kullanıcı 400 alır.
+        // production ship_sales_orders tutar → detay "Sevket" butonu çalışır.
+        const neededPerm = transition === "shipped" ? "ship_sales_orders" : "manage_sales_orders";
+        const transitionGuard = await requirePermission(req, neededPerm);
+        if (transitionGuard) return transitionGuard;
 
         if (!transition) {
             return NextResponse.json({ error: "'transition' alanı zorunludur." }, { status: 400 });
@@ -90,7 +99,10 @@ export async function PATCH(
             }).catch(err => console.error("[email order_shipped]", err));
         }
         revalidateTag("products", "max");
-        const response: Record<string, unknown> = { ...updated };
+        // RBAC R3/F3b: production (ship_sales_orders var, view_sales_prices yok)
+        // PATCH ship response'unda satış finansallarını GÖRMESİN (per-request).
+        const perms = await getCurrentUserPermissions(req);
+        const response: Record<string, unknown> = updated ? { ...redactOrderForPerms(updated, perms) } : {};
         if (result.shortages && result.shortages.length > 0) {
             response.shortages = result.shortages;
         }

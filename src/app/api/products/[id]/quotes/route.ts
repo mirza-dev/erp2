@@ -21,14 +21,16 @@ export async function GET(
             .filter((x): x is string => !!x);
         const emailMap = await dbLookupUserEmails(uuids);
 
-        // RBAC R3: sales-financial — view_sales_prices yoksa unitPrice null
-        // (ürün detayı "tekliflerde" widget'ı sales fiyatı içerir; per-request).
+        // RBAC R3: sales-financial — view_sales_prices yoksa unitPrice VE lineTotal
+        // null (ürün detayı "tekliflerde" widget'ı sales fiyatı içerir; per-request).
+        // lineTotal ham bırakılırsa lineTotal/quantity ile birim fiyat türetilebilir.
         const perms = await getCurrentUserPermissions(req);
         const canViewSalesPrices = perms.has("view_sales_prices");
 
         const items = rows.map(r => ({
             ...r,
             unitPrice: canViewSalesPrices ? r.unitPrice : null,
+            lineTotal: canViewSalesPrices ? r.lineTotal : null,
             createdByEmail: r.createdBy ? emailMap.get(r.createdBy) ?? null : null,
         }));
 

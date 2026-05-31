@@ -169,7 +169,7 @@ export async function dbUpdateVendor(id: string, patch: UpdateVendorInput): Prom
 
 const ACTIVE_PO_STATUSES = ["draft", "sent", "confirmed", "partially_received"];
 
-export async function dbDeactivateVendor(id: string): Promise<void> {
+export async function dbDeactivateVendor(id: string, actor: string | null = null): Promise<void> {
     const supabase = createServiceClient();
 
     // Aktif PO guard: vendor'a bağlı draft/sent/confirmed/partially_received PO varsa pasife alınamaz.
@@ -196,6 +196,7 @@ export async function dbDeactivateVendor(id: string): Promise<void> {
         entity_type: "vendor",
         entity_id: id,
         after_state: { is_active: false },
+        actor,
         source: "ui",
     });
 }
