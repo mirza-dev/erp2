@@ -1,6 +1,6 @@
 ---
 name: project_rbac
-description: "Rol bazlı erişim (RBAC) — 6 rol, permission sistemi, page-gate, kullanıcı yönetimi; Faz 1+2+4+5 MAIN'DE, 6/7 ertelendi"
+description: "Rol bazlı erişim (RBAC) — 6 rol, permission/page-gate/kullanıcı yönetimi/redaction; Faz 1-5 MAIN'DE TAM (Faz 4 quotes+PO+archive dahil), 6/7 ertelendi"
 metadata: 
   node_type: memory
   type: project
@@ -29,7 +29,8 @@ ERP2 rol bazlı erişim sistemi. Kaynak plan: `role-based-access-plan.md` (kulla
 - **R5** canAccessPath bilinmeyen /dashboard/* fail-closed test'i.
 - **Migration**: product-types requireRole(["admin"])→requirePermission("manage_product_types") (admin→admin+purchasing genişledi, page-gate tutarlılığı). PO cancel/receive/from-rec + import classify/extract/apply/document-lines zaten requireRole'lı, DOKUNULMADI.
 - **Test**: rbac-mutation-guards.test.ts (48, gerçek requirePermission + viewer perm → 403) + redact.test.ts (pure, snake_case regresyon) + products-get-redaction (per-request diskriminatif) + R4/R5. ~30 mevcut test dosyasına uniform role-guard mock. **3980 test yeşil · tsc temiz · build OK (ƒ Proxy) · eslint 0 warning.**
-- **KALAN (Faz 4 sonrası, ayrı tur)**: parasut oauth/start+refresh hâlâ ADMIN_EMAILS env-gate (manage_parasut'a alınmadı — güvenli, sadece policy modeli farklı); customers/orders redaction'a end-to-end diskriminatif test (products'ta var, opsiyonel); product-types purchasing→200 positive test (broadening wired ama test edilmedi). **quotes GET redaction YOK** (redact.ts products/customers/orders kapsar; `view_quotes` olan tam fiyat görür — Faz 4 bilinçli kapsamı, gelecek tur). Faz 6 (delete policy) + Faz 7 (dashboard kart maskeleme + null finansal `--` UI) hâlâ ertelendi.
+- **Faz 4 TAMAMLANDI (2026-05-31, commit `1db5865`, FF→origin/main):** quotes + PO finansal GET redaction + archive gate eklendi (önceki tur sadece products/customers/orders'tı). `redact.ts` +4 fn: `redactQuotes/QuoteForPerms` (CAMELCASE — quotes route mapper'lı: grandTotal/subtotal/vatTotal/discountAmount+satır unitPrice/lineTotal ← view_sales_prices), `redactPurchaseOrders/OrderForPerms` (SNAKE_CASE raw row: subtotal/vat_total/grand_total+satır unit_price/line_total ← view_purchase_costs). Wiring: quotes+PO list/detail GET. quote **archive** (donmuş HTML PDF, seçici redaction imkânsız) → `requirePermission(view_sales_prices)` tüm belge gate. Sınıf ayrımı doğrulandı: sales PO maliyeti GÖRMEZ / purchasing quote fiyatı GÖRMEZ. **Sızıntı yüzeyi (advisor):** preview/page.tsx yalnız localStorage (Mod A, yazarın kendi taslağı); [id]/page.tsx inline PDF render ETMEZ → server-fetch saklı teklif PDF yolu YOK. +23 test (4197). **camelCase/snake_case ayrımı redact.ts yorumunda işaretli** (quotes camelCase = orders'ın tersi).
+- **KALAN (ayrı tur)**: parasut oauth/start+refresh hâlâ ADMIN_EMAILS env-gate (güvenli, policy modeli farklı); customers/orders redaction'a end-to-end diskriminatif test (opsiyonel); product-types purchasing→200 positive test. **Faz 6 (delete policy: domain `delete_*` perm + 409 ilişkili + audit snapshot) + Faz 7 (dashboard kart maskeleme + null finansal `--` UI) hâlâ ertelendi.**
 
 **ERTELENEN (Faz 3 zaten R1'e dahil edildi) — :**
 - Faz 3: 14 `requireRole` callsite → `requirePermission`; admin/parasut oauth permission map.

@@ -5,7 +5,18 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (**RBAC Faz 4 (R1-R5) MAIN'E MERGE + PUSH** — merge commit `234d8d9`, 4174 test, build OK)
+## Son Tamamlanan İş — 2026-05-31 (**RBAC Faz 4 TAMAMLANDI — quotes + PO redaction + archive gate**, commit `1db5865`, 4197 test)
+
+Plan (role-based-access-plan.md) Faz 4'ün açık kalemleri kapatıldı. Önceki tur sadece products/customers/orders redакteliydi.
+- `redact.ts` +4 fn: quotes (CAMELCASE — mapper'lı; grandTotal/subtotal/vatTotal/discountAmount+satır unitPrice/lineTotal ← `view_sales_prices`), PO (SNAKE_CASE raw row; subtotal/vat_total/grand_total+satır unit_price/line_total ← `view_purchase_costs`).
+- Wiring: quotes+PO list/detail GET. quote **archive** (donmuş HTML PDF) → `view_sales_prices` yoksa tüm belgeye 403.
+- Sınıf ayrımı: sales PO maliyeti GÖRMEZ / purchasing quote fiyatı GÖRMEZ. Sızıntı yüzeyi (advisor): preview=localStorage Mod A (yazarın taslağı), [id] inline PDF render ETMEZ → server-fetch saklı PDF yolu YOK.
+- +23 test (redact unit camelCase+snake_case regresyon kilidi + route diskriminatif + archive gate). **tsc temiz · 4197 test · lint 0 · build OK (`ƒ Proxy`)**.
+- **KALAN: Faz 6 (delete policy) + Faz 7 (dashboard maskeleme + null finansal `--`).** Detay: [[project_rbac]].
+
+---
+
+## Önceki — 2026-05-31 (**RBAC Faz 4 (R1-R5) MAIN'E MERGE + PUSH** — merge commit `234d8d9`, 4174 test, build OK)
 
 **Rol bazlı erişim tamamlandı.** `worktree-rbac-foundation` (7 commit) güncel main'e merge edildi (foundation Faz 1+2+5 zaten main'deydi, merge-base `a0130de`).
 - **R3 finansal redaction** (route seviyesi, snake_case): products `price`/`cost_price`, customers `total_revenue`, orders `grand_total`/`subtotal`/`vat_total`+satır fiyatları → yetkiye göre null. Per-request, cache key'e girmez.
