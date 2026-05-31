@@ -77,13 +77,16 @@ export async function dbListNoteTemplates(opts: ListNoteTemplatesOptions = {}): 
 
 export async function dbGetNoteTemplate(id: string): Promise<NoteTemplateRow | null> {
     const supabase = createServiceClient();
+    // maybeSingle: 0 satır → {data:null,error:null} (not-found); gerçek DB/RLS
+    // hatası → error set → throw (route'ta 500). .single()'ın PGRST116'sı
+    // not-found ile gerçek hatayı ayırmıyordu → DB hatası sessizce 404'e düşerdi (P2).
     const { data, error } = await supabase
         .from("note_templates")
         .select("*")
         .eq("id", id)
-        .single();
-    if (error || !data) return null;
-    return data;
+        .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ?? null;
 }
 
 // ── Create / Update / Deactivate ────────────────────────────
@@ -127,8 +130,9 @@ export async function dbUpdateNoteTemplate(id: string, patch: UpdateNoteTemplate
     if (err) throw new Error(err);
 
     const supabase = createServiceClient();
-    const { data: existing } = await supabase
-        .from("note_templates").select("*").eq("id", id).single();
+    const { data: existing, error: readErr } = await supabase
+        .from("note_templates").select("*").eq("id", id).maybeSingle();
+    if (readErr) throw new Error(readErr.message);
     if (!existing) throw new Error("Şablon bulunamadı.");
 
     const updatePayload: Record<string, unknown> = {};
@@ -162,8 +166,9 @@ export async function dbUpdateNoteTemplate(id: string, patch: UpdateNoteTemplate
 export async function dbDeactivateNoteTemplate(id: string): Promise<void> {
     const supabase = createServiceClient();
 
-    const { data: existing } = await supabase
-        .from("note_templates").select("*").eq("id", id).single();
+    const { data: existing, error: readErr } = await supabase
+        .from("note_templates").select("*").eq("id", id).maybeSingle();
+    if (readErr) throw new Error(readErr.message);
     if (!existing) throw new Error("Şablon bulunamadı.");
     if (!existing.is_active) throw new Error("Şablon zaten pasif.");
 

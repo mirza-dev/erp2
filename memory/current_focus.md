@@ -5,7 +5,12 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** — migration 079, 4094 test, COMMIT+PUSH EDİLDİ (3551302) · 079 APPLY BEKLİYOR)
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** + Bulgular 1.tur — migration 079, 4096 test, COMMIT+PUSH EDİLDİ (3551302 Faz 7 + Bulgular) · 079 APPLY BEKLİYOR)
+
+**Bulgular 1. tur (P1 yok; 2 fix + double-check):** **#1 (P2 FIX)** `dbGetNoteTemplate`+update/deactivate ön-okuma `.single()`→`.maybeSingle()`+`if(error)throw` (gerçek DB/RLS hatası artık 404 değil 500). **#2 (P3 FIX)** geçersiz `?kind=`→**400** (fail-closed; eskiden sessizce tüm liste). **#3 (no-op)** `[id]` GET inactive döndürüyor ama tüketici yok + hassas değil → bırakıldı. **#4 (ertelendi)** pasif görme/reaktivate UI yok (soft-delete DB'de korunur; PATCH is_active gelecek tur). **#5 (FIX)** doc/plan migration drift hizalandı (QUOTES_V2_PLAN final + historical bloklar SUPERSEDED). **4094→4096** · tsc/lint/build temiz.
+
+---
+
 
 **Faz 7 = V7 master-plan'ın SON fazı. Not şablonları CRUD + QuoteForm picker.**
 - **080 KALICI DÜŞÜRÜLDÜ:** master-plan `079 → quote_line_items_sort_order (koşullu)` diyordu; doğrulandı ki `quote_line_items.position` zaten var (034:106), `quotes.ts:88` ona göre sıralıyor, accept RPC ona göre order'lıyor → yeni kolon koşulsuz gereksiz. Drag-reorder UX **ertelendi** (eklenirse `position` yeniden atama, şema değişikliği DEĞİL). → Faz 7 = **tek migration 079** (memory'deki "079-080" güncellendi: 080 yok).

@@ -364,9 +364,12 @@ Faz 6 (eski 075 → 077):
           (throw değil; marker yazılmaz) + ZORUNLU sync_issue alert
         + V7-A9 SalesOrderRow TS + api-mappers (discount_amount/vat_rate/source_quote_revision_no/quote_pdf_archive_id)
 
-Faz 7 (eski 076-077 → 078-079):
-  078 → note_templates + RLS
-  079 → quote_line_items_sort_order (koşullu)
+Faz 7 (UYGULANDI 2026-05-31; final numbering):
+  079 → note_templates + RLS + PMT seed   (077 accept + 078 qty-fix uygulandığı için 079)
+  ~~080 → quote_line_items_sort_order~~ → KALICI DÜŞÜRÜLDÜ: quote_line_items.position
+         zaten var (034:106), quotes.ts:88 ona göre sıralıyor, accept RPC ona göre
+         order'lıyor → yeni kolon koşulsuz gereksiz. Drag-reorder UX ertelendi
+         (eklenirse position yeniden atama, şema değişikliği DEĞİL). Faz 7 = tek migration.
 ```
 
 ## Risk Noktaları (V7 Güncel)

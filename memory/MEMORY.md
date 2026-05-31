@@ -11,7 +11,7 @@
 - [project_integrations.md](project_integrations.md) — Paraşüt Faz 1-10 ✅ (1914 test), Faz 11 sırada; AI kolon eşleştirme, Sentry ✅, k6, smoke 24
 - [project_auth.md](project_auth.md) — Login, kullanıcı yönetimi, admin API, landing page
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
-- [current_focus.md](current_focus.md) — Son: Teklif V7 **Faz 7 — Not Şablonları (note_templates)** — migration 079 (080 KALICI DÜŞÜRÜLDÜ: position zaten var); CRUD helper/route (GET açık, mutation admin, soft-delete) + settings sayfası + QuoteForm 3-alan picker (applyTemplateToField/templatesForField) + PMT seed. **4094 test, COMMIT+PUSH EDİLDİ (3551302) · 079 APPLY BEKLİYOR**; **V7 master-plan TAMAMLANDI**; önceki: Faz 6 Bulgular 3. tur (`9b9ecde`, 4043 test, 077/078 APPLY EDİLDİ ✅)
+- [current_focus.md](current_focus.md) — Son: Teklif V7 **Faz 7 — Not Şablonları (note_templates)** — migration 079 (080 KALICI DÜŞÜRÜLDÜ: position zaten var); CRUD helper/route (GET açık, mutation admin, soft-delete) + settings sayfası + QuoteForm 3-alan picker (applyTemplateToField/templatesForField) + PMT seed + **Bulgular 1.tur** (maybeSingle DB-hata ayrımı, geçersiz ?kind→400, doc drift hizalama). **4096 test, COMMIT+PUSH EDİLDİ (3551302 + Bulgular) · 079 APPLY BEKLİYOR**; **V7 master-plan TAMAMLANDI**; önceki: Faz 6 Bulgular 3. tur (`9b9ecde`, 4043 test, 077/078 APPLY EDİLDİ ✅)
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)

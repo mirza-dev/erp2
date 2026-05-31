@@ -4,7 +4,19 @@ description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan re
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 ---
-## Faz 7 — Not Şablonları (note_templates) (2026-05-31) — migration 079, 4094 test, COMMIT+PUSH EDİLDİ (3551302) · 079 APPLY BEKLİYOR — **V7 master-plan TAMAMLANDI**
+## Faz 7 — Not Şablonları (note_templates) (2026-05-31) — migration 079, 4096 test, COMMIT+PUSH EDİLDİ (3551302 Faz 7 + Bulgular 1.tur) · 079 APPLY BEKLİYOR — **V7 master-plan TAMAMLANDI**
+
+**Bulgular 1. tur (kullanıcı review, P1 yok; 2 fix + 3 double-check):**
+- **#1 (P2 FIX) DB hatası → 404 maskeleniyordu:** `dbGetNoteTemplate` + update/deactivate ön-okumaları `.single()` + `if(error||!data) return null` ile gerçek DB/RLS hatasını not-found'a düşürüyordu → route 500 yerine 404. **Fix:** `.maybeSingle()` + `if(error) throw` (not-found=null, gerçek hata=throw→500). +2 test (0 satır→null / permission denied→throw).
+- **#2 (P3 FIX) Geçersiz `?kind=` tüm şablonları döndürüyordu:** route GET `kind=delivary` typo'su → undefined → filtresiz tam liste (footgun). **Fix:** `?kind=` verildi ama geçersizse **400** (fail-closed); param yoksa filtresiz. Test 400 bekleyecek şekilde flip edildi. (Not: QuoteForm picker zaten `?kind`'siz fetch edip client-side `templatesForField` ile gruplar → mevcut tüketiciyi etkilemez.)
+- **#3 (P3 double-check, no-op) `[id]` GET inactive döndürüyor:** liste aktif filtreli; `[id]` GET pasifi de map'liyor. Mevcut tüketici YOK (settings edit modal listeden açılır, picker liste kullanır) + şablon hassas veri değil → id-lookup'ın spesifik satırı dönmesi meşru, bırakıldı.
+- **#4 (P3 ertelendi) UI'da pasifleri görme/geri alma yok:** soft-delete DB'de korunuyor ama reaktivasyon yolu yok (PATCH `is_active` kabul etmiyor). Gelecek küçük geliştirme: pasifler sekmesi + reaktivate (PATCH is_active). Bu turda kapsam dışı, dokümante.
+- **#5 (P3 FIX) Doc/plan migration drift:** `QUOTES_V2_PLAN.md` final numbering'e hizalandı (079 note_templates + 080 düşürüldü gerekçesiyle); historical V5 blokları (project_quotes/CLAUDE migration tahsisi) "⟵ SUPERSEDED" işaretlendi; stale "079-080" referansları "079 (080 düşürüldü)".
+- **Ek not (no-op):** audit insert error kontrolsüz — mevcut product-types/vendors paterniyle uyumlu, Faz 7'ye özel regresyon değil; "audit garanti" istenirse ayrı tur.
+- **Doğrulama:** **4094→4096** · tsc temiz · npm run lint 0 · build OK.
+
+---
+
 
 **V7'nin SON fazı.** PMT teklif formunun 3 serbest-metin alanı (Notlar & Şartlar / Teslimat Şekli / Ödeme Şekli) için tekrar kullanılabilir not şablonları (admin CRUD + QuoteForm picker). Plan: `~/.claude/plans/clever-dancing-owl.md`.
 
@@ -27,7 +39,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **#1 (P3) Doc drift:** `9a57d66` push edildi (HEAD=origin/main) ama CLAUDE.md/current_focus/project_quotes hâlâ "COMMIT+PUSH BEKLİYOR" + 078 "APPLY BEKLİYOR" diyordu → "EDİLDİ" hizalandı (078 kullanıcı tarafından uygulandı).
 - **#2 (P3) Archive route stale yorum:** `archive/route.ts:34` "recover/generate Faz 6'da gelecek" diyordu — Faz 6'da geldi (`serviceArchiveQuotePdf` tri-state self-heal). Yorum güncellendi (lookup-only sözleşme gerekçesiyle; bu GET route üretmez, accept yolu self-heal eder).
 - **#3 (P3, kullanıcı kararı: emoji kalsın) Order arşiv buton emoji:** `📄 Belgeyi Aç →` — doğrulama emoji'nin proje-geneli konvansiyon (`📄 Arşivlenmiş Teklif` kardeş buton, `📄 Yazdır/PDF`, `📦`/`↻`/`✦ AI`) + `lucide-react` 0 kullanım (Tailwind/Framer gibi kurulu-ama-kullanılmaz) gösterdi → emoji tutarlı, kod değişmez.
-- **DURUM: COMMIT+PUSH EDİLDİ; 077/078 APPLY EDİLDİ ✅.** Kod değişimi yalnız #2 (yorum); test 4043 sabit. Faz 6 tam kapandı. Faz 7 → note_templates 079-080.
+- **DURUM: COMMIT+PUSH EDİLDİ; 077/078 APPLY EDİLDİ ✅.** Kod değişimi yalnız #2 (yorum); test 4043 sabit. Faz 6 tam kapandı. Faz 7 → note_templates **079** (080 KALICI DÜŞÜRÜLDÜ — bkz. en üstteki Faz 7 bloğu).
 
 ---
 
@@ -68,7 +80,7 @@ originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3
 - **UI:** tek "Kabul Et ve Siparişe Dönüştür"→`/accept`; already→mevcut order; legacy accepted+siparişsiz→`/accept` (recover); Faz 3 iskonto-not kaldırıldı.
 - **TS/mapper (V7-A9):** SalesOrderRow +4 alan; mapOrderDetail map; OrderDetail interface UI alanları.
 - **Test (+47 net):** quotes-accept-order-migration (drift-guard ~14) + quotes-accept-service + quotes-accept-route + parasut-discount-guard (3) + order-mapper-faz6 + quotes-accept-ui; flip'ler: quote-convert-route→410, quote-service accepted geçersiz, quotes-id-route transition:accepted→410, quotes-faz2-validation 'rejected'→409, quotes-faz3-discount UI-not kaldırıldı. **3974→4021 yeşil** · tsc temiz · build OK (`ƒ Proxy` + `/api/quotes/[id]/accept`) · eslint src 31/0.
-- **DURUM: COMMIT+PUSH EDİLDİ (`d4988ca`) + 077 APPLY EDİLDİ ✅.** (Bulgular turu yukarıda: 078 + 5 fix.) Sıradaki: manuel smoke + Faz 7 (note_templates 079-080).
+- **DURUM: COMMIT+PUSH EDİLDİ (`d4988ca`) + 077 APPLY EDİLDİ ✅.** (Bulgular turu yukarıda: 078 + 5 fix.) Sıradaki: manuel smoke + Faz 7 (note_templates **079**; 080 düşürüldü).
 
 ---
 ## Faz 4 — PDF Arşiv (2026-05-30) — dondurulmuş HTML snapshot + Bulgular 1.+2.+3.+4. review tur, 3974 test, COMMIT+PUSH EDİLDİ (`6c9c317`) + migration 075/076 APPLY EDİLDİ ✅
@@ -262,8 +274,8 @@ Faz 1 → **1a (DB foundation)** ✅ + **1b (QuoteForm/UI)** ✅ tamamlandı. 1b
 - 073: quote_pdf_archives + RLS (Faz 4c)
 - 074: storage quote-pdfs bucket (Faz 4c)
 - 075: sales_orders meta + accept_quote_and_create_order RPC (Faz 6, V5-A4)
-- 076: note_templates + RLS (Faz 7)
-- 077: quote_line_items_sort_order (Faz 7, koşullu)
+- 076: note_templates + RLS (Faz 7)  ⟵ SUPERSEDED: final = **079_note_templates** (UYGULANDI 2026-05-31; üstteki Faz 7 bloğu)
+- 077: quote_line_items_sort_order (Faz 7, koşullu)  ⟵ SUPERSEDED: KALICI DÜŞÜRÜLDÜ (position zaten var, yeni kolon yok)
 
 **Önceki düzeltmeler korundu:**
 - V4 (13 düzeltme): audit_log.source='system', customer_address+validator, seller_* snapshot, productId hard, PDF 3 path resume, DELETE draft, kg DB persist, /accept tek yol, quote_yearly_counters, RLS, hs/size geniş, audit source test, memory checklist

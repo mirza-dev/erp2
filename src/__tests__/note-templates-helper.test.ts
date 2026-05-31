@@ -23,6 +23,7 @@ function makeChain() {
     chain.eq = (k: unknown, v: unknown) => { mockEq(k, v); return chain; };
     chain.order = ret;
     chain.single = () => Promise.resolve(singleQueue.shift() ?? { data: null, error: null });
+    chain.maybeSingle = () => Promise.resolve(singleQueue.shift() ?? { data: null, error: null });
     // thenable → `await query` (list / update-terminal / audit insert)
     chain.then = (resolve: (v: unknown) => unknown) => resolve(execResult);
     return chain;
@@ -136,6 +137,20 @@ describe("dbListNoteTemplates", () => {
         execResult = { data: null, error: { message: "db fail" } };
         const { dbListNoteTemplates } = await import("@/lib/supabase/note-templates");
         await expect(dbListNoteTemplates()).rejects.toThrow(/db fail/);
+    });
+});
+
+describe("dbGetNoteTemplate not-found vs DB hatası (P2)", () => {
+    it("0 satır → null (maybeSingle, throw etmez)", async () => {
+        singleQueue = [{ data: null, error: null }];
+        const { dbGetNoteTemplate } = await import("@/lib/supabase/note-templates");
+        expect(await dbGetNoteTemplate("yok")).toBeNull();
+    });
+
+    it("gerçek DB/RLS hatası → throw (404'e düşmez)", async () => {
+        singleQueue = [{ data: null, error: { message: "permission denied" } }];
+        const { dbGetNoteTemplate } = await import("@/lib/supabase/note-templates");
+        await expect(dbGetNoteTemplate("x")).rejects.toThrow(/permission denied/);
     });
 });
 

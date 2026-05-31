@@ -74,10 +74,10 @@ describe("GET /api/note-templates", () => {
         expect(mockDbList).toHaveBeenCalledWith({ kind: "payment" });
     });
 
-    it("geçersiz ?kind → undefined (filtresiz)", async () => {
-        mockDbList.mockResolvedValue([]);
-        await listGET(makeReq(undefined, "GET", "http://localhost/api/note-templates?kind=bad"));
-        expect(mockDbList).toHaveBeenCalledWith({ kind: undefined });
+    it("geçersiz ?kind → 400 (fail-closed; tüm şablonları döndürmez)", async () => {
+        const res = await listGET(makeReq(undefined, "GET", "http://localhost/api/note-templates?kind=bad"));
+        expect(res.status).toBe(400);
+        expect(mockDbList).not.toHaveBeenCalled();
     });
 });
 

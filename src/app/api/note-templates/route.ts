@@ -7,6 +7,7 @@ import {
 import { mapNoteTemplate } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { requireRole } from "@/lib/auth/role-guard";
+import type { NoteTemplateKind } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,12 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const kindParam = searchParams.get("kind");
-        const kind = isValidNoteTemplateKind(kindParam) ? kindParam : undefined;
+        // ?kind= verildiyse geçerli olmalı: typo (?kind=delivary) sessizce TÜM
+        // şablonları döndürmesin (fail-closed). Param yoksa filtresiz tam liste.
+        if (kindParam !== null && !isValidNoteTemplateKind(kindParam)) {
+            return NextResponse.json({ error: "Geçersiz şablon türü." }, { status: 400 });
+        }
+        const kind = kindParam !== null ? kindParam as NoteTemplateKind : undefined;
 
         const rows = await dbListNoteTemplates({ kind });
         return NextResponse.json(rows.map(mapNoteTemplate));
