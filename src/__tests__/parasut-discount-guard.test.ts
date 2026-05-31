@@ -32,6 +32,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
     serviceSyncOrderToParasut,
+    serviceRetryParasutStep,
     computeHeaderDiscountPct,
     reconcileParasutDiscount,
 } from "@/lib/services/parasut-service";
@@ -147,6 +148,48 @@ describe("serviceSyncOrderToParasut — iskonto reconciliation (V7-A4 evrimi)", 
         expect(mockCreateAlert).not.toHaveBeenCalled();
         expect(mockRpc).toHaveBeenCalledWith("parasut_claim_sync", expect.objectContaining({ p_order_id: OID }));
         expect(r.skipped).toBe(true);
+        expect(r.reason).toBe("not_eligible_or_locked");
+    });
+});
+
+// ── Invoice retry reconciliation (Bulgular) ──────────────────────
+// upsertInvoice retry yolu da header iskontoyu discount_value'ya uygular → ana sync
+// ile aynı guard claim ÖNCESİ çalışmalı. Test guard'a GERÇEKTEN ulaşsın diye
+// parasut_step="invoice" + parasut_shipment_document_id set: checkStepDeps("invoice")
+// shipment doc ister, step-order guard 3>3 false → guard YOK iken upsertInvoice'a
+// varırdı (honest reachability). Assertion template = ana sync integration (yukarı).
+describe("serviceRetryParasutStep — invoice retry reconciliation", () => {
+    const retryOrder = (over: Record<string, unknown> = {}) =>
+        baseOrder({ parasut_step: "invoice", parasut_shipment_document_id: "ship-1", ...over });
+
+    it("invoice retry + discount mismatch → skipped (reconcile_failed) + claim YOK + alert", async () => {
+        mockGetOrder.mockResolvedValue(retryOrder({ discount_amount: 20, subtotal: 100, grand_total: 999, lines: okLines }));
+        const r = await serviceRetryParasutStep(OID, "invoice");
+        expect(r.success).toBe(false);
+        expect(r.skipped).toBe(true);
+        expect(r.reason).toBe("discount_reconcile_failed");
+        expect(mockRpc).not.toHaveBeenCalled();
+        expect(mockCreateAlert).toHaveBeenCalledTimes(1);
+        const arg = mockCreateAlert.mock.calls[0][0];
+        expect(arg.type).toBe("sync_issue");
+        expect(arg.entity_id).toBe(OID);
+        expect(arg.description).toMatch(/iskonto/i);
+    });
+
+    it("invoice retry + subtotal=0 & discount>0 → skipped + claim YOK + alert", async () => {
+        mockGetOrder.mockResolvedValue(retryOrder({ discount_amount: 150, subtotal: 0, grand_total: 0 }));
+        const r = await serviceRetryParasutStep(OID, "invoice");
+        expect(r.reason).toBe("discount_reconcile_failed");
+        expect(mockRpc).not.toHaveBeenCalled();
+        expect(mockCreateAlert).toHaveBeenCalledTimes(1);
+    });
+
+    it("invoice retry + discount=0 → guard tetiklenmez, claim ÇAĞRILIR (no-regression)", async () => {
+        mockGetOrder.mockResolvedValue(retryOrder({ discount_amount: 0 }));
+        mockRpc.mockResolvedValue({ data: null, error: null }); // claim null → erken çıkış
+        const r = await serviceRetryParasutStep(OID, "invoice");
+        expect(mockCreateAlert).not.toHaveBeenCalled();
+        expect(mockRpc).toHaveBeenCalledWith("parasut_claim_sync", expect.objectContaining({ p_order_id: OID }));
         expect(r.reason).toBe("not_eligible_or_locked");
     });
 });

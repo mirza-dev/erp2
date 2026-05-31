@@ -1048,6 +1048,38 @@ export function reconcileParasutDiscount(order: ReconcileOrder): {
     return { ok: Math.abs(expected - grandTotal) <= tolerance, expected, grandTotal, tolerance };
 }
 
+/**
+ * Faz 8e + Bulgular: header iskontolu siparişin orantılı toplamı donmuş grand_total
+ * ile tolerans dahilinde uyuşmuyorsa (veya subtotal=0 & discount>0) sessiz yanlış
+ * fatura yerine claim ÖNCESİ blok + ZORUNLU sync_issue alert. Hem ana sync
+ * (serviceSyncOrderToParasut) hem manuel invoice retry (serviceRetryParasutStep,
+ * step="invoice") bu helper'ı çağırır → fatura builder'ın (upsertInvoice) TÜM
+ * girişlerinde aynı koruma. İskonto yok / tutarlı → null (akış devam eder).
+ * throw DEĞİL → marker/lease churn yok.
+ */
+async function guardDiscountReconciliation(order: OrderWithLines): Promise<SyncOrderResult | null> {
+    if (!(Number(order.discount_amount ?? 0) > 0)) return null;
+    const recon = reconcileParasutDiscount(order);
+    if (recon.ok) return null;
+    const msg = recon.reason === "subtotal_zero"
+        ? "Paraşüt iskonto aktarımı: subtotal sıfır, orantılı iskonto hesaplanamıyor — fatura oluşturulmadı."
+        : `Paraşüt iskonto aktarımı: orantılı toplam (${recon.expected}) sipariş toplamı (${recon.grandTotal}) ile uyuşmuyor (tolerans ${recon.tolerance.toFixed(2)}) — fatura oluşturulmadı.`;
+    try {
+        await dbCreateAlert({
+            type:        "sync_issue",
+            severity:    "warning",
+            title:       "İskontolu sipariş Paraşüt'e aktarılamadı (reconcile)",
+            description: `${order.order_number}: ${msg} (iskonto: ${order.discount_amount})`,
+            entity_type: "sales_order",
+            entity_id:   order.id,
+            source:      "system",
+        });
+    } catch (alertErr) {
+        console.error(JSON.stringify({ parasut_discount_alert_fail: String(alertErr), orderId: order.id }));
+    }
+    return { success: false, skipped: true, reason: "discount_reconcile_failed", error: msg };
+}
+
 export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOrderResult> {
     if (!isParasutEnabled()) return { success: false, error: "Paraşüt entegrasyonu devre dışı." };
 
@@ -1063,36 +1095,13 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
         return { success: false, error: "Müşteri bilgisi eksik — Paraşüt sync için zorunlu." };
     }
 
-    // Faz 8e (V7-A4 evrimi): header iskontolu sipariş artık Paraşüt'e GİDER —
+    // Faz 8e (V7-A4 evrimi) + Bulgular: header iskontolu sipariş Paraşüt'e GİDER —
     // discount_amount orantılı per-satır yüzde olarak faturaya taşınır (builder'da
-    // discount_value). Ama guard'ın ruhu korunur: claim'den ÖNCE reconciliation —
-    // orantılı pct ile beklenen toplamı kendi kodumuzda kurup donmuş grand_total
-    // ile tolerans dahilinde karşılaştır. Tolerans aşılırsa (veya subtotal=0 &
-    // discount>0) sessiz yanlış fatura yerine early return + ZORUNLU sync_issue
-    // alert (throw DEĞİL → marker/lease churn yok). Tutarlıysa normal akış sürer.
-    if (Number(order.discount_amount ?? 0) > 0) {
-        const recon = reconcileParasutDiscount(order);
-        if (!recon.ok) {
-            const msg = recon.reason === "subtotal_zero"
-                ? "Paraşüt iskonto aktarımı: subtotal sıfır, orantılı iskonto hesaplanamıyor — fatura oluşturulmadı."
-                : `Paraşüt iskonto aktarımı: orantılı toplam (${recon.expected}) sipariş toplamı (${recon.grandTotal}) ile uyuşmuyor (tolerans ${recon.tolerance.toFixed(2)}) — fatura oluşturulmadı.`;
-            try {
-                await dbCreateAlert({
-                    type:        "sync_issue",
-                    severity:    "warning",
-                    title:       "İskontolu sipariş Paraşüt'e aktarılamadı (reconcile)",
-                    description: `${order.order_number}: ${msg} (iskonto: ${order.discount_amount})`,
-                    entity_type: "sales_order",
-                    entity_id:   orderId,
-                    source:      "system",
-                });
-            } catch (alertErr) {
-                console.error(JSON.stringify({ parasut_discount_alert_fail: String(alertErr), orderId }));
-            }
-            return { success: false, skipped: true, reason: "discount_reconcile_failed", error: msg };
-        }
-        // Reconcile OK → orantılı iskonto fatura builder'ında uygulanır.
-    }
+    // discount_value). Guard'ın ruhu korunur: claim'den ÖNCE reconciliation
+    // (guardDiscountReconciliation) — fatura builder'ın her girişinde (ana sync +
+    // manuel invoice retry) aynı koruma → sessiz yanlış fatura yok.
+    const reconBlock = await guardDiscountReconciliation(order);
+    if (reconBlock) return reconBlock;
 
     const supabase = createServiceClient();
     const owner    = crypto.randomUUID();
@@ -1305,6 +1314,16 @@ export async function serviceRetryParasutStep(
 
     const dep = await checkStepDeps(step, order);
     if (!dep.ok) return { success: false, error: dep.error };
+
+    // Bulgular: invoice retry de fatura builder'ı (upsertInvoice) header iskontoyu
+    // discount_value'ya uygular → ana sync ile aynı reconciliation guard claim
+    // ÖNCESİ uygulanmalı (yoksa iskontolu + uyuşmayan sipariş manuel retry ile
+    // sessiz yanlış fatura üretir). Yalnız step="invoice": edoc çalıştığında fatura
+    // zaten oluşmuş, orada blok yalnız tamamlanmış faturayı strand eder.
+    if (step === "invoice") {
+        const reconBlock = await guardDiscountReconciliation(order);
+        if (reconBlock) return reconBlock;
+    }
 
     const supabase = createServiceClient();
     const owner    = crypto.randomUUID();
