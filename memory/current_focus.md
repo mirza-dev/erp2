@@ -5,7 +5,21 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** + Bulgular 1.+2.tur — migration 079, 4098 test, COMMIT+PUSH EDİLDİ · **079 APPLY EDİLDİ ✅**)
+## Son Tamamlanan İş — 2026-05-31 (Teklif V7 **Faz 8 — Ertelenen Borçlar Kapanışı** — 5 alt-faz/5 commit, 4096 test, COMMIT+PUSH EDİLDİ · **migration 080 APPLY BEKLİYOR**)
+
+**V7'nin tüm ertelenen borçları kapatıldı (5 bağımsız kalem, ayrı commit'ler). Kullanıcı kararları: Paraşüt orantılı / sig rename ATLA / drag-reorder ERTELE.**
+- **8a (`4935e88`) Quotes RBAC:** yazma uçlarına guard (accept precedent'i) — POST/PATCH/revise → `manage_quotes`, DELETE → `delete_quotes`; GET'ler auth-only. quotes-rbac.test.ts (5) + 7 mevcut route testine role-guard mock (varsayılan izinli).
+- **8b (`71a22cd`) Convert ölü kod temizliği:** `serviceConvertQuoteToOrder` + `ConvertResult` kaldırıldı (hiç çağrılmıyordu; yerini Faz 6 atomik accept aldı). `dbFindOrderByQuoteId` KORUNDU (route kullanıyor), `/convert` 410 stub KALDI. quote-convert-service.test.ts silindi.
+- **8c (`034f8ea`) Quotes audit katmanı:** helper seviyesi (RPC değil — product-types paterni; advisor) — dbCreateQuote/dbUpdateQuote/dbCreateQuoteRevision → audit_log (quote_created/updated/revised, source ui, best-effort, actor'sız [codebase-tutarlı]). RPC repro riski elendi. quotes-audit.test.ts (3).
+- **8d (`4218d3e`) order_line_description — Migration 080 (APPLY BEKLİYOR):** order_lines += description; accept RPC = 078 gövdesi BİREBİR + tek delta (qli.description taşı; master p.name KORUNDU). TS/mapper/order-detay-UI. order-line-description.test.ts (6: invariant koruması + delta + mapper).
+- **8e (`4b9c938`) Paraşüt iskonto orantılı aktarım:** guard → reconciliation. `computeHeaderDiscountPct` (discount/subtotal*100) builder'da per-satır discount_value; `reconcileParasutDiscount` orantılı toplamı kendi kodumuzda kurup grand_total ile tolerans dahilinde karşılaştırır (mock net_total iskonto yok sayıyor). Tolerans aşımı/subtotal=0 → blok+alert (guard ruhu); uyuşursa fatura OLUŞUR. order_lines mutate edilmez. parasut-discount-guard FLIP (pure 6 + integration 4).
+- **Doğrulama:** **4098→4096** (8b −22 convert-service +sonra net) · tsc temiz · npm run lint 0 · build OK (`ƒ /api/note-templates` + `ƒ Proxy`).
+- **DURUM: 5 commit COMMIT+PUSH EDİLDİ · migration 080 APPLY BEKLİYOR (yalnız 8d).** Diğer 4 kalem migration'sız.
+- **Kapsam dışı (kullanıcı kararı):** sig_* rename ATLA (kabul edilen isimlendirme); drag-reorder ERTELE. **V7 master-plan + tüm ertelenen borçlar TAMAMLANDI** (kalan: audit actor [trigger ayrı faz], GET view_quotes RBAC, Paraşüt Sandbox GATE — hiçbiri quotes modülü borcu değil).
+
+---
+
+## Önceki — 2026-05-31 (Teklif V7 **Faz 7 — Not Şablonları (note_templates)** + Bulgular 1.+2.tur — migration 079, 4098 test, COMMIT+PUSH EDİLDİ · **079 APPLY EDİLDİ ✅**)
 
 **Bulgular 2. tur (P1 yok; 1 yeni P2 fix + 1 P3 fix + 3 zaten-düzeltilmiş doğrulama):**
 - **#1 (YENİ P2 FIX) Unsaved draft restore'da not/teslimat/ödeme kaybı:** `autoSave` `teklif_v3` draft key'ine yalnız `{currency,rows,descDirty,discount}` yazıyordu; notes/delivery/payment sadece `teklif_v3_full`'da (preview için). Yeni teklif restore `teklif_v3` okuduğundan, şablonla eklenen (veya elle yazılan) metin kaydetmeden refresh/preview-dönüşünde kayboluyordu. **Fix:** `teklif_v3` payload'a `notes/deliveryMethod/paymentMethod` eklendi + restore bunları geri yükler (Faz 3 `discount` precedent'i). +2 drift-guard test; 3 mevcut regex (faz4b/faz3/faz4a) yeni payload'a göre güncellendi.
