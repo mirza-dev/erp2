@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetQuote } from "@/lib/supabase/quotes";
 import { dbGetQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists } from "@/lib/supabase/quote-pdf-archives";
 import { handleApiError } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -11,10 +12,17 @@ export const dynamic = "force-dynamic";
 // üretmez. Read-only → demo modda GET izinli (middleware).
 // Güvenlik: yalnız {url, expires_in, revision_no} döner; file_path/content_hash sızdırmaz.
 export async function GET(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // RBAC R3 (Faz 4 tamamlama): arşiv donmuş HTML — fiyatlar gömülü, seçici
+        // redaction imkânsız → view_sales_prices yoksa tüm belgeye 403 (quote ağırlıkla
+        // fiyat belgesi; viewer/demo/production/purchasing erişemez). Live preview detay
+        // GET'ten beslendiği için redaction'ı zaten miras alır.
+        const guard = await requirePermission(req, "view_sales_prices");
+        if (guard) return guard;
+
         const { id } = await params;
 
         const quote = await dbGetQuote(id);

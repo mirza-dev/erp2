@@ -5,7 +5,8 @@ import {
     isValidPoCurrency,
 } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { redactPurchaseOrderForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-orders/[id]
@@ -20,7 +21,10 @@ export async function GET(
         const { id } = await params;
         const po = await dbGetPurchaseOrderById(id);
         if (!po) return NextResponse.json({ error: "PO bulunamadı." }, { status: 404 });
-        return NextResponse.json(po);
+        // RBAC R3 (Faz 4 tamamlama): purchase-financial — view_purchase_costs yoksa
+        // subtotal/vat_total/grand_total + satır unit_price/line_total null.
+        const perms = await getCurrentUserPermissions();
+        return NextResponse.json(redactPurchaseOrderForPerms(po, perms));
     } catch (err) {
         return handleApiError(err, "GET /api/purchase-orders/[id]");
     }

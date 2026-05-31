@@ -55,7 +55,8 @@ vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
     // RBAC R1/R2: PO route'larına requirePermission guard eklendi → allow.
     requirePermission: vi.fn().mockResolvedValue(null),
-    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_purchase_orders", "manage_purchase_orders"])),
+    // Faz 4 R3: GET redaction view_purchase_costs okur → tam veri için sete eklenir (no-op).
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_purchase_orders", "manage_purchase_orders", "view_purchase_costs"])),
 }));
 
 const mockRevalidateTag = vi.fn();

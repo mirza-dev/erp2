@@ -7,7 +7,8 @@ import { mapQuoteDetail } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { validateQuoteLineQuantities, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { redactQuoteForPerms } from "@/lib/auth/redact";
 
 function getCachedQuote(id: string) {
     return unstable_cache(
@@ -62,7 +63,12 @@ export async function GET(
             }
         }
 
-        return NextResponse.json({ ...data, convertedOrderId, convertedOrderNumber, revisedBy, revisionOf });
+        // RBAC R3 (Faz 4 tamamlama): sales-financial redaction — view_sales_prices
+        // yoksa subtotal/vatTotal/grandTotal/discountAmount + satır fiyatları null.
+        const perms = await getCurrentUserPermissions();
+        return NextResponse.json(
+            redactQuoteForPerms({ ...data, convertedOrderId, convertedOrderNumber, revisedBy, revisionOf }, perms),
+        );
     } catch (err) {
         return handleApiError(err, "GET /api/quotes/[id]");
     }

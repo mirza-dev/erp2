@@ -81,3 +81,68 @@ export function redactOrderForPerms<T extends object>(order: T, perms: Set<Permi
     }
     return r as T;
 }
+
+/**
+ * DİKKAT — quotes route'ları SNAKE_CASE DEĞİL CAMELCASE döndürür: GET'ler
+ * `mapQuoteSummary`/`mapQuoteDetail`'i SERVER'da çağırır, response camelCase
+ * çıkar (products/orders'ın aksine). Bu yüzden quote redaction CAMELCASE
+ * anahtarları null'lar (`grandTotal`/`subtotal`/`vatTotal`/`discountAmount` +
+ * `lines[].unitPrice`/`lineTotal`). snake_case null'lamak burada SIZDIRIR.
+ * Sınıf: sales-financial → view_sales_prices.
+ */
+export function redactQuotesForPerms<T extends object>(items: T[], perms: Set<Permission>): T[] {
+    if (perms.has("view_sales_prices")) return items;
+    return items.map((q) => {
+        const r = { ...q } as Row;
+        nullField(r, "grandTotal");
+        return r as T;
+    });
+}
+
+/** Tek teklif (detail route için, camelCase). view_sales_prices yoksa finansal alanlar null. */
+export function redactQuoteForPerms<T extends object>(quote: T, perms: Set<Permission>): T {
+    if (perms.has("view_sales_prices")) return quote;
+    const r = { ...quote } as Row;
+    nullField(r, "subtotal");
+    nullField(r, "vatTotal");
+    nullField(r, "grandTotal");
+    nullField(r, "discountAmount");
+    if (Array.isArray(r.lines)) {
+        r.lines = (r.lines as Row[]).map((l) => {
+            const lr: Row = { ...l };
+            nullField(lr, "unitPrice");
+            nullField(lr, "lineTotal");
+            return lr;
+        });
+    }
+    return r as T;
+}
+
+/**
+ * purchase-orders GET (SNAKE_CASE — raw row, mapper YOK): `subtotal`/`vat_total`/
+ * `grand_total` + `lines[].unit_price`/`line_total`. Sınıf: purchase-financial →
+ * view_purchase_costs (sales/production/viewer null; purchasing/accounting/admin görür).
+ * `vat_rate` (yüzde) ve `discount_pct` (yüzde) finansal değer değil → dokunulmaz.
+ */
+export function redactPurchaseOrdersForPerms<T extends object>(items: T[], perms: Set<Permission>): T[] {
+    if (perms.has("view_purchase_costs")) return items;
+    return items.map((p) => redactPurchaseOrderForPerms(p, perms));
+}
+
+/** Tek PO (detail route için, snake_case). view_purchase_costs yoksa maliyet alanları null. */
+export function redactPurchaseOrderForPerms<T extends object>(po: T, perms: Set<Permission>): T {
+    if (perms.has("view_purchase_costs")) return po;
+    const r = { ...po } as Row;
+    nullField(r, "subtotal");
+    nullField(r, "vat_total");
+    nullField(r, "grand_total");
+    if (Array.isArray(r.lines)) {
+        r.lines = (r.lines as Row[]).map((l) => {
+            const lr: Row = { ...l };
+            nullField(lr, "unit_price");
+            nullField(lr, "line_total");
+            return lr;
+        });
+    }
+    return r as T;
+}

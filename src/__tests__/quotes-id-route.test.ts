@@ -12,9 +12,11 @@ const mockDbUpdateQuote = vi.fn();
 const mockDbDeleteQuote = vi.fn();
 
 // Faz 8a: RBAC guard — varsayılan izinli (mevcut testler davranışı korur).
+// Faz 4 R3: detail GET redaction view_sales_prices okur → tam veri için sete eklenir (no-op).
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
     requireRole: vi.fn().mockResolvedValue(null),
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_sales_prices"])),
 }));
 
 vi.mock("@/lib/supabase/quotes", () => ({

@@ -5,7 +5,8 @@ import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { mapQuoteDetail, mapQuoteSummary } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { validateQuoteLineQuantities, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { redactQuotesForPerms } from "@/lib/auth/redact";
 
 const getCachedQuotes = unstable_cache(
     async (status?: string) => {
@@ -21,7 +22,9 @@ export async function GET(req: NextRequest) {
     try {
         const status = req.nextUrl.searchParams.get("status") ?? undefined;
         const data = await getCachedQuotes(status);
-        return NextResponse.json(data);
+        // RBAC R3 (Faz 4 tamamlama): sales-financial — view_sales_prices yoksa grandTotal null.
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(redactQuotesForPerms(data, perms));
     } catch (err) {
         return handleApiError(err, "GET /api/quotes");
     }

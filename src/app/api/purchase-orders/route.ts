@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListPurchaseOrders, dbCreatePurchaseOrder, validatePoLines, isValidPoCurrency } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { redactPurchaseOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-orders?status=...&vendor_id=...
@@ -18,7 +19,10 @@ export async function GET(req: NextRequest) {
             status: status as import("@/lib/database.types").PurchaseOrderStatus | undefined,
             vendor_id,
         });
-        return NextResponse.json(orders);
+        // RBAC R3 (Faz 4 tamamlama): purchase-financial — view_purchase_costs yoksa
+        // subtotal/vat_total/grand_total null (sales/production/viewer maliyeti görmez).
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(redactPurchaseOrdersForPerms(orders, perms));
     } catch (err) {
         return handleApiError(err, "GET /api/purchase-orders");
     }
