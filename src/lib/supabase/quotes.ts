@@ -71,7 +71,17 @@ export async function dbCreateQuote(input: CreateQuoteInput): Promise<QuoteWithL
         p_lines: lines,
     });
     if (error) throw error;
-    return (await dbGetQuote(quoteId as string))!;
+    const created = (await dbGetQuote(quoteId as string))!;
+    // Faz 8c: quotes audit katmanı (helper seviyesi — product-types/vendors paterni;
+    // best-effort, actor'sız [codebase audit'leri actor yakalamıyor → tutarlı]).
+    await sb.from("audit_log").insert({
+        action: "quote_created",
+        entity_type: "quote",
+        entity_id: created.id,
+        after_state: { quote_number: created.quote_number, status: created.status, grand_total: created.grand_total },
+        source: "ui",
+    });
+    return created;
 }
 
 export async function dbGetQuote(id: string): Promise<QuoteWithLines | null> {
@@ -120,7 +130,16 @@ export async function dbUpdateQuote(
         p_lines: lines,
     });
     if (error) throw error;
-    return (await dbGetQuote(id))!;
+    const updated = (await dbGetQuote(id))!;
+    // Faz 8c: audit (helper seviyesi, best-effort).
+    await sb.from("audit_log").insert({
+        action: "quote_updated",
+        entity_type: "quote",
+        entity_id: id,
+        after_state: { quote_number: updated.quote_number, status: updated.status, grand_total: updated.grand_total },
+        source: "ui",
+    });
+    return updated;
 }
 
 export async function dbDeleteQuote(id: string): Promise<void> {
@@ -179,7 +198,17 @@ export async function dbCreateQuoteRevision(sourceId: string): Promise<string> {
     const sb = createServiceClient();
     const { data, error } = await sb.rpc("create_quote_revision", { p_source_id: sourceId });
     if (error) throw error;
-    return data as string;
+    const newQuoteId = data as string;
+    // Faz 8c: audit (helper seviyesi, best-effort). entity = kaynak teklif; after_state
+    // yeni revizyon teklifine işaret eder.
+    await sb.from("audit_log").insert({
+        action: "quote_revised",
+        entity_type: "quote",
+        entity_id: sourceId,
+        after_state: { new_quote_id: newQuoteId, source_quote_id: sourceId },
+        source: "ui",
+    });
+    return newQuoteId;
 }
 
 /**

@@ -105,6 +105,8 @@ vi.mock("@/lib/supabase/service", () => ({
             select: () => ({
                 eq: () => ({ maybeSingle: () => mockMaybeSingle() }),
             }),
+            // Faz 8c: dbCreateQuote/dbUpdateQuote helper-seviyesi audit_log insert'i.
+            insert: () => ({ select: () => ({ single: async () => ({ data: null, error: null }) }) }),
         }),
     }),
 }));
