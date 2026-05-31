@@ -132,3 +132,34 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/parasut", both)).toBe(false); // ikisi de değil
     });
 });
+
+describe("R5 — bilinmeyen /dashboard/* fail-closed (matriste olmayan)", () => {
+    const viewer = permissionsForRoles(["viewer"]);
+    const sales = permissionsForRoles(["sales"]);
+
+    it("matriste OLMAYAN /dashboard/* → admin TRUE, non-admin FALSE", () => {
+        // Henüz PAGE_ACCESS'e eklenmemiş hipotetik hassas sayfa
+        expect(canAccessPath("/dashboard/yeni-hassas-sayfa", viewer, true)).toBe(true);   // admin
+        expect(canAccessPath("/dashboard/yeni-hassas-sayfa", viewer, false)).toBe(false); // viewer
+        expect(canAccessPath("/dashboard/yeni-hassas-sayfa", sales, false)).toBe(false);  // sales
+    });
+
+    it("isAdmin default false → bilinmeyen path reddedilir (parametre verilmezse)", () => {
+        expect(canAccessPath("/dashboard/bilinmeyen", viewer)).toBe(false);
+    });
+
+    it("bilinen path isAdmin'den BAĞIMSIZ permission'a bakar (regresyon)", () => {
+        // /dashboard/parasut matriste var → isAdmin=true olsa bile perms belirleyici
+        expect(canAccessPath("/dashboard/parasut", viewer, false)).toBe(false);
+        expect(canAccessPath("/dashboard/quotes", viewer, false)).toBe(true); // viewer view_quotes var
+    });
+
+    it("/dashboard kökü matriste (view_dashboard) → isAdmin'e düşmez", () => {
+        expect(canAccessPath("/dashboard", viewer, false)).toBe(true);
+    });
+
+    it("/dashboard DIŞI path her zaman serbest (proxy zaten /dashboard ile sınırlı)", () => {
+        expect(canAccessPath("/login", viewer, false)).toBe(true);
+        expect(canAccessPath("/api/products", viewer, false)).toBe(true);
+    });
+});

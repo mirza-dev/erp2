@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { serviceConfirmBatch } from "@/lib/services/import-service";
 import { revalidateTag } from "next/cache";
 
@@ -10,6 +11,9 @@ export async function POST(
 ) {
     try {
         const { batchId } = await params;
+
+        const guard = await requirePermission(_req, "manage_import");
+        if (guard) return guard;
         const result = await serviceConfirmBatch(batchId);
         revalidateTag("products", "max");
         return NextResponse.json(result);

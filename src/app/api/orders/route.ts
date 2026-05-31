@@ -10,6 +10,8 @@ import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
+import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
 // GET /api/orders?commercial_status=approved&customer_id=xxx&page=1
@@ -26,7 +28,9 @@ export async function GET(req: NextRequest) {
             page,
         });
 
-        return NextResponse.json(orders);
+        // RBAC R3: redaction per-request (serviceListOrders cache'siz; yine de perms ayrı).
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(redactOrdersForPerms(orders, perms));
     } catch (err) {
         return handleApiError(err, "GET /api/orders");
     }
@@ -35,6 +39,9 @@ export async function GET(req: NextRequest) {
 // POST /api/orders — creates a new order (draft or pending_approval)
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_sales_orders");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as CreateOrderInput;

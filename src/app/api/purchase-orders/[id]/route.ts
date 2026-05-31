@@ -5,6 +5,7 @@ import {
     isValidPoCurrency,
 } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-orders/[id]
@@ -13,6 +14,9 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(_req, "view_purchase_orders");
+        if (guard) return guard;
+
         const { id } = await params;
         const po = await dbGetPurchaseOrderById(id);
         if (!po) return NextResponse.json({ error: "PO bulunamadı." }, { status: 404 });
@@ -29,6 +33,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(req, "manage_purchase_orders");
+        if (guard) return guard;
+
         const { id } = await params;
 
         const existing = await dbGetPurchaseOrderById(id);

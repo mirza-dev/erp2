@@ -42,8 +42,13 @@ vi.mock("@/lib/supabase/product-types", () => ({
 }));
 
 const mockRequireRole = vi.fn();
+// RBAC R1 P2#4: product-types requireRole(["admin"]) → requirePermission("manage_product_types").
+// Route artık requirePermission çağırıyor; aynı kontrol fn'ine bağla (mevcut allow/deny
+// senaryoları korunur). Policy GENİŞLEDİ: admin → admin+purchasing (page-gate tutarlılığı;
+// purchasing /dashboard/settings/product-types'a erişebiliyordu ama API admin-only'di).
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    requirePermission: (...a: unknown[]) => mockRequireRole(...a),
 }));
 
 vi.mock("next/cache", () => ({

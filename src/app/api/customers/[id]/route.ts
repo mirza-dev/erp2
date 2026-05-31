@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbDeleteCustomer, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbCountOrdersByCustomer } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // PATCH /api/customers/[id]
 export async function PATCH(
@@ -9,6 +10,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_customers");
+        if (guard) return guard;
+
         const { id } = await params;
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
@@ -39,6 +43,9 @@ export async function DELETE(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(_req, "manage_customers");
+        if (guard) return guard;
+
         const { id } = await params;
         const orderCount = await dbCountOrdersByCustomer(id);
         if (orderCount > 0) {

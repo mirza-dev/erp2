@@ -16,9 +16,14 @@ async function requireAdmin(): Promise<{ error: NextResponse } | null> {
     if (parseRoles(user.app_metadata, user.email, emails).includes("admin")) return null;
     // Zero-admin bootstrap (route.ts ile aynı): sistemde hiç admin yoksa ilk
     // authd kullanıcıya izin; ilk admin atanınca kapanır → brick-proof.
+    // R4 fix: listUsers HATASI fail-CLOSED — hata varsa "admin yok" varsayıp
+    // izin verme (eski hâl: data undefined → boş → fail-open).
     const svc = createServiceClient();
-    const { data } = await svc.auth.admin.listUsers();
-    const anyAdmin = (data?.users ?? []).some(u => parseRoles(u.app_metadata, u.email, emails).includes("admin"));
+    const { data, error } = await svc.auth.admin.listUsers();
+    if (error || !data) {
+        return { error: NextResponse.json({ error: "Yetki doğrulanamadı." }, { status: 500 }) };
+    }
+    const anyAdmin = data.users.some(u => parseRoles(u.app_metadata, u.email, emails).includes("admin"));
     if (!anyAdmin) return null;
     return { error: NextResponse.json({ error: "Bu işlem için admin yetkisi gereklidir." }, { status: 403 }) };
 }
@@ -28,10 +33,13 @@ async function requireAdmin(): Promise<{ error: NextResponse } | null> {
  * Last-admin lockout korumasında kullanılır.
  */
 async function countAdmins(svc: ReturnType<typeof createServiceClient>): Promise<{ count: number; targetIsAdmin: (id: string) => boolean }> {
-    const { data } = await svc.auth.admin.listUsers();
+    const { data, error } = await svc.auth.admin.listUsers();
+    // R4 fix: listUsers hatası fail-CLOSED — count=0 dönmek last-admin lockout'u
+    // bypass ettirir (son admin demote/sil edilebilir). Hata → throw → 500.
+    if (error || !data) throw new Error("Admin sayımı yapılamadı (listUsers).");
     const emails = adminEmails();
     const adminIds = new Set(
-        (data?.users ?? [])
+        data.users
             .filter(u => parseRoles(u.app_metadata, u.email, emails).includes("admin"))
             .map(u => u.id),
     );

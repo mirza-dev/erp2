@@ -6,6 +6,7 @@ import {
     CommitmentConflictError,
 } from "@/lib/supabase/purchase-commitments";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-commitments/[id]
@@ -14,6 +15,9 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(_req, "view_purchase_orders");
+        if (guard) return guard;
+
         const { id } = await params;
         const commitment = await dbGetCommitment(id);
         if (!commitment) {
@@ -32,6 +36,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_purchase_orders");
+        if (guard) return guard;
+
         const { id } = await params;
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;

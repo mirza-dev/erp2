@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetCompanySettings, dbUpdateCompanySettings } from "@/lib/supabase/company-settings";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { isValidEmail, isValidTaxNumber, isValidUrl } from "@/lib/validation";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 const getCachedCompanySettings = unstable_cache(
@@ -70,6 +71,9 @@ function validateCompanyPatch(patch: Record<string, unknown>): string | null {
 // PATCH /api/settings/company
 export async function PATCH(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_settings");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Record<string, unknown>;

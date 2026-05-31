@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceGetAlert, serviceUpdateAlertStatus } from "@/lib/services/alert-service";
 import { safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import type { AlertStatus } from "@/lib/database.types";
 
 // GET /api/alerts/[id]
@@ -26,6 +27,9 @@ export async function PATCH(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_alerts");
+        if (guard) return guard;
+
         const { id } = await params;
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;

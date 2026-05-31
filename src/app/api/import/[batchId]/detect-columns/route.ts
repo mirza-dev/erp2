@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { dbGetBatch } from "@/lib/supabase/import";
 import { dbLookupColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { aiDetectColumns, FALLBACK_FIELD_MAP } from "@/lib/services/ai-service";
@@ -30,6 +31,9 @@ export async function POST(
 ) {
     try {
         const { batchId } = await params;
+
+        const guard = await requirePermission(req, "manage_import");
+        if (guard) return guard;
         const batch = await dbGetBatch(batchId);
         if (!batch) {
             return NextResponse.json({ error: "Batch bulunamadı." }, { status: 404 });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbListDrafts } from "@/lib/supabase/import";
 import { serviceAddDraftsToBatch } from "@/lib/services/import-service";
 import { safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/import/[batchId]/drafts
 export async function GET(
@@ -25,6 +26,9 @@ export async function POST(
     { params }: { params: Promise<{ batchId: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_import");
+        if (guard) return guard;
+
         const { batchId } = await params;
         const safeParsed = await safeParseJson(req);
         if (!safeParsed.ok) return safeParsed.response;

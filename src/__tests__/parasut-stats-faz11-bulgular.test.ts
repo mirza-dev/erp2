@@ -5,6 +5,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// RBAC R2: parasut/stats GET'e view_parasut guard eklendi → allow.
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+    requireRole: vi.fn().mockResolvedValue(null),
+    requireAnyRole: vi.fn().mockResolvedValue(null),
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_parasut"])),
+    getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
+    getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
+}));
+
 const tokenRow = { expires_at: new Date(Date.now() + 3600_000).toISOString(), token_version: 7, updated_at: new Date().toISOString() };
 const distRows = [
     { parasut_step: "contact",  parasut_error_kind: null },

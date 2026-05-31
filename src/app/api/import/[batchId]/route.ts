@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch, dbUpdateBatchStatus, dbDeleteBatch } from "@/lib/supabase/import";
 import type { ImportBatchStatus } from "@/lib/database.types";
 import { safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/import/[batchId]
 export async function GET(
@@ -26,6 +27,9 @@ export async function DELETE(
     { params }: { params: Promise<{ batchId: string }> }
 ) {
     try {
+        const guard = await requirePermission(_req, "manage_import");
+        if (guard) return guard;
+
         const { batchId } = await params;
         await dbDeleteBatch(batchId);
         return new NextResponse(null, { status: 204 });
@@ -42,6 +46,9 @@ export async function PATCH(
     { params }: { params: Promise<{ batchId: string }> }
 ) {
     try {
+        const guard = await requirePermission(req, "manage_import");
+        if (guard) return guard;
+
         const { batchId } = await params;
         const safeParsed = await safeParseJson(req);
         if (!safeParsed.ok) return safeParsed.response;

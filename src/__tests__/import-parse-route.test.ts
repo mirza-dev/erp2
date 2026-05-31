@@ -4,6 +4,16 @@
  * Follows the ai-purchase-copilot-route.test.ts pattern.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// RBAC Faz 4: import route'larına requirePermission(manage_import) eklendi → allow.
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+    requireRole: vi.fn().mockResolvedValue(null),
+    requireAnyRole: vi.fn().mockResolvedValue(null),
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["manage_import"])),
+    getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
+    getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
+}));
 import { NextRequest } from "next/server";
 
 // ─── DB import mock ───────────────────────────────────────────────────────────

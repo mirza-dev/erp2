@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListPurchaseOrders, dbCreatePurchaseOrder, validatePoLines, isValidPoCurrency } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-orders?status=...&vendor_id=...
 export async function GET(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "view_purchase_orders");
+        if (guard) return guard;
+
         const { searchParams } = new URL(req.url);
         const status = searchParams.get("status") ?? undefined;
         const vendor_id = searchParams.get("vendor_id") ?? undefined;
@@ -23,6 +27,9 @@ export async function GET(req: NextRequest) {
 // POST /api/purchase-orders
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_purchase_orders");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
 

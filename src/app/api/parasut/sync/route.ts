@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 
 // POST /api/parasut/sync
 // Body: { order_id: string }
 export async function POST(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "manage_parasut");
+        if (guard) return guard;
+
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const { order_id } = parsed.data as { order_id: string };

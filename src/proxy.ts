@@ -54,9 +54,10 @@ function pageGateRedirect(
     pathname: string,
     perms: Set<import("@/lib/auth/permissions").Permission>,
     rate: RateCheckResult,
+    isAdmin = false,
 ): NextResponse | null {
     if (!pathname.startsWith("/dashboard")) return null;
-    if (canAccessPath(pathname, perms)) return null;
+    if (canAccessPath(pathname, perms, isAdmin)) return null;
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.searchParams.set("forbidden", pathname);
@@ -236,7 +237,7 @@ export async function proxy(request: NextRequest) {
     // /dashboard/** erişimi. user.app_metadata authoritative (user_metadata DEĞİL).
     const roles = parseRoles(user.app_metadata, user.email, adminEmailsFromEnv());
     const perms = permissionsForRoles(roles);
-    const gated = pageGateRedirect(request, pathname, perms, rate);
+    const gated = pageGateRedirect(request, pathname, perms, rate, roles.includes("admin"));
     if (gated) return gated;
 
     return withRateHeaders(supabaseResponse, rate);

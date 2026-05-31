@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetPurchaseOrderById } from "@/lib/supabase/purchase-orders";
 import { serviceConfirmPO } from "@/lib/services/purchase-order-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // POST /api/purchase-orders/[id]/confirm — draft|sent → confirmed (B4 guards in RPC)
@@ -10,6 +11,9 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
+        const guard = await requirePermission(req, "manage_purchase_orders");
+        if (guard) return guard;
+
         const { id } = await params;
 
         const existing = await dbGetPurchaseOrderById(id);

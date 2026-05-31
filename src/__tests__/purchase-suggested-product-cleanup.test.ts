@@ -6,6 +6,17 @@
  * route handler'larının dbExpireEntityRecommendations'ı tetiklediğini doğrular.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// RBAC Faz 4: route'lara requirePermission guard eklendi → guard'ı allow'a mock'la.
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+    requireRole: vi.fn().mockResolvedValue(null),
+    requireAnyRole: vi.fn().mockResolvedValue(null),
+    getCurrentUserPermissions: vi.fn().mockResolvedValue(
+        new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
+    getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
+    getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
+}));
 import { NextRequest } from "next/server";
 
 // ─── Module mocks ────────────────────────────────────────────────────────────
