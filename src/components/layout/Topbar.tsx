@@ -3,6 +3,7 @@
 import { memo } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
+import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
 
 interface TopbarProps {
     onToggleSidebar?: () => void;
@@ -75,19 +76,22 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
             {/* Right */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 {/* Live indicator — hide on mobile */}
-                <div className="topbar-right-extras" style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                    <span
-                        className="animate-pulse-dot"
-                        style={{
-                            width: "6px",
-                            height: "6px",
-                            background: "var(--success)",
-                            borderRadius: "50%",
-                        }}
-                    />
-                    <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                        Bağlı
-                    </span>
+                <div className="topbar-right-extras" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <ExchangeRatesTicker />
+                    <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                        <span
+                            className="animate-pulse-dot"
+                            style={{
+                                width: "6px",
+                                height: "6px",
+                                background: "var(--success)",
+                                borderRadius: "50%",
+                            }}
+                        />
+                        <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                            Bağlı
+                        </span>
+                    </div>
                 </div>
 
                 {/* Alert button */}
