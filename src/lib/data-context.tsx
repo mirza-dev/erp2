@@ -143,7 +143,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
           // sayfası onları listelemiyordu.
           fetch("/api/products?all=1"),
           fetch("/api/customers"),
-          fetch("/api/orders"),
+          // ?all=1 — pagination'sız tüm siparişler. Tab sayaçları + müşteri
+          // cirosu (CustomerDetailPanel) 50-sipariş cap'i nedeniyle eksik
+          // hesaplanıyordu; products ile aynı patern.
+          fetch("/api/orders?all=1"),
           fetch("/api/production"),
           fetch("/api/alerts"),
         ]);

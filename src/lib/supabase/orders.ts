@@ -158,6 +158,77 @@ export async function dbCreateOrder(input: CreateOrderInput): Promise<SalesOrder
     return row;
 }
 
+// ── Draft edit (Faz 2) ───────────────────────────────────────
+
+export interface UpdateOrderInput {
+    customer_id?: string;
+    customer_name: string;
+    customer_email?: string;
+    customer_country?: string;
+    customer_tax_office?: string;
+    customer_tax_number?: string;
+    currency: string;
+    notes?: string;
+    quote_valid_until?: string;
+    lines: {
+        product_id: string;
+        product_name: string;
+        product_sku: string;
+        unit: string;
+        quantity: number;
+        unit_price: number;
+        discount_pct: number;
+        line_total: number;
+    }[];
+}
+
+/**
+ * Taslak siparişin müşteri/kalem/not/teklif-vadesini atomik değiştirir.
+ * update_order_with_lines RPC: FOR UPDATE + status='draft' guard + totals
+ * yeniden hesap (sunucu tarafı). draft dışı → RPC RAISE eder (service map'ler).
+ */
+export async function dbUpdateOrderWithLines(
+    orderId: string,
+    input: UpdateOrderInput,
+    actor?: string | null,
+): Promise<SalesOrderRow> {
+    const supabase = createServiceClient();
+    const { error } = await supabase.rpc("update_order_with_lines", {
+        p_order_id: orderId,
+        p_header: {
+            customer_id: input.customer_id ?? null,
+            customer_name: input.customer_name,
+            customer_email: input.customer_email ?? null,
+            customer_country: input.customer_country ?? null,
+            customer_tax_office: input.customer_tax_office ?? null,
+            customer_tax_number: input.customer_tax_number ?? null,
+            currency: input.currency,
+            notes: input.notes ?? null,
+            quote_valid_until: input.quote_valid_until ?? null,
+        },
+        p_lines: input.lines.map((l) => ({
+            product_id: l.product_id,
+            product_name: l.product_name,
+            product_sku: l.product_sku,
+            unit: l.unit,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            discount_pct: l.discount_pct,
+            line_total: l.line_total,
+        })),
+        p_actor: actor ?? null,
+    });
+    if (error) throw new Error(error.message);
+
+    const { data: row, error: rowErr } = await supabase
+        .from("sales_orders")
+        .select("*")
+        .eq("id", orderId)
+        .single();
+    if (rowErr || !row) throw new Error("Sipariş güncellendi ancak okunamadı");
+    return row;
+}
+
 export async function dbUpdateOrderStatus(
     id: string,
     commercial_status: CommercialStatus,

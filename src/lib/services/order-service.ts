@@ -16,7 +16,9 @@ import {
     dbCancelOrder,
     dbListExpiredQuotes,
     dbUpdateOrderQuoteDeadline,
+    dbUpdateOrderWithLines,
     type CreateOrderInput,
+    type UpdateOrderInput,
     type ListOrdersFilter,
     type ApproveOrderResult,
     type OrderWithLines,
@@ -126,6 +128,52 @@ export async function serviceCreateOrder(input: CreateOrderInput) {
         throw new Error(`Geçersiz başlangıç durumu: ${input.commercial_status}`);
     }
     return dbCreateOrder({ ...input, fulfillment_status: "unallocated" });
+}
+
+// ── Draft edit (Faz 2) ───────────────────────────────────────
+
+export function validateOrderUpdate(input: UpdateOrderInput): ValidationResult {
+    const errors: string[] = [];
+
+    if (!input.customer_name?.trim()) errors.push("Müşteri adı zorunludur.");
+    if (!input.lines || input.lines.length === 0) errors.push("En az bir satır ürün girilmelidir.");
+
+    if (input.quote_valid_until) {
+        const today = new Date().toISOString().slice(0, 10);
+        if (input.quote_valid_until < today) {
+            errors.push("Teklif geçerlilik tarihi bugün veya sonrası olmalıdır.");
+        }
+    }
+
+    for (const [i, line] of (input.lines ?? []).entries()) {
+        if (!line.product_id) errors.push(`Satır ${i + 1}: Ürün seçilmedi.`);
+        if (line.quantity <= 0) errors.push(`Satır ${i + 1}: Miktar 0'dan büyük olmalı.`);
+        if (line.quantity > 999_999_999) errors.push(`Satır ${i + 1}: Miktar çok büyük.`);
+        if (line.unit_price < 0) errors.push(`Satır ${i + 1}: Birim fiyat negatif olamaz.`);
+        if (line.unit_price > 999_999_999) errors.push(`Satır ${i + 1}: Birim fiyat çok büyük.`);
+    }
+
+    return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Taslak siparişin içeriğini değiştirir (müşteri/kalem/not/teklif vadesi).
+ * Yalnızca draft düzenlenebilir — service pre-check + RPC FOR UPDATE guard
+ * (yarış: RPC authoritative). Totaller RPC içinde line_total'lerden hesaplanır.
+ */
+export async function serviceUpdateOrderLines(
+    orderId: string,
+    input: UpdateOrderInput,
+    actor?: string | null,
+) {
+    const order = await dbGetOrderById(orderId);
+    if (!order) throw new Error("Sipariş bulunamadı.");
+    if (order.commercial_status !== "draft") {
+        throw new Error("Yalnızca taslak siparişler düzenlenebilir.");
+    }
+    const validation = validateOrderUpdate(input);
+    if (!validation.valid) throw new Error(validation.errors.join(" "));
+    return dbUpdateOrderWithLines(orderId, input, actor);
 }
 
 // ── Faz 11.1: Shipment Preflight ─────────────────────────────

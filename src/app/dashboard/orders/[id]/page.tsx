@@ -159,6 +159,7 @@ export default function OrderDetailPage() {
 
     const [hardDeleteOpen, setHardDeleteOpen] = useState(false);
     const [hardDeleteLoading, setHardDeleteLoading] = useState(false);
+    const [hoveredLineId, setHoveredLineId] = useState<string | null>(null);
 
     type ParasutStatus = "idle" | "sending" | "sent" | "error";
     const [parasutStatus, setParasutStatus] = useState<ParasutStatus>("idle");
@@ -455,6 +456,11 @@ export default function OrderDetailPage() {
                                 >
                                     Kalıcı Sil
                                 </button>
+                                {has("manage_sales_orders") && (
+                                    <Link href={`/dashboard/orders/${order.id}/edit`}>
+                                        <Button variant="secondary" disabled={loading !== null}>Düzenle</Button>
+                                    </Link>
+                                )}
                                 <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
@@ -637,16 +643,18 @@ export default function OrderDetailPage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {order.lines.map(line => (
+                                    {order.lines.map(line => {
+                                        const lineBg = hoveredLineId === line.id ? "var(--bg-secondary)" : "transparent";
+                                        return (
                                         <tr
                                             key={line.id}
-                                            onMouseEnter={e => e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "var(--bg-secondary)"))}
-                                            onMouseLeave={e => e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "transparent"))}
+                                            onMouseEnter={() => setHoveredLineId(line.id)}
+                                            onMouseLeave={() => setHoveredLineId(null)}
                                         >
-                                            <td style={{ ...tdStyle, fontFamily: "var(--font-mono)", fontSize: "12px", color: "var(--text-secondary)" }}>
+                                            <td style={{ ...tdStyle, background: lineBg, fontFamily: "var(--font-mono)", fontSize: "12px", color: "var(--text-secondary)" }}>
                                                 {line.productSku}
                                             </td>
-                                            <td style={{ ...tdStyle, fontWeight: 500 }}>
+                                            <td style={{ ...tdStyle, background: lineBg, fontWeight: 500 }}>
                                                 {line.productName}
                                                 {line.description && (
                                                     <div style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-tertiary)", marginTop: "2px" }}>
@@ -654,20 +662,21 @@ export default function OrderDetailPage() {
                                                     </div>
                                                 )}
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: "right" }}>
+                                            <td style={{ ...tdStyle, background: lineBg, textAlign: "right" }}>
                                                 {line.quantity} {line.unit}
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: "right" }}>
+                                            <td style={{ ...tdStyle, background: lineBg, textAlign: "right" }}>
                                                 {maskCurrency(line.unitPrice, order.currency, canViewSalesPrices)}
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: "right", color: line.discountPct > 0 ? "var(--warning-text)" : "var(--text-tertiary)" }}>
+                                            <td style={{ ...tdStyle, background: lineBg, textAlign: "right", color: line.discountPct > 0 ? "var(--warning-text)" : "var(--text-tertiary)" }}>
                                                 {line.discountPct > 0 ? `%${line.discountPct}` : "—"}
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}>
+                                            <td style={{ ...tdStyle, background: lineBg, textAlign: "right", fontWeight: 600 }}>
                                                 {maskCurrency(line.lineTotal, order.currency, canViewSalesPrices)}
                                             </td>
                                         </tr>
-                                    ))}
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>

@@ -68,6 +68,15 @@ function matchesTab(order: { commercial_status: CommercialStatus; fulfillment_st
     return order.commercial_status === tab;
 }
 
+// Toplu işlem = soft-DELETE = iptal. Yalnızca iptal edilebilir siparişler
+// seçilebilir: zaten iptal edilmiş VEYA sevk edilmiş siparişler iptal edilemez
+// (backend 400 döner). Sevk edilmiş approved da kapsam dışı.
+export function isOrderCancellable(order: { commercial_status: CommercialStatus; fulfillment_status: FulfillmentStatus }): boolean {
+    if (order.commercial_status === "cancelled") return false;
+    if (order.fulfillment_status === "shipped") return false;
+    return true;
+}
+
 function OrdersList() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -88,6 +97,7 @@ function OrdersList() {
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
     const [bulkDeleting, setBulkDeleting] = useState(false);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
     const filterAppliedRef = useRef(false);
 
     // Browser tab title — sidebar label ile hizalı (2026-05-27).
@@ -104,7 +114,8 @@ function OrdersList() {
     }, [contextOrders]);
 
     const refetch = useCallback(async () => {
-        const res = await fetch("/api/orders");
+        // ?all=1 — pagination'sız; tab sayaçları + filtreler 50-cap'e takılmasın.
+        const res = await fetch("/api/orders?all=1");
         if (res.ok) {
             const data = await res.json();
             if (Array.isArray(data)) setMockOrders(data.map(mapOrderSummary));
@@ -193,7 +204,9 @@ function OrdersList() {
 
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
         useSelection(`${activeTab}|${search}|${customerIdFilter ?? ""}|${dateFrom}|${dateTo}|${currencyFilter}`);
-    const pageIds = pagedItems.map(o => o.id);
+    // Select-all yalnızca iptal edilebilir satırları kapsar (sevk/iptal edilmiş
+    // siparişler toplu iptalde 400 alırdı).
+    const cancellablePageIds = pagedItems.filter(isOrderCancellable).map(o => o.id);
 
     const handleBulkDelete = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -204,8 +217,9 @@ function OrdersList() {
         );
         const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
         const succeeded = ids.length - failed;
-        if (succeeded > 0) toast({ type: "success", message: `${succeeded} sipariş silindi.` });
-        if (failed > 0) toast({ type: "error", message: `${failed} sipariş silinemedi.` });
+        // Soft-DELETE = iptal (silme değil). Dürüst sözcük (tekil buton "iptal et" der).
+        if (succeeded > 0) toast({ type: "success", message: `${succeeded} sipariş iptal edildi.` });
+        if (failed > 0) toast({ type: "error", message: `${failed} sipariş iptal edilemedi.` });
         clearAll();
         setBulkDeleteConfirm(false);
         setBulkDeleting(false);
@@ -404,7 +418,7 @@ function OrdersList() {
                             opacity: bulkDeleting ? 0.6 : 1,
                         }}
                     >
-                        {bulkDeleting ? "Siliniyor…" : "Sil"}
+                        {bulkDeleting ? "İptal ediliyor…" : "İptal Et"}
                     </button>
                     <button
                         onClick={clearAll}
@@ -433,12 +447,13 @@ function OrdersList() {
                             <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
                                 <input
                                     type="checkbox"
-                                    checked={isPageAllSelected(pageIds)}
-                                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
-                                    onChange={() => toggleAll(pageIds)}
+                                    checked={isPageAllSelected(cancellablePageIds)}
+                                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(cancellablePageIds); }}
+                                    onChange={() => toggleAll(cancellablePageIds)}
                                     onClick={e => e.stopPropagation()}
-                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                    aria-label="Sayfadaki tüm siparişleri seç"
+                                    disabled={cancellablePageIds.length === 0}
+                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: cancellablePageIds.length === 0 ? "not-allowed" : "pointer" }}
+                                    aria-label="Sayfadaki iptal edilebilir siparişleri seç"
                                 />
                             </th>
                             <th style={thStyle}>Sipariş No</th>
@@ -473,55 +488,39 @@ function OrdersList() {
                             pagedItems.map((order) => {
                                 const commercial = commercialStatusConfig[order.commercial_status];
                                 const fulfillment = fulfillmentStatusConfig[order.fulfillment_status];
+                                const isHovered = hoveredId === order.id;
+                                const cellBg = isHovered ? "var(--bg-secondary)" : "transparent";
+                                const cancellable = isOrderCancellable(order);
                                 return (
                                     <tr
                                         key={order.id}
-                                        style={{ cursor: "pointer" }}
+                                        style={{ cursor: "pointer", background: cellBg }}
                                         onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-                                        onMouseEnter={(e) => {
-                                            const tds = e.currentTarget.querySelectorAll("td");
-                                            tds.forEach((td, i) => {
-                                                td.style.background = "var(--bg-secondary)";
-                                                if (i === 0) td.style.borderLeft = "2px solid var(--accent)";
-                                            });
-                                            const chevron = e.currentTarget.querySelector("[data-chevron]") as HTMLElement;
-                                            if (chevron) chevron.style.opacity = "1";
-                                            const deleteBtn = e.currentTarget.querySelector("[data-delete]") as HTMLElement;
-                                            if (deleteBtn) deleteBtn.style.opacity = "1";
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            const tds = e.currentTarget.querySelectorAll("td");
-                                            tds.forEach((td, i) => {
-                                                td.style.background = "transparent";
-                                                if (i === 0) td.style.borderLeft = "2px solid transparent";
-                                            });
-                                            const chevron = e.currentTarget.querySelector("[data-chevron]") as HTMLElement;
-                                            if (chevron) chevron.style.opacity = "0";
-                                            const deleteBtn = e.currentTarget.querySelector("[data-delete]") as HTMLElement;
-                                            if (deleteBtn) deleteBtn.style.opacity = "0";
-                                            if (confirmId === order.id) setConfirmId(null);
-                                        }}
+                                        onMouseEnter={() => setHoveredId(order.id)}
+                                        onMouseLeave={() => setHoveredId(null)}
                                     >
                                         <td
-                                            style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
+                                            style={{ ...tdStyle, background: cellBg, width: "36px", padding: "10px 8px 10px 14px", borderLeft: isHovered ? "2px solid var(--accent)" : "2px solid transparent" }}
                                             onClick={e => e.stopPropagation()}
                                         >
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.has(order.id)}
-                                                onChange={() => toggleOne(order.id)}
-                                                onClick={e => e.stopPropagation()}
-                                                style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                                aria-label={`${order.orderNumber} seç`}
-                                            />
+                                            {cancellable && (
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(order.id)}
+                                                    onChange={() => toggleOne(order.id)}
+                                                    onClick={e => e.stopPropagation()}
+                                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                                    aria-label={`${order.orderNumber} seç`}
+                                                />
+                                            )}
                                         </td>
-                                        <td style={{ ...tdStyle, fontWeight: 500, borderLeft: "2px solid transparent" }}>
+                                        <td style={{ ...tdStyle, background: cellBg, fontWeight: 500 }}>
                                             {order.orderNumber}
                                         </td>
-                                        <td style={tdStyle}>
+                                        <td style={{ ...tdStyle, background: cellBg }}>
                                             {order.customerName}
                                         </td>
-                                        <td style={{ ...tdStyle, textAlign: "center" }}>
+                                        <td style={{ ...tdStyle, background: cellBg, textAlign: "center" }}>
                                             <span className={`badge ${commercial.cls}`}>{commercial.label}</span>
                                             {order.quoteValidUntil &&
                                              (order.commercial_status === "draft" || order.commercial_status === "pending_approval") && (() => {
@@ -543,7 +542,7 @@ function OrdersList() {
                                                 );
                                             })()}
                                         </td>
-                                        <td style={{ ...tdStyle, textAlign: "center" }}>
+                                        <td style={{ ...tdStyle, background: cellBg, textAlign: "center" }}>
                                             {order.fulfillment_status !== "unallocated" && (
                                                 <span
                                                     className={`badge ${fulfillment.cls}`}
@@ -553,17 +552,17 @@ function OrdersList() {
                                                 </span>
                                             )}
                                         </td>
-                                        <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>
+                                        <td style={{ ...tdStyle, background: cellBg, color: "var(--text-secondary)" }}>
                                             {formatDate(order.createdAt)}
                                         </td>
-                                        <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)" }}>
+                                        <td style={{ ...tdStyle, background: cellBg, textAlign: "center", color: "var(--text-secondary)" }}>
                                             {order.itemCount}
                                         </td>
-                                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500 }}>
+                                        <td style={{ ...tdStyle, background: cellBg, textAlign: "right", fontWeight: 500 }}>
                                             {maskCurrency(order.grandTotal, order.currency, canViewSalesPrices)}
                                         </td>
                                         <td
-                                            style={{ ...tdStyle, width: "64px", textAlign: "right", padding: "10px 8px" }}
+                                            style={{ ...tdStyle, background: cellBg, width: "64px", textAlign: "right", padding: "10px 8px" }}
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
@@ -582,25 +581,25 @@ function OrdersList() {
                                                     </button>
                                                 ) : (
                                                     <button
-                                                        data-delete=""
                                                         onClick={(e) => handleDelete(e, order.id)}
                                                         disabled={isDemo || deletingId === order.id}
-                                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "İptal et"}
+                                                        aria-label={`${order.orderNumber} iptal et`}
                                                         style={{
-                                                            opacity: 0, background: "transparent", border: "none",
+                                                            opacity: isHovered ? 1 : 0, background: "transparent", border: "none",
                                                             cursor: isDemo ? "not-allowed" : "pointer", color: "var(--text-tertiary)",
                                                             padding: "2px 4px", borderRadius: "3px",
                                                             display: "flex", alignItems: "center",
                                                             transition: "opacity 0.1s, color 0.1s",
                                                         }}
                                                     >
-                                                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                                                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
                                                             <path d="M2 3.5h9M5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v3.5M7.5 6v3.5M3 3.5l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7"
                                                                 stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
                                                         </svg>
                                                     </button>
                                                 ))}
-                                                <span data-chevron="" style={{ opacity: 0, color: "var(--text-tertiary)" }}>
+                                                <span style={{ opacity: isHovered ? 1 : 0, color: "var(--text-tertiary)" }} aria-hidden="true">
                                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                                                         <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                                                     </svg>
@@ -639,10 +638,10 @@ function OrdersList() {
                         borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
                     }}>
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
-                            {selectedIds.size} siparişi sil
+                            {selectedIds.size} siparişi iptal et
                         </div>
                         <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
-                            Seçili siparişleri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
+                            Seçili siparişler iptal edilecek (rezerve stoklar serbest bırakılır). Devam edilsin mi?
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
                             <button
@@ -666,7 +665,7 @@ function OrdersList() {
                                     cursor: bulkDeleting ? "not-allowed" : "pointer", opacity: bulkDeleting ? 0.6 : 1,
                                 }}
                             >
-                                {bulkDeleting ? "Siliniyor…" : "Sil"}
+                                {bulkDeleting ? "İptal ediliyor…" : "İptal Et"}
                             </button>
                         </div>
                     </div>

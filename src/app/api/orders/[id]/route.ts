@@ -3,12 +3,13 @@ import {
     serviceGetOrder,
     serviceTransitionOrder,
     serviceUpdateQuoteDeadline,
+    serviceUpdateOrderLines,
     type OrderTransition,
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
-import { handleApiError, safeParseJson } from "@/lib/api-error";
-import { dbGetOrderById, dbHardDeleteOrder } from "@/lib/supabase/orders";
+import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
+import { dbGetOrderById, dbHardDeleteOrder, type UpdateOrderInput } from "@/lib/supabase/orders";
 import { getCurrentUserPermissions, getCurrentUserId, requirePermission } from "@/lib/auth/role-guard";
 import { redactOrderForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
@@ -109,6 +110,46 @@ export async function PATCH(
         return NextResponse.json(response);
     } catch (err) {
         return handleApiError(err, "PATCH /api/orders/[id]");
+    }
+}
+
+// PUT /api/orders/[id] — taslak sipariş içeriğini düzenle (müşteri/kalem/not/
+// teklif vadesi). Yalnızca draft (service + RPC guard). Totaller RPC'de
+// line_total'lerden yeniden hesaplanır.
+export async function PUT(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const guard = await requirePermission(req, "manage_sales_orders");
+        if (guard) return guard;
+
+        const { id } = await params;
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+        const body = parsed.data as UpdateOrderInput;
+
+        const lengthErr = validateStringLengths(body as unknown as Record<string, unknown>);
+        if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
+
+        const actor = await getCurrentUserId();
+        try {
+            await serviceUpdateOrderLines(id, body, actor);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Sipariş güncellenemedi.";
+            // Eşleme: bulunamadı → 404, taslak değil → 409, diğer (validation) → 400
+            const status = msg.includes("bulunamadı") ? 404
+                : msg.includes("taslak") ? 409
+                : 400;
+            return NextResponse.json({ error: msg }, { status });
+        }
+
+        revalidateTag("products", "max");
+        const updated = await serviceGetOrder(id);
+        const perms = await getCurrentUserPermissions(req);
+        return NextResponse.json(updated ? redactOrderForPerms(updated, perms) : { ok: true });
+    } catch (err) {
+        return handleApiError(err, "PUT /api/orders/[id]");
     }
 }
 

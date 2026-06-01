@@ -15,17 +15,23 @@ import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
 // GET /api/orders?commercial_status=approved&customer_id=xxx&page=1
+// GET /api/orders?all=1[&commercial_status=...&customer_id=...]
+//   → pagination'sız (UI global state / liste için; tab sayaçları + müşteri
+//     cirosu eksiksiz olur). Önceden default page=1 (50 sipariş) → 50'den
+//     eski siparişler görünmez, sayaçlar yanlıştı (products ?all=1 paterni).
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
         const status = searchParams.get("commercial_status") as CommercialStatus | null;
         const customer_id = searchParams.get("customer_id") ?? undefined;
+        const all = searchParams.get("all") === "1";
         const page = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
 
         const orders = await serviceListOrders({
             commercial_status: status ?? undefined,
             customer_id,
-            page,
+            page: all ? 1 : page,
+            pageSize: all ? 10000 : undefined,
         });
 
         // RBAC R3: redaction per-request (serviceListOrders cache'siz; yine de perms ayrı).
