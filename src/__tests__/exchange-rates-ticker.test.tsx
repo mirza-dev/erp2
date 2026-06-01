@@ -44,10 +44,11 @@ describe("ExchangeRatesTicker", () => {
 
         render(<ExchangeRatesTicker />);
 
-        await waitFor(() => expect(screen.getByText("USD A/S")).toBeTruthy());
-        expect(screen.getByText("40,12 / 40,29")).toBeTruthy();
-        expect(screen.getByText("EUR A/S")).toBeTruthy();
-        expect(screen.getByText("46,20 / 46,41")).toBeTruthy();
+        await waitFor(() => expect(screen.getByText("TCMB")).toBeTruthy());
+        expect(screen.getByText("USD")).toBeTruthy();
+        expect(screen.getByText("40,123 / 40,288")).toBeTruthy();
+        expect(screen.getByText("EUR")).toBeTruthy();
+        expect(screen.getByText("46,201 / 46,415")).toBeTruthy();
         expect(fetchMock).toHaveBeenCalledWith("/api/exchange-rates");
     });
 

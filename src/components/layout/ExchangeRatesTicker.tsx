@@ -6,6 +6,10 @@ import type { ExchangeCurrencyCode, ExchangeRatesResponse } from "@/lib/exchange
 const REFRESH_MS = 60 * 60 * 1000;
 const CURRENCIES: ExchangeCurrencyCode[] = ["USD", "EUR"];
 const SYMBOLS: Record<ExchangeCurrencyCode, string> = { USD: "$", EUR: "€" };
+const RATE_FORMATTER = new Intl.NumberFormat("tr-TR", {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+});
 
 function isRatePayload(value: unknown): value is ExchangeRatesResponse {
     if (!value || typeof value !== "object") return false;
@@ -24,25 +28,54 @@ function isRatePayload(value: unknown): value is ExchangeRatesResponse {
 }
 
 function formatRate(value: number): string {
-    return new Intl.NumberFormat("tr-TR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(value);
+    return RATE_FORMATTER.format(value);
 }
 
-const chipStyle: React.CSSProperties = {
+const tickerStyle: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: "5px",
-    height: "24px",
-    padding: "0 8px",
+    gap: "6px",
+    height: "28px",
+    padding: "2px 5px 2px 6px",
     border: "0.5px solid var(--border-secondary)",
-    borderRadius: "6px",
+    borderRadius: "7px",
     background: "var(--bg-secondary)",
     color: "var(--text-secondary)",
+    boxSizing: "border-box",
+    whiteSpace: "nowrap",
+};
+
+const sourceStyle: React.CSSProperties = {
+    height: "20px",
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "0 6px",
+    border: "0.5px solid var(--accent-border)",
+    borderRadius: "5px",
+    background: "var(--accent-bg)",
+    color: "var(--accent-text)",
+    fontSize: "10px",
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    lineHeight: 1,
+};
+
+const ratesStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: "3px",
+};
+
+const rateStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    height: "22px",
+    padding: "0 6px",
+    borderRadius: "5px",
+    background: "var(--bg-tertiary)",
     fontSize: "11px",
     lineHeight: 1,
-    whiteSpace: "nowrap",
 };
 
 const codeStyle: React.CSSProperties = {
@@ -50,8 +83,14 @@ const codeStyle: React.CSSProperties = {
     fontWeight: 600,
 };
 
-const valueStyle: React.CSSProperties = {
+const labelStyle: React.CSSProperties = {
     color: "var(--text-tertiary)",
+    fontSize: "10px",
+    fontWeight: 600,
+};
+
+const valueStyle: React.CSSProperties = {
+    color: "var(--text-secondary)",
     fontVariantNumeric: "tabular-nums",
 };
 
@@ -90,20 +129,24 @@ const ExchangeRatesTicker = memo(function ExchangeRatesTicker() {
         <div
             aria-label="TCMB döviz kurları"
             title={`TCMB alış/satış kuru · ${rates.date}`}
-            style={{ display: "flex", alignItems: "center", gap: "6px" }}
+            style={tickerStyle}
         >
-            {CURRENCIES.map((code) => {
-                const rate = rates.rates[code];
-                return (
-                    <span key={code} style={chipStyle}>
-                        <span aria-hidden="true">{SYMBOLS[code]}</span>
-                        <span style={codeStyle}>{code} A/S</span>
-                        <span style={valueStyle}>
-                            {formatRate(rate.buying)} / {formatRate(rate.selling)}
+            <span style={sourceStyle}>TCMB</span>
+            <span style={ratesStyle}>
+                {CURRENCIES.map((code) => {
+                    const rate = rates.rates[code];
+                    return (
+                        <span key={code} style={rateStyle}>
+                            <span aria-hidden="true">{SYMBOLS[code]}</span>
+                            <span style={codeStyle}>{code}</span>
+                            <span style={labelStyle}>A/S</span>
+                            <span style={valueStyle}>
+                                {formatRate(rate.buying)} / {formatRate(rate.selling)}
+                            </span>
                         </span>
-                    </span>
-                );
-            })}
+                    );
+                })}
+            </span>
         </div>
     );
 });
