@@ -40,6 +40,32 @@ describe("Fix 1 — ilk yükleme effect products.length dependency", () => {
     });
 });
 
+describe("AI enrich timeout — canlı loader takılma regresyonu", () => {
+    it("purchase-copilot fetch'i dedicated AbortController signal'ı kullanır", () => {
+        expect(pageSource).toContain("const requestController = new AbortController()");
+        expect(pageSource).toMatch(/fetch\("\/api\/ai\/purchase-copilot",\s*\{[\s\S]*signal:\s*requestController\.signal/);
+    });
+
+    it("AI çağrısı 30 saniye soft timeout ile deterministik moda düşer", () => {
+        expect(pageSource).toContain("const AI_ENRICH_SOFT_TIMEOUT_MS = 30_000");
+        expect(pageSource).toMatch(/setTimeout\(\(\)\s*=>\s*\{[\s\S]*softTimedOut\s*=\s*true[\s\S]*setAiError\(true\)[\s\S]*setAiLoading\(false\)[\s\S]*resolve\(false\)/);
+    });
+
+    it("soft timeout uzun süren AI isteğini abort etmez", () => {
+        const timeoutBlock = pageSource.match(
+            /timeoutId = setTimeout\(\(\) => \{([\s\S]*?)\}, AI_ENRICH_SOFT_TIMEOUT_MS\);/
+        )?.[1] ?? "";
+        expect(timeoutBlock).not.toContain("requestController.abort()");
+        expect(pageSource).toMatch(/return await Promise\.race\(\[fetchTask,\s*softTimeoutTask\]\)/);
+    });
+
+    it("parent abort listener cleanup edilir", () => {
+        expect(pageSource).toMatch(/signal\?\.addEventListener\("abort",\s*abortFromParent,\s*\{\s*once:\s*true\s*\}\)/);
+        expect(pageSource).toMatch(/signal\?\.removeEventListener\("abort",\s*abortFromParent\)/);
+        expect(pageSource).toMatch(/clearTimeout\(timeoutId\)/);
+    });
+});
+
 // ─── Audit 10. tur Fix 2 — Behavior helper: shouldTriggerFetch ──────────────
 //
 // page.tsx'teki effect'in fetch tetikleme koşulunu birebir taklit eden helper.

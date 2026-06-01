@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { Suspense, useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
@@ -10,8 +11,15 @@ import { isValidEmail, isValidTaxNumber, isValidUrl } from "@/lib/validation";
 import { NOTIFICATION_TYPES, type NotificationTypeKey } from "@/lib/notification-types";
 import type { UserProfile } from "@/lib/supabase/user-profile";
 import type { NotificationPref } from "@/lib/supabase/user-preferences";
-
-type Tab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
+import { getUserInitials } from "@/lib/user-display";
+import { usePermissions } from "@/lib/auth/use-permissions";
+import {
+    canViewSystemSettings,
+    getVisibleSettingsTabs,
+    parseSettingsTab,
+    resolveSettingsTab,
+    type SettingsTab,
+} from "@/lib/settings-tabs";
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
@@ -480,7 +488,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
         );
     }
 
-    const initial = (profile?.fullName || profile?.email || "?").charAt(0).toUpperCase();
+    const initial = getUserInitials(profile?.fullName, profile?.email);
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
@@ -1132,19 +1140,35 @@ function AiTab() {
 }
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
-export default function SettingsPage() {
-    const [activeTab, setActiveTab] = useState<Tab>("firma");
-    const [dirtyTabs, setDirtyTabs] = useState<Set<Tab>>(new Set());
+function SettingsPageInner() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
+    const { perms } = usePermissions();
+    const permissionsLoaded = perms !== null;
+    const canViewSystem = canViewSystemSettings(perms);
+    const searchKey = searchParams.toString();
+    const requestedTab = parseSettingsTab(searchParams.get("tab"));
+    const resolvedTab = resolveSettingsTab(requestedTab, canViewSystem);
+    const tabs = useMemo(() => getVisibleSettingsTabs(canViewSystem), [canViewSystem]);
+    const [activeTab, setActiveTab] = useState<SettingsTab>(resolvedTab);
+    const [dirtyTabs, setDirtyTabs] = useState<Set<SettingsTab>>(new Set());
 
-    const tabs: { key: Tab; label: string }[] = [
-        { key: "firma", label: "Firma Profili" },
-        { key: "kullanici", label: "Kullanıcı" },
-        { key: "bildirimler", label: "Bildirimler" },
-        { key: "api", label: "API Anahtarları" },
-        { key: "yapay-zeka", label: "Yapay Zeka" },
-    ];
+    useEffect(() => {
+        setActiveTab(resolvedTab);
+        if (permissionsLoaded && requestedTab !== resolvedTab) {
+            const params = new URLSearchParams(searchKey);
+            params.set("tab", resolvedTab);
+            router.replace(`/dashboard/settings?${params.toString()}`);
+        }
+    }, [permissionsLoaded, requestedTab, resolvedTab, router, searchKey]);
 
-    const handleDirtyChange = (tab: Tab, isDirty: boolean) => {
+    const pushTab = useCallback((tab: SettingsTab) => {
+        const params = new URLSearchParams(searchKey);
+        params.set("tab", tab);
+        router.push(`/dashboard/settings?${params.toString()}`);
+    }, [router, searchKey]);
+
+    const handleDirtyChange = (tab: SettingsTab, isDirty: boolean) => {
         setDirtyTabs(prev => {
             const next = new Set(prev);
             if (isDirty) { next.add(tab); } else { next.delete(tab); }
@@ -1152,12 +1176,13 @@ export default function SettingsPage() {
         });
     };
 
-    const handleTabSwitch = (key: Tab) => {
+    const handleTabSwitch = (key: SettingsTab) => {
         if (dirtyTabs.has(activeTab) && key !== activeTab) {
             if (!window.confirm("Kaydedilmemiş değişiklikler var. Yine de devam edilsin mi?")) return;
             setDirtyTabs(prev => { const next = new Set(prev); next.delete(activeTab); return next; });
         }
         setActiveTab(key);
+        pushTab(key);
     };
 
     return (
@@ -1233,7 +1258,15 @@ export default function SettingsPage() {
             </div>
 
             {/* Tehlikeli Bölge — sayfanın en altında, ayrı blok */}
-            <ResetDemoSection />
+            {canViewSystem && <ResetDemoSection />}
         </div>
+    );
+}
+
+export default function SettingsPage() {
+    return (
+        <Suspense fallback={<div style={{ padding: "24px", color: "var(--text-secondary)", fontSize: "13px" }}>Yükleniyor…</div>}>
+            <SettingsPageInner />
+        </Suspense>
     );
 }

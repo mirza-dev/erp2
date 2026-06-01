@@ -4,6 +4,7 @@ import { memo } from "react";
 import Link from "next/link";
 import { useData } from "@/lib/data-context";
 import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
+import UserAvatarLink from "@/components/layout/UserAvatarLink";
 
 interface TopbarProps {
     onToggleSidebar?: () => void;
@@ -114,22 +115,7 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                 )}
 
                 {/* User avatar */}
-                <div
-                    style={{
-                        width: "30px",
-                        height: "30px",
-                        borderRadius: "50%",
-                        background: "var(--accent-bg)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        color: "var(--accent-text)",
-                    }}
-                >
-                    CS
-                </div>
+                <UserAvatarLink />
             </div>
         </header>
     );

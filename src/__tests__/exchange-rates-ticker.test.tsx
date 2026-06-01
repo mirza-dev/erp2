@@ -6,8 +6,8 @@ import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
 import Topbar from "@/components/layout/Topbar";
 
 vi.mock("next/link", () => ({
-    default: ({ href, children }: { href: string; children: ReactNode }) => (
-        <a href={href}>{children}</a>
+    default: ({ href, children, ...props }: { href: string; children: ReactNode; [key: string]: unknown }) => (
+        <a href={href} {...props}>{children}</a>
     ),
 }));
 
@@ -65,16 +65,27 @@ describe("ExchangeRatesTicker", () => {
     });
 
     it("üst barın mevcut Bağlı, uyarı ve avatar davranışını korur", async () => {
-        global.fetch = vi.fn().mockResolvedValue({
-            ok: true,
-            json: async () => RATE_PAYLOAD,
+        global.fetch = vi.fn((input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url === "/api/settings/user/profile") {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ fullName: "Can Sarı", email: "can.sari@example.com", avatarUrl: null }),
+                } as Response);
+            }
+            return Promise.resolve({
+                ok: true,
+                json: async () => RATE_PAYLOAD,
+            } as Response);
         }) as unknown as typeof fetch;
 
         render(<Topbar />);
 
         expect(screen.getByText("Bağlı")).toBeTruthy();
         expect(screen.getByText("15 Uyarı")).toBeTruthy();
+        await waitFor(() => expect(screen.getByRole("link", { name: "Profil ve ayarlar" })).toBeTruthy());
         expect(screen.getByText("CS")).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Profil ve ayarlar" }).getAttribute("href")).toBe("/dashboard/settings?tab=kullanici");
         await waitFor(() => expect(screen.getByLabelText("TCMB döviz kurları")).toBeTruthy());
     });
 });

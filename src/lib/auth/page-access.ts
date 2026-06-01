@@ -13,6 +13,8 @@ export interface PageAccessRule {
     prefix: string;
     /** Bu sayfaya erişim için gereken permission. */
     permission: Permission;
+    /** true ise yalnız exact pathname eşleşir, alt-yollara yayılmaz. */
+    exact?: boolean;
 }
 
 /**
@@ -23,7 +25,8 @@ export interface PageAccessRule {
 export const PAGE_ACCESS: PageAccessRule[] = [
     { prefix: "/dashboard/settings/users", permission: "view_users" },
     { prefix: "/dashboard/settings/product-types", permission: "view_product_types" },
-    { prefix: "/dashboard/settings", permission: "view_settings" },
+    { prefix: "/dashboard/settings/note-templates", permission: "view_settings" },
+    { prefix: "/dashboard/settings", permission: "view_dashboard", exact: true },
     { prefix: "/dashboard/purchase/suggested", permission: "view_purchase_suggestions" },
     { prefix: "/dashboard/purchase/orders", permission: "view_purchase_orders" },
     { prefix: "/dashboard/quotes", permission: "view_quotes" },
@@ -47,7 +50,7 @@ export const PAGE_ACCESS: PageAccessRule[] = [
  */
 export function requiredPermissionForPath(pathname: string): Permission | null {
     for (const rule of PAGE_ACCESS) {
-        if (pathname === rule.prefix || pathname.startsWith(rule.prefix + "/")) {
+        if (rule.exact ? pathname === rule.prefix : pathname === rule.prefix || pathname.startsWith(rule.prefix + "/")) {
             return rule.permission;
         }
     }

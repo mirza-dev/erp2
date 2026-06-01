@@ -29,8 +29,9 @@ describe("requiredPermissionForPath", () => {
     it("spesifiklik sırası: settings/users settings'ten önce", () => {
         expect(requiredPermissionForPath("/dashboard/settings/users")).toBe("view_users");
         expect(requiredPermissionForPath("/dashboard/settings/product-types")).toBe("view_product_types");
-        expect(requiredPermissionForPath("/dashboard/settings")).toBe("view_settings");
-        expect(requiredPermissionForPath("/dashboard/settings/company")).toBe("view_settings");
+        expect(requiredPermissionForPath("/dashboard/settings/note-templates")).toBe("view_settings");
+        expect(requiredPermissionForPath("/dashboard/settings")).toBe("view_dashboard");
+        expect(requiredPermissionForPath("/dashboard/settings/company")).toBeNull();
     });
 
     it("/dashboard exact → view_dashboard", () => {
@@ -64,7 +65,7 @@ describe("canAccessPath — rol bazlı", () => {
         }
     });
 
-    it("sales: quotes/orders/customers VAR; parasut/vendors/production/settings YOK", () => {
+    it("sales: quotes/orders/customers/kişisel settings VAR; parasut/vendors/production YOK", () => {
         expect(canAccessPath("/dashboard/quotes", sales)).toBe(true);
         expect(canAccessPath("/dashboard/orders", sales)).toBe(true);
         expect(canAccessPath("/dashboard/customers", sales)).toBe(true);
@@ -72,7 +73,7 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/parasut", sales)).toBe(false);
         expect(canAccessPath("/dashboard/vendors", sales)).toBe(false);
         expect(canAccessPath("/dashboard/production", sales)).toBe(false);
-        expect(canAccessPath("/dashboard/settings", sales)).toBe(false);
+        expect(canAccessPath("/dashboard/settings", sales)).toBe(true);
         expect(canAccessPath("/dashboard/purchase/orders", sales)).toBe(false);
     });
 
@@ -85,7 +86,7 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/quotes", purchasing)).toBe(false);
         expect(canAccessPath("/dashboard/parasut", purchasing)).toBe(false);
         expect(canAccessPath("/dashboard/production", purchasing)).toBe(false);
-        expect(canAccessPath("/dashboard/settings", purchasing)).toBe(false);
+        expect(canAccessPath("/dashboard/settings", purchasing)).toBe(true);
     });
 
     it("production: production/orders/products/alerts VAR; quotes/vendors/parasut YOK", () => {
@@ -98,7 +99,7 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/parasut", production)).toBe(false);
     });
 
-    it("accounting: parasut/PO/vendors/quotes(view)/customers VAR; production/alerts/settings YOK", () => {
+    it("accounting: parasut/PO/vendors/quotes(view)/customers/kişisel settings VAR; production/alerts YOK", () => {
         expect(canAccessPath("/dashboard/parasut", accounting)).toBe(true);
         expect(canAccessPath("/dashboard/purchase/orders", accounting)).toBe(true);
         expect(canAccessPath("/dashboard/vendors", accounting)).toBe(true);
@@ -106,7 +107,7 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/customers", accounting)).toBe(true);
         expect(canAccessPath("/dashboard/production", accounting)).toBe(false);
         expect(canAccessPath("/dashboard/alerts", accounting)).toBe(false);
-        expect(canAccessPath("/dashboard/settings", accounting)).toBe(false);
+        expect(canAccessPath("/dashboard/settings", accounting)).toBe(true);
     });
 
     it("viewer: temel okuma sayfaları VAR; tüm yönetim sayfaları YOK", () => {
@@ -120,8 +121,10 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/vendors", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/production", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/import", viewer)).toBe(false);
-        expect(canAccessPath("/dashboard/settings", viewer)).toBe(false);
+        expect(canAccessPath("/dashboard/settings", viewer)).toBe(true);
         expect(canAccessPath("/dashboard/settings/users", viewer)).toBe(false);
+        expect(canAccessPath("/dashboard/settings/note-templates", viewer)).toBe(false);
+        expect(canAccessPath("/dashboard/settings/company", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/purchase/suggested", viewer)).toBe(false);
     });
 

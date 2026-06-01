@@ -23,6 +23,8 @@ interface AiEnrichmentItem {
 
 type UrgencyLevel = "critical" | "high" | "moderate";
 
+const AI_ENRICH_SOFT_TIMEOUT_MS = 30_000;
+
 interface RecEntry {
     id: string;
     status: string;
@@ -794,57 +796,83 @@ export default function PurchaseSuggestedPage() {
         setAiLoading(true);
         setAiError(false);
         setAiRateLimited(null);
-        try {
-            const res = await fetch("/api/ai/purchase-copilot", {
-                method: "POST",
-                signal,
-            });
-            // 2026-05-26: Route-level AI rate limit guard 429 dönerse generic
-            // "AI çağrısı başarısız" yerine spesifik "AI istek limiti aşıldı"
-            // mesajı göster (retryAfter ile). Aksi halde kullanıcı tek tıkta
-            // 10'u aşınca "Aşağıda standart hesaplamalara dayalı..." gibi
-            // yanıltıcı bir mesaj görüyordu.
-            if (res.status === 429) {
-                const body = await res.json().catch(() => ({ retryAfter: 60 }));
-                setAiRateLimited({ retryAfter: typeof body?.retryAfter === "number" ? body.retryAfter : 60 });
-                return false;
-            }
-            const data = res.ok ? await res.json() : null;
-            if (data) {
-                setAiData(data);
-                if (data.recommendations) {
-                    const newMap = new Map<string, RecEntry & { editedQty?: number }>();
-                    for (const r of data.recommendations) {
-                        if (r.recommendationId) {
-                            const editedQty = r.status === "edited"
-                                ? (r.editedMetadata?.suggestQty as number | undefined)
-                                : undefined;
-                            newMap.set(r.productId, {
-                                id: r.recommendationId,
-                                status: r.status,
-                                decidedAt: r.decidedAt ?? null,
-                                currentDrift: r.currentDrift ?? null,
-                                frozenSuggestQty: r.frozenSuggestQty ?? null,
-                                linkedPOs: r.linkedPOs ?? [],
-                                ...(editedQty != null && { editedQty }),
-                            });
-                        }
-                    }
-                    setRecMap(newMap);
-                }
-                return true;
-            } else {
-                setAiError(true);
-                return false;
-            }
-        } catch (e) {
-            if (!(e instanceof Error && e.name === "AbortError")) {
-                setAiError(true);
-            }
-            return false;
-        } finally {
-            setAiLoading(false);
+        let softTimedOut = false;
+        const requestController = new AbortController();
+        let timeoutId: ReturnType<typeof setTimeout> | undefined;
+        const abortFromParent = () => requestController.abort();
+        if (signal?.aborted) {
+            requestController.abort();
+        } else {
+            signal?.addEventListener("abort", abortFromParent, { once: true });
         }
+
+        const fetchTask = (async (): Promise<boolean> => {
+            try {
+                const res = await fetch("/api/ai/purchase-copilot", {
+                    method: "POST",
+                    signal: requestController.signal,
+                });
+                // 2026-05-26: Route-level AI rate limit guard 429 dönerse generic
+                // "AI çağrısı başarısız" yerine spesifik "AI istek limiti aşıldı"
+                // mesajı göster (retryAfter ile). Aksi halde kullanıcı tek tıkta
+                // 10'u aşınca "Aşağıda standart hesaplamalara dayalı..." gibi
+                // yanıltıcı bir mesaj görüyordu.
+                if (res.status === 429) {
+                    const body = await res.json().catch(() => ({ retryAfter: 60 }));
+                    setAiRateLimited({ retryAfter: typeof body?.retryAfter === "number" ? body.retryAfter : 60 });
+                    return false;
+                }
+                const data = res.ok ? await res.json() : null;
+                if (data) {
+                    setAiData(data);
+                    setAiError(false);
+                    if (data.recommendations) {
+                        const newMap = new Map<string, RecEntry & { editedQty?: number }>();
+                        for (const r of data.recommendations) {
+                            if (r.recommendationId) {
+                                const editedQty = r.status === "edited"
+                                    ? (r.editedMetadata?.suggestQty as number | undefined)
+                                    : undefined;
+                                newMap.set(r.productId, {
+                                    id: r.recommendationId,
+                                    status: r.status,
+                                    decidedAt: r.decidedAt ?? null,
+                                    currentDrift: r.currentDrift ?? null,
+                                    frozenSuggestQty: r.frozenSuggestQty ?? null,
+                                    linkedPOs: r.linkedPOs ?? [],
+                                    ...(editedQty != null && { editedQty }),
+                                });
+                            }
+                        }
+                        setRecMap(newMap);
+                    }
+                    return true;
+                } else {
+                    setAiError(true);
+                    return false;
+                }
+            } catch (e) {
+                if (!(e instanceof Error && e.name === "AbortError")) {
+                    setAiError(true);
+                }
+                return false;
+            } finally {
+                if (timeoutId) clearTimeout(timeoutId);
+                signal?.removeEventListener("abort", abortFromParent);
+                if (!softTimedOut) setAiLoading(false);
+            }
+        })();
+
+        const softTimeoutTask = new Promise<false>((resolve) => {
+            timeoutId = setTimeout(() => {
+                softTimedOut = true;
+                setAiError(true);
+                setAiLoading(false);
+                resolve(false);
+            }, AI_ENRICH_SOFT_TIMEOUT_MS);
+        });
+
+        return await Promise.race([fetchTask, softTimeoutTask]);
     }, [isDemo]);
 
     // Audit 4-5-7. tur: imza set tabanlı (length yerine).
