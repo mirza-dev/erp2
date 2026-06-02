@@ -20,6 +20,7 @@ const makeChain = () => {
     };
     c.select = (_v?: unknown) => c;
     c.eq     = (_k: unknown, _v: unknown) => c;
+    c.in     = (_k: unknown, _v: unknown) => c;
     c.order  = (_v: unknown, _o?: unknown) => c;
     return c;
 };

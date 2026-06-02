@@ -303,7 +303,9 @@ export async function dbGetOpenShortagesByProduct(): Promise<Map<string, number>
         .from("shortages")
         .select("product_id, shortage_qty, sales_orders!inner(commercial_status)")
         .eq("status", "open")
-        .eq("sales_orders.commercial_status", "approved");
+        // pending_approval artık HARD rezerve (migration 082) → eksiği approved kadar
+        // gerçek; order_shortage uyarısı pending'i de saymalı (yoksa onaya kadar görünmez).
+        .in("sales_orders.commercial_status", ["pending_approval", "approved"]);
     if (error) throw new Error(error.message);
 
     const map = new Map<string, number>();
@@ -368,7 +370,9 @@ export async function dbGetOpenShortagesByProductId(
         `)
         .eq("product_id", productId)
         .eq("status", "open")
-        .eq("sales_orders.commercial_status", "approved");
+        // migration 082: pending_approval da hard-rezerve → shortage detayı (drawer)
+        // aggregate uyarıyla tutarlı kalsın.
+        .in("sales_orders.commercial_status", ["pending_approval", "approved"]);
     // Faz 10 review: DB/permission/query hatasını yutma — route 500 dönsün ki
     // drawer "Açık shortage kalmadı" empty branch'ine düşüp kullanıcıyı
     // yanıltmasın. PostgREST data null olmaz (empty result → [] döner);

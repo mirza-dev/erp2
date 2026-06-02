@@ -80,16 +80,16 @@ export async function POST(req: NextRequest) {
         // Create-and-send: draft'ı onaya gönder → stok rezervasyonu + shortage
         let finalOrder = result;
         let createShortages: ShortageInfo[] | undefined;
+        let submitError: string | undefined;
         if (requestedPending) {
             const submit = await serviceTransitionOrder(result.id, "pending_approval");
-            if (!submit.success) {
-                // Allocation başarısız (ör. yeterli stok yok) → sipariş DRAFT kalır,
-                // kullanıcıya bildir (sipariş yine de oluştu).
-                revalidateTag("products", "max");
-                return NextResponse.json({ ...result, submitError: submit.error }, { status: 201 });
+            if (submit.success) {
+                createShortages = submit.shortages;
+                finalOrder = (await serviceGetOrder(result.id)) ?? result;
+            } else {
+                // Allocation başarısız (ör. yeterli stok yok) → sipariş DRAFT kalır.
+                submitError = submit.error;
             }
-            createShortages = submit.shortages;
-            finalOrder = (await serviceGetOrder(result.id)) ?? result;
         }
 
         // Fire-and-forget AI scoring — don't block the response
@@ -97,22 +97,29 @@ export async function POST(req: NextRequest) {
             console.error("[AI Score] fire-and-forget:", err)
         );
 
-        // Fire-and-forget order_new e-posta bildirimi
-        notifyUsersByEmail({
-            notificationType: "order_new",
-            entityType: "sales_order",
-            entityId: result.id,
-            render: { type: "order_new", ctx: {
-                orderNumber: result.order_number,
-                customerName: result.customer_name,
-                total: result.grand_total,
-                currency: result.currency,
-            } },
-        }).catch(err => console.error("[email order_new]", err));
+        // Fire-and-forget order_new e-postası — başarıyla onaya gönderildiyse
+        // ATLA (geçişin order_pending'i tek bildirim; çift e-posta yok). Taslak
+        // kaldıysa (draft create veya submit fail) order_new gönderilir.
+        const sentToPending = requestedPending && !submitError;
+        if (!sentToPending) {
+            notifyUsersByEmail({
+                notificationType: "order_new",
+                entityType: "sales_order",
+                entityId: result.id,
+                render: { type: "order_new", ctx: {
+                    orderNumber: result.order_number,
+                    customerName: result.customer_name,
+                    total: result.grand_total,
+                    currency: result.currency,
+                } },
+            }).catch(err => console.error("[email order_new]", err));
+        }
 
         revalidateTag("products", "max");
         return NextResponse.json(
-            createShortages?.length ? { ...finalOrder, shortages: createShortages } : finalOrder,
+            submitError ? { ...result, submitError }
+                : createShortages?.length ? { ...finalOrder, shortages: createShortages }
+                : finalOrder,
             { status: 201 },
         );
     } catch (err) {
