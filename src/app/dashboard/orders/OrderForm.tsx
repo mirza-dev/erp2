@@ -242,7 +242,7 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
         if (!canSubmit || !selectedCustomer) return;
         setIsSubmitting(true);
         try {
-            await addOrder({
+            const result = await addOrder({
                 customerName: selectedCustomer.name,
                 customerId: selectedCustomer.id,
                 customerEmail: selectedCustomer.email,
@@ -260,7 +260,13 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                 quoteValidUntil: quoteValidUntil || undefined,
                 lines: buildOrderLines(),
             });
-            toast({ type: "success", message: status === "draft" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
+            // create-and-send: stok yetersizse rezervasyon yapılamadı → sipariş
+            // TASLAK kaldı; dürüst bildirim (başarı yalanı yok).
+            if (result.submitError) {
+                toast({ type: "warning", message: `Sipariş taslak olarak oluşturuldu ancak onaya gönderilemedi (stok yetersiz). Stok girişi sonrası tekrar deneyin.` });
+            } else {
+                toast({ type: "success", message: status === "draft" ? "Sipariş taslak olarak kaydedildi" : "Sipariş oluşturuldu ve onaya gönderildi" });
+            }
             router.push("/dashboard/orders");
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Sipariş kaydedilemedi. Lütfen tekrar deneyin.";

@@ -95,7 +95,7 @@ interface DataContextValue {
   deleteUretimKaydi: (id: string) => Promise<{ refetchFailed?: boolean }>;
   addOrder: (
     detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">
-  ) => Promise<string>;
+  ) => Promise<{ id: string; submitError?: string }>;
   updateOrderStatus: (
     orderId: string,
     transition: OrderTransition
@@ -413,8 +413,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const addOrder = async (
     detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">
-  ): Promise<string> => {
-    if (demoGuard()) return "";
+  ): Promise<{ id: string; submitError?: string }> => {
+    if (demoGuard()) return { id: "" };
     try {
       const body: CreateOrderInput = {
         customer_id: detail.customerId,
@@ -448,9 +448,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        const data: SalesOrderRow = await res.json();
+        const data: SalesOrderRow & { submitError?: string } = await res.json();
         setOrders((prev) => [mapOrderSummary(data), ...prev]);
-        return data.id;
+        // create-and-send: pending istendi ama allocation başarısızsa (stok yok)
+        // sipariş DRAFT kaldı → submitError ile dürüst bildirim (route 201 döner).
+        return { id: data.id, submitError: data.submitError };
       }
       const errJson = await res.json().catch(() => null);
       const errMsg =

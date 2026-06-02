@@ -5,7 +5,27 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-05-31 (**Teklif V7 Faz 8 Bulgular 1. tur — Paraşüt reconcile retry-bypass + doc/P3**, 2 commit, 4215 test)
+## Son Tamamlanan İş — 2026-06-02 (**Satış Siparişleri Faz 3 — HARD rezervasyonu "Bekliyor"a (pending_approval) taşı**)
+
+Ürün sahibi kararı: rezervasyon onayda DEĞİL, **onaya gönderirken** olsun (müşteriye teklif → stok kilitle → aşırı-satış yok). **domain-rules §5.1 BİLİNÇLİ DEĞİŞTİ.** Yeni akış: Taslak → "Onaya Gönder" (confirm + HARD rezervasyon + shortage uyarısı, alt-not "Teklif yapıldı") → Bekliyor (fulfillment=allocated → "Rezerveli" otomatik) → "Onayla" (light, alt-not "Stok rezerve edildi") → Onaylı.
+- **Migration 082** (`082_reservation_at_pending.sql`): `allocate_order_lines` helper (saf rezervasyon, statüye dokunmaz) + `submit_order_for_approval` (draft guard, zero-stock reddi, hedef pending_approval) + `approve_order` (light flip; legacy `fulfillment='unallocated'` pending → fallback allocation) + backfill DO-block (rezervsiz pending = ORD-0001/0002) + ROLLBACK. Eski `approve_order_with_allocation` health-check (route 138) için KORUNDU.
+- **Çift sayma fix:** `dbGetQuotedQuantities` + `dbGetQuotedBreakdownByProduct` filtresi `['draft','pending_approval']`→`'draft'`. pending artık `reserved`'da; `quoted`=draft. Net `promisable=available_now-quoted` invariant korunur (kova değişir).
+- **Servis:** `dbSubmitOrderForApproval` (yeni) + `dbApproveOrder`→`approve_order` RPC. order-service: pending dalı allocate+shortages döner, approved light. `dbUpdateOrderStatus`/`dbLogOrderAction` import'ları kaldırıldı (unused).
+- **POST /api/orders:** pending istenince DRAFT oluştur→`serviceTransitionOrder(pending_approval)` allocate; shortages/`submitError` (zero-stock→draft kalır) yanıtta.
+- **UI** (`[id]/page.tsx`): STATUS_META pending="Teklif yapıldı"; "Onaya Gönder"→`requestTransition` (confirm "stok kontrol+rezervasyon"); "Onayla" sade confirm; shortage dialog pending dalına; "Onayla" loading "Onaylanıyor...".
+- **cancel_order/ship_order_full DEĞİŞMEDİ** (cancel pending rezervi release eder; ship `approved` guard korunur). Teklif accept order'ı zaten draft oluşturur (uyumlu).
+- **Test 4334 yeşil:** DR-5.1 invariant TERSİNE (rezervasyon pending'de); db-quoted-quantities + quoted-breakdown mock `.in`→`.eq`; YENİ order-submit-allocation-migration (082 drift) + order-service pending describe + orders-route create-and-send. tsc temiz · lint 0 · build OK (`ƒ Proxy`).
+- **DURUM: COMMIT EDİLMEDİ (kullanıcı onayı bekliyor). ⚠️ Migration 082 APPLY BEKLİYOR — deploy ile YAKIN zamanda olmalı** (082 backfill ORD-0001/0002'yi rezerve eder; eski kod hâlâ quoted=draft+pending sayarsa geçici çift-sayma penceresi). Plan: `~/.claude/plans/tingly-herding-pony.md`. Canlı DB-katmanı smoke (submit reserve / approve light / cancel release / backfill) 082 apply sonrası yapılacak.
+
+---
+
+## Önceki — 2026-06-02 (**Satış Siparişleri Faz 1+2 — migration 081 APPLY EDİLDİ ✅ + canlı doğrulama**)
+
+Satış Siparişleri Faz 1 (bug fix: `?all=1` 50-cap, DOM-mutation hover→state, soft-DELETE=iptal dürüst sözcük) + Faz 2 (taslak düzenleme: migration **081 `update_order_with_lines`** RPC + `OrderForm` paylaşılan new/edit + `PUT /api/orders/[id]` + `/[id]/edit` sayfası) main'de (`e9c6ac6`, origin/main). **Bu oturum:** kullanıcı 081'i Supabase'de çalıştırdı; **canlı E2E smoke yapıldı** (admin oturum cookie'si `@supabase/ssr` formatında elle kuruldu — login→base64url session→chunked `sb-<ref>-auth-token`). Sıfır-mutasyon: PUT kimliksiz→401, demo→403, non-draft RPC→guard RAISE+rollback. **Tam happy-path E2E (gerçek route'lar):** POST taslak oluştur (ORD-2026-0009) → PUT düzenle (1→2 satır) → **total yeniden-hesap DOĞRU** (subtotal 8100/vat 1620/grand 9720, item_count 2, satırlar replace) → audit_log `order_lines_replaced` actor=user_id/source=ui → guard E2E (pending_approval'da PUT→409 "Yalnızca taslak") → temizlik (DELETE soft+permanent, sales_orders/order_lines/draft hepsi boş, test öncesi duruma dönüldü). Yan etki: ORD-2026-0009 numara sayacı tüketildi (sonraki gerçek sipariş 0010). **151 order testi yeşil · tsc temiz · lint 0.** Kullanıcı kararıyla ATLANAN (borç değil): sevk modalı + planned_shipment_date (B/C kapsamı). **Satış siparişleri sayfası: yapılması gerekenler tamam, hata yok.**
+
+---
+
+## Önceki — 2026-05-31 (**Teklif V7 Faz 8 Bulgular 1. tur — Paraşüt reconcile retry-bypass + doc/P3**, 2 commit, 4215 test)
 
 "önce doğrula sonra düzelt" — 3 bulgu kod karşısında doğrulandı, üçü de geçerli.
 - **P1/P2 (FİNANSAL, `f7fc9f8`):** Faz 8e reconciliation guard yalnız ana sync'teydi (`serviceSyncOrderToParasut`). Manuel invoice retry (`serviceRetryParasutStep`, step=invoice → `upsertInvoice` header iskontoyu `discount_value`'ya uygular) guard'sız claim alıp **sessiz yanlış fatura** üretebiliyordu — canlı ama `checkStepDeps("invoice")` shipment dep'i arkasında latent. **Fix (advisor):** `guardDiscountReconciliation` helper'ı çıkarıldı (inline blok birebir), her iki yolda claim ÖNCESİ; retry'da **`step==="invoice"` gating** (edoc'ta fatura zaten oluşmuş → strand etmemek için). upsertInvoice'a gömülmedi (throw kontratı korundu). Test: invoice retry mismatch/subtotal=0 → claim YOK + alert (`parasut_shipment_document_id` ile honest reachability), discount=0 → claim çağrılır.

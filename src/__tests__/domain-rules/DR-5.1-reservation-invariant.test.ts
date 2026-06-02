@@ -1,7 +1,8 @@
 /**
- * DR-5.1 — Stok Rezervasyon İnvariantı
- * domain-rules.md §5.1: Rezervasyon SADECE onaylı (approved) siparişlerde oluşur.
- * domain-rules.md §5.5: İptal veya sevkiyatta rezervasyon serbest bırakılır.
+ * DR-5.1 — Stok Rezervasyon İnvariantı (migration 082)
+ * domain-rules.md §5.1: Hard reservation "Onaya Gönder" (draft → pending_approval)
+ * geçişinde oluşur ve sonrasında korunur. (Eski sürümde yalnız approved'daydı.)
+ * domain-rules.md §5.4/§5.5: İptal veya sevkiyatta rezervasyon serbest bırakılır.
  *
  * Service layer'ın doğru Postgres RPC'yi çağırdığını doğrular.
  * Gerçek rezervasyon mutasyonları RPC içinde atomik olarak gerçekleşir.
@@ -11,6 +12,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Mocks (hoisted) ───────────────────────────────────────────
 
 const mockDbGetOrderById      = vi.fn();
+const mockDbSubmitOrderForApproval = vi.fn();
 const mockDbApproveOrder      = vi.fn();
 const mockDbShipOrderFull     = vi.fn();
 const mockDbCancelOrder       = vi.fn();
@@ -19,6 +21,7 @@ const mockDbLogOrderAction    = vi.fn();
 
 vi.mock("@/lib/supabase/orders", () => ({
     dbGetOrderById:             (...args: unknown[]) => mockDbGetOrderById(...args),
+    dbSubmitOrderForApproval:   (...args: unknown[]) => mockDbSubmitOrderForApproval(...args),
     dbApproveOrder:             (...args: unknown[]) => mockDbApproveOrder(...args),
     dbShipOrderFull:            (...args: unknown[]) => mockDbShipOrderFull(...args),
     dbCancelOrder:              (...args: unknown[]) => mockDbCancelOrder(...args),
@@ -26,6 +29,11 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbLogOrderAction:           (...args: unknown[]) => mockDbLogOrderAction(...args),
     dbListExpiredQuotes:        vi.fn(),
     dbUpdateOrderQuoteDeadline: vi.fn(),
+}));
+
+// Fire-and-forget e-posta — gerçek çağrı yapma
+vi.mock("@/lib/services/email-service", () => ({
+    notifyUsersByEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/lib/supabase/alerts", () => ({
@@ -77,6 +85,7 @@ const APPROVED_ORDER = {
 
 beforeEach(() => {
     mockDbGetOrderById.mockReset();
+    mockDbSubmitOrderForApproval.mockReset();
     mockDbApproveOrder.mockReset();
     mockDbShipOrderFull.mockReset();
     mockDbCancelOrder.mockReset();
@@ -86,8 +95,23 @@ beforeEach(() => {
 
 // ── Tests ─────────────────────────────────────────────────────
 
-describe("DR-5.1: Rezervasyon SADECE approved geçişte tetiklenir", () => {
-    it("approved geçişi → approve_order_with_allocation RPC çağrılır", async () => {
+describe("DR-5.1: Rezervasyon 'Onaya Gönder' (draft→pending_approval) geçişinde tetiklenir", () => {
+    it("pending_approval geçişi → submit_order_for_approval RPC (HARD rezervasyon)", async () => {
+        mockDbGetOrderById.mockResolvedValue(DRAFT_ORDER);
+        mockDbSubmitOrderForApproval.mockResolvedValue({
+            success: true,
+            fulfillment_status: "allocated",
+            shortages: [],
+        });
+
+        await serviceTransitionOrder("order-1", "pending_approval");
+
+        expect(mockDbSubmitOrderForApproval).toHaveBeenCalledTimes(1);
+        expect(mockDbSubmitOrderForApproval).toHaveBeenCalledWith("order-1");
+        expect(mockDbApproveOrder).not.toHaveBeenCalled();
+    });
+
+    it("approved geçişi → light approve_order RPC (rezervasyon zaten yapıldı)", async () => {
         mockDbGetOrderById.mockResolvedValue(PENDING_ORDER);
         mockDbApproveOrder.mockResolvedValue({
             success: true,
@@ -99,18 +123,7 @@ describe("DR-5.1: Rezervasyon SADECE approved geçişte tetiklenir", () => {
 
         expect(mockDbApproveOrder).toHaveBeenCalledTimes(1);
         expect(mockDbApproveOrder).toHaveBeenCalledWith("order-1");
-    });
-
-    it("pending_approval geçişi → rezervasyon RPC çağrılmaz, sadece status güncellenir", async () => {
-        mockDbGetOrderById.mockResolvedValue(DRAFT_ORDER);
-        mockDbUpdateOrderStatus.mockResolvedValue({});
-        mockDbLogOrderAction.mockResolvedValue({});
-
-        await serviceTransitionOrder("order-1", "pending_approval");
-
-        expect(mockDbApproveOrder).not.toHaveBeenCalled();
-        expect(mockDbShipOrderFull).not.toHaveBeenCalled();
-        expect(mockDbUpdateOrderStatus).toHaveBeenCalledTimes(1);
+        expect(mockDbSubmitOrderForApproval).not.toHaveBeenCalled();
     });
 });
 

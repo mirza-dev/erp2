@@ -50,7 +50,7 @@ const STEP_LABELS: Record<ParasutStepKey, string> = {
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string; description: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral", description: "Onaya gönderilmedi" },
-    pending_approval: { label: "Bekliyor",    cls: "badge-warning", description: "Stok kontrol bekleniyor" },
+    pending_approval: { label: "Bekliyor",    cls: "badge-warning", description: "Teklif yapıldı" },
     approved:         { label: "Onaylı",      cls: "badge-accent",  description: "Stok rezerve edildi" },
     cancelled:        { label: "İptal",       cls: "badge-danger",  description: "Sipariş kapatıldı" },
 };
@@ -294,28 +294,56 @@ export default function OrderDetailPage() {
                 return;
             }
 
+            // ── Taslak → Onaya Gönder: HARD rezervasyon BURADA (migration 082) ──
+            // Stok kontrol + rezervasyon + shortage uyarısı bu adımda çalışır.
+            if (next === "pending_approval") {
+                const result = await updateOrderStatus(order.id, "pending_approval");
+                if (!result.ok) {
+                    toast({ type: "error", message: result.error || "Onaya gönderme başarısız." });
+                    return;
+                }
+                const realFulfillment = result.fulfillment_status ?? "allocated";
+                setCommercialStatus("pending_approval");
+                setFulfillmentStatus(realFulfillment);
+                setJustTransitionedCommercial("pending_approval");
+                setJustTransitionedFulfillment(realFulfillment);
+                setTimeout(() => {
+                    setJustTransitionedCommercial(null);
+                    setJustTransitionedFulfillment(null);
+                }, 1500);
+                if (realFulfillment === "partially_allocated" && result.shortages?.length) {
+                    setShortages(result.shortages);
+                    setShortageDialogOpen(true);
+                    toast({ type: "warning", message: "Onaya gönderildi, stok kısmen ayrıldı" });
+                } else {
+                    toast({ type: "success", message: "Onaya gönderildi ve stok rezerve edildi" });
+                }
+                return;
+            }
+
+            // ── Bekliyor → Onayla: light ticari teyit (rezervasyon zaten yapıldı) ──
             if (next === "approved") {
                 const result = await updateOrderStatus(order.id, "approved");
                 if (!result.ok) {
                     toast({ type: "error", message: result.error || "Onaylama başarısız." });
                     return;
                 }
-                const realFulfillment = result.fulfillment_status ?? "allocated";
                 setCommercialStatus("approved");
-                setFulfillmentStatus(realFulfillment);
+                if (result.fulfillment_status) setFulfillmentStatus(result.fulfillment_status);
                 setJustTransitionedCommercial("approved");
                 setTimeout(() => setJustTransitionedCommercial(null), 1500);
-                if (realFulfillment === "partially_allocated" && result.shortages?.length) {
+                // Legacy fallback (rezervsiz pending) → shortage dönebilir
+                if (result.fulfillment_status === "partially_allocated" && result.shortages?.length) {
                     setShortages(result.shortages);
                     setShortageDialogOpen(true);
                     toast({ type: "warning", message: "Sipariş kısmi rezerve ile onaylandı" });
                 } else {
-                    toast({ type: "success", message: "Sipariş onaylandı ve stok rezerve edildi" });
+                    toast({ type: "success", message: "Sipariş onaylandı" });
                 }
                 return;
             }
 
-            // pending_approval, cancelled
+            // cancelled
             const result = await updateOrderStatus(order.id, next);
             if (!result.ok) {
                 toast({ type: "error", message: result.error || "İşlem başarısız oldu." });
@@ -327,11 +355,6 @@ export default function OrderDetailPage() {
                 setJustTransitionedCommercial("cancelled");
                 setTimeout(() => setJustTransitionedCommercial(null), 1500);
                 toast({ type: "warning", message: "Sipariş iptal edildi" });
-            } else if (next === "pending_approval") {
-                setCommercialStatus("pending_approval");
-                setJustTransitionedCommercial("pending_approval");
-                setTimeout(() => setJustTransitionedCommercial(null), 1500);
-                toast({ type: "success", message: "Sipariş onaya gönderildi" });
             }
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.";
@@ -350,11 +373,21 @@ export default function OrderDetailPage() {
                 confirmLabel: "Evet, İptal Et",
                 variant: "danger",
             });
+        } else if (next === "pending_approval") {
+            // Stok kontrol + rezervasyon bu adımda yapılır → onay diyaloğu
+            setConfirmDialog({
+                action: "pending_approval",
+                title: "Onaya Gönder",
+                message: `${order.orderNumber} numaralı siparişi onaya göndermek istediğinize emin misiniz? Stok kontrolleri yapılacak ve rezervasyon oluşturulacak.`,
+                confirmLabel: "Onaya Gönder",
+                variant: "primary",
+            });
         } else if (next === "approved") {
+            // Rezervasyon zaten Bekliyor'da yapıldı → sade ticari teyit
             setConfirmDialog({
                 action: "approved",
                 title: "Siparişi Onayla",
-                message: `${order.orderNumber} numaralı siparişi onaylamak istediğinize emin misiniz? Stok kontrolleri yapılacak ve rezervasyon oluşturulacak.`,
+                message: `${order.orderNumber} numaralı siparişi onaylamak istediğinize emin misiniz?`,
                 confirmLabel: "Onayla",
                 variant: "primary",
             });
@@ -464,7 +497,7 @@ export default function OrderDetailPage() {
                                 <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
-                                <Button variant="primary" onClick={() => handleTransition("pending_approval")} disabled={isDemo || loading !== null} loading={loading === "pending_approval"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                <Button variant="primary" onClick={() => requestTransition("pending_approval")} disabled={isDemo || loading !== null} loading={loading === "pending_approval"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     {loading === "pending_approval" ? "Gönderiliyor..." : "Onaya Gönder"}
                                 </Button>
                             </>
@@ -475,7 +508,7 @@ export default function OrderDetailPage() {
                                     İptal Et
                                 </Button>
                                 <Button variant="primary" onClick={() => requestTransition("approved")} disabled={isDemo || loading !== null} loading={loading === "approved"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                                    {loading === "approved" ? "Kontrol ediliyor..." : "Onayla"}
+                                    {loading === "approved" ? "Onaylanıyor..." : "Onayla"}
                                 </Button>
                             </>
                         )}
