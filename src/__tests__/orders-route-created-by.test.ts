@@ -39,6 +39,11 @@ vi.mock("@/lib/services/ai-service", () => ({
     aiScoreOrder: (...args: unknown[]) => mockAiScoreOrder(...args),
 }));
 
+const mockNotify = vi.fn();
+vi.mock("@/lib/services/email-service", () => ({
+    notifyUsersByEmail: (...args: unknown[]) => mockNotify(...args),
+}));
+
 const mockGetUser = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -74,6 +79,7 @@ beforeEach(() => {
     mockServiceGetOrder.mockResolvedValue({ id: "order-new", commercial_status: "pending_approval", fulfillment_status: "allocated" });
     mockServiceTransitionOrder.mockResolvedValue({ success: true, fulfillment_status: "allocated", shortages: [] });
     mockAiScoreOrder.mockResolvedValue(undefined);
+    mockNotify.mockResolvedValue(undefined);
 });
 
 // ── Tests ─────────────────────────────────────────────────────
@@ -169,5 +175,25 @@ describe("POST /api/orders — create-and-send (pending_approval)", () => {
         await POST(req);
 
         expect(mockServiceTransitionOrder).not.toHaveBeenCalled();
+    });
+
+    // ── order_new e-posta dedup (tek bildirim) ──
+    const newEmailCount = () =>
+        mockNotify.mock.calls.filter(c => (c[0] as { notificationType?: string })?.notificationType === "order_new").length;
+
+    it("başarılı create-and-send → order_new ATLANIR (order_pending tek bildirim)", async () => {
+        await POST(makeRequest({ ...VALID_BODY, commercial_status: "pending_approval" }));
+        expect(newEmailCount()).toBe(0);
+    });
+
+    it("allocation başarısız (draft kaldı) → order_new GÖNDERİLİR", async () => {
+        mockServiceTransitionOrder.mockResolvedValue({ success: false, error: "stok yok" });
+        await POST(makeRequest({ ...VALID_BODY, commercial_status: "pending_approval" }));
+        expect(newEmailCount()).toBe(1);
+    });
+
+    it("draft create → order_new GÖNDERİLİR", async () => {
+        await POST(makeRequest({ ...VALID_BODY, commercial_status: "draft" }));
+        expect(newEmailCount()).toBe(1);
     });
 });
