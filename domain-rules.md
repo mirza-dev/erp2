@@ -135,11 +135,16 @@ Bu yüzden:
 - `allocated -> partially_shipped`
 - `partially_shipped -> shipped`
 
-### 4.4 Sipariş Onayı
-Sipariş `approved` olduğunda:
+### 4.4 Sipariş Onaya Gönderimi (rezervasyon tetikleyici)
+Sipariş `draft → pending_approval` (Onaya Gönder) olduğunda:
 - rezervasyon motoru çalışır
 - satır bazlı allocation yapılır
 - varsa shortage kaydı açılır
+
+`pending_approval → approved` (Onayla) ise yalnızca ticari teyittir — rezervasyon
+zaten yapılmıştır (light geçiş). Gerekçe: müşteriye teklif verilirken stok kilitlenir,
+bekleyen siparişler için aşırı-satış olmaz. (migration 082; eski sürümde rezervasyon
+`approved`'da olurdu.)
 
 ### 4.5 Sipariş İptali
 Sipariş iptal edilirse:
@@ -152,14 +157,17 @@ Sipariş iptal edilirse:
 ## 5. Inventory ve Reservation Domain
 
 ### 5.1 Rezervasyon Ne Zaman Oluşur
-Hard reservation yalnızca `approved` siparişte oluşur.
+Hard reservation `pending_approval` (Onaya Gönder) durumunda oluşur ve sonrasında
+(`approved`) korunur. (migration 082 — eski sürümde yalnız `approved`'daydı.)
 
-Aşağıdaki durumlarda rezervasyon oluşmaz:
-- `draft`
-- `pending_approval`
+Aşağıdaki durumda rezervasyon oluşmaz:
+- `draft` (yalnız `quoted` soft-hold; `available_now`'u düşürmez)
+
+Not: `quoted` = yalnız draft siparişlerin miktarı; `reserved` = pending_approval ve
+sonrası. Böylece `promisable = available_now - quoted` çift saymaz.
 
 ### 5.2 Rezervasyon Mantığı
-Sipariş onaylandığında her satır için:
+Sipariş onaya gönderildiğinde (`pending_approval`) her satır için:
 - uygun stok varsa rezerv oluştur
 - stok yetersizse kısmi rezerv oluştur
 - eksik kısım için `Shortage` oluştur

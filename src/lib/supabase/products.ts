@@ -405,14 +405,18 @@ export async function dbGetOpenShortagesByProductId(
 
 /**
  * Returns a map of product_id → total quoted quantity across all active
- * draft and pending_approval orders. Used to compute `promisable` stock.
+ * DRAFT orders (soft hold). Used to compute `promisable` stock.
+ *
+ * NOT: pending_approval artık HARD rezerve ediliyor (migration 082) →
+ * products.reserved'a düşer (available_now azalır). Burada da sayılırsa
+ * promisable ÇİFT düşer. Bu yüzden quoted = yalnız draft. (reserved = pending+)
  */
 export async function dbGetQuotedQuantities(): Promise<Map<string, number>> {
     const supabase = createServiceClient();
     const { data, error } = await supabase
         .from("order_lines")
         .select("product_id, quantity, sales_orders!inner(commercial_status)")
-        .in("sales_orders.commercial_status", ["draft", "pending_approval"]);
+        .eq("sales_orders.commercial_status", "draft");
     if (error) throw new Error(`dbGetQuotedQuantities: ${error.message}`);
     if (!data) return new Map();
     const map = new Map<string, number>();
@@ -453,9 +457,12 @@ type SalesOrderJoin = {
 };
 
 /**
- * Bir ürünün aktif tekliflerinde yer aldığı order_line satırlarını
- * sipariş ve müşteri bilgileriyle döner. Sadece draft ve pending_approval.
+ * Bir ürünün aktif TASLAK tekliflerinde yer aldığı order_line satırlarını
+ * sipariş ve müşteri bilgileriyle döner. Sadece draft (soft hold).
  * Sıralama: en yeni teklif üstte (orderCreatedAt DESC).
+ *
+ * NOT: pending_approval artık HARD rezerve (migration 082) → "Teklifte"
+ * (quoted=draft) sayısıyla tutarlı kalmak için breakdown da draft-only.
  */
 export async function dbGetQuotedBreakdownByProduct(
     productId: string
@@ -481,7 +488,7 @@ export async function dbGetQuotedBreakdownByProduct(
             )
         `)
         .eq("product_id", productId)
-        .in("sales_orders.commercial_status", ["draft", "pending_approval"]);
+        .eq("sales_orders.commercial_status", "draft");
     if (error || !data) return [];
 
     const rows: QuotedBreakdownRow[] = [];

@@ -22,12 +22,16 @@ import { NextRequest } from "next/server";
 // ── Mocks ─────────────────────────────────────────────────────
 
 const mockServiceCreateOrder = vi.fn();
+const mockServiceGetOrder = vi.fn();
+const mockServiceTransitionOrder = vi.fn();
 const mockValidateOrderCreate = vi.fn();
 const mockAiScoreOrder = vi.fn();
 
 vi.mock("@/lib/services/order-service", () => ({
     serviceListOrders: vi.fn(),
     serviceCreateOrder: (...args: unknown[]) => mockServiceCreateOrder(...args),
+    serviceGetOrder: (...args: unknown[]) => mockServiceGetOrder(...args),
+    serviceTransitionOrder: (...args: unknown[]) => mockServiceTransitionOrder(...args),
     validateOrderCreate: (...args: unknown[]) => mockValidateOrderCreate(...args),
 }));
 
@@ -66,7 +70,9 @@ const VALID_BODY = {
 beforeEach(() => {
     vi.clearAllMocks();
     mockValidateOrderCreate.mockReturnValue({ valid: true, errors: [] });
-    mockServiceCreateOrder.mockResolvedValue({ id: "order-new" });
+    mockServiceCreateOrder.mockResolvedValue({ id: "order-new", order_number: "ORD-X", customer_name: "T", grand_total: 100, currency: "USD" });
+    mockServiceGetOrder.mockResolvedValue({ id: "order-new", commercial_status: "pending_approval", fulfillment_status: "allocated" });
+    mockServiceTransitionOrder.mockResolvedValue({ success: true, fulfillment_status: "allocated", shortages: [] });
     mockAiScoreOrder.mockResolvedValue(undefined);
 });
 
@@ -114,5 +120,54 @@ describe("POST /api/orders — created_by population", () => {
 
         expect(res.status).toBe(400);
         expect(mockServiceCreateOrder).not.toHaveBeenCalled();
+    });
+});
+
+// ── Create-and-send: pending_approval başlangıç → DRAFT oluştur + allocate (082) ──
+describe("POST /api/orders — create-and-send (pending_approval)", () => {
+    beforeEach(() => {
+        mockGetUser.mockResolvedValue({ data: { user: { id: "u1" } } });
+    });
+
+    it("pending_approval istenince DRAFT oluşturulur sonra onaya gönderilir (allocate)", async () => {
+        const req = makeRequest({ ...VALID_BODY, commercial_status: "pending_approval" });
+        const res = await POST(req);
+
+        expect(res.status).toBe(201);
+        // Doğrudan pending INSERT etmez — draft'a indirir
+        const [input] = mockServiceCreateOrder.mock.calls[0];
+        expect(input.commercial_status).toBe("draft");
+        // Sonra onaya gönder (rezervasyon)
+        expect(mockServiceTransitionOrder).toHaveBeenCalledWith("order-new", "pending_approval");
+    });
+
+    it("kısmi stok: shortages create yanıtında döner", async () => {
+        const shortages = [{ product_name: "Vana", requested: 10, reserved: 3, shortage: 7 }];
+        mockServiceTransitionOrder.mockResolvedValue({ success: true, fulfillment_status: "partially_allocated", shortages });
+
+        const req = makeRequest({ ...VALID_BODY, commercial_status: "pending_approval" });
+        const res = await POST(req);
+        const body = await res.json();
+
+        expect(res.status).toBe(201);
+        expect(body.shortages).toHaveLength(1);
+    });
+
+    it("allocation başarısız (stok yok) → sipariş DRAFT kalır, submitError döner", async () => {
+        mockServiceTransitionOrder.mockResolvedValue({ success: false, error: "Hiçbir satır için yeterli stok yok." });
+
+        const req = makeRequest({ ...VALID_BODY, commercial_status: "pending_approval" });
+        const res = await POST(req);
+        const body = await res.json();
+
+        expect(res.status).toBe(201);
+        expect(body.submitError).toContain("stok");
+    });
+
+    it("draft başlangıç → transition ÇAĞRILMAZ (mevcut davranış korunur)", async () => {
+        const req = makeRequest({ ...VALID_BODY, commercial_status: "draft" });
+        await POST(req);
+
+        expect(mockServiceTransitionOrder).not.toHaveBeenCalled();
     });
 });

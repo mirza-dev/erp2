@@ -1,9 +1,9 @@
 /**
  * Tests for dbGetQuotedBreakdownByProduct (src/lib/supabase/products.ts)
  *
- * Kurallar:
- *   - Sadece draft + pending_approval siparişler dahil edilir
- *   - Approved siparişler filtrelenir (inner join + IN filter)
+ * Kurallar (migration 082):
+ *   - Sadece DRAFT siparişler dahil edilir (soft hold). pending_approval artık
+ *     HARD rezerve → "Teklifte" (quoted=draft) ile tutarlı, breakdown'a girmez.
  *   - Sonuçlar orderCreatedAt DESC sıralı
  *   - Supabase error → [] döner (graceful)
  */
@@ -12,8 +12,8 @@ import { describe, it, expect, vi } from "vitest";
 // ── Mock ──────────────────────────────────────────────────────
 
 const mockSelect = vi.fn();
-const mockEq = vi.fn();
-const mockIn = vi.fn();
+const mockEqProduct = vi.fn();
+const mockEqStatus = vi.fn();
 
 vi.mock("@/lib/supabase/service", () => ({
     createServiceClient: () => ({
@@ -35,7 +35,7 @@ function makeLine(overrides: {
     sales_orders: {
         id: string;
         order_number: string;
-        commercial_status: "draft" | "pending_approval";
+        commercial_status: "draft";
         created_at: string;
         created_by: string | null;
         customer_id: string;
@@ -51,10 +51,11 @@ function makeLine(overrides: {
     };
 }
 
+// Zincir: from().select().eq(product_id).eq(commercial_status='draft')
 function setupMockChain(result: { data: unknown[] | null; error: unknown | null }) {
-    mockIn.mockResolvedValue(result);
-    mockEq.mockReturnValue({ in: mockIn });
-    mockSelect.mockReturnValue({ eq: mockEq });
+    mockEqStatus.mockResolvedValue(result);
+    mockEqProduct.mockReturnValue({ eq: mockEqStatus });
+    mockSelect.mockReturnValue({ eq: mockEqProduct });
 }
 
 // ── Tests ─────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ describe("dbGetQuotedBreakdownByProduct — temel kurallar", () => {
             }),
             makeLine({
                 quantity: 5,
-                sales_orders: { id: "o2", order_number: "ORD-002", commercial_status: "pending_approval", created_at: "2024-06-03T08:00:00Z", created_by: null, customer_id: "c2", customer_name: "Beta" },
+                sales_orders: { id: "o2", order_number: "ORD-002", commercial_status: "draft", created_at: "2024-06-03T08:00:00Z", created_by: null, customer_id: "c2", customer_name: "Beta" },
             }),
             makeLine({
                 quantity: 8,

@@ -3,18 +3,19 @@
  * (src/lib/supabase/products.ts)
  *
  * Mocks the Supabase service client. Verifies aggregation of quoted quantities
- * across draft and pending_approval orders from the order_lines table.
+ * across DRAFT orders from the order_lines table (migration 082: pending_approval
+ * artık HARD rezerve → quoted'a girmez, çift sayma önlenir).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Supabase mock ─────────────────────────────────────────────
 
-const mockIn = vi.fn();
+const mockEq = vi.fn();
 
 function makeBuilder() {
     const b: Record<string, unknown> = {};
     b.select = () => b;
-    b.in = mockIn;
+    b.eq = mockEq;
     return b;
 }
 
@@ -47,7 +48,7 @@ function makeLine(product_id: string, quantity: number) {
 
 beforeEach(() => {
     mockFrom.mockReset();
-    mockIn.mockReset();
+    mockEq.mockReset();
     mockFrom.mockImplementation(() => makeBuilder());
 });
 
@@ -55,31 +56,31 @@ beforeEach(() => {
 
 describe("dbGetQuotedQuantities", () => {
     it("returns empty Map when no active order lines exist", async () => {
-        mockIn.mockResolvedValue({ data: [], error: null });
+        mockEq.mockResolvedValue({ data: [], error: null });
         const result = await dbGetQuotedQuantities();
         expect(result.size).toBe(0);
     });
 
     it("throws on Supabase error", async () => {
-        mockIn.mockResolvedValue({ data: null, error: { message: "DB error" } });
+        mockEq.mockResolvedValue({ data: null, error: { message: "DB error" } });
         await expect(dbGetQuotedQuantities()).rejects.toThrow("DB error");
     });
 
     it("returns empty Map when data is null without error", async () => {
-        mockIn.mockResolvedValue({ data: null, error: null });
+        mockEq.mockResolvedValue({ data: null, error: null });
         const result = await dbGetQuotedQuantities();
         expect(result.size).toBe(0);
     });
 
     it("aggregates a single product from a single line", async () => {
-        mockIn.mockResolvedValue({ data: [makeLine("prod-1", 30)], error: null });
+        mockEq.mockResolvedValue({ data: [makeLine("prod-1", 30)], error: null });
         const result = await dbGetQuotedQuantities();
         expect(result.get("prod-1")).toBe(30);
         expect(result.size).toBe(1);
     });
 
     it("aggregates the same product across multiple lines/orders", async () => {
-        mockIn.mockResolvedValue({
+        mockEq.mockResolvedValue({
             data: [makeLine("prod-1", 20), makeLine("prod-1", 10)],
             error: null,
         });
@@ -89,7 +90,7 @@ describe("dbGetQuotedQuantities", () => {
     });
 
     it("tracks multiple products independently", async () => {
-        mockIn.mockResolvedValue({
+        mockEq.mockResolvedValue({
             data: [
                 makeLine("prod-1", 30),
                 makeLine("prod-2", 15),
@@ -104,17 +105,17 @@ describe("dbGetQuotedQuantities", () => {
     });
 
     it("queries the order_lines table", async () => {
-        mockIn.mockResolvedValue({ data: [], error: null });
+        mockEq.mockResolvedValue({ data: [], error: null });
         await dbGetQuotedQuantities();
         expect(mockFrom).toHaveBeenCalledWith("order_lines");
     });
 
-    it("filters by draft and pending_approval statuses", async () => {
-        mockIn.mockResolvedValue({ data: [], error: null });
+    it("filters by draft status only (pending artık reserved)", async () => {
+        mockEq.mockResolvedValue({ data: [], error: null });
         await dbGetQuotedQuantities();
-        expect(mockIn).toHaveBeenCalledWith(
+        expect(mockEq).toHaveBeenCalledWith(
             "sales_orders.commercial_status",
-            ["draft", "pending_approval"]
+            "draft"
         );
     });
 });

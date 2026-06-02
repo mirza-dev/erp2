@@ -1,9 +1,15 @@
 # KokpitERP — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-06-01_
+_Son güncelleme: 2026-06-02_
+
+**Son tamamlanan iş:** **Satış Siparişleri — Faz 3: HARD rezervasyonu "Bekliyor"a (pending_approval) taşı** (ürün sahibi kararı; domain-rules §5.1 BİLİNÇLİ DEĞİŞTİ). Yeni akış: **Taslak → "Onaya Gönder" (onay diyaloğu + HARD rezervasyon + stok kontrol + shortage uyarısı, alt-not "Teklif yapıldı") → Bekliyor → "Onayla" (light ticari teyit, alt-not "Stok rezerve edildi") → Onaylı**. LOJİSTİK: Bekliyor'da fulfillment=allocated → "Rezerveli" otomatik işaretlenir. **Migration 082** (`allocate_order_lines` helper + `submit_order_for_approval` [draft guard, zero-stock reddi, hedef pending] + `approve_order` [light + legacy unallocated fallback] + rezervsiz-pending backfill; eski `approve_order_with_allocation` health-check için korundu; ROLLBACK). **Çift sayma fix (ZORUNLU):** `dbGetQuotedQuantities`/`dbGetQuotedBreakdownByProduct` filtresi `['draft','pending_approval']`→`['draft']` (pending artık `reserved`'da; `quoted`=draft, net `promisable` invariant korunur). **Servis:** `dbSubmitOrderForApproval` helper; `dbApproveOrder`→`approve_order` RPC; order-service pending dalı artık allocate eder + shortages döner, approved dalı light. **POST /api/orders:** pending_approval istenince DRAFT oluştur→`serviceTransitionOrder(pending_approval)` (allocate), shortages/submitError yanıtta. **UI** (`[id]/page.tsx`): STATUS_META pending="Teklif yapıldı"; "Onaya Gönder"→requestTransition (confirm); "Onayla" sade confirm; shortage dialog pending dalında. **cancel_order/ship_order_full DEĞİŞMEDİ** (cancel pending rezervi release eder, ship approved guard korunur). **Test: 4334 yeşil** (DR-5.1 invariant tersine çevrildi, db-quoted/quoted-breakdown mock güncel, +order-submit-allocation-migration + order-service pending + create-and-send) · tsc temiz · lint 0 · build OK (`ƒ Proxy`). **DURUM: COMMIT EDİLMEDİ (kullanıcı onayı bekliyor) · ⚠️ Migration 082 APPLY BEKLİYOR — deploy ile YAKIN zamanda (082 backfill ORD-0001/0002'yi rezerve eder; eski kod hâlâ quoted=draft+pending sayarsa geçici çift sayma).** domain-rules.md §4.4/§5.1/§5.2 + CLAUDE.md stok modeli güncellendi.
+
+<details><summary>Önceki: Satış Siparişleri Faz 1+2 (`e9c6ac6`, migration 081 APPLY EDİLDİ ✅)</summary>
 
 **Son tamamlanan iş:** **Satış Siparişleri — Faz 1 bug fix + Faz 2 taslak düzenleme** (worktree `satis-siparisleri-tamamlama`, commit `95054b2`; 4316 test). Kullanıcı "satış siparişleri sayfasını eksiksiz tamamla + bağlantılı sorunları çöz" dedi → kapsamlı inceleme + AskUserQuestion ile kapsam onayı (B/C [sevk modalı + planned_shipment_date] kullanıcı kararıyla ATLANDI). **Faz 1 (kesin hatalar):** (1) **`/api/orders ?all=1`** — route yalnız `page` okuyordu, `dbListOrders` default `pageSize:50` → UI hiçbir zaman en yeni 50 siparişten fazlasını tutamıyordu; **tab sayaçları (`getCount`/`pendingCount`) + `CustomerDetailPanel` müşteri cirosu/sipariş sayısı 50-cap'e takılıyordu** (downstream). Fix: route `all=1`→`page:1,pageSize:10000`; DataContext.refetchAll + liste `refetch()` `?all=1` (products paterni). (2) **DOM mutation hover** (liste 481-503, detay satır 643-644) doğrudan `td.style.background`/`data-chevron`/`data-delete` yazıyordu → `hoveredId`/`hoveredLineId` state (teklifler sayfası paterni); confirmId artık mouse-leave'de sıfırlanmaz (UX fix). (3) **Toplu işlem**: soft-DELETE=iptal → dürüst sözcük ("iptal edildi", "silindi" DEĞİL); `isOrderCancellable` (cancelled/shipped hariç) ile select-all + satır checkbox yalnız iptal edilebilir siparişlerde (sevk/iptal 400 alırdı). **Faz 2 (taslak düzenleme — hiç yoktu, sipariş oluşunca dondurulmuştu):** **Migration 081** `update_order_with_lines` RPC (`FOR UPDATE` + `status='draft'` guard + atomik order_lines DELETE+reinsert + **sunucu-tarafı totals yeniden hesap** — sales_orders totals trigger YOK; discount_amount/vat_rate KORUNUR [Faz 6 formülü], statü/numara/parasut DOKUNULMAZ; audit_log `order_lines_replaced`; ROLLBACK). `dbUpdateOrderWithLines` helper + `validateOrderUpdate`+`serviceUpdateOrderLines` (draft pre-check, RPC authoritative) + **`PUT /api/orders/[id]`** (`manage_sales_orders`; bulunamadı→404/taslak değil→409/validation→400). **Paylaşılan `OrderForm`** bileşeni (new+edit ortak — QuoteForm `initialData` paterni); `/new` ince Suspense wrapper, **`/[id]/edit`** yeni sayfa (taslak guard + bulunamadı). Pasif/silinmiş satır ürünü `synthesizeProductStub` + `productOptions` merge ile korunur (**satır kaybı yok**). Detay sayfasında taslakta **"Düzenle"** linki (`manage_sales_orders` gate). Stok uyarısı "Teklif verilemez"→"Stok yetersiz" (sipariş bağlamı). **+47 test** (orders-route-all, orders-list-bug-fixes, order-update-lines-migration, order-update-route, order-update-service, order-form) · tsc temiz · `npm run lint` 0 · build OK (`ƒ /dashboard/orders/[id]/edit` + `ƒ Proxy`). **DURUM: worktree branch'te COMMIT EDİLDİ (`95054b2`); main merge/push BEKLİYOR · ⚠️ Migration 081 APPLY BEKLİYOR (kullanıcı Supabase'de çalıştırmalı — yoksa PUT /api/orders/[id] 500).** **İncelenen bağlantılar temiz:** dashboard RecentOrders/StatsCards, quote→order accept snapshot, customer panel.
+
+</details>
 
 
 **Lint sinyali (2026-05-31 düzeltildi):** `npm run lint` (== `eslint src`) artık **EXIT 0, 0 sorun**. (1) `eslint.config.mjs` globalIgnores'a `**/.next/**` + `.claude/**` + `.agents/**` + `skills/**` eklendi → `.claude/worktrees/<x>/.next` kaynaklı ~32k sahte sorun temizlendi (artık `npm run lint` güvenilir). (2) react-hooks@7 (React Compiler-era) `set-state-in-effect`/`refs`/`purity` kuralları config'te justify+suppress edildi (kullanıcı kararı 2026-05-31) — proje SWR/React Query KULLANMIYOR → fetch-in-effect bilinçli konvansiyon (react-doctor `no-fetch-in-effect` suppress'iyle aynı mantık); gerçek düzeltme frontend-renewal planında. **Geçmiş bloklardaki "eslint src 31/0 baseline" ifadeleri o tarih için geçerliydi; artık baseline 0.**
@@ -1759,10 +1765,11 @@ OrderDetail: ...Order, customerId, customerEmail, customerCountry,
 commercial_status:
   DRAFT → PENDING_APPROVAL → APPROVED → CANCELLED
 
-fulfillment_status (sadece APPROVED siparişlerde aktif):
+fulfillment_status (PENDING_APPROVAL'dan itibaren aktif):
   UNALLOCATED → PARTIALLY_ALLOCATED → ALLOCATED → PARTIALLY_SHIPPED → SHIPPED
 
-Kural: Rezervasyon sadece commercial_status = APPROVED olunca tetiklenir.
+Kural: Rezervasyon "Onaya Gönder" (DRAFT → PENDING_APPROVAL) ile tetiklenir
+       (migration 082; eskiden APPROVED'daydı). APPROVED = light ticari teyit.
 ```
 
 ---
@@ -1781,7 +1788,7 @@ grandTotal = subtotal + vatTotal
 ```
 available_now = on_hand - reserved
 // on_hand: fiziksel stok
-// reserved: onaylı siparişler için ayrılmış
+// reserved: pending_approval + approved siparişler için ayrılmış (migration 082)
 // available_now: satılabilir gerçek miktar (computed column)
 ```
 
@@ -1791,9 +1798,9 @@ available_now = on_hand - reserved
 
 ```
 on_hand        — fiziksel stok
-reserved       — onaylı siparişler için ayrılmış
+reserved       — pending_approval + approved siparişler için ayrılmış (migration 082)
 available_now  = on_hand - reserved              (computed column)
-quoted         = draft + pending_approval siparişlerdeki toplam miktar
+quoted         = YALNIZ draft siparişlerdeki toplam miktar (soft hold; pending artık reserved'da)
 promisable     = available_now - quoted          (canonical; negatif olabilir — Math.max ile gizleme)
 incoming       = açık purchase commitment toplamı
 forecasted     = on_hand + incoming - reserved - quoted

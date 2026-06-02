@@ -9,8 +9,7 @@ import {
     dbGetOrderById,
     dbListOrders,
     dbCreateOrder,
-    dbUpdateOrderStatus,
-    dbLogOrderAction,
+    dbSubmitOrderForApproval,
     dbApproveOrder,
     dbShipOrderFull,
     dbCancelOrder,
@@ -237,17 +236,19 @@ export async function serviceTransitionOrder(
     shipMeta?: ShipMeta,
 ): Promise<TransitionResult> {
 
-    // ── draft → pending_approval (simple status update, no stock effect) ──
+    // ── draft → pending_approval: HARD rezervasyon BURADA (migration 082) ──
+    // Eskiden no-op statü geçişiydi; artık submit_order_for_approval RPC stok
+    // kontrol + rezervasyon + shortage yapar (eski "approved" mantığı buraya taşındı).
     if (transition === "pending_approval") {
         const order = await dbGetOrderById(orderId);
         if (!order) return { success: false, error: "Sipariş bulunamadı." };
         if (!isValidCommercialTransition(order.commercial_status, "pending_approval")) {
             return { success: false, error: `'${order.commercial_status}' durumundan onay beklemesine geçilemez.` };
         }
-        await dbUpdateOrderStatus(orderId, "pending_approval", order.fulfillment_status ?? "unallocated");
-        await dbLogOrderAction(orderId, "status_transition",
-            { commercial_status: order.commercial_status },
-            { commercial_status: "pending_approval" });
+        const result: ApproveOrderResult = await dbSubmitOrderForApproval(orderId);
+        if (!result.success) {
+            return { success: false, error: result.error };
+        }
         // Fire-and-forget e-posta bildirimi
         notifyUsersByEmail({
             notificationType: "order_pending",
@@ -260,10 +261,16 @@ export async function serviceTransitionOrder(
                 currency: order.currency,
             } },
         }).catch(err => console.error("[email order_pending]", err));
-        return { success: true };
+        return {
+            success: true,
+            shortages: result.shortages,
+            fulfillment_status: result.fulfillment_status,
+        };
     }
 
-    // ── pending_approval → approved: atomic RPC with partial allocation ──
+    // ── pending_approval → approved: light ticari teyit (rezervasyon zaten ──
+    // pending'de yapıldı). approve_order RPC sadece statü flip eder; legacy
+    // rezervsiz pending'de fallback allocation çalışır (shortages dönebilir).
     if (transition === "approved") {
         const order = await dbGetOrderById(orderId);
         if (!order) return { success: false, error: "Sipariş bulunamadı." };

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     serviceListOrders,
     serviceCreateOrder,
+    serviceGetOrder,
+    serviceTransitionOrder,
     validateOrderCreate,
+    type ShortageInfo,
 } from "@/lib/services/order-service";
 import { aiScoreOrder } from "@/lib/services/ai-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
@@ -65,7 +68,29 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ errors: validation.errors }, { status: 400 });
         }
 
+        // Yeni invariant (migration 082): pending_approval HARD rezervasyon ister.
+        // Doğrudan pending INSERT etme (rezervsiz pending oluşur) → önce DRAFT
+        // oluştur, sonra "Onaya Gönder" geçişiyle allocate et. "Taslak Kaydet"
+        // yolu değişmez.
+        const requestedPending = body.commercial_status === "pending_approval";
+        if (requestedPending) body.commercial_status = "draft";
+
         const result = await serviceCreateOrder(body);
+
+        // Create-and-send: draft'ı onaya gönder → stok rezervasyonu + shortage
+        let finalOrder = result;
+        let createShortages: ShortageInfo[] | undefined;
+        if (requestedPending) {
+            const submit = await serviceTransitionOrder(result.id, "pending_approval");
+            if (!submit.success) {
+                // Allocation başarısız (ör. yeterli stok yok) → sipariş DRAFT kalır,
+                // kullanıcıya bildir (sipariş yine de oluştu).
+                revalidateTag("products", "max");
+                return NextResponse.json({ ...result, submitError: submit.error }, { status: 201 });
+            }
+            createShortages = submit.shortages;
+            finalOrder = (await serviceGetOrder(result.id)) ?? result;
+        }
 
         // Fire-and-forget AI scoring — don't block the response
         aiScoreOrder(result.id).catch(err =>
@@ -86,7 +111,10 @@ export async function POST(req: NextRequest) {
         }).catch(err => console.error("[email order_new]", err));
 
         revalidateTag("products", "max");
-        return NextResponse.json(result, { status: 201 });
+        return NextResponse.json(
+            createShortages?.length ? { ...finalOrder, shortages: createShortages } : finalOrder,
+            { status: 201 },
+        );
     } catch (err) {
         return handleApiError(err, "POST /api/orders");
     }

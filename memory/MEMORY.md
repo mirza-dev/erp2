@@ -14,6 +14,9 @@
 - [project_products_page.md](project_products_page.md) — Veri akışı, drawer edit modu, dinamik kategori, scan lock, mount scan davranışı, perf pattern
 - [current_focus.md](current_focus.md) — Son: Teklif V7 **Faz 8 — Ertelenen Borçlar Kapanışı** (5 alt-faz/commit): 8a RBAC yazma uçları (`4935e88`), 8b convert ölü kod temizliği (`71a22cd`), 8c quotes audit katmanı helper-seviyesi (`034f8ea`), 8d order_line_description migration 080 (`4218d3e`, APPLY EDİLDİ ✅), 8e Paraşüt iskonto orantılı guard→reconciliation (`4b9c938`). Kullanıcı: sig rename ATLA, drag-reorder ERTELE. **+Bulgular 1.tur (`f7fc9f8`): reconcile guard invoice retry yoluna da uygulandı + 080 doc flip + P3 yorumlar. 4215 test, COMMIT+PUSH EDİLDİ · 080 APPLY EDİLDİ ✅**; **V7 + tüm ertelenen borçlar TAMAMLANDI**; önceki: Faz 7 note_templates (079 APPLY EDİLDİ ✅)
 
+## Reference
+- [reference_live_demo_redaction.md](reference_live_demo_redaction.md) — Canlı/demo'da null fiyatlar = RBAC redaction (viewer rolü), BUG DEĞİL; auth gate `src/proxy.ts` (middleware.ts değil)
+
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)
 - [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)

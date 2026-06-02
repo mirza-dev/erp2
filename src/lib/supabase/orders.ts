@@ -265,9 +265,27 @@ export interface ApproveOrderResult {
     shortages?: { product_name: string; requested: number; reserved: number; shortage: number }[];
 }
 
+/**
+ * Taslak → Bekliyor: HARD rezervasyon burada oluşur (migration 082).
+ * submit_order_for_approval RPC: allocate + commercial_status='pending_approval'.
+ */
+export async function dbSubmitOrderForApproval(orderId: string): Promise<ApproveOrderResult> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("submit_order_for_approval", {
+        p_order_id: orderId,
+    });
+    if (error) throw new Error(error.message);
+    return data as ApproveOrderResult;
+}
+
+/**
+ * Bekliyor → Onaylı: light ticari teyit (rezervasyon zaten pending'de yapıldı).
+ * approve_order RPC: commercial_status='approved' (legacy rezervsiz pending'de
+ * fallback allocation çalışır). Migration 082.
+ */
 export async function dbApproveOrder(orderId: string): Promise<ApproveOrderResult> {
     const supabase = createServiceClient();
-    const { data, error } = await supabase.rpc("approve_order_with_allocation", {
+    const { data, error } = await supabase.rpc("approve_order", {
         p_order_id: orderId,
     });
     if (error) throw new Error(error.message);

@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Mocks (hoisted) ───────────────────────────────────────────
 
 const mockDbGetOrderById    = vi.fn();
+const mockDbSubmitOrderForApproval = vi.fn();
 const mockDbApproveOrder    = vi.fn();
 const mockDbShipOrderFull   = vi.fn();
 const mockDbCancelOrder     = vi.fn();
@@ -24,6 +25,7 @@ const mockDbUpdateOrderQuoteDeadline = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@/lib/supabase/orders", () => ({
     dbGetOrderById:      (...args: unknown[]) => mockDbGetOrderById(...args),
+    dbSubmitOrderForApproval: (...args: unknown[]) => mockDbSubmitOrderForApproval(...args),
     dbApproveOrder:      (...args: unknown[]) => mockDbApproveOrder(...args),
     dbShipOrderFull:     (...args: unknown[]) => mockDbShipOrderFull(...args),
     dbCancelOrder:       (...args: unknown[]) => mockDbCancelOrder(...args),
@@ -33,6 +35,11 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbListOrders:                 vi.fn().mockResolvedValue([]),
     dbListExpiredQuotes:          vi.fn(),
     dbUpdateOrderQuoteDeadline:   (...args: unknown[]) => mockDbUpdateOrderQuoteDeadline(...args),
+}));
+
+// Fire-and-forget e-posta bildirimleri — gerçek çağrı yapma
+vi.mock("@/lib/services/email-service", () => ({
+    notifyUsersByEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
 const mockDbBatchResolveAlerts = vi.fn().mockResolvedValue(0);
@@ -95,6 +102,7 @@ const DRAFT_ORDER = {
 
 beforeEach(() => {
     mockDbGetOrderById.mockReset();
+    mockDbSubmitOrderForApproval.mockReset();
     mockDbApproveOrder.mockReset();
     mockDbShipOrderFull.mockReset();
     mockDbCancelOrder.mockReset();
@@ -159,6 +167,55 @@ describe("serviceTransitionOrder — approve (007 RPC davranışı)", () => {
         const result = await serviceTransitionOrder("order-1", "approved");
         expect(result.success).toBe(false);
         expect(mockDbApproveOrder).not.toHaveBeenCalled();
+    });
+});
+
+// ── onaya gönder (draft → pending_approval) = HARD rezervasyon (082) ──
+
+describe("serviceTransitionOrder — pending_approval (onaya gönder = rezervasyon)", () => {
+    it("draft → pending: dbSubmitOrderForApproval çağrılır, success + fulfillment döner", async () => {
+        mockDbGetOrderById.mockResolvedValue(DRAFT_ORDER);
+        mockDbSubmitOrderForApproval.mockResolvedValue({
+            success: true,
+            fulfillment_status: "allocated",
+            shortages: [],
+        });
+        const result = await serviceTransitionOrder("order-1", "pending_approval");
+        expect(mockDbSubmitOrderForApproval).toHaveBeenCalledWith("order-1");
+        expect(result.success).toBe(true);
+        expect(result.fulfillment_status).toBe("allocated");
+    });
+
+    it("kısmi stok: shortages servis sonucuna taşınır", async () => {
+        mockDbGetOrderById.mockResolvedValue(DRAFT_ORDER);
+        const shortages = [{ product_name: "Vana DN25", requested: 10, reserved: 3, shortage: 7 }];
+        mockDbSubmitOrderForApproval.mockResolvedValue({
+            success: true,
+            fulfillment_status: "partially_allocated",
+            shortages,
+        });
+        const result = await serviceTransitionOrder("order-1", "pending_approval");
+        expect(result.success).toBe(true);
+        expect(result.fulfillment_status).toBe("partially_allocated");
+        expect(result.shortages).toHaveLength(1);
+    });
+
+    it("RPC zero-stock hatası → success:false, error yüzeye çıkar", async () => {
+        mockDbGetOrderById.mockResolvedValue(DRAFT_ORDER);
+        mockDbSubmitOrderForApproval.mockResolvedValue({
+            success: false,
+            error: "Hiçbir satır için yeterli stok yok.",
+        });
+        const result = await serviceTransitionOrder("order-1", "pending_approval");
+        expect(result.success).toBe(false);
+        expect(result.error).toContain("stok");
+    });
+
+    it("zaten pending sipariş tekrar onaya gönderilemez — pre-check, RPC çağrılmaz", async () => {
+        mockDbGetOrderById.mockResolvedValue(PENDING_ORDER);
+        const result = await serviceTransitionOrder("order-1", "pending_approval");
+        expect(result.success).toBe(false);
+        expect(mockDbSubmitOrderForApproval).not.toHaveBeenCalled();
     });
 });
 
