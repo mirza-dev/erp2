@@ -18,6 +18,8 @@ import {
 } from "@/lib/ai-guards";
 import { normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { IMPORT_FIELD_NAMES } from "@/lib/import-fields";
+import { normalizeTechnicalEvidence } from "@/lib/technical-templates";
+import type { TechnicalExtractionEvidence } from "@/lib/database.types";
 
 export function isAIAvailable(): boolean {
     return !!process.env.ANTHROPIC_API_KEY;
@@ -1330,6 +1332,7 @@ export interface ExtractedProductLine {
      */
     product_type_id: string | null;
     attributes: Record<string, unknown>;
+    extraction_evidence: TechnicalExtractionEvidence;
     confidence: number;
 }
 
@@ -1394,6 +1397,9 @@ ${typesBlock}
 Kurallar:
 - Her item için en uygun tipin UUID'sini "product_type_id" alanına yaz. Hiçbiri uymuyorsa null bırak.
 - "attributes" objesinde YALNIZ seçtiğin tipin field_key'lerini kullan; başka tipin alanlarını yazma.
+- Her dolu teknik attribute için "extraction_evidence" içinde aynı field_key ile kanıt yaz.
+- Kanıt güveni: "high" yalnız değer kaynak metinde açıkça görünüyorsa; normalize/tahmin varsa "medium" veya "low"; bulunamadıysa "not_found".
+- "high" için evidence_text boş olamaz. Kanıt yoksa değeri yazma veya güveni düşür.
 - Sayısal değerleri number tipinde, select'leri tam liste değerinde yaz.
 - Her item için name (Türkçe normalize) ve sku (varsa) çıkar.
 - Bilmediğin alanı boş bırak (null veya hiç ekleme).
@@ -1409,6 +1415,13 @@ Kurallar:
       "sku": "...",
       "product_type_id": "<yukarıdaki UUID'lerden biri veya null>",
       "attributes": { "field_key": value, ... },
+      "extraction_evidence": {
+        "field_key": {
+          "confidence": "high|medium|low|not_found",
+          "evidence_text": "belgedeki kısa alıntı",
+          "normalization_note": "opsiyonel kısa not"
+        }
+      },
       "confidence": 0.92
     }
   ]
@@ -1474,7 +1487,16 @@ export function parseExtractionResponse(
             // Diğer (object/array) tipler reddedilir — şema basit tutuluyor
         }
 
-        out.push({ line, name, sku, product_type_id, attributes, confidence });
+        const rawEvidence = (
+            it.extraction_evidence && typeof it.extraction_evidence === "object"
+                ? it.extraction_evidence
+                : it.field_evidence && typeof it.field_evidence === "object"
+                    ? it.field_evidence
+                    : {}
+        ) as Record<string, unknown>;
+        const extraction_evidence = normalizeTechnicalEvidence(rawEvidence, new Set(Object.keys(attributes)));
+
+        out.push({ line, name, sku, product_type_id, attributes, extraction_evidence, confidence });
     }
     return { items: out };
 }

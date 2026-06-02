@@ -28,7 +28,7 @@ describe("requiredPermissionForPath", () => {
 
     it("spesifiklik sırası: settings/users settings'ten önce", () => {
         expect(requiredPermissionForPath("/dashboard/settings/users")).toBe("view_users");
-        expect(requiredPermissionForPath("/dashboard/settings/product-types")).toBe("view_product_types");
+        expect(requiredPermissionForPath("/dashboard/settings/product-types")).toBe("view_products");
         expect(requiredPermissionForPath("/dashboard/settings/note-templates")).toBe("view_settings");
         expect(requiredPermissionForPath("/dashboard/settings")).toBe("view_dashboard");
         expect(requiredPermissionForPath("/dashboard/settings/company")).toBeNull();
@@ -122,6 +122,7 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/production", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/import", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/settings", viewer)).toBe(true);
+        expect(canAccessPath("/dashboard/settings/product-types", viewer)).toBe(true);
         expect(canAccessPath("/dashboard/settings/users", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/settings/note-templates", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/settings/company", viewer)).toBe(false);

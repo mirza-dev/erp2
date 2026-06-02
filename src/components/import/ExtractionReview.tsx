@@ -10,7 +10,7 @@
  *
  * Pure helpers live in @/lib/extraction-review-helpers.
  */
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
@@ -18,6 +18,8 @@ import type {
     ImportDocumentLineRow,
     ImportDocumentLineMatchAction,
     ImportDocumentLineCandidate,
+    ProductTypeFieldRow,
+    TechnicalExtractionEvidence,
 } from "@/lib/database.types";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import Button from "@/components/ui/Button";
@@ -28,12 +30,14 @@ import {
     isCertFlowDocumentType,
 } from "@/lib/extraction-review-helpers";
 import type { ApplyResultSummary } from "@/lib/extraction-review-helpers";
+import { confidenceLabel } from "@/lib/technical-templates";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
 export interface QueuedSuggestedType {
     id: string;
     name: string;
+    fields: ProductTypeFieldRow[];
 }
 
 export interface ExtractionReviewProps {
@@ -171,7 +175,14 @@ export default function ExtractionReview({ document: doc, initialLines, productT
         }
     }
 
-    async function patchLine(lineId: string, payload: { match_action: ImportDocumentLineMatchAction; matched_product_id?: string | null; match_confidence?: number | null }) {
+    async function patchLine(lineId: string, payload: {
+        match_action: ImportDocumentLineMatchAction;
+        matched_product_id?: string | null;
+        match_confidence?: number | null;
+        product_type_id?: string | null;
+        extracted_attributes?: Record<string, unknown>;
+        extraction_evidence?: TechnicalExtractionEvidence;
+    }) {
         if (isDemo) {
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
             return;
@@ -210,36 +221,146 @@ export default function ExtractionReview({ document: doc, initialLines, productT
         void patchLine(line.id, { match_action: "skipped", matched_product_id: null });
     }
 
-    // Review 3b 3.tur: satır bazlı tip override. AI yanlış tip seçtiyse veya
-    // null bıraktıysa kullanıcı düzeltir. match_action korunur; sadece
-    // product_type_id güncellenir. Helper signature genişlemediği için ayrı
-    // bir fetch yapıyoruz (patchLine match_action zorunlu kılıyor).
     async function handleTypeChange(line: ImportDocumentLineRow, newTypeId: string | null) {
-        if (isDemo) {
-            toast({ type: "info", message: DEMO_BLOCK_TOAST });
-            return;
+        const nextType = newTypeId ? productTypes.find(t => t.id === newTypeId) : null;
+        const allowedKeys = new Set(nextType?.fields.map(f => f.field_key) ?? []);
+        const filteredAttributes = Object.fromEntries(
+            Object.entries(line.extracted_attributes ?? {}).filter(([key]) => allowedKeys.has(key)),
+        );
+        const filteredEvidence = Object.fromEntries(
+            Object.entries(line.extraction_evidence ?? {}).filter(([key]) => allowedKeys.has(key)),
+        ) as TechnicalExtractionEvidence;
+        await patchLine(line.id, {
+            match_action: line.match_action,
+            matched_product_id: line.matched_product_id,
+            match_confidence: line.match_confidence,
+            product_type_id: newTypeId,
+            extracted_attributes: filteredAttributes,
+            extraction_evidence: filteredEvidence,
+        });
+    }
+
+    async function patchTechnicalAttribute(line: ImportDocumentLineRow, field: ProductTypeFieldRow, value: unknown) {
+        const nextAttributes = { ...(line.extracted_attributes ?? {}) };
+        if (value === "" || value === null || value === undefined || (Array.isArray(value) && value.length === 0)) {
+            delete nextAttributes[field.field_key];
+        } else {
+            nextAttributes[field.field_key] = value;
         }
-        try {
-            const res = await fetch(`/api/import/document-lines/${line.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    match_action: line.match_action, // mevcut korunur
-                    matched_product_id: line.matched_product_id,
-                    match_confidence: line.match_confidence,
-                    product_type_id: newTypeId,
-                }),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                toast({ type: "error", message: err.error ?? "Tip güncellenemedi" });
-                return;
-            }
-            const data = await res.json() as { line: ImportDocumentLineRow };
-            setLines(prev => prev.map(l => l.id === line.id ? data.line : l));
-        } catch (e) {
-            toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
+        const nextEvidence: TechnicalExtractionEvidence = {
+            ...(line.extraction_evidence ?? {}),
+            [field.field_key]: {
+                confidence: "medium",
+                evidence_text: line.extraction_evidence?.[field.field_key]?.evidence_text ?? null,
+                normalization_note: "Kullanıcı onay ekranında düzenledi.",
+            },
+        };
+        if (!(field.field_key in nextAttributes)) delete nextEvidence[field.field_key];
+        await patchLine(line.id, {
+            match_action: line.match_action,
+            matched_product_id: line.matched_product_id,
+            match_confidence: line.match_confidence,
+            product_type_id: line.product_type_id,
+            extracted_attributes: nextAttributes,
+            extraction_evidence: nextEvidence,
+        });
+    }
+
+    function getProductTypeForLine(line: ImportDocumentLineRow) {
+        return line.product_type_id ? productTypes.find(t => t.id === line.product_type_id) ?? null : null;
+    }
+
+    function renderTechnicalEditor(line: ImportDocumentLineRow, field: ProductTypeFieldRow) {
+        const disabled = isDemo || isDocApplied || isDocApplying;
+        const value = (line.extracted_attributes ?? {})[field.field_key];
+
+        if (field.field_type === "boolean") {
+            return (
+                <input
+                    type="checkbox"
+                    checked={value === true}
+                    disabled={disabled}
+                    onChange={event => void patchTechnicalAttribute(line, field, event.target.checked)}
+                    aria-label={`${line.line_number}. satır ${field.label_tr}`}
+                    style={{ width: "16px", height: "16px", accentColor: "var(--accent)" }}
+                />
+            );
         }
+
+        if (field.field_type === "select") {
+            return (
+                <select
+                    value={typeof value === "string" ? value : ""}
+                    disabled={disabled}
+                    onChange={event => void patchTechnicalAttribute(line, field, event.target.value)}
+                    aria-label={`${line.line_number}. satır ${field.label_tr}`}
+                    style={techInputStyle}
+                >
+                    <option value="">—</option>
+                    {(field.options ?? []).map(option => <option key={option} value={option}>{option}</option>)}
+                </select>
+            );
+        }
+
+        if (field.field_type === "multiselect") {
+            const selected = Array.isArray(value) ? value.map(String) : [];
+            return (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "5px" }}>
+                    {(field.options ?? []).map(option => {
+                        const on = selected.includes(option);
+                        return (
+                            <button
+                                key={option}
+                                type="button"
+                                disabled={disabled}
+                                onClick={() => {
+                                    const next = on ? selected.filter(item => item !== option) : [...selected, option];
+                                    void patchTechnicalAttribute(line, field, next);
+                                }}
+                                style={{
+                                    fontSize: "11px",
+                                    padding: "3px 8px",
+                                    borderRadius: "999px",
+                                    border: `0.5px solid ${on ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                    background: on ? "var(--accent-bg)" : "transparent",
+                                    color: on ? "var(--accent-text)" : "var(--text-secondary)",
+                                    cursor: disabled ? "not-allowed" : "pointer",
+                                }}
+                            >
+                                {option}
+                            </button>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        if (field.field_type === "longtext") {
+            return (
+                <textarea
+                    defaultValue={typeof value === "string" ? value : value == null ? "" : String(value)}
+                    disabled={disabled}
+                    onBlur={event => void patchTechnicalAttribute(line, field, event.target.value)}
+                    aria-label={`${line.line_number}. satır ${field.label_tr}`}
+                    rows={2}
+                    style={{ ...techInputStyle, resize: "vertical" }}
+                />
+            );
+        }
+
+        return (
+            <input
+                type={field.field_type === "number" ? "number" : field.field_type === "date" ? "date" : "text"}
+                defaultValue={value == null ? "" : String(value)}
+                disabled={disabled}
+                onBlur={event => {
+                    const raw = event.target.value;
+                    void patchTechnicalAttribute(line, field, field.field_type === "number" && raw !== "" ? Number(raw) : raw);
+                }}
+                aria-label={`${line.line_number}. satır ${field.label_tr}`}
+                style={techInputStyle}
+            />
+        );
     }
 
     function handleApproveAll() {
@@ -401,106 +522,154 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                             <tbody>
                                 {lines.map(line => {
                                     const colors = getMatchActionColor(line.match_action);
+                                    const lineType = getProductTypeForLine(line);
+                                    const techFields = lineType?.fields ?? [];
+                                    const detailColSpan = isCertFlow ? 6 : 7;
                                     return (
-                                        <tr key={line.id} style={{ borderTop: "0.5px solid var(--border-tertiary)" }}>
-                                            <td style={td}>{line.line_number}</td>
-                                            <td style={td}>
-                                                <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.extracted_name ?? "—"}</div>
-                                                {line.extracted_sku && (
-                                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>{line.extracted_sku}</div>
-                                                )}
-                                            </td>
-                                            {/* Review 3b 3.tur: per-row tip override (multi-type).
-                                                Review 3b 6.tur: cert-flow'da gizli — sertifika satırı tip
-                                                kullanmıyor (3c'de hedef ürüne göre belirlenir). */}
-                                            {!isCertFlow && (
+                                        <Fragment key={line.id}>
+                                            <tr style={{ borderTop: "0.5px solid var(--border-tertiary)" }}>
+                                                <td style={td}>{line.line_number}</td>
                                                 <td style={td}>
-                                                    <select
-                                                        value={line.product_type_id ?? ""}
-                                                        onChange={e => {
-                                                            const v = e.target.value;
-                                                            void handleTypeChange(line, v === "" ? null : v);
-                                                        }}
-                                                        disabled={isDemo}
-                                                        aria-label={`Satır ${line.line_number} ürün tipi`}
-                                                        style={{
-                                                            padding: "4px 8px", fontSize: "11px",
-                                                            background: "var(--bg-primary)", color: "var(--text-primary)",
-                                                            border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
-                                                            minWidth: "120px",
-                                                        }}
-                                                    >
-                                                        <option value="">— Yok —</option>
-                                                        {productTypes.map(t => (
-                                                            <option key={t.id} value={t.id}>{t.name}</option>
-                                                        ))}
-                                                    </select>
+                                                    <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.extracted_name ?? "—"}</div>
+                                                    {line.extracted_sku && (
+                                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>{line.extracted_sku}</div>
+                                                    )}
                                                 </td>
-                                            )}
-                                            <td style={td}>
-                                                {line.candidate_matches.length === 0 ? (
-                                                    <span style={{ color: "var(--text-tertiary)" }}>Aday yok</span>
-                                                ) : (
-                                                    <select
-                                                        value={line.matched_product_id ?? ""}
-                                                        onChange={e => {
-                                                            const candId = e.target.value;
-                                                            const cand = line.candidate_matches.find(c => c.id === candId);
-                                                            if (cand) handleSelectCandidate(line, cand);
-                                                        }}
-                                                        disabled={isDemo}
-                                                        aria-label={`Satır ${line.line_number} aday seç`}
-                                                        style={{
-                                                            padding: "4px 8px", fontSize: "11px",
-                                                            background: "var(--bg-primary)", color: "var(--text-primary)",
-                                                            border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
-                                                            minWidth: "200px",
-                                                        }}
-                                                    >
-                                                        <option value="">— Seçilmedi —</option>
-                                                        {line.candidate_matches.map(c => (
-                                                            <option key={c.id} value={c.id}>
-                                                                {c.sku} · {c.name} ({c.score})
-                                                            </option>
-                                                        ))}
-                                                    </select>
+                                                {/* Review 3b 3.tur: per-row tip override (multi-type).
+                                                    Review 3b 6.tur: cert-flow'da gizli — sertifika satırı tip
+                                                    kullanmıyor (3c'de hedef ürüne göre belirlenir). */}
+                                                {!isCertFlow && (
+                                                    <td style={td}>
+                                                        <select
+                                                            value={line.product_type_id ?? ""}
+                                                            onChange={e => {
+                                                                const v = e.target.value;
+                                                                void handleTypeChange(line, v === "" ? null : v);
+                                                            }}
+                                                            disabled={isDemo || isDocApplied || isDocApplying}
+                                                            aria-label={`Satır ${line.line_number} teknik şablon`}
+                                                            style={{
+                                                                padding: "4px 8px", fontSize: "11px",
+                                                                background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                                border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
+                                                                minWidth: "120px",
+                                                            }}
+                                                        >
+                                                            <option value="">— Yok —</option>
+                                                            {productTypes.map(t => (
+                                                                <option key={t.id} value={t.id}>{t.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
                                                 )}
-                                            </td>
-                                            <td style={td}>
-                                                {line.match_confidence !== null ? `${line.match_confidence}` : "—"}
-                                            </td>
-                                            <td style={td}>
-                                                <span style={{
-                                                    fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
-                                                    background: colors.bg, color: colors.text,
-                                                    border: `0.5px solid ${colors.border}`, fontWeight: 600,
-                                                }}>
-                                                    {formatMatchAction(line.match_action)}
-                                                </span>
-                                            </td>
-                                            <td style={td}>
-                                                <div style={{ display: "flex", gap: "4px" }}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleMarkNew(line)}
-                                                        disabled={isDemo}
-                                                        aria-label={`Satır ${line.line_number} yeni ürün`}
-                                                        style={btnSecondary}
-                                                    >
-                                                        Yeni
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleSkip(line)}
-                                                        disabled={isDemo}
-                                                        aria-label={`Satır ${line.line_number} atla`}
-                                                        style={btnSecondary}
-                                                    >
-                                                        Atla
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
+                                                <td style={td}>
+                                                    {line.candidate_matches.length === 0 ? (
+                                                        <span style={{ color: "var(--text-tertiary)" }}>Aday yok</span>
+                                                    ) : (
+                                                        <select
+                                                            value={line.matched_product_id ?? ""}
+                                                            onChange={e => {
+                                                                const candId = e.target.value;
+                                                                const cand = line.candidate_matches.find(c => c.id === candId);
+                                                                if (cand) handleSelectCandidate(line, cand);
+                                                            }}
+                                                            disabled={isDemo || isDocApplied || isDocApplying}
+                                                            aria-label={`Satır ${line.line_number} aday seç`}
+                                                            style={{
+                                                                padding: "4px 8px", fontSize: "11px",
+                                                                background: "var(--bg-primary)", color: "var(--text-primary)",
+                                                                border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
+                                                                minWidth: "200px",
+                                                            }}
+                                                        >
+                                                            <option value="">— Seçilmedi —</option>
+                                                            {line.candidate_matches.map(c => (
+                                                                <option key={c.id} value={c.id}>
+                                                                    {c.sku} · {c.name} ({c.score})
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    )}
+                                                </td>
+                                                <td style={td}>
+                                                    {line.match_confidence !== null ? `${line.match_confidence}` : "—"}
+                                                </td>
+                                                <td style={td}>
+                                                    <span style={{
+                                                        fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
+                                                        background: colors.bg, color: colors.text,
+                                                        border: `0.5px solid ${colors.border}`, fontWeight: 600,
+                                                    }}>
+                                                        {formatMatchAction(line.match_action)}
+                                                    </span>
+                                                </td>
+                                                <td style={td}>
+                                                    <div style={{ display: "flex", gap: "4px" }}>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleMarkNew(line)}
+                                                            disabled={isDemo || isDocApplied || isDocApplying}
+                                                            aria-label={`Satır ${line.line_number} yeni ürün`}
+                                                            style={btnSecondary}
+                                                        >
+                                                            Yeni
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleSkip(line)}
+                                                            disabled={isDemo || isDocApplied || isDocApplying}
+                                                            aria-label={`Satır ${line.line_number} atla`}
+                                                            style={btnSecondary}
+                                                        >
+                                                            Atla
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                            {!isCertFlow && techFields.length > 0 && (
+                                                <tr key={`${line.id}-tech`}>
+                                                    <td colSpan={detailColSpan} style={{ padding: "0 10px 12px", borderBottom: "0.5px solid var(--border-tertiary)", background: "var(--bg-primary)" }}>
+                                                        <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "10px", background: "var(--bg-secondary)" }}>
+                                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                                                Teknik bilgiler · {lineType?.name}
+                                                            </div>
+                                                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "8px" }}>
+                                                                {techFields.map(field => {
+                                                                    const evidence = line.extraction_evidence?.[field.field_key];
+                                                                    return (
+                                                                        <div key={field.id} style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "8px", background: "var(--bg-primary)" }}>
+                                                                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                                                                                <span style={{ fontSize: "12px", fontWeight: 650, color: "var(--text-primary)" }}>{field.label_tr}{field.required ? " *" : ""}</span>
+                                                                                <span style={{
+                                                                                    fontSize: "10px",
+                                                                                    padding: "2px 6px",
+                                                                                    borderRadius: "999px",
+                                                                                    background: evidence?.confidence === "high" ? "var(--success-bg)" : evidence?.confidence === "medium" ? "var(--accent-bg)" : "var(--warning-bg)",
+                                                                                    color: evidence?.confidence === "high" ? "var(--success-text)" : evidence?.confidence === "medium" ? "var(--accent-text)" : "var(--warning-text)",
+                                                                                }}>
+                                                                                    {confidenceLabel(evidence?.confidence ?? "not_found")}
+                                                                                </span>
+                                                                            </div>
+                                                                            {renderTechnicalEditor(line, field)}
+                                                                            {evidence?.evidence_text && (
+                                                                                <div style={{ marginTop: "6px", fontSize: "11px", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+                                                                                    Kanıt: {evidence.evidence_text}
+                                                                                </div>
+                                                                            )}
+                                                                            {evidence?.normalization_note && (
+                                                                                <div style={{ marginTop: "4px", fontSize: "11px", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+                                                                                    Not: {evidence.normalization_note}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </Fragment>
                                     );
                                 })}
                             </tbody>
@@ -620,4 +789,15 @@ const btnSecondary: React.CSSProperties = {
     background: "transparent", color: "var(--text-secondary)",
     border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
     cursor: "pointer",
+};
+
+const techInputStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "5px 8px",
+    fontSize: "12px",
+    background: "var(--bg-secondary)",
+    color: "var(--text-primary)",
+    border: "0.5px solid var(--border-secondary)",
+    borderRadius: "5px",
 };

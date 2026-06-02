@@ -18,14 +18,15 @@ export async function GET(
         const { id } = await params;
         const { searchParams } = new URL(req.url);
         const withFields = searchParams.get("withFields") === "1";
+        const includeInactive = searchParams.get("includeInactive") === "1";
 
         if (withFields) {
-            const type = await dbGetProductTypeWithFields(id);
+            const type = await dbGetProductTypeWithFields(id, { includeInactive });
             if (!type) return NextResponse.json({ error: "Tip bulunamadı." }, { status: 404 });
             return NextResponse.json(type);
         }
 
-        const type = await dbGetProductType(id);
+        const type = await dbGetProductType(id, { includeInactive });
         if (!type) return NextResponse.json({ error: "Tip bulunamadı." }, { status: 404 });
         return NextResponse.json(type);
     } catch (err) {
@@ -33,18 +34,18 @@ export async function GET(
     }
 }
 
-// PATCH /api/product-types/[id]  (admin only)
+// PATCH /api/product-types/[id]
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
-    const forbidden = await requirePermission(req, "manage_product_types");
+    const forbidden = await requirePermission(req, ["manage_product_types", "manage_product_master"]);
     if (forbidden) return forbidden;
 
     try {
         const { id } = await params;
 
-        const existing = await dbGetProductType(id);
+        const existing = await dbGetProductType(id, { includeInactive: true });
         if (!existing) return NextResponse.json({ error: "Tip bulunamadı." }, { status: 404 });
 
         const parsed = await safeParseJson(req);
@@ -59,6 +60,7 @@ export async function PATCH(
             description: body.description as string | null | undefined,
             icon: body.icon as string | null | undefined,
             sort_order: body.sort_order != null ? Number(body.sort_order) : undefined,
+            is_active: body.is_active !== undefined ? Boolean(body.is_active) : undefined,
         });
 
         revalidateTag("product-types", "max");
@@ -80,12 +82,12 @@ export async function PATCH(
     }
 }
 
-// DELETE /api/product-types/[id]  (admin only)
+// DELETE /api/product-types/[id]
 export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
-    const forbidden = await requirePermission(req, "manage_product_types");
+    const forbidden = await requirePermission(req, ["manage_product_types", "manage_product_master"]);
     if (forbidden) return forbidden;
 
     try {
@@ -98,12 +100,6 @@ export async function DELETE(
         revalidateTag("product-types", "max");
         return NextResponse.json({ success: true });
     } catch (err) {
-        if (err instanceof Error && err.message.includes("Sistem tipi")) {
-            return NextResponse.json({ error: err.message }, { status: 409 });
-        }
-        if (err instanceof Error && err.message.includes("ürün var")) {
-            return NextResponse.json({ error: err.message }, { status: 409 });
-        }
         if (err instanceof Error && err.message.includes("bulunamadı")) {
             return NextResponse.json({ error: err.message }, { status: 404 });
         }

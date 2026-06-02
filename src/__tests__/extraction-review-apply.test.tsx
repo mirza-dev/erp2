@@ -65,6 +65,7 @@ function makeLine(id: string, overrides: Partial<ImportDocumentLineRow> = {}): I
         extracted_name: `Vana ${id}`,
         extracted_sku: `SKU-${id}`,
         extracted_attributes: {},
+        extraction_evidence: {},
         candidate_matches: [],
         matched_product_id: "p-1",
         match_confidence: 95,

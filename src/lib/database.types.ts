@@ -76,6 +76,7 @@ export interface ProductTypeRow {
     icon: string | null
     sort_order: number
     is_system: boolean
+    is_active: boolean
     created_at: string
     updated_at: string
 }
@@ -90,6 +91,7 @@ export interface ProductTypeFieldRow {
     unit: string | null
     options: string[] | null
     required: boolean
+    is_active: boolean
     placeholder: string | null
     help_text: string | null
     sort_order: number
@@ -613,6 +615,21 @@ export interface ImportDocumentLineCandidate {
     reasons: string[]
 }
 
+export type AiEvidenceConfidence = "high" | "medium" | "low" | "not_found"
+
+export interface TechnicalFieldEvidence {
+    confidence: AiEvidenceConfidence
+    evidence_text: string | null
+    evidence_location?: {
+        page?: number
+        row?: number
+        column?: string
+    } | null
+    normalization_note?: string | null
+}
+
+export type TechnicalExtractionEvidence = Record<string, TechnicalFieldEvidence>
+
 export interface ImportDocumentLineRow {
     id: string
     document_id: string
@@ -622,6 +639,7 @@ export interface ImportDocumentLineRow {
     extracted_name: string | null
     extracted_sku: string | null
     extracted_attributes: Record<string, unknown>
+    extraction_evidence: TechnicalExtractionEvidence
     candidate_matches: ImportDocumentLineCandidate[]
     matched_product_id: string | null
     match_confidence: number | null

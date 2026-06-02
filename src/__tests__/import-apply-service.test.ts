@@ -12,6 +12,7 @@ const mockUpdateProduct = vi.fn();
 const mockGetProductById = vi.fn();
 const mockCreateAttachment = vi.fn();
 const mockStorageDownload = vi.fn();
+const mockGetProductTypeWithFields = vi.fn();
 
 vi.mock("@/lib/supabase/import-documents", () => ({
     dbGetImportDocument: (...a: unknown[]) => mockGetDoc(...a),
@@ -33,6 +34,10 @@ const mockSupersedeCerts = vi.fn();
 vi.mock("@/lib/supabase/product-attachments", () => ({
     dbCreateAttachment: (...a: unknown[]) => mockCreateAttachment(...a),
     dbSupersedeCertificatesByName: (...a: unknown[]) => mockSupersedeCerts(...a),
+}));
+
+vi.mock("@/lib/supabase/product-types", () => ({
+    dbGetProductTypeWithFields: (...a: unknown[]) => mockGetProductTypeWithFields(...a),
 }));
 
 const mockAuditInsert = vi.fn(() => Promise.resolve({ error: null }));
@@ -70,10 +75,11 @@ function makeLine(id: string, overrides: Record<string, unknown> = {}) {
         document_id: "doc-1",
         line_number: Number(id.replace(/\D/g, "")) || 1,
         extraction_type: "product",
-        product_type_id: null,
+        product_type_id: "type-vana",
         extracted_name: `Vana ${id}`,
         extracted_sku: `SKU-${id}`,
         extracted_attributes: { dn: 50 },
+        extraction_evidence: { dn: { confidence: "high", evidence_text: "DN50" } },
         candidate_matches: [],
         matched_product_id: null,
         match_confidence: null,
@@ -95,6 +101,7 @@ beforeEach(() => {
     mockGetProductById.mockReset();
     mockCreateAttachment.mockReset();
     mockStorageDownload.mockReset();
+    mockGetProductTypeWithFields.mockReset();
     mockSupersedeCerts.mockReset();
     mockSupersedeCerts.mockResolvedValue(0);
     mockAuditInsert.mockReset();
@@ -102,6 +109,15 @@ beforeEach(() => {
     mockStorageDownload.mockResolvedValue({
         data: { arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer },
         error: null,
+    });
+    mockGetProductTypeWithFields.mockResolvedValue({
+        id: "type-vana",
+        name: "Vana",
+        is_active: true,
+        fields: [
+            { id: "f-dn", field_key: "dn", label_tr: "DN", field_type: "number", is_active: true },
+            { id: "f-pn", field_key: "pn_class", label_tr: "PN", field_type: "text", is_active: true },
+        ],
     });
 });
 
@@ -172,7 +188,7 @@ describe("serviceApplyImportDocument — product flow", () => {
     it("untyped_products: product_type_id null ile yeni ürün → counter artar", async () => {
         mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
-            makeLine("1", { product_type_id: null }),
+            makeLine("1", { product_type_id: null, extracted_attributes: {}, extraction_evidence: {} }),
             makeLine("2", { product_type_id: "type-vana" }),
         ]);
         mockCreateProduct.mockResolvedValue({ id: "p-x" });
@@ -180,6 +196,18 @@ describe("serviceApplyImportDocument — product flow", () => {
         const r = await serviceApplyImportDocument("doc-1", null);
         expect(r.products_created).toBe(2);
         expect(r.untyped_products).toBe(1);
+    });
+
+    it("teknik attribute var ama şablon yoksa satır apply edilmez", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { product_type_id: null, extracted_attributes: { dn: 50 } }),
+        ]);
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", null);
+        expect(r.products_created).toBe(0);
+        expect(r.skipped).toBe(1);
+        expect(r.errors[0]).toMatch(/teknik şablon/i);
     });
 
     it("matched + matched_product_id eksik → error + skipped++", async () => {
@@ -405,12 +433,14 @@ describe("serviceApplyImportDocument — Review (P3 aggregate audit)", () => {
         mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
         const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
         await serviceApplyImportDocument("doc-1", "user-1");
-        expect(mockAuditInsert).toHaveBeenCalledTimes(1);
-        const row = mockAuditInsert.mock.calls[0]?.[0] as {
+        const row = mockAuditInsert.mock.calls
+            .map(call => call[0] as { action?: string })
+            .find(call => call.action === "import_applied") as {
             action: string; entity_type: string; entity_id: string;
             after_state: { success: boolean; products_created: number };
             actor: string | null;
         };
+        expect(row).toBeTruthy();
         expect(row.action).toBe("import_applied");
         expect(row.entity_type).toBe("import_document");
         expect(row.entity_id).toBe("doc-1");
@@ -473,10 +503,12 @@ describe("serviceApplyImportDocument — Faz 3c Review 4.tur (P2 post-commit)", 
         expect(classifiedCalls).toHaveLength(0);
 
         // Audit log: status_update_failed=true, success=false
-        expect(mockAuditInsert).toHaveBeenCalledTimes(1);
-        const row = mockAuditInsert.mock.calls[0]?.[0] as {
+        const row = mockAuditInsert.mock.calls
+            .map(call => call[0] as { action?: string })
+            .find(call => call.action === "import_applied") as {
             after_state: { success: boolean; status_update_failed: boolean; products_created: number };
         };
+        expect(row).toBeTruthy();
         expect(row.after_state.status_update_failed).toBe(true);
         expect(row.after_state.success).toBe(false);  // successPath, applied set başarısız
         expect(row.after_state.products_created).toBe(1);  // gerçek yazım sayısı korunur

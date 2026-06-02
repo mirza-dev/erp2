@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
     dbListProductTypes,
+    dbListProductTypesWithStats,
     dbCreateProductType,
     dbReorderProductTypes,
 } from "@/lib/supabase/product-types";
@@ -9,24 +10,31 @@ import { requirePermission } from "@/lib/auth/role-guard";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 const getCachedTypes = unstable_cache(
-    () => dbListProductTypes(),
+    (includeInactive: boolean) => dbListProductTypes({ includeInactive }),
     ["product-types-list"],
     { tags: ["product-types"], revalidate: 60 },
 );
 
 // GET /api/product-types
-export async function GET() {
+export async function GET(req?: NextRequest) {
     try {
-        const types = await getCachedTypes();
+        const { searchParams } = new URL(req?.url ?? "http://localhost/api/product-types");
+        const includeInactive = searchParams.get("includeInactive") === "1";
+        const withStats = searchParams.get("withStats") === "1";
+        if (withStats) {
+            const types = await dbListProductTypesWithStats({ includeInactive });
+            return NextResponse.json(types);
+        }
+        const types = await getCachedTypes(includeInactive);
         return NextResponse.json(types);
     } catch (err) {
         return handleApiError(err, "GET /api/product-types");
     }
 }
 
-// POST /api/product-types  (admin only)
+// POST /api/product-types
 export async function POST(req: NextRequest) {
-    const forbidden = await requirePermission(req, "manage_product_types");
+    const forbidden = await requirePermission(req, ["manage_product_types", "manage_product_master"]);
     if (forbidden) return forbidden;
 
     try {
@@ -60,9 +68,9 @@ export async function POST(req: NextRequest) {
     }
 }
 
-// PUT /api/product-types — reorder (admin only)
+// PUT /api/product-types — reorder
 export async function PUT(req: NextRequest) {
-    const forbidden = await requirePermission(req, "manage_product_types");
+    const forbidden = await requirePermission(req, ["manage_product_types", "manage_product_master"]);
     if (forbidden) return forbidden;
 
     try {

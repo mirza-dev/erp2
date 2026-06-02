@@ -61,7 +61,9 @@ describe("parseExtractionResponse (multi-type)", () => {
             JSON.stringify({
                 items: [
                     { line: 1, name: "Vana DN50", sku: "KV-50", product_type_id: VANA_ID,
-                      attributes: { dn: 50, pn_class: "PN16" }, confidence: 0.9 },
+                      attributes: { dn: 50, pn_class: "PN16" },
+                      extraction_evidence: { dn: { confidence: "high", evidence_text: "DN50" } },
+                      confidence: 0.9 },
                 ],
             }),
             AVAILABLE_TYPES,
@@ -70,7 +72,28 @@ describe("parseExtractionResponse (multi-type)", () => {
         expect(r.items[0].name).toBe("Vana DN50");
         expect(r.items[0].product_type_id).toBe(VANA_ID);
         expect(r.items[0].attributes.dn).toBe(50);
+        expect(r.items[0].extraction_evidence.dn.confidence).toBe("high");
         expect(r.items[0].confidence).toBe(0.9);
+    });
+
+    it("evidence whitelist + kanıtsız high güven downgrade edilir", async () => {
+        const { parseExtractionResponse } = await import("@/lib/services/ai-service");
+        const r = parseExtractionResponse(
+            JSON.stringify({
+                items: [
+                    { line: 1, name: "Vana", sku: null, product_type_id: VANA_ID,
+                      attributes: { dn: 50 },
+                      extraction_evidence: {
+                          dn: { confidence: "high", evidence_text: "" },
+                          thickness: { confidence: "high", evidence_text: "3 mm" },
+                      },
+                      confidence: 0.5 },
+                ],
+            }),
+            AVAILABLE_TYPES,
+        );
+        expect(r.items[0].extraction_evidence.dn.confidence).toBe("medium");
+        expect(r.items[0].extraction_evidence.thickness).toBeUndefined();
     });
 
     it("attribute whitelist item başına dinamik — vana item conta field'ı reddedilir", async () => {

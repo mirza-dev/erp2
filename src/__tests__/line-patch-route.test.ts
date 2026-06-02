@@ -8,6 +8,7 @@ const mockGetLine = vi.fn();
 const mockUpdateLine = vi.fn();
 const mockGetProductById = vi.fn();
 const mockGetProductType = vi.fn();
+const mockGetProductTypeWithFields = vi.fn();
 const mockGetImportDoc = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
@@ -33,6 +34,7 @@ vi.mock("@/lib/supabase/products", () => ({
 
 vi.mock("@/lib/supabase/product-types", () => ({
     dbGetProductType: (...a: unknown[]) => mockGetProductType(...a),
+    dbGetProductTypeWithFields: (...a: unknown[]) => mockGetProductTypeWithFields(...a),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -53,9 +55,16 @@ beforeEach(() => {
     mockUpdateLine.mockReset();
     mockGetProductById.mockReset();
     mockGetProductType.mockReset();
+    mockGetProductTypeWithFields.mockReset();
     mockGetImportDoc.mockReset();
     // Default: doc 'classified' (mevcut testler buna göre yazıldı; Faz 3c Review)
     mockGetImportDoc.mockResolvedValue({ id: "doc-1", status: "classified" });
+    mockGetProductTypeWithFields.mockResolvedValue({
+        id: "type-1",
+        name: "Vana",
+        is_active: true,
+        fields: [],
+    });
 });
 
 // Valid UUID for happy paths
@@ -189,6 +198,7 @@ describe("PATCH /api/import/document-lines/[id]", () => {
         mockRequireRole.mockResolvedValueOnce(null);
         mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
         mockGetProductType.mockResolvedValueOnce({ id: TYPE_ID, name: "Vana" });
+        mockGetProductTypeWithFields.mockResolvedValueOnce({ id: TYPE_ID, name: "Vana", is_active: true, fields: [] });
         mockUpdateLine.mockResolvedValueOnce({ id: "l-1", product_type_id: TYPE_ID });
         const res = await callPATCH("l-1", { match_action: "pending", product_type_id: TYPE_ID });
         expect(res.status).toBe(200);

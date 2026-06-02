@@ -19,6 +19,7 @@ import {
 import { dbListLinesByDocument } from "@/lib/supabase/import-document-lines";
 import { dbCreateProduct, dbUpdateProduct, dbGetProductById } from "@/lib/supabase/products";
 import { dbCreateAttachment, dbSupersedeCertificatesByName } from "@/lib/supabase/product-attachments";
+import { dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
 import type { ImportDocumentLineRow } from "@/lib/database.types";
 
 const STORAGE_BUCKET = "product-files";
@@ -77,6 +78,63 @@ function buildCreateProductInput(line: ImportDocumentLineRow): {
         product_type_id: line.product_type_id,
         attributes: line.extracted_attributes ?? {},
     };
+}
+
+async function validateTechnicalAttributesForApply(
+    line: ImportDocumentLineRow,
+    productTypeId: string | null,
+): Promise<Record<string, unknown>> {
+    const attributes = line.extracted_attributes ?? {};
+    const keys = Object.keys(attributes);
+    if (keys.length === 0) return {};
+
+    if (!productTypeId) {
+        throw new Error("teknik özellik var ama teknik şablon seçilmemiş");
+    }
+
+    const typeWithFields = await dbGetProductTypeWithFields(productTypeId);
+    if (!typeWithFields || typeWithFields.is_active === false) {
+        throw new Error("teknik şablon aktif değil veya bulunamadı");
+    }
+
+    const allowedKeys = new Set(typeWithFields.fields.map(field => field.field_key));
+    const unknownKeys = keys.filter(key => !allowedKeys.has(key));
+    if (unknownKeys.length > 0) {
+        throw new Error(`teknik şablonda olmayan alanlar: ${unknownKeys.join(", ")}`);
+    }
+
+    return attributes;
+}
+
+async function auditTechnicalTemplateApply(input: {
+    documentId: string;
+    line: ImportDocumentLineRow;
+    productId: string;
+    productTypeId: string | null;
+    actorUserId: string | null;
+}) {
+    const attributeKeys = Object.keys(input.line.extracted_attributes ?? {});
+    if (attributeKeys.length === 0) return;
+    try {
+        const sb = createServiceClient();
+        const { error } = await sb.from("audit_log").insert({
+            action: "technical_template_ai_applied",
+            entity_type: "product",
+            entity_id: input.productId,
+            after_state: {
+                import_document_id: input.documentId,
+                import_document_line_id: input.line.id,
+                product_type_id: input.productTypeId,
+                attribute_keys: attributeKeys,
+                evidence: input.line.extraction_evidence ?? {},
+            },
+            source: "ui",
+            actor: input.actorUserId,
+        });
+        if (error) console.warn("[import-apply] technical audit insert failed:", error);
+    } catch (err) {
+        console.warn("[import-apply] technical audit exception:", err);
+    }
 }
 
 export async function serviceApplyImportDocument(
@@ -138,7 +196,15 @@ export async function serviceApplyImportDocument(
                 if (line.extraction_type === "product") {
                     if (line.match_action === "new_product") {
                         const input = buildCreateProductInput(line);
-                        await dbCreateProduct(input);
+                        input.attributes = await validateTechnicalAttributesForApply(line, input.product_type_id);
+                        const created = await dbCreateProduct(input);
+                        await auditTechnicalTemplateApply({
+                            documentId,
+                            line,
+                            productId: created.id,
+                            productTypeId: input.product_type_id,
+                            actorUserId,
+                        });
                         result.products_created += 1;
                         if (!input.product_type_id) result.untyped_products += 1;
                     } else {
@@ -150,13 +216,23 @@ export async function serviceApplyImportDocument(
                         if (!current) {
                             throw new Error("eşleşen ürün bulunamadı");
                         }
+                        const effectiveProductTypeId = current.product_type_id ?? line.product_type_id;
+                        const safeLineAttributes = await validateTechnicalAttributesForApply(line, effectiveProductTypeId);
                         // attributes merge: { ...current, ...new } — yeni ezerler
                         const mergedAttributes = {
                             ...(current.attributes ?? {}),
-                            ...(line.extracted_attributes ?? {}),
+                            ...safeLineAttributes,
                         };
                         await dbUpdateProduct(line.matched_product_id, {
+                            ...(current.product_type_id ? {} : { product_type_id: effectiveProductTypeId }),
                             attributes: mergedAttributes,
+                        });
+                        await auditTechnicalTemplateApply({
+                            documentId,
+                            line,
+                            productId: line.matched_product_id,
+                            productTypeId: effectiveProductTypeId,
+                            actorUserId,
                         });
                         result.products_updated += 1;
                     }

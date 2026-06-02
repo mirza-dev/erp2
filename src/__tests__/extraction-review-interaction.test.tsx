@@ -75,6 +75,7 @@ function makeLine(id: string, overrides: Partial<ImportDocumentLineRow> = {}): I
         extracted_name: `Test ${id}`,
         extracted_sku: `SKU-${id}`,
         extracted_attributes: {},
+        extraction_evidence: {},
         candidate_matches: [],
         matched_product_id: "p-1",
         match_confidence: 95,
@@ -157,7 +158,7 @@ describe("ExtractionReview — bulk approve (Review 3b 4.tur P3)", () => {
                 suggested_product_type_id: "type-stale-or-deleted",
             },
         };
-        const productTypes = [{ id: "type-vana", name: "Vana" }];
+        const productTypes = [{ id: "type-vana", name: "Vana", fields: [] }];
 
         render(<ExtractionReview document={certDoc} initialLines={[]} productTypes={productTypes} />);
 
@@ -195,7 +196,7 @@ describe("ExtractionReview — bulk approve (Review 3b 4.tur P3)", () => {
             match_confidence: 70,
         });
 
-        render(<ExtractionReview document={certDoc} initialLines={[certLine]} productTypes={[{ id: "type-vana", name: "Vana" }]} />);
+        render(<ExtractionReview document={certDoc} initialLines={[certLine]} productTypes={[{ id: "type-vana", name: "Vana", fields: [] }]} />);
 
         // Tablo başlığında "Tip" kolonu yok
         const headers = screen.getAllByRole("columnheader").map(h => h.textContent);

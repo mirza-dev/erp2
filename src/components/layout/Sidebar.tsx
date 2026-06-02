@@ -88,7 +88,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
             label: "Sistem",
             items: [
                 { label: "Ayarlar", href: "/dashboard/settings" },
-                { label: "Ürün Tipleri", href: "/dashboard/settings/product-types" },
+                { label: "Teknik Şablonlar", href: "/dashboard/settings/product-types" },
                 { label: "Not Şablonları", href: "/dashboard/settings/note-templates" },
                 { label: "Kullanıcılar", href: "/dashboard/settings/users" },
             ],

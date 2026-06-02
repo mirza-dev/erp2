@@ -127,15 +127,15 @@ describe("formatAttributeValue", () => {
 
 describe("Faz 2c — product detail page source", () => {
     it("loads product types via /api/product-types on mount", () => {
-        expect(SOURCE).toMatch(/fetch\(\s*"\/api\/product-types"\s*\)/);
+        expect(SOURCE).toMatch(/fetch\(\s*"\/api\/product-types\?includeInactive=1"\s*\)/);
     });
 
     it("loads active type fields via withFields=1 query", () => {
         expect(SOURCE).toMatch(/\?withFields=1/);
     });
 
-    it("Genel tab includes 'Tip Şablonu' selector wired to handleTypeChange", () => {
-        expect(SOURCE).toMatch(/Tip Şablonu/);
+    it("Genel tab includes 'Teknik Şablon' selector wired to handleTypeChange", () => {
+        expect(SOURCE).toMatch(/Teknik Şablon/);
         expect(SOURCE).toMatch(/handleTypeChange/);
     });
 
@@ -145,7 +145,7 @@ describe("Faz 2c — product detail page source", () => {
     });
 
     it("Teknik tab shows empty state when no type selected and when no fields defined", () => {
-        expect(SOURCE).toMatch(/tip şablonu seçilmemiş/);
+        expect(SOURCE).toMatch(/teknik şablon seçilmemiş/);
         expect(SOURCE).toMatch(/tanımlı alan yok/);
     });
 
@@ -219,8 +219,8 @@ describe("P3-003 — handleSave required attribute validation (source)", () => {
         expect(SOURCE).toMatch(/export function getMissingRequiredAttributes/);
     });
 
-    it("handleSave calls getMissingRequiredAttributes with activeTypeFields", () => {
-        expect(SOURCE).toMatch(/getMissingRequiredAttributes\(activeTypeFields,/);
+    it("handleSave calls getMissingRequiredAttributes with editable active fields", () => {
+        expect(SOURCE).toMatch(/getMissingRequiredAttributes\(editableTypeFields,/);
     });
 
     it("handleSave shows toast with missing field names when required fields are empty", () => {

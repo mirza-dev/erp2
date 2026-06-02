@@ -15,6 +15,7 @@ import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
+import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 
 
 interface RiskItem {
@@ -80,15 +81,7 @@ export function getMissingRequiredAttributes(
     fields: ProductTypeFieldRow[],
     attributes: Record<string, unknown>,
 ): string[] {
-    return fields
-        .filter(f => f.required)
-        .filter(f => {
-            const v = attributes[f.field_key];
-            if (v === undefined || v === null || v === "") return true;
-            if (Array.isArray(v) && v.length === 0) return true;
-            return false;
-        })
-        .map(f => f.label_tr);
+    return missingRequiredTechnicalFields(fields, attributes).map(f => f.label_tr);
 }
 
 export default function ProductsPage() {
@@ -303,6 +296,10 @@ export default function ProductsPage() {
     const riskliCount = mockProducts.filter(p => riskData.has(p.id)).length;
     const uyariliCount = productsWithAlerts.size;
     const oneriCount = mockProducts.filter(p => recMap.get(p.id)?.status === "suggested").length;
+    const createMissingRequired = useMemo(
+        () => getMissingRequiredAttributes(createTypeFields, createForm.attributes),
+        [createTypeFields, createForm.attributes],
+    );
 
     const handleDelete = async (id: string) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -365,7 +362,7 @@ export default function ProductsPage() {
     const handleCreate = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!createForm.name.trim() || !createForm.sku.trim()) return;
-        const missingRequired = getMissingRequiredAttributes(createTypeFields, createForm.attributes);
+        const missingRequired = createMissingRequired;
         if (missingRequired.length > 0) {
             toast({ type: "error", message: `Zorunlu alanlar eksik: ${missingRequired.join(", ")}` });
             return;
@@ -1293,7 +1290,7 @@ export default function ProductsPage() {
                                 </FormField>
                             </div>
 
-                            {/* Tip Şablonu + Dinamik Teknik Alanlar */}
+                            {/* Teknik Şablon + Dinamik Teknik Alanlar */}
                             <div style={{
                                 borderTop: "0.5px solid var(--border-tertiary)",
                                 paddingTop: "12px",
@@ -1302,16 +1299,16 @@ export default function ProductsPage() {
                                 gap: "10px",
                             }}>
                                 <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                    Tip Şablonu <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(isteğe bağlı)</span>
+                                    Teknik Şablon <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(isteğe bağlı)</span>
                                 </div>
-                                <FormField label="Tip Şablonu">
+                                <FormField label="Teknik Şablon">
                                     <select
                                         style={modalInputStyle}
                                         value={createForm.productTypeId}
                                         onChange={e => handleCreateTypeChange(e.target.value)}
-                                        aria-label="Tip şablonu"
+                                        aria-label="Teknik şablon"
                                     >
-                                        <option value="">— seçiniz —</option>
+                                        <option value="">— Teknik şablon seçili değil —</option>
                                         {createProductTypes.map(t => (
                                             <option key={t.id} value={t.id}>{t.name}</option>
                                         ))}
@@ -1338,6 +1335,11 @@ export default function ProductsPage() {
                                         })}
                                     />
                                 ))}
+                                {createMissingRequired.length > 0 && (
+                                    <div role="alert" style={{ fontSize: "12px", color: "var(--warning-text)", padding: "7px 9px", background: "var(--warning-bg)", borderRadius: "5px", border: "0.5px solid var(--warning-border)" }}>
+                                        Zorunlu teknik bilgi eksik: {createMissingRequired.join(", ")}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

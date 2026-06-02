@@ -6,7 +6,7 @@
  *
  * Coverage:
  *   - DynamicFieldEdit shared component: 7 field_type branch'i
- *   - products/page.tsx create drawer: productTypeId + attributes state, Tip Şablonu selector,
+ *   - products/page.tsx create drawer: productTypeId + attributes state, Teknik Şablon selector,
  *     handleCreateTypeChange, handleCreate body
  *   - getMissingRequiredAttributes pure helper: gerçek mantık testleri
  */
@@ -163,8 +163,8 @@ describe("Faz 2c Review P2-001 — create drawer type selector source", () => {
         expect(CREATE_SOURCE).toMatch(/attributes:.*createForm\.attributes/s);
     });
 
-    it("create drawer JSX renders Tip Şablonu selector", () => {
-        expect(CREATE_SOURCE).toMatch(/Tip Şablonu/);
+    it("create drawer JSX renders Teknik Şablon selector", () => {
+        expect(CREATE_SOURCE).toMatch(/Teknik Şablon/);
         expect(CREATE_SOURCE).toMatch(/createProductTypes\.map/);
     });
 

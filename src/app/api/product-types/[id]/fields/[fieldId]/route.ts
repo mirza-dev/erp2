@@ -8,12 +8,12 @@ import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-
 import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
-// PATCH /api/product-types/[id]/fields/[fieldId]  (admin only)
+// PATCH /api/product-types/[id]/fields/[fieldId]
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string; fieldId: string }> },
 ) {
-    const forbidden = await requirePermission(req, "manage_product_types");
+    const forbidden = await requirePermission(req, ["manage_product_types", "manage_product_master"]);
     if (forbidden) return forbidden;
 
     try {
@@ -31,12 +31,14 @@ export async function PATCH(
         }
 
         const field = await dbUpdateProductTypeField(fieldId, {
+            field_key: body.field_key !== undefined ? String(body.field_key).trim() : undefined,
             label_tr: body.label_tr !== undefined ? String(body.label_tr) : undefined,
             label_en: body.label_en as string | null | undefined,
             field_type: body.field_type as ProductFieldType | undefined,
             unit: body.unit as string | null | undefined,
             options: body.options as string[] | null | undefined,
             required: body.required !== undefined ? Boolean(body.required) : undefined,
+            is_active: body.is_active !== undefined ? Boolean(body.is_active) : undefined,
             placeholder: body.placeholder as string | null | undefined,
             help_text: body.help_text as string | null | undefined,
             sort_order: body.sort_order != null ? Number(body.sort_order) : undefined,
@@ -51,6 +53,8 @@ export async function PATCH(
             err.message.toLowerCase().includes("geçersiz") ||
             err.message.includes("dizi olmalı") ||
             err.message.includes("metinler olmalı") ||
+            err.message.includes("zaten var") ||
+            err.message.includes("çakışıyor") ||
             err.message.includes("tam sayı")
         )) {
             return NextResponse.json({ error: err.message }, { status: 400 });
@@ -65,12 +69,12 @@ export async function PATCH(
     }
 }
 
-// DELETE /api/product-types/[id]/fields/[fieldId]  (admin only)
+// DELETE /api/product-types/[id]/fields/[fieldId]
 export async function DELETE(
     req: NextRequest,
     { params }: { params: Promise<{ id: string; fieldId: string }> },
 ) {
-    const forbidden = await requirePermission(req, "manage_product_types");
+    const forbidden = await requirePermission(req, ["manage_product_types", "manage_product_master"]);
     if (forbidden) return forbidden;
 
     try {

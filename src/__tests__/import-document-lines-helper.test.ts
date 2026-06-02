@@ -92,6 +92,7 @@ describe("dbCreateExtractedLines", () => {
         const rows = mockInsert.mock.calls[0]?.[0] as Array<Record<string, unknown>>;
         expect(rows[0].document_id).toBe("doc-1");
         expect(rows[0].extracted_attributes).toEqual({});
+        expect(rows[0].extraction_evidence).toEqual({});
         expect(rows[0].candidate_matches).toEqual([]);
         expect(rows[0].match_action).toBe("pending");
     });
@@ -177,6 +178,18 @@ describe("dbUpdateLineMatch", () => {
         await dbUpdateLineMatch("l-1", { match_action: "pending", product_type_id: null });
         const patch = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
         expect(patch.product_type_id).toBeNull();
+    });
+
+    it("extracted_attributes + extraction_evidence patch'e yazılır", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { id: "l-1" }, error: null });
+        await dbUpdateLineMatch("l-1", {
+            match_action: "pending",
+            extracted_attributes: { dn: 50 },
+            extraction_evidence: { dn: { confidence: "high", evidence_text: "DN50" } },
+        });
+        const patch = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(patch.extracted_attributes).toEqual({ dn: 50 });
+        expect(patch.extraction_evidence).toEqual({ dn: { confidence: "high", evidence_text: "DN50" } });
     });
 });
 

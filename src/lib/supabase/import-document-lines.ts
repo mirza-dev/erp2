@@ -14,6 +14,7 @@ import type {
     ImportDocumentLineExtractionType,
     ImportDocumentLineMatchAction,
     ImportDocumentLineCandidate,
+    TechnicalExtractionEvidence,
 } from "@/lib/database.types";
 
 export interface CreateExtractedLineInput {
@@ -23,6 +24,7 @@ export interface CreateExtractedLineInput {
     extracted_name?: string | null;
     extracted_sku?: string | null;
     extracted_attributes?: Record<string, unknown>;
+    extraction_evidence?: TechnicalExtractionEvidence;
     candidate_matches?: ImportDocumentLineCandidate[];
     matched_product_id?: string | null;
     match_confidence?: number | null;
@@ -40,6 +42,8 @@ export interface UpdateLineMatchInput {
      * yazma (mevcut korunur), null = explicit clear.
      */
     product_type_id?: string | null;
+    extracted_attributes?: Record<string, unknown>;
+    extraction_evidence?: TechnicalExtractionEvidence;
 }
 
 const VALID_MATCH_ACTIONS: ImportDocumentLineMatchAction[] = [
@@ -65,6 +69,7 @@ export async function dbCreateExtractedLines(
         extracted_name: l.extracted_name ?? null,
         extracted_sku: l.extracted_sku ?? null,
         extracted_attributes: l.extracted_attributes ?? {},
+        extraction_evidence: l.extraction_evidence ?? {},
         candidate_matches: l.candidate_matches ?? [],
         matched_product_id: l.matched_product_id ?? null,
         match_confidence: l.match_confidence ?? null,
@@ -125,6 +130,12 @@ export async function dbUpdateLineMatch(
     // product_type_id: undefined → patch'e yazma; null → explicit clear; string → set
     if (input.product_type_id !== undefined) {
         patch.product_type_id = input.product_type_id;
+    }
+    if (input.extracted_attributes !== undefined) {
+        patch.extracted_attributes = input.extracted_attributes;
+    }
+    if (input.extraction_evidence !== undefined) {
+        patch.extraction_evidence = input.extraction_evidence;
     }
 
     const sb = createServiceClient();

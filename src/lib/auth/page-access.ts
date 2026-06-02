@@ -24,7 +24,7 @@ export interface PageAccessRule {
  */
 export const PAGE_ACCESS: PageAccessRule[] = [
     { prefix: "/dashboard/settings/users", permission: "view_users" },
-    { prefix: "/dashboard/settings/product-types", permission: "view_product_types" },
+    { prefix: "/dashboard/settings/product-types", permission: "view_products" },
     { prefix: "/dashboard/settings/note-templates", permission: "view_settings" },
     { prefix: "/dashboard/settings", permission: "view_dashboard", exact: true },
     { prefix: "/dashboard/purchase/suggested", permission: "view_purchase_suggestions" },
