@@ -6,6 +6,7 @@ import {
     type CreatePOFromRecsLine,
 } from "@/lib/services/purchase-order-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { validateStringLengths } from "@/lib/validation/string-lengths";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CURRENCY_WHITELIST = new Set(["TRY", "USD", "EUR"]);
@@ -18,6 +19,9 @@ export async function POST(req: NextRequest) {
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Record<string, unknown>;
+
+        const lenErr = validateStringLengths(body);
+        if (lenErr) return NextResponse.json({ error: lenErr }, { status: 400 });
 
         if (typeof body.vendor_id !== "string" || !UUID_RE.test(body.vendor_id))
             return NextResponse.json({ error: "vendor_id geçerli UUID olmalıdır." }, { status: 400 });

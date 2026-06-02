@@ -1538,6 +1538,7 @@ export default function PurchaseSuggestedPage() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Ürün adı veya SKU..."
+                    aria-label="Ürün adı veya SKU'ya göre ara"
                     style={{
                         fontSize: "12px",
                         padding: "6px 12px",
@@ -1622,7 +1623,7 @@ export default function PurchaseSuggestedPage() {
                                 border: "1px solid var(--border-secondary)",
                                 borderRadius: "8px",
                                 padding: "14px 16px",
-                                background: urgency >= 80 ? "rgba(248,81,73,0.04)" : "var(--bg-secondary)",
+                                background: urgency >= 80 ? "var(--danger-bg-subtle)" : "var(--bg-secondary)",
                                 opacity: isRejected ? 0.6 : 1,
                             }}>
                                 {/* Type + Name row */}
@@ -1782,7 +1783,7 @@ export default function PurchaseSuggestedPage() {
                                 return (
                                     <tr key={p.id} style={{
                                         borderBottom: idx < sorted.length - 1 ? "1px solid var(--border-tertiary)" : "none",
-                                        background: urgency >= 80 ? "rgba(248,81,73,0.04)" : "transparent",
+                                        background: urgency >= 80 ? "var(--danger-bg-subtle)" : "transparent",
                                         opacity: isRejected ? 0.6 : 1,
                                     }}>
                                         {/* Tür */}

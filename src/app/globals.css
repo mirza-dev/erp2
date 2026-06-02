@@ -46,6 +46,7 @@
   /* Danger — canlı kırmızı */
   --danger: #f85149;
   --danger-bg: rgba(248, 81, 73, 0.15);
+  --danger-bg-subtle: rgba(248, 81, 73, 0.04);
   --danger-border: #da3633;
   --danger-text: #f85149;
 

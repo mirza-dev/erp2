@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetRecommendationById, dbUpdateRecommendationStatus } from "@/lib/supabase/recommendations";
 import { mapRecommendation } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { validateStringLengths } from "@/lib/validation/string-lengths";
 import { requirePermission } from "@/lib/auth/role-guard";
 import type { RecommendationStatus } from "@/lib/database.types";
 
@@ -37,6 +38,9 @@ export async function PATCH(
     const safeParsed = await safeParseJson(req);
     if (!safeParsed.ok) return safeParsed.response;
     const body = safeParsed.data as { status?: string; editedMetadata?: Record<string, unknown>; feedbackNote?: string };
+
+    const lenErr = validateStringLengths(body as Record<string, unknown>);
+    if (lenErr) return NextResponse.json({ error: lenErr }, { status: 400 });
 
     const status = body.status as RecommendationStatus;
     if (!status || !ALLOWED_STATUSES.includes(status)) {
