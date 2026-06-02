@@ -102,6 +102,7 @@ export default function ProductsPage() {
     const [search, setSearch] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
     const categoryDropdownRef = useRef<HTMLDivElement>(null);
@@ -815,6 +816,7 @@ export default function ProductsPage() {
                     <tbody>
                         {pagedItems.map((product) => {
                             const isCritical = product.promisable <= product.minStockLevel;
+                            const rowBg = hoveredId === product.id ? "var(--bg-secondary)" : "transparent";
                             return (
                                 <tr
                                     key={product.id}
@@ -829,15 +831,11 @@ export default function ProductsPage() {
                                             router.push(`/dashboard/products/${product.id}`);
                                         }
                                     }}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "var(--bg-secondary)"));
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "transparent"));
-                                    }}
+                                    onMouseEnter={() => setHoveredId(product.id)}
+                                    onMouseLeave={() => setHoveredId(null)}
                                 >
                                     <td
-                                        style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
+                                        style={{ ...tdStyle, background: rowBg, width: "36px", padding: "10px 8px 10px 14px" }}
                                         onClick={e => e.stopPropagation()}
                                     >
                                         <input
@@ -849,30 +847,30 @@ export default function ProductsPage() {
                                             aria-label={`${product.name} seç`}
                                         />
                                     </td>
-                                    <td style={{ ...tdStyle, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "12px" }}>
+                                    <td style={{ ...tdStyle, background: rowBg, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "12px" }}>
                                         {product.sku}
                                     </td>
-                                    <td style={{ ...tdStyle, fontWeight: 500, maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    <td style={{ ...tdStyle, background: rowBg, fontWeight: 500, maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis" }}>
                                         {product.name}
                                     </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: isCritical ? "var(--danger-text)" : "var(--text-primary)" }}>
+                                    <td style={{ ...tdStyle, background: rowBg, textAlign: "right", fontWeight: 600, color: isCritical ? "var(--danger-text)" : "var(--text-primary)" }}>
                                         {formatNumber(product.on_hand)}
                                     </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600, color: product.promisable <= 0 ? "var(--danger-text)" : product.promisable <= product.minStockLevel ? "var(--warning-text)" : "var(--text-primary)" }}>
+                                    <td style={{ ...tdStyle, background: rowBg, textAlign: "right", fontWeight: 600, color: product.promisable <= 0 ? "var(--danger-text)" : product.promisable <= product.minStockLevel ? "var(--warning-text)" : "var(--text-primary)" }}>
                                         {formatNumber(product.promisable)}
                                     </td>
                                     {!isMobile && (
-                                        <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-secondary)" }}>
+                                        <td style={{ ...tdStyle, background: rowBg, textAlign: "right", color: "var(--text-secondary)" }}>
                                             {product.price != null ? maskCurrency(product.price, product.currency, canViewSalesPrices) : "—"}
                                         </td>
                                     )}
                                     {!isMobile && (
-                                        <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-secondary)" }}>
+                                        <td style={{ ...tdStyle, background: rowBg, textAlign: "right", color: "var(--text-secondary)" }}>
                                             {formatNumber(product.minStockLevel)}
                                         </td>
                                     )}
                                     <td
-                                        style={{ ...tdStyle, textAlign: "right", paddingRight: "12px" }}
+                                        style={{ ...tdStyle, background: rowBg, textAlign: "right", paddingRight: "12px" }}
                                         onClick={e => e.stopPropagation()}
                                     >
                                         {has("manage_product_master") && (confirmDeleteId === product.id ? (

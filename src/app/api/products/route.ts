@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
 import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
-import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
+import { validateProductInput } from "@/lib/validation/product-input";
+import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { ConfigError } from "@/lib/supabase/service";
 import { computeOrderDeadline } from "@/lib/stock-utils";
 import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
@@ -115,27 +116,8 @@ export async function POST(req: NextRequest) {
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as CreateProductInput;
 
-        const lengthErr = validateStringLengths(body as unknown as Record<string, unknown>);
-        if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
-
-        if (!body.name?.trim()) {
-            return NextResponse.json({ error: "Ürün adı zorunludur." }, { status: 400 });
-        }
-        if (!body.sku?.trim()) {
-            return NextResponse.json({ error: "SKU zorunludur." }, { status: 400 });
-        }
-        if (!body.unit?.trim()) {
-            return NextResponse.json({ error: "Birim zorunludur." }, { status: 400 });
-        }
-        const MAX_NUM = 999_999_999;
-        if (body.price !== undefined && body.price > MAX_NUM)
-            return NextResponse.json({ error: "Fiyat çok büyük." }, { status: 400 });
-        if (body.on_hand !== undefined && body.on_hand > MAX_NUM)
-            return NextResponse.json({ error: "Stok miktarı çok büyük." }, { status: 400 });
-        if (body.min_stock_level !== undefined && body.min_stock_level > MAX_NUM)
-            return NextResponse.json({ error: "Minimum stok seviyesi çok büyük." }, { status: 400 });
-        if (body.cost_price !== undefined && body.cost_price > MAX_NUM)
-            return NextResponse.json({ error: "Maliyet fiyatı çok büyük." }, { status: 400 });
+        const validationErr = validateProductInput(body, { requireCore: true });
+        if (validationErr) return NextResponse.json({ error: validationErr }, { status: 400 });
 
         const product = await dbCreateProduct(body);
         revalidateTag("products", "max");

@@ -73,28 +73,8 @@ export async function safeParseJson(
 }
 
 /**
- * String alanlarında boyut sınırı kontrolü.
- * Nesnenin tüm string değerlerini maxLength ile karşılaştırır.
- * İhlal varsa Türkçe hata mesajı döner, yoksa null.
+ * String alanlarında boyut sınırı kontrolü — saf implementasyon
+ * `@/lib/validation/string-lengths`'e taşındı (request-ip.ts precedent'i).
+ * Geriye uyumluluk için buradan re-export edilir.
  */
-const MAX_STRING_LENGTH = 10_000;
-
-export function validateStringLengths(
-    obj: Record<string, unknown>,
-    maxLength = MAX_STRING_LENGTH
-): string | null {
-    for (const [key, val] of Object.entries(obj)) {
-        if (typeof val === "string" && val.length > maxLength) {
-            return `${key} alanı çok uzun (maksimum ${maxLength} karakter).`;
-        }
-        if (Array.isArray(val)) {
-            for (let i = 0; i < val.length; i++) {
-                if (val[i] !== null && typeof val[i] === "object") {
-                    const nestedErr = validateStringLengths(val[i] as Record<string, unknown>, maxLength);
-                    if (nestedErr) return `${key}[${i}].${nestedErr}`;
-                }
-            }
-        }
-    }
-    return null;
-}
+export { validateStringLengths, MAX_STRING_LENGTH } from "@/lib/validation/string-lengths";

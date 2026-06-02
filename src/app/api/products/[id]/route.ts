@@ -6,6 +6,7 @@ import {
     dbGetQuotedQuantities,
     type CreateProductInput,
 } from "@/lib/supabase/products";
+import { validateProductInput } from "@/lib/validation/product-input";
 import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
 import { dbExpireEntityRecommendations } from "@/lib/supabase/recommendations";
@@ -71,6 +72,10 @@ export async function PATCH(
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Partial<CreateProductInput> & { is_active?: boolean };
+        // Validation parity: POST ile aynı string/numeric guard'lar (requireCore: false —
+        // PATCH alan atlayabilir; yalnız gelen alanlar doğrulanır).
+        const validationErr = validateProductInput(body, { requireCore: false });
+        if (validationErr) return NextResponse.json({ error: validationErr }, { status: 400 });
         const product = await dbUpdateProduct(id, body);
         revalidateTag("products", "max");
         // Ürün deaktif edildiyse ilgili aktif uyarıları ve önerileri kapat
