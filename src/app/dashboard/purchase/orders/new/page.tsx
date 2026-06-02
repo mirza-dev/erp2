@@ -158,7 +158,8 @@ function NewPurchaseOrderPageInner() {
             const qty = Number(l.quantity);
             if (!Number.isInteger(qty) || qty <= 0) { setFormError(`Line ${i + 1}: miktar pozitif tam sayı olmalı.`); return; }
             const price = Number(l.unit_price);
-            if (!Number.isFinite(price) || price < 0) { setFormError(`Line ${i + 1}: birim fiyat geçersiz.`); return; }
+            // Server (validatePoLines) sıfır/negatifi reddeder — client de aynı: price <= 0 geçersiz.
+            if (!Number.isFinite(price) || price <= 0) { setFormError(`Line ${i + 1}: birim fiyat sıfırdan büyük olmalı.`); return; }
         }
 
         setSaving(true);

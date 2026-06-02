@@ -167,4 +167,79 @@ describe("Faz 4 follow-up — new page fromDraft preload", () => {
         expect(newSrc).toContain("expectedDateDirty");
         expect(newSrc).toContain("setExpectedDateDirty(true)");
     });
+
+    it("Fiyat tutarsızlığı kapandı — handleSubmit price <= 0 reddeder (server semantiği)", () => {
+        // Eski `price < 0` (0 geçiyordu) → server validatePoLines `<= 0` ile çelişiyordu.
+        expect(newSrc).toContain("price <= 0");
+        expect(newSrc).not.toMatch(/price < 0\b/);
+    });
+});
+
+// ── Final ürün turu — isPoCancellable pure helper ─────────────
+
+describe("isPoCancellable — toplu iptal seçim yüklemi (satış siparişleri paritesi)", () => {
+    it("received/cancelled → false (iptal edilemez)", async () => {
+        const { isPoCancellable } = await import("@/app/dashboard/purchase/orders/page");
+        expect(isPoCancellable({ status: "received" })).toBe(false);
+        expect(isPoCancellable({ status: "cancelled" })).toBe(false);
+    });
+
+    it("draft/sent/confirmed/partially_received → true (iptal edilebilir)", async () => {
+        const { isPoCancellable } = await import("@/app/dashboard/purchase/orders/page");
+        expect(isPoCancellable({ status: "draft" })).toBe(true);
+        expect(isPoCancellable({ status: "sent" })).toBe(true);
+        expect(isPoCancellable({ status: "confirmed" })).toBe(true);
+        expect(isPoCancellable({ status: "partially_received" })).toBe(true);
+    });
+});
+
+// ── Final ürün turu — liste sayfası UI polish (source-regex) ──
+
+describe("Liste sayfası — hover state + toplu-iptal seçim + modal a11y", () => {
+    let listSrc = "";
+
+    beforeAll(async () => {
+        const fs = await import("fs/promises");
+        const path = await import("path");
+        listSrc = await fs.readFile(
+            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/page.tsx"),
+            "utf-8",
+        );
+    });
+
+    it("hover DOM-mutation antipattern kaldırıldı → hoveredId state", () => {
+        expect(listSrc).toContain("const [hoveredId, setHoveredId]");
+        expect(listSrc).toContain("setHoveredId(o.id)");
+        expect(listSrc).toContain("const isHovered = hoveredId === o.id");
+        // Eski doğrudan DOM yazımı kalmamalı
+        expect(listSrc).not.toContain("e.currentTarget.style.background");
+    });
+
+    it("toplu iptal seçimi yalnız iptal edilebilir PO'larda (cancellablePageIds)", () => {
+        expect(listSrc).toContain("const cancellablePageIds = pagedItems.filter(isPoCancellable)");
+        expect(listSrc).toContain("toggleAll(cancellablePageIds)");
+        expect(listSrc).toContain("isPageAllSelected(cancellablePageIds)");
+        // satır checkbox koşullu
+        expect(listSrc).toMatch(/\{cancellable && \(\s*<input/);
+        // eski pageIds bağımlılığı kalmamalı
+        expect(listSrc).not.toContain("toggleAll(pageIds)");
+    });
+
+    it("toplu-iptal modalı a11y: role=dialog + aria-modal + aria-labelledby", () => {
+        expect(listSrc).toContain('role="dialog" aria-modal="true" aria-labelledby="bulk-cancel-title"');
+        expect(listSrc).toContain('id="bulk-cancel-title"');
+    });
+});
+
+describe("Detay sayfası — iptal modalı aria-labelledby", () => {
+    it("dialog aria-labelledby + başlık id eşleşir", async () => {
+        const fs = await import("fs/promises");
+        const path = await import("path");
+        const detailSrc = await fs.readFile(
+            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/[id]/page.tsx"),
+            "utf-8",
+        );
+        expect(detailSrc).toContain('aria-labelledby="po-cancel-title"');
+        expect(detailSrc).toContain('id="po-cancel-title"');
+    });
 });

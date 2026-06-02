@@ -477,3 +477,64 @@ describe("POST /api/purchase-orders/[id]/revise", () => {
         expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
     });
 });
+
+// ── validateStringLengths parity (öneriler turu paritesi) ─────
+// `validateStringLengths` mock'lanmıyor → gerçek recursive helper çalışır
+// (top-level notes + lines[].notes array-of-objects kapsanır).
+
+describe("validateStringLengths parity — POST/PATCH/PUT-lines", () => {
+    const LONG = "a".repeat(10_001);
+
+    it("POST: 10k+ üst-seviye notes → 400, dbCreatePurchaseOrder ÇAĞRILMAZ", async () => {
+        const res = await listPOST(makeReq({
+            vendor_id: "v-1",
+            currency: "TRY",
+            notes: LONG,
+            lines: [{ product_id: PID, quantity: 2, unit_price: 100 }],
+        }) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        expect(mockDbCreatePurchaseOrder).not.toHaveBeenCalled();
+    });
+
+    it("POST: nested lines[].notes 10k+ → 400 (recursive lock), dbCreate ÇAĞRILMAZ", async () => {
+        const res = await listPOST(makeReq({
+            vendor_id: "v-1",
+            currency: "TRY",
+            lines: [{ product_id: PID, quantity: 2, unit_price: 100, notes: LONG }],
+        }) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(400);
+        expect(mockDbCreatePurchaseOrder).not.toHaveBeenCalled();
+    });
+
+    it("POST: normal kısa notes → 201 (guard regresyon yapmaz)", async () => {
+        mockDbCreatePurchaseOrder.mockResolvedValue({ id: "po-new", po_number: "PO-2026-0009" });
+        const res = await listPOST(makeReq({
+            vendor_id: "v-1",
+            currency: "TRY",
+            notes: "Acil — kalan stok için.",
+            lines: [{ product_id: PID, quantity: 2, unit_price: 100, notes: "öncelikli" }],
+        }) as unknown as Parameters<typeof listPOST>[0]);
+        expect(res.status).toBe(201);
+        expect(mockDbCreatePurchaseOrder).toHaveBeenCalledTimes(1);
+    });
+
+    it("PATCH: 10k+ notes → 400, dbPatchPurchaseOrder ÇAĞRILMAZ (draft PO)", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValue(samplePO); // draft
+        const res = await detailPATCH(
+            makeReq({ notes: LONG }) as unknown as Parameters<typeof detailPATCH>[0],
+            makeParams("po-1"),
+        );
+        expect(res.status).toBe(400);
+        expect(mockDbPatchPurchaseOrder).not.toHaveBeenCalled();
+    });
+
+    it("PUT lines: nested lines[].notes 10k+ → 400, dbReplacePurchaseOrderLines ÇAĞRILMAZ (draft PO)", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValue(samplePO); // draft
+        const res = await linesPUT(
+            makeReq({ lines: [{ product_id: PID, quantity: 1, unit_price: 50, notes: LONG }] }) as unknown as Parameters<typeof linesPUT>[0],
+            makeParams("po-1"),
+        );
+        expect(res.status).toBe(400);
+        expect(mockDbReplacePurchaseOrderLines).not.toHaveBeenCalled();
+    });
+});

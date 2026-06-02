@@ -481,7 +481,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
 
             {/* Cancel modal */}
             {cancelOpen && (
-                <div role="dialog" aria-modal="true" style={{
+                <div role="dialog" aria-modal="true" aria-labelledby="po-cancel-title" style={{
                     position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
                     display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
@@ -489,7 +489,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                         background: "var(--bg-primary)", padding: "24px", borderRadius: "10px",
                         width: "440px", maxWidth: "calc(100vw - 32px)", display: "flex", flexDirection: "column", gap: "12px",
                     }}>
-                        <h2 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                        <h2 id="po-cancel-title" style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
                             Siparişi İptal Et
                         </h2>
                         <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0 }}>

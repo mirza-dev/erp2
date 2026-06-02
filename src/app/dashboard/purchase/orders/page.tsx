@@ -50,6 +50,12 @@ function formatCurrency(amount: number, currency: string): string {
     return `${sym}${amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Test edilebilir pure helper: PO iptal edilebilir mi? Detay `isCancelable` ile aynı yüklem.
+ * Toplu iptal seçimi yalnız bu PO'ları kapsar (received/cancelled → 409 gürültüsü önlenir). */
+export function isPoCancellable(po: { status: PurchaseOrderStatus }): boolean {
+    return !["received", "cancelled"].includes(po.status);
+}
+
 export default function PurchaseOrdersPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
@@ -61,6 +67,7 @@ export default function PurchaseOrdersPage() {
     const [loading, setLoading] = useState(true);
     const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
     const [bulkCancelling, setBulkCancelling] = useState(false);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
 
     const loadOrders = useCallback(async () => {
         setLoading(true);
@@ -110,7 +117,7 @@ export default function PurchaseOrdersPage() {
 
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
         useSelection(`${search}|${activeTab}`);
-    const pageIds = pagedItems.map(o => o.id);
+    const cancellablePageIds = pagedItems.filter(isPoCancellable).map(o => o.id);
 
     const handleBulkCancel = async () => {
         if (isDemo) { toast({ type: "info", message: "Demo modda bu işlem yapılamaz." }); return; }
@@ -261,12 +268,13 @@ export default function PurchaseOrdersPage() {
                                 <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
                                     <input
                                         type="checkbox"
-                                        checked={isPageAllSelected(pageIds)}
-                                        ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
-                                        onChange={() => toggleAll(pageIds)}
+                                        checked={isPageAllSelected(cancellablePageIds)}
+                                        ref={el => { if (el) el.indeterminate = isPageIndeterminate(cancellablePageIds); }}
+                                        onChange={() => toggleAll(cancellablePageIds)}
                                         onClick={e => e.stopPropagation()}
-                                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                        aria-label="Sayfadaki tüm siparişleri seç"
+                                        disabled={cancellablePageIds.length === 0}
+                                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: cancellablePageIds.length === 0 ? "not-allowed" : "pointer" }}
+                                        aria-label="Sayfadaki iptal edilebilir siparişleri seç"
                                     />
                                 </th>
                                 <th style={thStyle}>PO No</th>
@@ -278,25 +286,33 @@ export default function PurchaseOrdersPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {pagedItems.map(o => (
+                            {pagedItems.map(o => {
+                                const isHovered = hoveredId === o.id;
+                                const cancellable = isPoCancellable(o);
+                                return (
                                 <tr key={o.id}
-                                    style={{ transition: "background 0.08s", cursor: "pointer" }}
-                                    onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-secondary)")}
-                                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                                    style={{
+                                        transition: "background 0.08s", cursor: "pointer",
+                                        background: isHovered ? "var(--bg-secondary)" : "transparent",
+                                    }}
+                                    onMouseEnter={() => setHoveredId(o.id)}
+                                    onMouseLeave={() => setHoveredId(null)}
                                     onClick={() => { window.location.href = `/dashboard/purchase/orders/${o.id}`; }}
                                 >
                                     <td
                                         style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
                                         onClick={e => e.stopPropagation()}
                                     >
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.has(o.id)}
-                                            onChange={() => toggleOne(o.id)}
-                                            onClick={e => e.stopPropagation()}
-                                            style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                            aria-label={`${o.po_number} seç`}
-                                        />
+                                        {cancellable && (
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(o.id)}
+                                                onChange={() => toggleOne(o.id)}
+                                                onClick={e => e.stopPropagation()}
+                                                style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                                aria-label={`${o.po_number} seç`}
+                                            />
+                                        )}
                                     </td>
                                     <td style={tdStyle}>
                                         <Link
@@ -327,7 +343,8 @@ export default function PurchaseOrdersPage() {
                                         {new Date(o.created_at).toLocaleDateString("tr-TR")}
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
                 )}
@@ -349,13 +366,13 @@ export default function PurchaseOrdersPage() {
                         onClick={() => !bulkCancelling && setBulkCancelConfirm(false)}
                         style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)" }}
                     />
-                    <div style={{
+                    <div role="dialog" aria-modal="true" aria-labelledby="bulk-cancel-title" style={{
                         position: "fixed", top: "50%", left: "50%",
                         transform: "translate(-50%, -50%)", zIndex: 101,
                         background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
                         borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
                     }}>
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
+                        <div id="bulk-cancel-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
                             {selectedIds.size} siparişi iptal et
                         </div>
                         <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>

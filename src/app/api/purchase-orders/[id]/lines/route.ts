@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetPurchaseOrderById, dbReplacePurchaseOrderLines, validatePoLines } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { validateStringLengths } from "@/lib/validation/string-lengths";
 import { requirePermission } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
@@ -29,6 +30,9 @@ export async function PUT(
         if (!parsed.ok) return parsed.response;
 
         const body = parsed.data as Record<string, unknown>;
+
+        const lenErr = validateStringLengths(body);
+        if (lenErr) return NextResponse.json({ error: lenErr }, { status: 400 });
 
         const linesErr = validatePoLines(body.lines);
         if (linesErr) return NextResponse.json({ error: linesErr }, { status: 400 });

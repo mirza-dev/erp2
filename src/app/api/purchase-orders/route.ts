@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListPurchaseOrders, dbCreatePurchaseOrder, validatePoLines, isValidPoCurrency } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { validateStringLengths } from "@/lib/validation/string-lengths";
 import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
 import { redactPurchaseOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
@@ -38,6 +39,9 @@ export async function POST(req: NextRequest) {
         if (!parsed.ok) return parsed.response;
 
         const body = parsed.data as Record<string, unknown>;
+
+        const lenErr = validateStringLengths(body);
+        if (lenErr) return NextResponse.json({ error: lenErr }, { status: 400 });
 
         if (!body.vendor_id) {
             return NextResponse.json({ error: "vendor_id zorunludur." }, { status: 400 });
