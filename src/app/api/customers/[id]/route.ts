@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbDeleteCustomer, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbCountOrdersByCustomer } from "@/lib/supabase/orders";
-import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
+import { revalidateTag } from "next/cache";
 
 // PATCH /api/customers/[id]
 export async function PATCH(
@@ -30,6 +31,9 @@ export async function PATCH(
                 { status: 400 }
             );
         }
+        // POST paritesi — düzenleme paneli notes/address sınırsızdı; recursive helper nested kapsar.
+        const lengthErr = validateStringLengths(body);
+        if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
         const customer = await dbUpdateCustomer(id, body);
         return NextResponse.json(customer);
     } catch (err) {
@@ -56,6 +60,7 @@ export async function DELETE(
         }
         const actor = await getCurrentUserId();
         await dbDeleteCustomer(id, actor);
+        revalidateTag("customers", "max");
         return NextResponse.json({ ok: true });
     } catch (err) {
         return handleApiError(err, "DELETE /api/customers/[id]");

@@ -225,7 +225,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         setCustomers((prev) => [mapCustomer(data), ...prev]);
       } else {
-        throw new Error(await res.text());
+        // route { error } JSON döndürür — kullanıcıya ham {"error":...} stringi
+        // değil mesajı göster (updateCustomer/deleteCustomer paterni).
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error ?? "Müşteri eklenemedi.");
       }
     } catch (err) {
       console.error("addCustomer failed:", err);

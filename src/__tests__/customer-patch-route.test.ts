@@ -14,6 +14,12 @@ vi.mock("@/lib/auth/role-guard", () => ({
         new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
     getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
+    getCurrentUserId: vi.fn().mockResolvedValue("user-1"),
+}));
+
+const mockRevalidateTag = vi.fn();
+vi.mock("next/cache", () => ({
+    revalidateTag: (...args: unknown[]) => mockRevalidateTag(...args),
 }));
 import { NextRequest } from "next/server";
 
@@ -32,7 +38,7 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbCountOrdersByCustomer: (...args: unknown[]) => mockDbCountOrdersByCustomer(...args),
 }));
 
-import { PATCH } from "@/app/api/customers/[id]/route";
+import { PATCH, DELETE } from "@/app/api/customers/[id]/route";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -189,5 +195,49 @@ describe("PATCH /api/customers/[id] — DB error handling", () => {
         expect(res.status).toBe(503);
         const body = await res.json();
         expect(body.code).toBe("CONFIG_ERROR");
+    });
+});
+
+// ─── Validation parity: string lengths (POST paritesi) ────────────────────────
+
+describe("PATCH /api/customers/[id] — string length validation parity", () => {
+    it("10k+ char notes → 400, dbUpdateCustomer çağrılmaz", async () => {
+        const res = await PATCH(makeRequest({ notes: "x".repeat(10001) }), makeParams());
+        expect(res.status).toBe(400);
+        expect(mockDbUpdateCustomer).not.toHaveBeenCalled();
+    });
+
+    it("normal kısa alanlar → 200, dbUpdateCustomer çağrılır (regresyon korunur)", async () => {
+        const res = await PATCH(makeRequest({ notes: "kısa not", address: "İstanbul" }), makeParams());
+        expect(res.status).toBe(200);
+        expect(mockDbUpdateCustomer).toHaveBeenCalledTimes(1);
+    });
+});
+
+// ─── DELETE /api/customers/[id] ───────────────────────────────────────────────
+
+describe("DELETE /api/customers/[id]", () => {
+    function makeDeleteParams(id = CUSTOMER_ID): { params: Promise<{ id: string }> } {
+        return { params: Promise.resolve({ id }) };
+    }
+    function makeDeleteRequest(): NextRequest {
+        return new NextRequest(`http://localhost/api/customers/${CUSTOMER_ID}`, { method: "DELETE" });
+    }
+
+    it("siparişi olan müşteri → 409, dbDeleteCustomer çağrılmaz", async () => {
+        mockDbCountOrdersByCustomer.mockResolvedValueOnce(3);
+        const res = await DELETE(makeDeleteRequest(), makeDeleteParams());
+        expect(res.status).toBe(409);
+        expect(mockDbDeleteCustomer).not.toHaveBeenCalled();
+        expect(mockRevalidateTag).not.toHaveBeenCalled();
+    });
+
+    it("siparişi olmayan müşteri → silinir + revalidateTag('customers') (POST paritesi)", async () => {
+        mockDbCountOrdersByCustomer.mockResolvedValueOnce(0);
+        mockDbDeleteCustomer.mockResolvedValueOnce(undefined);
+        const res = await DELETE(makeDeleteRequest(), makeDeleteParams());
+        expect(res.status).toBe(200);
+        expect(mockDbDeleteCustomer).toHaveBeenCalledWith(CUSTOMER_ID, "user-1");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("customers", "max");
     });
 });

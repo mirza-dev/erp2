@@ -66,6 +66,7 @@ export default function CustomersPage() {
     const [isAdding, setIsAdding] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
     const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -127,13 +128,16 @@ export default function CustomersPage() {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setBulkDeleting(true);
         const ids = Array.from(selectedIds);
-        const results = await Promise.allSettled(
-            ids.map(id => fetch(`/api/customers/${id}`, { method: "DELETE" })),
-        );
-        const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
+        // Context deleteCustomer üzerinden geç — her başarı kendi satırını
+        // setCustomers filter'ıyla state'ten kaldırır (ham fetch yalnız seçimi
+        // temizliyordu, silinen satırlar tabloda kalıyordu).
+        const results = await Promise.allSettled(ids.map(id => deleteCustomer(id)));
+        const failed = results.filter(r => r.status === "rejected").length;
         const succeeded = ids.length - failed;
         if (succeeded > 0) toast({ type: "success", message: `${succeeded} müşteri silindi.` });
         if (failed > 0) toast({ type: "error", message: `${failed} müşteri silinemedi.` });
+        // Açık panel toplu silmeye dahilse kapat (tek-silme paritesi).
+        if (selectedCustomer && ids.includes(selectedCustomer.id)) setSelectedCustomer(null);
         clearAll();
         setBulkDeleteConfirm(false);
         setBulkDeleting(false);
@@ -306,14 +310,13 @@ export default function CustomersPage() {
                             {pagedItems.map((customer) => (
                                 <tr
                                     key={customer.id}
-                                    style={{ cursor: "pointer" }}
+                                    style={{
+                                        cursor: "pointer",
+                                        background: hoveredId === customer.id ? "var(--bg-secondary)" : "transparent",
+                                    }}
                                     onClick={() => setSelectedCustomer(customer)}
-                                    onMouseEnter={(e) => {
-                                        e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "var(--bg-secondary)"));
-                                    }}
-                                    onMouseLeave={(e) => {
-                                        e.currentTarget.querySelectorAll("td").forEach(td => (td.style.background = "transparent"));
-                                    }}
+                                    onMouseEnter={() => setHoveredId(customer.id)}
+                                    onMouseLeave={() => setHoveredId(null)}
                                 >
                                     <td
                                         style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
@@ -479,13 +482,17 @@ export default function CustomersPage() {
                         onClick={() => !bulkDeleting && setBulkDeleteConfirm(false)}
                         style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)" }}
                     />
-                    <div style={{
-                        position: "fixed", top: "50%", left: "50%",
-                        transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
-                        borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
-                    }}>
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="bulk-delete-customers-title"
+                        style={{
+                            position: "fixed", top: "50%", left: "50%",
+                            transform: "translate(-50%, -50%)", zIndex: 101,
+                            background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                            borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                        }}>
+                        <div id="bulk-delete-customers-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
                             {selectedIds.size} müşteriyi sil
                         </div>
                         <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
@@ -533,6 +540,9 @@ export default function CustomersPage() {
                         }}
                     />
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="add-customer-title"
                         style={{
                             position: "fixed",
                             top: "50%",
@@ -558,7 +568,7 @@ export default function CustomersPage() {
                                 borderBottom: "0.5px solid var(--border-tertiary)",
                             }}
                         >
-                            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                            <div id="add-customer-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                                 Yeni Müşteri
                             </div>
                             <button

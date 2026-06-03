@@ -126,6 +126,9 @@ export default function CustomerDetailPanel({
             {/* Panel */}
             <div
                 className="animate-slide-in-right"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="customer-detail-title"
                 style={{
                     position: "fixed",
                     right: 0,
@@ -170,7 +173,7 @@ export default function CustomerDetailPanel({
                             {customer.name.charAt(0)}
                         </div>
                         <div>
-                            <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}>
+                            <div id="customer-detail-title" style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}>
                                 {customer.name}
                             </div>
                             <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
