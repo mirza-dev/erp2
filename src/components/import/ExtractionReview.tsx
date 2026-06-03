@@ -518,6 +518,13 @@ export default function ExtractionReview({ document: doc, initialLines, productT
 
     const docType = doc.classification?.document_type ?? "unknown";
     const docConf = doc.classification?.confidence ?? 0;
+    const lineTableStyle: React.CSSProperties = {
+        width: "100%",
+        minWidth: isCertFlow ? "920px" : "1120px",
+        borderCollapse: "collapse",
+        fontSize: "12px",
+        tableLayout: "fixed",
+    };
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -610,8 +617,17 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                         </Button>
                     </div>
 
-                    <div style={{ overflow: "auto", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px" }}>
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                    <div style={{ overflowX: "auto", overflowY: "hidden", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px" }}>
+                        <table style={lineTableStyle}>
+                            <colgroup>
+                                <col style={{ width: "44px" }} />
+                                <col style={{ width: isCertFlow ? "34%" : "28%" }} />
+                                {!isCertFlow && <col style={{ width: "180px" }} />}
+                                <col style={{ width: isCertFlow ? "34%" : "28%" }} />
+                                <col style={{ width: "82px" }} />
+                                <col style={{ width: "128px" }} />
+                                <col style={{ width: "136px" }} />
+                            </colgroup>
                             <thead>
                                 <tr style={{ background: "var(--bg-secondary)" }}>
                                     <th style={th}>#</th>
@@ -687,7 +703,8 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                                 padding: "4px 8px", fontSize: "11px",
                                                                 background: "var(--bg-primary)", color: "var(--text-primary)",
                                                                 border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
-                                                                minWidth: "120px",
+                                                                width: "100%",
+                                                                minWidth: 0,
                                                             }}
                                                         >
                                                             <option value="">— Yok —</option>
@@ -725,7 +742,8 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                                 padding: "4px 8px", fontSize: "11px",
                                                                 background: "var(--bg-primary)", color: "var(--text-primary)",
                                                                 border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
-                                                                minWidth: "200px",
+                                                                width: "100%",
+                                                                minWidth: 0,
                                                             }}
                                                         >
                                                             <option value="">— Seçilmedi —</option>
@@ -742,15 +760,17 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                 </td>
                                                 <td style={td}>
                                                     <span style={{
+                                                        display: "inline-flex", alignItems: "center", justifyContent: "center",
                                                         fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
                                                         background: colors.bg, color: colors.text,
                                                         border: `0.5px solid ${colors.border}`, fontWeight: 600,
+                                                        whiteSpace: "nowrap", lineHeight: 1.25, minWidth: "72px",
                                                     }}>
                                                         {formatMatchAction(line.match_action)}
                                                     </span>
                                                 </td>
                                                 <td style={td}>
-                                                    <div style={{ display: "flex", gap: "4px" }}>
+                                                    <div style={{ display: "flex", gap: "6px", flexWrap: "nowrap", justifyContent: "flex-start" }}>
                                                         <button
                                                             type="button"
                                                             onClick={() => handleMarkNew(line)}
@@ -954,17 +974,19 @@ const th: React.CSSProperties = {
     padding: "8px 10px", textAlign: "left",
     color: "var(--text-secondary)", fontWeight: 600,
     fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.5px",
+    whiteSpace: "nowrap",
 };
 
 const td: React.CSSProperties = {
     padding: "10px", color: "var(--text-primary)", verticalAlign: "top",
+    overflowWrap: "anywhere",
 };
 
 const btnSecondary: React.CSSProperties = {
     padding: "4px 10px", fontSize: "11px",
     background: "transparent", color: "var(--text-secondary)",
     border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
-    cursor: "pointer",
+    cursor: "pointer", minWidth: "56px", whiteSpace: "nowrap",
 };
 
 const productFieldCheckStyle = (muted: boolean): React.CSSProperties => ({

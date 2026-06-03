@@ -138,6 +138,27 @@ describe("ExtractionReview — Faz 3c Apply", () => {
         expect(btn).toHaveProperty("disabled", false);
     });
 
+    it("line table keeps status/action columns readable for new-product rows", () => {
+        vi.stubGlobal("fetch", vi.fn());
+        const { container } = render(<ExtractionReview
+            document={DOC}
+            initialLines={[makeLine("1", {
+                match_action: "new_product",
+                extracted_name: "Sürgülü Vana A105 Gövde Sınıf 600 SS Trim Stellite Yüzey",
+                product_type_id: "type-vana",
+            })]}
+            productTypes={PRODUCT_TYPES}
+        />);
+
+        const table = container.querySelector("table");
+        expect(table?.style.minWidth).toBe("1120px");
+        expect(table?.style.tableLayout).toBe("fixed");
+
+        const statusBadge = screen.getByText("Yeni ürün");
+        expect(statusBadge.style.whiteSpace).toBe("nowrap");
+        expect(statusBadge.style.minWidth).toBe("72px");
+    });
+
     it("apply başarılı → fetch POST + sonuç paneli render + success toast + setDocApplied", async () => {
         const fetchSpy = vi.fn(async () => new Response(JSON.stringify({
             ok: true,
