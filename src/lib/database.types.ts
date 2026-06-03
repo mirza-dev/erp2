@@ -3,6 +3,8 @@
 // Generated from supabase/migrations/001_initial_schema.sql
 // ============================================================
 
+import type { AiImportOperationType } from "@/lib/ai-import-operations"
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Json = string | number | boolean | null | { [key: string]: any } | any[]
 
@@ -39,6 +41,7 @@ export interface DocumentClassification {
     language: string
     summary: string
     suggested_product_type_id: string | null
+    operation_type?: AiImportOperationType | null
 }
 export type SyncStatus = "success" | "error" | "pending" | "retrying"
 export type AuditSource = "ui" | "system" | "ai" | "integration"
@@ -652,7 +655,7 @@ export interface ImportDocumentLineRow {
 export interface ImportDraftRow {
     id: string
     batch_id: string
-    entity_type: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"
+    entity_type: "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"
     raw_data: Json | null
     parsed_data: Json | null
     matched_entity_id: string | null

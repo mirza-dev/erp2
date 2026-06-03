@@ -35,7 +35,7 @@ const MODEL = "claude-haiku-4-5-20251001";
 
 export interface ParseEntityInput {
     raw_text: string;
-    entity_type: "customer" | "product" | "order";
+    entity_type: "customer" | "product" | "vendor" | "stock" | "order";
 }
 
 export interface ParseEntityResult {
@@ -144,7 +144,7 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
 // ── Batch Parse ─────────────────────────────────────────────
 
 export interface BatchParseInput {
-    entity_type: "customer" | "product" | "order";
+    entity_type: "customer" | "product" | "vendor" | "stock" | "order";
     rows: Array<Record<string, string>>;
 }
 
@@ -162,6 +162,36 @@ const BATCH_PARSE_SYSTEM: Record<string, string> = {
 You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
 For each row, extract customer fields and return a JSON array with objects containing these keys (omit missing fields):
 { "name": string, "email": string, "phone": string, "country": string (ISO 2-letter or full name), "currency": string (ISO 3-letter), "tax_number": string, "tax_office": string, "address": string, "notes": string }
+
+Return ONLY a JSON object in this exact format:
+{
+  "items": [
+    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
+    ...
+  ]
+}
+Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
+
+    vendor: `You are a data extraction assistant for a B2B ERP system.
+You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
+For each row, extract vendor fields and return a JSON array with objects containing these keys (omit missing fields):
+{ "name": string, "contact_email": string, "contact_phone": string, "contact_person": string, "tax_number": string, "address": string, "currency": string (ISO 3-letter), "payment_terms_days": number, "lead_time_days": number, "notes": string }
+Do not extract price, cost, unit cost, sales price, purchase price or valuation fields.
+
+Return ONLY a JSON object in this exact format:
+{
+  "items": [
+    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
+    ...
+  ]
+}
+Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
+
+    stock: `You are a data extraction assistant for a B2B ERP system.
+You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
+For each row, extract stock operation fields and return a JSON array with objects containing these keys (omit missing fields):
+{ "sku": string, "on_hand": number }
+Do not extract cost, valuation, sales price, purchase price or accounting fields.
 
 Return ONLY a JSON object in this exact format:
 {
@@ -219,6 +249,18 @@ export const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
         odeme_vadesi_gun: "payment_terms_days",
         incoterm_tercihi: "default_incoterm",
         musteri_kodu: "customer_code",
+    },
+    vendor: {
+        tedarikci_adi: "name", tedarikci: "name", firma_adi: "name", ad: "name", isim: "name",
+        email: "contact_email", eposta: "contact_email", e_posta: "contact_email", tedarikci_email: "contact_email",
+        telefon: "contact_phone", tel: "contact_phone",
+        yetkili: "contact_person", ilgili_kisi: "contact_person",
+        vergi_no: "tax_number", vergi_numarasi: "tax_number",
+        adres: "address",
+        para_birimi: "currency",
+        odeme_vadesi_gun: "payment_terms_days",
+        tedarik_suresi_gun: "lead_time_days", lead_time_gun: "lead_time_days",
+        notlar: "notes", not: "notes",
     },
     product: {
         urun_adi: "name", ad: "name", isim: "name",
@@ -292,6 +334,10 @@ export const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
         tahsil_edilen_tutar_usd: "amount",
         odeme_yontemi: "payment_method",
     },
+    stock: {
+        urun_kodu: "sku", sku: "sku",
+        stok: "on_hand", stok_miktari: "on_hand", miktar: "on_hand", sayim: "on_hand",
+    },
 };
 
 export function fallbackParseRow(
@@ -313,6 +359,7 @@ export function fallbackParseRow(
                 "cost_price", "weight_kg", "payment_terms_days",
                 "total_amount", "net_weight_kg", "gross_weight_kg",
                 "amount", "validity_days", "quantity", "unit_price", "line_total",
+                "lead_time_days", "reorder_qty",
             ]);
             parsed_data[erpField] = !isNaN(num) && value.trim() !== "" && NUMERIC_FIELDS.has(erpField)
                 ? num
@@ -1093,6 +1140,12 @@ export async function aiScoreOrder(orderId: string): Promise<ScoreOrderResult> {
 // ── Faz 3a — Document Classifier ──────────────────────────────
 
 import type { DocumentType, DocumentClassification } from "@/lib/database.types";
+import {
+    DEFAULT_AI_IMPORT_OPERATION,
+    getAiImportOperation,
+    isAiImportOperationType,
+    type AiImportOperationType,
+} from "@/lib/ai-import-operations";
 
 export interface ProductTypeContext {
     id: string;
@@ -1107,6 +1160,8 @@ export interface ClassifyDocumentInput {
     excelTextSample?: string;
     /** dbListProductTypes ile çekilen tip listesi — prompt context */
     productTypes: ProductTypeContext[];
+    /** Kullanıcının seçtiği AI Import işlem türü — prompt ve audit bağlamı. */
+    operationType?: AiImportOperationType;
 }
 
 const DOCUMENT_TYPES: readonly DocumentType[] = [
@@ -1156,11 +1211,24 @@ export function pickContentBlockForMime(
     throw new Error(`Unsupported MIME for classifier: ${mime}`);
 }
 
-function buildClassifierSystemPrompt(productTypes: ProductTypeContext[]): string {
+function buildClassifierSystemPrompt(
+    productTypes: ProductTypeContext[],
+    operationType: AiImportOperationType = DEFAULT_AI_IMPORT_OPERATION,
+): string {
     const typeList = productTypes
         .map(t => `- ${t.name} (id: ${t.id})`)
         .join("\n");
+    const operation = getAiImportOperation(operationType);
     return `Sen bir endüstriyel ekipman ERP sistemi için belge analiz asistanısın.
+Kullanıcının seçtiği işlem:
+- ${operation.title}
+- ${operation.promptContext}
+
+Önemli güvenlik:
+- Dosyanın gerçek belge türünü dürüst sınıflandır; işlem türüne uydurmak için belge tipini değiştirme.
+- Fiyat/maliyet bilgisi görürsen bunu ürün finansal alanlarına uygulanacak öneri gibi sunma.
+- Sertifika/standart eksiklerini bloklayıcı zorunluluk gibi değerlendirme.
+
 Yüklenen dosyayı incele ve aşağıdaki tiplerden BİRİNE sınıflandır:
 
 - product_catalog: çoklu ürün listesi (üretici/tedarikçi kataloğu)
@@ -1200,12 +1268,16 @@ export async function aiClassifyDocument(
     input: ClassifyDocumentInput,
     signal?: AbortSignal,
 ): Promise<DocumentClassification> {
+    const operationType = isAiImportOperationType(input.operationType)
+        ? input.operationType
+        : DEFAULT_AI_IMPORT_OPERATION;
     const fallback: DocumentClassification = {
         document_type: "unknown",
         confidence: 0,
         language: "unknown",
         summary: "AI servisi yanıt veremedi.",
         suggested_product_type_id: null,
+        operation_type: operationType,
     };
 
     if (!isAIAvailable()) {
@@ -1215,7 +1287,7 @@ export async function aiClassifyDocument(
     const t0 = Date.now();
     try {
         const contentBlock = pickContentBlockForMime(input.mimeType, input.buffer, input.excelTextSample);
-        const systemPrompt = buildClassifierSystemPrompt(input.productTypes);
+        const systemPrompt = buildClassifierSystemPrompt(input.productTypes, operationType);
 
         const userBlocks: ClassifierContentBlock[] = [
             contentBlock,
@@ -1238,7 +1310,10 @@ export async function aiClassifyDocument(
             .map(c => (c as { type: "text"; text: string }).text)
             .join("\n");
 
-        const result = parseClassifierResponse(text, input.productTypes);
+        const result = {
+            ...parseClassifierResponse(text, input.productTypes),
+            operation_type: operationType,
+        } satisfies DocumentClassification;
 
         void logAiRun({
             feature: "import_classify",
@@ -1353,6 +1428,7 @@ export interface ExtractProductsInput {
     mimeType: string;
     fileName: string;
     excelTextSample?: string;
+    operationType?: AiImportOperationType;
     /**
      * Review 3b 3.tur: tek tip context yerine TÜM aktif tipler. AI item
      * başına `product_type_id` seçer (whitelisted UUID). PMT multi-type
@@ -1369,6 +1445,7 @@ export interface ExtractProductsResult {
 }
 
 function buildExtractionSystemPrompt(input: ExtractProductsInput): string {
+    const operation = getAiImportOperation(input.operationType ?? DEFAULT_AI_IMPORT_OPERATION);
     const types = input.availableProductTypes;
     const typesBlock = types.length === 0
         ? "(sistem tipi yok — sadece name + sku çıkar, attributes boş bırak)"
@@ -1388,6 +1465,10 @@ function buildExtractionSystemPrompt(input: ExtractProductsInput): string {
         : "Belge tek bir ürünün VERİ SAYFASI; yalnız bir item üret (line=1).";
 
     return `Sen bir endüstriyel ekipman kataloğunu analiz eden ekstraksiyon asistanısın.
+Kullanıcının seçtiği işlem:
+- ${operation.title}
+- ${operation.promptContext}
+
 ${cardinality}
 
 Aşağıda sistemdeki mevcut ürün tipleri ve her tipin alan tanımları var:
@@ -1395,6 +1476,9 @@ Aşağıda sistemdeki mevcut ürün tipleri ve her tipin alan tanımları var:
 ${typesBlock}
 
 Kurallar:
+- İşlem türüne göre odaklan ama belgedeki gerçek veriyi uydurma.
+- Fiyat, maliyet, satış fiyatı veya birim maliyet bilgilerini attributes içine yazma.
+- Dosyada olmayan alanı doldurma; boş alan mevcut ERP değerinin silineceği anlamına gelmez.
 - Her item için en uygun tipin UUID'sini "product_type_id" alanına yaz. Hiçbiri uymuyorsa null bırak.
 - "attributes" objesinde YALNIZ seçtiğin tipin field_key'lerini kullan; başka tipin alanlarını yazma.
 - Her dolu teknik attribute için "extraction_evidence" içinde aynı field_key ile kanıt yaz.
@@ -1548,7 +1632,7 @@ export async function aiExtractProductsFromDocument(
         void logAiRun({
             feature: "import_extract_products",
             entity_id: null,
-            input_hash: hashInput(`${input.mimeType}:${input.fileName}:${input.buffer.length}:${typeIdsHash}`),
+            input_hash: hashInput(`${input.mimeType}:${input.fileName}:${input.buffer.length}:${typeIdsHash}:${input.operationType ?? DEFAULT_AI_IMPORT_OPERATION}`),
             confidence: avgConf,
             latency_ms: Date.now() - t0,
             model: MODEL,
@@ -1576,6 +1660,8 @@ export interface ExtractedCertificateTarget {
     target_sku: string | null;
     confidence: number;
 }
+
+export type ExtractedProductDocumentTarget = ExtractedCertificateTarget;
 
 const CERT_SYSTEM_PROMPT = `Sen bir endüstriyel sertifika/uygunluk belgesi okuyup, belgenin atfedildiği ürünün ad ve SKU'sunu çıkaran asistansın.
 
@@ -1659,6 +1745,73 @@ export async function aiExtractCertificateTarget(
             throw err;
         }
         console.error("[AI Extract Certificate] graceful degradation:", err);
+        return { target_name: null, target_sku: null, confidence: 0 };
+    }
+}
+
+const PRODUCT_DOCUMENT_TARGET_PROMPT = `Sen bir endüstriyel ürün dosyasını okuyup, dosyanın hangi ürüne ait olduğunu çıkaran asistansın.
+
+Dosya türleri ürün fotoğrafı, datasheet, teknik doküman, sertifika veya uygunluk belgesi olabilir.
+
+Kurallar:
+- target_name: belgedeki/fotoğraftaki ürün adı veya ayırt edici model adı.
+- target_sku: ürün SKU/kodu/model numarası varsa çıkar.
+- Fotoğrafta yazı azsa confidence düşük tut; uydurma.
+- Fiyat, maliyet veya ticari koşul çıkarma.
+
+Çıktı YALNIZCA aşağıdaki JSON formatında olmalı:
+{
+  "target_name": "...",
+  "target_sku": "...",
+  "confidence": 0.85
+}`;
+
+export async function aiExtractProductDocumentTarget(
+    input: ExtractCertificateInput,
+    signal?: AbortSignal,
+): Promise<ExtractedProductDocumentTarget> {
+    if (!isAIAvailable()) {
+        return { target_name: null, target_sku: null, confidence: 0 };
+    }
+    const t0 = Date.now();
+    try {
+        const contentBlock = pickContentBlockForMime(input.mimeType, input.buffer, input.excelTextSample);
+        const message = await client.messages.create(
+            {
+                model: MODEL,
+                max_tokens: 512,
+                system: PRODUCT_DOCUMENT_TARGET_PROMPT,
+                messages: [{
+                    role: "user",
+                    content: [
+                        contentBlock,
+                        { type: "text", text: `Dosya adı: ${sanitizeAiInput(input.fileName, 200)}` },
+                    ] as unknown as Anthropic.MessageParam["content"],
+                }],
+            },
+            { signal },
+        );
+        const text = message.content
+            .filter(c => c.type === "text")
+            .map(c => (c as { type: "text"; text: string }).text)
+            .join("\n");
+        const result = parseCertificateTargetResponse(text);
+
+        void logAiRun({
+            feature: "import_extract_certificate",
+            entity_id: null,
+            input_hash: hashInput(`product-document:${input.mimeType}:${input.fileName}:${input.buffer.length}`),
+            confidence: result.confidence,
+            latency_ms: Date.now() - t0,
+            model: MODEL,
+        });
+
+        return result;
+    } catch (err) {
+        if (signal?.aborted || (err instanceof Error && err.name === "AbortError")) {
+            throw err;
+        }
+        console.error("[AI Extract Product Document Target] graceful degradation:", err);
         return { target_name: null, target_sku: null, confidence: 0 };
     }
 }

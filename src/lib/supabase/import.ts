@@ -88,7 +88,7 @@ export async function dbClaimBatchForConfirm(id: string): Promise<ImportBatchRow
 
 export interface CreateDraftInput {
     batch_id: string;
-    entity_type: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment";
+    entity_type: "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment";
     raw_data?: Json;
     parsed_data?: Json;
     matched_entity_id?: string;

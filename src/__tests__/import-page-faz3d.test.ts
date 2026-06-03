@@ -37,12 +37,14 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
         expect(SOURCE).not.toMatch(/setMode\("classic"\)/);
     });
 
-    it("AI akışı (DropZone + ClassifierQueue) her zaman render — mode==='ai' guard kalmadı", () => {
+    it("AI belge akışı (DropZone + ClassifierQueue) product/document operasyonlarında render — mode==='ai' guard kalmadı", () => {
         // mode === "ai" koşullu render kaldırıldı
         expect(SOURCE).not.toMatch(/mode === "ai" &&/);
         // DropZone import + render var
         expect(SOURCE).toMatch(/<DropZone/);
         expect(SOURCE).toMatch(/<ClassifierQueue/);
+        // Faz 2 stok/müşteri/tedarikçi operasyonları bilinçli klasik Excel/CSV hattına yönlenir.
+        expect(SOURCE).toMatch(/selectedUsesClassic/);
     });
 
     it("ClassifierQueue'ya onOpenClassicMode prop'u geçer (migration_excel CTA)", () => {
@@ -136,5 +138,22 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
         expect(E2E_SRC).toMatch(/getByTestId\("import-error-banner"\)/);
         // Defense-in-depth — eski selector geri gelirse strict-mode collision döner
         expect(E2E_SRC).not.toMatch(/getByRole\("alert"\)/);
+    });
+
+    it("Faz 2: vendor/stock sheet adları klasik wizard mapping'inde desteklenir", () => {
+        expect(SOURCE).toMatch(/Tedarikciler/);
+        expect(SOURCE).toMatch(/Tedarikçi_Ürünleri/);
+        expect(SOURCE).toMatch(/Stok_Sayimi/);
+        expect(SOURCE).toMatch(/Stok_Hareketleri/);
+    });
+
+    it("Faz 2: apply-mappings request seçili operation_type taşır", () => {
+        expect(SOURCE).toMatch(/operation_type:\s*aiOperationType/);
+    });
+
+    it("Faz 2: internal operation marker preview tablosunda gösterilmez", () => {
+        expect(SOURCE).toMatch(/INTERNAL_IMPORT_FIELDS/);
+        expect(SOURCE).toMatch(/__ai_import_operation/);
+        expect(SOURCE).toMatch(/!INTERNAL_IMPORT_FIELDS\.has\(k\)/);
     });
 });

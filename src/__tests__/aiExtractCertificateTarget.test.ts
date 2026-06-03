@@ -123,3 +123,40 @@ describe("aiExtractCertificateTarget — behavior", () => {
         vi.unstubAllEnvs();
     });
 });
+
+describe("aiExtractProductDocumentTarget — behavior", () => {
+    it("AI unavailable → fallback no API call", async () => {
+        vi.unstubAllEnvs();
+        const { aiExtractProductDocumentTarget } = await import("@/lib/services/ai-service");
+        const r = await aiExtractProductDocumentTarget({
+            buffer: Buffer.from("x"), mimeType: "image/jpeg", fileName: "photo.jpg",
+        });
+        expect(r.target_name).toBeNull();
+        expect(r.confidence).toBe(0);
+        expect(mockMessagesCreate).not.toHaveBeenCalled();
+    });
+
+    it("happy path → product document prompt parses target and logs AI run", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockResolvedValueOnce(aiResponse({
+            target_name: "Küresel Vana DN50", target_sku: "KV-50", confidence: 0.76,
+        }));
+        const { aiExtractProductDocumentTarget } = await import("@/lib/services/ai-service");
+        const r = await aiExtractProductDocumentTarget({
+            buffer: Buffer.from("photo-bytes"), mimeType: "image/jpeg", fileName: "KV-50.jpg",
+        });
+        expect(r).toEqual({
+            target_name: "Küresel Vana DN50",
+            target_sku: "KV-50",
+            confidence: 0.76,
+        });
+        expect(mockMessagesCreate.mock.calls[0]?.[0]).toMatchObject({
+            max_tokens: 512,
+        });
+        expect(mockLogAiRun.mock.calls[0]?.[0]).toMatchObject({
+            feature: "import_extract_certificate",
+            confidence: 0.76,
+        });
+        vi.unstubAllEnvs();
+    });
+});

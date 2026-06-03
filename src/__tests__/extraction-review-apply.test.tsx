@@ -55,6 +55,47 @@ const DOC: ImportDocumentRow = {
     created_at: "2026-01-01",
 };
 
+const PRODUCT_TYPES = [{
+    id: "type-vana",
+    name: "Vana",
+    fields: [
+        {
+            id: "field-dn",
+            product_type_id: "type-vana",
+            field_key: "dn",
+            label_tr: "DN",
+            label_en: null,
+            field_type: "number" as const,
+            unit: "mm",
+            options: null,
+            required: false,
+            is_active: true,
+            placeholder: null,
+            help_text: null,
+            sort_order: 1,
+            created_at: "2026-01-01",
+            updated_at: "2026-01-01",
+        },
+        {
+            id: "field-pn",
+            product_type_id: "type-vana",
+            field_key: "pn_class",
+            label_tr: "PN",
+            label_en: null,
+            field_type: "text" as const,
+            unit: null,
+            options: null,
+            required: false,
+            is_active: true,
+            placeholder: null,
+            help_text: null,
+            sort_order: 2,
+            created_at: "2026-01-01",
+            updated_at: "2026-01-01",
+        },
+    ],
+}];
+
 function makeLine(id: string, overrides: Partial<ImportDocumentLineRow> = {}): ImportDocumentLineRow {
     return {
         id,
@@ -122,6 +163,13 @@ describe("ExtractionReview — Faz 3c Apply", () => {
         const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
         expect(url).toContain("/api/import/documents/doc-1/apply");
         expect(init.method).toBe("POST");
+        expect(JSON.parse(String(init.body))).toMatchObject({
+            fieldApprovals: {
+                "1": { technicalAttributeKeys: [] },
+                "2": { technicalAttributeKeys: [] },
+                "3": { technicalAttributeKeys: [] },
+            },
+        });
 
         // Success toast
         expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ type: "success" }));
@@ -130,6 +178,56 @@ describe("ExtractionReview — Faz 3c Apply", () => {
         await waitFor(() => {
             const btn = screen.getByRole("button", { name: /^Uygula$/ });
             expect(btn).toHaveProperty("disabled", true);
+        });
+    });
+
+    it("teknik alan checkbox'ı kapatılırsa apply body yalnız seçili alanları taşır", async () => {
+        const fetchSpy = vi.fn(async () => new Response(JSON.stringify({
+            ok: true,
+            result: {
+                products_created: 0,
+                products_updated: 1,
+                attachments_created: 0,
+                technical_fields_applied: 1,
+                skipped: 0,
+                errors: [],
+                untyped_products: 0,
+            },
+        }), { status: 200 }));
+        vi.stubGlobal("fetch", fetchSpy);
+
+        render(<ExtractionReview
+            document={DOC}
+            initialLines={[makeLine("1", {
+                product_type_id: "type-vana",
+                extracted_attributes: { dn: 50, pn_class: "PN16" },
+                extraction_evidence: {
+                    dn: { confidence: "high", evidence_text: "DN50" },
+                    pn_class: { confidence: "high", evidence_text: "PN16" },
+                },
+            })]}
+            productTypes={PRODUCT_TYPES}
+        />);
+
+        const pnApproval = screen.getByLabelText(/1\. satır PN uygulama onayı/);
+        expect(pnApproval).toHaveProperty("checked", true);
+
+        await act(async () => {
+            fireEvent.click(pnApproval);
+        });
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: /^Uygula$/ }));
+        });
+
+        const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+        expect(JSON.parse(String(init.body))).toMatchObject({
+            fieldApprovals: {
+                "1": { technicalAttributeKeys: ["dn"] },
+            },
+        });
+        await waitFor(() => {
+            expect(screen.getByText(/1 teknik alan uygulandı/)).toBeTruthy();
         });
     });
 

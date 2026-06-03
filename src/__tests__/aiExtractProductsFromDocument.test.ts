@@ -309,6 +309,26 @@ describe("aiExtractProductsFromDocument — behavior (multi-type)", () => {
         expect(call.system).toContain("PN16");
         // AI'ya product_type_id seçtirme talimatı var mı
         expect(call.system).toContain("product_type_id");
+        expect(call.system).toContain("Mevcut ürünü güncelle");
+        expect(call.system).toMatch(/Fiyat, maliyet|fiyat, maliyet/i);
+        vi.unstubAllEnvs();
+    });
+
+    it("selected operationType changes extraction focus in prompt", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockResolvedValueOnce(aiResponse({ items: [] }));
+        const { aiExtractProductsFromDocument } = await import("@/lib/services/ai-service");
+        await aiExtractProductsFromDocument({
+            buffer: Buffer.from("x"),
+            mimeType: "application/pdf",
+            fileName: "x.pdf",
+            availableProductTypes: AVAILABLE_TYPES,
+            operationType: "product_technical_update",
+            multiRow: true,
+        });
+        const call = mockMessagesCreate.mock.calls[0]?.[0] as { system: string };
+        expect(call.system).toContain("Teknik bilgileri güncelle");
+        expect(call.system).toContain("Dosyada olmayan alanı doldurma");
         vi.unstubAllEnvs();
     });
 

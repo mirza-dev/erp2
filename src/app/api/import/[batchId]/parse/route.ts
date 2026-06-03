@@ -28,7 +28,7 @@ export async function POST(
         const body = safeParsed.data as {
             sheets: Array<{
                 sheet_name: string;
-                entity_type: "customer" | "product" | "order";
+                entity_type: "customer" | "product" | "vendor" | "stock" | "order";
                 rows: Array<Record<string, string>>;
             }>;
         };
@@ -37,7 +37,7 @@ export async function POST(
             return NextResponse.json({ error: "En az bir sheet gerekli." }, { status: 400 });
         }
 
-        const VALID_ENTITY_TYPES = new Set<string>(["customer", "product", "order"]);
+        const VALID_ENTITY_TYPES = new Set<string>(["customer", "product", "vendor", "stock", "order"]);
         const MAX_ROWS_PER_SHEET = 200;
 
         for (const sheet of body.sheets) {

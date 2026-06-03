@@ -1,11 +1,15 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
-import type { ExchangeCurrencyCode, ExchangeRatesResponse } from "@/lib/exchange-rates";
+import type { ExchangeCurrencyCode, ExchangeRatesResponse, ExchangeRatesSource } from "@/lib/exchange-rates";
 
-const REFRESH_MS = 60 * 60 * 1000;
+const REFRESH_MS = 20 * 60 * 1000;
 const CURRENCIES: ExchangeCurrencyCode[] = ["USD", "EUR"];
 const SYMBOLS: Record<ExchangeCurrencyCode, string> = { USD: "$", EUR: "€" };
+const SOURCE_META: Record<ExchangeRatesSource, { badge: string; label: string }> = {
+    LIVE_RATES: { badge: "LIVE", label: "Live-Rates" },
+    TCMB: { badge: "TCMB", label: "TCMB" },
+};
 const RATE_FORMATTER = new Intl.NumberFormat("tr-TR", {
     minimumFractionDigits: 3,
     maximumFractionDigits: 3,
@@ -14,7 +18,7 @@ const RATE_FORMATTER = new Intl.NumberFormat("tr-TR", {
 function isRatePayload(value: unknown): value is ExchangeRatesResponse {
     if (!value || typeof value !== "object") return false;
     const candidate = value as Partial<ExchangeRatesResponse>;
-    return candidate.source === "TCMB"
+    return (candidate.source === "LIVE_RATES" || candidate.source === "TCMB")
         && typeof candidate.date === "string"
         && !!candidate.rates
         && CURRENCIES.every((code) => {
@@ -29,6 +33,16 @@ function isRatePayload(value: unknown): value is ExchangeRatesResponse {
 
 function formatRate(value: number): string {
     return RATE_FORMATTER.format(value);
+}
+
+function sourceMeta(source: ExchangeRatesSource) {
+    return SOURCE_META[source];
+}
+
+function titleForRates(rates: ExchangeRatesResponse): string {
+    const meta = sourceMeta(rates.source);
+    const timestamp = rates.providerTimestamp ?? rates.date;
+    return `${meta.label} alış/satış kuru · ${timestamp}`;
 }
 
 const tickerStyle: React.CSSProperties = {
@@ -124,14 +138,15 @@ const ExchangeRatesTicker = memo(function ExchangeRatesTicker() {
     }, []);
 
     if (!rates) return null;
+    const meta = sourceMeta(rates.source);
 
     return (
         <div
-            aria-label="TCMB döviz kurları"
-            title={`TCMB alış/satış kuru · ${rates.date}`}
+            aria-label={`${meta.label} döviz kurları`}
+            title={titleForRates(rates)}
             style={tickerStyle}
         >
-            <span style={sourceStyle}>TCMB</span>
+            <span style={sourceStyle}>{meta.badge}</span>
             <span style={ratesStyle}>
                 {CURRENCIES.map((code) => {
                     const rate = rates.rates[code];

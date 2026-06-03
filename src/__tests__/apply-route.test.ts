@@ -40,13 +40,17 @@ beforeEach(() => {
     mockGetUser.mockImplementation(() => Promise.resolve({ data: { user: { id: "user-1" } } }));
 });
 
-function makeReq(id: string): NextRequest {
-    return new NextRequest(new URL(`http://localhost/api/import/documents/${id}/apply`), { method: "POST" });
+function makeReq(id: string, body?: unknown): NextRequest {
+    return new NextRequest(new URL(`http://localhost/api/import/documents/${id}/apply`), {
+        method: "POST",
+        body: body === undefined ? undefined : JSON.stringify(body),
+        headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    });
 }
 
-async function callPOST(id: string) {
+async function callPOST(id: string, body?: unknown) {
     const { POST } = await import("@/app/api/import/documents/[id]/apply/route");
-    return POST(makeReq(id), { params: Promise.resolve({ id }) });
+    return POST(makeReq(id, body), { params: Promise.resolve({ id }) });
 }
 
 const RESULT = {
@@ -98,7 +102,30 @@ describe("POST /api/import/documents/[id]/apply", () => {
         mockRequireRole.mockResolvedValueOnce(null);
         mockApplyService.mockResolvedValueOnce(RESULT);
         await callPOST("doc-1");
-        expect(mockApplyService).toHaveBeenCalledWith("doc-1", "user-1");
+        expect(mockApplyService).toHaveBeenCalledWith("doc-1", "user-1", { fieldApprovals: undefined });
+    });
+
+    it("fieldApprovals body normalize edilir ve apply service'e forward edilir", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockApplyService.mockResolvedValueOnce(RESULT);
+        await callPOST("doc-1", {
+            fieldApprovals: {
+                "line-1": {
+                    productFields: ["name", "sku", "price", "product_type_id", "name"],
+                    technicalAttributeKeys: ["dn", "pn_class", "DN", "bad-key!", "dn"],
+                },
+                "line-2": { technicalAttributeKeys: ["material"] },
+            },
+        });
+        expect(mockApplyService).toHaveBeenCalledWith("doc-1", "user-1", {
+            fieldApprovals: {
+                "line-1": {
+                    productFields: ["name", "sku", "product_type_id"],
+                    technicalAttributeKeys: ["dn", "pn_class"],
+                },
+                "line-2": { productFields: [], technicalAttributeKeys: ["material"] },
+            },
+        });
     });
 
     // ── Faz 3c Review 4.tur (P3) — 409 mapping for 'applying' state ──────

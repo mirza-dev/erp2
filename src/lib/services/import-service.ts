@@ -9,10 +9,13 @@ import {
     dbClaimBatchForConfirm,
     type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
+import type { VendorRow } from "@/lib/database.types";
 import { dbIncrementMappingSuccess } from "@/lib/supabase/column-mappings";
 import { dbCreateCustomer, dbFindCustomerByName, dbFindCustomerByCode, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbLookupEntityAlias, dbSaveEntityAlias } from "@/lib/supabase/entity-aliases";
 import { dbCreateProduct, dbFindProductBySku, dbUpdateProduct } from "@/lib/supabase/products";
+import type { CreateProductInput } from "@/lib/supabase/products";
+import { dbCreateVendor, dbListVendors, dbUpdateVendor } from "@/lib/supabase/vendors";
 import { dbFindOrderByOriginalNumber, dbCreateOrder } from "@/lib/supabase/orders";
 import { dbCreateQuote, dbFindQuoteByNumber, dbUpdateQuote } from "@/lib/supabase/quotes";
 import { dbCreateShipment } from "@/lib/supabase/shipments";
@@ -50,7 +53,7 @@ export async function serviceAddDraftsToBatch(
 // ── Confirm ──────────────────────────────────────────────────
 
 export type ConfirmEntityType =
-    | "customer" | "product" | "quote" | "order" | "order_line"
+    | "customer" | "product" | "vendor" | "quote" | "order" | "order_line"
     | "stock" | "shipment" | "invoice" | "payment";
 
 export interface EntityCounts {
@@ -72,6 +75,7 @@ function makeEmptyByEntity(): Record<ConfirmEntityType, EntityCounts> {
     return {
         customer:   { added: 0, updated: 0, skipped: 0 },
         product:    { added: 0, updated: 0, skipped: 0 },
+        vendor:     { added: 0, updated: 0, skipped: 0 },
         quote:      { added: 0, updated: 0, skipped: 0 },
         order:      { added: 0, updated: 0, skipped: 0 },
         order_line: { added: 0, updated: 0, skipped: 0 },
@@ -84,9 +88,11 @@ function makeEmptyByEntity(): Record<ConfirmEntityType, EntityCounts> {
 
 // Entity processing order — respects dependency chain
 const ENTITY_PRIORITY: Record<string, number> = {
-    product: 1, customer: 2, quote: 3, order: 4,
-    order_line: 5, stock: 5, shipment: 6, invoice: 7, payment: 8,
+    product: 1, vendor: 2, customer: 3, quote: 4, order: 5,
+    order_line: 6, stock: 6, shipment: 7, invoice: 8, payment: 9,
 };
+
+const IMPORT_OPERATION_FIELD = "__ai_import_operation";
 
 /**
  * Numeric field parser that preserves 0 as a valid value.
@@ -105,6 +111,17 @@ function parseNumeric(value: unknown): number | undefined {
     // EN format or simple comma-decimal: 1234.56 or 1234,56
     const n = Number(s.replace(",", "."));
     return Number.isNaN(n) ? undefined : n;
+}
+
+function maybeString(value: unknown): string | undefined {
+    if (value === null || value === undefined) return undefined;
+    const s = String(value).trim();
+    return s ? s : undefined;
+}
+
+function maybeFiniteNumber(value: unknown): number | undefined {
+    const parsed = parseNumeric(value);
+    return parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined;
 }
 
 /**
@@ -158,6 +175,12 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
         productSkus:   new Map<string, string>(),   // Urun_Kodu → product uuid
     };
 
+    let activeVendorsCache: VendorRow[] | null = null;
+    const getActiveVendors = async (): Promise<VendorRow[]> => {
+        if (!activeVendorsCache) activeVendorsCache = await dbListVendors({ isActive: true });
+        return activeVendorsCache;
+    };
+
     // Sprint B G4: Aynı order'a multiple line draft → her birinde DB'den okumak
     // güncel olmayan state veriyordu (mevcut INSERT henüz commit olmadıysa görünmez).
     // Per-order cache ile sıralı sort_order garanti.
@@ -171,6 +194,9 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
         const base = (draft.parsed_data ?? {}) as Record<string, unknown>;
         const corrections = (draft.user_corrections ?? {}) as Record<string, unknown>;
         const data = { ...base, ...corrections };
+        const importOperation = typeof data[IMPORT_OPERATION_FIELD] === "string"
+            ? data[IMPORT_OPERATION_FIELD]
+            : null;
 
         try {
             if (draft.entity_type === "customer") {
@@ -240,6 +266,42 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
                 if (customerCode) refMap.customerCodes.set(customerCode, customerId);
 
             } else if (draft.entity_type === "product") {
+                if (importOperation === "vendor_product_relation") {
+                    const sku = maybeString(data.sku);
+                    if (!sku) {
+                        errors.push(`Satır ${rowNum}: Tedarikçi ürün ilişkisi için SKU eksik.`);
+                        await dbUpdateDraft(draft.id, { status: "rejected" });
+                        skipped++; bumpEntity(draft.entity_type, "skipped");
+                        continue;
+                    }
+                    const existingProduct = await dbFindProductBySku(sku);
+                    if (!existingProduct) {
+                        errors.push(`Satır ${rowNum}: '${sku}' kodlu ürün bulunamadı.`);
+                        await dbUpdateDraft(draft.id, { status: "rejected" });
+                        skipped++; bumpEntity(draft.entity_type, "skipped");
+                        continue;
+                    }
+                    const vendorRelationPatch: Partial<CreateProductInput> = {};
+                    const preferredVendor = maybeString(data.preferred_vendor);
+                    const leadTimeDays = maybeFiniteNumber(data.lead_time_days);
+                    const reorderQty = maybeFiniteNumber(data.reorder_qty);
+                    if (preferredVendor !== undefined) vendorRelationPatch.preferred_vendor = preferredVendor;
+                    if (leadTimeDays !== undefined) vendorRelationPatch.lead_time_days = leadTimeDays;
+                    if (reorderQty !== undefined) vendorRelationPatch.reorder_qty = reorderQty;
+
+                    if (Object.keys(vendorRelationPatch).length === 0) {
+                        errors.push(`Satır ${rowNum}: Tedarikçi ürün ilişkisi için uygulanacak alan bulunamadı.`);
+                        await dbUpdateDraft(draft.id, { status: "rejected" });
+                        skipped++; bumpEntity(draft.entity_type, "skipped");
+                        continue;
+                    }
+                    await dbUpdateProduct(existingProduct.id, vendorRelationPatch);
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existingProduct.id });
+                    updated++; bumpEntity(draft.entity_type, "updated");
+                    refMap.productSkus.set(sku, existingProduct.id);
+                    continue;
+                }
+
                 if (!data.sku || !data.name || !data.unit) {
                     const missing: string[] = [];
                     if (!data.name) missing.push("ürün adı");
@@ -323,6 +385,63 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
                     added++; bumpEntity(draft.entity_type, "added");
                 }
                 refMap.productSkus.set(sku, productId);
+
+            } else if (draft.entity_type === "vendor") {
+                const vendorName = String(data.name ?? "").trim();
+                const email = maybeString(data.contact_email) ?? maybeString(data.email);
+                const phone = maybeString(data.contact_phone) ?? maybeString(data.phone);
+                const taxNumber = maybeString(data.tax_number);
+                const vendors = await getActiveVendors();
+                const normEmail = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
+                const normText = (v: string | null | undefined) => (v ?? "").trim().toLocaleLowerCase("tr-TR");
+                const normPlain = (v: string | null | undefined) => (v ?? "").trim();
+                const existing =
+                    (email ? vendors.find(v => normEmail(v.contact_email) === normEmail(email)) : undefined)
+                    ?? (taxNumber ? vendors.find(v => normPlain(v.tax_number) === normPlain(taxNumber)) : undefined)
+                    ?? (phone ? vendors.find(v => normPlain(v.contact_phone) === normPlain(phone)) : undefined)
+                    ?? (vendorName ? vendors.find(v => normText(v.name) === normText(vendorName)) : undefined);
+
+                const vendorFields = {
+                    name: vendorName || undefined,
+                    contact_email: email,
+                    contact_phone: phone,
+                    contact_person: maybeString(data.contact_person),
+                    tax_number: taxNumber,
+                    address: maybeString(data.address),
+                    currency: maybeString(data.currency),
+                    payment_terms_days: maybeFiniteNumber(data.payment_terms_days),
+                    lead_time_days: maybeFiniteNumber(data.lead_time_days),
+                    notes: maybeString(data.notes),
+                };
+
+                if (existing) {
+                    const updatedVendor = await dbUpdateVendor(existing.id, vendorFields);
+                    activeVendorsCache = vendors.map(v => v.id === updatedVendor.id ? updatedVendor : v);
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
+                    updated++; bumpEntity(draft.entity_type, "updated");
+                } else {
+                    if (!vendorName) {
+                        errors.push(`Satır ${rowNum}: Tedarikçi adı eksik.`);
+                        await dbUpdateDraft(draft.id, { status: "rejected" });
+                        skipped++; bumpEntity(draft.entity_type, "skipped");
+                        continue;
+                    }
+                    const vendor = await dbCreateVendor({
+                        name: vendorName,
+                        contact_email: email,
+                        contact_phone: phone,
+                        contact_person: maybeString(data.contact_person),
+                        tax_number: taxNumber,
+                        address: maybeString(data.address),
+                        currency: maybeString(data.currency) ?? "TRY",
+                        payment_terms_days: maybeFiniteNumber(data.payment_terms_days),
+                        lead_time_days: maybeFiniteNumber(data.lead_time_days),
+                        notes: maybeString(data.notes),
+                    });
+                    activeVendorsCache = [...vendors, vendor];
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: vendor.id });
+                    added++; bumpEntity(draft.entity_type, "added");
+                }
 
             } else if (draft.entity_type === "quote") {
                 const quoteNumber = String(data.quote_number ?? "");
@@ -526,8 +645,23 @@ async function runConfirmFlow(batchId: string): Promise<ConfirmResult> {
                     skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
-                // Additive: imported qty is added to existing stock (not overwrite)
-                const newOnHand = prod.on_hand + Number(data.on_hand);
+                const quantity = maybeFiniteNumber(data.on_hand);
+                if (quantity === undefined) {
+                    errors.push(`Satır ${rowNum}: Stok miktarı (on_hand) geçersiz.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
+                    continue;
+                }
+                if (importOperation === "stock_count" && quantity < 0) {
+                    errors.push(`Satır ${rowNum}: Stok sayımı negatif olamaz.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
+                    continue;
+                }
+                // Legacy/default: additive. AI Import stock_count: count snapshot overwrite.
+                const newOnHand = importOperation === "stock_count"
+                    ? quantity
+                    : prod.on_hand + quantity;
                 await dbUpdateProduct(prod.id, { on_hand: newOnHand });
                 await dbUpdateDraft(draft.id, { status: "merged" });
                 updated++; bumpEntity(draft.entity_type, "updated");

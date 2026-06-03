@@ -157,7 +157,9 @@ describe("POST /api/import/[batchId]/apply-mappings", () => {
         }), makeCtx());
 
         const draftInputs: Array<{ parsed_data: Record<string, unknown> }> = mockDbCreateDrafts.mock.calls[0][0];
-        expect(Object.keys(draftInputs[0].parsed_data)).toEqual(["sku"]);
+        expect(draftInputs[0].parsed_data).toHaveProperty("sku", "P001");
+        expect(draftInputs[0].parsed_data).toHaveProperty("__ai_import_operation", "product_update");
+        expect(draftInputs[0].parsed_data).not.toHaveProperty("junk");
     });
 
     it("TR number format: '1.234,56' is parsed as 1234.56 for numeric fields", async () => {
@@ -232,5 +234,88 @@ describe("POST /api/import/[batchId]/apply-mappings", () => {
         const draftInputs: Array<{ parsed_data: Record<string, unknown> }> = mockDbCreateDrafts.mock.calls[0][0];
         expect(draftInputs[0].parsed_data).toHaveProperty("sku");
         expect(draftInputs[0].parsed_data).not.toHaveProperty("category");
+    });
+
+    it("persists selected operation_type as internal draft metadata", async () => {
+        await POST(makeReq({
+            operation_type: "stock_count",
+            sheets: [{
+                sheet_name: "Stok_Sayimi",
+                entity_type: "stock",
+                mappings: [
+                    { source_column: "sku", target_field: "sku" },
+                    { source_column: "stok", target_field: "on_hand" },
+                ],
+                rows: [{ sku: "P001", stok: "12" }],
+                remember: false,
+            }],
+        }), makeCtx());
+
+        const draftInputs: Array<{ entity_type: string; parsed_data: Record<string, unknown> }> = mockDbCreateDrafts.mock.calls[0][0];
+        expect(draftInputs[0].entity_type).toBe("stock");
+        expect(draftInputs[0].parsed_data).toMatchObject({
+            sku: "P001",
+            on_hand: 12,
+            __ai_import_operation: "stock_count",
+        });
+    });
+
+    it("vendor entity mappings are whitelisted and keep price/cost out", async () => {
+        await POST(makeReq({
+            operation_type: "vendor_upsert",
+            sheets: [{
+                sheet_name: "Tedarikciler",
+                entity_type: "vendor",
+                mappings: [
+                    { source_column: "name", target_field: "name" },
+                    { source_column: "email", target_field: "contact_email" },
+                    { source_column: "price", target_field: "price" },
+                ],
+                rows: [{ name: "Acme Makine", email: "satis@acme.com", price: "999" }],
+                remember: false,
+            }],
+        }), makeCtx());
+
+        const draftInputs: Array<{ entity_type: string; parsed_data: Record<string, unknown> }> = mockDbCreateDrafts.mock.calls[0][0];
+        expect(draftInputs[0].entity_type).toBe("vendor");
+        expect(draftInputs[0].parsed_data).toMatchObject({
+            name: "Acme Makine",
+            contact_email: "satis@acme.com",
+            __ai_import_operation: "vendor_upsert",
+        });
+        expect(draftInputs[0].parsed_data).not.toHaveProperty("price");
+        expect(draftInputs[0].parsed_data).not.toHaveProperty("cost_price");
+    });
+
+    it("planned operation_type is rejected", async () => {
+        const res = await POST(makeReq({
+            operation_type: "product_type_template",
+            sheets: [{
+                sheet_name: "S1",
+                entity_type: "product",
+                mappings: [{ source_column: "sku", target_field: "sku" }],
+                rows: [{ sku: "P001" }],
+                remember: false,
+            }],
+        }), makeCtx());
+
+        expect(res.status).toBe(400);
+        expect(mockDbDeletePendingDrafts).not.toHaveBeenCalled();
+        expect(mockDbCreateDrafts).not.toHaveBeenCalled();
+    });
+
+    it("invalid entity_type is rejected before creating drafts", async () => {
+        const res = await POST(makeReq({
+            sheets: [{
+                sheet_name: "Bad",
+                entity_type: "unknown",
+                mappings: [{ source_column: "name", target_field: "name" }],
+                rows: [{ name: "X" }],
+                remember: false,
+            }],
+        }), makeCtx());
+
+        expect(res.status).toBe(400);
+        expect(mockDbCreateDrafts).not.toHaveBeenCalled();
     });
 });

@@ -9,6 +9,7 @@ const mockReplaceLines = vi.fn();
 const mockGetProductType = vi.fn();
 const mockExtractProducts = vi.fn();
 const mockExtractCert = vi.fn();
+const mockExtractProductDocTarget = vi.fn();
 const mockFindCandidates = vi.fn();
 const mockStorageDownload = vi.fn();
 const mockLoadActiveMatchables = vi.fn();
@@ -31,6 +32,7 @@ vi.mock("@/lib/supabase/import-document-lines", () => ({
 vi.mock("@/lib/services/ai-service", () => ({
     aiExtractProductsFromDocument: (...a: unknown[]) => mockExtractProducts(...a),
     aiExtractCertificateTarget: (...a: unknown[]) => mockExtractCert(...a),
+    aiExtractProductDocumentTarget: (...a: unknown[]) => mockExtractProductDocTarget(...a),
 }));
 
 vi.mock("@/lib/services/product-matcher", async () => {
@@ -76,6 +78,7 @@ beforeEach(() => {
     mockGetProductType.mockReset();
     mockExtractProducts.mockReset();
     mockExtractCert.mockReset();
+    mockExtractProductDocTarget.mockReset();
     mockFindCandidates.mockReset();
     mockStorageDownload.mockReset();
     mockLoadActiveMatchables.mockReset();
@@ -156,13 +159,30 @@ describe("POST /api/import/documents/[id]/extract — validation", () => {
         const res = await callPOST(makeReq("doc-1"), "doc-1");
         expect(res.status).toBe(400);
     });
+
+    it("operation=product_documents yine de unknown belge tipini ekstraksiyona sokmaz", async () => {
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            classification: {
+                ...PROD_DOC.classification,
+                document_type: "unknown",
+                operation_type: "product_documents",
+            },
+        });
+        const res = await callPOST(makeReq("doc-1"), "doc-1");
+        expect(res.status).toBe(400);
+        expect(mockExtractProductDocTarget).not.toHaveBeenCalled();
+    });
 });
 
 describe("POST /api/import/documents/[id]/extract — happy product flow", () => {
     beforeEach(() => mockRequireRole.mockResolvedValue(null));
 
     it("product_catalog → extracts + matches + creates lines (201)", async () => {
-        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            classification: { ...PROD_DOC.classification, operation_type: "product_technical_update" },
+        });
         mockExtractProducts.mockResolvedValueOnce({
             items: [
                 { line: 1, name: "Vana DN50", sku: "KV-50", attributes: { dn: 50 }, confidence: 0.9, product_type_id: null },
@@ -179,6 +199,9 @@ describe("POST /api/import/documents/[id]/extract — happy product flow", () =>
         const res = await callPOST(makeReq("doc-1"), "doc-1");
         expect(res.status).toBe(201);
         expect(mockExtractProducts).toHaveBeenCalledTimes(1);
+        expect(mockExtractProducts.mock.calls[0]?.[0]).toMatchObject({
+            operationType: "product_technical_update",
+        });
         // Per-item matcher called twice
         expect(mockFindCandidates).toHaveBeenCalledTimes(2);
         expect(mockReplaceLines).toHaveBeenCalledTimes(1);
@@ -224,6 +247,65 @@ describe("POST /api/import/documents/[id]/extract — certificate flow", () => {
         const linesArg = mockReplaceLines.mock.calls[0]?.[1] as Array<{ extraction_type: string; line_number: number }>;
         expect(linesArg[0].extraction_type).toBe("certificate_target");
         expect(linesArg[0].line_number).toBe(1);
+    });
+
+    it("product_photo → product document target flow + single attachment-target line", async () => {
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            file_name: "valve-photo.jpg",
+            mime_type: "image/jpeg",
+            classification: { ...PROD_DOC.classification, document_type: "product_photo" },
+        });
+        mockExtractProductDocTarget.mockResolvedValueOnce({
+            target_name: "Vana DN50",
+            target_sku: "KV-50",
+            confidence: 0.72,
+        });
+        mockFindCandidates.mockResolvedValueOnce([
+            { id: "p-1", sku: "KV-50", name: "Vana DN50", score: 90, reasons: ["sku_exact"] },
+        ]);
+        mockReplaceLines.mockResolvedValueOnce([{ id: "l-1", line_number: 1 }]);
+
+        const res = await callPOST(makeReq("doc-1"), "doc-1");
+        expect(res.status).toBe(201);
+        expect(mockExtractProductDocTarget).toHaveBeenCalledTimes(1);
+        expect(mockExtractCert).not.toHaveBeenCalled();
+        expect(mockExtractProducts).not.toHaveBeenCalled();
+        const linesArg = mockReplaceLines.mock.calls[0]?.[1] as Array<{
+            extraction_type: string;
+            matched_product_id: string | null;
+            product_type_id: string | null;
+        }>;
+        expect(linesArg[0].extraction_type).toBe("certificate_target");
+        expect(linesArg[0].matched_product_id).toBe("p-1");
+        expect(linesArg[0].product_type_id).toBeNull();
+    });
+
+    it("operation=product_documents + product_datasheet → attaches to product instead of product extraction", async () => {
+        mockGetDoc.mockResolvedValueOnce({
+            ...PROD_DOC,
+            classification: {
+                ...PROD_DOC.classification,
+                document_type: "product_datasheet",
+                operation_type: "product_documents",
+            },
+        });
+        mockExtractProductDocTarget.mockResolvedValueOnce({
+            target_name: "Datasheet Vana DN80",
+            target_sku: "KV-80",
+            confidence: 0.66,
+        });
+        mockFindCandidates.mockResolvedValueOnce([]);
+        mockReplaceLines.mockResolvedValueOnce([{ id: "l-1", line_number: 1 }]);
+
+        const res = await callPOST(makeReq("doc-1", { productTypeId: "ignored-in-document-flow" }), "doc-1");
+        expect(res.status).toBe(201);
+        expect(mockGetProductType).not.toHaveBeenCalled();
+        expect(mockExtractProducts).not.toHaveBeenCalled();
+        expect(mockExtractProductDocTarget).toHaveBeenCalledTimes(1);
+        const linesArg = mockReplaceLines.mock.calls[0]?.[1] as Array<{ match_action: string; product_type_id: string | null }>;
+        expect(linesArg[0].match_action).toBe("new_product");
+        expect(linesArg[0].product_type_id).toBeNull();
     });
 });
 

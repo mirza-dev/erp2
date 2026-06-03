@@ -46,6 +46,38 @@ export interface ExtractionReviewProps {
     productTypes: QueuedSuggestedType[];
 }
 
+function hasTechnicalReviewValue(value: unknown): boolean {
+    if (value === null || value === undefined) return false;
+    if (typeof value === "string") return value.trim().length > 0;
+    if (Array.isArray(value)) return value.length > 0;
+    return true;
+}
+
+function buildInitialTechnicalApprovals(lines: ImportDocumentLineRow[]): Record<string, Record<string, boolean>> {
+    return Object.fromEntries(lines.map(line => [
+        line.id,
+        Object.fromEntries(
+            Object.entries(line.extracted_attributes ?? {})
+                .filter(([, value]) => hasTechnicalReviewValue(value))
+                .map(([key]) => [key, true]),
+        ),
+    ]));
+}
+
+function buildInitialProductFieldApprovals(lines: ImportDocumentLineRow[]): Record<string, Record<string, boolean>> {
+    return Object.fromEntries(lines.map(line => {
+        const isNew = line.match_action === "new_product";
+        return [
+            line.id,
+            {
+                name: isNew && hasTechnicalReviewValue(line.extracted_name),
+                sku: isNew && hasTechnicalReviewValue(line.extracted_sku),
+                product_type_id: hasTechnicalReviewValue(line.product_type_id),
+            },
+        ];
+    }));
+}
+
 export default function ExtractionReview({ document: doc, initialLines, productTypes }: ExtractionReviewProps) {
     const isDemo = useIsDemo();
     const { toast } = useToast();
@@ -54,6 +86,12 @@ export default function ExtractionReview({ document: doc, initialLines, productT
     const isCertFlow = isCertFlowDocumentType(doc.classification?.document_type ?? null);
 
     const [lines, setLines] = useState<ImportDocumentLineRow[]>(initialLines);
+    const [approvedTechnicalFields, setApprovedTechnicalFields] = useState<Record<string, Record<string, boolean>>>(
+        () => buildInitialTechnicalApprovals(initialLines),
+    );
+    const [approvedProductFields, setApprovedProductFields] = useState<Record<string, Record<string, boolean>>>(
+        () => buildInitialProductFieldApprovals(initialLines),
+    );
     const [extracting, setExtracting] = useState(false);
     // Cert-flow'da suggested_product_type_id default'a aktarılmaz (anlamsız);
     // product-flow'da AI'nın önerdiği tipi başlangıç olarak gösterir.
@@ -87,6 +125,15 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             const res = await fetch(`/api/import/documents/${doc.id}/apply`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    fieldApprovals: Object.fromEntries(lines.map(line => [
+                        line.id,
+                        {
+                            productFields: approvedProductFieldKeysForLine(line),
+                            technicalAttributeKeys: approvedTechnicalKeysForLine(line),
+                        },
+                    ])),
+                }),
             });
             const body = await res.json().catch(() => ({}));
             // Faz 3c Review 4.tur (P3): 409 = başka oturum apply'ı sürüyor.
@@ -167,6 +214,8 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             }
             const data = await res.json() as { lines: ImportDocumentLineRow[] };
             setLines(data.lines);
+            setApprovedTechnicalFields(buildInitialTechnicalApprovals(data.lines));
+            setApprovedProductFields(buildInitialProductFieldApprovals(data.lines));
             toast({ type: "success", message: `${data.lines.length} satır çıkarıldı` });
         } catch (e) {
             toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
@@ -238,6 +287,17 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             extracted_attributes: filteredAttributes,
             extraction_evidence: filteredEvidence,
         });
+        setApprovedTechnicalFields(prev => ({
+            ...prev,
+            [line.id]: Object.fromEntries(
+                Object.entries(prev[line.id] ?? {})
+                    .filter(([key]) => allowedKeys.has(key) && hasTechnicalReviewValue(filteredAttributes[key])),
+            ),
+        }));
+        setApprovedProductFields(prev => ({
+            ...prev,
+            [line.id]: { ...(prev[line.id] ?? {}), product_type_id: Boolean(newTypeId) },
+        }));
     }
 
     async function patchTechnicalAttribute(line: ImportDocumentLineRow, field: ProductTypeFieldRow, value: unknown) {
@@ -264,10 +324,54 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             extracted_attributes: nextAttributes,
             extraction_evidence: nextEvidence,
         });
+        setApprovedTechnicalFields(prev => ({
+            ...prev,
+            [line.id]: {
+                ...(prev[line.id] ?? {}),
+                [field.field_key]: hasTechnicalReviewValue(nextAttributes[field.field_key]),
+            },
+        }));
     }
 
     function getProductTypeForLine(line: ImportDocumentLineRow) {
         return line.product_type_id ? productTypes.find(t => t.id === line.product_type_id) ?? null : null;
+    }
+
+    function setTechnicalFieldApproval(lineId: string, fieldKey: string, checked: boolean) {
+        setApprovedTechnicalFields(prev => ({
+            ...prev,
+            [lineId]: { ...(prev[lineId] ?? {}), [fieldKey]: checked },
+        }));
+    }
+
+    function setProductFieldApproval(lineId: string, fieldKey: string, checked: boolean) {
+        setApprovedProductFields(prev => ({
+            ...prev,
+            [lineId]: { ...(prev[lineId] ?? {}), [fieldKey]: checked },
+        }));
+    }
+
+    function isTechnicalFieldApproved(line: ImportDocumentLineRow, fieldKey: string): boolean {
+        return Boolean(approvedTechnicalFields[line.id]?.[fieldKey])
+            && hasTechnicalReviewValue((line.extracted_attributes ?? {})[fieldKey]);
+    }
+
+    function approvedTechnicalKeysForLine(line: ImportDocumentLineRow): string[] {
+        return Object.entries(approvedTechnicalFields[line.id] ?? {})
+            .filter(([key, on]) => on && hasTechnicalReviewValue((line.extracted_attributes ?? {})[key]))
+            .map(([key]) => key);
+    }
+
+    function approvedProductFieldKeysForLine(line: ImportDocumentLineRow): string[] {
+        return Object.entries(approvedProductFields[line.id] ?? {})
+            .filter(([key, on]) => {
+                if (!on) return false;
+                if (key === "name") return hasTechnicalReviewValue(line.extracted_name);
+                if (key === "sku") return hasTechnicalReviewValue(line.extracted_sku);
+                if (key === "product_type_id") return hasTechnicalReviewValue(line.product_type_id);
+                return false;
+            })
+            .map(([key]) => key);
     }
 
     function renderTechnicalEditor(line: ImportDocumentLineRow, field: ProductTypeFieldRow) {
@@ -438,7 +542,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                     {/* Multi-type filter — default "AI otomatik": tüm tipler context'e
                         geçirilir, AI her satırın tipini kendi seçer (PMT multi-type).
                         "Sadece X" seçilirse availableProductTypes tek tipe filtre olur.
-                        Cert-flow'da gizlenir — sertifika product_type_id kullanmıyor. */}
+                        Dosya-ekleme flow'unda gizlenir — hedef ürün üzerinden bağlanır. */}
                     {!isCertFlow && (
                         <select
                             value={overrideTypeId}
@@ -525,6 +629,11 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                     const lineType = getProductTypeForLine(line);
                                     const techFields = lineType?.fields ?? [];
                                     const detailColSpan = isCertFlow ? 6 : 7;
+                                    const approvedFieldCount = approvedTechnicalKeysForLine(line).length;
+                                    const isNewProductLine = line.match_action === "new_product";
+                                    const productNameApproved = Boolean(approvedProductFields[line.id]?.name);
+                                    const productSkuApproved = Boolean(approvedProductFields[line.id]?.sku);
+                                    const productTypeApproved = Boolean(approvedProductFields[line.id]?.product_type_id) && Boolean(line.product_type_id);
                                     return (
                                         <Fragment key={line.id}>
                                             <tr style={{ borderTop: "0.5px solid var(--border-tertiary)" }}>
@@ -534,10 +643,36 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                     {line.extracted_sku && (
                                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>{line.extracted_sku}</div>
                                                     )}
+                                                    {!isCertFlow && (
+                                                        <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "7px" }}>
+                                                            <label style={productFieldCheckStyle(isNewProductLine || isDocApplied || isDocApplying)}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isNewProductLine || productNameApproved}
+                                                                    disabled={isNewProductLine || isDemo || isDocApplied || isDocApplying || !hasTechnicalReviewValue(line.extracted_name)}
+                                                                    onChange={event => setProductFieldApproval(line.id, "name", event.target.checked)}
+                                                                    aria-label={`Satır ${line.line_number} ürün adı uygulama onayı`}
+                                                                    style={{ width: "13px", height: "13px", accentColor: "var(--accent)" }}
+                                                                />
+                                                                Ad uygula
+                                                            </label>
+                                                            <label style={productFieldCheckStyle(isNewProductLine || isDocApplied || isDocApplying)}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={isNewProductLine || productSkuApproved}
+                                                                    disabled={isNewProductLine || isDemo || isDocApplied || isDocApplying || !hasTechnicalReviewValue(line.extracted_sku)}
+                                                                    onChange={event => setProductFieldApproval(line.id, "sku", event.target.checked)}
+                                                                    aria-label={`Satır ${line.line_number} SKU uygulama onayı`}
+                                                                    style={{ width: "13px", height: "13px", accentColor: "var(--accent)" }}
+                                                                />
+                                                                SKU uygula
+                                                            </label>
+                                                        </div>
+                                                    )}
                                                 </td>
                                                 {/* Review 3b 3.tur: per-row tip override (multi-type).
-                                                    Review 3b 6.tur: cert-flow'da gizli — sertifika satırı tip
-                                                    kullanmıyor (3c'de hedef ürüne göre belirlenir). */}
+                                                    Review 3b 6.tur: dosya-ekleme flow'unda gizli —
+                                                    satır tip kullanmıyor (3c'de hedef ürüne göre belirlenir). */}
                                                 {!isCertFlow && (
                                                     <td style={td}>
                                                         <select
@@ -560,6 +695,17 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                                 <option key={t.id} value={t.id}>{t.name}</option>
                                                             ))}
                                                         </select>
+                                                        <label style={{ ...productFieldCheckStyle(isDocApplied || isDocApplying || !line.product_type_id), marginTop: "7px" }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={productTypeApproved}
+                                                                disabled={isDemo || isDocApplied || isDocApplying || !line.product_type_id}
+                                                                onChange={event => setProductFieldApproval(line.id, "product_type_id", event.target.checked)}
+                                                                aria-label={`Satır ${line.line_number} ürün tipi uygulama onayı`}
+                                                                style={{ width: "13px", height: "13px", accentColor: "var(--accent)" }}
+                                                            />
+                                                            Tip uygula
+                                                        </label>
                                                     </td>
                                                 )}
                                                 <td style={td}>
@@ -631,24 +777,51 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                     <td colSpan={detailColSpan} style={{ padding: "0 10px 12px", borderBottom: "0.5px solid var(--border-tertiary)", background: "var(--bg-primary)" }}>
                                                         <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "10px", background: "var(--bg-secondary)" }}>
                                                             <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
-                                                                Teknik bilgiler · {lineType?.name}
+                                                                Teknik bilgiler · {lineType?.name} · {approvedFieldCount} alan uygulanacak
                                                             </div>
                                                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "8px" }}>
                                                                 {techFields.map(field => {
                                                                     const evidence = line.extraction_evidence?.[field.field_key];
+                                                                    const value = (line.extracted_attributes ?? {})[field.field_key];
+                                                                    const hasValue = hasTechnicalReviewValue(value);
+                                                                    const fieldApproved = isTechnicalFieldApproved(line, field.field_key);
+                                                                    const approvalDisabled = isDemo || isDocApplied || isDocApplying || !hasValue;
                                                                     return (
                                                                         <div key={field.id} style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "8px", background: "var(--bg-primary)" }}>
                                                                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                                                                                 <span style={{ fontSize: "12px", fontWeight: 650, color: "var(--text-primary)" }}>{field.label_tr}{field.required ? " *" : ""}</span>
-                                                                                <span style={{
-                                                                                    fontSize: "10px",
-                                                                                    padding: "2px 6px",
-                                                                                    borderRadius: "999px",
-                                                                                    background: evidence?.confidence === "high" ? "var(--success-bg)" : evidence?.confidence === "medium" ? "var(--accent-bg)" : "var(--warning-bg)",
-                                                                                    color: evidence?.confidence === "high" ? "var(--success-text)" : evidence?.confidence === "medium" ? "var(--accent-text)" : "var(--warning-text)",
-                                                                                }}>
-                                                                                    {confidenceLabel(evidence?.confidence ?? "not_found")}
-                                                                                </span>
+                                                                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                                                                    <label
+                                                                                        title={hasValue ? "Bu alan gerçek veriye uygulansın" : "Değer yok; uygulanmaz"}
+                                                                                        style={{
+                                                                                            display: "inline-flex",
+                                                                                            alignItems: "center",
+                                                                                            gap: "4px",
+                                                                                            fontSize: "10px",
+                                                                                            color: approvalDisabled ? "var(--text-tertiary)" : "var(--text-secondary)",
+                                                                                            cursor: approvalDisabled ? "not-allowed" : "pointer",
+                                                                                        }}
+                                                                                    >
+                                                                                        <input
+                                                                                            type="checkbox"
+                                                                                            checked={fieldApproved}
+                                                                                            disabled={approvalDisabled}
+                                                                                            onChange={event => setTechnicalFieldApproval(line.id, field.field_key, event.target.checked)}
+                                                                                            aria-label={`${line.line_number}. satır ${field.label_tr} uygulama onayı`}
+                                                                                            style={{ width: "13px", height: "13px", accentColor: "var(--accent)" }}
+                                                                                        />
+                                                                                        Uygula
+                                                                                    </label>
+                                                                                    <span style={{
+                                                                                        fontSize: "10px",
+                                                                                        padding: "2px 6px",
+                                                                                        borderRadius: "999px",
+                                                                                        background: evidence?.confidence === "high" ? "var(--success-bg)" : evidence?.confidence === "medium" ? "var(--accent-bg)" : "var(--warning-bg)",
+                                                                                        color: evidence?.confidence === "high" ? "var(--success-text)" : evidence?.confidence === "medium" ? "var(--accent-text)" : "var(--warning-text)",
+                                                                                    }}>
+                                                                                        {confidenceLabel(evidence?.confidence ?? "not_found")}
+                                                                                    </span>
+                                                                                </div>
                                                                             </div>
                                                                             {renderTechnicalEditor(line, field)}
                                                                             {evidence?.evidence_text && (
@@ -693,7 +866,10 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                 Uygulama sonucu
                             </div>
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                                {applyResult.products_created} yeni ürün · {applyResult.products_updated} güncelleme · {applyResult.attachments_created} sertifika · {applyResult.skipped} atlandı
+                                {applyResult.products_created} yeni ürün · {applyResult.products_updated} güncelleme · {applyResult.attachments_created} ek · {applyResult.skipped} atlandı
+                                {applyResult.technical_fields_applied !== undefined && (
+                                    <> · {applyResult.technical_fields_applied} teknik alan uygulandı</>
+                                )}
                                 {applyResult.attachments_superseded > 0 && (
                                     <> · {applyResult.attachments_superseded} eski sertifika önceki versiyona alındı</>
                                 )}
@@ -790,6 +966,15 @@ const btnSecondary: React.CSSProperties = {
     border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
     cursor: "pointer",
 };
+
+const productFieldCheckStyle = (muted: boolean): React.CSSProperties => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    fontSize: "10px",
+    color: muted ? "var(--text-tertiary)" : "var(--text-secondary)",
+    cursor: muted ? "not-allowed" : "pointer",
+});
 
 const techInputStyle: React.CSSProperties = {
     width: "100%",

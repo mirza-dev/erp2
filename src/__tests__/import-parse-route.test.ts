@@ -145,6 +145,53 @@ describe("POST /api/import/[batchId]/parse — empty sheets", () => {
     });
 });
 
+// ─── Entity type validation ─────────────────────────────────────────────────
+
+describe("POST /api/import/[batchId]/parse — entity type validation", () => {
+    beforeEach(() => {
+        mockDbGetBatch.mockResolvedValue({ id: BATCH_ID, status: "pending" });
+        mockIsAIAvailable.mockReturnValue(true);
+        mockAiBatchParse.mockResolvedValue(makeBatchParseResult(1));
+        mockDbCreateDrafts.mockResolvedValue([makeDraft({ entity_type: "vendor" })]);
+    });
+
+    it("accepts phase-2 vendor entity type", async () => {
+        const res = await POST(makeRequest({
+            sheets: [{ sheet_name: "Vendors", entity_type: "vendor", rows: [{ tedarikci_adi: "Acme" }] }],
+        }), makeParams());
+
+        expect(res.status).toBe(201);
+        expect(mockAiBatchParse).toHaveBeenCalledWith({
+            entity_type: "vendor",
+            rows: [{ tedarikci_adi: "Acme" }],
+        });
+    });
+
+    it("accepts phase-2 stock entity type", async () => {
+        mockDbCreateDrafts.mockResolvedValue([makeDraft({ entity_type: "stock" })]);
+
+        const res = await POST(makeRequest({
+            sheets: [{ sheet_name: "Stock", entity_type: "stock", rows: [{ sku: "GV-050", stok: "12" }] }],
+        }), makeParams());
+
+        expect(res.status).toBe(201);
+        expect(mockAiBatchParse).toHaveBeenCalledWith({
+            entity_type: "stock",
+            rows: [{ sku: "GV-050", stok: "12" }],
+        });
+    });
+
+    it("rejects unsupported entity type", async () => {
+        const res = await POST(makeRequest({
+            sheets: [{ sheet_name: "Invoices", entity_type: "invoice", rows: [{ fatura_no: "F-1" }] }],
+        }), makeParams());
+
+        expect(res.status).toBe(400);
+        expect(mockAiBatchParse).not.toHaveBeenCalled();
+        expect(mockDbCreateDrafts).not.toHaveBeenCalled();
+    });
+});
+
 // ─── Happy path — AI available ────────────────────────────────────────────────
 
 describe("POST /api/import/[batchId]/parse — happy path (AI available)", () => {

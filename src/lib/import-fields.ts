@@ -24,6 +24,13 @@ export const IMPORT_FIELDS: Record<string, Array<{ field: string; label: string 
         { field: "notes", label: "Notlar" }, { field: "payment_terms_days", label: "Ödeme Vadesi (gün)" },
         { field: "customer_code", label: "Müşteri Kodu" }, { field: "default_incoterm", label: "Varsayılan Incoterm" },
     ],
+    vendor: [
+        { field: "name", label: "Tedarikçi Adı" }, { field: "contact_email", label: "E-posta" },
+        { field: "contact_phone", label: "Telefon" }, { field: "contact_person", label: "Yetkili" },
+        { field: "tax_number", label: "Vergi No" }, { field: "address", label: "Adres" },
+        { field: "currency", label: "Para Birimi" }, { field: "payment_terms_days", label: "Ödeme Vadesi (gün)" },
+        { field: "lead_time_days", label: "Tedarik Süresi (gün)" }, { field: "notes", label: "Notlar" },
+    ],
     order: [
         { field: "customer_name", label: "Müşteri Adı" }, { field: "customer_code", label: "Müşteri Kodu" },
         { field: "currency", label: "Para Birimi" }, { field: "grand_total", label: "Toplam Tutar" },
@@ -77,6 +84,7 @@ export const IMPORT_FIELD_SET: Record<string, Set<string>> = Object.fromEntries(
 export const REQUIRED_FIELDS: Record<string, string[]> = {
     product: ["sku", "name", "unit"],
     customer: ["name"],
+    vendor: ["name"],
     quote: ["quote_number"],
     order: [],
     order_line: ["order_number", "product_sku"],

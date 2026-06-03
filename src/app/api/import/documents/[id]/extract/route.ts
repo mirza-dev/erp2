@@ -4,8 +4,9 @@
  * Classified bir import_documents satırı için AI ekstraksiyonu çalıştırır:
  *   - product_catalog / product_datasheet → aiExtractProductsFromDocument
  *   - material_certificate / compliance_doc / test_report → aiExtractCertificateTarget
+ *   - product_photo veya operation=product_documents + katalog/datasheet → aiExtractProductDocumentTarget
  *   - migration_excel → 400 "Klasik Mod kullanın"
- *   - diğer (msds/vendor_profile/product_photo/unknown) → 400 "Bu tip için ekstraksiyon yok"
+ *   - diğer (msds/vendor_profile/unknown) → 400 "Bu tip için ekstraksiyon yok"
  *
  * Her item için product-matcher top-3 candidate üretir; auto-link skoru ≥85
  * varsa matched_product_id + match_action='matched', 60-84 'pending', <60
@@ -27,6 +28,7 @@ import {
 import {
     aiExtractProductsFromDocument,
     aiExtractCertificateTarget,
+    aiExtractProductDocumentTarget,
 } from "@/lib/services/ai-service";
 import {
     findProductMatchCandidates,
@@ -38,6 +40,11 @@ import { dbGetProductTypeWithFields, dbListProductTypes } from "@/lib/supabase/p
 import { requireRole } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
+import {
+    DEFAULT_AI_IMPORT_OPERATION,
+    isAiImportOperationType,
+    type AiImportOperationType,
+} from "@/lib/ai-import-operations";
 import type {
     DocumentType,
     ImportDocumentLineCandidate,
@@ -63,6 +70,10 @@ const CERT_EXTRACT_TYPES = new Set<DocumentType>([
     "material_certificate",
     "compliance_doc",
     "test_report",
+]);
+
+const PRODUCT_DOCUMENT_TARGET_TYPES = new Set<DocumentType>([
+    "product_photo",
 ]);
 
 function extractExcelTextSample(buffer: Buffer, maxChars = 4000): string {
@@ -98,15 +109,25 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         }
 
         const docType: DocumentType = doc.classification?.document_type ?? "unknown";
+        const operationType: AiImportOperationType = isAiImportOperationType(doc.classification?.operation_type)
+            ? doc.classification.operation_type
+            : DEFAULT_AI_IMPORT_OPERATION;
 
         if (docType === "migration_excel") {
             return NextResponse.json({ error: "Migration Excel için Klasik Mod kullanın." }, { status: 400 });
         }
 
-        const isProductFlow = PRODUCT_EXTRACT_TYPES.has(docType);
+        const isProductDocumentTargetFlow =
+            PRODUCT_DOCUMENT_TARGET_TYPES.has(docType)
+            || (
+                operationType === "product_documents"
+                && PRODUCT_EXTRACT_TYPES.has(docType)
+            );
+        const isProductFlow = PRODUCT_EXTRACT_TYPES.has(docType) && !isProductDocumentTargetFlow;
         const isCertFlow = CERT_EXTRACT_TYPES.has(docType);
+        const isAttachmentTargetFlow = isCertFlow || isProductDocumentTargetFlow;
 
-        if (!isProductFlow && !isCertFlow) {
+        if (!isProductFlow && !isAttachmentTargetFlow) {
             return NextResponse.json({ error: "Bu belge tipi için ekstraksiyon desteklenmiyor." }, { status: 400 });
         }
 
@@ -204,6 +225,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                         fileName: doc.file_name,
                         excelTextSample,
                         availableProductTypes,
+                        operationType,
                         multiRow: docType === "product_catalog",
                     },
                     req.signal,
@@ -243,10 +265,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                     match_action: initialAction,
                 });
             }
-        } else if (isCertFlow) {
+        } else if (isAttachmentTargetFlow) {
             let target;
             try {
-                target = await aiExtractCertificateTarget(
+                const targetExtractor = isCertFlow ? aiExtractCertificateTarget : aiExtractProductDocumentTarget;
+                target = await targetExtractor(
                     {
                         buffer,
                         mimeType: doc.mime_type,
@@ -262,11 +285,11 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                 throw err;
             }
 
-            // Review 3b P2-C: cert AI hiçbir ipucu çıkaramadıysa (name+sku null
+            // Review 3b P2-C: target AI hiçbir ipucu çıkaramadıysa (name+sku null
             // ve confidence 0) satır yaratma — re-extract sessizce silme
             // tehlikesini önlemek için 422 guard'a düşer.
-            const hasCertSignal = target.target_name !== null || target.target_sku !== null || target.confidence > 0;
-            if (hasCertSignal) {
+            const hasTargetSignal = target.target_name !== null || target.target_sku !== null || target.confidence > 0;
+            if (hasTargetSignal) {
                 const candidates: ImportDocumentLineCandidate[] = await findProductMatchCandidates({
                     name: target.target_name,
                     sku: target.target_sku,
@@ -278,7 +301,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                 linesToCreate.push({
                     line_number: 1,
                     extraction_type: "certificate_target",
-                    product_type_id: null, // sertifika hedef ürün üzerinden 3c'de belirlenir
+                    product_type_id: null, // dosya eki hedef ürün üzerinden 3c'de belirlenir
                     extracted_name: target.target_name,
                     extracted_sku: target.target_sku,
                     extracted_attributes: {},

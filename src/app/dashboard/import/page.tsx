@@ -10,6 +10,13 @@ import { IMPORT_FIELDS, REQUIRED_FIELDS } from "@/lib/import-fields";
 import DropZone from "@/components/import/DropZone";
 import ClassifierQueue from "@/components/import/ClassifierQueue";
 import type { ProductTypeRow } from "@/lib/database.types";
+import {
+    DEFAULT_AI_IMPORT_OPERATION,
+    getActiveAiImportOperations,
+    getAiImportOperation,
+    getPlannedAiImportOperations,
+    type AiImportOperationType,
+} from "@/lib/ai-import-operations";
 
 // Faz 3d (2026-05-23): Eski `ImportMode = "ai" | "classic"` toggle kaldırıldı;
 // AI artık default+her zaman görünür akış, klasik mod alt accordion'da fallback.
@@ -24,7 +31,7 @@ interface SheetInfo {
     displayName: string;
     rows: number;
     entity: string;
-    entityType: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment" | null;
+    entityType: "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment" | null;
     status: "importable" | "unsupported";
     selected: boolean;
     headers: string[];
@@ -56,9 +63,16 @@ interface DraftRow {
 const ERP_FIELDS = IMPORT_FIELDS;
 
 // Known sheet → entity type mapping
-const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"; displayName: string; entity: string; status: "importable" }> = {
+const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"; displayName: string; entity: string; status: "importable" }> = {
     Urunler: { entityType: "product", displayName: "Ürünler", entity: "Ürünler", status: "importable" },
     Musteriler: { entityType: "customer", displayName: "Müşteriler", entity: "Müşteriler", status: "importable" },
+    Tedarikciler: { entityType: "vendor", displayName: "Tedarikçiler", entity: "Tedarikçiler", status: "importable" },
+    "Tedarikçiler": { entityType: "vendor", displayName: "Tedarikçiler", entity: "Tedarikçiler", status: "importable" },
+    Tedarikci_Urunleri: { entityType: "product", displayName: "Tedarikçi Ürün İlişkileri", entity: "Tedarikçi Ürün İlişkileri", status: "importable" },
+    "Tedarikçi_Ürünleri": { entityType: "product", displayName: "Tedarikçi Ürün İlişkileri", entity: "Tedarikçi Ürün İlişkileri", status: "importable" },
+    Stok_Sayimi: { entityType: "stock", displayName: "Stok Sayımı", entity: "Stok Sayımı", status: "importable" },
+    "Stok_Sayımı": { entityType: "stock", displayName: "Stok Sayımı", entity: "Stok Sayımı", status: "importable" },
+    Stok_Hareketleri: { entityType: "stock", displayName: "Stok Hareketleri", entity: "Stok Hareketleri", status: "importable" },
     Teklifler: { entityType: "quote", displayName: "Teklifler", entity: "Teklifler", status: "importable" },
     Siparisler: { entityType: "order", displayName: "Siparişler", entity: "Siparişler", status: "importable" },
     Siparis_Kalemleri: { entityType: "order_line", displayName: "Sipariş Kalemleri", entity: "Sipariş Kalemleri", status: "importable" },
@@ -69,7 +83,7 @@ const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "o
 };
 
 const entityTypeLabels: Record<string, string> = {
-    customer: "Müşteriler", product: "Ürünler", quote: "Teklifler",
+    customer: "Müşteriler", product: "Ürünler", vendor: "Tedarikçiler", quote: "Teklifler",
     order: "Siparişler", order_line: "Sipariş Kalemleri", shipment: "Sevkiyatlar",
     invoice: "Faturalar", payment: "Tahsilatlar", stock: "Stok",
 };
@@ -110,6 +124,9 @@ const sourceChipStyle = (src: "memory" | "ai" | "fallback" | "user"): React.CSSP
 };
 
 const PAGE_SIZE = 100;
+const ACTIVE_AI_IMPORT_OPERATIONS = getActiveAiImportOperations();
+const PLANNED_AI_IMPORT_OPERATIONS = getPlannedAiImportOperations();
+const INTERNAL_IMPORT_FIELDS = new Set(["__ai_import_operation"]);
 
 export default function ImportPage() {
     const { refetchAll } = useData();
@@ -131,6 +148,7 @@ export default function ImportPage() {
     }, []);
     const [aiFiles, setAiFiles] = useState<File[]>([]);
     const [aiSuggestedTypes, setAiSuggestedTypes] = useState<Array<{ id: string; name: string }>>([]);
+    const [aiOperationType, setAiOperationType] = useState<AiImportOperationType>(DEFAULT_AI_IMPORT_OPERATION);
 
     // Load product types once for AI badge labels
     useEffect(() => {
@@ -290,6 +308,7 @@ export default function ImportPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    operation_type: aiOperationType,
                     sheets: selectedSheets.map(s => ({
                         sheet_name: s.name,
                         entity_type: s.entityType,
@@ -470,6 +489,11 @@ export default function ImportPage() {
     const importableSelected = sheets.filter(s => s.status === "importable" && s.selected);
     const draftEntityTypes = [...new Set(drafts.map(d => d.entity_type))];
     const filteredDrafts = drafts.filter(d => d.entity_type === activeTab);
+    const selectedAiOperation = getAiImportOperation(aiOperationType);
+    const selectedUsesClassic =
+        selectedAiOperation.scope === "stock" ||
+        selectedAiOperation.scope === "customer" ||
+        selectedAiOperation.scope === "vendor";
 
     // Step indicator
     const STEPS = [
@@ -505,39 +529,187 @@ export default function ImportPage() {
 
             {/* Faz 3d — AI default akış (her zaman görünür); klasik mod alt accordion'da */}
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <DropZone
-                    onFiles={files => setAiFiles(prev => [...prev, ...files])}
-                    disabled={isDemo}
-                    disabledTooltip={DEMO_DISABLED_TOOLTIP}
-                />
-                {/* Faz 3d — empty state (henüz dosya yüklenmedi) */}
-                {aiFiles.length === 0 && (
+                <section
+                    aria-label="AI Import işlem türü"
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "10px",
+                        padding: "14px",
+                        background: "var(--bg-secondary)",
+                        border: "0.5px solid var(--border-tertiary)",
+                        borderRadius: "8px",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                        <div>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" }}>
+                                İşlem Türü
+                            </div>
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "3px", maxWidth: "720px", lineHeight: 1.5 }}>
+                                AI dosyayı seçtiğin amaca göre okur. Kanıt, eşleşme ve onay ekranı bu işleme göre hazırlanır.
+                            </div>
+                        </div>
+                        <div
+                            title={selectedAiOperation.safetyNote}
+                            style={{
+                                fontSize: "11px",
+                                padding: "4px 8px",
+                                borderRadius: "999px",
+                                background: "var(--accent-bg)",
+                                color: "var(--accent-text)",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Aktif: {selectedAiOperation.shortTitle}
+                        </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "8px" }}>
+                        {ACTIVE_AI_IMPORT_OPERATIONS.map(operation => {
+                            const active = operation.id === aiOperationType;
+                            return (
+                                <button
+                                    key={operation.id}
+                                    type="button"
+                                    onClick={() => setAiOperationType(operation.id)}
+                                    disabled={aiFiles.length > 0}
+                                    aria-pressed={active}
+                                    title={aiFiles.length > 0 ? "İşlem türünü değiştirmek için önce kuyruğu temizle." : operation.safetyNote}
+                                    style={{
+                                        minHeight: "104px",
+                                        textAlign: "left",
+                                        padding: "10px",
+                                        borderRadius: "7px",
+                                        border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-tertiary)"}`,
+                                        background: active ? "var(--accent-bg)" : "var(--bg-primary)",
+                                        color: "var(--text-primary)",
+                                        cursor: aiFiles.length > 0 ? "not-allowed" : "pointer",
+                                        opacity: aiFiles.length > 0 && !active ? 0.62 : 1,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "7px",
+                                    }}
+                                >
+                                    <span style={{ fontSize: "12px", fontWeight: 700, color: active ? "var(--accent-text)" : "var(--text-primary)" }}>
+                                        {operation.title}
+                                    </span>
+                                    <span style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                                        {operation.description}
+                                    </span>
+                                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+                                        {operation.evidenceHint}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <details style={{ marginTop: "2px" }}>
+                        <summary style={{ fontSize: "11px", color: "var(--text-secondary)", cursor: "pointer" }}>
+                            Faz 2 ve ürün tipi şablon işlemleri
+                        </summary>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
+                            {PLANNED_AI_IMPORT_OPERATIONS.map(operation => (
+                                <span
+                                    key={operation.id}
+                                    title={operation.description}
+                                    style={{
+                                        fontSize: "11px",
+                                        padding: "4px 8px",
+                                        borderRadius: "999px",
+                                        border: "0.5px solid var(--border-tertiary)",
+                                        color: "var(--text-tertiary)",
+                                        background: "var(--bg-primary)",
+                                    }}
+                                >
+                                    {operation.shortTitle} · Faz {operation.phase}
+                                </span>
+                            ))}
+                        </div>
+                    </details>
+                </section>
+
+                {selectedUsesClassic ? (
                     <div
                         role="status"
                         style={{
-                            padding: "16px 20px",
+                            padding: "16px 18px",
                             background: "var(--bg-secondary)",
-                            border: "0.5px dashed var(--border-tertiary)",
+                            border: "0.5px solid var(--border-tertiary)",
                             borderRadius: "8px",
-                            color: "var(--text-tertiary)",
-                            fontSize: "12px", lineHeight: 1.6,
+                            display: "grid",
+                            gridTemplateColumns: "1fr auto",
+                            gap: "12px",
+                            alignItems: "center",
                         }}
                     >
-                        <div style={{ fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px" }}>
-                            Henüz dosya yüklenmedi
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
+                                {selectedAiOperation.shortTitle} Excel/CSV onay hattında çalışır
+                            </div>
+                            <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                                Bu işlemde AI/kolon eşleştirme çıktısı draft tabloya düşer; kullanıcı alanları gözden geçirip
+                                onayladıktan sonra kayıtlar uygulanır. Stok sayımı mevcut miktarı yazar, stok hareketi miktarı
+                                ekler/çıkarır; fiyat ve maliyet alanları uygulanmaz.
+                            </div>
                         </div>
-                        PDF sertifika, Excel kataloğu, datasheet veya ürün resmi sürükle bırak.
-                        AI dosyayı sınıflandırır, eşleşen ürünleri bulur ve onayınla katalogu günceller.
-                        Migration Excel dosyaları için aşağıdaki <b>Gelişmiş / Klasik Mod</b> kullanılır.
+                        <button
+                            type="button"
+                            onClick={openClassicFromCta}
+                            style={{
+                                fontSize: "12px",
+                                padding: "7px 12px",
+                                borderRadius: "6px",
+                                border: "0.5px solid var(--accent-border)",
+                                background: "var(--accent-bg)",
+                                color: "var(--accent-text)",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Excel/CSV yükle
+                        </button>
                     </div>
+                ) : (
+                    <>
+                        <DropZone
+                            onFiles={files => setAiFiles(prev => [...prev, ...files])}
+                            disabled={isDemo}
+                            disabledTooltip={DEMO_DISABLED_TOOLTIP}
+                        />
+                        {/* Faz 3d — empty state (henüz dosya yüklenmedi) */}
+                        {aiFiles.length === 0 && (
+                            <div
+                                role="status"
+                                style={{
+                                    padding: "16px 20px",
+                                    background: "var(--bg-secondary)",
+                                    border: "0.5px dashed var(--border-tertiary)",
+                                    borderRadius: "8px",
+                                    color: "var(--text-tertiary)",
+                                    fontSize: "12px", lineHeight: 1.6,
+                                }}
+                            >
+                                <div style={{ fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px" }}>
+                                    Henüz dosya yüklenmedi
+                                </div>
+                                Seçili işlem: <b>{selectedAiOperation.title}</b>. PDF sertifika, Excel kataloğu, datasheet veya ürün resmi sürükle bırak.
+                                AI dosyayı bu amaca göre sınıflandırır, eşleşen ürünleri bulur ve onayınla güncelleme adaylarını hazırlar.
+                                Migration Excel dosyaları için aşağıdaki <b>Gelişmiş / Klasik Mod</b> kullanılır.
+                            </div>
+                        )}
+                        <ClassifierQueue
+                            files={aiFiles}
+                            operationType={aiOperationType}
+                            suggestedProductTypes={aiSuggestedTypes}
+                            onClear={() => setAiFiles([])}
+                            onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}
+                            onOpenClassicMode={openClassicFromCta}
+                        />
+                    </>
                 )}
-                <ClassifierQueue
-                    files={aiFiles}
-                    suggestedProductTypes={aiSuggestedTypes}
-                    onClear={() => setAiFiles([])}
-                    onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}
-                    onOpenClassicMode={openClassicFromCta}
-                />
             </div>
 
             {/* Faz 3d — Klasik Mod accordion (eski 7-adım wizard fallback).
@@ -946,13 +1118,19 @@ export default function ImportPage() {
                         const required = REQUIRED_FIELDS[filteredDrafts[0].entity_type] ?? [];
                         const fieldSet = new Set<string>();
                         for (const d of filteredDrafts) {
-                            for (const k of Object.keys((d.parsed_data ?? {}) as Record<string, unknown>)) fieldSet.add(k);
+                            for (const k of Object.keys((d.parsed_data ?? {}) as Record<string, unknown>)) {
+                                if (!INTERNAL_IMPORT_FIELDS.has(k)) fieldSet.add(k);
+                            }
                             const edits = draftEdits[d.id];
-                            if (edits) { for (const k of Object.keys(edits)) fieldSet.add(k); }
+                            if (edits) {
+                                for (const k of Object.keys(edits)) {
+                                    if (!INTERNAL_IMPORT_FIELDS.has(k)) fieldSet.add(k);
+                                }
+                            }
                         }
                         // Required fields always shown (even if unmapped), then the rest
                         const visibleFields = [
-                            ...required,
+                            ...required.filter(f => !INTERNAL_IMPORT_FIELDS.has(f)),
                             ...[...fieldSet].filter(f => !required.includes(f)),
                         ];
 
@@ -1130,6 +1308,7 @@ export default function ImportPage() {
                         const ENTITY_LABELS: Record<string, string> = {
                             customer:   "Müşteri",
                             product:    "Ürün",
+                            vendor:     "Tedarikçi",
                             quote:      "Teklif",
                             order:      "Sipariş",
                             order_line: "Sipariş Satırı",

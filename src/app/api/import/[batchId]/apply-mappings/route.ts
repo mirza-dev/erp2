@@ -4,6 +4,12 @@ import { dbGetBatch, dbUpdateBatchStatus, dbCreateDrafts, dbDeletePendingDrafts 
 import { dbSaveColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { NUMERIC_FIELDS, IMPORT_FIELD_SET } from "@/lib/import-fields";
 import { safeParseJson } from "@/lib/api-error";
+import {
+    DEFAULT_AI_IMPORT_OPERATION,
+    getAiImportOperation,
+    isAiImportOperationType,
+    type AiImportOperationType,
+} from "@/lib/ai-import-operations";
 
 function parseTRNumber(raw: string): number | null {
     const s = raw.toString().trim();
@@ -66,10 +72,18 @@ export async function POST(
                 rows: Array<Record<string, string>>;
                 remember: boolean;
             }>;
+            operation_type?: unknown;
         };
 
         if (!body.sheets || body.sheets.length === 0) {
             return NextResponse.json({ error: "En az bir sheet gerekli." }, { status: 400 });
+        }
+        const operationType: AiImportOperationType = isAiImportOperationType(body.operation_type)
+            ? body.operation_type
+            : DEFAULT_AI_IMPORT_OPERATION;
+        const operation = getAiImportOperation(operationType);
+        if (isAiImportOperationType(body.operation_type) && operation.status !== "active") {
+            return NextResponse.json({ error: "Bu AI Import işlem türü henüz aktif değil." }, { status: 400 });
         }
 
         // Fix: delete existing pending drafts before re-creating — prevents duplication on back navigation
@@ -83,13 +97,19 @@ export async function POST(
 
         for (const sheet of body.sheets) {
             const { entity_type, mappings, rows, remember } = sheet;
+            const allowedFields = IMPORT_FIELD_SET[entity_type];
+            if (!allowedFields) {
+                return NextResponse.json(
+                    { error: `Geçersiz entity tipi: ${entity_type}` },
+                    { status: 400 },
+                );
+            }
 
             // Active (non-skip) mappings — filtered against known fields for this entity type
             const activeMappings = mappings
                 .filter(m => m.target_field && m.target_field !== "skip")
                 .filter(m => {
-                    const allowed = IMPORT_FIELD_SET[entity_type];
-                    return allowed && allowed.has(m.target_field);
+                    return allowedFields.has(m.target_field);
                 });
             const activeNormalized = activeMappings.map(m => normalizeColumnName(m.source_column));
 
@@ -120,9 +140,12 @@ export async function POST(
                 }
                 return {
                     batch_id: batchId,
-                    entity_type: entity_type as "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment",
+                    entity_type: entity_type as "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment",
                     raw_data: row as Record<string, unknown>,
-                    parsed_data,
+                    parsed_data: {
+                        ...parsed_data,
+                        __ai_import_operation: operationType,
+                    },
                     confidence: 1.0,   // user confirmed the mapping
                     ai_reason: "Kullanıcı kolon eşleştirmesini onayladı",
                     unmatched_fields: [] as unknown[],

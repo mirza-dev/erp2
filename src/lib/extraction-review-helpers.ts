@@ -51,15 +51,16 @@ export interface ApplyResultSummary {
     products_updated: number;
     attachments_created: number;
     attachments_superseded: number;
+    technical_fields_applied?: number;
     skipped: number;
     errors: string[];
     untyped_products: number;
     status_update_failed?: boolean;
 }
 
-// Review 3b 5.tur P2: sertifika/uygunluk/test_report doc'larında product_type_id kullanılmaz.
+// Review 3b 5.tur P2: dosya-ekleme flow'larında product_type_id kullanılmaz.
 const CERT_FLOW_TYPES: ReadonlySet<string> = new Set([
-    "material_certificate", "compliance_doc", "test_report",
+    "material_certificate", "compliance_doc", "test_report", "product_photo",
 ]);
 
 export function isCertFlowDocumentType(t: string | null | undefined): boolean {
