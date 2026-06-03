@@ -50,6 +50,12 @@ function formatCurrency(amount: number, currency: string): string {
     return `${sym}${amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** ISO tarih (YYYY-MM-DD) → tr-TR (DD.MM.YYYY); null → "—". Liste sayfasıyla tutarlı. */
+function formatExpectedDate(iso: string | null): string {
+    if (!iso) return "—";
+    return new Date(iso + "T00:00:00Z").toLocaleDateString("tr-TR");
+}
+
 export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
@@ -227,7 +233,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                         }}>{STATUS_LABEL[po.status]}</span>
                     </div>
                     <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: "4px 0 0" }}>
-                        {vendor?.name ?? "—"} · Beklenen: {po.expected_date ?? "—"}
+                        {vendor?.name ?? "—"} · Beklenen: {formatExpectedDate(po.expected_date)}
                     </p>
                 </div>
 

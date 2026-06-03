@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -67,6 +67,7 @@ function NewPurchaseOrderPageInner() {
 
     const [vendors, setVendors] = useState<VendorRow[]>([]);
     const [products, setProducts] = useState<ProductRow[]>([]);
+    const [loadError, setLoadError] = useState(false);
     const [vendorId, setVendorId] = useState<string>("");
     const [currency, setCurrency] = useState<string>("TRY");
     const [expectedDate, setExpectedDate] = useState<string>("");
@@ -76,20 +77,26 @@ function NewPurchaseOrderPageInner() {
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 
-    useEffect(() => {
-        void (async () => {
-            try {
-                const [vRes, pRes] = await Promise.all([
-                    fetch("/api/vendors"),
-                    fetch("/api/products?all=1"),
-                ]);
-                if (vRes.ok) setVendors(await vRes.json());
-                if (pRes.ok) setProducts(await pRes.json());
-            } catch {
-                toast({ type: "error", message: "Veriler yüklenemedi." });
+    const loadData = useCallback(async () => {
+        setLoadError(false);
+        try {
+            const [vRes, pRes] = await Promise.all([
+                fetch("/api/vendors"),
+                fetch("/api/products?all=1"),
+            ]);
+            // Form verileri sessizce yutulmaz: boş dropdown yerine görünür hata.
+            if (!vRes.ok || !pRes.ok) {
+                setLoadError(true);
+                return;
             }
-        })();
-    }, [toast]);
+            setVendors(await vRes.json());
+            setProducts(await pRes.json());
+        } catch {
+            setLoadError(true);
+        }
+    }, []);
+
+    useEffect(() => { void loadData(); }, [loadData]);
 
     // fromDraft preload: detail'deki "Düzenle" → ?fromDraft=<id> ile gelen taslağı yükle
     useEffect(() => {
@@ -198,6 +205,22 @@ function NewPurchaseOrderPageInner() {
             <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 20px" }}>
                 Yeni Satın Alma Siparişi
             </h1>
+
+            {loadError && (
+                <div role="alert" aria-live="polite" style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px",
+                    padding: "10px 14px", marginBottom: "16px", fontSize: "13px",
+                    background: "var(--danger-bg)", color: "var(--danger-text)",
+                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
+                }}>
+                    <span>Form verileri yüklenemedi (tedarikçi/ürün listesi). Lütfen tekrar deneyin.</span>
+                    <button onClick={() => void loadData()} style={{
+                        padding: "4px 12px", fontSize: "12px",
+                        background: "var(--accent)", color: "#fff",
+                        border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: 500, flexShrink: 0,
+                    }}>Yeniden dene</button>
+                </div>
+            )}
 
             {/* Header form */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "20px" }}>

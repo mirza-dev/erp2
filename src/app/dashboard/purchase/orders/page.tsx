@@ -50,6 +50,13 @@ function formatCurrency(amount: number, currency: string): string {
     return `${sym}${amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+/** Test edilebilir pure helper: ISO tarih (YYYY-MM-DD) → tr-TR (DD.MM.YYYY). null → "—".
+ * created_at sütunuyla tutarlı görünüm; UTC midnight ile gün kayması önlenir. */
+export function formatExpectedDate(iso: string | null): string {
+    if (!iso) return "—";
+    return new Date(iso + "T00:00:00Z").toLocaleDateString("tr-TR");
+}
+
 /** Test edilebilir pure helper: PO iptal edilebilir mi? Detay `isCancelable` ile aynı yüklem.
  * Toplu iptal seçimi yalnız bu PO'ları kapsar (received/cancelled → 409 gürültüsü önlenir). */
 export function isPoCancellable(po: { status: PurchaseOrderStatus }): boolean {
@@ -65,12 +72,14 @@ export default function PurchaseOrdersPage() {
     const [activeTab, setActiveTab] = useState<StatusFilter>("all");
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
     const [bulkCancelling, setBulkCancelling] = useState(false);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
 
     const loadOrders = useCallback(async () => {
         setLoading(true);
+        setLoadError(false);
         try {
             const url = activeTab === "all"
                 ? "/api/purchase-orders"
@@ -79,10 +88,14 @@ export default function PurchaseOrdersPage() {
                 fetch(url),
                 fetch("/api/vendors?all=1"),
             ]);
-            if (ordersRes.ok) {
-                const data = await ordersRes.json();
-                setOrders(Array.isArray(data) ? data : []);
+            // Siparişler kritik: 401/403/500'ü sessizce yutma (yanıltıcı "boş liste"
+            // yerine görünür hata). Detay sayfası loadPO ile aynı dürüstlük.
+            if (!ordersRes.ok) {
+                setLoadError(true);
+                return;
             }
+            const data = await ordersRes.json();
+            setOrders(Array.isArray(data) ? data : []);
             if (vendorsRes.ok) {
                 const vendors: VendorRow[] = await vendorsRes.json();
                 const m = new Map<string, string>();
@@ -90,11 +103,11 @@ export default function PurchaseOrdersPage() {
                 setVendorMap(m);
             }
         } catch {
-            toast({ type: "error", message: "Siparişler yüklenemedi." });
+            setLoadError(true);
         } finally {
             setLoading(false);
         }
-    }, [activeTab, toast]);
+    }, [activeTab]);
 
     useEffect(() => { void loadOrders(); }, [loadOrders]);
 
@@ -257,6 +270,22 @@ export default function PurchaseOrdersPage() {
                     <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                         Yükleniyor...
                     </div>
+                ) : loadError ? (
+                    <div role="alert" aria-live="polite" style={{ padding: "32px", textAlign: "center", fontSize: "13px" }}>
+                        <div style={{ color: "var(--danger-text)", marginBottom: "12px" }}>
+                            Siparişler yüklenemedi. Lütfen tekrar deneyin.
+                        </div>
+                        <button
+                            onClick={() => void loadOrders()}
+                            style={{
+                                padding: "6px 16px", fontSize: "13px",
+                                background: "var(--accent)", color: "#fff",
+                                border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: 500,
+                            }}
+                        >
+                            Yeniden dene
+                        </button>
+                    </div>
                 ) : filtered.length === 0 ? (
                     <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                         {search ? "Arama kriterine uyan sipariş bulunamadı." : "Henüz sipariş yok."}
@@ -334,7 +363,7 @@ export default function PurchaseOrdersPage() {
                                         </span>
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)" }}>
-                                        {o.expected_date ?? "—"}
+                                        {formatExpectedDate(o.expected_date)}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                                         {formatCurrency(o.grand_total, o.currency)}
@@ -348,7 +377,7 @@ export default function PurchaseOrdersPage() {
                         </tbody>
                     </table>
                 )}
-                {!loading && filtered.length > 0 && (
+                {!loading && !loadError && filtered.length > 0 && (
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}

@@ -243,3 +243,101 @@ describe("Detay sayfası — iptal modalı aria-labelledby", () => {
         expect(detailSrc).toContain('id="po-cancel-title"');
     });
 });
+
+// ── Final ürün turu — formatExpectedDate pure helper ──────────
+
+describe("formatExpectedDate — ISO → tr-TR (DD.MM.YYYY)", () => {
+    it("dolu ISO tarih → tr-TR formatı", async () => {
+        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/page");
+        // tr-TR locale gün.ay.yıl → "15.05.2026"
+        expect(formatExpectedDate("2026-05-15")).toBe("15.05.2026");
+    });
+
+    it("null → '—' (ham ISO basılmaz)", async () => {
+        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/page");
+        expect(formatExpectedDate(null)).toBe("—");
+    });
+
+    it("UTC midnight ile gün kayması yok (ayın ilk günü)", async () => {
+        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/page");
+        // +"T00:00:00Z" olmadan yerel TZ bir önceki güne kaydırabilirdi
+        expect(formatExpectedDate("2026-01-01")).toBe("01.01.2026");
+    });
+});
+
+// ── Final ürün turu — sessiz yükleme hatası → görünür error state ──
+
+describe("Liste sayfası — loadOrders sessiz hata yutmuyor (loadError state)", () => {
+    let listSrc = "";
+
+    beforeAll(async () => {
+        const fs = await import("fs/promises");
+        const path = await import("path");
+        listSrc = await fs.readFile(
+            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/page.tsx"),
+            "utf-8",
+        );
+    });
+
+    it("loadError state + !ordersRes.ok → setLoadError(true) + early return", () => {
+        expect(listSrc).toContain("const [loadError, setLoadError]");
+        expect(listSrc).toMatch(/if \(!ordersRes\.ok\) \{\s*setLoadError\(true\);\s*return;/);
+        // Eski sessiz "if (ordersRes.ok)" sarması kalmamalı
+        expect(listSrc).not.toContain("if (ordersRes.ok) {");
+    });
+
+    it("error banner: role=alert + Yeniden dene + empty state'ten ayrı dal", () => {
+        expect(listSrc).toMatch(/loadError \?[^]*role="alert"/);
+        expect(listSrc).toContain("Yeniden dene");
+        expect(listSrc).toContain("Siparişler yüklenemedi");
+        // empty state ("Henüz sipariş yok") artık loadError dalından SONRA gelir
+        expect(listSrc).toMatch(/loadError \?[^]*filtered\.length === 0 \?/);
+    });
+
+    it("expected_date hücresi formatExpectedDate ile (ham ISO değil)", () => {
+        expect(listSrc).toContain("formatExpectedDate(o.expected_date)");
+        expect(listSrc).not.toContain("{o.expected_date ?? \"—\"}");
+    });
+});
+
+describe("New form — loadData sessiz hata yutmuyor (loadError state)", () => {
+    let newSrc = "";
+
+    beforeAll(async () => {
+        const fs = await import("fs/promises");
+        const path = await import("path");
+        newSrc = await fs.readFile(
+            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/new/page.tsx"),
+            "utf-8",
+        );
+    });
+
+    it("loadError state + (!vRes.ok || !pRes.ok) → setLoadError(true)", () => {
+        expect(newSrc).toContain("const [loadError, setLoadError]");
+        expect(newSrc).toMatch(/if \(!vRes\.ok \|\| !pRes\.ok\) \{\s*setLoadError\(true\);\s*return;/);
+        // Eski sessiz "if (vRes.ok)" / "if (pRes.ok)" yutma kalmamalı
+        expect(newSrc).not.toContain("if (vRes.ok) setVendors");
+        expect(newSrc).not.toContain("if (pRes.ok) setProducts");
+    });
+
+    it("error banner: role=alert + Yeniden dene → loadData refetch", () => {
+        expect(newSrc).toMatch(/loadError && \(/);
+        expect(newSrc).toContain('role="alert"');
+        expect(newSrc).toContain("Form verileri yüklenemedi");
+        expect(newSrc).toMatch(/Yeniden dene[^]*<\/button>/);
+        expect(newSrc).toContain("void loadData()");
+    });
+});
+
+describe("Detay sayfası — expected_date formatExpectedDate", () => {
+    it("ham ISO yerine tr-TR helper kullanılır", async () => {
+        const fs = await import("fs/promises");
+        const path = await import("path");
+        const detailSrc = await fs.readFile(
+            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/[id]/page.tsx"),
+            "utf-8",
+        );
+        expect(detailSrc).toContain("formatExpectedDate(po.expected_date)");
+        expect(detailSrc).not.toContain("Beklenen: {po.expected_date ?? \"—\"}");
+    });
+});
