@@ -124,6 +124,7 @@ export default function VendorsPage() {
 
     const [vendors, setVendors] = useState<VendorRow[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
     const [search, setSearch] = useState("");
     const [showAll, setShowAll] = useState(false);
 
@@ -142,6 +143,7 @@ export default function VendorsPage() {
 
     const loadVendors = useCallback(async () => {
         setLoading(true);
+        setLoadError(false);
         try {
             const params = new URLSearchParams();
             if (showAll) params.set("all", "1");
@@ -150,6 +152,7 @@ export default function VendorsPage() {
             const data: VendorRow[] = await res.json();
             setVendors(data);
         } catch {
+            setLoadError(true);
             toast({ type: "error", message: "Tedarikçiler yüklenemedi." });
         } finally {
             setLoading(false);
@@ -173,7 +176,10 @@ export default function VendorsPage() {
 
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
         useSelection(`${search}|${showAll}`);
-    const pageIds = pagedItems.map(v => v.id);
+    // Toplu pasifleştirme yalnız aktif tedarikçiler için anlamlı — zaten-pasif
+    // satırlar seçilirse DELETE 409 "zaten pasif" gürültüsü üretir. Seçimi (satır
+    // checkbox + select-all) aktif alt-kümeyle sınırla (PO cancellablePageIds paterni).
+    const pageIds = pagedItems.filter(v => v.is_active).map(v => v.id);
 
     const handleBulkDeactivate = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -387,6 +393,28 @@ export default function VendorsPage() {
                     <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                         Yükleniyor...
                     </div>
+                ) : loadError ? (
+                    <div
+                        role="alert"
+                        aria-live="polite"
+                        style={{ padding: "32px", textAlign: "center", color: "var(--danger-text)", fontSize: "13px" }}
+                    >
+                        <div style={{ marginBottom: "12px" }}>Tedarikçiler yüklenemedi. Lütfen tekrar deneyin.</div>
+                        <button
+                            onClick={() => void loadVendors()}
+                            style={{
+                                fontSize: "13px",
+                                padding: "6px 16px",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "6px",
+                                background: "var(--bg-tertiary)",
+                                color: "var(--text-primary)",
+                                cursor: "pointer",
+                            }}
+                        >
+                            Yeniden dene
+                        </button>
+                    </div>
                 ) : filtered.length === 0 ? (
                     <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                         {search ? "Arama kriterine uyan tedarikçi bulunamadı." : "Henüz tedarikçi eklenmemiş."}
@@ -425,14 +453,16 @@ export default function VendorsPage() {
                                         style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
                                         onClick={e => e.stopPropagation()}
                                     >
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.has(v.id)}
-                                            onChange={() => toggleOne(v.id)}
-                                            onClick={e => e.stopPropagation()}
-                                            style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                            aria-label={`${v.name} seç`}
-                                        />
+                                        {v.is_active && (
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedIds.has(v.id)}
+                                                onChange={() => toggleOne(v.id)}
+                                                onClick={e => e.stopPropagation()}
+                                                style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                                                aria-label={`${v.name} seç`}
+                                            />
+                                        )}
                                     </td>
                                     <td style={tdStyle}>
                                         <div style={{ fontWeight: 500 }}>{v.name}</div>
@@ -543,7 +573,7 @@ export default function VendorsPage() {
                         </tbody>
                     </table>
                 )}
-                {!loading && filtered.length > 0 && (
+                {!loading && !loadError && filtered.length > 0 && (
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}
@@ -562,13 +592,18 @@ export default function VendorsPage() {
                         onClick={() => !bulkDeactivating && setBulkDeactivateConfirm(false)}
                         style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)" }}
                     />
-                    <div style={{
-                        position: "fixed", top: "50%", left: "50%",
-                        transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
-                        borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
-                    }}>
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="bulk-deactivate-title"
+                        style={{
+                            position: "fixed", top: "50%", left: "50%",
+                            transform: "translate(-50%, -50%)", zIndex: 101,
+                            background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                            borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                        }}
+                    >
+                        <div id="bulk-deactivate-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
                             {selectedIds.size} tedarikçiyi pasife al
                         </div>
                         <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
@@ -606,7 +641,7 @@ export default function VendorsPage() {
             {/* Drawer */}
             {drawerMode && (
                 <div style={drawerOverlayStyle} onClick={e => { if (e.target === e.currentTarget) closeDrawer(); }}>
-                    <div style={drawerPanelStyle} role="dialog" aria-label={drawerMode === "create" ? "Yeni tedarikçi" : "Tedarikçi düzenle"}>
+                    <div style={drawerPanelStyle} role="dialog" aria-modal="true" aria-label={drawerMode === "create" ? "Yeni tedarikçi" : "Tedarikçi düzenle"}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <h2 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
                                 {drawerMode === "create" ? "Yeni Tedarikçi" : "Tedarikçi Düzenle"}
