@@ -23,6 +23,7 @@ export interface CreateProductionInput {
 
 export interface ComponentShortage {
     component_product_id: string;
+    component_name?: string;   // complete_production RPC her zaman gönderir — UI bunu mesaja taşır (buildShortageMessage); tip yalan söylememeli
     required_qty: number;
     available_qty: number;
 }

@@ -31,6 +31,7 @@ import type { SalesOrderRow } from "./database.types";
 import { isDemoMode as checkDemoMode } from "./demo-utils";
 import { shouldSuggestReorder } from "./stock-utils";
 import { buildCustomerPatch } from "./customer-helpers";
+import { buildShortageMessage } from "./production-shortage-helpers";
 
 // ── Exported types ─────────────────────────────────────────
 
@@ -338,7 +339,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
-        throw new Error(errBody?.error ?? "Üretim kaydedilemedi.");
+        // 409 BOM eksik-bileşen payload'ı (errBody.shortages) varsa hangi
+        // bileşenin ne kadar gerekli/mevcut olduğunu mesaja taşı — yoksa
+        // jenerik "Yetersiz bileşen stoğu." kullanıcıya hangi hammaddeyi
+        // tedarik edeceğini söylemiyordu.
+        const fallback = errBody?.error ?? "Üretim kaydedilemedi.";
+        throw new Error(buildShortageMessage(errBody?.shortages, fallback));
       }
       // POST succeeded — refetch production and products (stock has changed)
       // Audit 5. tur Fix 4: ?all=1 — global state ilk 100'e düşmesin

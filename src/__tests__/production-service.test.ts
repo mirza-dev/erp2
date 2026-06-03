@@ -122,6 +122,29 @@ describe("serviceCreateProductionEntry — hata durumları", () => {
         expect(result.shortages).toEqual(shortages);
     });
 
+    it("shortages component_name'i koruyarak geçirir (headline: UI buildShortageMessage'a taşır)", async () => {
+        // complete_production RPC her shortage'da component_name gönderir; bu alan
+        // servis→route→addUretimKaydi zincirinde DÜŞÜRÜLMEMELİ — düşerse headline
+        // jenerik "Yetersiz bileşen stoğu."a geri döner. Tip+bu test sözleşmeyi kilitler.
+        const shortages = [
+            { component_product_id: "comp-1", component_name: "Conta SS", required_qty: 10, available_qty: 4 },
+        ];
+        mockDbCompleteProduction.mockResolvedValue({
+            success: false,
+            error: "Yetersiz bileşen stoğu.",
+            shortages,
+        });
+
+        const result = await serviceCreateProductionEntry({
+            product_id: "prod-1",
+            produced_qty: 10,
+        });
+
+        expect(result.success).toBe(false);
+        expect(result.shortages?.[0].component_name).toBe("Conta SS");
+        expect(result.shortages).toEqual(shortages);
+    });
+
     it("dbTryResolveShortages throw ederse sonuç hâlâ success (non-fatal)", async () => {
         mockDbCompleteProduction.mockResolvedValue({ success: true, entry_id: "entry-1" });
         mockDbTryResolveShortages.mockRejectedValue(new Error("shortage resolution failed"));

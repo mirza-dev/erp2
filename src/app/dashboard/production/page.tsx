@@ -90,6 +90,7 @@ function ProductionPageInner() {
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
     const [isSaving, setIsSaving] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     const todayStr = today();
     const todayLogs = uretimKayitlari.filter(k => k.tarih === todayStr);
@@ -253,7 +254,10 @@ function ProductionPageInner() {
                 setLines([newLine()]);
             }
         } else if (succeeded > 0 && failed > 0) {
-            toast({ type: "warning", message: `${succeeded} kayıt başarılı, ${failed} kayıt başarısız. Başarısız satırları kontrol edin.` });
+            // firstError (örn. BOM eksik-bileşen detayı) kısmi dalda da gösterilir —
+            // aksi halde çok-satırlı partide zengin hata mesajı sessizce kaybolurdu.
+            const detail = firstError ? ` ${firstError}` : "";
+            toast({ type: "warning", message: `${succeeded} kayıt başarılı, ${failed} kayıt başarısız.${detail} Başarısız satırları kontrol edin.` });
             setLines(prev => prev.filter(l => failedLineIds.includes(l.id)));
         } else {
             toast({ type: "error", message: firstError ?? "Hiçbir kayıt oluşturulamadı. Lütfen tekrar deneyin." });
@@ -263,6 +267,24 @@ function ProductionPageInner() {
     };
 
     const canSave = lines.some(l => l.productId && parseInt(l.adet) > 0);
+
+    // Üretim kaydı silme = stok ters hareketi (bitmiş ürün düşer + BOM bileşenleri
+    // geri yüklenir). Tek tıkla sessiz mutasyon riskine karşı onay modalından geçer.
+    const performDelete = async (id: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (deletingId) return;
+        setDeletingId(id);
+        try {
+            await deleteUretimKaydi(id);
+            toast({ type: "success", message: "Üretim kaydı silindi" });
+            setConfirmDeleteId(null);
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "Kayıt silinemedi.";
+            toast({ type: "error", message: msg });
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     // Ses kaydı hatası — toast olarak göster (sadece yeni hata gelince)
     const prevVoiceErrorRef = useRef<string | null>(null);
@@ -312,6 +334,7 @@ function ProductionPageInner() {
                         type="date"
                         value={tarih}
                         onChange={e => setTarih(e.target.value)}
+                        aria-label="Üretim tarihi"
                         style={{ ...inputStyle, width: "140px" }}
                     />
                 </div>
@@ -492,6 +515,7 @@ function ProductionPageInner() {
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
                                             onClick={() => removeLine(line.id)}
+                                            aria-label={`${idx + 1}. satırı kaldır`}
                                             style={{
                                                 fontSize: "16px",
                                                 color: "var(--danger-text)",
@@ -587,21 +611,13 @@ function ProductionPageInner() {
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.notlar || "—"}</td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
-                                            onClick={async () => {
+                                            onClick={() => {
                                                 if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
-                                                if (deletingId === kaydi.id) return;
-                                                setDeletingId(kaydi.id);
-                                                try {
-                                                    await deleteUretimKaydi(kaydi.id);
-                                                    toast({ type: "success", message: "Üretim kaydı silindi" });
-                                                } catch (err) {
-                                                    const msg = err instanceof Error ? err.message : "Kayıt silinemedi.";
-                                                    toast({ type: "error", message: msg });
-                                                } finally {
-                                                    setDeletingId(null);
-                                                }
+                                                if (deletingId) return;
+                                                setConfirmDeleteId(kaydi.id);
                                             }}
                                             disabled={isDemo || deletingId === kaydi.id}
+                                            aria-label={`${kaydi.productName} üretim kaydını sil`}
                                             title={isDemo ? DEMO_DISABLED_TOOLTIP : "Kaydı sil (stok geri alınır)"}
                                             style={{
                                                 fontSize: "14px",
@@ -660,6 +676,76 @@ function ProductionPageInner() {
                     </div>
                 </div>
             )}
+
+            {/* Silme onay modalı — stok ters hareketi geri-dönüşü zor olduğundan
+                tek tıkla silmeyi engeller (role=dialog + aria-modal, PO precedent) */}
+            {confirmDeleteId && (() => {
+                const target = todayLogs.find(k => k.id === confirmDeleteId);
+                if (!target) return null;
+                const busy = deletingId === confirmDeleteId;
+                return (
+                    <div
+                        onClick={() => { if (!busy) setConfirmDeleteId(null); }}
+                        style={{
+                            position: "fixed", inset: 0, zIndex: 200,
+                            background: "rgba(0,0,0,0.45)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            padding: "16px",
+                        }}
+                    >
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="delete-production-title"
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                background: "var(--bg-primary)",
+                                border: "0.5px solid var(--border-secondary)",
+                                borderRadius: "8px",
+                                padding: "20px",
+                                maxWidth: "400px", width: "100%",
+                                display: "flex", flexDirection: "column", gap: "12px",
+                            }}
+                        >
+                            <div id="delete-production-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                                Üretim kaydını sil
+                            </div>
+                            <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                                <strong>{target.productName}</strong> · +{formatNumber(target.adet)} {target.productSku}
+                                <br />
+                                Bu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.
+                            </div>
+                            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+                                <button
+                                    onClick={() => setConfirmDeleteId(null)}
+                                    disabled={busy}
+                                    style={{
+                                        fontSize: "13px", padding: "6px 14px",
+                                        border: "0.5px solid var(--border-secondary)",
+                                        borderRadius: "6px", background: "transparent",
+                                        color: "var(--text-secondary)", cursor: busy ? "not-allowed" : "pointer",
+                                    }}
+                                >
+                                    Vazgeç
+                                </button>
+                                <button
+                                    onClick={() => void performDelete(confirmDeleteId)}
+                                    disabled={busy}
+                                    style={{
+                                        fontSize: "13px", padding: "6px 14px",
+                                        border: "0.5px solid var(--danger-border)",
+                                        borderRadius: "6px", background: "var(--danger-bg)",
+                                        color: "var(--danger-text)", cursor: busy ? "not-allowed" : "pointer",
+                                        opacity: busy ? 0.6 : 1,
+                                    }}
+                                >
+                                    {busy ? "Siliniyor..." : "Evet, sil (stok geri alınır)"}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
         </div>
     );
 }

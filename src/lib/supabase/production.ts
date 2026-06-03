@@ -104,7 +104,7 @@ export interface CompleteProductionResult {
     entry_id?: string;
     new_on_hand?: number;
     error?: string;
-    shortages?: { component_product_id: string; required_qty: number; available_qty: number }[];
+    shortages?: { component_product_id: string; component_name?: string; required_qty: number; available_qty: number }[];
 }
 
 // ── Reverse Production (atomic delete + stock rollback) ──────
