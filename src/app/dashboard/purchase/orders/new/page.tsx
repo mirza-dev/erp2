@@ -49,6 +49,38 @@ export function computeExpectedDate(leadTimeDays: number | null | undefined, bas
     return d.toISOString().slice(0, 10);
 }
 
+/** Test edilebilir pure helper: ürün seçilince satın alma birim fiyatını öner.
+ * Satın alma = MALİYET fiyatı (cost_price). `price` SATIŞ fiyatıdır, fallback
+ * olarak KULLANILMAZ (PO'yu şişirir). cost_price null → boş (kullanıcı elle girer). */
+export function pickPurchaseUnitPrice(product: { cost_price: number | null }): string {
+    return product.cost_price != null ? String(product.cost_price) : "";
+}
+
+/** Test edilebilir pure helper: satırlardan ara toplam / iskonto / KDV / genel toplam.
+ * KDV %20 sabit. Geçersiz/0 satırlar atlanır (mevcut grandTotal davranışıyla aynı). */
+export function computePoTotals(lines: LineDraft[]): { subtotal: number; discount: number; vat: number; grand: number } {
+    let gross = 0;     // iskonto öncesi (qty * price)
+    let subtotal = 0;  // iskonto sonrası
+    for (const l of lines) {
+        const qty = Number(l.quantity);
+        const price = Number(l.unit_price);
+        const disc = Number(l.discount_pct) || 0;
+        if (Number.isFinite(qty) && Number.isFinite(price) && qty > 0 && price >= 0) {
+            const lineGross = qty * price;
+            gross += lineGross;
+            subtotal += lineGross * (1 - disc / 100);
+        }
+    }
+    const round = (n: number) => Math.round(n * 100) / 100;
+    const vat = subtotal * 0.20;  // KDV %20
+    return {
+        subtotal: round(subtotal),
+        discount: round(gross - subtotal),
+        vat: round(vat),
+        grand: round(subtotal + vat),
+    };
+}
+
 export default function NewPurchaseOrderPage() {
     // Next.js: useSearchParams Suspense boundary'si gerektirir (prerender).
     return (
@@ -141,18 +173,16 @@ function NewPurchaseOrderPageInner() {
     const addLine = () => setLines(prev => [...prev, { ...emptyLine }]);
     const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx));
 
-    const grandTotal = useMemo(() => {
-        let subtotal = 0;
-        for (const l of lines) {
-            const qty = Number(l.quantity);
-            const price = Number(l.unit_price);
-            const disc = Number(l.discount_pct) || 0;
-            if (Number.isFinite(qty) && Number.isFinite(price) && qty > 0 && price >= 0) {
-                subtotal += qty * price * (1 - disc / 100);
-            }
-        }
-        return Math.round(subtotal * 1.20 * 100) / 100;  // KDV %20
-    }, [lines]);
+    // Ürün seçilince birim fiyatı maliyet fiyatından (cost_price) otomatik doldur.
+    const handleProductSelect = (idx: number, productId: string) => {
+        const product = products.find(p => p.id === productId);
+        updateLine(idx, {
+            product_id: productId,
+            unit_price: product ? pickPurchaseUnitPrice(product) : "",
+        });
+    };
+
+    const totals = useMemo(() => computePoTotals(lines), [lines]);
 
     const handleSubmit = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -271,11 +301,20 @@ function NewPurchaseOrderPageInner() {
                     }}>
                         <div>
                             {idx === 0 && <label style={labelStyle}>Ürün</label>}
-                            <select value={l.product_id} onChange={e => updateLine(idx, { product_id: e.target.value })}
+                            <select value={l.product_id} onChange={e => handleProductSelect(idx, e.target.value)}
                                 aria-label={`Line ${idx + 1} ürün`} style={inputStyle}>
                                 <option value="">Seçiniz...</option>
                                 {products.map(p => <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>)}
                             </select>
+                            {(() => {
+                                const sel = l.product_id ? products.find(p => p.id === l.product_id) : undefined;
+                                if (!sel || sel.currency === currency) return null;
+                                return (
+                                    <div style={{ fontSize: "10px", color: "var(--warning-text)", marginTop: "3px", lineHeight: 1.3 }}>
+                                        Ürün fiyatı {sel.currency} cinsinden — PO {currency}, kontrol edin.
+                                    </div>
+                                );
+                            })()}
                         </div>
                         <div>
                             {idx === 0 && <label style={labelStyle}>Miktar</label>}
@@ -315,13 +354,44 @@ function NewPurchaseOrderPageInner() {
                     rows={3} aria-label="Notlar" style={{ ...inputStyle, resize: "vertical" }} />
             </div>
 
-            {/* Total + actions */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                    Tahmini Toplam (KDV dahil): <strong style={{ color: "var(--text-primary)" }}>
-                        {grandTotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {currency}
+            {/* Total breakdown */}
+            <div style={{
+                display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-end",
+                marginBottom: "16px", fontSize: "13px", color: "var(--text-secondary)",
+            }}>
+                <div style={{ display: "flex", gap: "16px" }}>
+                    <span>Ara Toplam:</span>
+                    <strong style={{ color: "var(--text-primary)", minWidth: "140px", textAlign: "right" }}>
+                        {totals.subtotal.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {currency}
                     </strong>
                 </div>
+                {totals.discount > 0 && (
+                    <div style={{ display: "flex", gap: "16px" }}>
+                        <span>İskonto:</span>
+                        <strong style={{ color: "var(--text-primary)", minWidth: "140px", textAlign: "right" }}>
+                            −{totals.discount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {currency}
+                        </strong>
+                    </div>
+                )}
+                <div style={{ display: "flex", gap: "16px" }}>
+                    <span>KDV (%20):</span>
+                    <strong style={{ color: "var(--text-primary)", minWidth: "140px", textAlign: "right" }}>
+                        {totals.vat.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {currency}
+                    </strong>
+                </div>
+                <div style={{ display: "flex", gap: "16px", fontSize: "14px", marginTop: "2px" }}>
+                    <span style={{ color: "var(--text-primary)" }}>Tahmini Genel Toplam (KDV dahil):</span>
+                    <strong style={{ color: "var(--text-primary)", minWidth: "140px", textAlign: "right" }}>
+                        {totals.grand.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {currency}
+                    </strong>
+                </div>
+                <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "1px" }}>
+                    Kesin tutar sipariş kaydedilince hesaplanır.
+                </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "16px" }}>
                 <div style={{ display: "flex", gap: "8px" }}>
                     <button onClick={() => router.push("/dashboard/purchase/orders")}
                         style={{

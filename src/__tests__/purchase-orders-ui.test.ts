@@ -341,3 +341,105 @@ describe("Detay sayfası — expected_date formatExpectedDate", () => {
         expect(detailSrc).not.toContain("Beklenen: {po.expected_date ?? \"—\"}");
     });
 });
+
+// ── Final ürün turu — ürün seçilince birim fiyat auto-fill + KDV kırılımı ──
+
+describe("pickPurchaseUnitPrice — satın alma birim fiyat önerisi (cost_price)", () => {
+    it("cost_price dolu → String(cost_price)", async () => {
+        const { pickPurchaseUnitPrice } = await import("@/app/dashboard/purchase/orders/new/page");
+        expect(pickPurchaseUnitPrice({ cost_price: 420 })).toBe("420");
+        expect(pickPurchaseUnitPrice({ cost_price: 9.5 })).toBe("9.5");
+    });
+
+    it("cost_price null → '' (kullanıcı elle girer; price fallback YOK)", async () => {
+        const { pickPurchaseUnitPrice } = await import("@/app/dashboard/purchase/orders/new/page");
+        expect(pickPurchaseUnitPrice({ cost_price: null })).toBe("");
+    });
+
+    it("cost_price 0 → '0' (sıfır geçerli sayı, null'dan farklı)", async () => {
+        const { pickPurchaseUnitPrice } = await import("@/app/dashboard/purchase/orders/new/page");
+        expect(pickPurchaseUnitPrice({ cost_price: 0 })).toBe("0");
+    });
+});
+
+describe("computePoTotals — ara toplam / iskonto / KDV %20 / genel toplam", () => {
+    it("tek satır, iskontosuz", async () => {
+        const { computePoTotals } = await import("@/app/dashboard/purchase/orders/new/page");
+        const r = computePoTotals([{ product_id: "p", quantity: "2", unit_price: "100", discount_pct: "0", notes: "" }]);
+        expect(r).toEqual({ subtotal: 200, discount: 0, vat: 40, grand: 240 });
+    });
+
+    it("iskontolu satır → discount + KDV iskonto sonrası matrahtan", async () => {
+        const { computePoTotals } = await import("@/app/dashboard/purchase/orders/new/page");
+        // gross 100, %10 iskonto → subtotal 90, KDV 18, grand 108
+        const r = computePoTotals([{ product_id: "p", quantity: "1", unit_price: "100", discount_pct: "10", notes: "" }]);
+        expect(r).toEqual({ subtotal: 90, discount: 10, vat: 18, grand: 108 });
+    });
+
+    it("çok satır → toplanır", async () => {
+        const { computePoTotals } = await import("@/app/dashboard/purchase/orders/new/page");
+        const r = computePoTotals([
+            { product_id: "a", quantity: "2", unit_price: "100", discount_pct: "0", notes: "" },
+            { product_id: "b", quantity: "1", unit_price: "50", discount_pct: "0", notes: "" },
+        ]);
+        expect(r.subtotal).toBe(250);
+        expect(r.vat).toBe(50);
+        expect(r.grand).toBe(300);
+    });
+
+    it("qty=0 / price geçersiz satır atlanır (mevcut grandTotal davranışı)", async () => {
+        const { computePoTotals } = await import("@/app/dashboard/purchase/orders/new/page");
+        const r = computePoTotals([
+            { product_id: "a", quantity: "0", unit_price: "100", discount_pct: "0", notes: "" },
+            { product_id: "b", quantity: "1", unit_price: "abc", discount_pct: "0", notes: "" },
+            { product_id: "c", quantity: "1", unit_price: "100", discount_pct: "0", notes: "" },
+        ]);
+        expect(r.subtotal).toBe(100);
+        expect(r.grand).toBe(120);
+    });
+
+    it("boş liste → tümü 0", async () => {
+        const { computePoTotals } = await import("@/app/dashboard/purchase/orders/new/page");
+        expect(computePoTotals([])).toEqual({ subtotal: 0, discount: 0, vat: 0, grand: 0 });
+    });
+});
+
+describe("New form — ürün seçimi unit_price auto-fill + currency uyarı + KDV kırılımı (source-regex)", () => {
+    let newSrc = "";
+
+    beforeAll(async () => {
+        const fs = await import("fs/promises");
+        const path = await import("path");
+        newSrc = await fs.readFile(
+            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/new/page.tsx"),
+            "utf-8",
+        );
+    });
+
+    it("ürün <select> onChange → handleProductSelect (eski salt product_id set kalmadı)", () => {
+        expect(newSrc).toContain("onChange={e => handleProductSelect(idx, e.target.value)}");
+        // handleProductSelect product_id + unit_price birlikte set eder
+        expect(newSrc).toMatch(/handleProductSelect = \(idx: number, productId: string\) => \{/);
+        expect(newSrc).toContain("unit_price: product ? pickPurchaseUnitPrice(product) : \"\"");
+        // eski salt-product_id onChange kalmamalı
+        expect(newSrc).not.toContain("onChange={e => updateLine(idx, { product_id: e.target.value })}");
+    });
+
+    it("currency mismatch inline uyarı (product.currency !== currency)", () => {
+        expect(newSrc).toContain("sel.currency === currency");
+        expect(newSrc).toContain("var(--warning-text)");
+        expect(newSrc).toMatch(/Ürün fiyatı \{sel\.currency\} cinsinden/);
+    });
+
+    it("KDV kırılımı: Ara Toplam + KDV (%20) + Genel Toplam (totals helper'dan)", () => {
+        expect(newSrc).toContain("const totals = useMemo(() => computePoTotals(lines)");
+        expect(newSrc).toContain("Ara Toplam:");
+        expect(newSrc).toContain("KDV (%20):");
+        // Kaydedilmemiş form = tahmin; sunucu RPC otoritatif → "Tahmini" çerçevesi korunur.
+        expect(newSrc).toContain("Tahmini Genel Toplam (KDV dahil):");
+        expect(newSrc).toContain("totals.vat.toLocaleString");
+        expect(newSrc).toContain("totals.grand.toLocaleString");
+        // eski tek-satır grandTotal kaldırıldı
+        expect(newSrc).not.toContain("grandTotal.toLocaleString");
+    });
+});
