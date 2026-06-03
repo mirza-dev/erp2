@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
         const supabase = createServiceClient();
 
-        const [customersRes, syncedRes, pendingRes, inProgressRes, failedRes, blockedRes, distRes, tokenRes] = await Promise.all([
+        const [customersRes, syncedRes, pendingRes, inProgressRes, failedRes, blockedRes, distRes, tokenRes, lastSyncRes] = await Promise.all([
             supabase.from("customers").select("id", { count: "exact", head: true }),
 
             // synced = has a Paraşüt invoice
@@ -47,6 +47,14 @@ export async function GET(req: NextRequest) {
             supabase.from("parasut_oauth_tokens")
                 .select("expires_at,token_version,updated_at")
                 .eq("singleton_key", "default")
+                .maybeSingle(),
+
+            // Gerçek "son sync" zamanı — FİLTRESİZ son log (UI'daki hardcoded
+            // tarih yerine; log filtreleri stats'a sızmaz → tutarlı timestamp).
+            supabase.from("integration_sync_logs")
+                .select("requested_at")
+                .order("requested_at", { ascending: false })
+                .limit(1)
                 .maybeSingle(),
         ]);
 
@@ -88,6 +96,8 @@ export async function GET(req: NextRequest) {
             };
         }
 
+        const lastSyncRow = lastSyncRes.data as { requested_at: string } | null;
+
         return NextResponse.json({
             customers:         customersRes.count   ?? 0,
             synced_invoices:   syncedRes.count      ?? 0,
@@ -98,6 +108,7 @@ export async function GET(req: NextRequest) {
             byStep,
             byErrorKind,
             token,
+            last_sync_at:      lastSyncRow?.requested_at ?? null,
         });
     } catch (err) {
         return handleApiError(err, "GET /api/parasut/stats");

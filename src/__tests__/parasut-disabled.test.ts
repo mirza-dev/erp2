@@ -17,6 +17,11 @@ vi.mock("next/headers", () => ({
     cookies: () => Promise.resolve({ get: () => undefined }),
 }));
 
+// config GET artık view_parasut guard'lı (kardeş stats/logs paritesi) → allow.
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+}));
+
 // ─── DB / parasut mocks ───────────────────────────────────────────────────────
 
 const mockDbGetOrderById = vi.fn();

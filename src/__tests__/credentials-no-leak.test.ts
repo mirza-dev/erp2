@@ -13,6 +13,11 @@ vi.mock("next/headers", () => ({
     cookies: () => Promise.resolve({ get: () => undefined }),
 }));
 
+// parasut/config GET artık view_parasut guard'lı → authenticated kullanıcı allow.
+vi.mock("@/lib/auth/role-guard", () => ({
+    requirePermission: vi.fn().mockResolvedValue(null),
+}));
+
 import { GET as parasutConfigGET } from "@/app/api/parasut/config/route";
 import { GET as apiKeysStatusGET } from "@/app/api/settings/api-keys-status/route";
 

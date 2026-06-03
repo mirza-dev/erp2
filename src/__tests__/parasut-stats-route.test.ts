@@ -32,6 +32,7 @@ function makeCountChain(key: string) {
 
 // Faz 11.4 — stats route'a parasut_oauth_tokens + dist (data) sorguları eklendi
 let salesOrderQueryIdx = 0;
+let lastSyncAt: string | null = "2026-06-01T10:30:00.000Z";
 const salesOrderKeys = ["synced", "pending", "in_progress", "failed", "blocked"];
 
 vi.mock("@/lib/supabase/service", () => {
@@ -48,6 +49,18 @@ vi.mock("@/lib/supabase/service", () => {
                         maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
                         then: (resolve: (v: { data: null; error: null }) => void) =>
                             resolve({ data: null, error: null }),
+                    };
+                }
+                if (table === "integration_sync_logs") {
+                    // last_sync_at sorgusu: select → order → limit → maybeSingle
+                    return {
+                        select:      vi.fn().mockReturnThis(),
+                        order:       vi.fn().mockReturnThis(),
+                        limit:       vi.fn().mockReturnThis(),
+                        maybeSingle: vi.fn().mockResolvedValue({
+                            data: { requested_at: lastSyncAt },
+                            error: null,
+                        }),
                     };
                 }
                 // sales_orders — count sorguları + dist sorgusu (data)
@@ -118,5 +131,19 @@ describe("GET /api/parasut/stats", () => {
     it("returns HTTP 200", async () => {
         const res = await GET();
         expect(res.status).toBe(200);
+    });
+
+    it("returns last_sync_at from the most recent (unfiltered) sync log", async () => {
+        lastSyncAt = "2026-06-01T10:30:00.000Z";
+        const res = await GET();
+        const body = await res.json();
+        expect(body.last_sync_at).toBe("2026-06-01T10:30:00.000Z");
+    });
+
+    it("returns last_sync_at = null when no sync logs exist", async () => {
+        lastSyncAt = null;
+        const res = await GET();
+        const body = await res.json();
+        expect(body.last_sync_at).toBeNull();
     });
 });

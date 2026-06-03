@@ -33,7 +33,7 @@ function makeBuilder(result: CountRes | { data: unknown; error: null }) {
         then:        promise.then.bind(promise),
         catch:       promise.catch.bind(promise),
     };
-    const chain = ["select","not","neq","eq","in","lt","gte","or","is","maybeSingle"];
+    const chain = ["select","not","neq","eq","in","lt","gte","or","is","order","limit","maybeSingle"];
     for (const m of chain) {
         builder[m] = () => builder;
     }
@@ -71,6 +71,7 @@ describe("GET /api/parasut/stats — Faz 11.4", () => {
             { count: 0  },        // blocked_syncs
             { data: distRows, error: null },
             { data: tokenRow, error: null },
+            { data: { requested_at: "2026-06-01T10:00:00.000Z" }, error: null }, // last_sync_at
         );
 
         const res = await GET();
@@ -85,6 +86,7 @@ describe("GET /api/parasut/stats — Faz 11.4", () => {
             { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 },
             { data: [], error: null },
             { data: tokenRow, error: null },
+            { data: { requested_at: "2026-06-01T10:00:00.000Z" }, error: null }, // last_sync_at
         );
         const res = await GET();
         const body = await res.json();
@@ -98,6 +100,7 @@ describe("GET /api/parasut/stats — Faz 11.4", () => {
             { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 },
             { data: [], error: null },
             { data: null, error: null },
+            { data: null, error: null }, // last_sync_at — no logs
         );
         const res = await GET();
         const body = await res.json();
@@ -111,6 +114,7 @@ describe("GET /api/parasut/stats — Faz 11.4", () => {
             { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 }, { count: 0 },
             { data: [], error: null },
             { data: expired, error: null },
+            { data: { requested_at: "2026-06-01T10:00:00.000Z" }, error: null }, // last_sync_at
         );
         const res = await GET();
         const body = await res.json();

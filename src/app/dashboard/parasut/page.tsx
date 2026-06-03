@@ -24,6 +24,7 @@ interface ParasutStats {
     blocked_syncs?: number;
     byStep?: Record<string, number>;
     byErrorKind?: Record<string, number>;
+    last_sync_at?: string | null;
     token?: {
         connected: boolean;
         expiresAt: string | null;
@@ -97,9 +98,6 @@ export default function ParasutPage() {
     // connection is derived from server-side config — never set locally
     const connection: ConnectionStatus = config?.enabled ? "connected" : "disconnected";
     const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
-    const [syncStep, setSyncStep] = useState(0);
-    const [syncProgress, setSyncProgress] = useState(0);
-    const [lastSyncTime, setLastSyncTime] = useState("17 Mar 2026 · 14:30");
     const [logs, setLogs] = useState<IntegrationSyncLogRow[]>([]);
     const [stats, setStats] = useState<ParasutStats>({ customers: 0, synced_invoices: 0, pending_syncs: 0, failed_syncs: 0 });
     const [syncedOrders, setSyncedOrders] = useState<SalesOrderRow[]>([]);
@@ -153,26 +151,15 @@ export default function ParasutPage() {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (syncStatus === "syncing") return;
         setSyncStatus("syncing");
-        setSyncStep(1);
-        setSyncProgress(20);
         try {
-            setSyncStep(2);
-            setSyncProgress(50);
-            const res = await fetch("/api/parasut/sync-all", { method: "POST" });
-            setSyncStep(3);
-            setSyncProgress(80);
+            // Authenticated toplu sync ucu — `sync-all` CRON-only olduğundan
+            // tarayıcıdan çağrılamaz; `sync-pending` session + manage_parasut ile açılır.
+            const res = await fetch("/api/parasut/sync-pending", { method: "POST" });
             if (res.ok) {
                 const data = await res.json();
-                setSyncProgress(100);
                 setSyncStatus("done");
-                setSyncStep(0);
 
-                const now = new Date();
-                const timeLabel = now.toLocaleDateString("tr-TR", { day: "2-digit", month: "short" })
-                    + " · " + now.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-                setLastSyncTime(timeLabel);
-
-                // Refetch all data
+                // "Son sync" zamanı stats.last_sync_at'tan türetilir → fetchAll tazeler.
                 await fetchAll();
 
                 const msg = `${data.synced} fatura gönderildi${data.failed > 0 ? `, ${data.failed} hata` : ""}`;
@@ -180,7 +167,8 @@ export default function ParasutPage() {
                 setTimeout(() => setSyncStatus("idle"), 3000);
             } else {
                 setSyncStatus("idle");
-                toast({ type: "error", message: "Sync başarısız" });
+                const data = await res.json().catch(() => ({}));
+                toast({ type: "error", message: data.error ?? "Sync başarısız" });
             }
         } catch (err) {
             console.error("Sync failed:", err);
@@ -233,7 +221,9 @@ export default function ParasutPage() {
         }
     };
 
-    const syncStepLabel = ["", "Cariler sync ediliyor...", "Faturalar sync ediliyor...", "Ödemeler sync ediliyor..."][syncStep] || "";
+    // Gerçek "son sync" zamanı — stats.last_sync_at (filtresiz son log). Yoksa
+    // henüz hiç sync olmamış demektir (eski hardcoded "17 Mar 2026" kaldırıldı).
+    const lastSyncTime = stats.last_sync_at ? formatDateTime(stats.last_sync_at) : "Henüz sync yapılmadı";
 
     const scopeCards = useMemo(() => [
         { label: "Cariler", count: stats.customers, unit: "cari" },
@@ -460,21 +450,20 @@ export default function ParasutPage() {
                             padding: "14px 20px",
                         }}
                     >
-                        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }} aria-live="polite">
                             <span style={{ fontSize: "13px", color: syncStatus === "done" ? "var(--success-text)" : "var(--warning-text)", fontWeight: 500 }}>
                                 {syncStatus === "done"
                                     ? "✓ Sync tamamlandı"
-                                    : syncStepLabel}
-                            </span>
-                            <span style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                {syncStatus === "done" ? "100%" : `${syncProgress}%`}
+                                    : "Senkronize ediliyor…"}
                             </span>
                         </div>
                         <div style={{ height: "4px", background: "var(--bg-tertiary)", borderRadius: "2px", overflow: "hidden" }}>
                             <div
                                 style={{
                                     height: "100%",
-                                    width: `${syncStatus === "done" ? 100 : syncProgress}%`,
+                                    // Sync tek istek — gerçek ilerleme bilinmiyor; "done"da dolu,
+                                    // "syncing"de belirsiz (sahte yüzde yok).
+                                    width: syncStatus === "done" ? "100%" : "40%",
                                     background: syncStatus === "done" ? "var(--success)" : "var(--warning)",
                                     borderRadius: "2px",
                                     transition: "width 0.3s ease",
@@ -733,6 +722,7 @@ export default function ParasutPage() {
                             <select
                                 value={logFilterStep}
                                 onChange={(e) => setLogFilterStep(e.target.value)}
+                                aria-label="Step'e göre filtrele"
                                 style={{
                                     fontSize: "11px",
                                     padding: "4px 6px",
@@ -750,6 +740,7 @@ export default function ParasutPage() {
                             <select
                                 value={logFilterErrorKind}
                                 onChange={(e) => setLogFilterErrorKind(e.target.value)}
+                                aria-label="Hata tipine göre filtrele"
                                 style={{
                                     fontSize: "11px",
                                     padding: "4px 6px",
@@ -767,6 +758,7 @@ export default function ParasutPage() {
                             <select
                                 value={logFilterStatus}
                                 onChange={(e) => setLogFilterStatus(e.target.value)}
+                                aria-label="Duruma göre filtrele"
                                 style={{
                                     fontSize: "11px",
                                     padding: "4px 6px",
@@ -865,7 +857,16 @@ export default function ParasutPage() {
                                             <td style={{ ...tdStyle, fontSize: "11px", color: "var(--danger-text)", maxWidth: "200px" }}>
                                                 {log.error_message ? (
                                                     <span
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        aria-expanded={isExpanded}
                                                         onClick={() => setExpandedError(isExpanded ? null : log.id)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === "Enter" || e.key === " ") {
+                                                                e.preventDefault();
+                                                                setExpandedError(isExpanded ? null : log.id);
+                                                            }
+                                                        }}
                                                         style={{ cursor: "pointer" }}
                                                         title={isExpanded ? "Küçült" : "Genişlet"}
                                                     >
