@@ -126,6 +126,9 @@ export default function ResetDemoSection() {
                     onClick={() => !busy && setShowConfirm(false)}
                 >
                     <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="reset-demo-confirm-title"
                         style={{
                             background: "var(--bg-secondary)",
                             border: "0.5px solid var(--border-secondary)",
@@ -137,6 +140,7 @@ export default function ResetDemoSection() {
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div
+                            id="reset-demo-confirm-title"
                             style={{
                                 fontSize: "15px",
                                 fontWeight: 600,

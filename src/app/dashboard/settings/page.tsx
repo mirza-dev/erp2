@@ -154,13 +154,16 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     currency: form.currency,
                 }),
             });
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => null);
+                throw new Error(errBody?.error ?? "Kayıt başarısız. Tekrar deneyin.");
+            }
             savedRef.current = { ...form };
             setIsDirty(false);
             onDirtyChange?.(false);
             toast({ type: "success", message: "Firma bilgileri kaydedildi" });
-        } catch {
-            toast({ type: "error", message: "Kayıt başarısız. Tekrar deneyin." });
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Kayıt başarısız. Tekrar deneyin." });
         } finally {
             setIsSaving(false);
         }
@@ -924,7 +927,7 @@ function ApiTab() {
                             {parasutToken === null ? (
                                 "Yükleniyor…"
                             ) : !parasutToken.connected ? (
-                                "Bağlantı yok — &apos;Bağlan&apos; ile akışı başlatın."
+                                "Bağlantı yok — 'Bağlan' ile akışı başlatın."
                             ) : (
                                 <>
                                     Geçerli ·{" "}
@@ -1179,6 +1182,9 @@ export default function SettingsPage() {
             <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", minHeight: "calc(100vh - 120px)" }}>
                 {/* Left tab menu */}
                 <div
+                    role="tablist"
+                    aria-label="Ayarlar bölümleri"
+                    aria-orientation="vertical"
                     style={{
                         borderRight: "0.5px solid var(--border-tertiary)",
                         padding: "16px 0",
@@ -1190,6 +1196,11 @@ export default function SettingsPage() {
                     {tabs.map(({ key, label }) => (
                         <button
                             key={key}
+                            role="tab"
+                            id={`settings-tab-${key}`}
+                            aria-selected={activeTab === key}
+                            aria-controls="settings-tabpanel"
+                            aria-label={dirtyTabs.has(key) ? `${label} (kaydedilmemiş değişiklikler)` : undefined}
                             onClick={() => handleTabSwitch(key)}
                             style={{
                                 textAlign: "left",
@@ -1208,7 +1219,7 @@ export default function SettingsPage() {
                         >
                             {label}
                             {dirtyTabs.has(key) && (
-                                <span style={{
+                                <span aria-hidden="true" style={{
                                     display: "inline-block",
                                     width: "6px",
                                     height: "6px",
@@ -1223,7 +1234,12 @@ export default function SettingsPage() {
                 </div>
 
                 {/* Right content */}
-                <div style={{ padding: "24px 28px", maxWidth: "640px" }}>
+                <div
+                    role="tabpanel"
+                    id="settings-tabpanel"
+                    aria-labelledby={`settings-tab-${activeTab}`}
+                    style={{ padding: "24px 28px", maxWidth: "640px" }}
+                >
                     {activeTab === "firma" && <FirmaTab onDirtyChange={(d) => handleDirtyChange("firma", d)} />}
                     {activeTab === "kullanici" && <KullaniciTab onDirtyChange={(d) => handleDirtyChange("kullanici", d)} />}
                     {activeTab === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
