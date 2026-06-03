@@ -260,6 +260,61 @@ describe("POST /api/import/[batchId]/apply-mappings", () => {
         });
     });
 
+    it("sheet adı barizse global operation_type yerine stok hareketi infer eder", async () => {
+        await POST(makeReq({
+            operation_type: "product_update",
+            sheets: [{
+                sheet_name: "Stok_Hareketleri",
+                entity_type: "stock",
+                mappings: [
+                    { source_column: "sku", target_field: "sku" },
+                    { source_column: "miktar", target_field: "on_hand" },
+                    { source_column: "yon", target_field: "direction" },
+                ],
+                rows: [{ sku: "P001", miktar: "5", yon: "out" }],
+                remember: false,
+            }],
+        }), makeCtx());
+
+        const draftInputs: Array<{ parsed_data: Record<string, unknown> }> = mockDbCreateDrafts.mock.calls[0][0];
+        expect(draftInputs[0].parsed_data.__ai_import_operation).toBe("stock_movement");
+    });
+
+    it("draft metadata: sheet, row number, field approvals, risk flags ve row_errors oluşturur", async () => {
+        await POST(makeReq({
+            operation_type: "product_update",
+            sheets: [{
+                sheet_name: "Urunler",
+                entity_type: "product",
+                mappings: [
+                    { source_column: "ad", target_field: "name" },
+                    { source_column: "fiyat", target_field: "price" },
+                ],
+                rows: [{ ad: "SKU olmayan ürün", fiyat: "10" }],
+                remember: false,
+            }],
+        }), makeCtx());
+
+        const draftInputs: Array<{
+            sheet_name: string;
+            row_number: number;
+            parsed_data: Record<string, unknown>;
+            field_approvals: Record<string, string>;
+            risk_flags: string[];
+            row_errors: string[];
+            match_status: string;
+        }> = mockDbCreateDrafts.mock.calls[0][0];
+        expect(draftInputs[0]).toMatchObject({
+            sheet_name: "Urunler",
+            row_number: 2,
+            match_status: "blocked",
+        });
+        expect(draftInputs[0].parsed_data.sku).toMatch(/^SKU-OLMA-URUN-/);
+        expect(draftInputs[0].field_approvals.price).toBe("skip");
+        expect(draftInputs[0].risk_flags).toContain("financial:price");
+        expect(draftInputs[0].row_errors.join(" ")).toContain("SKU dosyada yoktu");
+    });
+
     it("vendor entity mappings are whitelisted and keep price/cost out", async () => {
         await POST(makeReq({
             operation_type: "vendor_upsert",

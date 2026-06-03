@@ -19,9 +19,12 @@ const mockDbUpdateDraft = vi.fn();
 const mockDbCreateProduct = vi.fn();
 const mockDbFindProductBySku = vi.fn();
 const mockDbUpdateProduct = vi.fn();
+const mockDbRecordMovementAtomic = vi.fn();
+const mockDbRecordStockTransfer = vi.fn();
 const mockDbCreateCustomer = vi.fn();
 const mockDbFindCustomerByCode = vi.fn();
 const mockDbFindCustomerByName = vi.fn();
+const mockDbFindCustomerByEmail = vi.fn();
 const mockDbUpdateCustomer = vi.fn();
 
 vi.mock("@/lib/supabase/import", () => ({
@@ -36,6 +39,7 @@ vi.mock("@/lib/supabase/customers", () => ({
     dbCreateCustomer: (...a: unknown[]) => mockDbCreateCustomer(...a),
     dbFindCustomerByName: (...a: unknown[]) => mockDbFindCustomerByName(...a),
     dbFindCustomerByCode: (...a: unknown[]) => mockDbFindCustomerByCode(...a),
+    dbFindCustomerByEmail: (...a: unknown[]) => mockDbFindCustomerByEmail(...a),
     dbUpdateCustomer: (...a: unknown[]) => mockDbUpdateCustomer(...a),
 }));
 vi.mock("@/lib/supabase/entity-aliases", () => ({
@@ -45,7 +49,12 @@ vi.mock("@/lib/supabase/entity-aliases", () => ({
 vi.mock("@/lib/supabase/products", () => ({
     dbCreateProduct: (...a: unknown[]) => mockDbCreateProduct(...a),
     dbFindProductBySku: (...a: unknown[]) => mockDbFindProductBySku(...a),
+    dbRecordMovementAtomic: (...a: unknown[]) => mockDbRecordMovementAtomic(...a),
+    dbRecordStockTransfer: (...a: unknown[]) => mockDbRecordStockTransfer(...a),
     dbUpdateProduct: (...a: unknown[]) => mockDbUpdateProduct(...a),
+}));
+vi.mock("@/lib/supabase/product-vendor-links", () => ({
+    dbUpsertProductVendorLink: vi.fn(),
 }));
 vi.mock("@/lib/supabase/orders", () => ({
     dbFindOrderByOriginalNumber: vi.fn(),
@@ -113,6 +122,9 @@ beforeEach(() => {
     mockDbUpdateDraft.mockResolvedValue({});
     mockDbFindCustomerByCode.mockResolvedValue(null);
     mockDbFindCustomerByName.mockResolvedValue(null);
+    mockDbFindCustomerByEmail.mockResolvedValue(null);
+    mockDbRecordMovementAtomic.mockResolvedValue({ success: true });
+    mockDbRecordStockTransfer.mockResolvedValue({ success: true });
 });
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -208,8 +220,8 @@ describe("ConfirmResult.byEntity — entity-bazlı sayaç kırılımı (Sprint B
         mockDbListDrafts.mockResolvedValue([
             makeCustomerDraft("d-c1", "Eski Firma"),
         ]);
-        // customer_code yok → dbFindCustomerByName üzerinden eşleşir
-        mockDbFindCustomerByName.mockResolvedValue({ id: "existing-c", name: "Eski Firma" });
+        // customer_code yok → e-posta exact match üzerinden eşleşir
+        mockDbFindCustomerByEmail.mockResolvedValue({ id: "existing-c", name: "Eski Firma" });
         mockDbUpdateCustomer.mockResolvedValue({ id: "existing-c", name: "Eski Firma" });
 
         const result = await serviceConfirmBatch("batch-1");

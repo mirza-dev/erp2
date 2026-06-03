@@ -10,6 +10,12 @@ import {
     isAiImportOperationType,
     type AiImportOperationType,
 } from "@/lib/ai-import-operations";
+import {
+    defaultFieldApprovals,
+    riskFlagsForFields,
+    suggestSkuFromName,
+    type ImportMatchStatus,
+} from "@/lib/import-center";
 
 function parseTRNumber(raw: string): number | null {
     const s = raw.toString().trim();
@@ -30,6 +36,26 @@ function coerceValue(field: string, raw: string): unknown {
         if (num !== null) return num;
     }
     return raw;
+}
+
+function inferOperationForSheet(input: {
+    sheetName: string;
+    entityType: string;
+    fallback: AiImportOperationType;
+}): AiImportOperationType {
+    const normalized = input.sheetName
+        .toLocaleLowerCase("tr-TR")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/ı/g, "i");
+    if (input.entityType === "stock") {
+        if (/(sayim|sayimi|count)/.test(normalized)) return "stock_count";
+        if (/(hareket|movement|giris|cikis|transfer)/.test(normalized)) return "stock_movement";
+    }
+    if (input.entityType === "product" && /(tedarikci|vendor|supplier)/.test(normalized)) {
+        return "vendor_product_relation";
+    }
+    return input.fallback;
 }
 
 /**
@@ -97,6 +123,11 @@ export async function POST(
 
         for (const sheet of body.sheets) {
             const { entity_type, mappings, rows, remember } = sheet;
+            const sheetOperationType = inferOperationForSheet({
+                sheetName: sheet.sheet_name,
+                entityType: entity_type,
+                fallback: operationType,
+            });
             const allowedFields = IMPORT_FIELD_SET[entity_type];
             if (!allowedFields) {
                 return NextResponse.json(
@@ -127,7 +158,7 @@ export async function POST(
                 columnMappingMeta.push({ entity_type, normalized_columns: activeNormalized });
             }
 
-            const draftInputs = rows.map(row => {
+            const draftInputs = rows.map((row, rowIndex) => {
                 const parsed_data: Record<string, unknown> = {};
                 for (const { source_column, target_field } of activeMappings) {
                     const rawVal = row[source_column];
@@ -138,17 +169,51 @@ export async function POST(
                         }
                     }
                 }
+                const rowErrors: string[] = [];
+                let matchStatus: ImportMatchStatus = "new";
+                if (entity_type === "product" && !parsed_data.sku && typeof parsed_data.name === "string") {
+                    parsed_data.sku = suggestSkuFromName(parsed_data.name, rowIndex + 1);
+                    rowErrors.push("SKU dosyada yoktu; sistem önerisi oluşturuldu, lütfen önizlemede doğrulayın.");
+                }
+                if (entity_type === "product" && (!parsed_data.sku || !parsed_data.name || !parsed_data.unit)) {
+                    matchStatus = "blocked";
+                    if (!parsed_data.sku) rowErrors.push("SKU zorunludur.");
+                    if (!parsed_data.name) rowErrors.push("Ürün adı zorunludur.");
+                    if (!parsed_data.unit) rowErrors.push("Birim zorunludur.");
+                }
+                if (entity_type === "customer" && !parsed_data.email && !parsed_data.customer_code) {
+                    rowErrors.push("E-posta veya müşteri kodu yok; isim benzerliği otomatik güncelleme sayılmaz.");
+                }
+                if (entity_type === "vendor" && !parsed_data.contact_email && !parsed_data.tax_number) {
+                    rowErrors.push("E-posta veya vergi no yok; isim benzerliği otomatik güncelleme sayılmaz.");
+                }
+                if (entity_type === "stock" && !parsed_data.sku) {
+                    matchStatus = "blocked";
+                    rowErrors.push("Stok işlemi için SKU zorunludur.");
+                }
+                const riskFlags = [
+                    ...riskFlagsForFields(parsed_data),
+                    ...(rowErrors.length > 0 ? ["review:required"] : []),
+                ];
+                const fieldApprovals = defaultFieldApprovals(parsed_data);
                 return {
                     batch_id: batchId,
                     entity_type: entity_type as "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment",
                     raw_data: row as Record<string, unknown>,
                     parsed_data: {
                         ...parsed_data,
-                        __ai_import_operation: operationType,
+                        __ai_import_operation: sheetOperationType,
                     },
                     confidence: 1.0,   // user confirmed the mapping
                     ai_reason: "Kullanıcı kolon eşleştirmesini onayladı",
                     unmatched_fields: [] as unknown[],
+                    sheet_name: sheet.sheet_name,
+                    row_number: rowIndex + 2,
+                    match_status: matchStatus,
+                    match_confidence: 1.0,
+                    risk_flags: riskFlags,
+                    field_approvals: fieldApprovals,
+                    row_errors: rowErrors,
                 };
             });
 

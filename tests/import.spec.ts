@@ -1,7 +1,7 @@
 /**
  * Import Wizard E2E Tests — klasik 7-adım wizard akışı.
  *
- * Faz 3d (2026-05-23): "AI ile Aktar" / "Klasik Mod" tab toggle kaldırıldı;
+ * Faz 3d (2026-05-23): "AI ile Aktar" / eski Excel modu tab toggle kaldırıldı;
  * klasik wizard sayfanın altında <details> accordion'a alındı (default kapalı).
  * AI default akışında DropZone'un kendi <input type="file"> var → eski genel
  * `page.locator(CLASSIC_FILE_INPUT)` locator'ı Playwright strict mode'da
@@ -31,6 +31,13 @@ if (!fs.existsSync(path.join(__dirname, "fixtures/invalid.txt"))) {
 test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard/import");
     await page.waitForLoadState("networkidle");
+    const demoLink = page.getByRole("link", { name: /demo ile gezin/i });
+    if (await demoLink.isVisible().catch(() => false)) {
+        await demoLink.click();
+        await page.waitForURL(/\/dashboard(?:\/.*)?$/, { timeout: 15_000 });
+        await page.goto("/dashboard/import");
+        await page.waitForLoadState("networkidle");
+    }
     // Faz 3d: klasik wizard accordion'ı testler için programmatic aç. <summary>
     // tıklama animasyonla async olabildiği için doğrudan DOM mutasyonu daha
     // güvenilir. classicDetailsRef React state'ine onToggle ile senkron olur.

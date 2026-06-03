@@ -1,5 +1,6 @@
 import { createServiceClient } from "./service";
 import type { ColumnMappingRow } from "@/lib/database.types";
+import { COLUMN_MAPPING_COMPANY_SCOPE } from "@/lib/import-center";
 
 export function normalizeColumnName(col: string): string {
     return col.trim()
@@ -17,6 +18,7 @@ export function normalizeColumnName(col: string): string {
 export async function dbLookupColumnMappings(
     headers: string[],
     entityType: string,
+    companyScope = COLUMN_MAPPING_COMPANY_SCOPE,
 ): Promise<Map<string, ColumnMappingRow>> {
     const supabase = createServiceClient();
     const normalizedHeaders = headers.map(normalizeColumnName);
@@ -25,6 +27,7 @@ export async function dbLookupColumnMappings(
     const { data, error } = await supabase
         .from("column_mappings")
         .select("*")
+        .eq("company_scope", companyScope)
         .eq("entity_type", entityType)
         .in("normalized", normalizedHeaders);
 
@@ -42,6 +45,7 @@ export async function dbLookupColumnMappings(
  */
 export async function dbSaveColumnMappings(
     mappings: { source_column: string; entity_type: string; target_field: string }[],
+    companyScope = COLUMN_MAPPING_COMPANY_SCOPE,
 ): Promise<void> {
     if (mappings.length === 0) return;
     const supabase = createServiceClient();
@@ -52,6 +56,7 @@ export async function dbSaveColumnMappings(
         const { data: existing } = await supabase
             .from("column_mappings")
             .select("id, usage_count, target_field")
+            .eq("company_scope", companyScope)
             .eq("normalized", norm)
             .eq("entity_type", m.entity_type)
             .maybeSingle();
@@ -73,6 +78,7 @@ export async function dbSaveColumnMappings(
                 .eq("id", existing.id);
         } else {
             await supabase.from("column_mappings").insert({
+                company_scope: companyScope,
                 source_column: m.source_column,
                 normalized: norm,
                 entity_type: m.entity_type,
@@ -90,6 +96,7 @@ export async function dbSaveColumnMappings(
 export async function dbIncrementMappingSuccess(
     normalizedColumns: string[],
     entityType: string,
+    companyScope = COLUMN_MAPPING_COMPANY_SCOPE,
 ): Promise<void> {
     if (normalizedColumns.length === 0) return;
     const supabase = createServiceClient();
@@ -97,6 +104,7 @@ export async function dbIncrementMappingSuccess(
     const { data } = await supabase
         .from("column_mappings")
         .select("id, success_count")
+        .eq("company_scope", companyScope)
         .eq("entity_type", entityType)
         .in("normalized", normalizedColumns);
 

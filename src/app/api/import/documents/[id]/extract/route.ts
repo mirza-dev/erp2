@@ -5,7 +5,7 @@
  *   - product_catalog / product_datasheet → aiExtractProductsFromDocument
  *   - material_certificate / compliance_doc / test_report → aiExtractCertificateTarget
  *   - product_photo veya operation=product_documents + katalog/datasheet → aiExtractProductDocumentTarget
- *   - migration_excel → 400 "Klasik Mod kullanın"
+ *   - migration_excel → 400 "Excel/CSV ile Toplu Aktarım bölümünü kullanın"
  *   - diğer (msds/vendor_profile/unknown) → 400 "Bu tip için ekstraksiyon yok"
  *
  * Her item için product-matcher top-3 candidate üretir; auto-link skoru ≥85
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             : DEFAULT_AI_IMPORT_OPERATION;
 
         if (docType === "migration_excel") {
-            return NextResponse.json({ error: "Migration Excel için Klasik Mod kullanın." }, { status: 400 });
+            return NextResponse.json({ error: "Migration Excel için Excel/CSV ile Toplu Aktarım bölümünü kullanın." }, { status: 400 });
         }
 
         const isProductDocumentTargetFlow =

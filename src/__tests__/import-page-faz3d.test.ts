@@ -1,8 +1,8 @@
 /**
  * Faz 3d (2026-05-23) — Import sayfası klasik mod accordion + AI default akış.
  *
- * Tab toggle ("AI ile Aktar" / "Klasik Mod") kaldırıldı; AI akışı her zaman
- * görünür, klasik mod alt <details> accordion'da fallback. migration_excel
+ * Tab toggle ("AI ile Aktar" / eski Excel modu) kaldırıldı; AI akışı her zaman
+ * görünür, Excel/CSV toplu aktarım alt <details> accordion'da fallback. migration_excel
  * tespit edilirse ClassifierQueue onOpenClassicMode callback'i ile parent
  * accordion'u açar.
  *
@@ -57,18 +57,18 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
     it("AI empty state — aiFiles.length === 0 ise yardım metni render edilir", () => {
         expect(SOURCE).toMatch(/aiFiles\.length === 0 &&/);
         expect(SOURCE).toMatch(/Henüz dosya yüklenmedi/);
-        // Migration Excel için fallback yönergesi metinde
-        expect(SOURCE).toMatch(/Migration Excel|Klasik Mod/);
+        // Excel/CSV tabloları için yeni toplu aktarım merkezi yönergesi metinde
+        expect(SOURCE).toMatch(/Excel\/CSV ile Toplu Aktarım/);
     });
 
-    it("Klasik mod <details> accordion içine alındı, default kapalı (showClassic=false)", () => {
+    it("Excel/CSV toplu aktarım <details> accordion içine alındı, default kapalı (showClassic=false)", () => {
         // <details> elementi + open binding
         expect(SOURCE).toMatch(/<details/);
         expect(SOURCE).toMatch(/open=\{showClassic\}/);
         // onToggle ile state senkron
         expect(SOURCE).toMatch(/onToggle=\{.*setShowClassic/);
-        // Summary etiketinde "Klasik Mod" ve "Gelişmiş"
-        expect(SOURCE).toMatch(/Gelişmiş.*Klasik Mod|Klasik Mod.*Gelişmiş/i);
+        // Summary etiketinde yeni premium Excel/CSV merkezi adı var
+        expect(SOURCE).toMatch(/Excel\/CSV ile Toplu Aktarım/);
     });
 
     it("Klasik wizard içeriği accordion'ın içinde — mode==='classic' guard kalmadı", () => {

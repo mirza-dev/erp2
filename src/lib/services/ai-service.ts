@@ -19,6 +19,7 @@ import {
 import { normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { IMPORT_FIELD_NAMES } from "@/lib/import-fields";
 import { normalizeTechnicalEvidence } from "@/lib/technical-templates";
+import { IMPORT_ALIAS_FIELD_MAP } from "@/lib/import-center";
 import type { TechnicalExtractionEvidence } from "@/lib/database.types";
 
 export function isAIAvailable(): boolean {
@@ -339,6 +340,11 @@ export const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
         stok: "on_hand", stok_miktari: "on_hand", miktar: "on_hand", sayim: "on_hand",
     },
 };
+
+Object.assign(FALLBACK_FIELD_MAP.customer, IMPORT_ALIAS_FIELD_MAP.customer);
+Object.assign(FALLBACK_FIELD_MAP.vendor, IMPORT_ALIAS_FIELD_MAP.vendor);
+Object.assign(FALLBACK_FIELD_MAP.product, IMPORT_ALIAS_FIELD_MAP.product);
+Object.assign(FALLBACK_FIELD_MAP.stock, IMPORT_ALIAS_FIELD_MAP.stock);
 
 export function fallbackParseRow(
     row: Record<string, string>,

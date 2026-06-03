@@ -80,6 +80,18 @@ export async function dbFindCustomerByName(name: string): Promise<CustomerRow | 
     return data;
 }
 
+export async function dbFindCustomerByEmail(email: string): Promise<CustomerRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("customers")
+        .select("*")
+        .ilike("email", email)
+        .limit(1)
+        .maybeSingle();
+    if (error || !data) return null;
+    return data;
+}
+
 export interface UpdateCustomerInput {
     name?: string;
     email?: string;

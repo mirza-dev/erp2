@@ -3,6 +3,7 @@ import { dbGetDraft, dbUpdateDraft } from "@/lib/supabase/import";
 import type { ImportDraftStatus } from "@/lib/database.types";
 import { safeParseJson } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
+import type { ImportFieldApproval } from "@/lib/import-center";
 
 // GET /api/import/drafts/[id]
 export async function GET(
@@ -21,7 +22,7 @@ export async function GET(
 }
 
 // PATCH /api/import/drafts/[id]
-// Body: { status?: "confirmed"|"rejected", user_corrections?: Record<string, unknown> }
+// Body: { status?: "confirmed"|"rejected", user_corrections?, field_approvals? }
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -36,14 +37,24 @@ export async function PATCH(
         const { status, user_corrections } = safeParsed.data as {
             status?: ImportDraftStatus;
             user_corrections?: Record<string, unknown>;
+            field_approvals?: Record<string, ImportFieldApproval>;
         };
+        const { field_approvals } = safeParsed.data as { field_approvals?: Record<string, ImportFieldApproval> };
 
         const validStatuses: ImportDraftStatus[] = ["confirmed", "rejected", "pending"];
         if (status && !validStatuses.includes(status)) {
             return NextResponse.json({ error: `Geçersiz status: ${status}` }, { status: 400 });
         }
 
-        const updated = await dbUpdateDraft(id, { status, user_corrections });
+        if (field_approvals) {
+            const allowed = new Set(["apply", "skip", "clear"]);
+            const invalid = Object.values(field_approvals).find(v => !allowed.has(v));
+            if (invalid) {
+                return NextResponse.json({ error: `Geçersiz alan onayı: ${invalid}` }, { status: 400 });
+            }
+        }
+
+        const updated = await dbUpdateDraft(id, { status, user_corrections, field_approvals });
         return NextResponse.json(updated);
     } catch (err) {
         console.error("[PATCH /api/import/drafts/[id]]", err);

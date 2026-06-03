@@ -24,14 +24,18 @@ const mockDbUpdateDraft = vi.fn();
 const mockDbCreateCustomer = vi.fn();
 const mockDbFindCustomerByName = vi.fn();
 const mockDbFindCustomerByCode = vi.fn();
+const mockDbFindCustomerByEmail = vi.fn();
 const mockDbLookupEntityAlias = vi.fn();
 const mockDbSaveEntityAlias = vi.fn();
 const mockDbCreateProduct = vi.fn();
 const mockDbFindProductBySku = vi.fn();
 const mockDbUpdateProduct = vi.fn();
+const mockDbRecordMovementAtomic = vi.fn();
+const mockDbRecordStockTransfer = vi.fn();
 const mockDbListVendors = vi.fn();
 const mockDbCreateVendor = vi.fn();
 const mockDbUpdateVendor = vi.fn();
+const mockDbUpsertProductVendorLink = vi.fn();
 const mockDbCreateOrder = vi.fn();
 const mockDbUpdateCustomer = vi.fn();
 const mockDbCreateQuote = vi.fn();
@@ -65,6 +69,7 @@ vi.mock("@/lib/supabase/customers", () => ({
     dbCreateCustomer: (...args: unknown[]) => mockDbCreateCustomer(...args),
     dbFindCustomerByName: (...args: unknown[]) => mockDbFindCustomerByName(...args),
     dbFindCustomerByCode: (...args: unknown[]) => mockDbFindCustomerByCode(...args),
+    dbFindCustomerByEmail: (...args: unknown[]) => mockDbFindCustomerByEmail(...args),
     dbUpdateCustomer: (...args: unknown[]) => mockDbUpdateCustomer(...args),
 }));
 vi.mock("@/lib/supabase/entity-aliases", () => ({
@@ -74,7 +79,12 @@ vi.mock("@/lib/supabase/entity-aliases", () => ({
 vi.mock("@/lib/supabase/products", () => ({
     dbCreateProduct: (...args: unknown[]) => mockDbCreateProduct(...args),
     dbFindProductBySku: (...args: unknown[]) => mockDbFindProductBySku(...args),
+    dbRecordMovementAtomic: (...args: unknown[]) => mockDbRecordMovementAtomic(...args),
+    dbRecordStockTransfer: (...args: unknown[]) => mockDbRecordStockTransfer(...args),
     dbUpdateProduct: (...args: unknown[]) => mockDbUpdateProduct(...args),
+}));
+vi.mock("@/lib/supabase/product-vendor-links", () => ({
+    dbUpsertProductVendorLink: (...args: unknown[]) => mockDbUpsertProductVendorLink(...args),
 }));
 vi.mock("@/lib/supabase/vendors", () => ({
     dbListVendors: (...args: unknown[]) => mockDbListVendors(...args),
@@ -144,6 +154,14 @@ function makeDraft(overrides: Partial<ImportDraftRow> = {}): ImportDraftRow {
         ...overrides,
     };
 }
+
+beforeEach(() => {
+    mockDbFindCustomerByEmail.mockResolvedValue(null);
+    mockDbRecordMovementAtomic.mockResolvedValue({ success: true });
+    mockDbRecordStockTransfer.mockResolvedValue({ success: true });
+    mockDbUpsertProductVendorLink.mockResolvedValue({ id: "link-1" });
+    mockDbListVendors.mockResolvedValue([]);
+});
 
 // ─── Batch lifecycle ─────────────────────────────────────────────────────────
 
@@ -317,9 +335,9 @@ describe("serviceConfirmBatch — customer merge", () => {
         expect(result.skipped).toBe(0);
     });
 
-    it("increments updated (not added) when customer already exists by name", async () => {
+    it("increments updated (not added) when customer already exists by email", async () => {
         mockDbListDrafts.mockResolvedValue([makeDraft()]);
-        mockDbFindCustomerByName.mockResolvedValue({ id: "existing-c", name: "Acme Vana" });
+        mockDbFindCustomerByEmail.mockResolvedValue({ id: "existing-c", name: "Acme Vana" });
         mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
 
         const result = await serviceConfirmBatch("batch-1");
@@ -667,17 +685,23 @@ describe("serviceConfirmBatch — vendor_product_relation operation", () => {
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 0 });
-        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+        mockDbListVendors.mockResolvedValue([{ id: "vendor-1", name: "Acme Makine", contact_email: null }]);
 
         const result = await serviceConfirmBatch("batch-1");
 
         expect(result.errors).toEqual([]);
         expect(result.updated).toBe(1);
-        expect(mockDbUpdateProduct).toHaveBeenCalledWith("existing-p", {
-            preferred_vendor: "Acme Makine",
+        expect(mockDbUpsertProductVendorLink).toHaveBeenCalledWith({
+            product_id: "existing-p",
+            vendor_id: "vendor-1",
+            vendor_sku: undefined,
             lead_time_days: 14,
-            reorder_qty: 25,
+            moq: 25,
+            is_preferred: undefined,
+            notes: undefined,
+            actor: null,
         });
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
         expect(mockDbCreateProduct).not.toHaveBeenCalled();
     });
 
@@ -687,18 +711,24 @@ describe("serviceConfirmBatch — vendor_product_relation operation", () => {
             parsed_data: {
                 sku: "GV-050",
                 preferred_vendor: "Acme Makine",
+                is_preferred: true,
                 __ai_import_operation: "vendor_product_relation",
             },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 0 });
-        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
+        mockDbListVendors.mockResolvedValue([{ id: "vendor-1", name: "Acme Makine", contact_email: null }]);
 
         const result = await serviceConfirmBatch("batch-1");
 
         expect(result.updated).toBe(1);
         expect(result.skipped).toBe(0);
-        expect(mockDbUpdateProduct).toHaveBeenCalledWith("existing-p", { preferred_vendor: "Acme Makine" });
+        expect(mockDbUpsertProductVendorLink).toHaveBeenCalledWith(expect.objectContaining({
+            product_id: "existing-p",
+            vendor_id: "vendor-1",
+            is_preferred: true,
+        }));
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
     });
 
     it("rejects when SKU exists but no safe relation field is present", async () => {
@@ -706,6 +736,7 @@ describe("serviceConfirmBatch — vendor_product_relation operation", () => {
             entity_type: "product",
             parsed_data: {
                 sku: "GV-050",
+                preferred_vendor: "Acme Makine",
                 price: 999,
                 cost_price: 500,
                 __ai_import_operation: "vendor_product_relation",
@@ -713,6 +744,7 @@ describe("serviceConfirmBatch — vendor_product_relation operation", () => {
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 0 });
+        mockDbListVendors.mockResolvedValue([{ id: "vendor-1", name: "Acme Makine", contact_email: null }]);
 
         const result = await serviceConfirmBatch("batch-1");
 
@@ -783,49 +815,59 @@ describe("serviceConfirmBatch — on_hand rules", () => {
         expect(updatePayload).not.toHaveProperty("on_hand");
     });
 
-    it("stock entity_type → additive: existing 50 + imported 30 = 80", async () => {
+    it("stock entity_type defaults to count mode and records delta movement", async () => {
         const draft = makeDraft({
             entity_type: "stock",
             parsed_data: { sku: "GV-050", on_hand: 30 },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", on_hand: 50 });
-        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
 
         const result = await serviceConfirmBatch("batch-1");
 
         expect(result.updated).toBe(1);
-        expect(mockDbUpdateProduct).toHaveBeenCalledWith("existing-p", { on_hand: 80 });
+        expect(mockDbRecordMovementAtomic).toHaveBeenCalledWith(expect.objectContaining({
+            product_id: "existing-p",
+            quantity: -20,
+            reference_type: "import",
+        }));
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
     });
 
-    it("AI stock_count operation overwrites on_hand instead of adding", async () => {
+    it("AI stock_count operation records counted-current delta", async () => {
         const draft = makeDraft({
             entity_type: "stock",
             parsed_data: { sku: "GV-050", on_hand: 30, __ai_import_operation: "stock_count" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", on_hand: 50 });
-        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
 
         const result = await serviceConfirmBatch("batch-1");
 
         expect(result.updated).toBe(1);
-        expect(mockDbUpdateProduct).toHaveBeenCalledWith("existing-p", { on_hand: 30 });
+        expect(mockDbRecordMovementAtomic).toHaveBeenCalledWith(expect.objectContaining({
+            product_id: "existing-p",
+            quantity: -20,
+        }));
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
     });
 
-    it("AI stock_movement operation remains additive", async () => {
+    it("AI stock_movement operation requires direction and records signed movement", async () => {
         const draft = makeDraft({
             entity_type: "stock",
-            parsed_data: { sku: "GV-050", on_hand: -5, __ai_import_operation: "stock_movement" },
+            parsed_data: { sku: "GV-050", on_hand: 5, direction: "out", __ai_import_operation: "stock_movement" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", on_hand: 50 });
-        mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
 
         const result = await serviceConfirmBatch("batch-1");
 
         expect(result.updated).toBe(1);
-        expect(mockDbUpdateProduct).toHaveBeenCalledWith("existing-p", { on_hand: 45 });
+        expect(mockDbRecordMovementAtomic).toHaveBeenCalledWith(expect.objectContaining({
+            product_id: "existing-p",
+            quantity: -5,
+        }));
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
     });
 
     it("AI stock_count rejects negative counted quantity", async () => {
@@ -878,6 +920,7 @@ describe("serviceConfirmBatch — on_hand rules", () => {
         const draft = makeDraft({
             entity_type: "product",
             parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet", on_hand: 999, price: 50 },
+            field_approvals: { price: "apply" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 10 });
@@ -1033,6 +1076,7 @@ describe("serviceConfirmBatch — product numeric fields preserve 0", () => {
                 cost_price: 0,
                 weight_kg: 0,
             },
+            field_approvals: { price: "apply", cost_price: "apply" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve", on_hand: 50 });
@@ -1062,6 +1106,7 @@ describe("serviceConfirmBatch — product numeric fields preserve 0", () => {
                 cost_price: 0,
                 weight_kg: 0,
             },
+            field_approvals: { price: "apply", cost_price: "apply" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue(null);
@@ -1088,6 +1133,7 @@ describe("serviceConfirmBatch — product numeric fields preserve 0", () => {
                 price: "0",
                 min_stock_level: "0",
             },
+            field_approvals: { price: "apply" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue(null);
@@ -2129,7 +2175,7 @@ describe("serviceConfirmBatch — order_line entity", () => {
         expect(mockSalesOrdersUpdate).toHaveBeenCalledWith(
             expect.objectContaining({ subtotal: 500, vat_total: 100, grand_total: 600 })
         );
-        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "merged" });
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "merged", matched_entity_id: "order-1" });
     });
 
     it("mevcut satır varsa sort_order bir artırılır", async () => {
@@ -2219,6 +2265,7 @@ describe("parseNumeric — TR format (dolaylı, product price üzerinden)", () =
         const draft = makeDraft({
             entity_type: "product",
             parsed_data: { name: "Flanş DN100", sku: "FL-100", unit: "adet", price: "1.234,56" },
+            field_approvals: { price: "apply" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue(null);
@@ -2234,6 +2281,7 @@ describe("parseNumeric — TR format (dolaylı, product price üzerinden)", () =
         const draft = makeDraft({
             entity_type: "product",
             parsed_data: { name: "Vana", sku: "VN-001", unit: "adet", price: "1.000" },
+            field_approvals: { price: "apply" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue(null);

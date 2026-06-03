@@ -1,5 +1,12 @@
 import { createServiceClient } from "./service";
-import type { ImportBatchRow, ImportDraftRow, ImportBatchStatus, ImportDraftStatus, Json } from "@/lib/database.types";
+import type {
+    ImportBatchRow,
+    ImportDraftRow,
+    ImportBatchStatus,
+    ImportDraftStatus,
+    ImportMatchStatus,
+    Json,
+} from "@/lib/database.types";
 
 // ── Batch ────────────────────────────────────────────────────
 
@@ -95,6 +102,13 @@ export interface CreateDraftInput {
     confidence?: number;
     ai_reason?: string;
     unmatched_fields?: Json;
+    sheet_name?: string | null;
+    row_number?: number | null;
+    match_status?: ImportMatchStatus;
+    match_confidence?: number | null;
+    risk_flags?: Json;
+    field_approvals?: Json;
+    row_errors?: Json;
 }
 
 export async function dbCreateDrafts(inputs: CreateDraftInput[]): Promise<ImportDraftRow[]> {
@@ -111,6 +125,13 @@ export async function dbCreateDrafts(inputs: CreateDraftInput[]): Promise<Import
             ai_reason: d.ai_reason ?? null,
             unmatched_fields: d.unmatched_fields ?? null,
             status: "pending",
+            sheet_name: d.sheet_name ?? null,
+            row_number: d.row_number ?? null,
+            match_status: d.match_status ?? "new",
+            match_confidence: d.match_confidence ?? d.confidence ?? null,
+            risk_flags: d.risk_flags ?? [],
+            field_approvals: d.field_approvals ?? {},
+            row_errors: d.row_errors ?? [],
         })))
         .select("*");
     if (error || !data) throw new Error(error?.message ?? "Draft creation failed");
@@ -155,6 +176,11 @@ export async function dbUpdateDraft(
         status?: ImportDraftStatus;
         user_corrections?: Json;
         matched_entity_id?: string;
+        field_approvals?: Json;
+        match_status?: ImportMatchStatus;
+        match_confidence?: number | null;
+        risk_flags?: Json;
+        row_errors?: Json;
     }
 ): Promise<ImportDraftRow> {
     const supabase = createServiceClient();

@@ -140,7 +140,7 @@ describe("POST /api/import/documents/[id]/extract — validation", () => {
         expect(res.status).toBe(400);
     });
 
-    it("returns 400 for migration_excel → Klasik Mod", async () => {
+    it("returns 400 for migration_excel → Excel/CSV ile Toplu Aktarım", async () => {
         mockGetDoc.mockResolvedValueOnce({
             ...PROD_DOC,
             classification: { ...PROD_DOC.classification, document_type: "migration_excel" },
@@ -148,7 +148,7 @@ describe("POST /api/import/documents/[id]/extract — validation", () => {
         const res = await callPOST(makeReq("doc-1"), "doc-1");
         expect(res.status).toBe(400);
         const body = await res.json();
-        expect(body.error).toMatch(/Klasik/i);
+        expect(body.error).toMatch(/Excel\/CSV ile Toplu Aktarım/i);
     });
 
     it("returns 400 for unsupported types (msds/unknown)", async () => {
