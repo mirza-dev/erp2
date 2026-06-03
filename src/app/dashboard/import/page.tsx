@@ -14,7 +14,6 @@ import {
     DEFAULT_AI_IMPORT_OPERATION,
     getActiveAiImportOperations,
     getAiImportOperation,
-    getPlannedAiImportOperations,
     type AiImportOperationType,
 } from "@/lib/ai-import-operations";
 
@@ -125,7 +124,6 @@ const sourceChipStyle = (src: "memory" | "ai" | "fallback" | "user"): React.CSSP
 
 const PAGE_SIZE = 100;
 const ACTIVE_AI_IMPORT_OPERATIONS = getActiveAiImportOperations();
-const PLANNED_AI_IMPORT_OPERATIONS = getPlannedAiImportOperations();
 const INTERNAL_IMPORT_FIELDS = new Set(["__ai_import_operation"]);
 
 export default function ImportPage() {
@@ -605,29 +603,6 @@ export default function ImportPage() {
                         })}
                     </div>
 
-                    <details style={{ marginTop: "2px" }}>
-                        <summary style={{ fontSize: "11px", color: "var(--text-secondary)", cursor: "pointer" }}>
-                            Faz 2 ve ürün tipi şablon işlemleri
-                        </summary>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "8px" }}>
-                            {PLANNED_AI_IMPORT_OPERATIONS.map(operation => (
-                                <span
-                                    key={operation.id}
-                                    title={operation.description}
-                                    style={{
-                                        fontSize: "11px",
-                                        padding: "4px 8px",
-                                        borderRadius: "999px",
-                                        border: "0.5px solid var(--border-tertiary)",
-                                        color: "var(--text-tertiary)",
-                                        background: "var(--bg-primary)",
-                                    }}
-                                >
-                                    {operation.shortTitle} · Faz {operation.phase}
-                                </span>
-                            ))}
-                        </div>
-                    </details>
                 </section>
 
                 {selectedUsesClassic ? (

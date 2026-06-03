@@ -156,4 +156,10 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
         expect(SOURCE).toMatch(/__ai_import_operation/);
         expect(SOURCE).toMatch(/!INTERNAL_IMPORT_FIELDS\.has\(k\)/);
     });
+
+    it("AI import sayfası aktif olmayan plan/phase rozetlerini kullanıcıya göstermez", () => {
+        expect(SOURCE).not.toMatch(/Faz 2 ve ürün tipi şablon işlemleri/);
+        expect(SOURCE).not.toMatch(/PLANNED_AI_IMPORT_OPERATIONS/);
+        expect(SOURCE).not.toMatch(/getPlannedAiImportOperations/);
+    });
 });
