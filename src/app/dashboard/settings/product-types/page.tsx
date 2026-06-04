@@ -7,11 +7,10 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { ProductType } from "@/lib/mock-data";
 import { mapProductType } from "@/lib/api-mappers";
-import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
+import type { ProductTypeRow } from "@/lib/database.types";
 
-interface ProductTypeWithFieldsRow extends ProductTypeRow {
-    fields: ProductTypeFieldRow[];
-}
+/** Liste endpoint'i artık her tipin fieldCount'unu döner (N+1 fetch kaldırıldı). */
+type ProductTypeListRowApi = ProductTypeRow & { fieldCount?: number };
 
 interface ProductTypeListItem extends ProductType {
     fieldCount: number;
@@ -147,22 +146,13 @@ export default function ProductTypesPage() {
         try {
             const res = await fetch("/api/product-types");
             if (!res.ok) throw new Error("Tipler yüklenemedi");
-            const rows = (await res.json()) as ProductTypeRow[];
+            const rows = (await res.json()) as ProductTypeListRowApi[];
 
-            // Her tipin alan sayısı için ayrı çağrı pahalı — onun yerine her satıra withFields fetch çağırıyoruz batch.
-            // Pratik: tek tek fetch (8-12 tip için OK)
-            const items: ProductTypeListItem[] = await Promise.all(
-                rows.map(async (row) => {
-                    try {
-                        const r = await fetch(`/api/product-types/${row.id}?withFields=1`);
-                        if (!r.ok) return { ...mapProductType(row), fieldCount: 0 };
-                        const data = (await r.json()) as ProductTypeWithFieldsRow;
-                        return { ...mapProductType(row), fieldCount: data.fields?.length ?? 0 };
-                    } catch {
-                        return { ...mapProductType(row), fieldCount: 0 };
-                    }
-                }),
-            );
+            // Alan sayısı liste endpoint'inden tek sorguda gelir (N+1 fetch kaldırıldı).
+            const items: ProductTypeListItem[] = rows.map((row) => ({
+                ...mapProductType(row),
+                fieldCount: row.fieldCount ?? 0,
+            }));
 
             setTypes(items);
         } catch (e) {

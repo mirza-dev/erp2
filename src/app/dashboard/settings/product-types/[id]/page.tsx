@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -115,6 +116,29 @@ const requiredBadgeStyle: React.CSSProperties = {
     marginLeft: "8px",
 };
 
+const modalBackdropStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.5)",
+    zIndex: 200,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "16px",
+};
+
+const modalStyle: React.CSSProperties = {
+    background: "var(--bg-primary)",
+    border: "0.5px solid var(--border-tertiary)",
+    borderRadius: "10px",
+    padding: "24px",
+    width: "100%",
+    maxWidth: "520px",
+    maxHeight: "90vh",
+    overflowY: "auto",
+    zIndex: 201,
+};
+
 const FIELD_TYPES: ProductFieldType[] = [
     "text", "longtext", "number", "select", "multiselect", "date", "boolean",
 ];
@@ -139,14 +163,65 @@ const EMPTY_DRAFT: NewFieldDraft = {
     required: false,
 };
 
+export interface FieldPayload {
+    label_tr: string;
+    label_en: string | null;
+    field_type: ProductFieldType;
+    unit: string | null;
+    options: string[] | null;
+}
+
+/**
+ * Alan body'sini normalize + validate eder (Ekle + Düzenle ortak; field_key/required ayrı eklenir).
+ * - select/multiselect → options newline-split, boşsa hata.
+ * - number → unit korunur; diğer tiplerde unit null (UI'da yalnız number'da görünür → stale önlenir).
+ */
+export function buildFieldPayload(
+    draft: Pick<NewFieldDraft, "label_tr" | "label_en" | "field_type" | "unit" | "options">,
+): { error: string } | { payload: FieldPayload } {
+    if (!draft.label_tr.trim()) {
+        return { error: "Türkçe etiket zorunludur." };
+    }
+    let optionsArr: string[] | null = null;
+    if (draft.field_type === "select" || draft.field_type === "multiselect") {
+        optionsArr = draft.options
+            .split("\n")
+            .map((o) => o.trim())
+            .filter((o) => o.length > 0);
+        if (optionsArr.length === 0) {
+            return { error: "Seçim alanları için en az bir seçenek girin." };
+        }
+    }
+    return {
+        payload: {
+            label_tr: draft.label_tr.trim(),
+            label_en: draft.label_en.trim() || null,
+            field_type: draft.field_type,
+            unit: draft.field_type === "number" ? (draft.unit.trim() || null) : null,
+            options: optionsArr,
+        },
+    };
+}
+
 export default function ProductTypeDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    const router = useRouter();
 
     const [type, setType] = useState<TypeWithFields | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Edit field modal
+    const [editFieldId, setEditFieldId] = useState<string | null>(null);
+    const [editDraft, setEditDraft] = useState<NewFieldDraft>(EMPTY_DRAFT);
+    const [editError, setEditError] = useState<string | null>(null);
+    const [savingEdit, setSavingEdit] = useState(false);
+
+    // Yıkıcı işlem onay modalları
+    const [confirmDeleteFieldId, setConfirmDeleteFieldId] = useState<string | null>(null);
+    const [confirmDeleteType, setConfirmDeleteType] = useState(false);
 
     // Edit type header
     const [editName, setEditName] = useState("");
@@ -223,21 +298,11 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
             setAddError("Alan anahtarı küçük harf, rakam, alt çizgi içermeli ve harf ile başlamalı.");
             return;
         }
-        if (!draft.label_tr.trim()) {
-            setAddError("Türkçe etiket zorunludur.");
-            return;
-        }
 
-        let optionsArr: string[] | null = null;
-        if (draft.field_type === "select" || draft.field_type === "multiselect") {
-            optionsArr = draft.options
-                .split("\n")
-                .map((o) => o.trim())
-                .filter((o) => o.length > 0);
-            if (optionsArr.length === 0) {
-                setAddError("Seçim alanları için en az bir seçenek girin.");
-                return;
-            }
+        const built = buildFieldPayload(draft);
+        if ("error" in built) {
+            setAddError(built.error);
+            return;
         }
 
         setAdding(true);
@@ -247,11 +312,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     field_key: draft.field_key,
-                    label_tr: draft.label_tr.trim(),
-                    label_en: draft.label_en.trim() || null,
-                    field_type: draft.field_type,
-                    unit: draft.unit.trim() || null,
-                    options: optionsArr,
+                    ...built.payload,
                     required: draft.required,
                     sort_order: (type?.fields.length ?? 0) * 10 + 10,
                 }),
@@ -270,9 +331,61 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
         }
     };
 
-    const deleteField = async (fieldId: string) => {
+    const openEdit = (field: ProductTypeFieldRow) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
-        if (!confirm("Bu alanı silmek istediğinden emin misin? Bu tipte oluşturulmuş ürünlerin bu alanı kaybolur.")) return;
+        setEditError(null);
+        setEditFieldId(field.id);
+        setEditDraft({
+            field_key: field.field_key,
+            label_tr: field.label_tr,
+            label_en: field.label_en ?? "",
+            field_type: field.field_type,
+            unit: field.unit ?? "",
+            options: Array.isArray(field.options) ? (field.options as string[]).join("\n") : "",
+            required: field.required,
+        });
+    };
+
+    const submitEdit = async () => {
+        setEditError(null);
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!editFieldId) return;
+
+        const built = buildFieldPayload(editDraft);
+        if ("error" in built) {
+            setEditError(built.error);
+            return;
+        }
+
+        setSavingEdit(true);
+        try {
+            const res = await fetch(`/api/product-types/${id}/fields/${editFieldId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(built.payload),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error ?? "Alan güncellenemedi");
+            }
+            toast({ type: "success", message: "Alan güncellendi." });
+            setEditFieldId(null);
+            load();
+        } catch (e) {
+            setEditError(e instanceof Error ? e.message : "Bilinmeyen hata");
+        } finally {
+            setSavingEdit(false);
+        }
+    };
+
+    const requestDeleteField = (fieldId: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setConfirmDeleteFieldId(fieldId);
+    };
+
+    const performDeleteField = async () => {
+        if (!confirmDeleteFieldId) return;
+        const fieldId = confirmDeleteFieldId;
         try {
             const res = await fetch(`/api/product-types/${id}/fields/${fieldId}`, { method: "DELETE" });
             if (!res.ok) {
@@ -280,9 +393,11 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                 throw new Error(data.error ?? "Silinemedi");
             }
             toast({ type: "success", message: "Alan silindi." });
+            setConfirmDeleteFieldId(null);
             load();
         } catch (e) {
             toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
+            setConfirmDeleteFieldId(null);
         }
     };
 
@@ -333,10 +448,14 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
         }
     };
 
-    const deleteType = async () => {
+    const requestDeleteType = () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!type) return;
-        if (!confirm(`"${type.name}" tipini silmek istediğine emin misin?`)) return;
+        setConfirmDeleteType(true);
+    };
+
+    const performDeleteType = async () => {
+        if (!type) return;
         try {
             const res = await fetch(`/api/product-types/${id}`, { method: "DELETE" });
             if (!res.ok) {
@@ -344,9 +463,10 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                 throw new Error(data.error ?? "Silinemedi");
             }
             toast({ type: "success", message: "Tip silindi." });
-            window.location.href = "/dashboard/settings/product-types";
+            router.push("/dashboard/settings/product-types");
         } catch (e) {
             toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
+            setConfirmDeleteType(false);
         }
     };
 
@@ -384,7 +504,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                 </h1>
                 <Button
                     variant="ghost"
-                    onClick={deleteType}
+                    onClick={requestDeleteType}
                     disabled={isDemo || type.is_system}
                     title={type.is_system ? "Sistem tipini silmek için önce 'is_system' kilidini düşürmek üzere düzenleyin" : (isDemo ? DEMO_DISABLED_TOOLTIP : undefined)}
                     style={{ color: type.is_system ? "var(--text-tertiary)" : "var(--danger)" }}
@@ -526,7 +646,17 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                                             </button>
                                             <button
                                                 type="button"
-                                                onClick={() => deleteField(f.id)}
+                                                onClick={() => openEdit(f)}
+                                                disabled={isDemo}
+                                                aria-label={`${f.label_tr} alanını düzenle`}
+                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Alanı düzenle"}
+                                                style={{ background: "transparent", border: "0.5px solid var(--border-secondary)", padding: "2px 8px", borderRadius: "4px", cursor: isDemo ? "not-allowed" : "pointer", color: "var(--text-primary)" }}
+                                            >
+                                                Düzenle
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => requestDeleteField(f.id)}
                                                 disabled={isDemo}
                                                 aria-label={`${f.label_tr} alanını sil`}
                                                 style={{ background: "transparent", border: "0.5px solid var(--danger-border)", padding: "2px 6px", borderRadius: "4px", cursor: "pointer", color: "var(--danger)" }}
@@ -650,6 +780,150 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                     </Button>
                 </div>
             </div>
+
+            {/* Alan düzenleme modalı */}
+            {editFieldId && (
+                <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="edit-field-title">
+                    <div style={modalStyle}>
+                        <h2 id="edit-field-title" style={{ fontSize: "16px", fontWeight: 600, marginBottom: "16px" }}>
+                            Alanı Düzenle
+                        </h2>
+
+                        <label style={labelStyle}>
+                            Alan Anahtarı <span style={{ color: "var(--text-tertiary)" }}>(değiştirilemez)</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={editDraft.field_key}
+                            readOnly
+                            disabled
+                            aria-label="Alan anahtarı (değiştirilemez)"
+                            style={{ ...inputStyle, fontFamily: "monospace", color: "var(--text-tertiary)", cursor: "not-allowed" }}
+                        />
+
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginTop: "12px" }}>
+                            <div>
+                                <label style={labelStyle}>Etiket (TR) *</label>
+                                <input
+                                    type="text"
+                                    value={editDraft.label_tr}
+                                    onChange={(e) => setEditDraft({ ...editDraft, label_tr: e.target.value })}
+                                    style={inputStyle}
+                                    aria-label="Türkçe etiket"
+                                />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Etiket (EN)</label>
+                                <input
+                                    type="text"
+                                    value={editDraft.label_en}
+                                    onChange={(e) => setEditDraft({ ...editDraft, label_en: e.target.value })}
+                                    style={inputStyle}
+                                    aria-label="İngilizce etiket"
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ display: "grid", gridTemplateColumns: editDraft.field_type === "number" ? "1fr 1fr" : "1fr", gap: "12px", marginTop: "12px" }}>
+                            <div>
+                                <label style={labelStyle}>Alan Tipi</label>
+                                <select
+                                    value={editDraft.field_type}
+                                    onChange={(e) => setEditDraft({ ...editDraft, field_type: e.target.value as ProductFieldType })}
+                                    style={inputStyle}
+                                    aria-label="Alan tipi"
+                                >
+                                    {FIELD_TYPES.map((t) => (
+                                        <option key={t} value={t}>{FIELD_TYPE_LABELS[t]}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {editDraft.field_type === "number" && (
+                                <div>
+                                    <label style={labelStyle}>Birim</label>
+                                    <input
+                                        type="text"
+                                        value={editDraft.unit}
+                                        onChange={(e) => setEditDraft({ ...editDraft, unit: e.target.value })}
+                                        placeholder="mm, bar, °C, kg"
+                                        style={inputStyle}
+                                        aria-label="Birim"
+                                        maxLength={20}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {(editDraft.field_type === "select" || editDraft.field_type === "multiselect") && (
+                            <div style={{ marginTop: "12px" }}>
+                                <label style={labelStyle}>Seçenekler (her satıra bir tane)</label>
+                                <textarea
+                                    value={editDraft.options}
+                                    onChange={(e) => setEditDraft({ ...editDraft, options: e.target.value })}
+                                    placeholder={"Seçenek 1\nSeçenek 2\nSeçenek 3"}
+                                    style={{ ...inputStyle, minHeight: "100px", resize: "vertical" as const, fontFamily: "monospace" }}
+                                    aria-label="Seçenekler"
+                                />
+                            </div>
+                        )}
+
+                        <div style={{ fontSize: "11px", color: "var(--warning-text)", marginTop: "10px" }}>
+                            Not: Alan tipini değiştirmek mevcut ürünlerdeki bu alanın değerlerini etkileyebilir.
+                        </div>
+
+                        {editError && <div style={errStyle} role="alert" aria-live="polite">{editError}</div>}
+
+                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "16px" }}>
+                            <Button variant="ghost" onClick={() => setEditFieldId(null)} disabled={savingEdit}>
+                                İptal
+                            </Button>
+                            <Button onClick={submitEdit} disabled={savingEdit || isDemo}>
+                                {savingEdit ? "Kaydediliyor..." : "Kaydet"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Alan silme onay modalı */}
+            {confirmDeleteFieldId && (
+                <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="delete-field-title">
+                    <div style={{ ...modalStyle, maxWidth: "420px" }}>
+                        <h2 id="delete-field-title" style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px" }}>
+                            Alanı sil?
+                        </h2>
+                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                            Bu alanı silmek istediğine emin misin? Bu tipte oluşturulmuş ürünlerin bu alanı kaybolur.
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "16px" }}>
+                            <Button variant="ghost" onClick={() => setConfirmDeleteFieldId(null)}>Vazgeç</Button>
+                            <Button onClick={performDeleteField} style={{ background: "var(--danger)", color: "white" }}>
+                                Evet, sil
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Tip silme onay modalı */}
+            {confirmDeleteType && type && (
+                <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-labelledby="delete-type-title">
+                    <div style={{ ...modalStyle, maxWidth: "420px" }}>
+                        <h2 id="delete-type-title" style={{ fontSize: "16px", fontWeight: 600, marginBottom: "12px" }}>
+                            Tipi sil?
+                        </h2>
+                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                            &quot;{type.name}&quot; tipini silmek istediğine emin misin?
+                        </div>
+                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "16px" }}>
+                            <Button variant="ghost" onClick={() => setConfirmDeleteType(false)}>Vazgeç</Button>
+                            <Button onClick={performDeleteType} style={{ background: "var(--danger)", color: "white" }}>
+                                Evet, sil
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

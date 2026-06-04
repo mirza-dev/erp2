@@ -108,16 +108,28 @@ function validateFieldInput(input: CreateProductTypeFieldInput | UpdateProductTy
 
 // ── List / Read ─────────────────────────────────────────────
 
-export async function dbListProductTypes(): Promise<ProductTypeRow[]> {
+/** Liste satırı = tip + alan sayısı (liste UI'ı için; N+1 fetch'i ortadan kaldırır). */
+export type ProductTypeListRow = ProductTypeRow & { fieldCount: number };
+
+export async function dbListProductTypes(): Promise<ProductTypeListRow[]> {
     const supabase = createServiceClient();
+    // Nested count ile tek sorguda alan sayısı (PostgREST shape: product_type_fields: [{ count: N }]).
     const { data, error } = await supabase
         .from("product_types")
-        .select("*")
+        .select("*, product_type_fields(count)")
         .order("sort_order", { ascending: true })
         .order("name", { ascending: true });
 
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return (data ?? []).map((row) => {
+        const { product_type_fields, ...rest } = row as ProductTypeRow & {
+            product_type_fields?: { count: number }[] | null;
+        };
+        const fieldCount = Array.isArray(product_type_fields) && product_type_fields.length > 0
+            ? Number(product_type_fields[0]?.count ?? 0)
+            : 0;
+        return { ...(rest as ProductTypeRow), fieldCount };
+    });
 }
 
 export async function dbGetProductType(id: string): Promise<ProductTypeRow | null> {
