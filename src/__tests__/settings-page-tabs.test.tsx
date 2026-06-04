@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import type { Permission } from "@/lib/auth/permissions";
 import SettingsPage from "@/app/dashboard/settings/page";
@@ -60,10 +60,10 @@ afterEach(() => {
 });
 
 describe("SettingsPage tab access", () => {
-    it("yetkisiz kullanıcı sistem tablarını görmez, yalnız Profil ve Bildirimler görünür", async () => {
+    it("yetkisiz kullanıcı sistem tablarını görmez, yalnız Kullanıcı Profili ve Bildirimler görünür", async () => {
         render(<SettingsPage />);
 
-        expect(screen.getByRole("button", { name: "Profil" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Kullanıcı Profili" })).toBeTruthy();
         expect(screen.getByRole("button", { name: "Bildirimler" })).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Firma Profili" })).toBeNull();
         expect(screen.queryByRole("button", { name: "API Anahtarları" })).toBeNull();
@@ -76,11 +76,14 @@ describe("SettingsPage tab access", () => {
 
         render(<SettingsPage />);
 
-        expect(screen.getByRole("button", { name: "Firma Profili" })).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Profil" })).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Bildirimler" })).toBeTruthy();
-        expect(screen.getByRole("button", { name: "API Anahtarları" })).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Yapay Zeka" })).toBeTruthy();
+        const settingsNav = screen.getByRole("navigation", { name: "Ayarlar sekmeleri" });
+        expect(within(settingsNav).getAllByRole("button").map(button => button.textContent)).toEqual([
+            "Firma Profili",
+            "API Anahtarları",
+            "Yapay Zeka",
+            "Kullanıcı Profili",
+            "Bildirimler",
+        ]);
         expect(screen.getByTestId("reset-demo-section")).toBeTruthy();
     });
 
@@ -90,7 +93,7 @@ describe("SettingsPage tab access", () => {
         render(<SettingsPage />);
 
         await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/dashboard/settings?tab=kullanici"));
-        expect(screen.getByRole("button", { name: "Profil" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Kullanıcı Profili" })).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Firma Profili" })).toBeNull();
     });
 
@@ -101,5 +104,26 @@ describe("SettingsPage tab access", () => {
 
         await waitFor(() => expect(screen.getByText("Profil Bilgileri")).toBeTruthy());
         expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it("sekme değiştirirken confirm göstermez ve kaydedilmemiş profil state'ini korur", async () => {
+        const confirmSpy = vi.spyOn(window, "confirm");
+        searchParams = new URLSearchParams("tab=kullanici");
+
+        render(<SettingsPage />);
+
+        const fullNameInput = await screen.findByPlaceholderText("Ad Soyad") as HTMLInputElement;
+        fireEvent.change(fullNameInput, { target: { value: "Can Test" } });
+
+        expect(screen.getByText("Kaydedilmemiş")).toBeTruthy();
+        expect(document.body.textContent).not.toContain("⚠");
+        expect(document.body.textContent).not.toContain("🏭");
+
+        fireEvent.click(screen.getByRole("button", { name: "Bildirimler" }));
+        expect(confirmSpy).not.toHaveBeenCalled();
+        expect(router.push).toHaveBeenCalledWith("/dashboard/settings?tab=bildirimler");
+
+        fireEvent.click(screen.getByRole("button", { name: "Kullanıcı Profili" }));
+        expect((screen.getByPlaceholderText("Ad Soyad") as HTMLInputElement).value).toBe("Can Test");
     });
 });

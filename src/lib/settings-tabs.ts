@@ -7,14 +7,40 @@ export interface SettingsTabDefinition {
     key: SettingsTab;
     label: string;
     scope: SettingsTabScope;
+    description: string;
 }
 
 export const SETTINGS_TABS: SettingsTabDefinition[] = [
-    { key: "firma", label: "Firma Profili", scope: "system" },
-    { key: "kullanici", label: "Profil", scope: "personal" },
-    { key: "bildirimler", label: "Bildirimler", scope: "personal" },
-    { key: "api", label: "API Anahtarları", scope: "system" },
-    { key: "yapay-zeka", label: "Yapay Zeka", scope: "system" },
+    {
+        key: "firma",
+        label: "Firma Profili",
+        scope: "system",
+        description: "Firma kimliği, logo ve belge varsayılanları.",
+    },
+    {
+        key: "api",
+        label: "API Anahtarları",
+        scope: "system",
+        description: "Entegrasyon anahtarları ve OAuth bağlantı durumu.",
+    },
+    {
+        key: "yapay-zeka",
+        label: "Yapay Zeka",
+        scope: "system",
+        description: "AI kullanımı, fallback ve öneri metrikleri.",
+    },
+    {
+        key: "kullanici",
+        label: "Kullanıcı Profili",
+        scope: "personal",
+        description: "Profil, avatar ve şifre bilgileri.",
+    },
+    {
+        key: "bildirimler",
+        label: "Bildirimler",
+        scope: "personal",
+        description: "E-posta ve tarayıcı bildirim tercihleri.",
+    },
 ];
 
 export function canViewSystemSettings(perms: Set<Permission> | null): boolean {

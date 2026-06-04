@@ -17,11 +17,23 @@ describe("settings-tabs", () => {
         expect(canViewSystemSettings(new Set<Permission>(["view_dashboard", "view_settings"]))).toBe(true);
         expect(getVisibleSettingsTabs(true).map(tab => tab.key)).toEqual([
             "firma",
-            "kullanici",
-            "bildirimler",
             "api",
             "yapay-zeka",
+            "kullanici",
+            "bildirimler",
         ]);
+    });
+
+    it("premium ayarlar etiketleri ve açıklamaları eksiksizdir", () => {
+        const visible = getVisibleSettingsTabs(true);
+        expect(visible.map(tab => tab.label)).toEqual([
+            "Firma Profili",
+            "API Anahtarları",
+            "Yapay Zeka",
+            "Kullanıcı Profili",
+            "Bildirimler",
+        ]);
+        expect(visible.every(tab => tab.description.length > 0)).toBe(true);
     });
 
     it("query tab parse ve fallback davranışını çözer", () => {

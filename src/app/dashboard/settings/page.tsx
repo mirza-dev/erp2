@@ -2,6 +2,18 @@
 
 import { Suspense, useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+    Bell,
+    BrainCircuit,
+    Building2,
+    CheckCircle2,
+    ImageIcon,
+    KeyRound,
+    RefreshCw,
+    TriangleAlert,
+    UserRound,
+    type LucideIcon,
+} from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
@@ -18,8 +30,22 @@ import {
     getVisibleSettingsTabs,
     parseSettingsTab,
     resolveSettingsTab,
+    type SettingsTabDefinition,
     type SettingsTab,
 } from "@/lib/settings-tabs";
+
+const settingsTabIcons: Record<SettingsTab, LucideIcon> = {
+    firma: Building2,
+    api: KeyRound,
+    "yapay-zeka": BrainCircuit,
+    kullanici: UserRound,
+    bildirimler: Bell,
+};
+
+const settingsGroupLabels: Record<SettingsTabDefinition["scope"], string> = {
+    system: "Sistem Yönetimi",
+    personal: "Kişisel Ayarlar",
+};
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
@@ -64,8 +90,9 @@ function SaveButton({ onClick, loading, dirty }: { onClick: () => void; loading?
                 Kaydet
             </Button>
             {dirty && !loading && (
-                <span style={{ fontSize: "12px", color: "var(--warning-text)" }}>
-                    ⚠ Kaydedilmemiş değişiklikler
+                <span style={{ fontSize: "12px", color: "var(--warning-text)", display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                    <TriangleAlert size={13} aria-hidden="true" />
+                    Kaydedilmemiş değişiklikler
                 </span>
             )}
         </div>
@@ -92,6 +119,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [logoLoaded, setLogoLoaded] = useState(false);
     const [logoDragging, setLogoDragging] = useState(false);
     const [logoUploading, setLogoUploading] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof typeof initialFirmaForm, string>>>({});
@@ -115,7 +143,10 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                 };
                 setForm(loaded);
                 savedRef.current = loaded;
-                if (s.logo_url) setLogoUrl(s.logo_url);
+                if (s.logo_url) {
+                    setLogoUrl(s.logo_url);
+                    setLogoLoaded(false);
+                }
             })
             .catch(() => {/* ağ hatası — varsayılanlarla devam et */})
             .finally(() => setIsLoading(false));
@@ -186,6 +217,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
             }
             const { logo_url } = await res.json();
             setLogoUrl(logo_url);
+            setLogoLoaded(false);
             toast({ type: "success", message: "Logo yüklendi" });
         } catch (e: unknown) {
             toast({ type: "error", message: e instanceof Error ? e.message : "Logo yüklenemedi." });
@@ -222,7 +254,10 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     style={{ display: "none" }}
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = ""; }}
                 />
-                <div
+                <button
+                    type="button"
+                    className="settings-logo-dropzone"
+                    aria-label="Firma logosu yükle"
                     onClick={() => logoFileRef.current?.click()}
                     onDragOver={e => { e.preventDefault(); setLogoDragging(true); }}
                     onDragLeave={() => setLogoDragging(false)}
@@ -243,17 +278,61 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                         display: "flex",
                         alignItems: "center",
                         gap: "16px",
+                        width: "100%",
+                        font: "inherit",
                     }}
                 >
                     {logoUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                            src={logoUrl}
-                            alt="Firma logosu"
-                            style={{ height: "56px", maxWidth: "120px", objectFit: "contain", borderRadius: "4px" }}
-                        />
+                        <div
+                            style={{
+                                width: "120px",
+                                height: "56px",
+                                borderRadius: "5px",
+                                border: "0.5px solid rgba(255,255,255,0.16)",
+                                background: "rgba(255,255,255,0.96)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                overflow: "hidden",
+                                flexShrink: 0,
+                            }}
+                        >
+                            {!logoLoaded && <ImageIcon size={20} color="var(--text-tertiary)" aria-hidden="true" />}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={logoUrl}
+                                alt="Firma logosu"
+                                onLoad={() => setLogoLoaded(true)}
+                                onError={() => {
+                                    setLogoLoaded(false);
+                                    setLogoUrl(null);
+                                }}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    padding: "4px",
+                                    objectFit: "contain",
+                                    display: logoLoaded ? "block" : "none",
+                                }}
+                            />
+                        </div>
                     ) : (
-                        <div style={{ fontSize: "28px" }}>🏭</div>
+                        <div
+                            style={{
+                                width: "56px",
+                                height: "56px",
+                                borderRadius: "7px",
+                                border: "0.5px solid var(--border-secondary)",
+                                background: "var(--bg-secondary)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                color: "var(--text-tertiary)",
+                                flexShrink: 0,
+                            }}
+                        >
+                            <ImageIcon size={24} aria-hidden="true" />
+                        </div>
                     )}
                     <div>
                         <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
@@ -263,13 +342,13 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                             PNG, JPEG, SVG, WebP · Maks 2MB
                         </div>
                     </div>
-                </div>
+                </button>
             </div>
 
             {/* Fields grid */}
             <div>
                 <div style={sectionTitle}>Firma Bilgileri</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div className="settings-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div style={{ gridColumn: "1 / -1" }}>
                         <label style={labelStyle}>Firma Adı *</label>
                         <input
@@ -555,7 +634,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
             {/* Profile fields */}
             <div>
                 <div style={sectionTitle}>Profil Bilgileri</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <div className="settings-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div>
                         <label style={labelStyle}>Ad Soyad</label>
                         <input
@@ -901,9 +980,22 @@ function ApiTab() {
                                         : configured
                                             ? "var(--success-text)"
                                             : "var(--warning-text)",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "5px",
+                                    lineHeight: 1.5,
                                 }}
                             >
-                                {configured === null ? "—" : configured ? "Yapılandırıldı ✓" : "Eksik"}
+                                {configured === null ? (
+                                    "—"
+                                ) : configured ? (
+                                    <>
+                                        <CheckCircle2 size={12} aria-hidden="true" />
+                                        Yapılandırıldı
+                                    </>
+                                ) : (
+                                    "Eksik"
+                                )}
                             </span>
                         </div>
                     );
@@ -973,9 +1065,19 @@ function ApiTab() {
                                 color: "var(--text-secondary)",
                                 cursor: refreshing || !parasutToken ? "not-allowed" : "pointer",
                                 opacity: refreshing || !parasutToken ? 0.5 : 1,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
                             }}
                         >
-                            {refreshing ? "Yenileniyor…" : "↻ Token Yenile"}
+                            {refreshing ? (
+                                "Yenileniyor…"
+                            ) : (
+                                <>
+                                    <RefreshCw size={12} aria-hidden="true" />
+                                    Token Yenile
+                                </>
+                            )}
                         </button>
                     </div>
                 </div>
@@ -1151,16 +1253,42 @@ function SettingsPageInner() {
     const resolvedTab = resolveSettingsTab(requestedTab, canViewSystem);
     const tabs = useMemo(() => getVisibleSettingsTabs(canViewSystem), [canViewSystem]);
     const [activeTab, setActiveTab] = useState<SettingsTab>(resolvedTab);
+    const [mountedTabs, setMountedTabs] = useState<Set<SettingsTab>>(() => new Set([resolvedTab]));
     const [dirtyTabs, setDirtyTabs] = useState<Set<SettingsTab>>(new Set());
+    const activeTabButtonRef = useRef<HTMLButtonElement | null>(null);
+    const tabGroups = useMemo(() => {
+        const scopes: SettingsTabDefinition["scope"][] = ["system", "personal"];
+        return scopes
+            .map(scope => ({
+                scope,
+                tabs: tabs.filter(tab => tab.scope === scope),
+            }))
+            .filter(group => group.tabs.length > 0);
+    }, [tabs]);
+    const activeTabDefinition = tabs.find(tab => tab.key === activeTab) ?? tabs[0];
 
     useEffect(() => {
         setActiveTab(resolvedTab);
+        setMountedTabs(prev => {
+            const next = new Set(prev);
+            next.add(resolvedTab);
+            return next;
+        });
         if (permissionsLoaded && requestedTab !== resolvedTab) {
             const params = new URLSearchParams(searchKey);
             params.set("tab", resolvedTab);
             router.replace(`/dashboard/settings?${params.toString()}`);
         }
     }, [permissionsLoaded, requestedTab, resolvedTab, router, searchKey]);
+
+    useEffect(() => {
+        const node = activeTabButtonRef.current;
+        if (!node?.scrollIntoView) return;
+        const frame = window.requestAnimationFrame(() => {
+            node.scrollIntoView({ block: "nearest", inline: "center" });
+        });
+        return () => window.cancelAnimationFrame(frame);
+    }, [activeTab, tabs]);
 
     const pushTab = useCallback((tab: SettingsTab) => {
         const params = new URLSearchParams(searchKey);
@@ -1177,83 +1305,93 @@ function SettingsPageInner() {
     };
 
     const handleTabSwitch = (key: SettingsTab) => {
-        if (dirtyTabs.has(activeTab) && key !== activeTab) {
-            if (!window.confirm("Kaydedilmemiş değişiklikler var. Yine de devam edilsin mi?")) return;
-            setDirtyTabs(prev => { const next = new Set(prev); next.delete(activeTab); return next; });
-        }
         setActiveTab(key);
+        setMountedTabs(prev => {
+            const next = new Set(prev);
+            next.add(key);
+            return next;
+        });
         pushTab(key);
     };
 
     return (
-        <div style={{ padding: "0" }}>
+        <div className="settings-page-shell">
             <DemoBanner storageKey="settings-demo">
                 Ayarlar demo modunda çalışmaktadır. Değişiklikler sadece bu oturum için geçerlidir.
             </DemoBanner>
-            {/* Header */}
-            <div style={{ padding: "20px 24px 16px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
-                <h1 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+            <div className="settings-page-header">
+                <h1>
                     Ayarlar
                 </h1>
-                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                <div>
                     Sistem ve hesap tercihlerinizi yönetin
                 </div>
             </div>
 
-            {/* 2-column layout */}
-            <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", minHeight: "calc(100vh - 120px)" }}>
-                {/* Left tab menu */}
-                <div
-                    style={{
-                        borderRight: "0.5px solid var(--border-tertiary)",
-                        padding: "16px 0",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "2px",
-                    }}
-                >
-                    {tabs.map(({ key, label }) => (
-                        <button
-                            key={key}
-                            onClick={() => handleTabSwitch(key)}
-                            style={{
-                                textAlign: "left",
-                                fontSize: "13px",
-                                padding: "8px 16px",
-                                border: "none",
-                                background: activeTab === key ? "var(--accent-bg)" : "transparent",
-                                color: activeTab === key ? "var(--accent-text)" : "var(--text-secondary)",
-                                cursor: "pointer",
-                                fontWeight: activeTab === key ? 500 : 400,
-                                borderLeft: `2px solid ${activeTab === key ? "var(--accent)" : "transparent"}`,
-                                transition: "all 0.1s",
-                                display: "flex",
-                                alignItems: "center",
-                            }}
-                        >
-                            {label}
-                            {dirtyTabs.has(key) && (
-                                <span style={{
-                                    display: "inline-block",
-                                    width: "6px",
-                                    height: "6px",
-                                    borderRadius: "50%",
-                                    background: "var(--warning)",
-                                    marginLeft: "6px",
-                                    flexShrink: 0,
-                                }} />
-                            )}
-                        </button>
+            <div className="settings-layout">
+                <nav className="settings-tab-nav" aria-label="Ayarlar sekmeleri">
+                    {tabGroups.map((group) => (
+                        <div key={group.scope} className="settings-tab-group">
+                            <div className="settings-tab-group-title">
+                                {settingsGroupLabels[group.scope]}
+                            </div>
+                            {group.tabs.map((tab) => {
+                                const Icon = settingsTabIcons[tab.key];
+                                const active = activeTab === tab.key;
+                                const dirty = dirtyTabs.has(tab.key);
+                                return (
+                                    <button
+                                        key={tab.key}
+                                        type="button"
+                                        onClick={() => handleTabSwitch(tab.key)}
+                                        aria-current={active ? "page" : undefined}
+                                        ref={(node) => {
+                                            if (active && node) activeTabButtonRef.current = node;
+                                        }}
+                                        className={`settings-tab-button${active ? " is-active" : ""}`}
+                                    >
+                                        <Icon className="settings-tab-icon" size={17} aria-hidden="true" />
+                                        <span className="settings-tab-label">{tab.label}</span>
+                                        {dirty && <span className="settings-tab-dirty-dot" aria-hidden="true" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     ))}
-                </div>
+                </nav>
 
-                {/* Right content */}
-                <div style={{ padding: "24px 28px", maxWidth: "640px" }}>
-                    {activeTab === "firma" && <FirmaTab onDirtyChange={(d) => handleDirtyChange("firma", d)} />}
-                    {activeTab === "kullanici" && <KullaniciTab onDirtyChange={(d) => handleDirtyChange("kullanici", d)} />}
-                    {activeTab === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
-                    {activeTab === "api" && <ApiTab />}
-                    {activeTab === "yapay-zeka" && <AiTab />}
+                <div className="settings-content">
+                    <div className="settings-content-inner">
+                        {activeTabDefinition && (
+                            <div className="settings-content-header">
+                                <div>
+                                    <div className="settings-content-eyebrow">
+                                        {settingsGroupLabels[activeTabDefinition.scope]}
+                                    </div>
+                                    <h2>{activeTabDefinition.label}</h2>
+                                    <p>{activeTabDefinition.description}</p>
+                                </div>
+                                {dirtyTabs.has(activeTab) && (
+                                    <div className="settings-unsaved-pill" aria-live="polite">
+                                        <TriangleAlert size={13} aria-hidden="true" />
+                                        Kaydedilmemiş
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="settings-panels">
+                            {tabs.map(({ key }) => mountedTabs.has(key) ? (
+                                <section key={key} className="settings-panel" hidden={activeTab !== key}>
+                                    {key === "firma" && <FirmaTab onDirtyChange={(d) => handleDirtyChange("firma", d)} />}
+                                    {key === "kullanici" && <KullaniciTab onDirtyChange={(d) => handleDirtyChange("kullanici", d)} />}
+                                    {key === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
+                                    {key === "api" && <ApiTab />}
+                                    {key === "yapay-zeka" && <AiTab />}
+                                </section>
+                            ) : null)}
+                        </div>
+                    </div>
                 </div>
             </div>
 
