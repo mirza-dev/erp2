@@ -48,10 +48,10 @@ function titleForRates(rates: ExchangeRatesResponse): string {
 const tickerStyle: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: "6px",
+    gap: "5px",
     height: "28px",
-    padding: "2px 5px 2px 6px",
-    border: "0.5px solid var(--border-secondary)",
+    padding: "2px 4px 2px 5px",
+    border: "0.5px solid var(--border-tertiary)",
     borderRadius: "7px",
     background: "var(--bg-secondary)",
     color: "var(--text-secondary)",
@@ -77,15 +77,15 @@ const sourceStyle: React.CSSProperties = {
 const ratesStyle: React.CSSProperties = {
     display: "flex",
     alignItems: "center",
-    gap: "3px",
+    gap: "2px",
 };
 
 const rateStyle: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: "4px",
+    gap: "3px",
     height: "22px",
-    padding: "0 6px",
+    padding: "0 5px",
     borderRadius: "5px",
     background: "var(--bg-tertiary)",
     fontSize: "11px",
@@ -94,7 +94,7 @@ const rateStyle: React.CSSProperties = {
 
 const codeStyle: React.CSSProperties = {
     color: "var(--text-primary)",
-    fontWeight: 600,
+    fontWeight: 700,
 };
 
 const labelStyle: React.CSSProperties = {

@@ -2,9 +2,13 @@
 
 import { memo } from "react";
 import Link from "next/link";
-import { useData } from "@/lib/data-context";
+import { usePathname } from "next/navigation";
+import { AlertTriangle, Menu } from "lucide-react";
 import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
+import SystemHealthIndicator from "@/components/layout/SystemHealthIndicator";
 import UserAvatarLink from "@/components/layout/UserAvatarLink";
+import { useData } from "@/lib/data-context";
+import { getTopbarTitle } from "@/lib/topbar-title";
 
 interface TopbarProps {
     onToggleSidebar?: () => void;
@@ -12,24 +16,19 @@ interface TopbarProps {
 
 const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
     const { activeAlertCount } = useData();
+    const pathname = usePathname();
     const alertCount = activeAlertCount;
+    const title = getTopbarTitle(pathname);
+
     return (
         <header
-            style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0 20px",
-                height: "52px",
-                background: "var(--bg-primary)",
-                borderBottom: "0.5px solid var(--border-tertiary)",
-            }}
+            className="topbar-shell"
         >
-            {/* Left */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                {/* Hamburger — mobile only */}
+            <div className="topbar-left">
                 <button
                     className="hamburger-btn"
+                    type="button"
+                    aria-label="Menüyü aç"
                     onClick={onToggleSidebar}
                     style={{
                         display: "none",
@@ -39,82 +38,65 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                         border: "none",
                         color: "var(--text-secondary)",
                         cursor: "pointer",
-                        padding: "4px",
+                        padding: "5px",
+                        borderRadius: "6px",
                     }}
                 >
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                        <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
+                    <Menu size={19} strokeWidth={1.8} aria-hidden />
                 </button>
 
-                {/* Logo */}
                 <div
+                    className="topbar-brand"
                     style={{
-                        fontSize: "15px",
-                        fontWeight: 600,
+                        fontSize: "15.5px",
+                        fontWeight: 700,
                         color: "var(--text-primary)",
                         display: "flex",
                         alignItems: "center",
-                        gap: "8px",
+                        letterSpacing: 0,
                     }}
                 >
                     KokpitERP
-                    <span
-                        style={{
-                            fontSize: "11px",
-                            background: "var(--accent-bg)",
-                            color: "var(--accent-text)",
-                            padding: "2px 6px",
-                            borderRadius: "4px",
-                            border: "0.5px solid var(--accent-border)",
-                        }}
-                    >
-                        AI
-                    </span>
                 </div>
             </div>
 
-            {/* Right */}
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                {/* Live indicator — hide on mobile */}
-                <div className="topbar-right-extras" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <ExchangeRatesTicker />
-                    <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                        <span
-                            className="animate-pulse-dot"
-                            style={{
-                                width: "6px",
-                                height: "6px",
-                                background: "var(--success)",
-                                borderRadius: "50%",
-                            }}
-                        />
-                        <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                            Bağlı
-                        </span>
-                    </div>
-                </div>
+            <div className="topbar-page-context" aria-label="Geçerli sayfa">
+                <span className="topbar-page-title" title={title}>
+                    {title}
+                </span>
+            </div>
 
-                {/* Alert button */}
+            <div className="topbar-right">
+                <div className="topbar-right-extras">
+                    <ExchangeRatesTicker />
+                    <SystemHealthIndicator />
+                </div>
                 {alertCount > 0 && (
-                    <Link href="/dashboard/alerts" style={{ textDecoration: "none" }}>
-                        <button
-                            style={{
-                                fontSize: "12px",
-                                padding: "5px 12px",
-                                border: "0.5px solid var(--danger-border)",
-                                borderRadius: "6px",
-                                background: "var(--danger-bg)",
-                                color: "var(--danger-text)",
-                                cursor: "pointer",
-                            }}
-                        >
-                            {alertCount} Uyarı
-                        </button>
+                    <Link
+                        href="/dashboard/alerts"
+                        aria-label={`${alertCount} aktif uyarı`}
+                        style={{
+                            height: "30px",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            padding: "0 11px",
+                            border: "0.5px solid var(--danger-border)",
+                            borderRadius: "7px",
+                            background: "var(--danger-bg)",
+                            color: "var(--danger-text)",
+                            fontSize: "12px",
+                            fontWeight: 650,
+                            lineHeight: 1,
+                            textDecoration: "none",
+                            whiteSpace: "nowrap",
+                            boxSizing: "border-box",
+                        }}
+                    >
+                        <AlertTriangle size={14} strokeWidth={1.9} aria-hidden />
+                        <span>{alertCount} Uyarı</span>
                     </Link>
                 )}
-
-                {/* User avatar */}
                 <UserAvatarLink />
             </div>
         </header>

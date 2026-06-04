@@ -11,6 +11,10 @@ vi.mock("next/link", () => ({
     ),
 }));
 
+vi.mock("next/navigation", () => ({
+    usePathname: () => "/dashboard",
+}));
+
 vi.mock("@/lib/data-context", () => ({
     useData: () => ({ activeAlertCount: 15 }),
 }));
@@ -123,6 +127,12 @@ describe("ExchangeRatesTicker", () => {
                     json: async () => ({ fullName: "Can Sarı", email: "can.sari@example.com", avatarUrl: null }),
                 } as Response);
             }
+            if (url === "/api/health") {
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({ status: "ok" }),
+                } as Response);
+            }
             return Promise.resolve({
                 ok: true,
                 json: async () => LIVE_RATE_PAYLOAD,
@@ -131,7 +141,8 @@ describe("ExchangeRatesTicker", () => {
 
         render(<Topbar />);
 
-        expect(screen.getByText("Bağlı")).toBeTruthy();
+        await waitFor(() => expect(screen.getByText("Bağlı")).toBeTruthy());
+        expect(screen.getByText("Dashboard")).toBeTruthy();
         expect(screen.getByText("15 Uyarı")).toBeTruthy();
         await waitFor(() => expect(screen.getByRole("link", { name: "Profil ve ayarlar" })).toBeTruthy());
         expect(screen.getByText("CS")).toBeTruthy();

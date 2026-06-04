@@ -40,7 +40,7 @@ export default function UserAvatarLink() {
                 width: "30px",
                 height: "30px",
                 borderRadius: "50%",
-                background: "linear-gradient(145deg, var(--accent-bg), var(--bg-tertiary))",
+                background: "linear-gradient(145deg, rgba(56, 139, 253, 0.18), var(--bg-tertiary))",
                 border: "0.5px solid var(--accent-border)",
                 boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 0 0 1px rgba(255,255,255,0.02)",
                 display: "flex",
@@ -52,6 +52,7 @@ export default function UserAvatarLink() {
                 textDecoration: "none",
                 letterSpacing: 0,
                 flexShrink: 0,
+                transition: "border-color 0.14s ease, background 0.14s ease, color 0.14s ease",
             }}
         >
             {initials}
