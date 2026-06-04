@@ -13,6 +13,8 @@ fs.mkdirSync(path.dirname(STORAGE_STATE), { recursive: true });
 
 export default defineConfig({
     testDir: "./tests",
+    globalSetup: "./tests/global-setup.ts",
+    globalTeardown: "./tests/global-teardown.ts",
     timeout: 30_000,
     retries: process.env.CI ? 2 : 1,
     fullyParallel: false,   // share a single dev server; parallelism risks data races
@@ -28,19 +30,6 @@ export default defineConfig({
     },
 
     projects: [
-        // ── Setup: log in once and persist session ──────────────────────────
-        {
-            name: "setup",
-            testMatch: /global-setup\.ts/,
-            teardown: "teardown",
-        },
-
-        // ── Teardown: clean up auth file ────────────────────────────────────
-        {
-            name: "teardown",
-            testMatch: /global-teardown\.ts/,
-        },
-
         // ── Auth tests: explicitly no stored session ─────────────────────────
         {
             name: "auth",
@@ -49,7 +38,6 @@ export default defineConfig({
                 ...devices["Desktop Chrome"],
                 storageState: undefined,
             },
-            dependencies: ["setup"],  // still need server running, but not the auth state
         },
 
         // ── All other tests: use persistent session ──────────────────────────
@@ -58,9 +46,8 @@ export default defineConfig({
             testMatch: /(?<!auth)\.spec\.ts/,
             use: {
                 ...devices["Desktop Chrome"],
-                storageState: fs.existsSync(STORAGE_STATE) ? STORAGE_STATE : { cookies: [], origins: [] },
+                storageState: STORAGE_STATE,
             },
-            dependencies: ["setup"],
         },
     ],
 
