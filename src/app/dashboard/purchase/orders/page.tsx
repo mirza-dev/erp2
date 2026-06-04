@@ -9,6 +9,8 @@ import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { PurchaseOrderRow, PurchaseOrderStatus, VendorRow } from "@/lib/database.types";
+import { ButtonLink } from "@/components/ui/Button";
+import { Plus } from "lucide-react";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left", padding: "10px 14px", fontSize: "12px", fontWeight: 500,
@@ -146,21 +148,15 @@ export default function PurchaseOrdersPage() {
                     </p>
                 </div>
                 {has("manage_purchase_orders") && (
-                    <Link
+                    <ButtonLink
                         href="/dashboard/purchase/orders/new"
-                        style={{
-                            padding: "8px 16px", fontSize: "13px",
-                            background: isDemo ? "var(--bg-tertiary)" : "var(--accent)",
-                            color: isDemo ? "var(--text-tertiary)" : "#fff",
-                            border: "none", borderRadius: "6px",
-                            cursor: isDemo ? "not-allowed" : "pointer",
-                            fontWeight: 500, textDecoration: "none", pointerEvents: isDemo ? "none" : "auto",
-                        }}
+                        size="cta"
+                        leftIcon={<Plus size={16} />}
+                        disabled={isDemo}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                        aria-disabled={isDemo}
                     >
-                        + Yeni Sipariş
-                    </Link>
+                        Yeni Sipariş
+                    </ButtonLink>
                 )}
             </div>
 

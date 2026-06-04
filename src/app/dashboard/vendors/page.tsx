@@ -8,6 +8,8 @@ import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { VendorRow } from "@/lib/database.types";
+import Button from "@/components/ui/Button";
+import { Plus } from "lucide-react";
 
 // ── Styles ────────────────────────────────────────────────────
 
@@ -298,23 +300,15 @@ export default function VendorsPage() {
                     </p>
                 </div>
                 {has("manage_vendors") && (
-                    <button
+                    <Button
+                        size="cta"
+                        leftIcon={<Plus size={16} />}
                         onClick={openCreate}
                         disabled={isDemo}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                        style={{
-                            padding: "8px 16px",
-                            fontSize: "13px",
-                            background: isDemo ? "var(--bg-tertiary)" : "var(--accent)",
-                            color: isDemo ? "var(--text-tertiary)" : "#fff",
-                            border: "none",
-                            borderRadius: "6px",
-                            cursor: isDemo ? "not-allowed" : "pointer",
-                            fontWeight: 500,
-                        }}
                     >
-                        + Yeni Tedarikçi
-                    </button>
+                        Yeni Tedarikçi
+                    </Button>
                 )}
             </div>
 
@@ -351,28 +345,21 @@ export default function VendorsPage() {
                     <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
                         {selectedIds.size} tedarikçi seçildi
                     </span>
-                    <button
+                    <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => setBulkDeactivateConfirm(true)}
                         disabled={bulkDeactivating}
-                        style={{
-                            fontSize: "12px", padding: "4px 12px",
-                            border: "0.5px solid var(--warning-border)",
-                            borderRadius: "5px", background: "var(--warning-bg)",
-                            color: "var(--warning-text)", cursor: bulkDeactivating ? "not-allowed" : "pointer",
-                            opacity: bulkDeactivating ? 0.6 : 1,
-                        }}
                     >
                         {bulkDeactivating ? "İşleniyor…" : "Pasife Al"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={clearAll}
-                        style={{
-                            fontSize: "12px", padding: "4px 10px", border: "none",
-                            background: "transparent", color: "var(--accent-text)", cursor: "pointer",
-                        }}
                     >
                         Seçimi Temizle
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -483,58 +470,35 @@ export default function VendorsPage() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right" }}>
                                         <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                                            <button
+                                            <Button
+                                                variant="secondary"
+                                                size="sm"
                                                 onClick={() => openEdit(v)}
                                                 disabled={isDemo}
                                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : "Düzenle"}
-                                                style={{
-                                                    fontSize: "12px",
-                                                    padding: "4px 10px",
-                                                    border: "0.5px solid var(--border-secondary)",
-                                                    borderRadius: "5px",
-                                                    background: "transparent",
-                                                    color: "var(--text-primary)",
-                                                    cursor: isDemo ? "not-allowed" : "pointer",
-                                                }}
                                             >
                                                 Düzenle
-                                            </button>
+                                            </Button>
                                             {v.is_active ? (
-                                                <button
+                                                <Button
+                                                    variant="danger"
+                                                    size="sm"
                                                     onClick={() => handleDeactivate(v)}
                                                     disabled={isDemo || deactivatingId === v.id}
                                                     title={isDemo ? DEMO_DISABLED_TOOLTIP : "Pasife al"}
-                                                    style={{
-                                                        fontSize: "12px",
-                                                        padding: "4px 10px",
-                                                        border: "0.5px solid var(--danger)",
-                                                        borderRadius: "5px",
-                                                        background: "transparent",
-                                                        color: "var(--danger)",
-                                                        cursor: isDemo || deactivatingId === v.id ? "not-allowed" : "pointer",
-                                                        opacity: deactivatingId === v.id ? 0.5 : 1,
-                                                    }}
                                                 >
                                                     {deactivatingId === v.id ? "..." : "Pasife al"}
-                                                </button>
+                                                </Button>
                                             ) : (
-                                                <button
+                                                <Button
+                                                    variant="success"
+                                                    size="sm"
                                                     onClick={() => handleReactivate(v)}
                                                     disabled={isDemo || reactivatingId === v.id}
                                                     title={isDemo ? DEMO_DISABLED_TOOLTIP : "Aktifleştir"}
-                                                    style={{
-                                                        fontSize: "12px",
-                                                        padding: "4px 10px",
-                                                        border: "0.5px solid var(--success)",
-                                                        borderRadius: "5px",
-                                                        background: "transparent",
-                                                        color: "var(--success)",
-                                                        cursor: isDemo || reactivatingId === v.id ? "not-allowed" : "pointer",
-                                                        opacity: reactivatingId === v.id ? 0.5 : 1,
-                                                    }}
                                                 >
                                                     {reactivatingId === v.id ? "..." : "Aktifleştir"}
-                                                </button>
+                                                </Button>
                                             )}
                                         </div>
                                     </td>
@@ -575,29 +539,22 @@ export default function VendorsPage() {
                             Seçili tedarikçileri pasife almak istediğinizden emin misiniz?
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="md"
                                 onClick={() => setBulkDeactivateConfirm(false)}
                                 disabled={bulkDeactivating}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                                    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                                }}
                             >
                                 İptal
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="danger"
+                                size="md"
                                 onClick={handleBulkDeactivate}
                                 disabled={bulkDeactivating}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--warning-border)", borderRadius: "6px",
-                                    background: "var(--warning-bg)", color: "var(--warning-text)",
-                                    cursor: bulkDeactivating ? "not-allowed" : "pointer", opacity: bulkDeactivating ? 0.6 : 1,
-                                }}
                             >
                                 {bulkDeactivating ? "İşleniyor…" : "Pasife Al"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </>
@@ -696,38 +653,23 @@ export default function VendorsPage() {
 
                         {/* Buttons */}
                         <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
-                            <button
-                                onClick={handleSave}
-                                disabled={saving}
-                                style={{
-                                    flex: 1,
-                                    padding: "9px",
-                                    fontSize: "13px",
-                                    fontWeight: 500,
-                                    background: saving ? "var(--bg-tertiary)" : "var(--accent)",
-                                    color: saving ? "var(--text-tertiary)" : "#fff",
-                                    border: "none",
-                                    borderRadius: "6px",
-                                    cursor: saving ? "not-allowed" : "pointer",
-                                }}
-                            >
-                                {saving ? "Kaydediliyor..." : (drawerMode === "create" ? "Ekle" : "Güncelle")}
-                            </button>
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="md"
                                 onClick={closeDrawer}
                                 disabled={saving}
-                                style={{
-                                    padding: "9px 16px",
-                                    fontSize: "13px",
-                                    background: "transparent",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    color: "var(--text-secondary)",
-                                }}
                             >
                                 İptal
-                            </button>
+                            </Button>
+                            <Button
+                                size="md"
+                                onClick={handleSave}
+                                disabled={saving}
+                                loading={saving}
+                                style={{ flex: 1 }}
+                            >
+                                {drawerMode === "create" ? "Ekle" : "Güncelle"}
+                            </Button>
                         </div>
                     </div>
                 </div>

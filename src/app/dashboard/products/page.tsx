@@ -2,12 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { maskCurrency, formatNumber } from "@/lib/utils";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapProduct } from "@/lib/api-mappers";
 import type { Product } from "@/lib/mock-data";
-import Button from "@/components/ui/Button";
+import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { usePagination } from "@/hooks/usePagination";
@@ -16,6 +15,7 @@ import { useSelection } from "@/hooks/useSelection";
 import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
+import { Plus, RefreshCw } from "lucide-react";
 
 
 interface RiskItem {
@@ -457,29 +457,16 @@ export default function ProductsPage() {
                         )}
                     </div>
                 </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <button
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: isMobile ? "flex-start" : "flex-end", flexWrap: "wrap", flex: isMobile ? "1 1 100%" : undefined }}>
+                    <Button
+                        variant="toolbar"
+                        size="md"
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        style={{
-                            fontSize: "12px",
-                            padding: "6px 12px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "6px",
-                            background: "transparent",
-                            color: "var(--text-secondary)",
-                            cursor: refreshing ? "not-allowed" : "pointer",
-                            opacity: refreshing ? 0.5 : 1,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "5px",
-                        }}
+                        leftIcon={<RefreshCw size={15} style={{ transform: refreshing ? "rotate(180deg)" : "none", transition: "transform 0.4s" }} />}
                     >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ transform: refreshing ? "rotate(180deg)" : "none", transition: "transform 0.4s" }}>
-                            <path d="M10 6A4 4 0 1 1 6 2a4 4 0 0 1 3.5 2M10 2v2.5H7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
                         {refreshing ? "Yenileniyor…" : "Yenile"}
-                    </button>
+                    </Button>
                     <input
                         type="text"
                         value={search}
@@ -492,20 +479,30 @@ export default function ProductsPage() {
                             borderRadius: "6px",
                             background: "var(--bg-primary)",
                             color: "var(--text-primary)",
-                            width: isMobile ? "140px" : "200px",
+                            width: isMobile ? "100%" : "200px",
+                            maxWidth: isMobile ? "168px" : "200px",
+                            minWidth: "0",
+                            flex: isMobile ? "1 1 150px" : undefined,
                         }}
                     />
-                    <Link
+                    <ButtonLink
                         href="/dashboard/products/aging"
-                        style={{
-                            fontSize: "12px", fontWeight: 500, padding: "6px 12px",
-                            border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                            background: "transparent", color: "var(--text-secondary)",
-                            textDecoration: "none", whiteSpace: "nowrap",
-                        }}
-                    >Eskime Raporu →</Link>
+                        variant="secondary"
+                        size="md"
+                    >
+                        Eskime Raporu
+                    </ButtonLink>
                     {has("manage_product_master") && (
-                        <Button variant="primary" onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", productTypeId: "", attributes: {} }); setCreateTypeFields([]); setCreateOpen(true); }} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>+ Yeni Ürün</Button>
+                        <Button
+                            size="cta"
+                            leftIcon={<Plus size={16} />}
+                            onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", productTypeId: "", attributes: {} }); setCreateTypeFields([]); setCreateOpen(true); }}
+                            disabled={isDemo}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                            style={{ width: isMobile ? "100%" : undefined }}
+                        >
+                            Yeni Ürün
+                        </Button>
                     )}
                 </div>
             </div>
@@ -751,28 +748,21 @@ export default function ProductsPage() {
                     <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
                         {selectedIds.size} ürün seçildi
                     </span>
-                    <button
+                    <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => setBulkDeleteConfirm(true)}
                         disabled={bulkDeleting}
-                        style={{
-                            fontSize: "12px", padding: "4px 12px",
-                            border: "0.5px solid var(--danger-border)",
-                            borderRadius: "5px", background: "var(--danger-bg)",
-                            color: "var(--danger-text)", cursor: bulkDeleting ? "not-allowed" : "pointer",
-                            opacity: bulkDeleting ? 0.6 : 1,
-                        }}
                     >
                         {bulkDeleting ? "Siliniyor…" : "Sil"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={clearAll}
-                        style={{
-                            fontSize: "12px", padding: "4px 10px", border: "none",
-                            background: "transparent", color: "var(--accent-text)", cursor: "pointer",
-                        }}
                     >
                         Seçimi Temizle
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -875,64 +865,32 @@ export default function ProductsPage() {
                                         {has("manage_product_master") && (confirmDeleteId === product.id ? (
                                             <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
                                                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Emin misin?</span>
-                                                <button
+                                                <Button
+                                                    variant="danger"
+                                                    size="xs"
                                                     disabled={deletingId === product.id}
                                                     onClick={() => handleDelete(product.id)}
-                                                    style={{
-                                                        fontSize: "11px",
-                                                        padding: "2px 8px",
-                                                        border: "0.5px solid var(--danger-border)",
-                                                        borderRadius: "4px",
-                                                        background: "var(--danger-bg)",
-                                                        color: "var(--danger-text)",
-                                                        cursor: "pointer",
-                                                    }}
                                                 >
                                                     {deletingId === product.id ? "…" : "Evet"}
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="xs"
                                                     onClick={() => setConfirmDeleteId(null)}
-                                                    style={{
-                                                        fontSize: "11px",
-                                                        padding: "2px 8px",
-                                                        border: "0.5px solid var(--border-secondary)",
-                                                        borderRadius: "4px",
-                                                        background: "transparent",
-                                                        color: "var(--text-secondary)",
-                                                        cursor: "pointer",
-                                                    }}
                                                 >
                                                     Hayır
-                                                </button>
+                                                </Button>
                                             </span>
                                         ) : (
-                                            <button
+                                            <Button
+                                                variant="danger"
+                                                size="xs"
                                                 onClick={() => !isDemo && setConfirmDeleteId(product.id)}
                                                 disabled={isDemo}
                                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                                style={{
-                                                    fontSize: "11px",
-                                                    padding: "2px 8px",
-                                                    border: "0.5px solid var(--border-secondary)",
-                                                    borderRadius: "4px",
-                                                    background: "transparent",
-                                                    color: "var(--text-tertiary)",
-                                                    cursor: isDemo ? "not-allowed" : "pointer",
-                                                    opacity: isDemo ? 0.5 : 1,
-                                                }}
-                                                onMouseEnter={e => {
-                                                    if (isDemo) return;
-                                                    e.currentTarget.style.borderColor = "var(--danger-border)";
-                                                    e.currentTarget.style.color = "var(--danger-text)";
-                                                }}
-                                                onMouseLeave={e => {
-                                                    if (isDemo) return;
-                                                    e.currentTarget.style.borderColor = "var(--border-secondary)";
-                                                    e.currentTarget.style.color = "var(--text-tertiary)";
-                                                }}
                                             >
                                                 Sil
-                                            </button>
+                                            </Button>
                                         ))}
                                     </td>
                                 </tr>
@@ -971,20 +929,13 @@ export default function ProductsPage() {
                                 : selectedCategories.length > 0 ? `Seçili kategorilerde ürün yok` : "Ürün bulunamadı"}
                         </div>
                         {(search || alertFilter !== "tumu") && (
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="sm"
                                 onClick={() => { setSearch(""); setAlertFilter("tumu"); }}
-                                style={{
-                                    fontSize: "12px",
-                                    padding: "4px 12px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "5px",
-                                    background: "transparent",
-                                    color: "var(--text-secondary)",
-                                    cursor: "pointer",
-                                }}
                             >
                                 Filtreleri temizle
-                            </button>
+                            </Button>
                         )}
                     </div>
                 )}
@@ -1011,29 +962,22 @@ export default function ProductsPage() {
                             Seçili ürünleri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="md"
                                 onClick={() => setBulkDeleteConfirm(false)}
                                 disabled={bulkDeleting}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                                    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                                }}
                             >
                                 İptal
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="danger"
+                                size="md"
                                 onClick={handleBulkDelete}
                                 disabled={bulkDeleting}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
-                                    background: "var(--danger-bg)", color: "var(--danger-text)",
-                                    cursor: bulkDeleting ? "not-allowed" : "pointer", opacity: bulkDeleting ? 0.6 : 1,
-                                }}
                             >
                                 {bulkDeleting ? "Siliniyor…" : "Sil"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </>

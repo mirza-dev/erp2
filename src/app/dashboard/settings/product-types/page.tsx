@@ -262,8 +262,13 @@ export default function TechnicalTemplatesPage() {
                         <Eye size={14} />
                         Pasifleri Göster
                     </Button>
-                    <Button onClick={openCreate} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                        <Plus size={14} />
+                    <Button
+                        size="cta"
+                        leftIcon={<Plus size={16} />}
+                        onClick={openCreate}
+                        disabled={isDemo}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                    >
                         Yeni Şablon
                     </Button>
                 </div>

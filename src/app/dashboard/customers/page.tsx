@@ -12,6 +12,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
+import { Plus } from "lucide-react";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -168,7 +169,7 @@ export default function CustomersPage() {
                             {mockCustomers.length} aktif müşteri · {new Set(mockCustomers.map(c => c.country)).size} ülke
                         </div>
                     </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", flex: "1 1 320px" }}>
                         <input
                             type="text"
                             value={search}
@@ -181,12 +182,21 @@ export default function CustomersPage() {
                                 borderRadius: "6px",
                                 background: "var(--bg-primary)",
                                 color: "var(--text-primary)",
-                                width: "220px",
+                                width: "100%",
+                                maxWidth: "220px",
+                                minWidth: "0",
+                                flex: "1 1 190px",
                             }}
                         />
                         {has("manage_customers") && (
-                            <Button variant="primary" onClick={() => setShowAddModal(true)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                                + Yeni Müşteri
+                            <Button
+                                size="cta"
+                                leftIcon={<Plus size={16} />}
+                                onClick={() => setShowAddModal(true)}
+                                disabled={isDemo}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                            >
+                                Yeni Müşteri
                             </Button>
                         )}
                     </div>
@@ -244,28 +254,21 @@ export default function CustomersPage() {
                         <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
                             {selectedIds.size} müşteri seçildi
                         </span>
-                        <button
+                        <Button
+                            variant="danger"
+                            size="sm"
                             onClick={() => setBulkDeleteConfirm(true)}
                             disabled={bulkDeleting}
-                            style={{
-                                fontSize: "12px", padding: "4px 12px",
-                                border: "0.5px solid var(--danger-border)",
-                                borderRadius: "5px", background: "var(--danger-bg)",
-                                color: "var(--danger-text)", cursor: bulkDeleting ? "not-allowed" : "pointer",
-                                opacity: bulkDeleting ? 0.6 : 1,
-                            }}
                         >
                             {bulkDeleting ? "Siliniyor…" : "Sil"}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={clearAll}
-                            style={{
-                                fontSize: "12px", padding: "4px 10px", border: "none",
-                                background: "transparent", color: "var(--accent-text)", cursor: "pointer",
-                            }}
                         >
                             Seçimi Temizle
-                        </button>
+                        </Button>
                     </div>
                 )}
 
@@ -390,64 +393,32 @@ export default function CustomersPage() {
                                         {has("delete_customers") && (confirmDeleteId === customer.id ? (
                                             <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
                                                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Kalıcı silinecek. Emin misin?</span>
-                                                <button
+                                                <Button
+                                                    variant="danger"
+                                                    size="xs"
                                                     disabled={deletingId === customer.id}
                                                     onClick={() => handleDelete(customer.id)}
-                                                    style={{
-                                                        fontSize: "11px",
-                                                        padding: "2px 8px",
-                                                        border: "0.5px solid var(--danger-border)",
-                                                        borderRadius: "4px",
-                                                        background: "var(--danger-bg)",
-                                                        color: "var(--danger-text)",
-                                                        cursor: "pointer",
-                                                    }}
                                                 >
                                                     {deletingId === customer.id ? "…" : "Kalıcı Sil"}
-                                                </button>
-                                                <button
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    size="xs"
                                                     onClick={() => setConfirmDeleteId(null)}
-                                                    style={{
-                                                        fontSize: "11px",
-                                                        padding: "2px 8px",
-                                                        border: "0.5px solid var(--border-secondary)",
-                                                        borderRadius: "4px",
-                                                        background: "transparent",
-                                                        color: "var(--text-secondary)",
-                                                        cursor: "pointer",
-                                                    }}
                                                 >
                                                     Hayır
-                                                </button>
+                                                </Button>
                                             </span>
                                         ) : (
-                                            <button
+                                            <Button
+                                                variant="danger"
+                                                size="xs"
                                                 onClick={() => setConfirmDeleteId(customer.id)}
                                                 disabled={isDemo}
                                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                                style={{
-                                                    fontSize: "11px",
-                                                    padding: "2px 8px",
-                                                    border: "0.5px solid var(--border-secondary)",
-                                                    borderRadius: "4px",
-                                                    background: "transparent",
-                                                    color: "var(--text-tertiary)",
-                                                    cursor: isDemo ? "not-allowed" : "pointer",
-                                                    opacity: isDemo ? 0.5 : 1,
-                                                }}
-                                                onMouseEnter={e => {
-                                                    if (isDemo) return;
-                                                    e.currentTarget.style.borderColor = "var(--danger-border)";
-                                                    e.currentTarget.style.color = "var(--danger-text)";
-                                                }}
-                                                onMouseLeave={e => {
-                                                    if (isDemo) return;
-                                                    e.currentTarget.style.borderColor = "var(--border-secondary)";
-                                                    e.currentTarget.style.color = "var(--text-tertiary)";
-                                                }}
                                             >
                                                 Kalıcı Sil
-                                            </button>
+                                            </Button>
                                         ))}
                                     </td>
                                 </tr>
@@ -492,29 +463,22 @@ export default function CustomersPage() {
                             Seçili müşterileri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="md"
                                 onClick={() => setBulkDeleteConfirm(false)}
                                 disabled={bulkDeleting}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                                    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                                }}
                             >
                                 İptal
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="danger"
+                                size="md"
                                 onClick={handleBulkDelete}
                                 disabled={bulkDeleting}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
-                                    background: "var(--danger-bg)", color: "var(--danger-text)",
-                                    cursor: bulkDeleting ? "not-allowed" : "pointer", opacity: bulkDeleting ? 0.6 : 1,
-                                }}
                             >
                                 {bulkDeleting ? "Siliniyor…" : "Sil"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </>
@@ -636,15 +600,22 @@ export default function CustomersPage() {
                                 display: "flex",
                                 gap: "8px",
                                 alignItems: "center",
+                                justifyContent: "flex-end",
                                 padding: "12px 18px",
                                 borderTop: "0.5px solid var(--border-tertiary)",
                             }}
                         >
-                            <Button variant="primary" size="md" onClick={handleAdd} disabled={isDemo || !newCustomer.name || isAdding} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                                {isAdding ? "Kaydediliyor…" : "Müşteriyi Kaydet"}
-                            </Button>
                             <Button variant="secondary" size="md" onClick={() => setShowAddModal(false)}>
                                 İptal
+                            </Button>
+                            <Button
+                                size="md"
+                                onClick={handleAdd}
+                                loading={isAdding}
+                                disabled={isDemo || !newCustomer.name || isAdding}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                            >
+                                Müşteriyi Kaydet
                             </Button>
                         </div>
                     </div>
