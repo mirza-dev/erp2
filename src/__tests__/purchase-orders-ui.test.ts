@@ -49,7 +49,7 @@ describe("Faz 4 — PO UI module load smoke", () => {
 
     it("Sidebar export 'Satın Alma' grubuna 'Satın Alma Siparişleri' linkini içerir", async () => {
         // 2026-05-27: label "Siparişler" → "Satın Alma Siparişleri" (operasyon
-        // grubundaki "Satış Siparişleri" ile karışmasın diye net adlandırma).
+        // Satış grubundaki "Satış Siparişleri" ile karışmasın diye net adlandırma).
         const fs = await import("fs/promises");
         const path = await import("path");
         const src = await fs.readFile(

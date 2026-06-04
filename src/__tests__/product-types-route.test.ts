@@ -14,6 +14,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Mocks ─────────────────────────────────────────────────────
 
 const mockDbListProductTypes = vi.fn();
+const mockDbListProductTypesWithStats = vi.fn();
 const mockDbGetProductType = vi.fn();
 const mockDbGetProductTypeWithFields = vi.fn();
 const mockDbCreateProductType = vi.fn();
@@ -28,6 +29,7 @@ const mockDbReorderProductTypeFields = vi.fn();
 
 vi.mock("@/lib/supabase/product-types", () => ({
     dbListProductTypes: (...a: unknown[]) => mockDbListProductTypes(...a),
+    dbListProductTypesWithStats: (...a: unknown[]) => mockDbListProductTypesWithStats(...a),
     dbGetProductType: (...a: unknown[]) => mockDbGetProductType(...a),
     dbGetProductTypeWithFields: (...a: unknown[]) => mockDbGetProductTypeWithFields(...a),
     dbCreateProductType: (...a: unknown[]) => mockDbCreateProductType(...a),
@@ -94,6 +96,7 @@ const sampleType = {
     icon: "🔧",
     sort_order: 10,
     is_system: true,
+    is_active: true,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
 };
@@ -108,6 +111,7 @@ const sampleField = {
     unit: "mm",
     options: null,
     required: true,
+    is_active: true,
     placeholder: null,
     help_text: null,
     sort_order: 10,
@@ -117,6 +121,7 @@ const sampleField = {
 
 beforeEach(() => {
     mockDbListProductTypes.mockReset();
+    mockDbListProductTypesWithStats.mockReset();
     mockDbGetProductType.mockReset();
     mockDbGetProductTypeWithFields.mockReset();
     mockDbCreateProductType.mockReset();
@@ -220,6 +225,16 @@ describe("GET /api/product-types/[id]", () => {
         expect(body.fields.length).toBe(1);
         expect(body.fields[0].field_key).toBe("dn");
     });
+
+    it("includeInactive=1 tekil GET'e iletilir", async () => {
+        mockDbGetProductType.mockResolvedValue({ ...sampleType, is_active: false });
+        const res = await typeIdGET(
+            makeReq(undefined, "GET", "http://localhost/api/product-types/t-1?includeInactive=1") as unknown as Parameters<typeof typeIdGET>[0],
+            makeParams({ id: "t-1" }),
+        );
+        expect(res.status).toBe(200);
+        expect(mockDbGetProductType).toHaveBeenCalledWith("t-1", { includeInactive: true });
+    });
 });
 
 // ── PATCH /api/product-types/[id] ───────────────────────────────
@@ -243,6 +258,15 @@ describe("PATCH /api/product-types/[id]", () => {
         const res = await typeIdPATCH(makeReq({ name: "Vana Updated" }, "PATCH") as unknown as Parameters<typeof typeIdPATCH>[0], makeParams({ id: "t-1" }));
         expect(res.status).toBe(200);
     });
+
+    it("pasif şablon yeniden aktifleştirilebilir", async () => {
+        mockDbGetProductType.mockResolvedValue({ ...sampleType, is_active: false });
+        mockDbUpdateProductType.mockResolvedValue({ ...sampleType, is_active: true });
+        const res = await typeIdPATCH(makeReq({ is_active: true }, "PATCH") as unknown as Parameters<typeof typeIdPATCH>[0], makeParams({ id: "t-1" }));
+        expect(res.status).toBe(200);
+        expect(mockDbGetProductType).toHaveBeenCalledWith("t-1", { includeInactive: true });
+        expect(mockDbUpdateProductType).toHaveBeenCalledWith("t-1", expect.objectContaining({ is_active: true }));
+    });
 });
 
 // ── DELETE /api/product-types/[id] ──────────────────────────────
@@ -260,18 +284,19 @@ describe("DELETE /api/product-types/[id]", () => {
         expect(res.status).toBe(404);
     });
 
-    it("sistem tipi → 409", async () => {
+    it("sistem tipi de güvenli şekilde pasifleştirilir → 200", async () => {
         mockDbGetProductType.mockResolvedValue(sampleType);
-        mockDbDeleteProductType.mockRejectedValue(new Error("Sistem tipi silinemez. Önce kilidi düşürün."));
+        mockDbDeleteProductType.mockResolvedValue(undefined);
         const res = await typeIdDELETE(makeReq(undefined, "DELETE") as unknown as Parameters<typeof typeIdDELETE>[0], makeParams({ id: "t-1" }));
-        expect(res.status).toBe(409);
+        expect(res.status).toBe(200);
+        expect(mockDbDeleteProductType).toHaveBeenCalledWith("t-1");
     });
 
-    it("bağlı ürün varsa → 409", async () => {
+    it("bağlı ürün varsa da hard delete yerine pasifleştirme çağrılır → 200", async () => {
         mockDbGetProductType.mockResolvedValue({ ...sampleType, is_system: false });
-        mockDbDeleteProductType.mockRejectedValue(new Error("Bu tipe bağlı 5 ürün var; tip silinemez."));
+        mockDbDeleteProductType.mockResolvedValue(undefined);
         const res = await typeIdDELETE(makeReq(undefined, "DELETE") as unknown as Parameters<typeof typeIdDELETE>[0], makeParams({ id: "t-1" }));
-        expect(res.status).toBe(409);
+        expect(res.status).toBe(200);
     });
 });
 

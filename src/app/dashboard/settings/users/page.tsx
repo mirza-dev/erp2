@@ -5,6 +5,8 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { createClient } from "@/lib/supabase/client";
 import { ROLES, ROLE_LABELS, type Role } from "@/lib/auth/permissions";
+import Button from "@/components/ui/Button";
+import { Plus } from "lucide-react";
 
 interface User {
     id: string;
@@ -232,24 +234,15 @@ export default function UsersPage() {
                         Sisteme erişim yetkisi olan hesaplar
                     </p>
                 </div>
-                <button
+                <Button
+                    size="cta"
+                    leftIcon={!showForm ? <Plus size={16} /> : undefined}
                     onClick={() => setShowForm(prev => !prev)}
                     disabled={isDemo}
                     title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                    style={{
-                        padding: "7px 14px",
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        color: "#fff",
-                        background: "var(--accent)",
-                        border: "none",
-                        borderRadius: "7px",
-                        cursor: isDemo ? "not-allowed" : "pointer",
-                        opacity: isDemo ? 0.5 : 1,
-                    }}
                 >
                     {showForm ? "İptal" : "Kullanıcı Ekle"}
-                </button>
+                </Button>
             </div>
 
             {/* Add user form */}
@@ -299,23 +292,13 @@ export default function UsersPage() {
                         <RoleCheckboxes selected={newRoles} onToggle={toggleNewRole} disabled={isDemo} />
                     </div>
                     <div>
-                        <button
+                        <Button
                             type="submit"
                             disabled={submitting}
-                            style={{
-                                padding: "7px 18px",
-                                fontSize: "13px",
-                                fontWeight: 500,
-                                color: "#fff",
-                                background: "var(--accent)",
-                                border: "none",
-                                borderRadius: "6px",
-                                cursor: submitting ? "not-allowed" : "pointer",
-                                opacity: submitting ? 0.6 : 1,
-                            }}
+                            loading={submitting}
                         >
-                            {submitting ? "Oluşturuluyor..." : "Oluştur"}
-                        </button>
+                            Oluştur
+                        </Button>
                     </div>
                 </form>
             )}

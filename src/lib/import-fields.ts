@@ -15,6 +15,9 @@ export const IMPORT_FIELDS: Record<string, Array<{ field: string; label: string 
         { field: "certifications", label: "Sertifikalar" }, { field: "product_notes", label: "Notlar" },
         { field: "lead_time_days", label: "Tedarik Süresi (gün)" }, { field: "reorder_qty", label: "Yeniden Sipariş Miktarı" },
         { field: "preferred_vendor", label: "Tercihli Tedarikçi" },
+        { field: "vendor_name", label: "Tedarikçi Adı" }, { field: "vendor_email", label: "Tedarikçi E-posta" },
+        { field: "vendor_sku", label: "Tedarikçi Ürün Kodu" }, { field: "moq", label: "MOQ" },
+        { field: "is_preferred", label: "Tercihli Tedarikçi Yap" },
     ],
     customer: [
         { field: "name", label: "Firma Adı" }, { field: "email", label: "E-posta" },
@@ -23,6 +26,13 @@ export const IMPORT_FIELDS: Record<string, Array<{ field: string; label: string 
         { field: "tax_office", label: "Vergi Dairesi" }, { field: "address", label: "Adres" },
         { field: "notes", label: "Notlar" }, { field: "payment_terms_days", label: "Ödeme Vadesi (gün)" },
         { field: "customer_code", label: "Müşteri Kodu" }, { field: "default_incoterm", label: "Varsayılan Incoterm" },
+    ],
+    vendor: [
+        { field: "name", label: "Tedarikçi Adı" }, { field: "contact_email", label: "E-posta" },
+        { field: "contact_phone", label: "Telefon" }, { field: "contact_person", label: "Yetkili" },
+        { field: "tax_number", label: "Vergi No" }, { field: "address", label: "Adres" },
+        { field: "currency", label: "Para Birimi" }, { field: "payment_terms_days", label: "Ödeme Vadesi (gün)" },
+        { field: "lead_time_days", label: "Tedarik Süresi (gün)" }, { field: "notes", label: "Notlar" },
     ],
     order: [
         { field: "customer_name", label: "Müşteri Adı" }, { field: "customer_code", label: "Müşteri Kodu" },
@@ -61,6 +71,9 @@ export const IMPORT_FIELDS: Record<string, Array<{ field: string; label: string 
     ],
     stock: [
         { field: "sku", label: "SKU" }, { field: "on_hand", label: "Stok Miktarı" },
+        { field: "direction", label: "Yön" }, { field: "warehouse", label: "Depo/Lokasyon" },
+        { field: "from_location", label: "Çıkış Lokasyonu" }, { field: "to_location", label: "Giriş Lokasyonu" },
+        { field: "notes", label: "Not" },
     ],
 };
 
@@ -77,6 +90,7 @@ export const IMPORT_FIELD_SET: Record<string, Set<string>> = Object.fromEntries(
 export const REQUIRED_FIELDS: Record<string, string[]> = {
     product: ["sku", "name", "unit"],
     customer: ["name"],
+    vendor: ["name"],
     quote: ["quote_number"],
     order: [],
     order_line: ["order_number", "product_sku"],
@@ -89,5 +103,5 @@ export const REQUIRED_FIELDS: Record<string, string[]> = {
 export const NUMERIC_FIELDS = new Set([
     "price", "grand_total", "min_stock_level", "on_hand", "cost_price", "weight_kg",
     "payment_terms_days", "total_amount", "net_weight_kg", "gross_weight_kg", "amount",
-    "validity_days", "quantity", "unit_price", "line_total", "lead_time_days", "reorder_qty",
+    "validity_days", "quantity", "unit_price", "line_total", "lead_time_days", "reorder_qty", "moq",
 ]);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { getCurrentUserId, getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
 import { serviceConfirmBatch } from "@/lib/services/import-service";
 import { revalidateTag } from "next/cache";
 
@@ -14,7 +14,11 @@ export async function POST(
 
         const guard = await requirePermission(_req, "manage_import");
         if (guard) return guard;
-        const result = await serviceConfirmBatch(batchId);
+        const [actorUserId, permissions] = await Promise.all([
+            getCurrentUserId(_req),
+            getCurrentUserPermissions(_req),
+        ]);
+        const result = await serviceConfirmBatch(batchId, { actorUserId, permissions });
         revalidateTag("products", "max");
         return NextResponse.json(result);
     } catch (err) {

@@ -9,6 +9,8 @@ import AIAlerts from "@/components/dashboard/AIAlerts";
 import AISummaryCard from "@/components/dashboard/AISummaryCard";
 import { useData } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
+import { ButtonLink } from "@/components/ui/Button";
+import { Plus } from "lucide-react";
 
 const STATUS_OPTIONS = [
     { key: "", label: "Tümü" },
@@ -211,21 +213,13 @@ export default function DashboardPage() {
                     </div>
 
                     {canCreateOrder && (
-                        <Link href="/dashboard/orders/new">
-                            <button
-                                style={{
-                                    fontSize: "12px",
-                                    padding: "6px 14px",
-                                    border: "0.5px solid var(--accent-border)",
-                                    borderRadius: "6px",
-                                    background: "var(--accent-bg)",
-                                    color: "var(--accent-text)",
-                                    cursor: "pointer",
-                                }}
-                            >
-                                + Yeni Sipariş
-                            </button>
-                        </Link>
+                        <ButtonLink
+                            href="/dashboard/orders/new"
+                            size="md"
+                            leftIcon={<Plus size={15} />}
+                        >
+                            Yeni Sipariş
+                        </ButtonLink>
                     )}
                 </div>
             </div>

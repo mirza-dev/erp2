@@ -2,6 +2,17 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
+import {
+    CheckCircle2,
+    Download,
+    Eye,
+    FileSpreadsheet,
+    GitMerge,
+    Rows3,
+    ShieldCheck,
+    Table2,
+    Upload,
+} from "lucide-react";
 import { useData } from "@/lib/data-context";
 import * as XLSX from "xlsx";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -10,11 +21,23 @@ import { IMPORT_FIELDS, REQUIRED_FIELDS } from "@/lib/import-fields";
 import DropZone from "@/components/import/DropZone";
 import ClassifierQueue from "@/components/import/ClassifierQueue";
 import type { ProductTypeRow } from "@/lib/database.types";
+import {
+    DEFAULT_AI_IMPORT_OPERATION,
+    getActiveAiImportOperations,
+    getAiImportOperation,
+    type AiImportOperationType,
+} from "@/lib/ai-import-operations";
+import {
+    detectSheetEntityType,
+    EXCEL_IMPORT_TEMPLATES,
+    FINANCIAL_IMPORT_FIELDS,
+    type ClassicImportEntityType,
+    type ImportFieldApproval,
+} from "@/lib/import-center";
 
-// Faz 3d (2026-05-23): Eski `ImportMode = "ai" | "classic"` toggle kaldırıldı;
-// AI artık default+her zaman görünür akış, klasik mod alt accordion'da fallback.
-// Bayrak `showClassic` sayfanın altındaki <details> collapsible'ını kontrol eder.
-// migration_excel belgesi yüklenirse otomatik açılır (parent state).
+// AI default akış olarak kalır; Excel/CSV toplu aktarım alt accordion'da
+// kontrollü tablo dosyası akışı olarak açılır. migration_excel belgesi
+// sınıflandırılırsa bu bölüm otomatik açılır.
 
 type ImportState = "idle" | "analyzing" | "sheet_select" | "column_mapping" | "preview" | "importing" | "done";
 
@@ -24,7 +47,7 @@ interface SheetInfo {
     displayName: string;
     rows: number;
     entity: string;
-    entityType: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment" | null;
+    entityType: "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment" | null;
     status: "importable" | "unsupported";
     selected: boolean;
     headers: string[];
@@ -50,15 +73,29 @@ interface DraftRow {
     unmatched_fields: string[] | null;
     status: string;
     user_corrections?: Record<string, unknown> | null;
+    sheet_name?: string | null;
+    row_number?: number | null;
+    match_status?: string | null;
+    match_confidence?: number | null;
+    risk_flags?: string[] | null;
+    field_approvals?: Record<string, ImportFieldApproval> | null;
+    row_errors?: string[] | null;
 }
 
 // ERP_FIELDS alias for backward compat with references in this file
 const ERP_FIELDS = IMPORT_FIELDS;
 
 // Known sheet → entity type mapping
-const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"; displayName: string; entity: string; status: "importable" }> = {
+const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"; displayName: string; entity: string; status: "importable" }> = {
     Urunler: { entityType: "product", displayName: "Ürünler", entity: "Ürünler", status: "importable" },
     Musteriler: { entityType: "customer", displayName: "Müşteriler", entity: "Müşteriler", status: "importable" },
+    Tedarikciler: { entityType: "vendor", displayName: "Tedarikçiler", entity: "Tedarikçiler", status: "importable" },
+    "Tedarikçiler": { entityType: "vendor", displayName: "Tedarikçiler", entity: "Tedarikçiler", status: "importable" },
+    Tedarikci_Urunleri: { entityType: "product", displayName: "Tedarikçi Ürün İlişkileri", entity: "Tedarikçi Ürün İlişkileri", status: "importable" },
+    "Tedarikçi_Ürünleri": { entityType: "product", displayName: "Tedarikçi Ürün İlişkileri", entity: "Tedarikçi Ürün İlişkileri", status: "importable" },
+    Stok_Sayimi: { entityType: "stock", displayName: "Stok Sayımı", entity: "Stok Sayımı", status: "importable" },
+    "Stok_Sayımı": { entityType: "stock", displayName: "Stok Sayımı", entity: "Stok Sayımı", status: "importable" },
+    Stok_Hareketleri: { entityType: "stock", displayName: "Stok Hareketleri", entity: "Stok Hareketleri", status: "importable" },
     Teklifler: { entityType: "quote", displayName: "Teklifler", entity: "Teklifler", status: "importable" },
     Siparisler: { entityType: "order", displayName: "Siparişler", entity: "Siparişler", status: "importable" },
     Siparis_Kalemleri: { entityType: "order_line", displayName: "Sipariş Kalemleri", entity: "Sipariş Kalemleri", status: "importable" },
@@ -68,8 +105,15 @@ const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "o
     Stok: { entityType: "stock", displayName: "Stok", entity: "Stok Güncellemesi", status: "importable" },
 };
 
+const CLASSIC_ENTITY_LABELS: Record<ClassicImportEntityType, string> = {
+    product: "Ürünler",
+    customer: "Müşteriler",
+    vendor: "Tedarikçiler",
+    stock: "Stok",
+};
+
 const entityTypeLabels: Record<string, string> = {
-    customer: "Müşteriler", product: "Ürünler", quote: "Teklifler",
+    customer: "Müşteriler", product: "Ürünler", vendor: "Tedarikçiler", quote: "Teklifler",
     order: "Siparişler", order_line: "Sipariş Kalemleri", shipment: "Sevkiyatlar",
     invoice: "Faturalar", payment: "Tahsilatlar", stock: "Stok",
 };
@@ -110,16 +154,26 @@ const sourceChipStyle = (src: "memory" | "ai" | "fallback" | "user"): React.CSSP
 };
 
 const PAGE_SIZE = 100;
+const ACTIVE_AI_IMPORT_OPERATIONS = getActiveAiImportOperations();
+const INTERNAL_IMPORT_FIELDS = new Set(["__ai_import_operation"]);
+
+function normalizeDraftApprovals(draft: DraftRow): Record<string, ImportFieldApproval> {
+    if (!draft.field_approvals || typeof draft.field_approvals !== "object") return {};
+    return Object.fromEntries(
+        Object.entries(draft.field_approvals)
+            .filter((entry): entry is [string, ImportFieldApproval] =>
+                entry[1] === "apply" || entry[1] === "skip" || entry[1] === "clear"),
+    );
+}
 
 export default function ImportPage() {
     const { refetchAll } = useData();
     const { toast } = useToast();
     const isDemo = useIsDemo();
-    // Faz 3d — AI default akış; klasik mod alt accordion (default kapalı,
-    // migration_excel tespit edilirse otomatik açılır).
+    // AI default akış; Excel/CSV toplu aktarım bölümü default kapalıdır.
     const [showClassic, setShowClassic] = useState(false);
     const classicDetailsRef = useRef<HTMLDetailsElement | null>(null);
-    // Faz 3d Review (2026-05-23): migration_excel CTA accordion'u açtığında
+    // migration_excel CTA accordion'u açtığında
     // uzun ClassifierQueue altında kalan kullanıcı için smooth scroll. Manuel
     // <summary> tıklamada zaten görsel temas olduğundan tetiklenmez — yalnız
     // programmatic open (openClassicFromCta) için.
@@ -131,6 +185,7 @@ export default function ImportPage() {
     }, []);
     const [aiFiles, setAiFiles] = useState<File[]>([]);
     const [aiSuggestedTypes, setAiSuggestedTypes] = useState<Array<{ id: string; name: string }>>([]);
+    const [aiOperationType, setAiOperationType] = useState<AiImportOperationType>(DEFAULT_AI_IMPORT_OPERATION);
 
     // Load product types once for AI badge labels
     useEffect(() => {
@@ -173,24 +228,30 @@ export default function ImportPage() {
     const [editingCell, setEditingCell] = useState<{ draftId: string; field: string } | null>(null);
     const [editingValue, setEditingValue] = useState("");
     const [draftEdits, setDraftEdits] = useState<Record<string, Record<string, unknown>>>({});
+    const [draftApprovals, setDraftApprovals] = useState<Record<string, Record<string, ImportFieldApproval>>>({});
     // Bulk fill state
     const [bulkField, setBulkField] = useState("");
     const [bulkValue, setBulkValue] = useState("");;
     const [previewPage, setPreviewPage] = useState(0);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const editInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        editInputRef.current?.focus();
+    }, [editingCell]);
 
     // ─── Parse Excel file client-side ─────────────────────────────────
     const parseExcelFile = useCallback((file: File) => {
         setFileName(file.name);
         setState("analyzing");
         setProgress(0);
-        setProgressLabel("Dosya okunuyor...");
+        setProgressLabel("Dosya okunuyor…");
 
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
                 setProgress(30);
-                setProgressLabel("Excel ayrıştırılıyor...");
+                setProgressLabel("Excel ayrıştırılıyor…");
                 const data = new Uint8Array(e.target?.result as ArrayBuffer);
                 const workbook = XLSX.read(data, { type: "array" });
                 setProgress(60);
@@ -201,13 +262,17 @@ export default function ImportPage() {
                     const jsonRows = XLSX.utils.sheet_to_json<Record<string, string>>(worksheet, { defval: "" });
                     const headers = jsonRows.length > 0 ? Object.keys(jsonRows[0]) : [];
                     const known = SHEET_ENTITY_MAP[name];
+                    const detected = known ? null : detectSheetEntityType(name, headers);
+                    const detectedEntity = detected?.entityType ?? null;
+                    const displayName = known?.displayName
+                        ?? (detectedEntity ? CLASSIC_ENTITY_LABELS[detectedEntity] : name);
 
                     return {
-                        name, displayName: known?.displayName ?? name,
-                        rows: jsonRows.length, entity: known?.entity ?? name,
-                        entityType: known?.entityType ?? null,
-                        status: known ? "importable" : "unsupported",
-                        selected: !!known, headers,
+                        name, displayName,
+                        rows: jsonRows.length, entity: known?.entity ?? displayName,
+                        entityType: known?.entityType ?? detectedEntity,
+                        status: known || detectedEntity ? "importable" : "unsupported",
+                        selected: !!known || !!detectedEntity, headers,
                         previewRows: jsonRows.slice(0, 5).map(row =>
                             Object.fromEntries(Object.entries(row).map(([k, v]) => [k, String(v)]))),
                         allRows: jsonRows.map(row =>
@@ -290,6 +355,7 @@ export default function ImportPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    operation_type: aiOperationType,
                     sheets: selectedSheets.map(s => ({
                         sheet_name: s.name,
                         entity_type: s.entityType,
@@ -341,6 +407,7 @@ export default function ImportPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    operation_type: aiOperationType,
                     sheets: selectedSheets.map(s => ({
                         sheet_name: s.name,
                         entity_type: s.entityType,
@@ -360,6 +427,7 @@ export default function ImportPage() {
             const applyResult = await applyRes.json();
             const createdDrafts: DraftRow[] = applyResult.drafts ?? [];
             setDrafts(createdDrafts);
+            setDraftApprovals(Object.fromEntries(createdDrafts.map(d => [d.id, normalizeDraftApprovals(d)])));
             const firstType = createdDrafts[0]?.entity_type;
             if (firstType) setActiveTab(firstType);
             setState("preview");
@@ -403,6 +471,27 @@ export default function ImportPage() {
         if (corrections && field in corrections) return corrections[field];
         const parsed = (draft.parsed_data ?? {}) as Record<string, unknown>;
         return parsed[field];
+    };
+
+    const getFieldApproval = (draft: DraftRow, field: string): ImportFieldApproval => {
+        return draftApprovals[draft.id]?.[field] ?? normalizeDraftApprovals(draft)[field] ?? "apply";
+    };
+
+    const setFieldApproval = async (draft: DraftRow, field: string, approval: ImportFieldApproval) => {
+        const prev = draftApprovals[draft.id] ?? normalizeDraftApprovals(draft);
+        const next = { ...prev, [field]: approval };
+        setDraftApprovals(current => ({ ...current, [draft.id]: next }));
+        try {
+            const res = await fetch(`/api/import/drafts/${draft.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ field_approvals: next }),
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        } catch {
+            setDraftApprovals(current => ({ ...current, [draft.id]: prev }));
+            toast({ type: "error", message: "Alan onayı kaydedilemedi — tekrar deneyin." });
+        }
     };
 
     // ─── Import (confirm) step ────────────────────────────────────────
@@ -464,21 +553,26 @@ export default function ImportPage() {
         setState("idle"); setFileName(null); setProgress(0); setProgressLabel("");
         setImportProgress({}); setConfirmResult(null); setDrafts([]); setSheets([]);
         setActiveTab(""); setBatchId(null); setParseError(null);
-        setColumnMappings({}); setDetectingColumns(false); setDraftEdits({});
+        setColumnMappings({}); setDetectingColumns(false); setDraftEdits({}); setDraftApprovals({});
     };
 
     const importableSelected = sheets.filter(s => s.status === "importable" && s.selected);
     const draftEntityTypes = [...new Set(drafts.map(d => d.entity_type))];
     const filteredDrafts = drafts.filter(d => d.entity_type === activeTab);
+    const selectedAiOperation = getAiImportOperation(aiOperationType);
+    const selectedUsesClassic =
+        selectedAiOperation.scope === "stock" ||
+        selectedAiOperation.scope === "customer" ||
+        selectedAiOperation.scope === "vendor";
 
     // Step indicator
     const STEPS = [
-        { key: "analyzing", label: "Dosya Okuma" },
-        { key: "sheet_select", label: "Sheet Seçimi" },
-        { key: "column_mapping", label: "Kolon Eşleştirme" },
-        { key: "preview", label: "İnceleme" },
-        { key: "importing", label: "İçe Aktarım" },
-        { key: "done", label: "Tamamlandı" },
+        { key: "analyzing", label: "Dosya", icon: FileSpreadsheet },
+        { key: "sheet_select", label: "Sheet", icon: Rows3 },
+        { key: "column_mapping", label: "Kolonlar", icon: GitMerge },
+        { key: "preview", label: "Önizleme", icon: Eye },
+        { key: "importing", label: "Aktarım", icon: Upload },
+        { key: "done", label: "Tamamlandı", icon: CheckCircle2 },
     ];
     const stepOrder = STEPS.map(s => s.key);
 
@@ -495,7 +589,7 @@ export default function ImportPage() {
                     </div>
                 </div>
                 {showClassic && (state !== "idle" && state !== "analyzing") && (
-                    <button onClick={reset} style={{
+                    <button type="button" onClick={reset} style={{
                         fontSize: "12px", padding: "5px 12px",
                         border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
                         background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
@@ -503,45 +597,168 @@ export default function ImportPage() {
                 )}
             </div>
 
-            {/* Faz 3d — AI default akış (her zaman görünür); klasik mod alt accordion'da */}
+            {/* AI default akış (her zaman görünür); Excel/CSV toplu aktarım alt accordion'da */}
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <DropZone
-                    onFiles={files => setAiFiles(prev => [...prev, ...files])}
-                    disabled={isDemo}
-                    disabledTooltip={DEMO_DISABLED_TOOLTIP}
-                />
-                {/* Faz 3d — empty state (henüz dosya yüklenmedi) */}
-                {aiFiles.length === 0 && (
-                    <div
-                        role="status"
+                <section
+                    aria-label="AI Import işlem türü"
+                    style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "10px",
+                        padding: "14px",
+                        background: "var(--bg-secondary)",
+                        border: "0.5px solid var(--border-tertiary)",
+                        borderRadius: "8px",
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                        <div>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" }}>
+                                İşlem Türü
+                            </div>
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "3px", maxWidth: "720px", lineHeight: 1.5 }}>
+                                AI dosyayı seçtiğin amaca göre okur. Kanıt, eşleşme ve onay ekranı bu işleme göre hazırlanır.
+                            </div>
+                        </div>
+                        <div
+                            title={selectedAiOperation.safetyNote}
+                            style={{
+                                fontSize: "11px",
+                                padding: "4px 8px",
+                                borderRadius: "999px",
+                                background: "var(--accent-bg)",
+                                color: "var(--accent-text)",
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Aktif: {selectedAiOperation.shortTitle}
+                        </div>
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "8px" }}>
+                        {ACTIVE_AI_IMPORT_OPERATIONS.map(operation => {
+                            const active = operation.id === aiOperationType;
+                            return (
+                                <button
+                                    key={operation.id}
+                                    type="button"
+                                    onClick={() => setAiOperationType(operation.id)}
+                                    disabled={aiFiles.length > 0}
+                                    aria-pressed={active}
+                                    title={aiFiles.length > 0 ? "İşlem türünü değiştirmek için önce kuyruğu temizle." : operation.safetyNote}
+                                    style={{
+                                        minHeight: "104px",
+                                        textAlign: "left",
+                                        padding: "10px",
+                                        borderRadius: "7px",
+                                        border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-tertiary)"}`,
+                                        background: active ? "var(--accent-bg)" : "var(--bg-primary)",
+                                        color: "var(--text-primary)",
+                                        cursor: aiFiles.length > 0 ? "not-allowed" : "pointer",
+                                        opacity: aiFiles.length > 0 && !active ? 0.62 : 1,
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: "7px",
+                                    }}
+                                >
+                                    <span style={{ fontSize: "12px", fontWeight: 700, color: active ? "var(--accent-text)" : "var(--text-primary)" }}>
+                                        {operation.title}
+                                    </span>
+                                    <span style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                                        {operation.description}
+                                    </span>
+                                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
+                                        {operation.evidenceHint}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                </section>
+
+                {selectedUsesClassic ? (
+                    <output
                         style={{
-                            padding: "16px 20px",
+                            padding: "16px 18px",
                             background: "var(--bg-secondary)",
-                            border: "0.5px dashed var(--border-tertiary)",
+                            border: "0.5px solid var(--border-tertiary)",
                             borderRadius: "8px",
-                            color: "var(--text-tertiary)",
-                            fontSize: "12px", lineHeight: 1.6,
+                            display: "grid",
+                            gridTemplateColumns: "1fr auto",
+                            gap: "12px",
+                            alignItems: "center",
                         }}
                     >
-                        <div style={{ fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px" }}>
-                            Henüz dosya yüklenmedi
+                        <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
+                                {selectedAiOperation.shortTitle} Excel/CSV onay hattında çalışır
+                            </div>
+                            <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                                Bu işlemde AI/kolon eşleştirme çıktısı draft tabloya düşer; kullanıcı alanları gözden geçirip
+                                onayladıktan sonra kayıtlar uygulanır. Stok sayımı mevcut miktarı yazar, stok hareketi miktarı
+                                ekler/çıkarır; fiyat ve maliyet alanları ayrı yetki ve açık onay olmadan uygulanmaz.
+                            </div>
                         </div>
-                        PDF sertifika, Excel kataloğu, datasheet veya ürün resmi sürükle bırak.
-                        AI dosyayı sınıflandırır, eşleşen ürünleri bulur ve onayınla katalogu günceller.
-                        Migration Excel dosyaları için aşağıdaki <b>Gelişmiş / Klasik Mod</b> kullanılır.
-                    </div>
+                        <button
+                            type="button"
+                            onClick={openClassicFromCta}
+                            style={{
+                                fontSize: "12px",
+                                padding: "7px 12px",
+                                borderRadius: "6px",
+                                border: "0.5px solid var(--accent-border)",
+                                background: "var(--accent-bg)",
+                                color: "var(--accent-text)",
+                                cursor: "pointer",
+                                fontWeight: 600,
+                                whiteSpace: "nowrap",
+                            }}
+                        >
+                            Excel/CSV yükle
+                        </button>
+                    </output>
+                ) : (
+                    <>
+                        <DropZone
+                            onFiles={files => setAiFiles(prev => [...prev, ...files])}
+                            disabled={isDemo}
+                            disabledTooltip={DEMO_DISABLED_TOOLTIP}
+                        />
+                        {/* Faz 3d — empty state (henüz dosya yüklenmedi) */}
+                        {aiFiles.length === 0 && (
+                            <output
+                                style={{
+                                    padding: "16px 20px",
+                                    background: "var(--bg-secondary)",
+                                    border: "0.5px dashed var(--border-tertiary)",
+                                    borderRadius: "8px",
+                                    color: "var(--text-tertiary)",
+                                    fontSize: "12px", lineHeight: 1.6,
+                                }}
+                            >
+                                <div style={{ fontWeight: 600, color: "var(--text-secondary)", marginBottom: "4px" }}>
+                                    Henüz dosya yüklenmedi
+                                </div>
+                                Seçili işlem: <b>{selectedAiOperation.title}</b>. PDF sertifika, Excel kataloğu, datasheet veya ürün resmi sürükle bırak.
+                                AI dosyayı bu amaca göre sınıflandırır, eşleşen ürünleri bulur ve onayınla güncelleme adaylarını hazırlar.
+                                Excel ve CSV tabloları için aşağıdaki <b>Excel/CSV ile Toplu Aktarım</b> bölümünü kullan.
+                            </output>
+                        )}
+                        <ClassifierQueue
+                            files={aiFiles}
+                            operationType={aiOperationType}
+                            suggestedProductTypes={aiSuggestedTypes}
+                            onClear={() => setAiFiles([])}
+                            onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}
+                            onOpenClassicMode={openClassicFromCta}
+                        />
+                    </>
                 )}
-                <ClassifierQueue
-                    files={aiFiles}
-                    suggestedProductTypes={aiSuggestedTypes}
-                    onClear={() => setAiFiles([])}
-                    onRemove={file => setAiFiles(prev => prev.filter(f => f !== file))}
-                    onOpenClassicMode={openClassicFromCta}
-                />
             </div>
 
-            {/* Faz 3d — Klasik Mod accordion (eski 7-adım wizard fallback).
-                Faz 3d Review 2: data-testid eklendi — E2E locator stable kalır;
+            {/* Excel/CSV toplu aktarım accordion.
+                data-testid E2E locator stable kalır;
                 sayfaya başka <details> eklense bile bu testid spesifik. */}
             <details
                 ref={classicDetailsRef}
@@ -567,13 +784,32 @@ export default function ImportPage() {
                         listStyle: "none",
                         display: "flex", alignItems: "center", gap: "8px",
                     }}
-                    aria-label="Gelişmiş: Klasik Mod (eski 7-adım wizard)"
+                    aria-label="Excel/CSV ile Toplu Aktarım"
                 >
                     <span aria-hidden style={{ fontSize: "10px" }}>{showClassic ? "▾" : "▸"}</span>
-                    <span>Gelişmiş: Klasik Mod — eski 7-adım Excel wizard (migration için)</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", width: "100%" }}>
+                        <FileSpreadsheet size={16} aria-hidden />
+                        <span style={{ color: "var(--text-primary)", fontWeight: 700 }}>Excel/CSV ile Toplu Aktarım</span>
+                        <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>
+                            Şablonlu veya serbest dosyaları önizleme ve onayla içe aktarın.
+                        </span>
+                        <span style={{ marginLeft: "auto", display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                            {["XLSX", "XLS", "CSV", "25 MB", "Çok sheet"].map(label => (
+                                <span key={label} style={{
+                                    fontSize: "10px",
+                                    padding: "2px 7px",
+                                    borderRadius: "999px",
+                                    border: "0.5px solid var(--border-tertiary)",
+                                    color: "var(--text-secondary)",
+                                    background: "var(--bg-primary)",
+                                    whiteSpace: "nowrap",
+                                }}>{label}</span>
+                            ))}
+                        </span>
+                    </div>
                 </summary>
                 <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: "16px", background: "var(--bg-primary)" }}>
-            {/* Klasik mod — eski 7-adım wizard */}
+            {/* Excel/CSV kontrollü aktarım adımları */}
 
             {/* Step indicator */}
             {state !== "idle" && (
@@ -583,14 +819,18 @@ export default function ImportPage() {
                         const stepIdx = stepOrder.indexOf(step.key);
                         const isDone = stepIdx < currentIdx;
                         const isActive = stepIdx === currentIdx;
+                        const StepIcon = step.icon;
                         return (
                             <div key={step.key} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                 {i > 0 && <div style={{ width: "20px", height: "0.5px", background: isDone || isActive ? "var(--accent)" : "var(--border-secondary)" }} />}
                                 <span style={{
                                     color: isDone ? "var(--success-text)" : isActive ? "var(--accent-text)" : "var(--text-tertiary)",
                                     fontWeight: isActive ? 600 : 400,
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "4px",
                                 }}>
-                                    {isDone ? "✓ " : ""}{step.label}
+                                    {isDone ? <CheckCircle2 size={13} aria-hidden /> : <StepIcon size={13} aria-hidden />}{step.label}
                                 </span>
                             </div>
                         );
@@ -615,6 +855,7 @@ export default function ImportPage() {
                 >
                     <span style={{ fontWeight: 600 }}>Hata:</span> {parseError}
                     <button
+                        type="button"
                         onClick={() => setParseError(null)}
                         aria-label="Hata mesajını kapat"
                         style={{ marginLeft: "auto", background: "none", border: "none", color: "var(--danger-text)", cursor: "pointer", fontSize: "14px" }}
@@ -630,9 +871,14 @@ export default function ImportPage() {
                         onDragLeave={() => setDragOver(false)}
                         onDrop={handleDrop}
                         style={{
-                            border: `2px dashed ${dragOver ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                            borderRadius: "8px", padding: "48px 24px", textAlign: "center",
+                            border: `1px dashed ${dragOver ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            borderRadius: "8px",
+                            padding: "18px",
                             background: dragOver ? "rgba(56,139,253,0.07)" : "var(--bg-primary)",
+                            display: "grid",
+                            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+                            gap: "16px",
+                            alignItems: "stretch",
                         }}
                     >
                         <input
@@ -640,57 +886,100 @@ export default function ImportPage() {
                             type="file"
                             accept=".xlsx,.xls,.csv"
                             data-testid="classic-import-file"
+                            aria-label="Excel veya CSV dosyası seç"
                             style={{ display: "none" }}
                             onChange={e => { if (e.target.files?.[0]) handleFileSelect(e.target.files[0]); }}
                         />
-                        <div style={{ width: "56px", height: "56px", margin: "0 auto 16px", background: "var(--accent-bg)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <svg width="24" height="24" viewBox="0 0 22 22" fill="none">
-                                <path d="M11 14V4M11 4L7 8M11 4L15 8" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                <path d="M3 17h16" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                        </div>
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "6px" }}>
-                            {dragOver ? "Dosyayı bırak" : "Dosyanı içe aktar"}
-                        </div>
-                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>
-                            Excel ve CSV dosyalarını destekliyoruz
-                        </div>
-                        <button onClick={() => fileInputRef.current?.click()} style={{
-                            padding: "8px 20px", background: "var(--accent)", color: "#fff",
-                            border: "none", borderRadius: "6px", fontSize: "13px", fontWeight: 600, cursor: "pointer",
-                        }}>Dosya Seç</button>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "8px" }}>veya dosyayı buraya sürükle</div>
-                        <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap", alignItems: "center" }}>
-                            {["XLSX", "XLS", "CSV"].map(ext => (
-                                <span key={ext} style={{ fontSize: "11px", padding: "3px 10px", background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", color: "var(--text-secondary)", fontFamily: "monospace", fontWeight: 600 }}>{ext}</span>
-                            ))}
-                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>· çok-sheet desteklenir · max 25 MB</span>
-                        </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "0", background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", overflow: "hidden" }}>
-                        {[
-                            { icon: "🔍", label: "Dosya Oku" }, { icon: "🗂", label: "Sheet Seç" },
-                            { icon: "🔗", label: "Kolon Eşleştir" }, { icon: "👁", label: "İncele" }, { icon: "✅", label: "İçe Aktar" },
-                        ].map((step, i) => (
-                            <div key={step.label} style={{ flex: 1, textAlign: "center", padding: "10px 8px", borderRight: i < 4 ? "0.5px solid var(--border-tertiary)" : "none", display: "flex", flexDirection: "column", alignItems: "center", gap: "3px" }}>
-                                <span style={{ fontSize: "14px" }}>{step.icon}</span>
-                                <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{step.label}</span>
+                        <div style={{ display: "flex", gap: "14px", alignItems: "center", minWidth: 0 }}>
+                            <div style={{ width: "48px", height: "48px", flex: "0 0 auto", background: "var(--accent-bg)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <Upload size={22} color="var(--accent)" aria-hidden />
                             </div>
-                        ))}
+                            <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: "14px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
+                                    {dragOver ? "Dosyayı bırak" : "Excel/CSV dosyanı yükle"}
+                                </div>
+                                <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5, maxWidth: "680px" }}>
+                                    Şablonlu veya serbest tablo dosyalarını sheet, kolon ve alan bazlı onayla içe aktar.
+                                    Veriler önizleme ve onaydan önce kaydedilmez.
+                                </div>
+                                <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                                    <button type="button" onClick={() => fileInputRef.current?.click()} style={{
+                                        padding: "8px 14px", background: "var(--accent)", color: "#fff",
+                                        border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                                        display: "inline-flex", alignItems: "center", gap: "7px",
+                                    }}><Upload size={15} aria-hidden />Dosya Seç</button>
+                                    <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>veya dosyayı buraya sürükle</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "7px", padding: "12px", background: "var(--bg-secondary)", display: "flex", flexDirection: "column", gap: "10px" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+                                <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" }}>Örnek şablon indir</div>
+                                <Download size={15} color="var(--text-tertiary)" aria-hidden />
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px" }}>
+                                {Object.values(EXCEL_IMPORT_TEMPLATES).map(template => (
+                                    <a
+                                        key={template.kind}
+                                        href={`/api/import/templates?kind=${template.kind}`}
+                                        style={{
+                                            fontSize: "11px",
+                                            padding: "6px 8px",
+                                            borderRadius: "5px",
+                                            border: "0.5px solid var(--border-tertiary)",
+                                            color: "var(--text-secondary)",
+                                            background: "var(--bg-primary)",
+                                            textDecoration: "none",
+                                            whiteSpace: "nowrap",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                        }}
+                                        title={`${template.title} şablonu`}
+                                    >
+                                        {template.title}
+                                    </a>
+                                ))}
+                            </div>
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", lineHeight: 1.45 }}>
+                                PDF, DOCX ve ürün görsel/doküman analizi için üstteki AI Import akışını kullan.
+                            </div>
+                        </div>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: "8px" }}>
                         {[
-                            { title: "Çok-Sheet Desteği", desc: "Excel dosyanızdaki tüm sheetler otomatik tespit edilir." },
-                            { title: "Akıllı Kolon Eşleştirme", desc: "AI kolonları ERP alanlarına eşleştirir, hafızaya kaydedilir." },
-                            { title: "Seçici İçe Aktarım", desc: "Her alanı önizleyin, düzeltin, sonra onaylayın." },
-                        ].map(card => (
+                            { icon: FileSpreadsheet, label: "Dosya" },
+                            { icon: Rows3, label: "Sheet" },
+                            { icon: GitMerge, label: "Kolonlar" },
+                            { icon: Eye, label: "Önizleme" },
+                            { icon: CheckCircle2, label: "Aktarım" },
+                        ].map(step => {
+                            const StepIcon = step.icon;
+                            return (
+                            <div key={step.label} style={{ textAlign: "center", padding: "10px 8px", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", background: "var(--bg-primary)", display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", minWidth: 0 }}>
+                                <StepIcon size={16} color="var(--text-tertiary)" aria-hidden />
+                                <span style={{ fontSize: "10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{step.label}</span>
+                            </div>
+                            );
+                        })}
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "10px" }}>
+                        {[
+                            { icon: Table2, title: "Çok sheet", desc: "Sheetler otomatik tespit edilir; belirsiz olanlar kullanıcı seçimine düşer." },
+                            { icon: ShieldCheck, title: "Kontrollü onay", desc: "Satır ve alan bazında önizleme olmadan kayıt yazılmaz." },
+                            { icon: GitMerge, title: "Kolon hafızası", desc: "Düzelttiğin eşleştirme sonraki dosyalarda hatırlanır." },
+                        ].map(card => {
+                            const CardIcon = card.icon;
+                            return (
                             <div key={card.title} style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "14px 16px" }}>
-                                <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>{card.title}</div>
+                                <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
+                                    <CardIcon size={15} aria-hidden />{card.title}
+                                </div>
                                 <div style={{ fontSize: "11px", color: "var(--text-secondary)", lineHeight: 1.5 }}>{card.desc}</div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </>
             )}
@@ -703,10 +992,10 @@ export default function ImportPage() {
                             <div key={i} style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)", animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
                         ))}
                     </div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>Dosya okunuyor...</div>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>Dosya okunuyor…</div>
                     {fileName && <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginBottom: "20px" }}>{fileName}</div>}
                     <div style={{ maxWidth: "320px", margin: "0 auto", height: "4px", background: "var(--border-tertiary)", borderRadius: "2px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${progress}%`, background: "var(--accent)", borderRadius: "2px", transition: "width 0.35s ease" }} />
+                        <div style={{ height: "100%", width: "100%", transform: `scaleX(${progress / 100})`, transformOrigin: "left", background: "var(--accent)", borderRadius: "2px", transition: "transform 0.35s ease" }} />
                     </div>
                     <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "8px" }}>{progressLabel}</div>
                 </div>
@@ -727,14 +1016,15 @@ export default function ImportPage() {
                         </div>
                         <div style={{ display: "flex", flexDirection: "column" }}>
                             {sheets.map((sheet, idx) => (
-                                <div key={sheet.name} onClick={() => toggleSheet(idx)} style={{
+                                <label key={sheet.name} style={{
                                     display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px",
                                     borderBottom: idx < sheets.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
                                     cursor: sheet.status === "importable" ? "pointer" : "default",
                                     opacity: sheet.status === "unsupported" ? 0.5 : 1,
                                 }}>
                                     <input type="checkbox" checked={sheet.selected} disabled={sheet.status !== "importable"}
-                                        onChange={() => toggleSheet(idx)} onClick={e => e.stopPropagation()}
+                                        aria-label={`${sheet.displayName} sheet seçimi`}
+                                        onChange={() => toggleSheet(idx)}
                                         style={{ cursor: sheet.status === "importable" ? "pointer" : "default", accentColor: "var(--accent)" }} />
                                     <div style={{ flex: 1, minWidth: 0 }}>
                                         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -751,13 +1041,13 @@ export default function ImportPage() {
                                     <span style={{ fontSize: "10px", padding: "2px 8px", background: sheet.status === "importable" ? "var(--success-bg)" : "var(--bg-tertiary)", color: sheet.status === "importable" ? "var(--success-text)" : "var(--text-tertiary)", borderRadius: "10px", whiteSpace: "nowrap" }}>
                                         {sheet.status === "importable" ? "İçe Aktarılabilir" : "Desteklenmiyor"}
                                     </span>
-                                </div>
+                                </label>
                             ))}
                         </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button onClick={reset} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
-                        <button onClick={handleDetectColumns} disabled={isDemo || importableSelected.length === 0}
+                        <button type="button" onClick={reset} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                        <button type="button" onClick={handleDetectColumns} disabled={isDemo || importableSelected.length === 0}
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: (!isDemo && importableSelected.length > 0) ? "var(--accent-bg)" : "var(--bg-tertiary)", color: (!isDemo && importableSelected.length > 0) ? "var(--accent-text)" : "var(--text-tertiary)", cursor: (!isDemo && importableSelected.length > 0) ? "pointer" : "not-allowed", fontWeight: 600 }}>
                             Kolon Eşleştirmeye Geç →
@@ -776,7 +1066,7 @@ export default function ImportPage() {
                                     <div key={i} style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)", animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
                                 ))}
                             </div>
-                            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>Kolonlar algılanıyor...</div>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>Kolonlar algılanıyor…</div>
                             <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>AI kolon adlarını ERP alanlarına eşleştiriyor</div>
                         </div>
                     ) : (
@@ -785,14 +1075,17 @@ export default function ImportPage() {
                             {importableSelected.length > 1 && (
                                 <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                                     {importableSelected.map(s => (
-                                        <button key={s.name} onClick={() => setActiveTab(s.name)} style={tabBtnStyle(activeTab === s.name)}>
+                                        <button type="button" key={s.name} onClick={() => setActiveTab(s.name)} style={tabBtnStyle(activeTab === s.name)}>
                                             {s.displayName}
                                         </button>
                                     ))}
                                 </div>
                             )}
 
-                            {importableSelected.filter(s => !activeTab || s.name === activeTab).map(sheet => {
+                            {importableSelected.reduce<SheetInfo[]>((acc, sheet) => {
+                                if (!activeTab || sheet.name === activeTab) acc.push(sheet);
+                                return acc;
+                            }, []).map(sheet => {
                                 const mappings = columnMappings[sheet.name] ?? [];
                                 const fields = ERP_FIELDS[sheet.entityType ?? ""] ?? [];
 
@@ -848,6 +1141,7 @@ export default function ImportPage() {
                             {/* Remember toggle */}
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <input type="checkbox" id="remember-mappings" checked={rememberMappings}
+                                    aria-label="Kolon eşleştirmesini hatırla"
                                     onChange={e => setRememberMappings(e.target.checked)}
                                     style={{ accentColor: "var(--accent)", cursor: "pointer" }} />
                                 <label htmlFor="remember-mappings" style={{ fontSize: "12px", color: "var(--text-secondary)", cursor: "pointer" }}>
@@ -856,11 +1150,11 @@ export default function ImportPage() {
                             </div>
 
                             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                                <button onClick={() => {
+                                <button type="button" onClick={() => {
                                     if (batchId) { fetch(`/api/import/${batchId}`, { method: "DELETE" }).catch(() => {}); }
                                     setState("sheet_select"); setColumnMappings({}); setBatchId(null);
                                 }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
-                                <button onClick={handleApplyMappings} style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer", fontWeight: 600 }}>
+                                <button type="button" onClick={handleApplyMappings} style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer", fontWeight: 600 }}>
                                     Eşleştirmeyi Uygula →
                                 </button>
                             </div>
@@ -877,7 +1171,7 @@ export default function ImportPage() {
                         {draftEntityTypes.map(type => {
                             const count = drafts.filter(d => d.entity_type === type).length;
                             return (
-                                <button key={type} onClick={() => { setActiveTab(type); setBulkField(""); setBulkValue(""); setPreviewPage(0); }} style={tabBtnStyle(activeTab === type)}>
+                                <button type="button" key={type} onClick={() => { setActiveTab(type); setBulkField(""); setBulkValue(""); setPreviewPage(0); }} style={tabBtnStyle(activeTab === type)}>
                                     {entityTypeLabels[type] ?? type}
                                     <span style={{ marginLeft: "5px", fontSize: "10px", opacity: 0.7 }}>{count}</span>
                                 </button>
@@ -888,15 +1182,21 @@ export default function ImportPage() {
                     {/* Summary + bulk fill */}
                     {(() => {
                         const entityFields = ERP_FIELDS[activeTab] ?? [];
+                        const warningRows = filteredDrafts.filter(d => (d.row_errors?.length ?? 0) > 0 || (d.risk_flags?.length ?? 0) > 0).length;
+                        const skippedFieldCount = filteredDrafts.reduce((sum, draft) => {
+                            const approvals = draftApprovals[draft.id] ?? normalizeDraftApprovals(draft);
+                            return sum + Object.values(approvals).filter(v => v === "skip").length;
+                        }, 0);
                         const applyBulkFill = () => {
                             if (!bulkField || bulkValue === "") return;
                             const ids = filteredDrafts.map(d => d.id);
+                            const draftById = new Map(filteredDrafts.map(d => [d.id, d]));
                             setDraftEdits(prev => {
                                 const next = { ...prev };
                                 for (const id of ids) {
                                     const existing = prev[id] ?? {};
                                     // Only fill if empty
-                                    const currentVal = existing[bulkField] ?? (filteredDrafts.find(d => d.id === id)?.parsed_data as Record<string, unknown> ?? {})[bulkField];
+                                    const currentVal = existing[bulkField] ?? (draftById.get(id)?.parsed_data as Record<string, unknown> ?? {})[bulkField];
                                     if (currentVal === undefined || currentVal === null || currentVal === "") {
                                         next[id] = { ...existing, [bulkField]: bulkValue };
                                     }
@@ -920,16 +1220,23 @@ export default function ImportPage() {
                         return (
                             <div style={{ display: "flex", gap: "8px", padding: "10px 14px", background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", fontSize: "12px", flexWrap: "wrap", alignItems: "center" }}>
                                 <span style={{ color: "var(--text-secondary)" }}>Toplam: <strong>{filteredDrafts.length}</strong> satır</span>
-                                <span style={{ color: "var(--text-tertiary)", fontSize: "11px", marginRight: "auto" }}>Hücreye tıkla → düzelt</span>
+                                {warningRows > 0 && <span style={{ color: "var(--warning-text)", fontSize: "11px" }}>{warningRows} satır gözden geçirme istiyor</span>}
+                                {skippedFieldCount > 0 && <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>{skippedFieldCount} alan atlanacak</span>}
+                                {batchId && (
+                                    <Link href={`/api/import/${batchId}/report?format=xlsx`} style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "var(--accent-text)", textDecoration: "none", marginRight: "auto" }}>
+                                        <Download size={13} /> Rapor XLSX
+                                    </Link>
+                                )}
+                                {!batchId && <span style={{ color: "var(--text-tertiary)", fontSize: "11px", marginRight: "auto" }}>Hücreye tıkla → düzelt</span>}
                                 {/* Bulk fill */}
                                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Toplu doldur:</span>
-                                <select value={bulkField} onChange={e => setBulkField(e.target.value)} style={{ fontSize: "11px", padding: "3px 6px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px" }}>
+                                <select aria-label="Toplu doldurulacak alan" value={bulkField} onChange={e => setBulkField(e.target.value)} style={{ fontSize: "11px", padding: "3px 6px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px" }}>
                                     <option value="">Alan seç</option>
                                     {entityFields.map(f => <option key={f.field} value={f.field}>{f.label}</option>)}
                                 </select>
-                                <input value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Değer..." onKeyDown={e => { if (e.key === "Enter") applyBulkFill(); }}
+                                <input aria-label="Toplu doldurma değeri" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Değer…" onKeyDown={e => { if (e.key === "Enter") applyBulkFill(); }}
                                     style={{ fontSize: "11px", padding: "3px 8px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", width: "120px" }} />
-                                <button onClick={applyBulkFill} disabled={!bulkField || bulkValue === ""} style={{ fontSize: "11px", padding: "3px 10px", background: bulkField && bulkValue ? "var(--accent-bg)" : "var(--bg-tertiary)", color: bulkField && bulkValue ? "var(--accent-text)" : "var(--text-tertiary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: bulkField && bulkValue ? "pointer" : "not-allowed" }}>
+                                <button type="button" onClick={applyBulkFill} disabled={!bulkField || bulkValue === ""} style={{ fontSize: "11px", padding: "3px 10px", background: bulkField && bulkValue ? "var(--accent-bg)" : "var(--bg-tertiary)", color: bulkField && bulkValue ? "var(--accent-text)" : "var(--text-tertiary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: bulkField && bulkValue ? "pointer" : "not-allowed" }}>
                                     Boşlara Uygula
                                 </button>
                             </div>
@@ -946,24 +1253,32 @@ export default function ImportPage() {
                         const required = REQUIRED_FIELDS[filteredDrafts[0].entity_type] ?? [];
                         const fieldSet = new Set<string>();
                         for (const d of filteredDrafts) {
-                            for (const k of Object.keys((d.parsed_data ?? {}) as Record<string, unknown>)) fieldSet.add(k);
+                            for (const k of Object.keys((d.parsed_data ?? {}) as Record<string, unknown>)) {
+                                if (!INTERNAL_IMPORT_FIELDS.has(k)) fieldSet.add(k);
+                            }
                             const edits = draftEdits[d.id];
-                            if (edits) { for (const k of Object.keys(edits)) fieldSet.add(k); }
+                            if (edits) {
+                                for (const k of Object.keys(edits)) {
+                                    if (!INTERNAL_IMPORT_FIELDS.has(k)) fieldSet.add(k);
+                                }
+                            }
                         }
                         // Required fields always shown (even if unmapped), then the rest
                         const visibleFields = [
-                            ...required,
+                            ...required.filter(f => !INTERNAL_IMPORT_FIELDS.has(f)),
                             ...[...fieldSet].filter(f => !required.includes(f)),
                         ];
+                        const fieldLabels = new Map((ERP_FIELDS[activeTab] ?? []).map(f => [f.field, f.label]));
 
                         return (
                             <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "auto" }}>
                                 {/* Table header */}
-                                <div style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(110px, 1fr))`, borderBottom: "0.5px solid var(--border-secondary)", background: "var(--bg-secondary)", minWidth: "600px" }}>
-                                    <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)" }}>#</div>
+                                <div style={{ display: "grid", gridTemplateColumns: `72px repeat(${visibleFields.length}, minmax(150px, 1fr))`, borderBottom: "0.5px solid var(--border-secondary)", background: "var(--bg-secondary)", minWidth: "760px" }}>
+                                    <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)" }}>Satır</div>
                                     {visibleFields.map(f => (
-                                        <div key={f} style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: required.includes(f) ? "var(--accent-text)" : "var(--text-secondary)", borderLeft: "0.5px solid var(--border-tertiary)" }}>
-                                            {f}{required.includes(f) ? " *" : ""}
+                                        <div key={f} style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: required.includes(f) ? "var(--accent-text)" : "var(--text-secondary)", borderLeft: "0.5px solid var(--border-tertiary)", display: "flex", gap: "6px", alignItems: "center", minWidth: 0 }}>
+                                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fieldLabels.get(f) ?? f}{required.includes(f) ? " *" : ""}</span>
+                                            {FINANCIAL_IMPORT_FIELDS.has(f) && <span style={{ fontSize: "9px", color: "var(--warning-text)", border: "0.5px solid var(--warning-border)", borderRadius: "999px", padding: "1px 5px", flexShrink: 0 }}>finans</span>}
                                         </div>
                                     ))}
                                 </div>
@@ -975,20 +1290,25 @@ export default function ImportPage() {
                                         return v === undefined || v === null || v === "";
                                     });
                                     return (
-                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `32px repeat(${visibleFields.length}, minmax(110px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "0.5px solid var(--border-tertiary)" : "none", background: rowHasMissing ? "rgba(var(--danger-rgb,248,81,73),0.06)" : globalIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "600px" }}>
-                                            <div style={{ padding: "6px 12px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", alignItems: "center" }}>
-                                                {rowHasMissing ? <span style={{ color: "var(--warning-text)", fontSize: "12px" }}>⚠</span> : globalIdx + 1}
+                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `72px repeat(${visibleFields.length}, minmax(150px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "0.5px solid var(--border-tertiary)" : "none", background: rowHasMissing ? "rgba(var(--danger-rgb,248,81,73),0.06)" : globalIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "760px" }}>
+                                            <div style={{ padding: "6px 10px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", justifyContent: "center", gap: "3px", minHeight: "42px" }}>
+                                                <span style={{ color: rowHasMissing ? "var(--warning-text)" : "var(--text-secondary)", fontWeight: 600 }}>{draft.row_number ?? globalIdx + 1}</span>
+                                                <span style={{ fontSize: "10px", color: draft.match_status === "blocked" ? "var(--danger-text)" : draft.match_status === "ambiguous" ? "var(--warning-text)" : "var(--text-tertiary)" }}>
+                                                    {draft.match_status ?? "new"}
+                                                </span>
                                             </div>
                                             {visibleFields.map(f => {
                                                 const val = getEffectiveValue(draft, f);
                                                 const isEditing = editingCell?.draftId === draft.id && editingCell?.field === f;
                                                 const isEmpty = required.includes(f) && (val === undefined || val === null || val === "");
+                                                const approval = getFieldApproval(draft, f);
+                                                const isSkipped = approval === "skip";
                                                 return (
-                                                    <div key={f} style={{ borderLeft: "0.5px solid var(--border-tertiary)", position: "relative" }}
-                                                        onClick={() => { if (!isEditing) startEdit(draft.id, f, val); }}>
+                                                    <div key={f} style={{ borderLeft: "0.5px solid var(--border-tertiary)", position: "relative" }}>
                                                         {isEditing ? (
                                                             <input
-                                                                autoFocus
+                                                                ref={editInputRef}
+                                                                aria-label={`${fieldLabels.get(f) ?? f} değeri`}
                                                                 value={editingValue}
                                                                 onChange={e => setEditingValue(e.target.value)}
                                                                 onBlur={() => commitEdit(draft.id, f)}
@@ -996,8 +1316,36 @@ export default function ImportPage() {
                                                                 style={{ width: "100%", padding: "6px 12px", background: "var(--accent-bg)", border: "none", borderTop: "1.5px solid var(--accent)", fontSize: "12px", color: "var(--text-primary)", boxSizing: "border-box" }}
                                                             />
                                                         ) : (
-                                                            <div style={{ padding: "6px 12px", fontSize: "12px", color: isEmpty ? "var(--danger-text)" : "var(--text-primary)", cursor: "pointer", outline: isEmpty ? "1px solid var(--danger-border)" : "none", minHeight: "30px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                                {val !== undefined && val !== null && val !== "" ? String(val) : <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>boş</span>}
+                                                            <div style={{ padding: "6px 10px", fontSize: "12px", color: isSkipped ? "var(--text-tertiary)" : isEmpty ? "var(--danger-text)" : "var(--text-primary)", outline: isEmpty && !isSkipped ? "1px solid var(--danger-border)" : "none", minHeight: "42px", display: "grid", gridTemplateColumns: "18px minmax(0, 1fr)", alignItems: "center", gap: "6px", opacity: isSkipped ? 0.62 : 1 }}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={!isSkipped}
+                                                                    aria-label={`${fieldLabels.get(f) ?? f} alanını uygula`}
+                                                                    title={isSkipped ? "Bu alan aktarımda atlanacak" : "Bu alan aktarımda uygulanacak"}
+                                                                    onClick={e => e.stopPropagation()}
+                                                                    onChange={e => void setFieldApproval(draft, f, e.target.checked ? "apply" : "skip")}
+                                                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)" }}
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    aria-label={`${fieldLabels.get(f) ?? f} alanını düzenle`}
+                                                                    onClick={() => startEdit(draft.id, f, val)}
+                                                                    style={{
+                                                                        minWidth: 0,
+                                                                        padding: 0,
+                                                                        border: "none",
+                                                                        background: "transparent",
+                                                                        color: "inherit",
+                                                                        cursor: "pointer",
+                                                                        textAlign: "left",
+                                                                        overflow: "hidden",
+                                                                        textOverflow: "ellipsis",
+                                                                        whiteSpace: "nowrap",
+                                                                        textDecoration: isSkipped ? "line-through" : "none",
+                                                                    }}
+                                                                >
+                                                                    {val !== undefined && val !== null && val !== "" ? String(val) : <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}>boş</span>}
+                                                                </button>
                                                             </div>
                                                         )}
                                                     </div>
@@ -1010,12 +1358,12 @@ export default function ImportPage() {
                                     const totalPages = Math.ceil(filteredDrafts.length / PAGE_SIZE);
                                     return (
                                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "10px 12px", background: "var(--bg-secondary)", borderTop: "0.5px solid var(--border-tertiary)", fontSize: "12px", color: "var(--text-secondary)" }}>
-                                            <button onClick={() => setPreviewPage(p => Math.max(0, p - 1))} disabled={previewPage === 0}
+                                            <button type="button" onClick={() => setPreviewPage(p => Math.max(0, p - 1))} disabled={previewPage === 0}
                                                 style={{ fontSize: "12px", padding: "4px 12px", background: previewPage === 0 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage === 0 ? "var(--text-tertiary)" : "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage === 0 ? "not-allowed" : "pointer" }}>
                                                 ← Önceki
                                             </button>
                                             <span>Sayfa {previewPage + 1} / {totalPages} (toplam {filteredDrafts.length} satır)</span>
-                                            <button onClick={() => setPreviewPage(p => Math.min(totalPages - 1, p + 1))} disabled={previewPage >= totalPages - 1}
+                                            <button type="button" onClick={() => setPreviewPage(p => Math.min(totalPages - 1, p + 1))} disabled={previewPage >= totalPages - 1}
                                                 style={{ fontSize: "12px", padding: "4px 12px", background: previewPage >= totalPages - 1 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage >= totalPages - 1 ? "var(--text-tertiary)" : "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage >= totalPages - 1 ? "not-allowed" : "pointer" }}>
                                                 Sonraki →
                                             </button>
@@ -1034,14 +1382,14 @@ export default function ImportPage() {
                         ).length;
                         return missingCount > 0 ? (
                             <div style={{ padding: "8px 14px", background: "var(--warning-bg)", border: "0.5px solid var(--warning-border)", borderRadius: "6px", fontSize: "12px", color: "var(--warning-text)" }}>
-                                ⚠ {missingCount} satırda zorunlu alan eksik (*). İçe aktarımda bu satırlar atlanabilir.
+                                {missingCount} satırda zorunlu alan eksik (*). İçe aktarımda bu satırlar atlanabilir.
                             </div>
                         ) : null;
                     })()}
 
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button onClick={() => { setState("column_mapping"); setDrafts([]); }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
-                        <button onClick={handleImport} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        <button type="button" onClick={() => { setState("column_mapping"); setDrafts([]); }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                        <button type="button" onClick={handleImport} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                             style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: isDemo ? "var(--bg-tertiary)" : "var(--accent-bg)", color: isDemo ? "var(--text-tertiary)" : "var(--accent-text)", cursor: isDemo ? "not-allowed" : "pointer", fontWeight: 600, opacity: isDemo ? 0.5 : 1 }}>
                             Onayla ve İçe Aktar →
                         </button>
@@ -1052,9 +1400,12 @@ export default function ImportPage() {
             {/* ───── IMPORTING ───── */}
             {state === "importing" && (
                 <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "24px" }}>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "20px" }}>İçe aktarılıyor...</div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "20px" }}>İçe aktarılıyor…</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-                        {sheets.filter(s => s.status === "importable" && s.selected).map(sheet => {
+                        {sheets.reduce<SheetInfo[]>((acc, sheet) => {
+                            if (sheet.status === "importable" && sheet.selected) acc.push(sheet);
+                            return acc;
+                        }, []).map(sheet => {
                             const count = importProgress[sheet.name] ?? 0;
                             const total = sheet.rows;
                             const pct = total > 0 ? Math.round((count / total) * 100) : 0;
@@ -1068,7 +1419,7 @@ export default function ImportPage() {
                                         </span>
                                     </div>
                                     <div style={{ height: "5px", background: "var(--border-tertiary)", borderRadius: "3px", overflow: "hidden" }}>
-                                        <div style={{ height: "100%", width: `${pct}%`, background: done ? "var(--success)" : "var(--accent)", borderRadius: "3px", transition: "width 0.2s ease" }} />
+                                        <div style={{ height: "100%", width: "100%", transform: `scaleX(${pct / 100})`, transformOrigin: "left", background: done ? "var(--success)" : "var(--accent)", borderRadius: "3px", transition: "transform 0.2s ease" }} />
                                     </div>
                                 </div>
                             );
@@ -1130,6 +1481,7 @@ export default function ImportPage() {
                         const ENTITY_LABELS: Record<string, string> = {
                             customer:   "Müşteri",
                             product:    "Ürün",
+                            vendor:     "Tedarikçi",
                             quote:      "Teklif",
                             order:      "Sipariş",
                             order_line: "Sipariş Satırı",
@@ -1138,9 +1490,10 @@ export default function ImportPage() {
                             invoice:    "Fatura",
                             payment:    "Tahsilat",
                         };
-                        const rows = Object.entries(confirmResult.byEntity)
-                            .filter(([, c]) => c.added + c.updated + c.skipped > 0)
-                            .map(([key, c]) => ({ key, label: ENTITY_LABELS[key] ?? key, ...c }));
+                        const rows = Object.entries(confirmResult.byEntity).reduce<Array<{ key: string; label: string; added: number; updated: number; skipped: number }>>((acc, [key, c]) => {
+                            if (c.added + c.updated + c.skipped > 0) acc.push({ key, label: ENTITY_LABELS[key] ?? key, ...c });
+                            return acc;
+                        }, []);
                         if (rows.length === 0) return null;
                         return (
                             <div style={{ marginBottom: "16px", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", overflow: "hidden" }}>
@@ -1148,7 +1501,7 @@ export default function ImportPage() {
                                     display: "grid",
                                     gridTemplateColumns: "1fr 90px 90px 90px",
                                     fontSize: "10px", fontWeight: 600,
-                                    color: "var(--text-tertiary)", letterSpacing: "0.06em",
+                                    color: "var(--text-tertiary)", letterSpacing: 0,
                                     padding: "8px 12px",
                                     background: "var(--bg-secondary)",
                                     borderBottom: "0.5px solid var(--border-tertiary)",
@@ -1180,17 +1533,27 @@ export default function ImportPage() {
                         <div style={{ marginBottom: "16px", background: "var(--danger-bg)", border: "0.5px solid var(--danger-border)", borderRadius: "6px", padding: "12px 14px" }}>
                             <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "8px" }}>{confirmResult.errors.length} satırda sorun oluştu</div>
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                {confirmResult.errors.map((err, i) => (
-                                    <div key={i} style={{ fontSize: "11px", color: "var(--text-secondary)" }}>· {err}</div>
+                                {confirmResult.errors.map((err) => (
+                                    <div key={err} style={{ fontSize: "11px", color: "var(--text-secondary)" }}>· {err}</div>
                                 ))}
                             </div>
                         </div>
                     )}
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                        {batchId && (
+                            <>
+                                <Link href={`/api/import/${batchId}/report?format=xlsx`} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-secondary)", color: "var(--text-primary)", textDecoration: "none", fontWeight: 500 }}>
+                                    <Download size={14} /> Rapor XLSX
+                                </Link>
+                                <Link href={`/api/import/${batchId}/report?format=csv`} style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-secondary)", color: "var(--text-primary)", textDecoration: "none", fontWeight: 500 }}>
+                                    Rapor CSV
+                                </Link>
+                            </>
+                        )}
                         <Link href="/dashboard/customers" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Cariler sayfasına git →</Link>
                         <Link href="/dashboard/orders" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Siparişler sayfasına git →</Link>
                         <Link href="/dashboard/products" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Stok & Ürünler →</Link>
-                        <button onClick={reset} style={{ fontSize: "12px", padding: "6px 16px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>Yeni Dosya Yükle</button>
+                        <button type="button" onClick={reset} style={{ fontSize: "12px", padding: "6px 16px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>Yeni Dosya Yükle</button>
                     </div>
                 </div>
             )}

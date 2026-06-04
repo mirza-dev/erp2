@@ -17,10 +17,12 @@ import {
 } from "@/lib/supabase/import-document-lines";
 import { dbGetImportDocument } from "@/lib/supabase/import-documents";
 import { dbGetProductById } from "@/lib/supabase/products";
-import { dbGetProductType } from "@/lib/supabase/product-types";
+import { dbGetProductType, dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
 import { requireRole } from "@/lib/auth/role-guard";
 import { createClient } from "@/lib/supabase/server";
 import { handleApiError } from "@/lib/api-error";
+import { normalizeTechnicalEvidence } from "@/lib/technical-templates";
+import type { TechnicalExtractionEvidence } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
@@ -108,6 +110,53 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             }
         }
 
+        let attributesPatch: Record<string, unknown> | undefined = undefined;
+        if (body.extracted_attributes !== undefined) {
+            if (!body.extracted_attributes || typeof body.extracted_attributes !== "object" || Array.isArray(body.extracted_attributes)) {
+                return NextResponse.json({ error: "extracted_attributes obje olmalı." }, { status: 400 });
+            }
+            attributesPatch = body.extracted_attributes as Record<string, unknown>;
+        }
+
+        let evidencePatch: TechnicalExtractionEvidence | undefined = undefined;
+        const shouldRevalidateAttributes = attributesPatch !== undefined || productTypeIdPatch !== undefined;
+        if (shouldRevalidateAttributes) {
+            const effectiveTypeId = productTypeIdPatch !== undefined ? productTypeIdPatch : existing.product_type_id;
+            let nextAttributes = attributesPatch ?? existing.extracted_attributes ?? {};
+
+            if (!effectiveTypeId) {
+                if (Object.keys(nextAttributes).length > 0) {
+                    return NextResponse.json({ error: "Teknik özellik için önce teknik şablon seçin." }, { status: 400 });
+                }
+                evidencePatch = {};
+            } else {
+                const typeWithFields = await dbGetProductTypeWithFields(effectiveTypeId);
+                if (!typeWithFields || typeWithFields.is_active === false) {
+                    return NextResponse.json({ error: "Teknik şablon aktif değil veya bulunamadı." }, { status: 400 });
+                }
+                const allowedKeys = new Set(typeWithFields.fields.map(f => f.field_key));
+                if (attributesPatch === undefined && productTypeIdPatch !== undefined) {
+                    nextAttributes = Object.fromEntries(
+                        Object.entries(nextAttributes).filter(([key]) => allowedKeys.has(key)),
+                    );
+                    attributesPatch = nextAttributes;
+                }
+                const unknownKeys = Object.keys(nextAttributes).filter(key => !allowedKeys.has(key));
+                if (unknownKeys.length > 0) {
+                    return NextResponse.json(
+                        { error: `Teknik şablonda olmayan alanlar: ${unknownKeys.join(", ")}` },
+                        { status: 400 },
+                    );
+                }
+                const rawEvidence = (
+                    body.extraction_evidence && typeof body.extraction_evidence === "object" && !Array.isArray(body.extraction_evidence)
+                        ? body.extraction_evidence
+                        : existing.extraction_evidence ?? {}
+                ) as Record<string, unknown>;
+                evidencePatch = normalizeTechnicalEvidence(rawEvidence, new Set(Object.keys(nextAttributes)));
+            }
+        }
+
         // Reviewer bilgisi
         const sb = await createClient();
         const { data: { user } } = await sb.auth.getUser();
@@ -120,6 +169,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             match_confidence: confidence,
             reviewed_by: user?.id ?? null,
             product_type_id: productTypeIdPatch,
+            extracted_attributes: attributesPatch,
+            extraction_evidence: evidencePatch,
         });
 
         return NextResponse.json({ ok: true, line: updated });

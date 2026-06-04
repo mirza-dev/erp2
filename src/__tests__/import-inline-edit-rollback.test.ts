@@ -91,9 +91,29 @@ describe("PATCH /api/import/drafts/[id] — inline edit backend", () => {
         const res = await PATCH(makeReq({ status: "confirmed", user_corrections: { sku: "ABC-001" } }), PARAMS);
         expect(res.status).toBe(200);
         expect(mockDbUpdateDraft).toHaveBeenCalledWith("draft-abc", {
+            field_approvals: undefined,
             status: "confirmed",
             user_corrections: { sku: "ABC-001" },
         });
+    });
+
+    it("field_approvals apply/skip/clear değerlerini kabul eder", async () => {
+        mockDbUpdateDraft.mockResolvedValue({
+            id: "draft-abc",
+            status: "pending",
+            field_approvals: { sku: "apply", price: "skip", notes: "clear" },
+        });
+        const res = await PATCH(makeReq({ field_approvals: { sku: "apply", price: "skip", notes: "clear" } }), PARAMS);
+        expect(res.status).toBe(200);
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith("draft-abc", expect.objectContaining({
+            field_approvals: { sku: "apply", price: "skip", notes: "clear" },
+        }));
+    });
+
+    it("field_approvals geçersiz değer gönderirse 400 döner ve DB yazmaz", async () => {
+        const res = await PATCH(makeReq({ field_approvals: { price: "yes" } }), PARAMS);
+        expect(res.status).toBe(400);
+        expect(mockDbUpdateDraft).not.toHaveBeenCalled();
     });
 });
 

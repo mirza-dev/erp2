@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
+import Link from "next/link";
 import Sidebar from "@/components/layout/Sidebar";
 import Topbar from "@/components/layout/Topbar";
 import { DataProvider } from "@/lib/data-context";
@@ -18,14 +19,14 @@ export default function DashboardLayout({
 }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isDemo] = useState(() => isDemoMode());
-    const router = useRouter();
+    const { push } = useRouter();
 
     const handleLoginFromDemo = (e: React.MouseEvent<HTMLAnchorElement>) => {
         e.preventDefault();
         // Demo cookie'yi login öncesi temizle — login sayfasında auth flow başlasa da
         // ortada demo cookie kalmasın, kullanıcı vazgeçerse stale cookie kalmasın
         clearDemoMode();
-        router.push("/login");
+        push("/login");
     };
 
     return (
@@ -37,7 +38,7 @@ export default function DashboardLayout({
                     style={{
                         minHeight: "100vh",
                         display: "grid",
-                        gridTemplateColumns: "200px 1fr",
+                        gridTemplateColumns: "var(--sidebar-width) 1fr",
                         gridTemplateRows: "52px 1fr",
                     }}
                 >
@@ -63,13 +64,13 @@ export default function DashboardLayout({
                         {isDemo && (
                             <DemoBanner storageKey="demo-readonly">
                                 Demo modundasınız — değişiklik yapabilmek için{" "}
-                                <a
+                                <Link
                                     href="/login"
                                     onClick={handleLoginFromDemo}
                                     style={{ color: "var(--accent-text)", textDecoration: "underline" }}
                                 >
                                     giriş yapın
-                                </a>.
+                                </Link>.
                             </DemoBanner>
                         )}
                         <Suspense fallback={null}>
@@ -82,8 +83,10 @@ export default function DashboardLayout({
                 {/* Sidebar — mobile drawer */}
                 {sidebarOpen && (
                     <>
-                        <div
+                        <button
+                            type="button"
                             className="sidebar-mobile-backdrop"
+                            aria-label="Menüyü kapat"
                             onClick={() => setSidebarOpen(false)}
                             style={{
                                 position: "fixed",
@@ -91,6 +94,9 @@ export default function DashboardLayout({
                                 top: "52px",
                                 background: "rgba(0,0,0,0.5)",
                                 zIndex: 99,
+                                border: 0,
+                                padding: 0,
+                                cursor: "pointer",
                             }}
                         />
                         <div

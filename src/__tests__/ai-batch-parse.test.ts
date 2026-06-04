@@ -90,6 +90,38 @@ describe("aiBatchParse — §7.2 graceful degradation: AI unavailable (no API ke
         const result = await aiBatchParse({ entity_type: "customer", rows: threeRows });
         expect(result.items).toHaveLength(3);
     });
+
+    it("fallback maps vendor rows without price/cost fields", async () => {
+        const result = await aiBatchParse({
+            entity_type: "vendor",
+            rows: [{
+                tedarikci_adi: "Acme Makine",
+                email: "satis@acme.com",
+                tedarik_suresi_gun: "14",
+                fiyat: "999",
+            }],
+        });
+
+        expect(result.items[0].parsed_data).toMatchObject({
+            name: "Acme Makine",
+            contact_email: "satis@acme.com",
+            lead_time_days: 14,
+        });
+        expect(result.items[0].parsed_data).not.toHaveProperty("price");
+        expect(result.items[0].parsed_data).not.toHaveProperty("cost_price");
+    });
+
+    it("fallback maps stock rows to sku and on_hand", async () => {
+        const result = await aiBatchParse({
+            entity_type: "stock",
+            rows: [{ urun_kodu: "GV-050", stok_miktari: "42" }],
+        });
+
+        expect(result.items[0].parsed_data).toMatchObject({
+            sku: "GV-050",
+            on_hand: 42,
+        });
+    });
 });
 
 // ─── §7.2 Graceful degradation — unsupported entity type ────────────────────

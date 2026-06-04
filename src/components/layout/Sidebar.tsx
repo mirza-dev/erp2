@@ -3,6 +3,25 @@
 import { memo, useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import {
+    Boxes,
+    Building2,
+    ClipboardList,
+    Factory,
+    FileText,
+    LayoutDashboard,
+    NotebookText,
+    RefreshCw,
+    Settings,
+    ShoppingBag,
+    SlidersHorizontal,
+    TrendingUp,
+    TriangleAlert,
+    Truck,
+    UploadCloud,
+    Users,
+    type LucideIcon,
+} from "lucide-react";
 import { useData } from "@/lib/data-context";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
 import { requiredPermissionForPath } from "@/lib/auth/page-access";
@@ -11,11 +30,15 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 interface NavItem {
     label: string;
     href: string;
+    icon: LucideIcon;
     count?: number;
+    countTone?: "info" | "warning" | "danger";
+    exact?: boolean;
 }
 
 interface NavGroup {
-    label: string;
+    id: string;
+    label?: string;
     items: NavItem[];
 }
 
@@ -48,49 +71,60 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
 
     const navGroups: NavGroup[] = useMemo(() => [
         {
-            label: "Operasyon",
+            id: "home",
             items: [
-                { label: "Dashboard", href: "/dashboard" },
-                { label: "Teklifler", href: "/dashboard/quotes" },
-                { label: "Satış Siparişleri", href: "/dashboard/orders", count: pendingOrderCount || undefined },
-                { label: "Stok & Ürünler", href: "/dashboard/products" },
+                { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, exact: true },
             ],
         },
         {
+            id: "sales",
+            label: "Satış",
+            items: [
+                { label: "Teklifler", href: "/dashboard/quotes", icon: FileText },
+                { label: "Satış Siparişleri", href: "/dashboard/orders", icon: ClipboardList, count: pendingOrderCount || undefined, countTone: "info" },
+                { label: "Cariler", href: "/dashboard/customers", icon: Building2 },
+            ],
+        },
+        {
+            id: "purchase",
             label: "Satın Alma",
             items: [
-                { label: "Öneriler", href: "/dashboard/purchase/suggested", count: reorderCount || undefined },
-                { label: "Satın Alma Siparişleri", href: "/dashboard/purchase/orders" },
-                { label: "Tedarikçiler", href: "/dashboard/vendors" },
+                { label: "Öneriler", href: "/dashboard/purchase/suggested", icon: TrendingUp, count: reorderCount || undefined, countTone: "warning" },
+                { label: "Satın Alma Siparişleri", href: "/dashboard/purchase/orders", icon: ShoppingBag },
+                { label: "Tedarikçiler", href: "/dashboard/vendors", icon: Truck },
             ],
         },
         {
-            label: "Üretim",
+            id: "stock-production",
+            label: "Stok & Üretim",
             items: [
-                { label: "Üretim Girişi", href: "/dashboard/production" },
+                { label: "Stok & Ürünler", href: "/dashboard/products", icon: Boxes },
+                { label: "Üretim Girişi", href: "/dashboard/production", icon: Factory },
+                { label: "Uyarılar", href: "/dashboard/alerts", icon: TriangleAlert, count: activeAlertCount || undefined, countTone: "danger" },
             ],
         },
         {
-            label: "Otomasyon",
+            id: "data",
+            label: "Veri",
             items: [
-                { label: "AI İçeri Aktar", href: "/dashboard/import" },
-                { label: "Üretim & Stok Uyarıları", href: "/dashboard/alerts", count: activeAlertCount || undefined },
+                { label: "Veri Aktarım Merkezi", href: "/dashboard/import", icon: UploadCloud },
             ],
         },
         {
-            label: "Muhasebe",
+            id: "finance",
+            label: "Finans",
             items: [
-                { label: "Paraşüt Sync", href: "/dashboard/parasut" },
-                { label: "Cariler", href: "/dashboard/customers" },
+                { label: "Paraşüt Sync", href: "/dashboard/parasut", icon: RefreshCw },
             ],
         },
         {
+            id: "system",
             label: "Sistem",
             items: [
-                { label: "Ayarlar", href: "/dashboard/settings" },
-                { label: "Ürün Tipleri", href: "/dashboard/settings/product-types" },
-                { label: "Not Şablonları", href: "/dashboard/settings/note-templates" },
-                { label: "Kullanıcılar", href: "/dashboard/settings/users" },
+                { label: "Ayarlar", href: "/dashboard/settings", icon: Settings, exact: true },
+                { label: "Teknik Şablonlar", href: "/dashboard/settings/product-types", icon: SlidersHorizontal },
+                { label: "Not Şablonları", href: "/dashboard/settings/note-templates", icon: NotebookText },
+                { label: "Kullanıcılar", href: "/dashboard/settings/users", icon: Users },
             ],
         },
     ], [reorderCount, pendingOrderCount, activeAlertCount]);
@@ -100,50 +134,67 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
     // boş kalan grup başlığı da gizlenir.
     const visibleGroups = useMemo(() => {
         if (perms === null) return navGroups;
-        return navGroups
-            .map(g => ({
-                ...g,
-                items: g.items.filter(it => {
-                    const req = requiredPermissionForPath(it.href);
-                    return req === null || perms.has(req);
-                }),
-            }))
-            .filter(g => g.items.length > 0);
+        return navGroups.reduce<NavGroup[]>((groups, group) => {
+            const items = group.items.filter(item => {
+                const req = requiredPermissionForPath(item.href);
+                return req === null || perms.has(req);
+            });
+            if (items.length > 0) {
+                groups.push({ ...group, items });
+            }
+            return groups;
+        }, []);
     }, [navGroups, perms]);
 
-    const isActive = (href: string) =>
-        href === "/dashboard"
-            ? pathname === href
-            : pathname.startsWith(href);
+    const isActive = (item: NavItem) =>
+        item.exact
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + "/");
+
+    const badgeColors = (tone: NavItem["countTone"] = "danger") => {
+        if (tone === "info") {
+            return { background: "var(--accent-bg)", color: "var(--accent-text)", border: "var(--accent-border)" };
+        }
+        if (tone === "warning") {
+            return { background: "var(--warning-bg)", color: "var(--warning-text)", border: "var(--warning-border)" };
+        }
+        return { background: "var(--danger-bg)", color: "var(--danger-text)", border: "var(--danger-border)" };
+    };
 
     return (
         <aside
             style={{
                 background: "var(--bg-primary)",
                 borderRight: "0.5px solid var(--border-tertiary)",
-                padding: "12px 0",
+                padding: "10px 8px 12px",
                 display: "flex",
                 flexDirection: "column",
-                gap: "1px",
+                gap: "2px",
                 overflowY: "auto",
                 height: "100%",
+                boxSizing: "border-box",
             }}
         >
             {visibleGroups.map((group) => (
-                <div key={group.label}>
-                    <div
-                        style={{
-                            padding: "14px 16px 5px",
-                            fontSize: "11px",
-                            color: "var(--text-tertiary)",
-                            letterSpacing: "0.06em",
-                            textTransform: "uppercase",
-                        }}
-                    >
-                        {group.label}
-                    </div>
+                <div key={group.id} style={{ marginTop: group.label ? "7px" : 0 }}>
+                    {group.label && (
+                        <div
+                            style={{
+                                padding: "10px 10px 5px",
+                                fontSize: "10px",
+                                color: "var(--text-tertiary)",
+                                letterSpacing: 0,
+                                textTransform: "uppercase",
+                                fontWeight: 650,
+                            }}
+                        >
+                            {group.label}
+                        </div>
+                    )}
                     {group.items.map((item) => {
-                        const active = isActive(item.href);
+                        const active = isActive(item);
+                        const Icon = item.icon;
+                        const badge = badgeColors(item.countTone);
                         return (
                             <Link
                                 key={item.href}
@@ -153,48 +204,88 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                                     display: "flex",
                                     alignItems: "center",
                                     gap: "10px",
-                                    padding: "8px 16px",
+                                    minHeight: "36px",
+                                    padding: "0 9px 0 10px",
                                     fontSize: "13px",
+                                    fontWeight: active ? 650 : 500,
                                     color: active ? "var(--accent-text)" : "var(--text-secondary)",
-                                    background: active ? "var(--accent-bg)" : "transparent",
+                                    background: active ? "rgba(56, 139, 253, 0.10)" : "transparent",
                                     textDecoration: "none",
                                     cursor: "pointer",
-                                    transition: "background 0.1s, color 0.1s",
+                                    transition: "background 0.14s ease, color 0.14s ease, border-color 0.14s ease",
+                                    borderRadius: "7px",
+                                    position: "relative",
+                                    border: "0.5px solid transparent",
+                                    boxSizing: "border-box",
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!active) {
                                         e.currentTarget.style.background = "var(--bg-secondary)";
                                         e.currentTarget.style.color = "var(--text-primary)";
+                                        e.currentTarget.style.borderColor = "var(--border-tertiary)";
                                     }
                                 }}
                                 onMouseLeave={(e) => {
                                     if (!active) {
                                         e.currentTarget.style.background = "transparent";
                                         e.currentTarget.style.color = "var(--text-secondary)";
+                                        e.currentTarget.style.borderColor = "transparent";
                                     }
                                 }}
                             >
-                                {/* Dot */}
                                 <span
+                                    aria-hidden
                                     style={{
-                                        width: "6px",
-                                        height: "6px",
-                                        borderRadius: "50%",
-                                        background: "currentColor",
-                                        opacity: active ? 1 : 0.5,
-                                        flexShrink: 0,
+                                        position: "absolute",
+                                        left: 0,
+                                        top: "7px",
+                                        bottom: "7px",
+                                        width: "2px",
+                                        borderRadius: "999px",
+                                        background: active ? "var(--accent)" : "transparent",
                                     }}
                                 />
-                                <span style={{ flex: 1 }}>{item.label}</span>
+                                <Icon
+                                    size={17}
+                                    strokeWidth={1.75}
+                                    aria-hidden
+                                    style={{
+                                        flexShrink: 0,
+                                        color: "currentColor",
+                                        opacity: active ? 1 : 0.72,
+                                    }}
+                                />
+                                <span
+                                    style={{
+                                        flex: 1,
+                                        minWidth: 0,
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        whiteSpace: "nowrap",
+                                    }}
+                                    title={item.label}
+                                >
+                                    {item.label}
+                                </span>
                                 {item.count && item.count > 0 && (
                                     <span
                                         style={{
                                             marginLeft: "auto",
+                                            minWidth: "22px",
+                                            height: "22px",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
                                             fontSize: "11px",
-                                            background: "var(--danger-bg)",
-                                            color: "var(--danger-text)",
-                                            padding: "1px 5px",
-                                            borderRadius: "8px",
+                                            lineHeight: 1,
+                                            fontWeight: 700,
+                                            background: badge.background,
+                                            color: badge.color,
+                                            border: `0.5px solid ${badge.border}`,
+                                            padding: "0 6px",
+                                            borderRadius: "999px",
+                                            boxSizing: "border-box",
+                                            flexShrink: 0,
                                         }}
                                     >
                                         {item.count}
@@ -238,6 +329,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                     </Link>
                 ) : (
                     <button
+                        type="button"
                         onClick={handleLogout}
                         style={{
                             width: "100%",

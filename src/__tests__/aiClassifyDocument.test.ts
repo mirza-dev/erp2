@@ -107,6 +107,28 @@ describe("aiClassifyDocument — content block routing", () => {
         expect(call.messages[0].content[0].text).toContain("SKU,Adı,Stok");
         vi.unstubAllEnvs();
     });
+
+    it("includes selected operation context in system prompt and result", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockResolvedValueOnce(aiResponse({
+            document_type: "product_datasheet", confidence: 0.9, language: "tr",
+            summary: "Teknik sayfa", suggested_product_type_id: null,
+        }));
+        const { aiClassifyDocument } = await import("@/lib/services/ai-service");
+        const result = await aiClassifyDocument({
+            buffer: Buffer.from("%PDF-1.4 fake"),
+            mimeType: "application/pdf",
+            fileName: "datasheet.pdf",
+            productTypes,
+            operationType: "product_technical_update",
+        });
+
+        const call = mockMessagesCreate.mock.calls[0]?.[0] as { system: string };
+        expect(call.system).toContain("Teknik bilgileri güncelle");
+        expect(call.system).toContain("Fiyat/maliyet");
+        expect(result.operation_type).toBe("product_technical_update");
+        vi.unstubAllEnvs();
+    });
 });
 
 describe("aiClassifyDocument — graceful fallback", () => {

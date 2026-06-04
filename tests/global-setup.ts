@@ -1,7 +1,8 @@
 import { chromium } from "@playwright/test";
-import { STORAGE_STATE } from "../playwright.config";
 import fs from "fs";
 import path from "path";
+
+const STORAGE_STATE = path.join(__dirname, ".auth/user.json");
 
 export default async function globalSetup() {
     const email    = process.env.E2E_USER_EMAIL    ?? "";

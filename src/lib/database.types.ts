@@ -3,6 +3,8 @@
 // Generated from supabase/migrations/001_initial_schema.sql
 // ============================================================
 
+import type { AiImportOperationType } from "@/lib/ai-import-operations"
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Json = string | number | boolean | null | { [key: string]: any } | any[]
 
@@ -19,6 +21,7 @@ export type AlertSeverity = "critical" | "warning" | "info"
 export type AlertStatus = "open" | "acknowledged" | "resolved" | "dismissed"
 export type ImportBatchStatus = "pending" | "processing" | "review" | "confirming" | "confirmed" | "failed"
 export type ImportDraftStatus = "pending" | "confirmed" | "rejected" | "merged"
+export type ImportMatchStatus = "new" | "update" | "ambiguous" | "blocked" | "skipped"
 export type ImportDocumentStatus = "pending" | "classifying" | "classified" | "applying" | "error" | "applied"
 
 export type DocumentType =
@@ -39,6 +42,7 @@ export interface DocumentClassification {
     language: string
     summary: string
     suggested_product_type_id: string | null
+    operation_type?: AiImportOperationType | null
 }
 export type SyncStatus = "success" | "error" | "pending" | "retrying"
 export type AuditSource = "ui" | "system" | "ai" | "integration"
@@ -76,6 +80,7 @@ export interface ProductTypeRow {
     icon: string | null
     sort_order: number
     is_system: boolean
+    is_active: boolean
     created_at: string
     updated_at: string
 }
@@ -90,6 +95,7 @@ export interface ProductTypeFieldRow {
     unit: string | null
     options: string[] | null
     required: boolean
+    is_active: boolean
     placeholder: string | null
     help_text: string | null
     sort_order: number
@@ -202,6 +208,19 @@ export interface ProductAttachmentRow {
     metadata: Json | null
     uploaded_at: string
     uploaded_by: string | null
+}
+
+export interface ProductVendorLinkRow {
+    id: string
+    product_id: string
+    vendor_id: string
+    vendor_sku: string | null
+    lead_time_days: number | null
+    moq: number | null
+    is_preferred: boolean
+    notes: string | null
+    created_at: string
+    updated_at: string
 }
 
 /** ProductRow extended with the computed available_now field (on_hand - reserved) */
@@ -406,6 +425,13 @@ export interface InventoryMovementRow {
     occurred_at: string
     created_by: string | null
     source: AuditSource
+}
+
+export interface StockLocationBalanceRow {
+    product_id: string
+    location: string
+    quantity: number
+    updated_at: string
 }
 
 export interface ProductionEntryRow {
@@ -613,6 +639,21 @@ export interface ImportDocumentLineCandidate {
     reasons: string[]
 }
 
+export type AiEvidenceConfidence = "high" | "medium" | "low" | "not_found"
+
+export interface TechnicalFieldEvidence {
+    confidence: AiEvidenceConfidence
+    evidence_text: string | null
+    evidence_location?: {
+        page?: number
+        row?: number
+        column?: string
+    } | null
+    normalization_note?: string | null
+}
+
+export type TechnicalExtractionEvidence = Record<string, TechnicalFieldEvidence>
+
 export interface ImportDocumentLineRow {
     id: string
     document_id: string
@@ -622,6 +663,7 @@ export interface ImportDocumentLineRow {
     extracted_name: string | null
     extracted_sku: string | null
     extracted_attributes: Record<string, unknown>
+    extraction_evidence: TechnicalExtractionEvidence
     candidate_matches: ImportDocumentLineCandidate[]
     matched_product_id: string | null
     match_confidence: number | null
@@ -634,7 +676,7 @@ export interface ImportDocumentLineRow {
 export interface ImportDraftRow {
     id: string
     batch_id: string
-    entity_type: "customer" | "product" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"
+    entity_type: "customer" | "product" | "vendor" | "order" | "order_line" | "stock" | "quote" | "shipment" | "invoice" | "payment"
     raw_data: Json | null
     parsed_data: Json | null
     matched_entity_id: string | null
@@ -644,6 +686,13 @@ export interface ImportDraftRow {
     user_corrections: Json | null
     status: ImportDraftStatus
     created_at: string
+    sheet_name: string | null
+    row_number: number | null
+    match_status: ImportMatchStatus
+    match_confidence: number | null
+    risk_flags: Json
+    field_approvals: Json
+    row_errors: Json
 }
 
 export interface IntegrationSyncLogRow {
@@ -728,6 +777,7 @@ export interface AiRunRow {
 
 export interface ColumnMappingRow {
     id: string
+    company_scope: string
     source_column: string
     normalized: string
     entity_type: string

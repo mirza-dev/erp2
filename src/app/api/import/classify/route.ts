@@ -22,6 +22,11 @@ import { dbListProductTypes } from "@/lib/supabase/product-types";
 import { requireRole } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
+import {
+    DEFAULT_AI_IMPORT_OPERATION,
+    getAiImportOperation,
+    isAiImportOperationType,
+} from "@/lib/ai-import-operations";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +69,7 @@ export async function POST(req: NextRequest) {
 
         const file = formData.get("file");
         const batchIdRaw = formData.get("batch_id");
+        const operationTypeRaw = formData.get("operation_type");
 
         if (!(file instanceof File)) {
             return NextResponse.json({ error: "Dosya bulunamadı." }, { status: 400 });
@@ -82,6 +88,16 @@ export async function POST(req: NextRequest) {
         }
 
         const batchId = typeof batchIdRaw === "string" && batchIdRaw.length > 0 ? batchIdRaw : null;
+        const operationType = typeof operationTypeRaw === "string" && operationTypeRaw.length > 0
+            ? operationTypeRaw
+            : DEFAULT_AI_IMPORT_OPERATION;
+        if (!isAiImportOperationType(operationType)) {
+            return NextResponse.json({ error: "Geçersiz AI Import işlem türü." }, { status: 400 });
+        }
+        const operation = getAiImportOperation(operationType);
+        if (operation.status !== "active") {
+            return NextResponse.json({ error: "Bu AI Import işlem türü henüz aktif değil." }, { status: 400 });
+        }
 
         const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -108,6 +124,7 @@ export async function POST(req: NextRequest) {
                     fileName: file.name,
                     excelTextSample,
                     productTypes: productTypes.map(t => ({ id: t.id, name: t.name })),
+                    operationType,
                 },
                 req.signal,
             );
@@ -146,7 +163,7 @@ export async function POST(req: NextRequest) {
             fileName: file.name,
             fileSize: file.size,
             mimeType: file.type,
-            classification,
+            classification: { ...classification, operation_type: operationType },
             status: "classified",
             createdBy: user?.id ?? null,
         });

@@ -220,7 +220,7 @@ export interface RecordMovementInput {
     product_id: string;
     movement_type: "production" | "receipt" | "adjustment";
     quantity: number;  // positive = in, negative = out
-    reference_type?: "order" | "production_entry" | "manual";
+    reference_type?: "order" | "production_entry" | "manual" | "import" | "stock_transfer";
     reference_id?: string;
     notes?: string;
     created_by?: string;
@@ -274,6 +274,33 @@ export async function dbRecordMovementAtomic(input: RecordMovementInput): Promis
     });
     if (error) throw new Error(error.message);
     return data as RecordMovementResult;
+}
+
+export interface RecordStockTransferResult {
+    success: boolean;
+    transfer_id?: string;
+    error?: string;
+}
+
+export async function dbRecordStockTransfer(input: {
+    product_id: string;
+    quantity: number;
+    from_location: string;
+    to_location: string;
+    notes?: string;
+    actor?: string | null;
+}): Promise<RecordStockTransferResult> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("record_stock_transfer", {
+        p_product_id: input.product_id,
+        p_quantity: input.quantity,
+        p_from_location: input.from_location,
+        p_to_location: input.to_location,
+        p_notes: input.notes ?? null,
+        p_actor: input.actor ?? null,
+    });
+    if (error) throw new Error(error.message);
+    return data as RecordStockTransferResult;
 }
 
 export interface ResolveShortagesResult {

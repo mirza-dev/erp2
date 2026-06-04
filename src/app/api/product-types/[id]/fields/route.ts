@@ -12,7 +12,7 @@ import { revalidateTag } from "next/cache";
 
 // GET /api/product-types/[id]/fields
 export async function GET(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
@@ -21,19 +21,21 @@ export async function GET(
         const parent = await dbGetProductType(id);
         if (!parent) return NextResponse.json({ error: "Tip bulunamadı." }, { status: 404 });
 
-        const fields = await dbListProductTypeFields(id);
+        const { searchParams } = new URL(req.url);
+        const includeInactive = searchParams.get("includeInactive") === "1";
+        const fields = await dbListProductTypeFields(id, { includeInactive });
         return NextResponse.json(fields);
     } catch (err) {
         return handleApiError(err, "GET /api/product-types/[id]/fields");
     }
 }
 
-// POST /api/product-types/[id]/fields  (admin only)
+// POST /api/product-types/[id]/fields
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
-    const forbidden = await requirePermission(req, "manage_product_types");
+    const forbidden = await requirePermission(req, ["manage_product_types", "manage_product_master"]);
     if (forbidden) return forbidden;
 
     try {
@@ -88,12 +90,12 @@ export async function POST(
     }
 }
 
-// PUT /api/product-types/[id]/fields — reorder (admin only)
+// PUT /api/product-types/[id]/fields — reorder
 export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
-    const forbidden = await requirePermission(req, "manage_product_types");
+    const forbidden = await requirePermission(req, ["manage_product_types", "manage_product_master"]);
     if (forbidden) return forbidden;
 
     try {

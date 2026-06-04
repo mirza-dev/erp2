@@ -3,8 +3,10 @@ import { dbCreateBatch, dbListBatches } from "@/lib/supabase/import";
 import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/import — batch listesi
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        const guard = await requirePermission(req, "view_import");
+        if (guard) return guard;
         const batches = await dbListBatches();
         return NextResponse.json(batches);
     } catch (err) {

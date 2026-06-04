@@ -5,6 +5,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
+import { Plus } from "lucide-react";
 
 export const KIND_META: Record<NoteTemplateKind, { label: string; badge: string }> = {
     notes: { label: "Notlar & Şartlar", badge: "Not" },
@@ -152,8 +153,14 @@ export default function NoteTemplatesPage() {
                         Teklif formunda Notlar, Teslimat ve Ödeme alanlarına tek tıkla eklenen hazır metinler.
                     </div>
                 </div>
-                <Button onClick={openCreate} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                    + Yeni Şablon
+                <Button
+                    size="cta"
+                    leftIcon={<Plus size={16} />}
+                    onClick={openCreate}
+                    disabled={isDemo}
+                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                >
+                    Yeni Şablon
                 </Button>
             </div>
 

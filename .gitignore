@@ -43,6 +43,9 @@ next-env.d.ts
 # local planning docs (not for repo)
 yuksek-etki.md
 
+# Supabase local/link cache
+supabase/.temp/
+
 # Playwright
 tests/.auth/
 test-results/

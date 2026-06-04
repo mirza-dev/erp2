@@ -26,20 +26,20 @@ test("stok tablosunda ürün satırları var", async ({ page }) => {
     expect(count).toBeGreaterThanOrEqual(0); // boş olabilir, yüklendi kontrol
 });
 
-test("sidebar navigasyon: Siparişler → /dashboard/orders", async ({ page }) => {
-    await page.getByRole("link", { name: /siparişler/i }).first().click();
+test("sidebar navigasyon: Satış Siparişleri → /dashboard/orders", async ({ page }) => {
+    await page.getByRole("link", { name: /satış siparişleri/i }).click();
     await page.waitForURL("**/orders**");
     expect(page.url()).toContain("/orders");
 });
 
 test("sidebar navigasyon: Ürünler → /dashboard/products", async ({ page }) => {
-    await page.getByRole("link", { name: /ürünler|stok/i }).first().click();
+    await page.getByRole("link", { name: /stok & ürünler/i }).click();
     await page.waitForURL("**/products**");
     expect(page.url()).toContain("/products");
 });
 
-test("sidebar navigasyon: İçe Aktarma → /dashboard/import", async ({ page }) => {
-    await page.getByRole("link", { name: /aktar|import/i }).first().click();
+test("sidebar navigasyon: Veri Aktarım Merkezi → /dashboard/import", async ({ page }) => {
+    await page.getByRole("link", { name: /veri aktarım merkezi/i }).click();
     await page.waitForURL("**/import**");
     expect(page.url()).toContain("/import");
 });

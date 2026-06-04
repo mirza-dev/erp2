@@ -12,6 +12,7 @@ const EXTRACTION_SUPPORTED_TYPES: ReadonlySet<DocumentType> = new Set([
     "material_certificate",
     "compliance_doc",
     "test_report",
+    "product_photo",
 ]);
 
 export function isExtractionSupportedType(t: DocumentType): boolean {

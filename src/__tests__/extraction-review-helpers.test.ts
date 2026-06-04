@@ -91,10 +91,12 @@ describe("isExtractionSupportedType / isMigrationExcelType — ClassifierQueue",
         expect(isExtractionSupportedType("compliance_doc")).toBe(true);
         expect(isExtractionSupportedType("test_report")).toBe(true);
     });
-    it("excludes msds/vendor/photo/unknown/migration_excel", () => {
+    it("product_photo supported as product-document attach flow", () => {
+        expect(isExtractionSupportedType("product_photo")).toBe(true);
+    });
+    it("excludes msds/vendor/unknown/migration_excel", () => {
         expect(isExtractionSupportedType("msds")).toBe(false);
         expect(isExtractionSupportedType("vendor_profile")).toBe(false);
-        expect(isExtractionSupportedType("product_photo")).toBe(false);
         expect(isExtractionSupportedType("unknown")).toBe(false);
         expect(isExtractionSupportedType("migration_excel")).toBe(false);
     });

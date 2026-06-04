@@ -1,17 +1,17 @@
 /**
- * Ayarlar sayfası — final ürün UI source-regex testleri.
+ * Ayarlar sayfası — sağlamlaştırma source-regex testleri (codex redesign sonrası re-apply).
  *
- * Bu tur düzeltmelerini kilitler (route davranışı settings-*-route.test.ts'te):
- *   1. [a11y] ResetDemoSection onay modalı role=dialog/aria-modal/aria-labelledby + başlık id.
- *   2. [a11y] Sol sekme menüsü tablist/tab/aria-selected + tabpanel/aria-labelledby
- *      (id eşleşmesi) + dirty nokta aria-hidden + dirty durum erişilebilir adda.
+ * Codex settings'i yeniden tasarladı (gruplu <nav>, aria-current). Bu oturumun
+ * sağlamlaştırması codex'in YENİ yapısına uyarlanarak re-apply edildi:
+ *   1. [a11y] ResetDemoSection onay modalı role=dialog/aria-modal/aria-labelledby (codex korudu).
+ *   2. [a11y] Gruplu sekme nav'ı: her sekme butonu `id` + dirty durum erişilebilir adda;
+ *      içerik alanı role=region + aria-labelledby aktif sekme id'sine bağlı; dirty nokta
+ *      aria-hidden (codex zaten aria-hidden). NOT: codex'in gruplu nav'ı flat tablist'e
+ *      uymaz → role=tablist/tab/tabpanel YERİNE nav+aria-current+region (geçerli ARIA).
  *   3. [render bug] ApiTab "Bağlantı yok" mesajı ham &apos; yerine düz tek tırnak
- *      (JS string literal'de HTML entity decode edilmez); :953 JSX text korunur.
+ *      (codex reintroduce etmişti); :1053 JSX text 'Paraşüt'e bağlan' korunur.
  *   4. [hata paritesi] FirmaTab handleSave !res.ok dalı errBody.error parse eder
- *      (ham res.text() yerine), sunucunun spesifik 400 mesajı kullanıcıya ulaşır.
- *
- * Kaynak okuma yöntemi (vendors-ui / production-ui / customers-ui aynası): JSX davranışı
- * jsdom render etmeden source-regex ile kilitlenir.
+ *      (codex'in diğer handler'larıyla aynı patern); catch err.message yüzeye çıkarır.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -26,7 +26,7 @@ const RESET_SRC = readFileSync(
     "utf8",
 );
 
-// ── 1. ResetDemoSection onay modalı a11y ──────────────────────
+// ── 1. ResetDemoSection onay modalı a11y (codex korudu) ───────
 
 describe("Ayarlar — ResetDemoSection onay modalı a11y", () => {
     it("onay paneli role=dialog + aria-modal=true + aria-labelledby taşır", () => {
@@ -40,30 +40,27 @@ describe("Ayarlar — ResetDemoSection onay modalı a11y", () => {
     });
 });
 
-// ── 2. Sekme menüsü tablist a11y + dirty dot ──────────────────
+// ── 2. Gruplu sekme nav'ı a11y (codex yapısına uyarlanmış) ────
 
-describe("Ayarlar — sekme menüsü tablist a11y", () => {
-    it("menü konteyner role=tablist + aria-label taşır", () => {
-        expect(PAGE_SRC).toMatch(/role="tablist"/);
-        expect(PAGE_SRC).toMatch(/aria-label="Ayarlar bölümleri"/);
+describe("Ayarlar — gruplu sekme nav a11y", () => {
+    it("nav konteyner aria-label taşır", () => {
+        expect(PAGE_SRC).toMatch(/<nav className="settings-tab-nav" aria-label="Ayarlar sekmeleri">/);
     });
 
-    it("her sekme butonu role=tab + aria-selected + id + aria-controls taşır", () => {
-        expect(PAGE_SRC).toMatch(/role="tab"/);
-        expect(PAGE_SRC).toMatch(/aria-selected=\{activeTab === key\}/);
-        expect(PAGE_SRC).toMatch(/id=\{`settings-tab-\$\{key\}`\}/);
-        expect(PAGE_SRC).toMatch(/aria-controls="settings-tabpanel"/);
+    it("her sekme butonu id + aria-current + dirty durum erişilebilir adda", () => {
+        expect(PAGE_SRC).toMatch(/id=\{`settings-tab-\$\{tab\.key\}`\}/);
+        expect(PAGE_SRC).toMatch(/aria-current=\{active \? "page" : undefined\}/);
+        // Dirty durum yalnız görsel nokta değil — buton erişilebilir adında
+        expect(PAGE_SRC).toMatch(/aria-label=\{dirty \? `\$\{tab\.label\} \(kaydedilmemiş değişiklikler\)` : undefined\}/);
     });
 
-    it("sağ içerik role=tabpanel + id + aria-labelledby aktif sekme id'sine eşlenir", () => {
-        expect(PAGE_SRC).toMatch(/role="tabpanel"/);
-        expect(PAGE_SRC).toMatch(/id="settings-tabpanel"/);
+    it("içerik alanı role=region + aria-labelledby aktif sekme id'sine bağlı", () => {
+        expect(PAGE_SRC).toMatch(/role="region"/);
         expect(PAGE_SRC).toMatch(/aria-labelledby=\{`settings-tab-\$\{activeTab\}`\}/);
     });
 
-    it("dirty nokta aria-hidden + dirty durum butonun erişilebilir adında", () => {
-        expect(PAGE_SRC).toMatch(/<span aria-hidden="true"/);
-        expect(PAGE_SRC).toMatch(/dirtyTabs\.has\(key\) \? `\$\{label\} \(kaydedilmemiş değişiklikler\)` : undefined/);
+    it("dirty nokta aria-hidden (görsel ipucu, SR'da gürültü yapmaz)", () => {
+        expect(PAGE_SRC).toMatch(/className="settings-tab-dirty-dot" aria-hidden="true"/);
     });
 });
 
@@ -85,7 +82,7 @@ describe("Ayarlar — ApiTab entity render bug", () => {
 
 describe("Ayarlar — FirmaTab kayıt hatası paritesi", () => {
     it("handleSave !res.ok dalı errBody.error parse eder, ham res.text() atmaz", () => {
-        expect(PAGE_SRC).toMatch(/const errBody = await res\.json\(\)\.catch\(\(\) => null\);\s*\n\s*throw new Error\(errBody\?\.error \?\? "Kayıt başarısız\. Tekrar deneyin\."\)/);
+        expect(PAGE_SRC).toMatch(/const errBody = await res\.json\(\)\.catch\(\(\) => \(\{\}\)\);\s*\n\s*throw new Error\(errBody\.error \?\? "Kayıt başarısız\. Tekrar deneyin\."\)/);
         // ham res.text() artık FirmaTab kayıt dalında kullanılmaz
         expect(PAGE_SRC).not.toMatch(/if \(!res\.ok\) throw new Error\(await res\.text\(\)\)/);
     });

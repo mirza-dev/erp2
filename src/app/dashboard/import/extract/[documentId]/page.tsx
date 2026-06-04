@@ -7,14 +7,14 @@
 import { notFound } from "next/navigation";
 import { dbGetImportDocument } from "@/lib/supabase/import-documents";
 import { dbListLinesByDocument } from "@/lib/supabase/import-document-lines";
-import { dbListProductTypes } from "@/lib/supabase/product-types";
+import { dbGetProductTypeWithFields, dbListProductTypes } from "@/lib/supabase/product-types";
 import ExtractionReview from "@/components/import/ExtractionReview";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExtractDocumentPage({ params }: { params: Promise<{ documentId: string }> }) {
     const { documentId } = await params;
-    const [doc, lines, productTypes] = await Promise.all([
+    const [doc, lines, productTypesBase] = await Promise.all([
         dbGetImportDocument(documentId),
         dbListLinesByDocument(documentId).catch(() => []),
         dbListProductTypes().catch(() => []),
@@ -22,12 +22,18 @@ export default async function ExtractDocumentPage({ params }: { params: Promise<
 
     if (!doc) notFound();
 
+    const productTypes = await Promise.all(
+        productTypesBase.map(type => dbGetProductTypeWithFields(type.id).catch(() => null)),
+    );
+
     return (
         <div style={{ padding: "24px", maxWidth: "1200px", margin: "0 auto" }}>
             <ExtractionReview
                 document={doc}
                 initialLines={lines}
-                productTypes={productTypes.map(t => ({ id: t.id, name: t.name }))}
+                productTypes={productTypes
+                    .filter((type): type is NonNullable<typeof type> => type !== null)
+                    .map(type => ({ id: type.id, name: type.name, fields: type.fields }))}
             />
         </div>
     );

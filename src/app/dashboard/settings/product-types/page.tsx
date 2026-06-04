@@ -1,103 +1,74 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import {
+    AlertTriangle,
+    ArchiveRestore,
+    Boxes,
+    CheckCircle2,
+    Eye,
+    Plus,
+    SlidersHorizontal,
+} from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
-import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import type { ProductType } from "@/lib/mock-data";
-import { mapProductType } from "@/lib/api-mappers";
-import type { ProductTypeRow } from "@/lib/database.types";
+import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-utils";
+import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
 
-/** Liste endpoint'i artık her tipin fieldCount'unu döner (N+1 fetch kaldırıldı). */
-type ProductTypeListRowApi = ProductTypeRow & { fieldCount?: number };
-
-interface ProductTypeListItem extends ProductType {
-    fieldCount: number;
-}
-
-const containerStyle: React.CSSProperties = {
+const pageStyle: React.CSSProperties = {
     padding: "24px",
-    maxWidth: "1100px",
+    maxWidth: "1180px",
     margin: "0 auto",
 };
 
-const headerStyle: React.CSSProperties = {
+const toolbarStyle: React.CSSProperties = {
     display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: "24px",
-};
-
-const cardGridStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+    justifyContent: "space-between",
     gap: "16px",
+    marginBottom: "18px",
 };
 
-const cardStyle: React.CSSProperties = {
-    background: "var(--bg-secondary)",
+const metricGridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "10px",
+    marginBottom: "14px",
+};
+
+const metricStyle: React.CSSProperties = {
     border: "0.5px solid var(--border-tertiary)",
     borderRadius: "8px",
-    padding: "16px",
-    cursor: "pointer",
-    transition: "border-color 120ms ease",
+    background: "var(--bg-secondary)",
+    padding: "12px 14px",
+    minHeight: "70px",
 };
 
-const cardIconStyle: React.CSSProperties = {
-    fontSize: "32px",
-    marginBottom: "8px",
-};
-
-const cardTitleStyle: React.CSSProperties = {
-    fontSize: "16px",
-    fontWeight: 600,
-    color: "var(--text-primary)",
-    marginBottom: "4px",
-};
-
-const cardMetaStyle: React.CSSProperties = {
-    fontSize: "12px",
-    color: "var(--text-tertiary)",
-    marginBottom: "8px",
-};
-
-const cardDescStyle: React.CSSProperties = {
-    fontSize: "13px",
-    color: "var(--text-secondary)",
-    minHeight: "36px",
-    lineHeight: 1.4,
-};
-
-const systemBadgeStyle: React.CSSProperties = {
-    display: "inline-block",
-    fontSize: "10px",
-    padding: "2px 6px",
-    background: "var(--accent-bg)",
-    color: "var(--accent-text)",
-    borderRadius: "4px",
-    marginLeft: "8px",
-    verticalAlign: "middle",
-};
-
-const modalBackdropStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.5)",
-    zIndex: 200,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-};
-
-const modalStyle: React.CSSProperties = {
-    background: "var(--bg-primary)",
+const tableWrapStyle: React.CSSProperties = {
     border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "10px",
-    padding: "24px",
-    width: "100%",
-    maxWidth: "440px",
-    zIndex: 201,
+    borderRadius: "8px",
+    overflow: "hidden",
+    background: "var(--bg-primary)",
+};
+
+const thStyle: React.CSSProperties = {
+    padding: "10px 12px",
+    fontSize: "11px",
+    color: "var(--text-tertiary)",
+    textAlign: "left",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    borderBottom: "0.5px solid var(--border-tertiary)",
+    background: "var(--bg-secondary)",
+};
+
+const tdStyle: React.CSSProperties = {
+    padding: "12px",
+    borderBottom: "0.5px solid var(--border-tertiary)",
+    color: "var(--text-primary)",
+    fontSize: "13px",
+    verticalAlign: "middle",
 };
 
 const inputStyle: React.CSSProperties = {
@@ -111,74 +82,141 @@ const inputStyle: React.CSSProperties = {
     boxSizing: "border-box",
 };
 
-const labelStyle: React.CSSProperties = {
-    fontSize: "12px",
-    color: "var(--text-secondary)",
-    marginBottom: "4px",
-    display: "block",
+const modalBackdropStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.5)",
+    zIndex: 200,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "18px",
 };
 
-const errStyle: React.CSSProperties = {
-    color: "var(--danger)",
-    fontSize: "12px",
-    marginTop: "8px",
+const modalStyle: React.CSSProperties = {
+    width: "100%",
+    maxWidth: "460px",
+    background: "var(--bg-primary)",
+    border: "0.5px solid var(--border-tertiary)",
+    borderRadius: "8px",
+    padding: "20px",
 };
 
-export default function ProductTypesPage() {
+function Metric({
+    label,
+    value,
+    sub,
+    icon,
+}: {
+    label: string;
+    value: string | number;
+    sub: string;
+    icon: React.ReactNode;
+}) {
+    return (
+        <div style={metricStyle}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>
+                <span style={{ color: "var(--text-tertiary)" }}>{icon}</span>
+            </div>
+            <div style={{ fontSize: "22px", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1 }}>{value}</div>
+            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "6px" }}>{sub}</div>
+        </div>
+    );
+}
+
+function statusBadge(type: ProductTypeStatsRow): React.ReactNode {
+    if (!type.is_active) {
+        return (
+            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", border: "0.5px solid var(--border-secondary)", borderRadius: "999px", padding: "3px 8px" }}>
+                Pasif
+            </span>
+        );
+    }
+    if (type.missing_required_product_count > 0) {
+        return (
+            <span style={{ fontSize: "11px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "0.5px solid var(--warning-border)", borderRadius: "999px", padding: "3px 8px" }}>
+                {type.missing_required_product_count} ürün eksik
+            </span>
+        );
+    }
+    if (type.product_count === 0) {
+        return (
+            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", border: "0.5px solid var(--border-secondary)", borderRadius: "999px", padding: "3px 8px" }}>
+                Kullanılmıyor
+            </span>
+        );
+    }
+    return (
+        <span style={{ fontSize: "11px", color: "var(--success-text)", background: "var(--success-bg)", border: "0.5px solid var(--success-border)", borderRadius: "999px", padding: "3px 8px" }}>
+            Tamam
+        </span>
+    );
+}
+
+export default function TechnicalTemplatesPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
 
-    const [types, setTypes] = useState<ProductTypeListItem[]>([]);
+    const [templates, setTemplates] = useState<ProductTypeStatsRow[]>([]);
+    const [showInactive, setShowInactive] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Modal state
     const [showCreate, setShowCreate] = useState(false);
     const [createName, setCreateName] = useState("");
-    const [createIcon, setCreateIcon] = useState("");
     const [createDescription, setCreateDescription] = useState("");
+    const [createIcon, setCreateIcon] = useState("");
     const [createError, setCreateError] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
 
-    const loadTypes = useCallback(async () => {
+    const loadTemplates = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch("/api/product-types");
-            if (!res.ok) throw new Error("Tipler yüklenemedi");
-            const rows = (await res.json()) as ProductTypeListRowApi[];
-
-            // Alan sayısı liste endpoint'inden tek sorguda gelir (N+1 fetch kaldırıldı).
-            const items: ProductTypeListItem[] = rows.map((row) => ({
-                ...mapProductType(row),
-                fieldCount: row.fieldCount ?? 0,
-            }));
-
-            setTypes(items);
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "Bilinmeyen hata");
+            const query = new URLSearchParams({ withStats: "1" });
+            if (showInactive) query.set("includeInactive", "1");
+            const res = await fetch(`/api/product-types?${query.toString()}`);
+            if (!res.ok) throw new Error("Teknik şablonlar yüklenemedi");
+            const data = await res.json() as ProductTypeStatsRow[];
+            setTemplates(data);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Bilinmeyen hata");
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [showInactive]);
 
     useEffect(() => {
-        loadTypes();
-    }, [loadTypes]);
+        void loadTemplates();
+    }, [loadTemplates]);
 
-    const openCreate = () => {
-        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+    const metrics = useMemo(() => {
+        const active = templates.filter(t => t.is_active);
+        return {
+            activeCount: active.length,
+            usedProducts: active.reduce((sum, t) => sum + t.product_count, 0),
+            unusedTemplates: active.filter(t => t.product_count === 0).length,
+            missingProducts: active.reduce((sum, t) => sum + t.missing_required_product_count, 0),
+        };
+    }, [templates]);
+
+    function openCreate() {
+        if (isDemo) {
+            toast({ type: "info", message: DEMO_BLOCK_TOAST });
+            return;
+        }
         setCreateName("");
-        setCreateIcon("📦");
         setCreateDescription("");
+        setCreateIcon("");
         setCreateError(null);
         setShowCreate(true);
-    };
+    }
 
-    const submitCreate = async () => {
+    async function submitCreate() {
         setCreateError(null);
         if (!createName.trim()) {
-            setCreateError("Tip adı zorunludur.");
+            setCreateError("Şablon adı zorunludur.");
             return;
         }
         setCreating(true);
@@ -192,116 +230,164 @@ export default function ProductTypesPage() {
                     icon: createIcon.trim() || null,
                 }),
             });
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.error ?? "Tip oluşturulamadı");
-            }
-            const row = (await res.json()) as ProductTypeRow;
-            toast({ type: "success", message: `"${row.name}" tipi oluşturuldu.` });
+            const body = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(body.error ?? "Şablon oluşturulamadı");
+            toast({ type: "success", message: "Teknik şablon oluşturuldu." });
             setShowCreate(false);
-            loadTypes();
-        } catch (e) {
-            setCreateError(e instanceof Error ? e.message : "Bilinmeyen hata");
+            await loadTemplates();
+        } catch (err) {
+            setCreateError(err instanceof Error ? err.message : "Bilinmeyen hata");
         } finally {
             setCreating(false);
         }
-    };
+    }
 
     return (
-        <div style={containerStyle}>
-            <div style={headerStyle}>
+        <div style={pageStyle}>
+            <div style={toolbarStyle}>
                 <div>
-                    <h1 style={{ fontSize: "22px", fontWeight: 700, marginBottom: "4px" }}>Ürün Tipleri</h1>
+                    <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 4px", color: "var(--text-primary)" }}>
+                        Teknik Şablonlar
+                    </h1>
                     <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                        Her tipin teknik alanlarını burada tanımla. Hazır 8 tip ile başla, kendine özel tipler ekle.
+                        Ürün katalog alanları, teknik veri kalitesi ve AI import şeması.
                     </div>
                 </div>
-                <Button
-                    onClick={openCreate}
-                    disabled={isDemo}
-                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                >
-                    + Yeni Tip Ekle
-                </Button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <Button
+                        variant={showInactive ? "primary" : "secondary"}
+                        onClick={() => setShowInactive(v => !v)}
+                        aria-pressed={showInactive}
+                    >
+                        <Eye size={14} />
+                        Pasifleri Göster
+                    </Button>
+                    <Button
+                        size="cta"
+                        leftIcon={<Plus size={16} />}
+                        onClick={openCreate}
+                        disabled={isDemo}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                    >
+                        Yeni Şablon
+                    </Button>
+                </div>
             </div>
 
-            {loading && <div style={{ color: "var(--text-secondary)" }}>Yükleniyor...</div>}
-            {error && <div style={errStyle} role="alert">{error}</div>}
+            <div style={metricGridStyle}>
+                <Metric label="Aktif Şablon" value={metrics.activeCount} sub="Yeni ürünlerde seçilebilir" icon={<SlidersHorizontal size={16} />} />
+                <Metric label="Ürün Kullanımı" value={metrics.usedProducts} sub="Aktif şablon bağlı ürün" icon={<Boxes size={16} />} />
+                <Metric label="Boş Şablon" value={metrics.unusedTemplates} sub="Henüz üründe kullanılmıyor" icon={<ArchiveRestore size={16} />} />
+                <Metric label="Eksik Bilgi" value={metrics.missingProducts} sub="Zorunlu teknik alan eksiği" icon={<AlertTriangle size={16} />} />
+            </div>
 
-            {!loading && !error && (
-                <div style={cardGridStyle}>
-                    {types.map((t) => (
-                        <Link
-                            key={t.id}
-                            href={`/dashboard/settings/product-types/${t.id}`}
-                            style={{ ...cardStyle, textDecoration: "none", display: "block" }}
-                            aria-label={`${t.name} tipini düzenle`}
-                        >
-                            <div style={cardIconStyle}>{t.icon ?? "📦"}</div>
-                            <div style={cardTitleStyle}>
-                                {t.name}
-                                {t.isSystem && <span style={systemBadgeStyle}>SİSTEM</span>}
-                            </div>
-                            <div style={cardMetaStyle}>{t.fieldCount} alan</div>
-                            <div style={cardDescStyle}>{t.description ?? "—"}</div>
-                        </Link>
-                    ))}
+            {error && (
+                <div role="alert" style={{ color: "var(--danger-text)", background: "var(--danger-bg)", border: "0.5px solid var(--danger-border)", borderRadius: "6px", padding: "10px 12px", marginBottom: "12px" }}>
+                    {error}
                 </div>
             )}
 
-            {!loading && !error && types.length === 0 && (
-                <div style={{ color: "var(--text-tertiary)", marginTop: "24px" }}>
-                    Henüz tip yok. Yeni Tip Ekle ile başla.
-                </div>
-            )}
+            <div style={tableWrapStyle}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                        <tr>
+                            <th style={thStyle}>Şablon</th>
+                            <th style={thStyle}>Ürün</th>
+                            <th style={thStyle}>Alan</th>
+                            <th style={thStyle}>Zorunlu</th>
+                            <th style={thStyle}>Eksik Veri</th>
+                            <th style={thStyle}>Durum</th>
+                            <th style={{ ...thStyle, textAlign: "right" }}>İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loading ? (
+                            <tr>
+                                <td colSpan={7} style={{ ...tdStyle, color: "var(--text-tertiary)" }}>Yükleniyor…</td>
+                            </tr>
+                        ) : templates.length === 0 ? (
+                            <tr>
+                                <td colSpan={7} style={{ ...tdStyle, color: "var(--text-tertiary)" }}>Teknik şablon yok.</td>
+                            </tr>
+                        ) : templates.map(template => (
+                            <tr key={template.id} style={{ opacity: template.is_active ? 1 : 0.55 }}>
+                                <td style={tdStyle}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                                        <span style={{
+                                            width: "30px",
+                                            height: "30px",
+                                            borderRadius: "8px",
+                                            border: "0.5px solid var(--border-secondary)",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            color: "var(--text-secondary)",
+                                            background: "var(--bg-secondary)",
+                                            flex: "0 0 auto",
+                                        }}>
+                                            {template.icon || <SlidersHorizontal size={15} />}
+                                        </span>
+                                        <div>
+                                            <Link
+                                                href={`/dashboard/settings/product-types/${template.id}`}
+                                                style={{ color: "var(--text-primary)", textDecoration: "none", fontWeight: 650 }}
+                                            >
+                                                {template.name}
+                                            </Link>
+                                            {template.description && (
+                                                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px", maxWidth: "360px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                    {template.description}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style={tdStyle}>{template.product_count}</td>
+                                <td style={tdStyle}>{template.field_count}</td>
+                                <td style={tdStyle}>{template.required_field_count}</td>
+                                <td style={tdStyle}>{statusBadge(template)}</td>
+                                <td style={tdStyle}>
+                                    {template.is_active ? (
+                                        <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "var(--success-text)", fontSize: "12px" }}>
+                                            <CheckCircle2 size={13} /> Aktif
+                                        </span>
+                                    ) : (
+                                        <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>Pasif</span>
+                                    )}
+                                </td>
+                                <td style={{ ...tdStyle, textAlign: "right" }}>
+                                    <Link href={`/dashboard/settings/product-types/${template.id}`} style={{ color: "var(--accent-text)", textDecoration: "none", fontWeight: 600 }}>
+                                        Düzenle
+                                    </Link>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
 
             {showCreate && (
-                <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-label="Yeni tip ekle">
+                <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-label="Yeni teknik şablon">
                     <div style={modalStyle}>
-                        <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "16px" }}>
-                            Yeni Ürün Tipi
-                        </h2>
-
-                        <label style={labelStyle}>Tip Adı *</label>
-                        <input
-                            type="text"
-                            value={createName}
-                            onChange={(e) => setCreateName(e.target.value)}
-                            placeholder="örn: Pompa"
-                            style={inputStyle}
-                            aria-label="Tip adı"
-                            autoFocus
-                        />
-
-                        <label style={{ ...labelStyle, marginTop: "12px" }}>Icon (emoji)</label>
-                        <input
-                            type="text"
-                            value={createIcon}
-                            onChange={(e) => setCreateIcon(e.target.value)}
-                            placeholder="📦"
-                            style={inputStyle}
-                            aria-label="Icon"
-                            maxLength={4}
-                        />
-
-                        <label style={{ ...labelStyle, marginTop: "12px" }}>Açıklama (opsiyonel)</label>
-                        <textarea
-                            value={createDescription}
-                            onChange={(e) => setCreateDescription(e.target.value)}
-                            placeholder="Bu tip neyi kapsar?"
-                            style={{ ...inputStyle, minHeight: "60px", resize: "vertical" as const }}
-                            aria-label="Açıklama"
-                        />
-
-                        {createError && <div style={errStyle} role="alert" aria-live="polite">{createError}</div>}
-
-                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "16px" }}>
-                            <Button variant="ghost" onClick={() => setShowCreate(false)} disabled={creating}>
-                                İptal
-                            </Button>
-                            <Button onClick={submitCreate} disabled={creating || isDemo}>
-                                {creating ? "Kaydediliyor..." : "Kaydet"}
-                            </Button>
+                        <h2 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 14px" }}>Yeni Teknik Şablon</h2>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                            <label style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                Şablon Adı
+                                <input aria-label="Şablon adı" value={createName} onChange={e => setCreateName(e.target.value)} style={{ ...inputStyle, marginTop: "4px" }} />
+                            </label>
+                            <label style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                Kısa Simge
+                                <input aria-label="Kısa simge" value={createIcon} onChange={e => setCreateIcon(e.target.value)} style={{ ...inputStyle, marginTop: "4px" }} maxLength={4} placeholder="V" />
+                            </label>
+                            <label style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                                Açıklama
+                                <textarea aria-label="Açıklama" value={createDescription} onChange={e => setCreateDescription(e.target.value)} style={{ ...inputStyle, marginTop: "4px", minHeight: "72px", resize: "vertical" }} />
+                            </label>
+                        </div>
+                        {createError && <div role="alert" style={{ color: "var(--danger-text)", fontSize: "12px", marginTop: "10px" }}>{createError}</div>}
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "16px" }}>
+                            <Button variant="secondary" onClick={() => setShowCreate(false)} disabled={creating}>İptal</Button>
+                            <Button onClick={submitCreate} loading={creating}>Oluştur</Button>
                         </div>
                     </div>
                 </div>
@@ -309,4 +395,3 @@ export default function ProductTypesPage() {
         </div>
     );
 }
-

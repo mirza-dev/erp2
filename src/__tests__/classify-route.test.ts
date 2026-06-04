@@ -142,6 +142,28 @@ describe("POST /api/import/classify — validation", () => {
         expect(res.status).toBe(400);
         expect(mockClassify).not.toHaveBeenCalled();
     });
+
+    it("returns 400 for invalid operation_type before AI call", async () => {
+        const fd = new FormData();
+        fd.append("file", makeFile("a.pdf", "application/pdf", 100));
+        fd.append("operation_type", "not_real");
+        const { POST } = await import("@/app/api/import/classify/route");
+        const res = await POST(makeFormRequest(fd));
+        expect(res.status).toBe(400);
+        expect(mockClassify).not.toHaveBeenCalled();
+        expect(mockCreateDoc).not.toHaveBeenCalled();
+    });
+
+    it("returns 400 for planned operation_type before AI call", async () => {
+        const fd = new FormData();
+        fd.append("file", makeFile("a.pdf", "application/pdf", 100));
+        fd.append("operation_type", "product_type_template");
+        const { POST } = await import("@/app/api/import/classify/route");
+        const res = await POST(makeFormRequest(fd));
+        expect(res.status).toBe(400);
+        expect(mockClassify).not.toHaveBeenCalled();
+        expect(mockCreateDoc).not.toHaveBeenCalled();
+    });
 });
 
 describe("POST /api/import/classify — happy path + Excel + graceful AI", () => {
@@ -160,6 +182,30 @@ describe("POST /api/import/classify — happy path + Excel + graceful AI", () =>
         const call = mockClassify.mock.calls[0]?.[0] as { productTypes: Array<{ id: string }>; mimeType: string };
         expect(call.mimeType).toBe("application/pdf");
         expect(call.productTypes[0].id).toBe("00000000-0000-4000-8000-000000000001");
+        expect(call).toMatchObject({ operationType: "product_update" });
+    });
+
+    it("passes selected operation_type to AI and persists it in classification", async () => {
+        mockClassify.mockResolvedValueOnce({
+            document_type: "product_datasheet", confidence: 0.8, language: "tr",
+            summary: "ok", suggested_product_type_id: null,
+        });
+        mockCreateDoc.mockResolvedValueOnce({ id: "doc-op" });
+        const fd = new FormData();
+        fd.append("file", makeFile("a.pdf", "application/pdf", 200));
+        fd.append("operation_type", "product_technical_update");
+        const { POST } = await import("@/app/api/import/classify/route");
+        await POST(makeFormRequest(fd));
+
+        expect(mockClassify.mock.calls[0]?.[0]).toMatchObject({
+            operationType: "product_technical_update",
+        });
+        expect(mockCreateDoc.mock.calls[0]?.[0]).toMatchObject({
+            classification: {
+                document_type: "product_datasheet",
+                operation_type: "product_technical_update",
+            },
+        });
     });
 
     it("for Excel files, AI receives excelTextSample (server-side parse)", async () => {

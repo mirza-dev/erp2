@@ -85,6 +85,24 @@ describe("ClassifierQueue — happy path (P2 + mountedRef fix)", () => {
         const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
         expect(url).toBe("/api/import/classify");
         expect(init.method).toBe("POST");
+        expect((init.body as FormData).get("operation_type")).toBe("product_update");
+    });
+
+    it("sends selected operation_type and renders operation chip after classification", async () => {
+        const fetchSpy = vi.fn(async () => okResponse("doc-op"));
+        vi.stubGlobal("fetch", fetchSpy);
+
+        render(
+            <ClassifierQueue
+                files={[makeFile("a.pdf")]}
+                operationType="product_documents"
+                suggestedProductTypes={[PT]}
+            />,
+        );
+
+        await screen.findByText(/İşlem: Doküman ekle/, {}, { timeout: 3000 });
+        const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
+        expect((init.body as FormData).get("operation_type")).toBe("product_documents");
     });
 
     it("Strict Mode double-render: fetch STILL called only once (no duplicate POST)", async () => {

@@ -1,14 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { maskCurrency, formatDate } from "@/lib/utils";
 import { useData, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapOrderSummary } from "@/lib/api-mappers";
 import type { Order } from "@/lib/mock-data";
-import Button from "@/components/ui/Button";
+import Button, { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -16,6 +15,7 @@ import { dateDaysFromToday } from "@/lib/stock-utils";
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
+import { Plus, RefreshCw } from "lucide-react";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral" },
@@ -244,32 +244,23 @@ function OrdersList() {
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <button
+                    <Button
+                        variant="toolbar"
+                        size="md"
                         onClick={handleRefresh}
                         disabled={refreshing}
-                        style={{
-                            fontSize: "12px",
-                            padding: "6px 12px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "6px",
-                            background: "transparent",
-                            color: "var(--text-secondary)",
-                            cursor: refreshing ? "not-allowed" : "pointer",
-                            opacity: refreshing ? 0.5 : 1,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "5px",
-                        }}
+                        leftIcon={<RefreshCw size={15} />}
                     >
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <path d="M10 6A4 4 0 1 1 6 2a4 4 0 0 1 3.5 2M10 2v2.5H7.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
                         {refreshing ? "Yenileniyor…" : "Yenile"}
-                    </button>
+                    </Button>
                     {has("manage_sales_orders") && (
-                        <Link href="/dashboard/orders/new">
-                            <Button variant="primary">+ Yeni Sipariş</Button>
-                        </Link>
+                        <ButtonLink
+                            href="/dashboard/orders/new"
+                            size="cta"
+                            leftIcon={<Plus size={16} />}
+                        >
+                            Yeni Sipariş
+                        </ButtonLink>
                     )}
                 </div>
             </div>

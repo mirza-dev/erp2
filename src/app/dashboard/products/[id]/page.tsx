@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { DynamicFieldEdit, FieldEdit } from "@/components/products/DynamicFieldEdit";
+import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 
 // Mirror of server-side ALLOWED_MIME — client-safe (no server module imports).
 // Source of truth: src/lib/supabase/product-attachments.ts ALLOWED_MIME.
@@ -120,15 +121,7 @@ export function getMissingRequiredAttributes(
     fields: ProductTypeFieldRow[],
     attributes: Record<string, unknown>,
 ): string[] {
-    return fields
-        .filter(f => f.required)
-        .filter(f => {
-            const v = attributes[f.field_key];
-            if (v === undefined || v === null || v === "") return true;
-            if (Array.isArray(v) && v.length === 0) return true;
-            return false;
-        })
-        .map(f => f.label_tr);
+    return missingRequiredTechnicalFields(fields, attributes).map(f => f.label_tr);
 }
 
 // Returns the set of attribute keys that will be lost if user switches from
@@ -400,7 +393,7 @@ export default function ProductDetailPage() {
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch("/api/product-types");
+                const res = await fetch("/api/product-types?includeInactive=1");
                 if (!cancelled && res.ok) {
                     const data = await res.json();
                     if (Array.isArray(data)) setProductTypes(data);
@@ -422,7 +415,7 @@ export default function ProductDetailPage() {
         setTypeFieldsLoading(true);
         (async () => {
             try {
-                const res = await fetch(`/api/product-types/${activeTypeId}?withFields=1`);
+                const res = await fetch(`/api/product-types/${activeTypeId}?withFields=1&includeInactive=1`);
                 if (!cancelled && res.ok) {
                     const data: ProductTypeWithFields = await res.json();
                     setActiveTypeFields(Array.isArray(data.fields) ? data.fields : []);
@@ -437,6 +430,8 @@ export default function ProductDetailPage() {
         })();
         return () => { cancelled = true; };
     }, [activeTypeId]);
+
+    const editableTypeFields = activeTypeFields.filter(f => f.is_active);
 
     // Fetch contextual sections (alerts/commitments/quotes) once product is loaded
     useEffect(() => {
@@ -708,7 +703,7 @@ export default function ProductDetailPage() {
     const handleSave = async () => {
         if (!editForm || !product) return;
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
-        const missingRequired = getMissingRequiredAttributes(activeTypeFields, editForm.attributes ?? {});
+        const missingRequired = getMissingRequiredAttributes(editableTypeFields, editForm.attributes ?? {});
         if (missingRequired.length > 0) {
             toast({ type: "error", message: `Zorunlu alanlar eksik: ${missingRequired.join(", ")}` });
             return;
@@ -785,7 +780,7 @@ export default function ProductDetailPage() {
     if (loading) {
         return (
             <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
-                Ürün yükleniyor...
+                Ürün yükleniyor…
             </div>
         );
     }
@@ -1038,16 +1033,18 @@ export default function ProductDetailPage() {
                                         <option value="commercial">Ticari</option>
                                     </select>
                                 </FieldEdit>
-                                <FieldEdit label="Tip Şablonu">
+                                <FieldEdit label="Teknik Şablon">
                                     <select
                                         value={form.productTypeId}
                                         onChange={e => handleTypeChange(e.target.value)}
                                         style={inputStyle}
-                                        aria-label="Tip şablonu"
+                                        aria-label="Teknik şablon"
                                     >
-                                        <option value="">— Tip seçili değil —</option>
+                                        <option value="">— Teknik şablon seçili değil —</option>
                                         {productTypes.map(t => (
-                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                            <option key={t.id} value={t.id} disabled={!t.is_active && t.id !== product.productTypeId}>
+                                                {t.name}{t.is_active ? "" : " (pasif)"}
+                                            </option>
                                         ))}
                                     </select>
                                 </FieldEdit>
@@ -1095,7 +1092,7 @@ export default function ProductDetailPage() {
                             <>
                                 <FieldView label="Ürün Adı" value={product.name} />
                                 <FieldView label="Ürün Tipi" value={product.productType === "manufactured" ? "İmalat" : "Ticari"} />
-                                <FieldView label="Tip Şablonu" value={productTypes.find(t => t.id === product.productTypeId)?.name ?? null} />
+                                <FieldView label="Teknik Şablon" value={productTypes.find(t => t.id === product.productTypeId)?.name ?? null} />
                                 <FieldView label="Kategori" value={product.category} />
                                 <FieldView label="Alt Kategori" value={product.subCategory} />
                                 <FieldView label="Ürün Ailesi" value={product.productFamily} />
@@ -1119,7 +1116,7 @@ export default function ProductDetailPage() {
                         <div style={sectionTitleStyle}>Teknik Özellikler</div>
                         {!activeTypeId ? (
                             <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                                Bu ürün için tip şablonu seçilmemiş. Genel sekmesinden bir tip seç ki tipin teknik alanları burada görünsün.
+                                Bu ürün için teknik şablon seçilmemiş. Genel sekmesinden bir teknik şablon seçince alanlar burada görünür.
                             </div>
                         ) : typeFieldsLoading ? (
                             <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
@@ -1127,14 +1124,19 @@ export default function ProductDetailPage() {
                             </div>
                         ) : activeTypeFields.length === 0 ? (
                             <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                                Bu tip için tanımlı alan yok.{" "}
+                                Bu teknik şablon için tanımlı alan yok.{" "}
                                 <Link href={`/dashboard/settings/product-types/${activeTypeId}`} style={{ color: "var(--accent-text)" }}>
-                                    Tip ayarlarından alan ekle →
+                                    Şablon ayarlarından alan ekle →
                                 </Link>
                             </div>
                         ) : editMode && form ? (
                             <>
-                                {activeTypeFields.map(f => (
+                                {editableTypeFields.length === 0 && (
+                                    <div style={{ padding: "16px 0", color: "var(--text-tertiary)", fontSize: "13px" }}>
+                                        Bu şablonda aktif teknik alan yok.
+                                    </div>
+                                )}
+                                {editableTypeFields.map(f => (
                                     <DynamicFieldEdit
                                         key={f.id}
                                         field={f}
@@ -1142,13 +1144,18 @@ export default function ProductDetailPage() {
                                         onChange={v => setAttribute(f.field_key, v)}
                                     />
                                 ))}
+                                {getMissingRequiredAttributes(editableTypeFields, form.attributes ?? {}).length > 0 && (
+                                    <div role="alert" style={{ marginTop: "10px", fontSize: "12px", color: "var(--warning-text)", padding: "7px 9px", background: "var(--warning-bg)", borderRadius: "5px", border: "0.5px solid var(--warning-border)" }}>
+                                        Zorunlu teknik bilgi eksik: {getMissingRequiredAttributes(editableTypeFields, form.attributes ?? {}).join(", ")}
+                                    </div>
+                                )}
                             </>
                         ) : (
                             <>
                                 {activeTypeFields.map(f => (
                                     <FieldView
                                         key={f.id}
-                                        label={f.label_tr}
+                                        label={`${f.label_tr}${f.is_active ? "" : " (pasif)"}`}
                                         value={formatAttributeValue(f, (product.attributes ?? {})[f.field_key])}
                                     />
                                 ))}

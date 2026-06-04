@@ -16,7 +16,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Bilinçli DROP:** field_key düzenleme (footgun), ürün attribute migration (backend sözleşmesi), focus-trap/Escape (evrensel), create modal maxLength (server validation).
 - **+20 test:** `product-types-ui.test.ts` (buildFieldPayload 7 + detay 8 source-regex + liste 2) + `product-types-list-count.test.ts` (unwrap 3). Mevcut 70 backend test dokunulmadı (70→92). tsc/lint/build temiz, **4460→4480 yeşil**.
 - **Canlı E2E — GÜVENLİ probe (MUTASYON YOK — Yeni Tip/Alan Ekle/Düzenle/Sil/reorder ASLA tıklanmadı; create/delete kalıcı+geri-alınamaz):** login→/dashboard · liste 200 + "Ürün Tipleri" + "N alan" kartları · **`GET /api/product-types` → 9 tip, HER tipte fieldCount, 7/9>0, `Vana=16 == detay alan 16` cross-check (DECISIVE drift-proof)** · detay 200 + **16 'Düzenle' butonu render** + **headline İNTERAKTİF kanıtı (MUTASYON YOK — openEdit saf client state, PATCH yalnız Kaydet'te): Düzenle→modal açıldı, field_key DISABLED+prefill "dn", label_tr round-trip "DN (Nominal Çap)", tip→select textarea görünür/tip→text gizlendi [dinamik iki yönlü], İptal→kapandı [Kaydet TIKLANMADI]** → 🎉 18/18. +Doğrudan helper prod: Vana16/Conta13/Flans9/Fitting7/Bağlantı8/Enstrüman8/Sızdırmazlık7 = seed birebir, `hasNested=false`. **İlk probe `unstable_cache` bayat-entry yakaladı (önceki dev session 8-tip eski shape) → `.next/cache` temizlenip doğrulandı.** Modal-açılış/prefill/dinamik-form CANLI; yalnız save-PATCH + alan-silme offline vitest + 33 route testi ile (mutasyon, canlı tetiklenmedi).
-- **DURUM: COMMIT EDİLDİ + PUSH kullanıcı onayı bekliyor** (push→Coolify prod deploy).
+- **DURUM: COMMIT+PUSH EDİLDİ (`0914b28` → main, `2509dcf..0914b28`, Coolify deploy tetiklendi).**
 
 ---
 

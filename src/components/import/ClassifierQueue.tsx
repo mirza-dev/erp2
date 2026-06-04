@@ -23,6 +23,11 @@ import {
     formatLanguage,
     classifierResultBadge,
 } from "@/lib/classifier-helpers";
+import {
+    DEFAULT_AI_IMPORT_OPERATION,
+    getAiImportOperation,
+    type AiImportOperationType,
+} from "@/lib/ai-import-operations";
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -37,6 +42,7 @@ interface QueuedFile {
     classification: DocumentClassification | null;
     documentId: string | null;
     errorMessage: string | null;
+    operationType: AiImportOperationType;
 }
 
 interface QueuedSuggestedType {
@@ -46,6 +52,7 @@ interface QueuedSuggestedType {
 
 export interface ClassifierQueueProps {
     files: File[];
+    operationType?: AiImportOperationType;
     suggestedProductTypes?: QueuedSuggestedType[];
     onClear?: () => void;
     /**
@@ -70,10 +77,12 @@ function newId(): string {
 
 async function uploadAndClassify(
     file: File,
+    operationType: AiImportOperationType,
     signal?: AbortSignal,
 ): Promise<{ ok: true; document: ImportDocumentRow } | { ok: false; error: string; aborted?: boolean }> {
     const fd = new FormData();
     fd.append("file", file);
+    fd.append("operation_type", operationType);
     try {
         const res = await fetch("/api/import/classify", { method: "POST", body: fd, signal });
         if (!res.ok) {
@@ -90,7 +99,14 @@ async function uploadAndClassify(
     }
 }
 
-export default function ClassifierQueue({ files, suggestedProductTypes = [], onClear, onRemove, onOpenClassicMode }: ClassifierQueueProps) {
+export default function ClassifierQueue({
+    files,
+    operationType = DEFAULT_AI_IMPORT_OPERATION,
+    suggestedProductTypes = [],
+    onClear,
+    onRemove,
+    onOpenClassicMode,
+}: ClassifierQueueProps) {
     const isDemo = useIsDemo();
 
     const [queue, setQueue] = useState<QueuedFile[]>([]);
@@ -142,17 +158,19 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
                         id: newId(), file: f, status: "error", started: true,
                         classification: null, documentId: null,
                         errorMessage: v.reason ?? "Dosya reddedildi.",
+                        operationType,
                     });
                     continue;
                 }
                 additions.push({
                     id: newId(), file: f, status: "uploading", started: false,
                     classification: null, documentId: null, errorMessage: null,
+                    operationType,
                 });
             }
             return additions.length > 0 ? [...prev, ...additions] : prev;
         });
-    }, [files]);
+    }, [files, operationType]);
 
     // Concurrency driver — fetch tetiklemesi yalnız useEffect içinde olmalı
     // (Strict Mode double-render güvenliği + render-phase side-effect yasağı).
@@ -176,7 +194,7 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
         for (const c of candidates) {
             const ctl = new AbortController();
             abortControllersRef.current.set(c.id, ctl);
-            uploadAndClassify(c.file, ctl.signal).then(result => {
+            uploadAndClassify(c.file, c.operationType, ctl.signal).then(result => {
                 abortControllersRef.current.delete(c.id);
                 // Abort edildiyse (remove/clear/unmount): UI'a yansıma yok
                 if (result.ok === false && result.aborted) return;
@@ -273,6 +291,7 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
                     const c = q.classification;
                     const badge = c ? classifierResultBadge(c) : null;
                     const suggestedName = suggestedTypeName(c?.suggested_product_type_id ?? null);
+                    const operation = getAiImportOperation(q.operationType);
                     return (
                         <div
                             key={q.id}
@@ -304,6 +323,10 @@ export default function ClassifierQueue({ files, suggestedProductTypes = [], onC
                                 </div>
                                 {c && (
                                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px", alignItems: "center" }}>
+                                        <span style={{
+                                            fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
+                                            background: "var(--bg-tertiary)", color: "var(--text-secondary)",
+                                        }}>İşlem: {operation.shortTitle}</span>
                                         {badge && (
                                             <span style={{
                                                 fontSize: "11px", padding: "2px 8px", borderRadius: "10px",

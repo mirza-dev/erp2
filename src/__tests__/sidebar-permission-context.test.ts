@@ -25,7 +25,7 @@ describe("Sidebar — Faz 7 permission context", () => {
     });
 
     it("permission filtre davranışı korundu (requiredPermissionForPath)", () => {
-        expect(SOURCE).toMatch(/requiredPermissionForPath\(it\.href\)/);
+        expect(SOURCE).toMatch(/requiredPermissionForPath\(item\.href\)/);
         // perms null → tüm item gösterilir (server gate korur)
         expect(SOURCE).toMatch(/perms === null/);
     });

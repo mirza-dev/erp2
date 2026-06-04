@@ -1,8 +1,8 @@
 /**
  * Faz 3d (2026-05-23) — Import sayfası klasik mod accordion + AI default akış.
  *
- * Tab toggle ("AI ile Aktar" / "Klasik Mod") kaldırıldı; AI akışı her zaman
- * görünür, klasik mod alt <details> accordion'da fallback. migration_excel
+ * Tab toggle ("AI ile Aktar" / eski Excel modu) kaldırıldı; AI akışı her zaman
+ * görünür, Excel/CSV toplu aktarım alt <details> accordion'da fallback. migration_excel
  * tespit edilirse ClassifierQueue onOpenClassicMode callback'i ile parent
  * accordion'u açar.
  *
@@ -37,12 +37,14 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
         expect(SOURCE).not.toMatch(/setMode\("classic"\)/);
     });
 
-    it("AI akışı (DropZone + ClassifierQueue) her zaman render — mode==='ai' guard kalmadı", () => {
+    it("AI belge akışı (DropZone + ClassifierQueue) product/document operasyonlarında render — mode==='ai' guard kalmadı", () => {
         // mode === "ai" koşullu render kaldırıldı
         expect(SOURCE).not.toMatch(/mode === "ai" &&/);
         // DropZone import + render var
         expect(SOURCE).toMatch(/<DropZone/);
         expect(SOURCE).toMatch(/<ClassifierQueue/);
+        // Faz 2 stok/müşteri/tedarikçi operasyonları bilinçli klasik Excel/CSV hattına yönlenir.
+        expect(SOURCE).toMatch(/selectedUsesClassic/);
     });
 
     it("ClassifierQueue'ya onOpenClassicMode prop'u geçer (migration_excel CTA)", () => {
@@ -55,18 +57,18 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
     it("AI empty state — aiFiles.length === 0 ise yardım metni render edilir", () => {
         expect(SOURCE).toMatch(/aiFiles\.length === 0 &&/);
         expect(SOURCE).toMatch(/Henüz dosya yüklenmedi/);
-        // Migration Excel için fallback yönergesi metinde
-        expect(SOURCE).toMatch(/Migration Excel|Klasik Mod/);
+        // Excel/CSV tabloları için yeni toplu aktarım merkezi yönergesi metinde
+        expect(SOURCE).toMatch(/Excel\/CSV ile Toplu Aktarım/);
     });
 
-    it("Klasik mod <details> accordion içine alındı, default kapalı (showClassic=false)", () => {
+    it("Excel/CSV toplu aktarım <details> accordion içine alındı, default kapalı (showClassic=false)", () => {
         // <details> elementi + open binding
         expect(SOURCE).toMatch(/<details/);
         expect(SOURCE).toMatch(/open=\{showClassic\}/);
         // onToggle ile state senkron
         expect(SOURCE).toMatch(/onToggle=\{.*setShowClassic/);
-        // Summary etiketinde "Klasik Mod" ve "Gelişmiş"
-        expect(SOURCE).toMatch(/Gelişmiş.*Klasik Mod|Klasik Mod.*Gelişmiş/i);
+        // Summary etiketinde yeni premium Excel/CSV merkezi adı var
+        expect(SOURCE).toMatch(/Excel\/CSV ile Toplu Aktarım/);
     });
 
     it("Klasik wizard içeriği accordion'ın içinde — mode==='classic' guard kalmadı", () => {
@@ -136,5 +138,28 @@ describe("Faz 3d — import page klasik mod accordion + AI polish", () => {
         expect(E2E_SRC).toMatch(/getByTestId\("import-error-banner"\)/);
         // Defense-in-depth — eski selector geri gelirse strict-mode collision döner
         expect(E2E_SRC).not.toMatch(/getByRole\("alert"\)/);
+    });
+
+    it("Faz 2: vendor/stock sheet adları klasik wizard mapping'inde desteklenir", () => {
+        expect(SOURCE).toMatch(/Tedarikciler/);
+        expect(SOURCE).toMatch(/Tedarikçi_Ürünleri/);
+        expect(SOURCE).toMatch(/Stok_Sayimi/);
+        expect(SOURCE).toMatch(/Stok_Hareketleri/);
+    });
+
+    it("Faz 2: apply-mappings request seçili operation_type taşır", () => {
+        expect(SOURCE).toMatch(/operation_type:\s*aiOperationType/);
+    });
+
+    it("Faz 2: internal operation marker preview tablosunda gösterilmez", () => {
+        expect(SOURCE).toMatch(/INTERNAL_IMPORT_FIELDS/);
+        expect(SOURCE).toMatch(/__ai_import_operation/);
+        expect(SOURCE).toMatch(/!INTERNAL_IMPORT_FIELDS\.has\(k\)/);
+    });
+
+    it("AI import sayfası aktif olmayan plan/phase rozetlerini kullanıcıya göstermez", () => {
+        expect(SOURCE).not.toMatch(/Faz 2 ve ürün tipi şablon işlemleri/);
+        expect(SOURCE).not.toMatch(/PLANNED_AI_IMPORT_OPERATIONS/);
+        expect(SOURCE).not.toMatch(/getPlannedAiImportOperations/);
     });
 });

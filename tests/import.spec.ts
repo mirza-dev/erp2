@@ -1,7 +1,7 @@
 /**
  * Import Wizard E2E Tests — klasik 7-adım wizard akışı.
  *
- * Faz 3d (2026-05-23): "AI ile Aktar" / "Klasik Mod" tab toggle kaldırıldı;
+ * Faz 3d (2026-05-23): "AI ile Aktar" / eski Excel modu tab toggle kaldırıldı;
  * klasik wizard sayfanın altında <details> accordion'a alındı (default kapalı).
  * AI default akışında DropZone'un kendi <input type="file"> var → eski genel
  * `page.locator(CLASSIC_FILE_INPUT)` locator'ı Playwright strict mode'da
@@ -21,6 +21,7 @@ const TXT_PATH  = path.join(__dirname, "fixtures/invalid.txt");
 // Faz 3d: page.tsx classic wizard input'una testid eklendi (AI dropzone input'u
 // ile karışmasın diye). Tüm aşağıdaki test'ler bu testid'i kullanır.
 const CLASSIC_FILE_INPUT = "[data-testid='classic-import-file']";
+const COLUMN_MAPPING_BUTTON = /kolon eşleştirmeye geç/i;
 
 // Create a small invalid file for testing
 import fs from "fs";
@@ -31,6 +32,13 @@ if (!fs.existsSync(path.join(__dirname, "fixtures/invalid.txt"))) {
 test.beforeEach(async ({ page }) => {
     await page.goto("/dashboard/import");
     await page.waitForLoadState("networkidle");
+    const demoLink = page.getByRole("link", { name: /demo ile gezin/i });
+    if (await demoLink.isVisible().catch(() => false)) {
+        await demoLink.click();
+        await page.waitForURL(/\/dashboard(?:\/.*)?$/, { timeout: 15_000 });
+        await page.goto("/dashboard/import");
+        await page.waitForLoadState("networkidle");
+    }
     // Faz 3d: klasik wizard accordion'ı testler için programmatic aç. <summary>
     // tıklama animasyonla async olabildiği için doğrudan DOM mutasyonu daha
     // güvenilir. classicDetailsRef React state'ine onToggle ile senkron olur.
@@ -129,7 +137,7 @@ test("'Kolon Eşleştirmeye Geç' butonu tıklanıyor → mapping tablosu görü
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();
 
     // Next button
-    const nextBtn = page.getByRole("button", { name: /kolon eşleştirme|devam|ileri/i });
+    const nextBtn = page.getByRole("button", { name: COLUMN_MAPPING_BUTTON });
     await expect(nextBtn).toBeEnabled({ timeout: 5_000 });
     await nextBtn.click();
 
@@ -150,7 +158,7 @@ test("kolon mapping tablosunda source chip'ler görünür (memory/fallback/ai)",
     const firstCheckbox = page.locator("input[type='checkbox']").first();
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();
 
-    await page.getByRole("button", { name: /kolon eşleştirme|devam|ileri/i }).click();
+    await page.getByRole("button", { name: COLUMN_MAPPING_BUTTON }).click();
 
     // Chip'ler: "Hafıza", "AI", "Fallback", "Kullanıcı"
     await expect(
@@ -166,7 +174,7 @@ test("dropdown ile alan değiştirilince chip 'Kullanıcı' (sarı) oluyor", asy
 
     const firstCheckbox = page.locator("input[type='checkbox']").first();
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();
-    await page.getByRole("button", { name: /kolon eşleştirme|devam|ileri/i }).click();
+    await page.getByRole("button", { name: COLUMN_MAPPING_BUTTON }).click();
 
     // Wait for mappings to load
     const firstSelect = page.locator("select, [role='combobox']").first();
@@ -191,7 +199,7 @@ test("preview ekranı draft tablosunu gösteriyor", async ({ page }) => {
 
     const firstCheckbox = page.locator("input[type='checkbox']").first();
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();
-    await page.getByRole("button", { name: /kolon eşleştirme|devam|ileri/i }).click();
+    await page.getByRole("button", { name: COLUMN_MAPPING_BUTTON }).click();
 
     // Wait for column mapping
     await page.waitForTimeout(5_000);
@@ -239,7 +247,7 @@ test("tam import akışı: dosya → done ekranı", async ({ page }) => {
     }
 
     // → column_mapping
-    await page.getByRole("button", { name: /kolon eşleştirme|devam|ileri/i }).click();
+    await page.getByRole("button", { name: COLUMN_MAPPING_BUTTON }).click();
     await page.waitForTimeout(8_000);  // AI detection may take time
 
     // → preview ("Eşleştirmeyi Uygula" veya "Önizleme" butonu)
@@ -281,7 +289,7 @@ test("geri navigasyon (column_mapping → sheet_select) batch'i siliyor", async 
 
     const firstCheckbox = page.locator("input[type='checkbox']").first();
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();
-    await page.getByRole("button", { name: /kolon eşleştirme|devam|ileri/i }).click();
+    await page.getByRole("button", { name: COLUMN_MAPPING_BUTTON }).click();
     await page.waitForTimeout(3_000);
 
     // Back button

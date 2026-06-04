@@ -5,7 +5,7 @@
  *   isValidFieldKey, isValidFieldType pure helpers
  *   dbCreateProductType validation
  *   dbAddProductTypeField validation
- *   dbDeleteProductType — sistem tipi guard, ürün bağlı guard
+ *   dbDeleteProductType — güvenli pasifleştirme
  *   dbReorderProductTypeFields — geçersiz id reddedilir
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -195,16 +195,18 @@ describe("dbReorderProductTypeFields", () => {
     });
 });
 
-// ── dbDeleteProductType guards ──────────────────────────────────
+// ── dbDeleteProductType safe deactivate ─────────────────────────
 
 describe("dbDeleteProductType", () => {
-    it("sistem tipi → reddedilir", async () => {
+    it("sistem tipi dahil hard-delete yerine is_active=false yazar", async () => {
         const { dbDeleteProductType } = await vi.importActual<typeof import("@/lib/supabase/product-types")>("@/lib/supabase/product-types");
         mockSingle.mockResolvedValueOnce({
             data: { id: "t-1", name: "Vana", is_system: true },
             error: null,
         });
-        await expect(dbDeleteProductType("t-1")).rejects.toThrow("Sistem tipi silinemez");
+        await expect(dbDeleteProductType("t-1")).resolves.toBeUndefined();
+        expect(mockUpdate).toHaveBeenCalledWith({ is_active: false });
+        expect(mockDelete).not.toHaveBeenCalled();
     });
 
     it("tip bulunamadı → reddedilir", async () => {

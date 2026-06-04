@@ -4,6 +4,7 @@ import type {
     ProductTypeFieldRow,
     ProductFieldType,
 } from "@/lib/database.types";
+import { isBlankTechnicalValue } from "@/lib/technical-templates";
 
 // ── Validation ──────────────────────────────────────────────
 
@@ -35,6 +36,7 @@ export interface UpdateProductTypeInput {
     description?: string | null;
     icon?: string | null;
     sort_order?: number;
+    is_active?: boolean;
 }
 
 export interface CreateProductTypeFieldInput {
@@ -52,12 +54,14 @@ export interface CreateProductTypeFieldInput {
 }
 
 export interface UpdateProductTypeFieldInput {
+    field_key?: string;
     label_tr?: string;
     label_en?: string | null;
     field_type?: ProductFieldType;
     unit?: string | null;
     options?: string[] | null;
     required?: boolean;
+    is_active?: boolean;
     placeholder?: string | null;
     help_text?: string | null;
     sort_order?: number;
@@ -65,6 +69,21 @@ export interface UpdateProductTypeFieldInput {
 
 export interface ProductTypeWithFieldsRow extends ProductTypeRow {
     fields: ProductTypeFieldRow[];
+}
+
+export interface ProductTypeStatsRow extends ProductTypeRow {
+    product_count: number;
+    field_count: number;
+    required_field_count: number;
+    missing_required_product_count: number;
+}
+
+export interface ProductTypeQueryOptions {
+    includeInactive?: boolean;
+}
+
+export interface ProductTypeFieldsQueryOptions {
+    includeInactive?: boolean;
 }
 
 // ── Validators ──────────────────────────────────────────────
@@ -108,70 +127,127 @@ function validateFieldInput(input: CreateProductTypeFieldInput | UpdateProductTy
 
 // ── List / Read ─────────────────────────────────────────────
 
-/** Liste satırı = tip + alan sayısı (liste UI'ı için; N+1 fetch'i ortadan kaldırır). */
-export type ProductTypeListRow = ProductTypeRow & { fieldCount: number };
-
-export async function dbListProductTypes(): Promise<ProductTypeListRow[]> {
+export async function dbListProductTypes(options: ProductTypeQueryOptions = {}): Promise<ProductTypeRow[]> {
     const supabase = createServiceClient();
-    // Nested count ile tek sorguda alan sayısı (PostgREST shape: product_type_fields: [{ count: N }]).
-    const { data, error } = await supabase
+    let query = supabase
         .from("product_types")
-        .select("*, product_type_fields(count)")
+        .select("*")
         .order("sort_order", { ascending: true })
         .order("name", { ascending: true });
 
+    if (!options.includeInactive) query = query.eq("is_active", true);
+
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
-    return (data ?? []).map((row) => {
-        const { product_type_fields, ...rest } = row as ProductTypeRow & {
-            product_type_fields?: { count: number }[] | null;
-        };
-        const fieldCount = Array.isArray(product_type_fields) && product_type_fields.length > 0
-            ? Number(product_type_fields[0]?.count ?? 0)
-            : 0;
-        return { ...(rest as ProductTypeRow), fieldCount };
-    });
+    return data ?? [];
 }
 
-export async function dbGetProductType(id: string): Promise<ProductTypeRow | null> {
+export async function dbGetProductType(
+    id: string,
+    options: ProductTypeQueryOptions = {},
+): Promise<ProductTypeRow | null> {
     const supabase = createServiceClient();
-    const { data, error } = await supabase
+    let query = supabase
         .from("product_types")
         .select("*")
-        .eq("id", id)
-        .single();
+        .eq("id", id);
+    if (!options.includeInactive) query = query.eq("is_active", true);
+    const { data, error } = await query.single();
     if (error || !data) return null;
     return data;
 }
 
-export async function dbGetProductTypeWithFields(id: string): Promise<ProductTypeWithFieldsRow | null> {
+export async function dbGetProductTypeWithFields(
+    id: string,
+    options: ProductTypeFieldsQueryOptions = {},
+): Promise<ProductTypeWithFieldsRow | null> {
     const supabase = createServiceClient();
     const { data: type, error: tErr } = await supabase
         .from("product_types").select("*").eq("id", id).single();
     if (tErr || !type) return null;
+    if (!options.includeInactive && (type as ProductTypeRow).is_active === false) return null;
 
-    const { data: fields, error: fErr } = await supabase
+    let fieldsQuery = supabase
         .from("product_type_fields")
         .select("*")
         .eq("product_type_id", id)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
 
+    if (!options.includeInactive) fieldsQuery = fieldsQuery.eq("is_active", true);
+
+    const { data: fields, error: fErr } = await fieldsQuery;
     if (fErr) throw new Error(fErr.message);
 
     return { ...(type as ProductTypeRow), fields: (fields ?? []) as ProductTypeFieldRow[] };
 }
 
-export async function dbListProductTypeFields(productTypeId: string): Promise<ProductTypeFieldRow[]> {
+export async function dbListProductTypeFields(
+    productTypeId: string,
+    options: ProductTypeFieldsQueryOptions = {},
+): Promise<ProductTypeFieldRow[]> {
     const supabase = createServiceClient();
-    const { data, error } = await supabase
+    let query = supabase
         .from("product_type_fields")
         .select("*")
         .eq("product_type_id", productTypeId)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
 
+    if (!options.includeInactive) query = query.eq("is_active", true);
+
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data ?? [];
+}
+
+export async function dbListProductTypesWithStats(
+    options: ProductTypeQueryOptions = {},
+): Promise<ProductTypeStatsRow[]> {
+    const supabase = createServiceClient();
+    const [types, fieldsRes, productsRes] = await Promise.all([
+        dbListProductTypes(options),
+        supabase.from("product_type_fields").select("*"),
+        supabase.from("products").select("id, product_type_id, attributes, is_active").eq("is_active", true),
+    ]);
+
+    const { data: fields, error: fieldsError } = fieldsRes;
+    if (fieldsError) throw new Error(fieldsError.message);
+    const { data: products, error: productsError } = productsRes;
+    if (productsError) throw new Error(productsError.message);
+
+    const productsByType = new Map<string, Array<{ attributes: Record<string, unknown> | null }>>();
+    for (const product of products ?? []) {
+        const typeId = product.product_type_id as string | null;
+        if (!typeId) continue;
+        const list = productsByType.get(typeId) ?? [];
+        list.push({ attributes: (product.attributes ?? {}) as Record<string, unknown> });
+        productsByType.set(typeId, list);
+    }
+
+    const fieldsByType = new Map<string, ProductTypeFieldRow[]>();
+    for (const field of (fields ?? []) as ProductTypeFieldRow[]) {
+        const list = fieldsByType.get(field.product_type_id) ?? [];
+        list.push(field);
+        fieldsByType.set(field.product_type_id, list);
+    }
+
+    return types.map(type => {
+        const typeFields = (fieldsByType.get(type.id) ?? []).filter(f => f.is_active !== false);
+        const required = typeFields.filter(f => f.required);
+        const typeProducts = productsByType.get(type.id) ?? [];
+        const missingCount = typeProducts.filter(product =>
+            required.some(field => isBlankTechnicalValue(product.attributes?.[field.field_key]))
+        ).length;
+
+        return {
+            ...type,
+            product_count: typeProducts.length,
+            field_count: typeFields.length,
+            required_field_count: required.length,
+            missing_required_product_count: missingCount,
+        };
+    });
 }
 
 // ── Create / Update / Delete (types) ────────────────────────
@@ -224,6 +300,7 @@ export async function dbUpdateProductType(id: string, patch: UpdateProductTypeIn
     if (patch.description !== undefined) updatePayload.description = patch.description;
     if (patch.icon !== undefined) updatePayload.icon = patch.icon;
     if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
+    if (patch.is_active !== undefined) updatePayload.is_active = patch.is_active;
 
     // Kullanıcı bir alanı düzenlerse, is_system kilidi düşer (artık "sistem tipi" sayılmaz).
     if (Object.keys(updatePayload).length > 0 && existing.is_system) {
@@ -262,27 +339,18 @@ export async function dbDeleteProductType(id: string): Promise<void> {
         .from("product_types").select("*").eq("id", id).single();
     if (!existing) throw new Error("Tip bulunamadı.");
 
-    if (existing.is_system) {
-        throw new Error("Sistem tipi silinemez. Önce 'is_system' kilidini düşürmek için tipi düzenleyin.");
-    }
-
-    // Aktif ürün guard'ı: bu tipe bağlı ürün varsa silinemez (set null → veri kaybı).
-    const { count } = await supabase
-        .from("products")
-        .select("id", { count: "exact", head: true })
-        .eq("product_type_id", id);
-    if ((count ?? 0) > 0) {
-        throw new Error(`Bu tipe bağlı ${count} ürün var; tip silinemez.`);
-    }
-
-    const { error } = await supabase.from("product_types").delete().eq("id", id);
+    const { error } = await supabase
+        .from("product_types")
+        .update({ is_active: false })
+        .eq("id", id);
     if (error) throw new Error(error.message);
 
     await supabase.from("audit_log").insert({
-        action: "product_type_deleted",
+        action: "product_type_deactivated",
         entity_type: "product_type",
         entity_id: id,
-        before_state: { name: existing.name, icon: existing.icon },
+        before_state: { name: existing.name, icon: existing.icon, is_active: existing.is_active },
+        after_state: { is_active: false },
         source: "ui",
     });
 }
@@ -317,6 +385,7 @@ export async function dbAddProductTypeField(input: CreateProductTypeFieldInput):
             placeholder: input.placeholder ?? null,
             help_text: input.help_text ?? null,
             sort_order: input.sort_order ?? 0,
+            is_active: true,
         })
         .select()
         .single();
@@ -373,12 +442,55 @@ export async function dbUpdateProductTypeField(
         .from("product_types").select("id, is_system").eq("id", existing.product_type_id).single();
 
     const updatePayload: Record<string, unknown> = {};
+    if (patch.field_key !== undefined && patch.field_key !== existing.field_key) {
+        if (!isValidFieldKey(patch.field_key)) {
+            throw new Error("Alan anahtarı geçersiz (küçük harf, rakam, alt çizgi; harf ile başlamalı).");
+        }
+        const { data: sibling } = await supabase
+            .from("product_type_fields")
+            .select("id")
+            .eq("product_type_id", existing.product_type_id)
+            .eq("field_key", patch.field_key)
+            .maybeSingle();
+        if (sibling?.id && sibling.id !== id) {
+            throw new Error("Bu alan anahtarı bu tipte zaten var.");
+        }
+
+        const { data: affectedProducts, error: affectedError } = await supabase
+            .from("products")
+            .select("id, attributes")
+            .eq("product_type_id", existing.product_type_id);
+        if (affectedError) throw new Error(affectedError.message);
+
+        for (const product of affectedProducts ?? []) {
+            const attrs = ((product.attributes ?? {}) as Record<string, unknown>);
+            if (!Object.prototype.hasOwnProperty.call(attrs, existing.field_key)) continue;
+            if (Object.prototype.hasOwnProperty.call(attrs, patch.field_key)) {
+                throw new Error("Teknik anahtar değiştirilemedi: bazı ürünlerde yeni anahtar zaten dolu.");
+            }
+        }
+
+        for (const product of affectedProducts ?? []) {
+            const attrs = { ...((product.attributes ?? {}) as Record<string, unknown>) };
+            if (!Object.prototype.hasOwnProperty.call(attrs, existing.field_key)) continue;
+            attrs[patch.field_key] = attrs[existing.field_key];
+            delete attrs[existing.field_key];
+            const { error: productErr } = await supabase
+                .from("products")
+                .update({ attributes: attrs })
+                .eq("id", product.id);
+            if (productErr) throw new Error(productErr.message);
+        }
+
+        updatePayload.field_key = patch.field_key;
+    }
     if (patch.label_tr !== undefined) updatePayload.label_tr = patch.label_tr.trim();
     if (patch.label_en !== undefined) updatePayload.label_en = patch.label_en;
     if (patch.field_type !== undefined) updatePayload.field_type = patch.field_type;
     if (patch.unit !== undefined) updatePayload.unit = patch.unit;
     if (patch.options !== undefined) updatePayload.options = patch.options;
     if (patch.required !== undefined) updatePayload.required = patch.required;
+    if (patch.is_active !== undefined) updatePayload.is_active = patch.is_active;
     if (patch.placeholder !== undefined) updatePayload.placeholder = patch.placeholder;
     if (patch.help_text !== undefined) updatePayload.help_text = patch.help_text;
     if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
@@ -406,6 +518,7 @@ export async function dbUpdateProductTypeField(
             field_key: existing.field_key,
             field_type: existing.field_type,
             required: existing.required,
+            is_active: existing.is_active,
             ...(parent?.is_system ? { is_system: true } : {}),
         },
         after_state: {
@@ -430,28 +543,35 @@ export async function dbDeleteProductTypeField(id: string, expectedTypeId?: stri
         throw new Error("Alan bu tipe ait değil.");
     }
 
-    // Parent type'ın is_system durumunu çek (system tipi field silinince kilidi düşer).
+    // Parent type'ın is_system durumunu çek (system tipi field pasifleşince kilidi düşer).
     const { data: parent } = await supabase
         .from("product_types").select("id, is_system").eq("id", existing.product_type_id).single();
 
-    const { error } = await supabase.from("product_type_fields").delete().eq("id", id);
+    const { error } = await supabase
+        .from("product_type_fields")
+        .update({ is_active: false })
+        .eq("id", id);
     if (error) throw new Error(error.message);
 
-    // System tipi field silinince kullanıcı tipi sayılır → kilidi düşür.
+    // System tipi field pasifleşince kullanıcı tipi sayılır → kilidi düşür.
     if (parent?.is_system) {
         await supabase.from("product_types").update({ is_system: false }).eq("id", existing.product_type_id);
     }
 
     await supabase.from("audit_log").insert({
-        action: "product_type_field_deleted",
+        action: "product_type_field_deactivated",
         entity_type: "product_type",
         entity_id: existing.product_type_id,
         before_state: {
             field_key: existing.field_key,
             field_type: existing.field_type,
+            is_active: existing.is_active,
             ...(parent?.is_system ? { is_system: true } : {}),
         },
-        after_state: parent?.is_system ? { is_system: false } : null,
+        after_state: {
+            is_active: false,
+            ...(parent?.is_system ? { is_system: false } : {}),
+        },
         source: "ui",
     });
 }
@@ -469,7 +589,8 @@ export async function dbReorderProductTypeFields(
     const { data: existing } = await supabase
         .from("product_type_fields")
         .select("id")
-        .eq("product_type_id", productTypeId);
+        .eq("product_type_id", productTypeId)
+        .eq("is_active", true);
 
     const existingIds = new Set((existing ?? []).map((f) => f.id));
     for (const id of fieldIdsInOrder) {
@@ -487,7 +608,8 @@ export async function dbReorderProductTypeFields(
             .from("product_type_fields")
             .update({ sort_order: (i + 1) * 10 })
             .eq("id", fieldIdsInOrder[i])
-            .eq("product_type_id", productTypeId);
+            .eq("product_type_id", productTypeId)
+            .eq("is_active", true);
         if (error) throw new Error(error.message);
     }
 
@@ -511,7 +633,7 @@ export async function dbReorderProductTypes(idsInOrder: string[]): Promise<void>
     const supabase = createServiceClient();
 
     const { data: existing } = await supabase
-        .from("product_types").select("id");
+        .from("product_types").select("id").eq("is_active", true);
     const existingIds = new Set((existing ?? []).map((t) => t.id));
     for (const id of idsInOrder) {
         if (!existingIds.has(id)) throw new Error("Sıralama listesinde geçersiz tip id'si var.");
@@ -521,7 +643,8 @@ export async function dbReorderProductTypes(idsInOrder: string[]): Promise<void>
         const { error } = await supabase
             .from("product_types")
             .update({ sort_order: (i + 1) * 10 })
-            .eq("id", idsInOrder[i]);
+            .eq("id", idsInOrder[i])
+            .eq("is_active", true);
         if (error) throw new Error(error.message);
     }
 }

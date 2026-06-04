@@ -18,8 +18,18 @@ import {
 } from "@/lib/supabase/import-documents";
 import { dbListLinesByDocument } from "@/lib/supabase/import-document-lines";
 import { dbCreateProduct, dbUpdateProduct, dbGetProductById } from "@/lib/supabase/products";
-import { dbCreateAttachment, dbSupersedeCertificatesByName } from "@/lib/supabase/product-attachments";
-import type { ImportDocumentLineRow } from "@/lib/database.types";
+import {
+    dbCreateAttachment,
+    dbListAttachmentsByProduct,
+    dbSetPrimaryImage,
+    dbSupersedeCertificatesByName,
+} from "@/lib/supabase/product-attachments";
+import { dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
+import type {
+    DocumentType,
+    ImportDocumentLineRow,
+    ProductAttachmentKind,
+} from "@/lib/database.types";
 
 const STORAGE_BUCKET = "product-files";
 
@@ -30,6 +40,7 @@ export interface ApplyResult {
     products_updated: number;
     attachments_created: number;
     attachments_superseded: number;
+    technical_fields_applied: number;
     skipped: number;
     errors: string[]; // "Satır N: <reason>"
     untyped_products: number;
@@ -41,12 +52,22 @@ export interface ApplyResult {
     status_update_failed: boolean;
 }
 
+export interface ApplyFieldApproval {
+    productFields?: string[];
+    technicalAttributeKeys: string[];
+}
+
+export interface ApplyOptions {
+    fieldApprovals?: Record<string, ApplyFieldApproval>;
+}
+
 function emptyResult(): ApplyResult {
     return {
         products_created: 0,
         products_updated: 0,
         attachments_created: 0,
         attachments_superseded: 0,
+        technical_fields_applied: 0,
         skipped: 0,
         errors: [],
         untyped_products: 0,
@@ -61,7 +82,11 @@ function emptyResult(): ApplyResult {
  * 'manufactured' alanı için Faz 1 default 'manufactured' kullanılır
  * (commercial seçimi UI'dan sonra yapılır).
  */
-function buildCreateProductInput(line: ImportDocumentLineRow): {
+function buildCreateProductInput(
+    line: ImportDocumentLineRow,
+    attributes: Record<string, unknown>,
+    productTypeId: string | null,
+): {
     name: string; sku: string; unit: string;
     product_type_id: string | null;
     attributes: Record<string, unknown>;
@@ -74,14 +99,148 @@ function buildCreateProductInput(line: ImportDocumentLineRow): {
         name,
         sku,
         unit: "adet", // PMT için varsayılan; UI sonra düzeltebilir
-        product_type_id: line.product_type_id,
-        attributes: line.extracted_attributes ?? {},
+        product_type_id: productTypeId,
+        attributes,
     };
+}
+
+const PRODUCT_CORE_FIELDS = new Set(["name", "sku", "product_type_id"]);
+
+function resolveAttachmentKindFromDocument(input: {
+    documentType: DocumentType | null | undefined;
+    mimeType: string | null | undefined;
+}): ProductAttachmentKind {
+    if (input.documentType === "product_photo" || input.mimeType?.startsWith("image/")) {
+        return "image";
+    }
+    if (input.documentType === "product_datasheet" || input.documentType === "product_catalog") {
+        return "datasheet";
+    }
+    if (
+        input.documentType === "material_certificate"
+        || input.documentType === "compliance_doc"
+        || input.documentType === "test_report"
+    ) {
+        return "certificate";
+    }
+    return "other";
+}
+
+async function ensurePrimaryImageIfMissing(input: {
+    productId: string;
+    attachmentId: string;
+    result: ApplyResult;
+    lineNumber: number;
+}) {
+    try {
+        const images = await dbListAttachmentsByProduct(input.productId, "image");
+        const hasPrimary = images.some(image => image.is_primary_image);
+        if (!hasPrimary) {
+            await dbSetPrimaryImage(input.productId, input.attachmentId);
+        }
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        input.result.errors.push(
+            `Satır ${input.lineNumber}: ana görsel uyarısı — ${msg}`,
+        );
+    }
+}
+
+async function validateTechnicalAttributesForApply(
+    attributes: Record<string, unknown>,
+    productTypeId: string | null,
+): Promise<Record<string, unknown>> {
+    const keys = Object.keys(attributes);
+    if (keys.length === 0) return {};
+
+    if (!productTypeId) {
+        throw new Error("teknik özellik var ama teknik şablon seçilmemiş");
+    }
+
+    const typeWithFields = await dbGetProductTypeWithFields(productTypeId);
+    if (!typeWithFields || typeWithFields.is_active === false) {
+        throw new Error("teknik şablon aktif değil veya bulunamadı");
+    }
+
+    const allowedKeys = new Set(typeWithFields.fields.map(field => field.field_key));
+    const unknownKeys = keys.filter(key => !allowedKeys.has(key));
+    if (unknownKeys.length > 0) {
+        throw new Error(`teknik şablonda olmayan alanlar: ${unknownKeys.join(", ")}`);
+    }
+
+    return attributes;
+}
+
+async function auditTechnicalTemplateApply(input: {
+    documentId: string;
+    line: ImportDocumentLineRow;
+    productId: string;
+    productTypeId: string | null;
+    appliedAttributes: Record<string, unknown>;
+    appliedEvidence: Record<string, unknown>;
+    actorUserId: string | null;
+}) {
+    const attributeKeys = Object.keys(input.appliedAttributes);
+    if (attributeKeys.length === 0) return;
+    try {
+        const sb = createServiceClient();
+        const { error } = await sb.from("audit_log").insert({
+            action: "technical_template_ai_applied",
+            entity_type: "product",
+            entity_id: input.productId,
+            after_state: {
+                import_document_id: input.documentId,
+                import_document_line_id: input.line.id,
+                product_type_id: input.productTypeId,
+                attribute_keys: attributeKeys,
+                evidence: input.appliedEvidence,
+            },
+            source: "ui",
+            actor: input.actorUserId,
+        });
+        if (error) console.warn("[import-apply] technical audit insert failed:", error);
+    } catch (err) {
+        console.warn("[import-apply] technical audit exception:", err);
+    }
+}
+
+function pickApprovedTechnicalAttributes(
+    line: ImportDocumentLineRow,
+    options?: ApplyOptions,
+): {
+    attributes: Record<string, unknown>;
+    evidence: Record<string, unknown>;
+} {
+    const attrs = line.extracted_attributes ?? {};
+    const evidence = line.extraction_evidence ?? {};
+    const approval = options?.fieldApprovals?.[line.id];
+    if (!approval) {
+        return { attributes: attrs, evidence };
+    }
+
+    const allowed = new Set(approval.technicalAttributeKeys);
+    const approvedAttributes = Object.fromEntries(
+        Object.entries(attrs).filter(([key]) => allowed.has(key)),
+    );
+    const approvedEvidence = Object.fromEntries(
+        Object.entries(evidence).filter(([key]) => allowed.has(key)),
+    );
+    return { attributes: approvedAttributes, evidence: approvedEvidence };
+}
+
+function approvedProductFieldsForLine(
+    line: ImportDocumentLineRow,
+    options?: ApplyOptions,
+): Set<string> | null {
+    const approval = options?.fieldApprovals?.[line.id];
+    if (!approval) return null;
+    return new Set((approval.productFields ?? []).filter(field => PRODUCT_CORE_FIELDS.has(field)));
 }
 
 export async function serviceApplyImportDocument(
     documentId: string,
     actorUserId: string | null,
+    options?: ApplyOptions,
 ): Promise<ApplyResult> {
     // Faz 3c Review 3.tur (P2 race): Atomik CAS — apply yetkisi al.
     // classified → applying tek SQL'de; yarışı kazanan iş yapar, kaybeden
@@ -118,10 +277,10 @@ export async function serviceApplyImportDocument(
             return result;
         }
 
-        // 3. Storage download (yalnız cert flow'larında kullanılır; bir kere yükle)
+        // 3. Storage download (dosya ekleme flow'larında kullanılır; bir kere yükle)
         let docBuffer: Buffer | null = null;
-        const hasCert = eligible.some(l => l.extraction_type === "certificate_target");
-        if (hasCert) {
+        const hasAttachmentTarget = eligible.some(l => l.extraction_type === "certificate_target");
+        if (hasAttachmentTarget) {
             const sb = createServiceClient();
             const { data: blob, error: dlErr } = await sb.storage
                 .from(STORAGE_BUCKET)
@@ -136,10 +295,28 @@ export async function serviceApplyImportDocument(
         for (const line of eligible) {
             try {
                 if (line.extraction_type === "product") {
+                    const approved = pickApprovedTechnicalAttributes(line, options);
+                    const approvedProductFields = approvedProductFieldsForLine(line, options);
                     if (line.match_action === "new_product") {
-                        const input = buildCreateProductInput(line);
-                        await dbCreateProduct(input);
+                        const productTypeApproved = approvedProductFields === null
+                            ? true
+                            : approvedProductFields.has("product_type_id");
+                        const createProductTypeId = productTypeApproved ? line.product_type_id : null;
+                        const createAttributes = productTypeApproved ? approved.attributes : {};
+                        const input = buildCreateProductInput(line, createAttributes, createProductTypeId);
+                        input.attributes = await validateTechnicalAttributesForApply(input.attributes, input.product_type_id);
+                        const created = await dbCreateProduct(input);
+                        await auditTechnicalTemplateApply({
+                            documentId,
+                            line,
+                            productId: created.id,
+                            productTypeId: input.product_type_id,
+                            appliedAttributes: input.attributes,
+                            appliedEvidence: approved.evidence,
+                            actorUserId,
+                        });
                         result.products_created += 1;
+                        result.technical_fields_applied += Object.keys(input.attributes).length;
                         if (!input.product_type_id) result.untyped_products += 1;
                     } else {
                         // matched | reviewed
@@ -150,56 +327,118 @@ export async function serviceApplyImportDocument(
                         if (!current) {
                             throw new Error("eşleşen ürün bulunamadı");
                         }
+                        const productTypeApproved = approvedProductFields === null
+                            ? true
+                            : approvedProductFields.has("product_type_id");
+                        const effectiveProductTypeId = current.product_type_id
+                            ?? (productTypeApproved ? line.product_type_id : null);
+                        const safeLineAttributes = await validateTechnicalAttributesForApply(
+                            effectiveProductTypeId ? approved.attributes : {},
+                            effectiveProductTypeId,
+                        );
+                        const productPatch: Record<string, unknown> = {};
+                        if (
+                            approvedProductFields?.has("name")
+                            && typeof line.extracted_name === "string"
+                            && line.extracted_name.trim().length > 0
+                            && line.extracted_name.trim() !== current.name
+                        ) {
+                            productPatch.name = line.extracted_name.trim();
+                        }
+                        if (
+                            approvedProductFields?.has("sku")
+                            && typeof line.extracted_sku === "string"
+                            && line.extracted_sku.trim().length > 0
+                            && line.extracted_sku.trim() !== current.sku
+                        ) {
+                            productPatch.sku = line.extracted_sku.trim();
+                        }
+                        const shouldSetProductType = productTypeApproved
+                            && !current.product_type_id
+                            && Boolean(effectiveProductTypeId);
+                        if (shouldSetProductType) {
+                            productPatch.product_type_id = effectiveProductTypeId;
+                        }
+                        if (Object.keys(safeLineAttributes).length === 0 && Object.keys(productPatch).length === 0) {
+                            result.skipped += 1;
+                            continue;
+                        }
                         // attributes merge: { ...current, ...new } — yeni ezerler
                         const mergedAttributes = {
                             ...(current.attributes ?? {}),
-                            ...(line.extracted_attributes ?? {}),
+                            ...safeLineAttributes,
                         };
                         await dbUpdateProduct(line.matched_product_id, {
-                            attributes: mergedAttributes,
+                            ...productPatch,
+                            ...(Object.keys(safeLineAttributes).length > 0 ? { attributes: mergedAttributes } : {}),
+                        });
+                        await auditTechnicalTemplateApply({
+                            documentId,
+                            line,
+                            productId: line.matched_product_id,
+                            productTypeId: effectiveProductTypeId,
+                            appliedAttributes: safeLineAttributes,
+                            appliedEvidence: approved.evidence,
+                            actorUserId,
                         });
                         result.products_updated += 1;
+                        result.technical_fields_applied += Object.keys(safeLineAttributes).length;
                     }
                 } else if (line.extraction_type === "certificate_target") {
                     if (line.match_action === "new_product") {
                         throw new Error(
-                            "Sertifika için 'yeni ürün' apply edilemez; önce ürün yarat veya sertifikayı atla",
+                            "Dosya eki için 'yeni ürün' apply edilemez; önce ürünü yarat veya eki atla",
                         );
                     }
                     if (!line.matched_product_id) {
-                        throw new Error("sertifika için hedef ürün seçilmemiş");
+                        throw new Error("dosya eki için hedef ürün seçilmemiş");
                     }
                     if (!docBuffer) {
                         throw new Error("belge buffer'ı yüklenemedi");
                     }
-                    const newCert = await dbCreateAttachment({
+                    const attachmentKind = resolveAttachmentKindFromDocument({
+                        documentType: doc.classification?.document_type,
+                        mimeType: doc.mime_type,
+                    });
+                    const newAttachment = await dbCreateAttachment({
                         productId: line.matched_product_id,
                         file: docBuffer,
                         fileName: doc.file_name,
                         fileSize: doc.file_size,
                         mimeType: doc.mime_type,
-                        kind: "certificate",
+                        kind: attachmentKind,
                         uploadedBy: actorUserId,
                     });
                     result.attachments_created += 1;
 
-                    // Faz 3c Review P2-1: aynı (product_id, file_name) eski aktif
-                    // sertifikaları yeni cert'e supersede et. Versiyonlama fail
-                    // ederse yeni cert geri alınmaz (zaten aktif); warning logla.
-                    try {
-                        const superseded = await dbSupersedeCertificatesByName(
-                            line.matched_product_id,
-                            doc.file_name,
-                            newCert.id,
-                        );
-                        if (superseded > 0) {
-                            result.attachments_superseded += superseded;
+                    if (attachmentKind === "image") {
+                        await ensurePrimaryImageIfMissing({
+                            productId: line.matched_product_id,
+                            attachmentId: newAttachment.id,
+                            result,
+                            lineNumber: line.line_number,
+                        });
+                    }
+
+                    if (attachmentKind === "certificate") {
+                        // Faz 3c Review P2-1: aynı (product_id, file_name) eski aktif
+                        // sertifikaları yeni cert'e supersede et. Versiyonlama fail
+                        // ederse yeni cert geri alınmaz (zaten aktif); warning logla.
+                        try {
+                            const superseded = await dbSupersedeCertificatesByName(
+                                line.matched_product_id,
+                                doc.file_name,
+                                newAttachment.id,
+                            );
+                            if (superseded > 0) {
+                                result.attachments_superseded += superseded;
+                            }
+                        } catch (vErr) {
+                            const vMsg = vErr instanceof Error ? vErr.message : String(vErr);
+                            result.errors.push(
+                                `Satır ${line.line_number}: versiyonlama uyarısı — ${vMsg}`,
+                            );
                         }
-                    } catch (vErr) {
-                        const vMsg = vErr instanceof Error ? vErr.message : String(vErr);
-                        result.errors.push(
-                            `Satır ${line.line_number}: versiyonlama uyarısı — ${vMsg}`,
-                        );
                     }
                 }
             } catch (err) {
@@ -277,6 +516,7 @@ export async function serviceApplyImportDocument(
                 skipped: result.skipped,
                 errors_count: result.errors.length,
                 untyped_products: result.untyped_products,
+                technical_fields_applied: result.technical_fields_applied,
                 success: successPath,
                 // Faz 3c Review 4.tur (P2): true → ürün/cert yazıldı ama
                 // 'applied' status update fail oldu, doc 'applying'de takılı.
