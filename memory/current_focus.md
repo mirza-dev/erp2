@@ -5,7 +5,24 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-06-04 (**Ürün Tipleri sayfası — final ürün [alan düzenleme UI + N+1 fix + a11y modal]**)
+## Son Tamamlanan İş — 2026-06-05 (**İki branch'i hizalama — codex ↔ main merge + main hardening re-apply**)
+
+Codex işini bitirdi (`origin/codex-experiment` @ `ee3b701`, ayrı Coolify deploy). İki branch ayrıştı: codex 16 commit önde (TCMB kur, profil avatar + ayarlar redesign, AI/Excel import merkezi, teknik şablonlar, premium button), main 13 commit önde (bu oturumun final-ürün turları). Kullanıcı: **iki branch'i aynı güncelliğe getir** (kod birebir, branch'ler ayrı deploy kalsın).
+
+- **Yöntem (salt-okuma önizleme):** `git merge-tree --write-tree` in-memory trial → **4 içerik çakışması, 9 dosya temiz oto-merge.** Çakışan 4: `settings/page.tsx` + product-types `helper`/`page`/`[id]` — codex bunları paralel YENİDEN YAZMIŞTI (field soft-delete, stats, teknik şablonlar, kendi edit modalı).
+- **Phase 0 baseline gate:** codex kendi başına yeşil (tsc 0/lint 0/4479 test/build 0) — kırık kazanan adopt etme riski elendi.
+- **Phase 1-2:** integration branch `integrate-codex` (main=prod'a doğrudan dokunulmadı); 4 çakışma **codex scaffold** (`git checkout --theirs`) temel alındı, sonra main hardening codex'in YENİ yapısına re-apply (silinmedi — kullanıcı "tüm sağlamlaştırmayı taşı"):
+  - **[BLOCKER] field_key edit-mode READ-ONLY** — codex products hâlâ `attributes[f.field_key]` (model değişmedi) ama edit modalı field_key'i `generateTechnicalFieldKey` ile yeniden üretiyordu → orphan; edit'te readOnly+disabled+onChange erken-return+orphan notu, new'de auto-generate korundu.
+  - **settings a11y** codex'in GRUPLU nav'ına uyarlandı (flat tablist gruplu yapıya uymaz=invalid ARIA → button id + dirty erişilebilir ad + content role=region/aria-labelledby + codex'in aria-current/aria-hidden korundu).
+  - **settings `&apos;` fix** (`:1027` codex reintroduce) + **FirmaTab errBody parite** (`:196` res.text → errBody.error, codex'in diğer handler paterni).
+- **Test reconciliation:** obsolet `product-types-ui`+`product-types-list-count` silindi (MY impl assert, codex'e karşı kırılır; codex helper/route testlerini kendi shape'ine güncellemiş) → yeni `product-types-field-key-guard.test.ts`; `settings-ui.test.ts` codex yapısına yeniden yazıldı; codex `settings-page-tabs.test.tsx` RTL query dirty-suffix regex'e uyarlandı.
+- **Phase 4:** tsc 0 · lint 0 · **4604 test yeşil** (320 dosya) · build 0 (`ƒ Proxy`). 9 oto-merge da bu net'le doğrulandı.
+- **Migrations 083 (technical templates) + 084 (excel import)** deploy'da DB'ye uygulanmalı.
+- **DURUM: `integrate-codex` @ `56ecbd1` (merge commit, 2 parent: main 0914b28 + codex ee3b701) YEŞİL.** Phase 5 (main + codex-experiment'i bu commit'e ff → birebir aynı) + **HER İKİ PUSH kullanıcı onayı BEKLİYOR** (⚠️ codex→main = 16 commit prod'a tek deploy = büyük değişiklik).
+
+---
+
+## Önceki — 2026-06-04 (**Ürün Tipleri sayfası — final ürün [alan düzenleme UI + N+1 fix + a11y modal]**) — ⚠️ product-types değişiklikleri `56ecbd1` merge'inde codex rewrite'ı ile superseded; field_key guard codex yapısına re-apply edildi
 
 `/dashboard/settings/product-types` liste + `[id]` detay + 4 API route + `product-types.ts` helper. Kullanıcı "son ürün haline, eksiksiz/hatasız/bugsuz, her işlev çalışmalı, e2e test" dedi. **Dürüst çerçeve:** sayfa olgun (helper 516 satır + 4 RBAC `manage_product_types` route + length validation + 404/409/400; backend testleri helper~25/route~33/seed 12). Güvenlik bug'ı YOK. Danışman triyajı + kullanıcı kapsam onayı.
 
