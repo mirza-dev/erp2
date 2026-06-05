@@ -1,5 +1,8 @@
 "use client";
 
+// TEMA-MUAF: bu belge beyaz kağıda baskı içindir; sabit hex renkler kasıtlıdır ve
+// tema (koyu/aydınlık) değişkenlerine BAĞLANMAMALIDIR — her iki temada beyaz kağıt.
+
 import Link from "next/link";
 import type {
     PurchaseOrderRow,

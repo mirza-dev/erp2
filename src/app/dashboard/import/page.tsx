@@ -874,7 +874,7 @@ export default function ImportPage() {
                             border: `1px dashed ${dragOver ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "8px",
                             padding: "18px",
-                            background: dragOver ? "rgba(56,139,253,0.07)" : "var(--bg-primary)",
+                            background: dragOver ? "var(--accent-bg)" : "var(--bg-primary)",
                             display: "grid",
                             gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                             gap: "16px",

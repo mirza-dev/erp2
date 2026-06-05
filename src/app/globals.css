@@ -6,9 +6,26 @@
    ============================================ */
 
 :root {
-  /* Layout */
+  /* Layout — temadan bağımsız (paylaşılan) */
   --sidebar-width: 216px;
   --topbar-height: 52px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+/* ============================================
+   Tema paletleri
+   Varsayılan = KOYU (mevcut değerler birebir korunur).
+   data-theme attribute'ü <head> bootstrap script'i ile boyamadan
+   ÖNCE set edilir (FOUC yok). 'light' override eder.
+   ============================================ */
+
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
   /* Background — koyu gri/siyah */
   --bg-primary: #1a1d23;
@@ -28,12 +45,15 @@
   /* Accent — elektrik mavisi, patlayan */
   --accent: #58a6ff;
   --accent-bg: rgba(56, 139, 253, 0.15);
+  --accent-bg-strong: rgba(56, 139, 253, 0.28);
+  --accent-glow: rgba(56, 139, 253, 0.35);
   --accent-border: #388bfd;
   --accent-text: #58a6ff;
 
   /* Success — canlı yeşil */
   --success: #3fb950;
   --success-bg: rgba(63, 185, 80, 0.15);
+  --success-bg-strong: rgba(63, 185, 80, 0.25);
   --success-border: #2ea043;
   --success-text: #3fb950;
 
@@ -46,18 +66,72 @@
   /* Danger — canlı kırmızı */
   --danger: #f85149;
   --danger-bg: rgba(248, 81, 73, 0.15);
+  --danger-bg-strong: rgba(248, 81, 73, 0.25);
   --danger-bg-subtle: rgba(248, 81, 73, 0.04);
   --danger-border: #da3633;
   --danger-text: #f85149;
 
-  /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
+  /* Highlight — koyu temada beyaz inset parıltı */
+  --highlight-inset: rgba(255, 255, 255, 0.06);
 
   /* Shadows — minimal */
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Background — Cool slate */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+
+  /* Text — slate-siyah */
+  --text-primary: #1f2328;
+  --text-secondary: #59636e;
+  --text-tertiary: #818b98;
+
+  /* Borders — soğuk gri (primary en belirgin → tertiary en soluk) */
+  --border-primary: #d0d7de;
+  --border-secondary: #d8dee4;
+  --border-tertiary: #e4e9ee;
+
+  /* Accent — beyazda kontrastlı koyu mavi */
+  --accent: #0969da;
+  --accent-bg: rgba(9, 105, 218, 0.10);
+  --accent-bg-strong: rgba(9, 105, 218, 0.18);
+  --accent-glow: rgba(9, 105, 218, 0.22);
+  --accent-border: #0969da;
+  --accent-text: #0969da;
+
+  /* Success — beyazda kontrastlı */
+  --success: #1a7f37;
+  --success-bg: rgba(26, 127, 55, 0.10);
+  --success-bg-strong: rgba(26, 127, 55, 0.18);
+  --success-border: #1a7f37;
+  --success-text: #1a7f37;
+
+  /* Warning — beyazda kontrastlı */
+  --warning: #9a6700;
+  --warning-bg: rgba(154, 103, 0, 0.12);
+  --warning-border: #9a6700;
+  --warning-text: #9a6700;
+
+  /* Danger — beyazda kontrastlı */
+  --danger: #cf222e;
+  --danger-bg: rgba(207, 34, 46, 0.10);
+  --danger-bg-strong: rgba(207, 34, 46, 0.18);
+  --danger-bg-subtle: rgba(207, 34, 46, 0.04);
+  --danger-border: #cf222e;
+  --danger-text: #cf222e;
+
+  /* Highlight — aydınlık temada koyu inset (beyaz görünmez) */
+  --highlight-inset: rgba(31, 35, 40, 0.05);
+
+  /* Shadows — slate tabanlı, biraz daha belirgin (beyaz zeminde derinlik) */
+  --shadow-xs: 0 1px 2px rgba(31, 35, 40, 0.06);
+  --shadow-sm: 0 1px 3px rgba(31, 35, 40, 0.10);
 }
 
 @theme inline {
@@ -111,6 +185,16 @@ body {
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: 0.01em;
+}
+
+/* Tema geçişi: anında swap (kasıtlı — yarım-fade içerik/zemin katmanını
+   ayrıştırır, "ucuz" görünür). reduced-motion için global guard. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ============================================

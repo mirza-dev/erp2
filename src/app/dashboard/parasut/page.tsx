@@ -294,8 +294,8 @@ export default function ParasutPage() {
                                     borderRadius: "50%",
                                     background: connection === "connected" ? "var(--success)" : "var(--danger)",
                                     boxShadow: connection === "connected"
-                                        ? "0 0 0 3px rgba(63, 185, 80, 0.2)"
-                                        : "0 0 0 3px rgba(248, 81, 73, 0.2)",
+                                        ? "0 0 0 3px var(--success-bg-strong)"
+                                        : "0 0 0 3px var(--danger-bg-strong)",
                                 }}
                             />
                             <span

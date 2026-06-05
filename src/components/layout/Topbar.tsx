@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
 import SystemHealthIndicator from "@/components/layout/SystemHealthIndicator";
+import ThemeToggle from "@/components/layout/ThemeToggle";
 import UserAvatarLink from "@/components/layout/UserAvatarLink";
 import { getTopbarTitle } from "@/lib/topbar-title";
 
@@ -65,6 +66,7 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                     <ExchangeRatesTicker />
                     <SystemHealthIndicator />
                 </div>
+                <ThemeToggle />
                 <UserAvatarLink />
             </div>
         </header>

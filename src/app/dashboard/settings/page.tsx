@@ -287,6 +287,8 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                 >
                     {logoUrl ? (
                         <div
+                            // tema-muaf: logo önizleme kutusu — firma logoları açık zemin için
+                            // tasarlandığından her iki temada da beyaz kalır (logo okunabilirliği).
                             style={{
                                 width: "120px",
                                 height: "56px",

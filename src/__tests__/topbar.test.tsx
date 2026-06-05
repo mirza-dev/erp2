@@ -21,6 +21,16 @@ vi.mock("next/navigation", () => ({
     usePathname: () => mockState.pathname,
 }));
 
+// ThemeToggle, useTheme + useToast bağlamı ister — Topbar'ı çıplak render ettiğimiz
+// için stub'larız (tema mantığı theme-system.test.ts'te ayrıca kapsanır).
+vi.mock("@/lib/theme/use-theme", () => ({
+    useTheme: () => ({ theme: "dark", resolved: "dark", setTheme: vi.fn(), toggle: vi.fn() }),
+}));
+
+vi.mock("@/components/ui/Toast", () => ({
+    useToast: () => ({ toast: vi.fn() }),
+}));
+
 const originalFetch = global.fetch;
 
 const LIVE_RATE_PAYLOAD = {

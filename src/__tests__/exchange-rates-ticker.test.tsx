@@ -19,6 +19,16 @@ vi.mock("@/lib/data-context", () => ({
     useData: () => ({ activeAlertCount: 15 }),
 }));
 
+// Topbar artık ThemeToggle render eder (useTheme + useToast ister) — çıplak render
+// için stub'lanır; tema davranışı theme-system.test.ts'te kapsanır.
+vi.mock("@/lib/theme/use-theme", () => ({
+    useTheme: () => ({ theme: "dark", resolved: "dark", setTheme: vi.fn(), toggle: vi.fn() }),
+}));
+
+vi.mock("@/components/ui/Toast", () => ({
+    useToast: () => ({ toast: vi.fn() }),
+}));
+
 const originalFetch = global.fetch;
 
 const LIVE_RATE_PAYLOAD = {

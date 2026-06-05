@@ -209,7 +209,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                                     fontSize: "13px",
                                     fontWeight: active ? 650 : 500,
                                     color: active ? "var(--accent-text)" : "var(--text-secondary)",
-                                    background: active ? "rgba(56, 139, 253, 0.10)" : "transparent",
+                                    background: active ? "var(--accent-bg)" : "transparent",
                                     textDecoration: "none",
                                     cursor: "pointer",
                                     transition: "background 0.14s ease, color 0.14s ease, border-color 0.14s ease",

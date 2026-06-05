@@ -193,7 +193,7 @@ export default function DashboardPage() {
                             {hasFilter && (
                                 <span style={{
                                     fontSize: "10px",
-                                    background: "rgba(255,255,255,0.2)",
+                                    background: "var(--accent-bg-strong)",
                                     borderRadius: "8px",
                                     padding: "1px 5px",
                                 }}>

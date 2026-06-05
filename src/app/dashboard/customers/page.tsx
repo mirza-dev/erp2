@@ -235,7 +235,7 @@ export default function CustomersPage() {
                                 fontSize: "11px",
                                 padding: "1px 5px",
                                 borderRadius: "10px",
-                                background: activeFilter === tab.key ? "rgba(255,255,255,0.15)" : "var(--bg-tertiary)",
+                                background: activeFilter === tab.key ? "var(--accent-bg-strong)" : "var(--bg-tertiary)",
                                 color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-tertiary)",
                             }}>{tab.count}</span>
                         </button>

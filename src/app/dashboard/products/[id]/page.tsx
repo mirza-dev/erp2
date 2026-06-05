@@ -1789,6 +1789,8 @@ export default function ProductDetailPage() {
                         size="sm"
                         leftIcon={<X size={14} />}
                         onClick={() => setLightboxAttachment(null)}
+                        // tema-muaf: lightbox kapat butonu görselin üzerinde durur —
+                        // her iki temada da beyaz/siyah kontrast (rastgele görsele karşı okunur).
                         style={{
                             position: "absolute",
                             top: "16px",

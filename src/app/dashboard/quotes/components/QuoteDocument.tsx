@@ -7,6 +7,10 @@
 
 import type { QuoteData } from "./quote-types";
 
+// TEMA-MUAF: bu belge beyaz kağıda baskı + PMT marka kimliği içindir; sabit hex
+// renkler (marka mavisi vb.) kasıtlıdır ve tema (koyu/aydınlık) değişkenlerine
+// BAĞLANMAMALIDIR — her iki temada da beyaz kağıt görünümü korunur.
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const FONT = {

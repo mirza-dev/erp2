@@ -7,6 +7,7 @@ import Topbar from "@/components/layout/Topbar";
 import { DataProvider } from "@/lib/data-context";
 import { PermissionProvider } from "@/lib/auth/use-permissions";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ThemeProvider } from "@/lib/theme/use-theme";
 import DemoBanner from "@/components/ui/DemoBanner";
 import ForbiddenBanner from "@/components/ui/ForbiddenBanner";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
@@ -30,6 +31,7 @@ export default function DashboardLayout({
     };
 
     return (
+        <ThemeProvider>
         <DataProvider>
             <PermissionProvider>
             <ToastProvider>
@@ -121,5 +123,6 @@ export default function DashboardLayout({
             </ToastProvider>
             </PermissionProvider>
         </DataProvider>
+        </ThemeProvider>
     );
 }

@@ -50,7 +50,8 @@ describe("Button premium system", () => {
         const button = screen.getByRole("button", { name: "Yenile" });
         expect(button.style.background).toBe("transparent");
         fireEvent.mouseEnter(button);
-        expect(button.style.background).toBe("rgba(240, 246, 252, 0.04)");
+        // Tema-bilir highlight token (koyu: beyaz inset, aydınlık: koyu inset).
+        expect(button.style.background).toBe("var(--highlight-inset)");
         fireEvent.mouseLeave(button);
         expect(button.style.background).toBe("transparent");
     });

@@ -5,7 +5,27 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-06-05 (**Topbar yeniden tasarım — "Sakin düz" + uyarı butonunu kaldırma**)
+## Son Tamamlanan İş — 2026-06-05 (**Tema sistemi — Koyu + Aydınlık (Cool slate), premium, sıfır frontend bozulması**)
+
+Sistem yalnız koyu temaydı; kullanıcı koyu+aydınlık istedi (premium, hiçbir frontend bozulmadan; `/frontend-design` + ultrathink, soru sorarak ilerle). **Kullanıcı kararları (AskUserQuestion):** (1) ilk açılış = **sistem tercihini izle** (`prefers-color-scheme`), elle seçim hatırlanır; (2) geçiş = **Topbar küçük ikon** (güneş/ay, avatar öncesi); (3) kayıt = **yalnız localStorage** (backend yok, FOUC-suz); (4) aydınlık palet = **Cool slate** (`#f6f8fa` zemin / `#1f2328` metin / `#0969da` accent — koyu paletle uyumlu).
+
+**Keşif:** tüm tema `globals.css :root`'ta (koyu sabit), `data-theme`/toggle yoktu; `layout.tsx` `<html>/<body>` zaten `suppressHydrationWarning`. Sabit renk yüzeyi ~153 (57 hex + 90 rgba + 6 named) kategorize edildi: baskı/marka belgeleri (kasıtlı sabit), siyah overlay (her iki temada doğru), beyaz inset shimmer + accent/status tint (tema-ilgili → tokenize), doygun yüzeyde beyaz metin (doğru kalır).
+
+**Uygulama (8 dosya + 2 yeni):**
+- `globals.css` — palet `:root`'tan `:root[data-theme="dark"]` (varsayılan, **mevcut değerler birebir korundu** → koyu kullanıcıda sıfır değişiklik) + `:root[data-theme="light"]` (Cool slate) bloklarına ayrıldı. Yeni tema-bilir tokenlar: `--highlight-inset`, `--accent-bg-strong`, `--success/danger-bg-strong`, `--accent-glow`. Her temada `color-scheme` + `prefers-reduced-motion` global guard. **Geçiş anında swap** (transition YOK — yarım-fade içerik/zemin katmanını ayrıştırır=ucuz, advisor kararı).
+- `layout.tsx` — `<head>` **FOUC-suz bootstrap script** (`dangerouslySetInnerHTML`): boyamadan ÖNCE `data-theme` set (localStorage `'dark'|'light'`→onu, yoksa/`'system'`→`matchMedia`; catch→`'dark'`).
+- `src/lib/theme/use-theme.tsx` (YENİ) — `ThemeProvider`/`useTheme`: `theme: system|dark|light` + türetilmiş `resolved`. localStorage persist; **ilk `resolved` DOM'dan okunur** (`getAttribute('data-theme')`) = re-flash yok; `system` iken `matchMedia` change canlı izlenir (kullanıcı seçince bypass).
+- `dashboard/layout.tsx` — `ThemeProvider` en dış provider (zaten `"use client"` + provider zinciri + Topbar orada render — DOĞRULANDI; sıfır boundary maliyeti).
+- `ThemeToggle.tsx` (YENİ) — lucide `Sun`/`Moon`, `resolved`'a göre ikon; **kısa tık** koyu↔aydınlık, **uzun bas (≥500ms)** → `setTheme('system')` + info toast (Q1↔Q2 gerilimi: 2-durumlu ikon `'system'`'i ulaşılamaz yapardı → geri-dönüş kancası, advisor). `aria-label="Temayı değiştir"`. `Topbar.tsx`: avatar öncesi.
+- **Remediasyon:** `Button` secondary/toolbar bg→`--highlight-inset`, danger/success hover→`-bg-strong`; `UserAvatarLink` inset→`--highlight-inset`+`--accent-bg-strong`; customers/dashboard count-badge `rgba(255,255,255,..)`→`--accent-bg-strong`; import dragOver + Sidebar active `rgba(56,139,253,..)`→`--accent-bg`; parasut status ring→`-bg-strong`. **Tema-muaf yorumu** eklendi: QuoteDocument/PurchaseOrderDocument (baskı=beyaz kağıt), settings logo kutusu, products lightbox (görsel-üstü kontrast).
+
+**ADVISOR FIX'leri:** (#1 plan, done-check öncesi) mount noktası `dashboard/layout.tsx` okunarak doğrulandı (zaten client+Topbar orada). (#2) body-only transition reddedildi → anında swap. (#3) toggle `'system'` ulaşılabilirliği uzun-bas ile. (#done-check KRİTİK) root bootstrap landing/login/error'ı global temalar → **tüm `#fff` metinleri statik denetlendi: hepsi `var(--accent)` (doygun mavi, beyaz-üstü kontrast iki temada güçlü) veya `rgba(0,0,0,0.6)` dark scrim üzerinde → `var(--bg-*)` üzerinde görünmez-beyaz YOK** = aydınlıkta first-screen kırılması yok (page.tsx:59/127, login:146, error:57, dashboard/error:37, users:393 + import/purchase butonları + products star/delete scrim icons hepsi denetlendi).
+
+**Doğrulama:** **+18 test** (`theme-system.test.ts`: bootstrap script, palet blokları+cool-slate değerleri, yeni tokenlar, useTheme mantığı [system çözümleme/persist/DOM-okuma/matchMedia/toggle], ThemeToggle [Sun-Moon/aria/uzun-bas]+Topbar entegrasyon, **baskı-belgeleri-tema-muaf regression**) + 3 mevcut test güncellendi (`topbar`/`exchange-rates-ticker` ThemeToggle için useTheme+useToast stub mock; `button-component` toolbar-hover `rgba(240,246,252,0.04)`→`var(--highlight-inset)`). Backend/migration/permission YOK (localStorage). tsc 0 · lint 0 · **4631→4650 test** · build 0 (`ƒ Proxy`). **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA; iki Coolify prod deploy.** Görsel kabul (kontrast/premium + teklif/PO önizleme aydınlıkta beyaz kağıt) kullanıcı gözüyle (deploy sonrası). Plan: `~/.claude/plans/tamam-bu-son-commitlerin-precious-fox.md`.
+
+<details><summary>Önceki: Topbar "Sakin düz" yeniden tasarım + uyarı butonunu kaldırma (`bf28fb0`)</summary>
+
+### Topbar yeniden tasarım — "Sakin düz" + uyarı butonunu kaldırma
 
 Kullanıcı topbar'ın "çip/kalitesiz" hissi verdiğini söyledi (ekran görüntüsü, `/frontend-design` + ultrathink). **Kök neden:** çip çorbası (her öğe ayrı bordürlü pill: ticker/sağlık/uyarı/sayfa-başlığı), `ExchangeRatesTicker` kutu-içinde-kutu-içinde-kutu (ticker → `ratesStyle` grup → per-kur `rateStyle` dolu pill), yeşil "Bağlı" + kırmızı "19 Uyarı" trafik-ışığı çakışması. **Kullanıcı kararları (AskUserQuestion):** (1) yön = **"Sakin düz"** (çip-içinde-çip kalkar, kurlar düz metin ` · ` ayraçlı, sağlık küçük renkli nokta, sağ taraf tek hafif küme, sayfa başlığı markanın yanına/sol — ortada pill yok), (2) marka = **"Sadece yazı kalsın"** (logo/ikon eklenmez), (3) **uyarı butonu kaldırılır** (doğrudan istek).
 
@@ -19,7 +39,11 @@ Kullanıcı topbar'ın "çip/kalitesiz" hissi verdiğini söyledi (ekran görün
 
 **ADVISOR FIX'leri (plan onayından sonra koda katıldı):** (#1 mobil — en yüksek risk) `.topbar-right-extras` zaten `@media(max-width:768px)`'te `display:none` olan öğe → küme border/bg'sini ona koydum, mobilde tüm küme gizli + avatar/hamburger kalır (selector uyumlu, doğrulandı). (#2 kaynak rozeti) onaylanan preview'da TCMB/LIVE görünür rozeti YOKtu → görünür kaynak etiketi EKLENMEDİ (bilgi tooltip+aria-label'da, `feedback_no_silent_deletes` sağlandı — yeniden ekleme = onaylı görünümden sapma olurdu). (#3 sarkan ayraç) ticker↔health ayracı health'e sabit `border-left` DEĞİL, ticker'ın kendi `borderRight`'ında → ticker `null` (kur yüklenemezse) ayraç da yok olur.
 
-**Doğrulama:** tsc 0 · lint 0 · **4627→4631 test** (`topbar.test.tsx` +4 kaynak-regresyon; `exchange-rates-ticker.test.tsx` 2 mevcut test güncellendi: görünür LIVE/TCMB rozeti→aria-label kontrolü, "15 Uyarı"→`queryByText null`) · build 0 (`ƒ Proxy`). Backend/migration/permission/veri akışı/a11y mantığı DEĞİŞMEDİ. **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA; iki Coolify prod deploy.** Görsel kabul kullanıcı gözüyle (deploy sonrası); ince ayar turu istenirse açık. Plan: `~/.claude/plans/tamam-bu-son-commitlerin-precious-fox.md`.
+**Doğrulama:** tsc 0 · lint 0 · **4627→4631 test** (`topbar.test.tsx` +4 kaynak-regresyon; `exchange-rates-ticker.test.tsx` 2 mevcut test güncellendi: görünür LIVE/TCMB rozeti→aria-label kontrolü, "15 Uyarı"→`queryByText null`) · build 0 (`ƒ Proxy`). Backend/migration/permission/veri akışı/a11y mantığı DEĞİŞMEDİ. **DURUM: PUSH EDİLDİ (`bf28fb0`) — `origin/main == origin/codex-experiment` birebir aynı SHA; iki Coolify prod deploy.**
+
+</details>
+
+---
 
 <details><summary>Önceki: Dashboard AI Özeti + Aktif Uyarılar collapsible (`44d4e54`)</summary>
 
