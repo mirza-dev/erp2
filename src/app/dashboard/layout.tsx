@@ -58,7 +58,7 @@ export default function DashboardLayout({
                     <main
                         style={{
                             padding: "18px",
-                            background: "var(--bg-secondary)",
+                            background: "var(--app-bg)",
                             overflowX: "auto",
                             minWidth: 0,
                         }}
@@ -110,8 +110,9 @@ export default function DashboardLayout({
                                 bottom: 0,
                                 width: "240px",
                                 zIndex: 100,
-                                background: "var(--bg-primary)",
-                                borderRight: "0.5px solid var(--border-tertiary)",
+                                background: "var(--shell-bg)",
+                                borderRight: "0.5px solid var(--shell-border)",
+                                boxShadow: "var(--shell-shadow)",
                                 overflowY: "auto",
                                 animation: "fade-in 0.15s ease-out",
                             }}

@@ -64,13 +64,13 @@ type VariantStyle = {
 
 const VARIANT_STYLES: Record<Variant, VariantStyle> = {
     primary: {
-        bg: "linear-gradient(180deg, #67b3ff 0%, #4a98f5 100%)",
-        border: "rgba(121, 192, 255, 0.55)",
+        bg: "var(--button-primary-bg)",
+        border: "var(--button-primary-border)",
         color: "#ffffff",
-        hoverBg: "linear-gradient(180deg, #79c0ff 0%, #58a6ff 100%)",
-        hoverBorder: "rgba(121, 192, 255, 0.78)",
-        shadow: "0 8px 18px rgba(56, 139, 253, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-        hoverShadow: "0 10px 22px rgba(56, 139, 253, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.26)",
+        hoverBg: "var(--button-primary-bg-hover)",
+        hoverBorder: "var(--button-primary-border-hover)",
+        shadow: "var(--button-primary-shadow)",
+        hoverShadow: "var(--button-primary-shadow-hover)",
     },
     secondary: {
         bg: "var(--highlight-inset)",

@@ -47,10 +47,11 @@ const StatsCards = memo(function StatsCards() {
                     <div
                         key={i}
                         style={{
-                            background: "var(--bg-primary)",
-                            border: "0.5px solid var(--border-tertiary)",
+                            background: "var(--surface-raised)",
+                            border: "0.5px solid var(--surface-border)",
                             borderRadius: "6px",
                             padding: "14px 16px",
+                            boxShadow: "var(--surface-shadow-sm)",
                         }}
                     >
                         <div style={{
@@ -139,22 +140,23 @@ const StatsCards = memo(function StatsCards() {
                     key={m.label}
                     onClick={() => router.push(m.href)}
                     style={{
-                        background: "var(--bg-primary)",
-                        border: "0.5px solid var(--border-tertiary)",
+                        background: "var(--surface-raised)",
+                        border: "0.5px solid var(--surface-border)",
                         borderRadius: "6px",
                         padding: "14px 16px",
                         cursor: "pointer",
                         position: "relative",
+                        boxShadow: "var(--surface-shadow-sm)",
                     }}
                     onMouseEnter={(e) => {
                         e.currentTarget.style.borderColor = "var(--accent-border)";
-                        e.currentTarget.style.background = "var(--bg-secondary)";
+                        e.currentTarget.style.background = "var(--surface-subtle)";
                         const arrow = e.currentTarget.querySelector("[data-arrow]") as HTMLElement;
                         if (arrow) arrow.style.color = "var(--accent-text)";
                     }}
                     onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = "var(--border-tertiary)";
-                        e.currentTarget.style.background = "var(--bg-primary)";
+                        e.currentTarget.style.borderColor = "var(--surface-border)";
+                        e.currentTarget.style.background = "var(--surface-raised)";
                         const arrow = e.currentTarget.querySelector("[data-arrow]") as HTMLElement;
                         if (arrow) arrow.style.color = "var(--text-tertiary)";
                     }}

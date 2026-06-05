@@ -164,8 +164,9 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
     return (
         <aside
             style={{
-                background: "var(--bg-primary)",
-                borderRight: "0.5px solid var(--border-tertiary)",
+                background: "var(--shell-bg)",
+                borderRight: "0.5px solid var(--shell-border)",
+                boxShadow: "var(--shell-shadow)",
                 padding: "10px 8px 12px",
                 display: "flex",
                 flexDirection: "column",
@@ -209,20 +210,20 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                                     fontSize: "13px",
                                     fontWeight: active ? 650 : 500,
                                     color: active ? "var(--accent-text)" : "var(--text-secondary)",
-                                    background: active ? "var(--accent-bg)" : "transparent",
+                                    background: active ? "var(--nav-active-bg)" : "transparent",
                                     textDecoration: "none",
                                     cursor: "pointer",
                                     transition: "background 0.14s ease, color 0.14s ease, border-color 0.14s ease",
                                     borderRadius: "7px",
                                     position: "relative",
-                                    border: "0.5px solid transparent",
+                                    border: `0.5px solid ${active ? "var(--nav-active-border)" : "transparent"}`,
                                     boxSizing: "border-box",
                                 }}
                                 onMouseEnter={(e) => {
                                     if (!active) {
-                                        e.currentTarget.style.background = "var(--bg-secondary)";
+                                        e.currentTarget.style.background = "var(--nav-hover-bg)";
                                         e.currentTarget.style.color = "var(--text-primary)";
-                                        e.currentTarget.style.borderColor = "var(--border-tertiary)";
+                                        e.currentTarget.style.borderColor = "var(--shell-border)";
                                     }
                                 }}
                                 onMouseLeave={(e) => {
@@ -301,7 +302,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                 style={{
                     marginTop: "auto",
                     padding: "12px 16px",
-                    borderTop: "0.5px solid var(--border-tertiary)",
+                    borderTop: "0.5px solid var(--shell-border)",
                 }}
             >
                 {isDemo ? (

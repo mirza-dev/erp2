@@ -46,10 +46,11 @@ function CollapsibleSection({
                     justifyContent: "space-between",
                     gap: "10px",
                     padding: "10px 14px",
-                    border: "0.5px solid var(--border-secondary)",
+                    border: "0.5px solid var(--surface-border)",
                     borderRadius: "8px",
-                    background: "var(--bg-secondary)",
+                    background: "var(--surface-subtle)",
                     color: "var(--text-primary)",
+                    boxShadow: "var(--surface-shadow-sm)",
                     cursor: "pointer",
                     textAlign: "left",
                 }}
@@ -208,10 +209,10 @@ export default function DashboardPage() {
                                 top: "calc(100% + 6px)",
                                 right: 0,
                                 zIndex: 200,
-                                background: "var(--bg-primary)",
-                                border: "0.5px solid var(--border-primary)",
+                                background: "var(--surface-raised)",
+                                border: "0.5px solid var(--surface-border)",
                                 borderRadius: "8px",
-                                boxShadow: "0 4px 20px rgba(0,0,0,0.35)",
+                                boxShadow: "var(--surface-shadow)",
                                 padding: "14px 16px",
                                 minWidth: "220px",
                                 display: "flex",
@@ -234,7 +235,7 @@ export default function DashboardPage() {
                                             padding: "5px 8px",
                                             border: "0.5px solid var(--border-secondary)",
                                             borderRadius: "6px",
-                                            background: "var(--bg-tertiary)",
+                                            background: "var(--input-bg)",
                                             color: "var(--text-primary)",
                                         }}
                                     >
@@ -395,12 +396,13 @@ export default function DashboardPage() {
                     <Link href="/dashboard/import" style={{ textDecoration: "none" }}>
                         <div
                             style={{
-                                border: "1.5px dashed var(--border-secondary)",
+                                border: "1.5px dashed var(--surface-border)",
                                 borderRadius: "6px",
                                 padding: "20px 16px",
                                 textAlign: "center",
                                 cursor: "pointer",
-                                background: "var(--bg-secondary)",
+                                background: "var(--surface-subtle)",
+                                boxShadow: "var(--surface-shadow-sm)",
                                 display: "flex",
                                 flexDirection: "column",
                                 alignItems: "center",
@@ -410,7 +412,7 @@ export default function DashboardPage() {
                                 e.currentTarget.style.borderColor = "var(--accent-border)";
                             }}
                             onMouseLeave={(e) => {
-                                e.currentTarget.style.borderColor = "var(--border-secondary)";
+                                e.currentTarget.style.borderColor = "var(--surface-border)";
                             }}
                         >
                             {/* Upload icon */}

@@ -29,10 +29,11 @@ const RecentOrders = memo(function RecentOrders() {
         return (
             <div
                 style={{
-                    background: "var(--bg-primary)",
-                    border: "0.5px solid var(--border-tertiary)",
+                    background: "var(--surface-raised)",
+                    border: "0.5px solid var(--surface-border)",
                     borderRadius: "6px",
                     padding: "16px",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}
             >
                 <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "12px" }}>
@@ -66,10 +67,11 @@ const RecentOrders = memo(function RecentOrders() {
     return (
         <div
             style={{
-                background: "var(--bg-primary)",
-                border: "0.5px solid var(--border-tertiary)",
+                background: "var(--surface-raised)",
+                border: "0.5px solid var(--surface-border)",
                 borderRadius: "6px",
                 padding: "16px",
+                boxShadow: "var(--surface-shadow-sm)",
             }}
         >
             <div

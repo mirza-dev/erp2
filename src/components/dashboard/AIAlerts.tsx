@@ -35,10 +35,11 @@ const AIAlerts = memo(function AIAlerts() {
     return (
       <div
         style={{
-          background: "var(--bg-primary)",
+          background: "var(--surface-raised)",
           border: "0.5px solid var(--accent-border)",
           borderRadius: "6px",
           padding: "16px",
+          boxShadow: "var(--surface-shadow-sm)",
         }}
       >
         {Array.from({ length: 3 }).map((_, i) => (
@@ -68,10 +69,11 @@ const AIAlerts = memo(function AIAlerts() {
   return (
     <div
       style={{
-        background: "var(--bg-primary)",
+        background: "var(--surface-raised)",
         border: "0.5px solid var(--accent-border)",
         borderRadius: "6px",
         padding: "16px",
+        boxShadow: "var(--surface-shadow-sm)",
       }}
     >
       {/* Başlık + "N açık" rozeti CollapsibleSection (dashboard) başlık çubuğunda — burada tekrarlanmaz */}

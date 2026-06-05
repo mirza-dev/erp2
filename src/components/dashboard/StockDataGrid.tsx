@@ -27,7 +27,7 @@ const thStyle: React.CSSProperties = {
     fontSize: "12px",
     fontWeight: 500,
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    borderBottom: "0.5px solid var(--surface-border)",
 };
 
 const tdStyle: React.CSSProperties = {
@@ -67,7 +67,7 @@ const StockDataGrid = memo(function StockDataGrid({
     const applyHover = (tr: HTMLElement) => {
         const tds = tr.querySelectorAll("td");
         tds.forEach((td, i) => {
-            td.style.background = "var(--bg-secondary)";
+            td.style.background = "var(--table-row-hover)";
             if (i === 0) td.style.borderLeft = "2px solid var(--accent)";
         });
     };
@@ -92,15 +92,16 @@ const StockDataGrid = memo(function StockDataGrid({
     return (
         <div
             style={{
-                background: "var(--bg-primary)",
-                border: "0.5px solid var(--border-tertiary)",
+                background: "var(--surface-raised)",
+                border: "0.5px solid var(--surface-border)",
                 borderRadius: "6px",
                 overflow: "hidden",
+                boxShadow: "var(--surface-shadow-sm)",
             }}
         >
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                 <thead>
-                    <tr style={{ background: "var(--bg-secondary)" }}>
+                    <tr style={{ background: "var(--table-header-bg)" }}>
                         <th style={thStyle}>SKU</th>
                         <th style={thStyle}>Ürün Adı</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>Gerçek Stok</th>
@@ -206,7 +207,7 @@ const StockDataGrid = memo(function StockDataGrid({
                     style={{
                         padding: "10px 14px",
                         borderTop: "0.5px solid var(--border-tertiary)",
-                        background: "var(--bg-secondary)",
+                        background: "var(--table-header-bg)",
                         textAlign: "right",
                     }}
                 >

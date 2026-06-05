@@ -77,33 +77,59 @@
   /* Shadows — minimal */
   --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+
+  /* Premium surface system — dark keeps the previous visual baseline. */
+  --app-bg: #131518;
+  --shell-bg: #1a1d23;
+  --shell-bg-subtle: #131518;
+  --shell-border: #2d333b;
+  --shell-shadow: none;
+  --surface: #1a1d23;
+  --surface-subtle: #131518;
+  --surface-raised: #1a1d23;
+  --surface-border: #373e47;
+  --surface-shadow: none;
+  --surface-shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --table-header-bg: #131518;
+  --table-row-hover: #22252c;
+  --input-bg: #22252c;
+  --input-border: #373e47;
+  --nav-hover-bg: #131518;
+  --nav-active-bg: rgba(56, 139, 253, 0.15);
+  --nav-active-border: rgba(56, 139, 253, 0.22);
+  --button-primary-bg: linear-gradient(180deg, #67b3ff 0%, #4a98f5 100%);
+  --button-primary-bg-hover: linear-gradient(180deg, #79c0ff 0%, #58a6ff 100%);
+  --button-primary-border: rgba(121, 192, 255, 0.55);
+  --button-primary-border-hover: rgba(121, 192, 255, 0.78);
+  --button-primary-shadow: 0 8px 18px rgba(56, 139, 253, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  --button-primary-shadow-hover: 0 10px 22px rgba(56, 139, 253, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.26);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
 
-  /* Background — Cool slate */
+  /* Background — premium cool slate */
   --bg-primary: #ffffff;
-  --bg-secondary: #f6f8fa;
-  --bg-tertiary: #eaeef2;
+  --bg-secondary: #eef3f8;
+  --bg-tertiary: #f7f9fc;
 
   /* Text — slate-siyah */
-  --text-primary: #1f2328;
-  --text-secondary: #59636e;
-  --text-tertiary: #818b98;
+  --text-primary: #1f2937;
+  --text-secondary: #536171;
+  --text-tertiary: #7b8794;
 
   /* Borders — soğuk gri (primary en belirgin → tertiary en soluk) */
-  --border-primary: #d0d7de;
-  --border-secondary: #d8dee4;
-  --border-tertiary: #e4e9ee;
+  --border-primary: #c5d2df;
+  --border-secondary: #d5e0ea;
+  --border-tertiary: #e2eaf2;
 
-  /* Accent — beyazda kontrastlı koyu mavi */
-  --accent: #0969da;
-  --accent-bg: rgba(9, 105, 218, 0.10);
-  --accent-bg-strong: rgba(9, 105, 218, 0.18);
-  --accent-glow: rgba(9, 105, 218, 0.22);
-  --accent-border: #0969da;
-  --accent-text: #0969da;
+  /* Accent — steel blue */
+  --accent: #1f6fd1;
+  --accent-bg: rgba(31, 111, 209, 0.10);
+  --accent-bg-strong: rgba(31, 111, 209, 0.18);
+  --accent-glow: rgba(31, 111, 209, 0.20);
+  --accent-border: #2b73d2;
+  --accent-text: #155fb6;
 
   /* Success — beyazda kontrastlı */
   --success: #1a7f37;
@@ -129,9 +155,35 @@
   /* Highlight — aydınlık temada koyu inset (beyaz görünmez) */
   --highlight-inset: rgba(31, 35, 40, 0.05);
 
-  /* Shadows — slate tabanlı, biraz daha belirgin (beyaz zeminde derinlik) */
-  --shadow-xs: 0 1px 2px rgba(31, 35, 40, 0.06);
-  --shadow-sm: 0 1px 3px rgba(31, 35, 40, 0.10);
+  /* Shadows — slate tabanlı, beyaz zeminde katman hissi */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.08);
+
+  /* Premium surface system — light gets depth without becoming card-heavy. */
+  --app-bg: #eef3f8;
+  --shell-bg: #f8fbff;
+  --shell-bg-subtle: #edf3f8;
+  --shell-border: #d9e4ef;
+  --shell-shadow: 0 1px 0 rgba(255,255,255,0.78), 0 10px 28px -26px rgba(15,23,42,0.35);
+  --surface: #ffffff;
+  --surface-subtle: #f8fafc;
+  --surface-raised: #ffffff;
+  --surface-border: #dce6ef;
+  --surface-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 14px 34px -30px rgba(15,23,42,0.55);
+  --surface-shadow-sm: 0 1px 2px rgba(15,23,42,0.04), 0 8px 22px -20px rgba(15,23,42,0.45);
+  --table-header-bg: #f4f7fb;
+  --table-row-hover: #f3f8fd;
+  --input-bg: #fbfdff;
+  --input-border: #cbd8e6;
+  --nav-hover-bg: #edf5ff;
+  --nav-active-bg: rgba(31, 111, 209, 0.11);
+  --nav-active-border: rgba(31, 111, 209, 0.28);
+  --button-primary-bg: linear-gradient(180deg, #2f7ee6 0%, #1f6fd1 100%);
+  --button-primary-bg-hover: linear-gradient(180deg, #3b8df3 0%, #2578dc 100%);
+  --button-primary-border: rgba(31, 111, 209, 0.38);
+  --button-primary-border-hover: rgba(31, 111, 209, 0.58);
+  --button-primary-shadow: 0 8px 18px rgba(31, 111, 209, 0.18), inset 0 1px 0 rgba(255,255,255,0.28);
+  --button-primary-shadow-hover: 0 10px 22px rgba(31, 111, 209, 0.24), inset 0 1px 0 rgba(255,255,255,0.34);
 }
 
 @theme inline {
@@ -177,7 +229,7 @@
 }
 
 body {
-  background: var(--bg-secondary);
+  background: var(--app-bg);
   color: var(--text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -350,8 +402,9 @@ body {
   gap: 16px;
   height: var(--topbar-height);
   padding: 0 18px 0 20px;
-  background: var(--bg-primary);
-  border-bottom: 0.5px solid var(--border-tertiary);
+  background: var(--shell-bg);
+  border-bottom: 0.5px solid var(--shell-border);
+  box-shadow: var(--shell-shadow);
   box-sizing: border-box;
 }
 
@@ -371,7 +424,7 @@ body {
   width: 1px;
   height: 18px;
   flex-shrink: 0;
-  background: var(--border-tertiary);
+  background: var(--shell-border);
 }
 
 .topbar-right {
@@ -386,9 +439,10 @@ body {
   gap: 10px;
   height: 32px;
   padding: 0 12px;
-  border: 0.5px solid var(--border-tertiary);
+  border: 0.5px solid var(--shell-border);
   border-radius: 8px;
-  background: var(--bg-secondary);
+  background: var(--surface-subtle);
+  box-shadow: var(--surface-shadow-sm);
   box-sizing: border-box;
 }
 
@@ -500,9 +554,9 @@ body {
 }
 
 .settings-tab-nav {
-  border-right: 0.5px solid var(--border-tertiary);
+  border-right: 0.5px solid var(--shell-border);
   padding: 14px 10px;
-  background: rgba(26, 29, 35, 0.38);
+  background: var(--shell-bg);
 }
 
 .settings-tab-group + .settings-tab-group {
@@ -554,13 +608,13 @@ body {
 }
 
 .settings-tab-button:hover {
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--nav-hover-bg);
   color: var(--text-primary);
 }
 
 .settings-tab-button.is-active {
-  border-color: rgba(56, 139, 253, 0.22);
-  background: rgba(56, 139, 253, 0.10);
+  border-color: var(--nav-active-border);
+  background: var(--nav-active-bg);
   color: var(--accent-text);
   font-weight: 650;
 }
@@ -674,8 +728,8 @@ body {
     overflow-x: auto;
     padding: 10px 12px;
     border-right: none;
-    border-bottom: 0.5px solid var(--border-tertiary);
-    background: rgba(26, 29, 35, 0.42);
+    border-bottom: 0.5px solid var(--shell-border);
+    background: var(--shell-bg);
     scroll-padding-inline: 12px;
     scrollbar-width: none;
   }
@@ -701,8 +755,8 @@ body {
     max-width: 190px;
     min-height: 34px;
     padding: 0 11px;
-    border-color: var(--border-tertiary);
-    background: rgba(34, 37, 44, 0.60);
+    border-color: var(--shell-border);
+    background: var(--surface-subtle);
   }
 
   .settings-tab-button::before {

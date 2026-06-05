@@ -29,7 +29,7 @@ describe("Button premium system", () => {
         expect(button.style.minHeight).toBe("40px");
         expect(button.style.minWidth).toBe("124px");
         expect(button.style.borderRadius).toBe("8px");
-        expect(button.style.background).toContain("linear-gradient");
+        expect(button.style.background).toBe("var(--button-primary-bg)");
     });
 
     it("modal ve lightbox aksiyonları için ref'i native button'a taşır", () => {

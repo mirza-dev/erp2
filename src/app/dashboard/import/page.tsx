@@ -606,9 +606,10 @@ export default function ImportPage() {
                         flexDirection: "column",
                         gap: "10px",
                         padding: "14px",
-                        background: "var(--bg-secondary)",
-                        border: "0.5px solid var(--border-tertiary)",
+                        background: "var(--surface-subtle)",
+                        border: "0.5px solid var(--surface-border)",
                         borderRadius: "8px",
+                        boxShadow: "var(--surface-shadow-sm)",
                     }}
                 >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
@@ -652,7 +653,7 @@ export default function ImportPage() {
                                         padding: "10px",
                                         borderRadius: "7px",
                                         border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-tertiary)"}`,
-                                        background: active ? "var(--accent-bg)" : "var(--bg-primary)",
+                                        background: active ? "var(--accent-bg)" : "var(--surface-raised)",
                                         color: "var(--text-primary)",
                                         cursor: aiFiles.length > 0 ? "not-allowed" : "pointer",
                                         opacity: aiFiles.length > 0 && !active ? 0.62 : 1,
@@ -681,9 +682,10 @@ export default function ImportPage() {
                     <output
                         style={{
                             padding: "16px 18px",
-                            background: "var(--bg-secondary)",
-                            border: "0.5px solid var(--border-tertiary)",
+                            background: "var(--surface-subtle)",
+                            border: "0.5px solid var(--surface-border)",
                             borderRadius: "8px",
+                            boxShadow: "var(--surface-shadow-sm)",
                             display: "grid",
                             gridTemplateColumns: "1fr auto",
                             gap: "12px",
@@ -730,9 +732,10 @@ export default function ImportPage() {
                             <output
                                 style={{
                                     padding: "16px 20px",
-                                    background: "var(--bg-secondary)",
-                                    border: "0.5px dashed var(--border-tertiary)",
+                                    background: "var(--surface-subtle)",
+                                    border: "0.5px dashed var(--surface-border)",
                                     borderRadius: "8px",
+                                    boxShadow: "var(--surface-shadow-sm)",
                                     color: "var(--text-tertiary)",
                                     fontSize: "12px", lineHeight: 1.6,
                                 }}
@@ -768,9 +771,10 @@ export default function ImportPage() {
                 style={{
                     marginTop: "8px",
                     padding: "0",
-                    border: "0.5px solid var(--border-tertiary)",
+                    border: "0.5px solid var(--surface-border)",
                     borderRadius: "8px",
-                    background: "var(--bg-secondary)",
+                    background: "var(--surface-subtle)",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}
             >
                 <summary
@@ -799,16 +803,16 @@ export default function ImportPage() {
                                     fontSize: "10px",
                                     padding: "2px 7px",
                                     borderRadius: "999px",
-                                    border: "0.5px solid var(--border-tertiary)",
+                                    border: "0.5px solid var(--surface-border)",
                                     color: "var(--text-secondary)",
-                                    background: "var(--bg-primary)",
+                                    background: "var(--surface-raised)",
                                     whiteSpace: "nowrap",
                                 }}>{label}</span>
                             ))}
                         </span>
                     </div>
                 </summary>
-                <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: "16px", background: "var(--bg-primary)" }}>
+                <div style={{ padding: "14px", display: "flex", flexDirection: "column", gap: "16px", background: "var(--surface-raised)" }}>
             {/* Excel/CSV kontrollü aktarım adımları */}
 
             {/* Step indicator */}
@@ -956,7 +960,7 @@ export default function ImportPage() {
                         ].map(step => {
                             const StepIcon = step.icon;
                             return (
-                            <div key={step.label} style={{ textAlign: "center", padding: "10px 8px", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", background: "var(--bg-primary)", display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", minWidth: 0 }}>
+                            <div key={step.label} style={{ textAlign: "center", padding: "10px 8px", border: "0.5px solid var(--surface-border)", borderRadius: "6px", background: "var(--surface-raised)", boxShadow: "var(--surface-shadow-sm)", display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", minWidth: 0 }}>
                                 <StepIcon size={16} color="var(--text-tertiary)" aria-hidden />
                                 <span style={{ fontSize: "10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{step.label}</span>
                             </div>
@@ -972,7 +976,7 @@ export default function ImportPage() {
                         ].map(card => {
                             const CardIcon = card.icon;
                             return (
-                            <div key={card.title} style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "14px 16px" }}>
+                            <div key={card.title} style={{ background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)", borderRadius: "6px", padding: "14px 16px", boxShadow: "var(--surface-shadow-sm)" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
                                     <CardIcon size={15} aria-hidden />{card.title}
                                 </div>
@@ -986,7 +990,7 @@ export default function ImportPage() {
 
             {/* ───── ANALYZING ───── */}
             {state === "analyzing" && (
-                <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "48px 24px", textAlign: "center" }}>
+                <div style={{ background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)", borderRadius: "8px", padding: "48px 24px", textAlign: "center", boxShadow: "var(--surface-shadow-sm)" }}>
                     <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "24px" }}>
                         {[0, 1, 2].map(i => (
                             <div key={i} style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)", animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
@@ -1004,8 +1008,8 @@ export default function ImportPage() {
             {/* ───── SHEET SELECT ───── */}
             {state === "sheet_select" && (
                 <>
-                    <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>
-                        <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--border-tertiary)", background: "var(--bg-secondary)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)", borderRadius: "8px", overflow: "hidden", boxShadow: "var(--surface-shadow-sm)" }}>
+                        <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--surface-border)", background: "var(--table-header-bg)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div>
                                 <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>Dosyada {sheets.length} sheet bulundu</span>
                                 <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "10px" }}>
@@ -1271,9 +1275,9 @@ export default function ImportPage() {
                         const fieldLabels = new Map((ERP_FIELDS[activeTab] ?? []).map(f => [f.field, f.label]));
 
                         return (
-                            <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "auto" }}>
+                            <div style={{ background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)", borderRadius: "8px", overflow: "auto", boxShadow: "var(--surface-shadow-sm)" }}>
                                 {/* Table header */}
-                                <div style={{ display: "grid", gridTemplateColumns: `72px repeat(${visibleFields.length}, minmax(150px, 1fr))`, borderBottom: "0.5px solid var(--border-secondary)", background: "var(--bg-secondary)", minWidth: "760px" }}>
+                                <div style={{ display: "grid", gridTemplateColumns: `72px repeat(${visibleFields.length}, minmax(150px, 1fr))`, borderBottom: "0.5px solid var(--surface-border)", background: "var(--table-header-bg)", minWidth: "760px" }}>
                                     <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)" }}>Satır</div>
                                     {visibleFields.map(f => (
                                         <div key={f} style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: required.includes(f) ? "var(--accent-text)" : "var(--text-secondary)", borderLeft: "0.5px solid var(--border-tertiary)", display: "flex", gap: "6px", alignItems: "center", minWidth: 0 }}>

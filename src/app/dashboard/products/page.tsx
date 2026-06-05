@@ -43,7 +43,7 @@ const thStyle: React.CSSProperties = {
     fontSize: "12px",
     fontWeight: 500,
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    borderBottom: "0.5px solid var(--surface-border)",
     whiteSpace: "nowrap",
 };
 
@@ -61,7 +61,7 @@ const modalInputStyle: React.CSSProperties = {
     padding: "6px 10px",
     border: "0.5px solid var(--border-secondary)",
     borderRadius: "6px",
-    background: "var(--bg-tertiary)",
+    background: "var(--input-bg)",
     color: "var(--text-primary)",
     width: "100%",
 };
@@ -478,7 +478,7 @@ export default function ProductsPage() {
                             padding: "6px 12px",
                             border: "0.5px solid var(--border-secondary)",
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: "var(--text-primary)",
                             width: isMobile ? "100%" : "200px",
                             maxWidth: isMobile ? "168px" : "200px",
@@ -556,10 +556,10 @@ export default function ProductsPage() {
                         top: "calc(100% + 4px)",
                         left: 0,
                         minWidth: "220px",
-                        background: "var(--bg-primary)",
-                        border: "0.5px solid var(--border-primary)",
+                        background: "var(--surface-raised)",
+                        border: "0.5px solid var(--surface-border)",
                         borderRadius: "6px",
-                        boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                        boxShadow: "var(--surface-shadow)",
                         zIndex: 50,
                         overflow: "hidden",
                     }}>
@@ -579,7 +579,7 @@ export default function ProductsPage() {
                                 justifyContent: "space-between",
                                 alignItems: "center",
                             }}
-                            onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-secondary)"; }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "var(--table-row-hover)"; }}
                             onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                         >
                             <span>Tümü</span>
@@ -610,7 +610,7 @@ export default function ProductsPage() {
                                         gap: "8px",
                                         color: checked ? "var(--accent-text)" : "var(--text-primary)",
                                     }}
-                                    onMouseEnter={e => { e.currentTarget.style.background = "var(--bg-secondary)"; }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = "var(--table-row-hover)"; }}
                                     onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
                                 >
                                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -770,16 +770,17 @@ export default function ProductsPage() {
             {/* Table */}
             <div
                 style={{
-                    background: "var(--bg-primary)",
-                    border: "0.5px solid var(--border-tertiary)",
+                    background: "var(--surface-raised)",
+                    border: "0.5px solid var(--surface-border)",
                     borderRadius: "6px",
                     overflow: "hidden",
                     overflowX: "auto",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}
             >
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: isMobile ? "360px" : "640px" }}>
                     <thead>
-                        <tr style={{ background: "var(--bg-secondary)" }}>
+                        <tr style={{ background: "var(--table-header-bg)" }}>
                             <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
                                 <input
                                     type="checkbox"
@@ -950,8 +951,9 @@ export default function ProductsPage() {
                     <div style={{
                         position: "fixed", top: "50%", left: "50%",
                         transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                        background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)",
                         borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                        boxShadow: "var(--surface-shadow)",
                     }}>
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
                             {selectedIds.size} ürünü sil
@@ -997,13 +999,13 @@ export default function ProductsPage() {
                         position: "fixed", top: "50%", left: "50%",
                         transform: "translate(-50%, -50%)",
                         zIndex: 101,
-                        background: "var(--bg-primary)",
-                        border: "0.5px solid var(--border-primary)",
+                        background: "var(--surface-raised)",
+                        border: "0.5px solid var(--surface-border)",
                         borderRadius: "8px",
                         width: isMobile ? "calc(100vw - 32px)" : "480px",
                         maxHeight: "90vh",
                         overflowY: "auto",
-                        boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                        boxShadow: "var(--surface-shadow)",
                     }}>
                         {/* Modal header */}
                         <div style={{

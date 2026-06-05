@@ -72,6 +72,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         typeof window === "undefined" ? "dark" : readDomResolved(),
     );
 
+    // Hydration veya route geçişi <html> üzerindeki bootstrap attribute'ünü
+    // düşürürse seçili tema yeniden DOM'a yazılır.
+    useEffect(() => {
+        applyDom(resolved);
+    }, [resolved]);
+
     // theme === 'system' iken OS tercihini canlı izle.
     useEffect(() => {
         if (theme !== "system") return;

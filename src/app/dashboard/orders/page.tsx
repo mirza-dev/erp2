@@ -50,7 +50,7 @@ const thStyle: React.CSSProperties = {
     fontSize: "12px",
     fontWeight: 500,
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    borderBottom: "0.5px solid var(--surface-border)",
 };
 
 const tdStyle: React.CSSProperties = {
@@ -306,7 +306,7 @@ function OrdersList() {
                             padding: "6px 12px",
                             border: "0.5px solid var(--border-secondary)",
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: "var(--text-primary)",
                             width: "200px",
                         }}
@@ -321,7 +321,7 @@ function OrdersList() {
                             padding: "5px 8px",
                             border: `0.5px solid ${dateFrom ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: dateFrom ? "var(--text-primary)" : "var(--text-tertiary)",
                             cursor: "pointer",
                         }}
@@ -337,7 +337,7 @@ function OrdersList() {
                             padding: "5px 8px",
                             border: `0.5px solid ${dateTo ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: dateTo ? "var(--text-primary)" : "var(--text-tertiary)",
                             cursor: "pointer",
                         }}
@@ -350,7 +350,7 @@ function OrdersList() {
                             padding: "5px 8px",
                             border: `0.5px solid ${currencyFilter ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: currencyFilter ? "var(--text-primary)" : "var(--text-tertiary)",
                             cursor: "pointer",
                         }}
@@ -426,15 +426,16 @@ function OrdersList() {
             {/* Table */}
             <div
                 style={{
-                    background: "var(--bg-primary)",
-                    border: "0.5px solid var(--border-tertiary)",
+                    background: "var(--surface-raised)",
+                    border: "0.5px solid var(--surface-border)",
                     borderRadius: "6px",
                     overflowX: "auto",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}
             >
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "740px" }}>
                     <thead>
-                        <tr style={{ background: "var(--bg-secondary)" }}>
+                        <tr style={{ background: "var(--table-header-bg)" }}>
                             <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
                                 <input
                                     type="checkbox"
@@ -625,8 +626,9 @@ function OrdersList() {
                     <div style={{
                         position: "fixed", top: "50%", left: "50%",
                         transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                        background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)",
                         borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                        boxShadow: "var(--surface-shadow)",
                     }}>
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
                             {selectedIds.size} siparişi iptal et

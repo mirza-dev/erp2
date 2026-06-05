@@ -1,11 +1,11 @@
 /**
- * Tema sistemi — koyu + aydınlık (Cool slate).
+ * Tema sistemi — koyu + aydınlık (premium cool slate).
  *
  * Kullanıcı kararları:
  *   - İlk açılış: sistem tercihini izle (prefers-color-scheme); elle seçim hatırlanır.
  *   - Geçiş: Topbar'da küçük ikon (güneş/ay), avatar öncesi.
  *   - Kayıt: yalnız localStorage (FOUC-suz, backend yok).
- *   - Aydınlık palet: Cool slate (#f6f8fa zemin / #1f2328 metin / #0969da accent).
+ *   - Aydınlık palet: premium cool slate (#eef3f8 zemin / #1f2937 metin / #1f6fd1 steel-blue accent).
  *
  * "Sıfır frontend bozulması": baskı/marka belgeleri (QuoteDocument, PurchaseOrderDocument)
  * tema-MUAF — sabit hex'leri korumalı (yanlışlıkla tokenize edilirse regression yakalanır).
@@ -21,6 +21,8 @@ const GLOBALS_SRC = read("src/app/globals.css");
 const THEME_SRC = read("src/lib/theme/use-theme.tsx");
 const TOGGLE_SRC = read("src/components/layout/ThemeToggle.tsx");
 const TOPBAR_SRC = read("src/components/layout/Topbar.tsx");
+const SIDEBAR_SRC = read("src/components/layout/Sidebar.tsx");
+const BUTTON_SRC = read("src/components/ui/Button.tsx");
 const DASH_LAYOUT_SRC = read("src/app/dashboard/layout.tsx");
 const QUOTE_DOC_SRC = read("src/app/dashboard/quotes/components/QuoteDocument.tsx");
 const PO_DOC_SRC = read("src/components/purchase/PurchaseOrderDocument.tsx");
@@ -54,10 +56,10 @@ describe("Tema — palet blokları (globals.css)", () => {
         expect(GLOBALS_SRC).toMatch(/--accent:\s*#58a6ff/);
     });
 
-    it("aydınlık palet Cool slate anahtar değerlerini taşır", () => {
-        expect(GLOBALS_SRC).toMatch(/--bg-secondary:\s*#f6f8fa/);
-        expect(GLOBALS_SRC).toMatch(/--text-primary:\s*#1f2328/);
-        expect(GLOBALS_SRC).toMatch(/--accent:\s*#0969da/);
+    it("aydınlık palet premium cool slate anahtar değerlerini taşır", () => {
+        expect(GLOBALS_SRC).toMatch(/--bg-secondary:\s*#eef3f8/);
+        expect(GLOBALS_SRC).toMatch(/--text-primary:\s*#1f2937/);
+        expect(GLOBALS_SRC).toMatch(/--accent:\s*#1f6fd1/);
     });
 
     it("color-scheme her iki temada native uyum için ayarlı", () => {
@@ -65,12 +67,27 @@ describe("Tema — palet blokları (globals.css)", () => {
         expect(GLOBALS_SRC).toMatch(/color-scheme:\s*light/);
     });
 
-    it("yeni tema-bilir tokenlar tanımlı (highlight-inset + -bg-strong + accent-glow)", () => {
+    it("tema-bilir tokenlar tanımlı (highlight-inset + -bg-strong + accent-glow)", () => {
         expect(GLOBALS_SRC).toMatch(/--highlight-inset:/);
         expect(GLOBALS_SRC).toMatch(/--accent-bg-strong:/);
         expect(GLOBALS_SRC).toMatch(/--success-bg-strong:/);
         expect(GLOBALS_SRC).toMatch(/--danger-bg-strong:/);
         expect(GLOBALS_SRC).toMatch(/--accent-glow:/);
+    });
+
+    it("light tema premium shell/surface materyal tokenlarını taşır", () => {
+        expect(GLOBALS_SRC).toMatch(/--app-bg:\s*#eef3f8/);
+        expect(GLOBALS_SRC).toMatch(/--shell-bg:\s*#f8fbff/);
+        expect(GLOBALS_SRC).toMatch(/--surface-raised:\s*#ffffff/);
+        expect(GLOBALS_SRC).toMatch(/--surface-shadow:/);
+        expect(GLOBALS_SRC).toMatch(/--table-header-bg:\s*#f4f7fb/);
+        expect(GLOBALS_SRC).toMatch(/--input-bg:\s*#fbfdff/);
+        expect(GLOBALS_SRC).toMatch(/--nav-active-bg:/);
+    });
+
+    it("dark'a ait sabit settings yüzey rgba'ları globals'ta kalmaz", () => {
+        expect(GLOBALS_SRC).not.toContain("rgba(26, 29, 35");
+        expect(GLOBALS_SRC).not.toContain("rgba(34, 37, 44");
     });
 
     it("reduced-motion global guard'ı var", () => {
@@ -92,6 +109,10 @@ describe("Tema — useTheme provider mantığı", () => {
 
     it("ilk resolved'ı DOM'dan okur (re-flash önler), default'tan değil", () => {
         expect(THEME_SRC).toMatch(/getAttribute\("data-theme"\)/);
+    });
+
+    it("hydrate sonrası bootstrap attribute'ü düşerse resolved'ı DOM'a tekrar yazar", () => {
+        expect(THEME_SRC).toMatch(/useEffect\(\(\) => \{[\s\S]*applyDom\(resolved\);[\s\S]*\}, \[resolved\]\)/);
     });
 
     it("theme==='system' iken matchMedia change dinler", () => {
@@ -125,6 +146,19 @@ describe("Tema — ThemeToggle UI", () => {
     it("ThemeProvider dashboard kabuğunda en dış provider olarak mount", () => {
         expect(DASH_LAYOUT_SRC).toMatch(/import \{ ThemeProvider \}/);
         expect(DASH_LAYOUT_SRC).toMatch(/<ThemeProvider>[\s\S]*<DataProvider>/);
+    });
+
+    it("dashboard shell light surface tokenlarını kullanır", () => {
+        expect(DASH_LAYOUT_SRC).toContain("var(--app-bg)");
+        expect(SIDEBAR_SRC).toContain("var(--shell-bg)");
+        expect(SIDEBAR_SRC).toContain("var(--nav-active-bg)");
+        expect(GLOBALS_SRC).toMatch(/\.topbar-shell[\s\S]*var\(--shell-bg\)/);
+    });
+
+    it("primary Button tema-bilir steel-blue tokenlarından gelir", () => {
+        expect(BUTTON_SRC).toContain("var(--button-primary-bg)");
+        expect(BUTTON_SRC).toContain("var(--button-primary-shadow)");
+        expect(GLOBALS_SRC).toMatch(/--button-primary-bg:/);
     });
 });
 

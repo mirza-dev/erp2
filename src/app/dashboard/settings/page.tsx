@@ -52,7 +52,7 @@ const inputStyle: React.CSSProperties = {
     padding: "7px 10px",
     border: "0.5px solid var(--border-secondary)",
     borderRadius: "6px",
-    background: "var(--bg-tertiary)",
+    background: "var(--input-bg)",
     color: "var(--text-primary)",
     width: "100%",
     boxSizing: "border-box",
@@ -779,10 +779,11 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
             <div style={sectionTitle}>Bildirim Kanalları</div>
             <div
                 style={{
-                    background: "var(--bg-secondary)",
-                    border: "0.5px solid var(--border-tertiary)",
+                    background: "var(--surface-subtle)",
+                    border: "0.5px solid var(--surface-border)",
                     borderRadius: "8px",
                     overflow: "hidden",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}
             >
                 {/* Header */}
@@ -948,10 +949,11 @@ function ApiTab() {
             <div style={sectionTitle}>Entegrasyon Anahtarları</div>
             <div
                 style={{
-                    background: "var(--bg-secondary)",
-                    border: "0.5px solid var(--border-tertiary)",
+                    background: "var(--surface-subtle)",
+                    border: "0.5px solid var(--surface-border)",
                     borderRadius: "8px",
                     overflow: "hidden",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}
             >
                 {entries.map((entry, i) => {
@@ -1014,10 +1016,11 @@ function ApiTab() {
             <div style={{ ...sectionTitle, marginTop: "24px" }}>Paraşüt OAuth</div>
             <div
                 style={{
-                    background: "var(--bg-secondary)",
-                    border: "0.5px solid var(--border-tertiary)",
+                    background: "var(--surface-subtle)",
+                    border: "0.5px solid var(--surface-border)",
                     borderRadius: "8px",
                     padding: "14px 16px",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}
             >
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>

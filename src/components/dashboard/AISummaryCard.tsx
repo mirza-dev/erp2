@@ -186,11 +186,12 @@ export default function AISummaryCard() {
     if (state === "loading") {
         return (
             <div style={{
-                background: "var(--bg-secondary)",
+                background: "var(--surface-subtle)",
                 border: "1px solid var(--accent-border)",
                 borderLeft: "3px solid var(--accent)",
                 borderRadius: "8px",
                 padding: "20px 24px",
+                boxShadow: "var(--surface-shadow-sm)",
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <div style={{
@@ -213,11 +214,12 @@ export default function AISummaryCard() {
     if (state === "disabled") {
         return (
             <div style={{
-                background: "var(--bg-secondary)",
+                background: "var(--surface-subtle)",
                 border: "1px solid var(--accent-border)",
                 borderLeft: "3px solid var(--accent)",
                 borderRadius: "8px",
                 padding: "20px 24px",
+                boxShadow: "var(--surface-shadow-sm)",
             }}>
                 {/* Başlık + rozet CollapsibleSection (dashboard) başlık çubuğunda — burada tekrarlanmaz */}
                 {data?.metrics && <MetricsContextBar metrics={data.metrics} />}
@@ -232,11 +234,12 @@ export default function AISummaryCard() {
     if (state === "error") {
         return (
             <div style={{
-                background: "var(--bg-secondary)",
+                background: "var(--surface-subtle)",
                 border: "1px solid var(--border-secondary)",
                 borderLeft: "3px solid var(--border-primary)",
                 borderRadius: "8px",
                 padding: "20px 24px",
+                boxShadow: "var(--surface-shadow-sm)",
             }}>
                 {/* Başlık CollapsibleSection (dashboard) başlık çubuğunda — burada tekrarlanmaz */}
                 {data?.metrics && <MetricsContextBar metrics={data.metrics} />}
@@ -284,11 +287,12 @@ export default function AISummaryCard() {
 
     return (
         <div style={{
-            background: "var(--bg-secondary)",
+            background: "var(--surface-subtle)",
             border: "1px solid var(--accent-border)",
             borderLeft: "3px solid var(--accent)",
             borderRadius: "8px",
             padding: "20px 24px",
+            boxShadow: "var(--surface-shadow-sm)",
         }}>
             {/* Başlık + AI rozeti CollapsibleSection (dashboard) başlık çubuğunda;
                 burada yalnız "Yenile" aksiyonu kalır */}
