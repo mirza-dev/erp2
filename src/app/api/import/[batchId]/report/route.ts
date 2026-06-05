@@ -19,8 +19,19 @@ function asObjectText(value: unknown): string {
         .join(" | ");
 }
 
+// CSV formül injection koruması: Excel/Sheets `= + - @` (ayrıca TAB/CR) ile
+// başlayan hücreyi formül olarak çalıştırır — tırnaklamak bunu ENGELLEMEZ
+// (tırnaklı alanda da evaluate edilir). Rapor verisi yüklenen dosyadan gelen
+// kullanıcı-kontrollü serbest metin (user_corrections/row_errors) → değer
+// seviyesinde nötrle: tehlikeli karakterle başlıyorsa başına tek tırnak ekle,
+// sonra standart CSV tırnaklama uygula. (XLSX yolu güvenli — json_to_sheet
+// hücreyi 's' string tipiyle yazar, formül olarak yorumlamaz.)
+function neutralizeCsvFormula(text: string): string {
+    return /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+}
+
 function escapeCsv(value: unknown): string {
-    const text = String(value ?? "");
+    const text = neutralizeCsvFormula(String(value ?? ""));
     if (!/[",\n\r]/.test(text)) return text;
     return `"${text.replace(/"/g, '""')}"`;
 }

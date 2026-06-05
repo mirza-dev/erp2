@@ -74,6 +74,43 @@ describe("GET /api/import/[batchId]/report", () => {
         expect(rows[0]).toMatchObject({ sheet: "Urunler", entity_type: "product", match_status: "update" });
     });
 
+    it("CSV formül injection nötrlenir (= + - @ ile başlayan hücreler)", async () => {
+        // Gerçek injection yüzeyi: tek-eleman dizi (asArrayText prefix eklemez) +
+        // ham string alanlar. (asObjectText her zaman 'key: value' → key ile başlar.)
+        mockDbListDrafts.mockResolvedValueOnce([
+            draft({
+                row_errors: ["=cmd|'/c calc'!A1"],
+                risk_flags: ["@SUM(1+1)"],
+                sheet_name: "+1234567890",
+                matched_entity_id: "-2+3",
+            }),
+        ]);
+        const res = await GET(req("csv"), PARAMS);
+        expect(res.status).toBe(200);
+        const csv = await res.text();
+        // Tehlikeli hücreler tek tırnakla nötrlenmiş olmalı (formül çalışmaz)
+        expect(csv).toContain("'=cmd"); // tek tırnak prefix → Excel formül olarak yorumlamaz
+        expect(csv).toContain("'@SUM(1+1)");
+        expect(csv).toContain("'+1234567890");
+        expect(csv).toContain("'-2+3");
+        // Ham (nötrlenmemiş) formül başlangıcı satır/alan başında bulunmamalı
+        expect(csv).not.toMatch(/(^|,)=cmd/m);
+        expect(csv).not.toMatch(/(^|,)@SUM/m);
+        expect(csv).not.toMatch(/(^|,)\+1234567890/m);
+    });
+
+    it("zararsız değerler CSV'de değiştirilmeden kalır", async () => {
+        mockDbListDrafts.mockResolvedValueOnce([
+            draft({ user_corrections: { name: "Vana A105" }, sheet_name: "Urunler" }),
+        ]);
+        const res = await GET(req("csv"), PARAMS);
+        const csv = await res.text();
+        expect(csv).toContain("Urunler");
+        expect(csv).toContain("name: Vana A105");
+        expect(csv).not.toContain("'Vana");
+        expect(csv).not.toContain("'Urunler");
+    });
+
     it("geçersiz format 400 döner", async () => {
         const res = await GET(req("pdf"), PARAMS);
         expect(res.status).toBe(400);

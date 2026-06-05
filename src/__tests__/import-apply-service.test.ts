@@ -193,6 +193,62 @@ describe("serviceApplyImportDocument — product flow", () => {
         expect(args.attributes).toEqual({ material: "A105", dn: 50, pn_class: "PN16" });
     });
 
+    it("null/boş AI değeri mevcut ürün attribute'unu SİLMEZ (clobber koruması)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", {
+                match_action: "matched",
+                matched_product_id: "p-existing",
+                // dn null + pn_class "" → mevcut değeri ezmemeli; material dolu → eklenmeli
+                extracted_attributes: { dn: null, pn_class: "", material: "A105" },
+                extraction_evidence: {},
+            }),
+        ]);
+        mockGetProductById.mockResolvedValueOnce({
+            id: "p-existing", attributes: { dn: 25, pn_class: "PN16" }, product_type_id: "type-vana",
+            on_hand: 0, reserved: 0, is_active: true,
+        });
+        mockGetProductTypeWithFields.mockResolvedValueOnce({
+            id: "type-vana", name: "Vana", is_active: true,
+            fields: [
+                { id: "f-dn", field_key: "dn", label_tr: "DN", field_type: "number", is_active: true },
+                { id: "f-pn", field_key: "pn_class", label_tr: "PN", field_type: "text", is_active: true },
+                { id: "f-mat", field_key: "material", label_tr: "Malzeme", field_type: "text", is_active: true },
+            ],
+        });
+        mockUpdateProduct.mockResolvedValueOnce({ id: "p-existing" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.products_updated).toBe(1);
+        const args = mockUpdateProduct.mock.calls[0]?.[1] as { attributes: Record<string, unknown> };
+        // dn=25 ve pn_class="PN16" KORUNUR (null/"" ezmedi); material eklenir
+        expect(args.attributes).toEqual({ dn: 25, pn_class: "PN16", material: "A105" });
+        // yalnız gerçekten uygulanan 1 alan sayılır (null/boş 2 alan hariç)
+        expect(r.technical_fields_applied).toBe(1);
+    });
+
+    it("tüm AI değerleri null/boş ise attributes hiç yazılmaz (no-op)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", {
+                match_action: "matched",
+                matched_product_id: "p-existing",
+                extracted_attributes: { dn: null, pn_class: "" },
+                extraction_evidence: {},
+            }),
+        ]);
+        mockGetProductById.mockResolvedValueOnce({
+            id: "p-existing", attributes: { dn: 25 }, product_type_id: "type-vana",
+            on_hand: 0, reserved: 0, is_active: true,
+        });
+        mockUpdateProduct.mockResolvedValueOnce({ id: "p-existing" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        // attributes + productPatch ikisi de boş → satır skip edilir, update çağrılmaz
+        expect(mockUpdateProduct).not.toHaveBeenCalled();
+        expect(r.products_updated).toBe(0);
+    });
+
     it("fieldApprovals varsa matched satır yalnız seçili teknik alanları merge eder", async () => {
         mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([

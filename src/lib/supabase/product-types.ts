@@ -470,6 +470,13 @@ export async function dbUpdateProductTypeField(
             }
         }
 
+        // SAĞLAMLIK NOTU (bilinen kabul): bu rename N ayrı ürün UPDATE'i +
+        // sonrasındaki field UPDATE'i tek transaction/RPC içinde DEĞİL
+        // (accept_quote / update_order_with_lines atomik RPC paterninin aksine).
+        // Döngü ortasında hata → kısmi rename kalabilir (bazı ürünler yeni
+        // anahtarda, bazıları eskide). UI'da field_key edit-modunda READ-ONLY
+        // (readOnly+disabled) + yalnız nadir admin işlemi olduğundan risk düşük.
+        // Sıklaşırsa tek-RPC'ye (FOR UPDATE + atomik) taşınmalı.
         for (const product of affectedProducts ?? []) {
             const attrs = { ...((product.attributes ?? {}) as Record<string, unknown>) };
             if (!Object.prototype.hasOwnProperty.call(attrs, existing.field_key)) continue;

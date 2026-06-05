@@ -336,6 +336,17 @@ export async function serviceApplyImportDocument(
                             effectiveProductTypeId ? approved.attributes : {},
                             effectiveProductTypeId,
                         );
+                        // attributes merge: { ...current, ...new } — yeni ezerler.
+                        // null/undefined/"" gelen AI değerleri mevcut ürün
+                        // attribute'unu SİLMEZ (ai-import-operations safetyNote
+                        // "boş alanlar mevcut veriyi silmez" — prompt talimatı
+                        // değil, burada kodda enforce edilir). Anahtarı temizleme
+                        // istenirse ayrı explicit "clear" akışı gerekir.
+                        const nonEmptyLineAttributes = Object.fromEntries(
+                            Object.entries(safeLineAttributes).filter(
+                                ([, v]) => v !== null && v !== undefined && v !== "",
+                            ),
+                        );
                         const productPatch: Record<string, unknown> = {};
                         if (
                             approvedProductFields?.has("name")
@@ -359,30 +370,31 @@ export async function serviceApplyImportDocument(
                         if (shouldSetProductType) {
                             productPatch.product_type_id = effectiveProductTypeId;
                         }
-                        if (Object.keys(safeLineAttributes).length === 0 && Object.keys(productPatch).length === 0) {
+                        // Uygulanacak gerçek bir şey yoksa (boş/null attr + boş patch)
+                        // satırı atla — gereksiz no-op update + yanıltıcı sayaç önlenir.
+                        if (Object.keys(nonEmptyLineAttributes).length === 0 && Object.keys(productPatch).length === 0) {
                             result.skipped += 1;
                             continue;
                         }
-                        // attributes merge: { ...current, ...new } — yeni ezerler
                         const mergedAttributes = {
                             ...(current.attributes ?? {}),
-                            ...safeLineAttributes,
+                            ...nonEmptyLineAttributes,
                         };
                         await dbUpdateProduct(line.matched_product_id, {
                             ...productPatch,
-                            ...(Object.keys(safeLineAttributes).length > 0 ? { attributes: mergedAttributes } : {}),
+                            ...(Object.keys(nonEmptyLineAttributes).length > 0 ? { attributes: mergedAttributes } : {}),
                         });
                         await auditTechnicalTemplateApply({
                             documentId,
                             line,
                             productId: line.matched_product_id,
                             productTypeId: effectiveProductTypeId,
-                            appliedAttributes: safeLineAttributes,
+                            appliedAttributes: nonEmptyLineAttributes,
                             appliedEvidence: approved.evidence,
                             actorUserId,
                         });
                         result.products_updated += 1;
-                        result.technical_fields_applied += Object.keys(safeLineAttributes).length;
+                        result.technical_fields_applied += Object.keys(nonEmptyLineAttributes).length;
                     }
                 } else if (line.extraction_type === "certificate_target") {
                     if (line.match_action === "new_product") {
