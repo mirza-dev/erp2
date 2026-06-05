@@ -18,7 +18,7 @@ Codex işini bitirdi (`origin/codex-experiment` @ `ee3b701`, ayrı Coolify deplo
 - **Test reconciliation:** obsolet `product-types-ui`+`product-types-list-count` silindi (MY impl assert, codex'e karşı kırılır; codex helper/route testlerini kendi shape'ine güncellemiş) → yeni `product-types-field-key-guard.test.ts`; `settings-ui.test.ts` codex yapısına yeniden yazıldı; codex `settings-page-tabs.test.tsx` RTL query dirty-suffix regex'e uyarlandı.
 - **Phase 4:** tsc 0 · lint 0 · **4604 test yeşil** (320 dosya) · build 0 (`ƒ Proxy`). 9 oto-merge da bu net'le doğrulandı.
 - **Migrations 083 (technical templates) + 084 (excel import)** deploy'da DB'ye uygulanmalı.
-- **DURUM: `integrate-codex` @ `56ecbd1` (merge commit, 2 parent: main 0914b28 + codex ee3b701) YEŞİL.** Phase 5 (main + codex-experiment'i bu commit'e ff → birebir aynı) + **HER İKİ PUSH kullanıcı onayı BEKLİYOR** (⚠️ codex→main = 16 commit prod'a tek deploy = büyük değişiklik).
+- **DURUM: TAMAMLANDI.** Kullanıcı onayı (083/084 codex'çe zaten uygulanmış, tek DB → push güvenli) → `4176c8d` her iki branch'e ff+push: `main 0914b28..4176c8d` + `codex-experiment ee3b701..4176c8d`. **`origin/main == origin/codex-experiment == 4176c8d` (birebir aynı).** İki Coolify prod deploy tetiklendi; `integrate-codex` silindi. Mekanik not: codex-experiment proje-codex worktree'sinde checkout'lu → ff worktree içinde yapıldı (`git checkout` çakışması önlendi).
 
 ---
 
