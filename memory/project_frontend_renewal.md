@@ -6,15 +6,15 @@ type: project
 
 **Dosya:** `/Users/mirzasaribiyik/Projects/erp2/frontend-renewal.md` (2026-04-08, gitignore'da değil)
 
-**Durum:** PLAN HAZIR — hiç uygulanmadı (kod commit'i yok)
+**Durum:** PLAN HAZIR — **kısmen turlarda uygulandı** (formal frontend-renewal commit'i yok ama maddeler ayrı turlarda kapatıldı). KAPANANLAR: DOM mutation fix (orders/quotes/products/customers/PO/production turlarında `hoveredId` state'e geçildi), a11y (modal `role=dialog`/`aria-modal`/`aria-labelledby` + aria-label çoğu sayfada), `prefers-reduced-motion` global guard (tema turunda `062bfa9`), Topbar yeniden tasarım ("Sakin düz" `bf28fb0` — breadcrumb yerine sola-başlık). AÇIK: component lib (`DataTable`/`Card`/`Badge`/`Input`/`PageHeader`/`SectionHeader`/`NavLink`/`Stat` — hâlâ yok), kalan inline-style→token konsolidasyonu.
 
 ---
 
 ## Sorunlar (plan gerekçesi)
 
-- 100+ inline `style={{}}` declaration — her sayfada sıfırdan yazılıyor, bakım yükü yüksek
-- DOM mutation antipattern: `onMouseEnter`'da `e.currentTarget.style.X = ...` — React prensibine aykırı; etkilenen dosyalar: `Button.tsx`, `Sidebar.tsx`, `StatsCards.tsx`, `StockDataGrid.tsx`, `orders/page.tsx`
-- Erişilebilirlik eksikleri: `cursor: pointer` eksik, `sm` buton <44px, `aria-label` yok, `prefers-reduced-motion` yok
+- 100+ inline `style={{}}` declaration — her sayfada sıfırdan yazılıyor, bakım yükü yüksek (KISMEN: tema turunda renkler CSS var/token'a taşındı, yapısal stiller hâlâ inline)
+- ~~DOM mutation antipattern~~ → **ÇOĞU KAPANDI** (`onMouseEnter`'da `e.currentTarget.style.X`→`hoveredId` state; orders/quotes/products/customers/PO/production sayfalarında uygulandı)
+- Erişilebilirlik: aria-label + modal a11y çoğu sayfada eklendi; ~~`prefers-reduced-motion` yok~~ → **EKLENDİ** (tema turu global guard); kalan: `sm` buton <44px, bazı skip-link/focus-trap
 
 ---
 
@@ -22,11 +22,11 @@ type: project
 
 | Faz | Konu | Açıklama |
 |-----|------|----------|
-| A | Design Token Genişletme | `globals.css`'e typography scale, spacing (4pt grid), z-index, hover tokens, skip-link, reduced-motion |
-| B | Component Kütüphanesi | DataTable, Card, Badge, Input, PageHeader, SectionHeader, NavLink, Stat (hepsi `src/components/ui/`) |
-| C | DOM Mutation Fix | 6 dosyadaki `onMouseEnter` style mutation → `useState(hovered)` |
-| D | Accessibility | Skip link, aria-label, focus trap (Sidebar mobile), form label-input bağlantısı |
-| E | Görsel Yenileme | Landing, Login split-screen, Sidebar, Topbar breadcrumb, Dashboard, Orders |
+| A | Design Token Genişletme | `globals.css`'e typography scale, spacing (4pt grid), z-index, hover tokens, skip-link, ~~reduced-motion~~ ✅ + tema token'ları (`--highlight-inset` vb. ✅) |
+| B | Component Kütüphanesi | DataTable, Card, Badge, Input, PageHeader, SectionHeader, NavLink, Stat (hepsi `src/components/ui/`) — **AÇIK (yapılmadı)** |
+| C | DOM Mutation Fix | `onMouseEnter` style mutation → `useState(hovered)` — **ÇOĞU YAPILDI** (orders/quotes/products/customers/PO/production) |
+| D | Accessibility | Skip link, aria-label ✅(çoğu), focus trap (Sidebar mobile), form label-input bağlantısı — kısmen |
+| E | Görsel Yenileme | Landing, Login split-screen, Sidebar, ~~Topbar breadcrumb~~ → **Topbar "Sakin düz" yapıldı** (`bf28fb0`, sola-başlık), Dashboard, Orders |
 
 **Uygulama sırası:** globals.css → Button fix → DataTable oluştur → DOM mutation'ları kur → Accessibility → Görsel
 

@@ -23,8 +23,9 @@ originSessionId: f81399bb-e89a-4404-bdd5-9b4a0afc0d53
 - **Sadece inline styles + CSS variables** — Tailwind class YASAK
 - **Framer Motion KALDIRILDI** (`npm uninstall framer-motion` — 2026-04-17; zustand da kaldırıldı)
 - Her interaktif component için `"use client";`
-- Renk: `var(--text-primary/secondary/tertiary)`, `var(--bg-primary/secondary/tertiary)`, `var(--border-primary/secondary/tertiary)`, `var(--accent/success/warning/danger)` + `-bg/-text/-border` varyantları
-- CSS `animation` ve `transition` sadece gerekli yerde (hover, progress bar)
+- Renk: `var(--text-primary/secondary/tertiary)`, `var(--bg-primary/secondary/tertiary)`, `var(--border-primary/secondary/tertiary)`, `var(--accent/success/warning/danger)` + `-bg/-text/-border` varyantları + tint tokenları `--highlight-inset`/`--accent-bg-strong`/`--success/danger-bg-strong`/`--accent-glow`
+- **Tema: koyu + aydınlık (`data-theme`, 2026-06-05).** Renkte HER ZAMAN `var(--...)` kullan → otomatik temalanır. Sabit hex/rgba ekleme. `#fff` metin yalnız doygun yüzeyde (`var(--accent)`/dark-scrim) güvenli, `var(--bg-*)` üstünde YASAK (aydınlıkta görünmez). **TEMA-MUAF** (sabit hex kasıtlı): baskı belgeleri (QuoteDocument/PurchaseOrderDocument), settings logo kutusu, products lightbox. Detay: [[reference_theming]]
+- CSS `animation` ve `transition` sadece gerekli yerde (hover, progress bar); `prefers-reduced-motion: reduce` global guard `globals.css`'te var
 
 ---
 
@@ -44,14 +45,15 @@ src/
 │   │   ├── purchase/suggested/ — yeniden sipariş önerileri
 │   │   └── settings/       — firma + kullanıcı + API ayarları
 │   ├── api/                — route handler'lar (Next.js App Router)
-│   └── globals.css         — CSS variables (dark theme)
+│   └── globals.css         — CSS variables (koyu + aydınlık, :root[data-theme])
 ├── components/
-│   ├── layout/             — Sidebar, Topbar
+│   ├── layout/             — Sidebar, Topbar, ThemeToggle, ExchangeRatesTicker, SystemHealthIndicator, UserAvatarLink
 │   ├── dashboard/          — StatsCards, RecentOrders, AIAlerts
 │   ├── ui/                 — Button, Toast, DemoBanner, DemoButton
 │   └── customers/          — CustomerDetailPanel
 └── lib/
     ├── supabase/            — DB client + tablo query fonksiyonları (service.ts, orders.ts, ...)
+    ├── theme/               — use-theme.tsx (ThemeProvider/useTheme — koyu+aydınlık)
     ├── services/            — iş mantığı (order/alert/production/purchase/parasut/import/ai service)
     ├── database.types.ts    — Supabase tablo tipleri (snake_case)
     ├── api-mappers.ts       — DB row → frontend model (mapProduct, mapCustomer, mapOrderDetail)
