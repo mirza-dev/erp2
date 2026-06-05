@@ -1115,7 +1115,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                         </div>
 
                         {/* Table */}
-                        <div style={{ overflowX: "auto" }}>
+                        {/* Ürün autocomplete dropdown'u <td> içinde position:absolute + top:100%
+                            ile satırın altına taşar. overflowX:auto kapsayıcısı (bir eksende
+                            auto → diğer eksen visible olamaz) bu dropdown'u dikey kırpıyordu.
+                            Dropdown açıkken (prodOpenRowId) overflow'u visible'a alıyoruz —
+                            liste tam görünür; kapalıyken yatay scroll (geniş tablo) korunur. */}
+                        <div style={{ overflowX: prodOpenRowId !== null ? "visible" : "auto" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid var(--border-secondary)" }}>
                                 <thead>
                                     <tr>

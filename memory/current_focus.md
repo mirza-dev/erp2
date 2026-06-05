@@ -5,6 +5,22 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## Son Tamamlanan İş — 2026-06-05 (**Teklif formu ürün açılır-listesi kırpılma fix'i**)
+
+Kullanıcı teklif formunda (`/dashboard/quotes/new`) satır eklerken ürün kodu girince açılan autocomplete listesinin kırpık göründüğünü bildirdi (ekran görüntüsü; macOS TCC ilk `Read`'i engelledi → `cp` denendi yine EPERM, ama harness görüntüyü inline gösterdi → teşhis görüntüyle doğrulandı: liste üstten/alttan kesik, kapsayıcıda sıkışık + dikey scrollbar).
+
+**Kök neden (kod-deterministik):** `QuoteForm.tsx:1118` lines tablosu `<div style={{ overflowX: "auto" }}>` ile sarılı (Faz 5 `f30b0bd`'de eklendi — eski sorun, görsel QA turuyla ilgisiz). Ürün dropdown'u `<td>` içinde `position:absolute; top:100%` ile satır altına taşıyor; CSS gereği bir eksende `overflow:auto` → diğer eksen `visible` kalamaz → dropdown dikey kırpılıyordu. Müşteri/firma dropdown'u (`:996`, tablo DIŞINDA) etkilenmiyordu — "ürün girerken" şikayetiyle birebir tutarlı.
+
+**Fix:** `overflowX: prodOpenRowId !== null ? "visible" : "auto"` — dropdown açıkken (`prodOpenRowId !== null`) kapsayıcı taşmayı serbest bırakır (liste tam görünür); kapalıyken yatay scroll (geniş tablo/mobil) korunur + açıklayıcı yorum. **+1 source-regression testi** (`quotes-ui-audit-fix.test.ts`: koşullu overflow ifadesi var + koşulsuz `overflowX:"auto"` yok).
+
+**Doğrulama:** tsc 0 · lint 0 · **4615→4616 test** (`quotes-ui-audit-fix` 20/20) · build 0. Backend/migration/permission DEĞİŞMEDİ.
+
+**DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA (tree özdeş); iki Coolify prod deploy. codex worktree main HEAD'e reset edildi.**
+
+---
+
+<details><summary>Önceki: Görsel QA (codex) + iki-branch hizalama + PUSH (`1ef3c8e`)</summary>
+
 ## Son Tamamlanan İş — 2026-06-05 (**Görsel QA (codex) + iki-branch hizalama + PUSH**)
 
 Kullanıcı codex worktree'sinde (`proje-codex`) görsel QA değişiklikleri yaptı; Claude 2-tur inceleyip raporladı, kullanıcı bulguları codex'e düzelttirdi, sonra "commitleyelim + her iki branch'i aynı hizaya getir + pushlayalım" dedi.
@@ -28,6 +44,8 @@ Kullanıcı codex worktree'sinde (`proje-codex`) görsel QA değişiklikleri yap
 **Backend/migration/permission DEĞİŞMEDİ.** Doğrulama (birleşik main): tsc 0 · lint 0 · **4615 test yeşil** (320 dosya) · build 0 (`ƒ Proxy`).
 
 **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment == <HEAD>` birebir aynı (tree+SHA özdeş); iki Coolify prod deploy tetiklendi. codex worktree main HEAD'e reset edildi.** main geçmişi: `39c0d07 → 5265a08(import) → görsel-QA → context`.
+
+</details>
 
 ---
 

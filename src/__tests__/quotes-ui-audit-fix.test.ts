@@ -161,4 +161,12 @@ describe("QuoteForm.tsx — INJECTED_CSS hardcoded fallback temizliği", () => {
         // En az bir yerde tr:hover veya .q-cust-opt:hover var(--bg-secondary) ile
         expect(FORM_SRC).toMatch(/tr:hover td\s*\{\s*background:\s*var\(--bg-secondary\)/);
     });
+
+    it("ürün dropdown'u açıkken tablo kapsayıcısı overflow:visible (kırpma fix)", () => {
+        // <td position:absolute dropdown'u overflowX:auto kapsayıcıda dikey
+        // kırpılıyordu; dropdown açıkken (prodOpenRowId) overflow visible olmalı.
+        expect(FORM_SRC).toMatch(/overflowX:\s*prodOpenRowId\s*!==\s*null\s*\?\s*"visible"\s*:\s*"auto"/);
+        // Sabit overflowX:"auto" (koşulsuz) artık tablo kapsayıcısında kalmamalı.
+        expect(FORM_SRC).not.toMatch(/<div style=\{\{\s*overflowX:\s*"auto"\s*\}\}>/);
+    });
 });
