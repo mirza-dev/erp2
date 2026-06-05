@@ -236,7 +236,7 @@ export default function UsersPage() {
                 </div>
                 <Button
                     size="cta"
-                    leftIcon={!showForm ? <Plus size={16} /> : undefined}
+                    leftIcon={!showForm ? <Plus size={15} /> : undefined}
                     onClick={() => setShowForm(prev => !prev)}
                     disabled={isDemo}
                     title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}

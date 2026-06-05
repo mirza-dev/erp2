@@ -84,6 +84,25 @@ describe("Cariler — modal/panel a11y", () => {
         expect(PANEL_SRC).toMatch(/aria-labelledby="customer-detail-title"/);
         expect(PANEL_SRC).toMatch(/id="customer-detail-title"/);
     });
+
+    it("CustomerDetailPanel aksiyonları premium Button bileşeninden gelir", () => {
+        expect(PANEL_SRC).toContain('from "@/components/ui/Button"');
+        expect(PANEL_SRC).toMatch(/leftIcon=\{<Plus/);
+        expect(PANEL_SRC).toMatch(/leftIcon=\{<Pencil/);
+        expect(PANEL_SRC).toMatch(/variant=\{editSaved \? "success" : "primary"\}/);
+        expect(PANEL_SRC).not.toMatch(/<button/);
+    });
+
+    it("CustomerDetailPanel düzenleme footer standardı İptal sonra Kaydet sırasını korur", () => {
+        const footerStart = PANEL_SRC.indexOf("onClick={() => setEditMode(false)}");
+        const cancelLabel = PANEL_SRC.indexOf("İptal", footerStart);
+        const saveAction = PANEL_SRC.indexOf("onClick={handleSave}", footerStart);
+        const saveLabel = PANEL_SRC.indexOf("Kaydet", saveAction);
+        expect(footerStart).toBeGreaterThan(0);
+        expect(cancelLabel).toBeGreaterThan(footerStart);
+        expect(saveAction).toBeGreaterThan(cancelLabel);
+        expect(saveLabel).toBeGreaterThan(saveAction);
+    });
 });
 
 // ── 4. addCustomer hata yüzeyi (ham JSON yerine errBody.error) ─

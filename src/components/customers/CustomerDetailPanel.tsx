@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Pencil, Plus, Save, X } from "lucide-react";
+import Button from "@/components/ui/Button";
 import { maskCurrency, formatDate } from "@/lib/utils";
 import type { Customer } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
@@ -181,20 +183,14 @@ export default function CustomerDetailPanel({
                             </div>
                         </div>
                     </div>
-                    <button
+                    <Button
+                        variant="secondary"
+                        size="xs"
+                        leftIcon={<X size={13} />}
                         onClick={onClose}
-                        style={{
-                            fontSize: "12px",
-                            padding: "4px 10px",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "6px",
-                            background: "transparent",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                        }}
                     >
                         Kapat
-                    </button>
+                    </Button>
                 </div>
 
                 {editMode && editForm ? (
@@ -260,41 +256,25 @@ export default function CustomerDetailPanel({
                         )}
 
                         <div style={{ display: "flex", gap: "8px", marginTop: "4px", alignItems: "center" }}>
-                            <button
-                                onClick={handleSave}
-                                disabled={isDemo || editSaving || editSaved}
-                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                style={{
-                                    flex: 1,
-                                    fontSize: "12px",
-                                    padding: "7px 12px",
-                                    border: "0.5px solid var(--accent-border)",
-                                    borderRadius: "6px",
-                                    background: "var(--accent-bg)",
-                                    color: "var(--accent-text)",
-                                    cursor: isDemo || editSaving || editSaved ? "default" : "pointer",
-                                    opacity: isDemo || editSaving ? 0.6 : 1,
-                                }}
-                            >
-                                {editSaved ? "✓ Kaydedildi" : editSaving ? "Kaydediliyor..." : "Kaydet"}
-                            </button>
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => setEditMode(false)}
                                 disabled={editSaving}
-                                style={{
-                                    flex: 1,
-                                    fontSize: "12px",
-                                    padding: "7px 12px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px",
-                                    background: "transparent",
-                                    color: "var(--text-secondary)",
-                                    cursor: editSaving ? "default" : "pointer",
-                                    opacity: editSaving ? 0.4 : 1,
-                                }}
+                                style={{ flex: 1, minWidth: 0 }}
                             >
                                 İptal
-                            </button>
+                            </Button>
+                            <Button
+                                variant={editSaved ? "success" : "primary"}
+                                leftIcon={<Save size={14} />}
+                                onClick={handleSave}
+                                disabled={isDemo || editSaving || editSaved}
+                                loading={editSaving}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                                style={{ flex: 1, minWidth: 0 }}
+                            >
+                                {editSaved ? "Kaydedildi" : editSaving ? "Kaydediliyor..." : "Kaydet"}
+                            </Button>
                         </div>
                     </div>
                 ) : (
@@ -414,44 +394,28 @@ export default function CustomerDetailPanel({
                         {(has("manage_sales_orders") || has("manage_customers")) && (
                         <div style={{ padding: "14px 16px", display: "flex", gap: "8px" }}>
                             {has("manage_sales_orders") && (
-                            <button
+                            <Button
+                                leftIcon={<Plus size={14} />}
                                 onClick={() => {
                                     onClose();
                                     router.push(`/dashboard/orders/new?customerId=${customer.id}&customerName=${encodeURIComponent(customer.name)}`);
                                 }}
-                                style={{
-                                    flex: 1,
-                                    fontSize: "12px",
-                                    padding: "7px 12px",
-                                    border: "0.5px solid var(--accent-border)",
-                                    borderRadius: "6px",
-                                    background: "var(--accent-bg)",
-                                    color: "var(--accent-text)",
-                                    cursor: "pointer",
-                                }}
+                                style={{ flex: 1, minWidth: 0 }}
                             >
                                 Yeni Sipariş
-                            </button>
+                            </Button>
                             )}
                             {has("manage_customers") && (
-                            <button
+                            <Button
+                                variant="secondary"
+                                leftIcon={<Pencil size={14} />}
                                 onClick={() => !isDemo && openEdit()}
                                 disabled={isDemo}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                style={{
-                                    flex: 1,
-                                    fontSize: "12px",
-                                    padding: "7px 12px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px",
-                                    background: "transparent",
-                                    color: "var(--text-secondary)",
-                                    cursor: isDemo ? "not-allowed" : "pointer",
-                                    opacity: isDemo ? 0.5 : 1,
-                                }}
+                                style={{ flex: 1, minWidth: 0 }}
                             >
                                 Düzenle
-                            </button>
+                            </Button>
                             )}
                         </div>
                         )}

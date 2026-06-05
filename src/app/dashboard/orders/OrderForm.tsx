@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { formatCurrency, safeRandomUUID } from "@/lib/utils";
 import { type Customer, type Product, type OrderLineItem } from "@/lib/mock-data";
 import { useData } from "@/lib/data-context";
-import Button from "@/components/ui/Button";
+import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { dateDaysFromToday } from "@/lib/stock-utils";
@@ -333,27 +333,9 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <Link href={backHref}>
-                        <button
-                            style={{
-                                fontSize: "12px",
-                                padding: "5px 10px",
-                                border: "0.5px solid var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: "transparent",
-                                color: "var(--text-secondary)",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "5px",
-                            }}
-                        >
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                            {isEdit ? "Sipariş" : "Siparişler"}
-                        </button>
-                    </Link>
+                    <ButtonLink href={backHref} variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />}>
+                        {isEdit ? "Sipariş" : "Siparişler"}
+                    </ButtonLink>
                     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                         <path d="M3 2l3 3-3 3" stroke="var(--text-tertiary)" strokeWidth="1" strokeLinecap="round" />
                     </svg>
@@ -366,9 +348,7 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                         <div style={{ display: "flex", gap: "8px" }}>
                             {isEdit ? (
                                 <>
-                                    <Link href={backHref}>
-                                        <Button variant="secondary" disabled={isSubmitting}>Vazgeç</Button>
-                                    </Link>
+                                    <ButtonLink href={backHref} variant="secondary" disabled={isSubmitting}>Vazgeç</ButtonLink>
                                     <Button variant="primary" loading={isSubmitting} onClick={handleSaveEdit} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                         {isSubmitting ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}
                                     </Button>
@@ -400,10 +380,11 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                 gap: "12px",
                 alignItems: "start",
                 paddingBottom: isMobile ? "80px" : undefined,
+                minWidth: 0,
             }}>
 
                 {/* Left column */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: 0 }}>
 
                     {/* Customer selector */}
                     <div
@@ -556,6 +537,7 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                             border: "0.5px solid var(--border-tertiary)",
                             borderRadius: "6px",
                             overflow: "hidden",
+                            minWidth: 0,
                         }}
                     >
                         <div
@@ -574,7 +556,8 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                             <span style={{ color: "var(--danger-text)" }}>*</span>
                         </div>
 
-                        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                        <div style={{ overflowX: "auto", maxWidth: "100%", minWidth: 0 }}>
+                        <table style={{ width: "100%", minWidth: "720px", borderCollapse: "collapse", fontSize: "13px" }}>
                             <thead>
                                 <tr style={{ background: "var(--bg-secondary)" }}>
                                     <th style={{ ...thStyle, width: "36px" }}>#</th>
@@ -671,28 +654,23 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                                                 {total > 0 ? formatCurrency(total, currency) : "—"}
                                             </td>
                                             <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                                                <button
+                                                <Button
+                                                    iconOnly
+                                                    variant="icon"
+                                                    size="xs"
+                                                    leftIcon={<Trash2 size={12} />}
                                                     onClick={() => { removeLine(line.id); if (lines.length > 1) toast({ type: "success", message: "Satır kaldırıldı" }); }}
                                                     disabled={lines.length === 1}
                                                     aria-label={`Satır ${idx + 1} kaldır`}
-                                                    style={{
-                                                        fontSize: "14px",
-                                                        color: lines.length === 1 ? "var(--text-tertiary)" : "var(--danger-text)",
-                                                        background: "transparent",
-                                                        border: "none",
-                                                        cursor: lines.length === 1 ? "not-allowed" : "pointer",
-                                                        padding: "2px 4px",
-                                                        opacity: lines.length === 1 ? 0.3 : 1,
-                                                    }}
-                                                >
-                                                    ×
-                                                </button>
+                                                    style={{ color: lines.length === 1 ? "var(--text-tertiary)" : "var(--danger-text)", background: "transparent", border: "none", opacity: lines.length === 1 ? 0.3 : 1 }}
+                                                />
                                             </td>
                                         </tr>
                                     );
                                 })}
                             </tbody>
                         </table>
+                        </div>
 
                         {submitAttempted && filledLines === 0 && (
                             <div style={{
@@ -712,39 +690,24 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                         )}
 
                         {/* Add line */}
-                        <button
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            fullWidth
+                            leftIcon={<Plus size={14} />}
                             onClick={() => setLines([...lines, newLine()])}
                             style={{
-                                width: "100%",
                                 height: "40px",
-                                fontSize: "13px",
                                 border: "none",
                                 borderTop: "0.5px dashed var(--border-secondary)",
                                 borderRadius: "0 0 6px 6px",
                                 background: "transparent",
                                 color: "var(--text-secondary)",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
                                 justifyContent: "center",
-                                gap: "6px",
-                            }}
-                            onMouseEnter={e => {
-                                e.currentTarget.style.color = "var(--accent-text)";
-                                e.currentTarget.style.background = "var(--accent-bg)";
-                                e.currentTarget.style.borderTopColor = "var(--accent-border)";
-                            }}
-                            onMouseLeave={e => {
-                                e.currentTarget.style.color = "var(--text-secondary)";
-                                e.currentTarget.style.background = "transparent";
-                                e.currentTarget.style.borderTopColor = "var(--border-secondary)";
                             }}
                         >
-                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                            </svg>
                             Kalem Ekle
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -848,15 +811,14 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                         </div>
 
                         {/* Actions */}
+                        {!isMobile && (
                         <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "12px" }}>
                             {isEdit ? (
                                 <>
                                     <Button variant="primary" size="md" fullWidth loading={isSubmitting} onClick={handleSaveEdit} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                         {isSubmitting ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}
                                     </Button>
-                                    <Link href={backHref} style={{ width: "100%" }}>
-                                        <Button variant="secondary" fullWidth disabled={isSubmitting}>Vazgeç</Button>
-                                    </Link>
+                                    <ButtonLink href={backHref} variant="secondary" fullWidth disabled={isSubmitting}>Vazgeç</ButtonLink>
                                 </>
                             ) : (
                                 <>
@@ -874,6 +836,7 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                                 </div>
                             )}
                         </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -898,19 +861,17 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                     <div style={{ display: "flex", gap: "8px" }}>
                         {isEdit ? (
                             <>
-                                <Link href={backHref} style={{ flex: 1 }}>
-                                    <Button variant="secondary" fullWidth disabled={isSubmitting}>Vazgeç</Button>
-                                </Link>
-                                <Button variant="primary" fullWidth loading={isSubmitting} onClick={primarySave} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                <ButtonLink href={backHref} variant="secondary" disabled={isSubmitting} style={{ flex: 1, minWidth: 0 }}>Vazgeç</ButtonLink>
+                                <Button variant="primary" loading={isSubmitting} onClick={primarySave} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined} style={{ flex: 1, minWidth: 0 }}>
                                     {isSubmitting ? "Kaydediliyor…" : "Kaydet"}
                                 </Button>
                             </>
                         ) : (
                             <>
-                                <Button variant="secondary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("draft")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                <Button variant="secondary" loading={isSubmitting} onClick={() => buildAndSave("draft")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined} style={{ flex: 1, minWidth: 0 }}>
                                     {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
                                 </Button>
-                                <Button variant="primary" fullWidth loading={isSubmitting} onClick={() => buildAndSave("pending_approval")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                <Button variant="primary" loading={isSubmitting} onClick={() => buildAndSave("pending_approval")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined} style={{ flex: 1, minWidth: 0 }}>
                                     {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
                                 </Button>
                             </>

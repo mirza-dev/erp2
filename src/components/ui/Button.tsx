@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { AnchorHTMLAttributes, ButtonHTMLAttributes, CSSProperties, ComponentProps, ReactNode } from "react";
+import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type CSSProperties, type ComponentProps, type ReactNode } from "react";
 
 type Variant = "primary" | "secondary" | "danger" | "success" | "ghost" | "toolbar" | "icon";
 type Size = "xs" | "sm" | "md" | "lg" | "cta";
@@ -69,8 +69,8 @@ const VARIANT_STYLES: Record<Variant, VariantStyle> = {
         color: "#ffffff",
         hoverBg: "linear-gradient(180deg, #79c0ff 0%, #58a6ff 100%)",
         hoverBorder: "rgba(121, 192, 255, 0.78)",
-        shadow: "0 10px 24px rgba(56, 139, 253, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.22)",
-        hoverShadow: "0 12px 28px rgba(56, 139, 253, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.28)",
+        shadow: "0 8px 18px rgba(56, 139, 253, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+        hoverShadow: "0 10px 22px rgba(56, 139, 253, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.26)",
     },
     secondary: {
         bg: "rgba(240, 246, 252, 0.03)",
@@ -123,7 +123,7 @@ const SIZE_STYLES: Record<Size, { fontSize: string; height: number; padding: str
     sm: { fontSize: "12px", height: 32, padding: "0 12px", gap: 6, iconSize: 14 },
     md: { fontSize: "13px", height: 36, padding: "0 16px", gap: 7, iconSize: 15 },
     lg: { fontSize: "14px", height: 40, padding: "0 20px", gap: 8, minWidth: 118, iconSize: 16 },
-    cta: { fontSize: "14px", height: 42, padding: "0 22px", gap: 8, minWidth: 132, iconSize: 16 },
+    cta: { fontSize: "14px", height: 40, padding: "0 20px", gap: 8, minWidth: 124, iconSize: 15 },
 };
 
 function getButtonStyle({
@@ -211,11 +211,9 @@ function renderButtonContent({
     size: Size;
 }) {
     if (iconOnly) {
-        return (
-            <>
-                {loading ? <span className="spinner" style={{ width: "13px", height: "13px", borderWidth: "1.5px" }} /> : (leftIcon ?? children)}
-            </>
-        );
+        if (loading) return <span className="spinner" style={{ width: "13px", height: "13px", borderWidth: "1.5px" }} />;
+        if (leftIcon) return <span aria-hidden="true" style={iconWrapperStyle(size)}>{leftIcon}</span>;
+        return <>{children}</>;
     }
 
     return (
@@ -231,7 +229,7 @@ function renderButtonContent({
     );
 }
 
-export default function Button({
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
     variant = "primary",
     size = "sm",
     loading = false,
@@ -246,11 +244,12 @@ export default function Button({
     onMouseEnter,
     onMouseLeave,
     ...rest
-}: ButtonProps) {
+}, ref) {
     const isDisabled = disabled || loading;
 
     return (
         <button
+            ref={ref}
             disabled={isDisabled}
             type={type}
             style={getButtonStyle({ variant, size, fullWidth, iconOnly, disabled: isDisabled, style })}
@@ -267,7 +266,9 @@ export default function Button({
             {renderButtonContent({ children, iconOnly, leftIcon, loading, rightIcon, size })}
         </button>
     );
-}
+});
+
+export default Button;
 
 export function ButtonLink({
     variant = "primary",

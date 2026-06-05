@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { ChevronDown, ChevronRight, Download, RefreshCw, Star, Trash2, X } from "lucide-react";
 import { formatCurrency, maskCurrency, formatNumber } from "@/lib/utils";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapProduct } from "@/lib/api-mappers";
@@ -809,6 +810,26 @@ export default function ProductDetailPage() {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <style>{`
+                @media (max-width: 640px) {
+                    .product-detail-header {
+                        gap: 12px !important;
+                    }
+                    .product-detail-title {
+                        flex: 1 1 calc(100% - 96px) !important;
+                        min-width: 0 !important;
+                    }
+                    .product-detail-title h1 {
+                        font-size: 17px !important;
+                        line-height: 1.35 !important;
+                    }
+                    .product-detail-actions {
+                        flex-basis: 100% !important;
+                        width: 100% !important;
+                        justify-content: flex-start !important;
+                    }
+                }
+            `}</style>
             {/* Back breadcrumb */}
             <div>
                 <Link href="/dashboard/products" style={{ fontSize: "12px", color: "var(--text-tertiary)", textDecoration: "none" }}>
@@ -817,7 +838,7 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "flex-start", gap: "16px", flexWrap: "wrap" }}>
+            <div className="product-detail-header" style={{ display: "flex", alignItems: "flex-start", gap: "16px", flexWrap: "wrap" }}>
                 {/* Primary image (Faz 2d) */}
                 {(() => {
                     const primary = findPrimaryImageWithUrl(attachments);
@@ -877,7 +898,7 @@ export default function ProductDetailPage() {
                 })()}
 
                 {/* Title + meta */}
-                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
+                <div className="product-detail-title" style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                         <h1 style={{ margin: 0, fontSize: "18px", fontWeight: 600, color: "var(--text-primary)" }}>
                             {product.name}
@@ -915,7 +936,7 @@ export default function ProductDetailPage() {
                 </div>
 
                 {/* Actions */}
-                <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                <div className="product-detail-actions" style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
                     {!editMode ? (
                         <>
                             <Button
@@ -1387,21 +1408,14 @@ export default function ProductDetailPage() {
                                 }}
                             >
                                 <span>⚠ {attachmentsError}</span>
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="danger"
+                                    size="xs"
+                                    leftIcon={<RefreshCw size={13} />}
                                     onClick={() => fetchAttachments()}
-                                    style={{
-                                        fontSize: "12px",
-                                        padding: "4px 10px",
-                                        background: "transparent",
-                                        color: "var(--danger-text)",
-                                        border: "0.5px solid var(--danger-border)",
-                                        borderRadius: "4px",
-                                        cursor: "pointer",
-                                    }}
                                 >
                                     Yeniden dene
-                                </button>
+                                </Button>
                             </div>
                         )}
 
@@ -1510,8 +1524,11 @@ export default function ProductDetailPage() {
                                                             position: "absolute", top: "4px", left: "4px", right: "4px",
                                                             display: "flex", justifyContent: "space-between", alignItems: "flex-start",
                                                         }}>
-                                                            <button
-                                                                type="button"
+                                                            <Button
+                                                                iconOnly
+                                                                variant="icon"
+                                                                size="xs"
+                                                                leftIcon={<Star size={13} fill={img.isPrimaryImage ? "currentColor" : "none"} />}
                                                                 onClick={() => handleSetPrimary(img.id)}
                                                                 aria-label={img.isPrimaryImage ? "Ana görsel" : "Ana görsel yap"}
                                                                 title={img.isPrimaryImage ? "Ana görsel" : "Ana görsel yap"}
@@ -1519,26 +1536,27 @@ export default function ProductDetailPage() {
                                                                 style={{
                                                                     background: "rgba(0,0,0,0.6)", border: "none",
                                                                     color: img.isPrimaryImage ? "#FFD700" : "#FFF",
-                                                                    padding: "3px 6px", borderRadius: "4px", cursor: img.isPrimaryImage || isDemo ? "default" : "pointer",
-                                                                    fontSize: "13px",
+                                                                    width: "26px", minWidth: "26px", height: "26px", minHeight: "26px",
+                                                                    borderRadius: "4px",
+                                                                    opacity: img.isPrimaryImage ? 1 : isDemo ? 0.56 : 1,
                                                                 }}
-                                                            >
-                                                                {img.isPrimaryImage ? "★" : "☆"}
-                                                            </button>
-                                                            <button
-                                                                type="button"
+                                                            />
+                                                            <Button
+                                                                iconOnly
+                                                                variant="icon"
+                                                                size="xs"
+                                                                leftIcon={<Trash2 size={13} />}
                                                                 onClick={() => handleDeleteAttachment(img.id, img.fileName)}
                                                                 aria-label={`${img.fileName} dosyasını sil`}
                                                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sil"}
                                                                 disabled={isDemo}
                                                                 style={{
                                                                     background: "rgba(0,0,0,0.6)", border: "none",
-                                                                    color: "#FFF", padding: "3px 6px", borderRadius: "4px",
-                                                                    cursor: isDemo ? "not-allowed" : "pointer", fontSize: "13px", lineHeight: 1,
+                                                                    color: "#FFF",
+                                                                    width: "26px", minWidth: "26px", height: "26px", minHeight: "26px",
+                                                                    borderRadius: "4px",
                                                                 }}
-                                                            >
-                                                                ×
-                                                            </button>
+                                                            />
                                                         </div>
                                                         <div style={{ padding: "6px 8px", fontSize: "11px", color: "var(--text-secondary)", borderTop: "0.5px solid var(--border-tertiary)" }}>
                                                             <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={img.fileName}>
@@ -1580,37 +1598,27 @@ export default function ProductDetailPage() {
                                                                 {getKindLabel(doc.kind)} · {formatFileSize(doc.fileSize)}
                                                             </div>
                                                         </div>
-                                                        <button
-                                                            type="button"
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="xs"
+                                                            leftIcon={<Download size={13} />}
                                                             onClick={() => handleDownloadDocument(doc.id)}
                                                             aria-label={`${doc.fileName} indir`}
-                                                            style={{
-                                                                fontSize: "12px", color: "var(--accent-text)",
-                                                                background: "transparent",
-                                                                padding: "4px 8px",
-                                                                border: "0.5px solid var(--accent-border)", borderRadius: "4px",
-                                                                cursor: "pointer",
-                                                            }}
+                                                            style={{ color: "var(--accent-text)", borderColor: "var(--accent-border)" }}
                                                         >
                                                             İndir
-                                                        </button>
-                                                        <button
-                                                            type="button"
+                                                        </Button>
+                                                        <Button
+                                                            variant="danger"
+                                                            size="xs"
+                                                            leftIcon={<Trash2 size={13} />}
                                                             onClick={() => handleDeleteAttachment(doc.id, doc.fileName)}
                                                             aria-label={`${doc.fileName} dosyasını sil`}
                                                             title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sil"}
                                                             disabled={isDemo}
-                                                            style={{
-                                                                fontSize: "13px", padding: "4px 8px",
-                                                                background: "transparent",
-                                                                color: "var(--danger-text)",
-                                                                border: "0.5px solid var(--danger-border)",
-                                                                borderRadius: "4px",
-                                                                cursor: isDemo ? "not-allowed" : "pointer",
-                                                            }}
                                                         >
                                                             Sil
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1620,26 +1628,25 @@ export default function ProductDetailPage() {
                                     {/* Faz 3c Review 2.tur — Önceki Sertifika Versiyonları (supersede edilenler) */}
                                     {supersededAttachments.length > 0 && (
                                         <div style={{ marginTop: "12px" }}>
-                                            <button
-                                                type="button"
+                                            <Button
+                                                variant="ghost"
+                                                size="xs"
+                                                leftIcon={showSuperseded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                                                 onClick={() => setShowSuperseded(s => !s)}
                                                 aria-expanded={showSuperseded}
                                                 aria-label="Önceki Sertifika Versiyonları"
                                                 style={{
-                                                    fontSize: "12px",
                                                     color: "var(--text-secondary)",
                                                     background: "transparent",
                                                     border: "none",
-                                                    cursor: "pointer",
                                                     padding: "4px 0",
-                                                    display: "flex",
-                                                    alignItems: "center",
-                                                    gap: "6px",
+                                                    minHeight: "24px",
+                                                    height: "24px",
+                                                    justifyContent: "flex-start",
                                                 }}
                                             >
-                                                <span aria-hidden>{showSuperseded ? "▾" : "▸"}</span>
                                                 <span>Önceki Sertifika Versiyonları ({supersededAttachments.length})</span>
-                                            </button>
+                                            </Button>
                                             {showSuperseded && (
                                                 <div style={{
                                                     marginTop: "8px",
@@ -1668,20 +1675,16 @@ export default function ProductDetailPage() {
                                                                     Önceki versiyon · {formatFileSize(doc.fileSize)}
                                                                 </div>
                                                             </div>
-                                                            <button
-                                                                type="button"
+                                                            <Button
+                                                                variant="secondary"
+                                                                size="xs"
+                                                                leftIcon={<Download size={13} />}
                                                                 onClick={() => handleDownloadDocument(doc.id)}
                                                                 aria-label={`${doc.fileName} indir (önceki versiyon)`}
-                                                                style={{
-                                                                    fontSize: "11px", color: "var(--accent-text)",
-                                                                    background: "transparent",
-                                                                    padding: "3px 8px",
-                                                                    border: "0.5px solid var(--accent-border)", borderRadius: "4px",
-                                                                    cursor: "pointer",
-                                                                }}
+                                                                style={{ color: "var(--accent-text)", borderColor: "var(--accent-border)" }}
                                                             >
                                                                 İndir
-                                                            </button>
+                                                            </Button>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -1780,27 +1783,22 @@ export default function ProductDetailPage() {
                             borderRadius: "4px",
                         }}
                     />
-                    <button
+                    <Button
                         ref={lightboxCloseBtnRef}
-                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        leftIcon={<X size={14} />}
                         onClick={() => setLightboxAttachment(null)}
-                        aria-label="Kapat"
                         style={{
                             position: "absolute",
                             top: "16px",
                             right: "16px",
-                            padding: "6px 12px",
                             background: "rgba(255,255,255,0.92)",
-                            border: "none",
-                            borderRadius: "4px",
-                            cursor: "pointer",
-                            fontSize: "14px",
-                            fontWeight: 600,
                             color: "#000",
                         }}
                     >
-                        ✕ Kapat
-                    </button>
+                        Kapat
+                    </Button>
                 </div>
             )}
 

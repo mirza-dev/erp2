@@ -44,10 +44,14 @@ vi.mock("@/components/ui/Button", () => ({
     default: ({ children, onClick, disabled }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean }) => (
         <button onClick={onClick} disabled={disabled}>{children}</button>
     ),
+    ButtonLink: ({ children, href, disabled }: { children: React.ReactNode; href: string; disabled?: boolean }) => (
+        <a href={href} aria-disabled={disabled || undefined}>{children}</a>
+    ),
 }));
 
 beforeEach(() => {
     vi.restoreAllMocks();
+    Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 1024 });
     mockAddOrder.mockReset().mockResolvedValue("new-order-id");
     mockToast.mockReset();
     mockPush.mockReset();
@@ -90,6 +94,17 @@ describe("OrderForm new mode — addOrder payload", () => {
             fireEvent.click(screen.getByText("Siparişi Oluştur ve Gönder"));
         });
         expect(mockAddOrder).not.toHaveBeenCalled();
+    });
+
+    it("mobilde summary aksiyonları gizler, sticky aksiyonları tek kaynak olarak gösterir", () => {
+        Object.defineProperty(window, "innerWidth", { configurable: true, writable: true, value: 390 });
+
+        render(<OrderForm mode="new" />);
+
+        expect(screen.queryByText("Siparişi Oluştur ve Gönder")).toBeNull();
+        expect(screen.queryByText("Taslak Olarak Kaydet")).toBeNull();
+        expect(screen.getByText("Taslak Kaydet")).toBeTruthy();
+        expect(screen.getByText("Gönder →")).toBeTruthy();
     });
 });
 

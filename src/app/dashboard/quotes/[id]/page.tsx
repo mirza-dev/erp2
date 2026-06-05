@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { FileText } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -377,11 +378,12 @@ export default function QuoteDetailPage() {
                 {status !== "draft" && (
                     <Button
                         variant="secondary"
+                        leftIcon={<FileText size={14} />}
                         onClick={handleViewArchive}
                         loading={archiveLoading}
                         title="Gönderilen teklifin dondurulmuş (immutable) kopyası"
                     >
-                        {archiveLoading ? "Açılıyor..." : "📄 Arşivlenmiş Teklif"}
+                        {archiveLoading ? "Açılıyor..." : "Arşivlenmiş Teklif"}
                     </Button>
                 )}
 

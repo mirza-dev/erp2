@@ -50,6 +50,13 @@ describe("OrderForm — mode-koşullu davranış", () => {
     it("demo guard her iki kayıt yolunda", () => {
         expect(ORDER_FORM).toMatch(/if \(isDemo\) \{ toast\(\{ type: "info", message: DEMO_BLOCK_TOAST \}\); return; \}/);
     });
+    it("geri/vazgeç ve satır komutları Button sistemine bağlıdır", () => {
+        expect(ORDER_FORM).toMatch(/Button, \{ ButtonLink \}/);
+        expect(ORDER_FORM).toMatch(/<ButtonLink href=\{backHref\}/);
+        expect(ORDER_FORM).not.toMatch(/<Link href=\{backHref\}>/);
+        expect(ORDER_FORM).toMatch(/leftIcon=\{<Trash2/);
+        expect(ORDER_FORM).toMatch(/leftIcon=\{<Plus/);
+    });
 });
 
 describe("new/edit page wiring", () => {

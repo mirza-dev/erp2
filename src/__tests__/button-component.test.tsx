@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import { createRef, type ReactNode } from "react";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { Plus, RefreshCw } from "lucide-react";
 
@@ -18,7 +18,7 @@ afterEach(() => {
 describe("Button premium system", () => {
     it("primary CTA dolu mavi, ikonlu ve temiz label ile render edilir", () => {
         render(
-            <Button size="cta" leftIcon={<Plus size={16} />}>
+            <Button size="cta" leftIcon={<Plus size={15} />}>
                 Yeni Tedarikçi
             </Button>,
         );
@@ -26,10 +26,18 @@ describe("Button premium system", () => {
         const button = screen.getByRole("button", { name: "Yeni Tedarikçi" });
         expect(button.textContent).toBe("Yeni Tedarikçi");
         expect(button.textContent).not.toContain("+ Yeni");
-        expect(button.style.minHeight).toBe("42px");
-        expect(button.style.minWidth).toBe("132px");
+        expect(button.style.minHeight).toBe("40px");
+        expect(button.style.minWidth).toBe("124px");
         expect(button.style.borderRadius).toBe("8px");
         expect(button.style.background).toContain("linear-gradient");
+    });
+
+    it("modal ve lightbox aksiyonları için ref'i native button'a taşır", () => {
+        const ref = createRef<HTMLButtonElement>();
+        render(<Button ref={ref}>Kapat</Button>);
+
+        expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+        expect(ref.current?.textContent).toBe("Kapat");
     });
 
     it("toolbar buton hover'da sakin yüzey rengini korur", () => {
@@ -78,6 +86,9 @@ describe("Button premium system", () => {
         const button = screen.getByLabelText("Yenile");
         expect(button.style.width).toBe("32px");
         expect(button.style.minWidth).toBe("32px");
+        const iconWrapper = button.querySelector('span[aria-hidden="true"]');
+        expect(iconWrapper).toBeTruthy();
+        expect(iconWrapper?.getAttribute("aria-hidden")).toBe("true");
     });
 
     it("ButtonLink disabled ise odak dışı kalır ve navigasyonu engeller", () => {

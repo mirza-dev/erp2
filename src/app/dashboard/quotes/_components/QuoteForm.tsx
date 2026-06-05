@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { Eraser, FileText, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import type { QuoteData } from "../components/quote-types";
+import Button from "@/components/ui/Button";
 import { useData } from "@/lib/data-context";
 import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
@@ -60,9 +62,6 @@ tr:hover .q-del-btn { opacity: 1; }
 .q-cell:focus { border-color: var(--accent-border) !important; background: var(--bg-secondary) !important; outline: none; }
 .q-total-inp:hover { border-color: var(--border-secondary) !important; background: var(--bg-secondary) !important; }
 .q-total-inp:focus { border-color: var(--accent-border) !important; background: var(--bg-secondary) !important; outline: none; }
-.q-add-btn:hover { color: var(--accent-text) !important; background: var(--accent-bg) !important; }
-.q-btn:hover { background: var(--bg-tertiary) !important; color: var(--text-primary) !important; }
-.q-btn-primary:hover { background: rgba(56,139,253,0.25) !important; }
 .q-info-inp:focus { border-bottom-style: solid !important; border-bottom-color: var(--accent-border) !important; outline: none; }
 .q-field-inp:focus { border-color: var(--accent-border) !important; outline: none; }
 .q-notes:focus { border-color: var(--accent-border) !important; outline: none; }
@@ -738,12 +737,6 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     }
 
     // ── Styles ───────────────────────────────────────────────────────────────
-    const btn: React.CSSProperties = {
-        display: "inline-flex", alignItems: "center", gap: "6px",
-        padding: "5px 12px", fontSize: "12px", fontWeight: 500,
-        border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-        background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-    };
     const fieldInput: React.CSSProperties = {
         background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)",
         borderRadius: "4px", padding: "5px 9px", fontSize: "12.5px",
@@ -857,20 +850,24 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                     </div>
                     {/* Buttons */}
                     <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                        <button className="q-btn q-btn-primary" style={{ ...btn, background: "var(--accent-bg)", borderColor: "var(--accent-border)", color: "var(--accent-text)" }} onClick={() => { savePreviewData(); router.push("/dashboard/quotes/preview"); }}>
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 6V2h8v4M4 11H3a1 1 0 01-1-1V7a1 1 0 011-1h10a1 1 0 011 1v3a1 1 0 01-1 1h-1M4 11v3h8v-3H4z" /><circle cx="12.5" cy="8.5" r=".5" fill="currentColor" /></svg>
+                        <Button
+                            size="sm"
+                            leftIcon={<FileText size={14} />}
+                            onClick={() => { savePreviewData(); router.push("/dashboard/quotes/preview"); }}
+                        >
                             Önizle &amp; PDF
-                        </button>
+                        </Button>
                         {!readOnly && (
-                        <button
-                            className="q-btn"
-                            style={{ ...btn, opacity: saving ? 0.6 : 1 }}
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            leftIcon={<Save size={14} />}
                             onClick={handleSave}
                             disabled={saving}
+                            loading={saving}
                         >
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M13 3l-2-2H3a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1V3z" /><path d="M10 1v4H6V1M5 9h6" /></svg>
                             {saving ? "Kaydediliyor…" : "Kaydet"}
-                        </button>
+                        </Button>
                         )}
                     </div>
                 </div>
@@ -1107,14 +1104,12 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                             </div>
                             {!readOnly && (
                             <div className="q-no-print" style={{ display: "flex", gap: "6px" }}>
-                                <button className="q-btn" style={btn} onClick={clearAll}>
-                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                                <Button variant="secondary" size="xs" leftIcon={<Eraser size={13} />} onClick={clearAll}>
                                     Temizle
-                                </button>
-                                <button className="q-btn q-btn-primary" style={{ ...btn, background: "var(--accent-bg)", borderColor: "var(--accent-border)", color: "var(--accent-text)" }} onClick={addRow}>
-                                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 3v10M3 8h10" /></svg>
+                                </Button>
+                                <Button size="xs" leftIcon={<Plus size={13} />} onClick={addRow}>
                                     Satır Ekle
-                                </button>
+                                </Button>
                             </div>
                             )}
                         </div>
@@ -1216,9 +1211,17 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                                 {/* Delete */}
                                                 {!readOnly && (
                                                 <td style={{ ...tdBase, width: "28px", textAlign: "center", padding: "0 4px" }} className="q-no-print">
-                                                    <button type="button" aria-label={`Satır ${idx + 1} sil`} className="q-del-btn" style={{ width: "22px", height: "22px", borderRadius: "3px", display: "grid", placeItems: "center", color: "var(--text-tertiary)", background: "none", border: "none", cursor: "pointer" }} onClick={() => deleteRow(row.id)} title="Sil">
-                                                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M3 4h10M6 4V2h4v2M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4" /></svg>
-                                                    </button>
+                                                    <Button
+                                                        iconOnly
+                                                        aria-label={`Satır ${idx + 1} sil`}
+                                                        className="q-del-btn"
+                                                        variant="icon"
+                                                        size="xs"
+                                                        leftIcon={<Trash2 size={12} />}
+                                                        onClick={() => deleteRow(row.id)}
+                                                        title="Sil"
+                                                        style={{ width: "22px", minWidth: "22px", height: "22px", minHeight: "22px", borderRadius: "3px", color: "var(--text-tertiary)", background: "none", border: "none" }}
+                                                    />
                                                 </td>
                                                 )}
                                             </tr>
@@ -1230,16 +1233,25 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
 
                         {/* Add row button */}
                         {!readOnly && (
-                        <button className="q-add-btn q-no-print" style={{
-                            display: "flex", alignItems: "center", gap: "7px",
-                            padding: "8px 24px", fontSize: "12px", color: "var(--text-tertiary)",
-                            borderTop: "0.5px dashed var(--border-tertiary)", width: "100%",
-                            background: "none", border: "none",
-                            cursor: "pointer",
-                        } as React.CSSProperties} onClick={addRow}>
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 3v10M3 8h10" /></svg>
+                        <Button
+                            className="q-add-btn q-no-print"
+                            variant="ghost"
+                            size="sm"
+                            fullWidth
+                            leftIcon={<Plus size={13} />}
+                            onClick={addRow}
+                            style={{
+                                justifyContent: "flex-start",
+                                padding: "8px 24px",
+                                color: "var(--text-tertiary)",
+                                border: "none",
+                                borderTop: "0.5px dashed var(--border-tertiary)",
+                                borderRadius: 0,
+                                background: "none",
+                            }}
+                        >
                             Add line item / Yeni satır ekle
-                        </button>
+                        </Button>
                         )}
 
                         {/* Totals */}
@@ -1268,7 +1280,18 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                         {compKg > 0 ? `${fmt(compKg)} kg` : "—"}
                                     </td>
                                     <td className="q-no-print" style={{ width: "28px", padding: "0 4px", textAlign: "center" }}>
-                                        {ovSub !== null && <button type="button" aria-label="Ara toplamı otomatik hesaplamaya döndür" style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvSub(null)} title="Otomatik hesaplamaya dön">↻</button>}
+                                        {ovSub !== null && (
+                                            <Button
+                                                iconOnly
+                                                aria-label="Ara toplamı otomatik hesaplamaya döndür"
+                                                variant="icon"
+                                                size="xs"
+                                                leftIcon={<RotateCcw size={12} />}
+                                                onClick={() => setOvSub(null)}
+                                                title="Otomatik hesaplamaya dön"
+                                                style={{ width: "20px", minWidth: "20px", height: "20px", minHeight: "20px", borderRadius: "3px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none" }}
+                                            />
+                                        )}
                                     </td>
                                 </tr>
                                 {/* Faz 3 (V7): İskonto — doğrudan giriş, ↻ revert YOK */}
@@ -1323,7 +1346,18 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     </td>
                                     <td colSpan={2}>&nbsp;</td>
                                     <td className="q-no-print" style={{ width: "28px", padding: "0 4px", textAlign: "center" }}>
-                                        {ovVat !== null && <button type="button" aria-label="KDV'yi otomatik hesaplamaya döndür" style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvVat(null)} title="Otomatik hesaplamaya dön">↻</button>}
+                                        {ovVat !== null && (
+                                            <Button
+                                                iconOnly
+                                                aria-label="KDV'yi otomatik hesaplamaya döndür"
+                                                variant="icon"
+                                                size="xs"
+                                                leftIcon={<RotateCcw size={12} />}
+                                                onClick={() => setOvVat(null)}
+                                                title="Otomatik hesaplamaya dön"
+                                                style={{ width: "20px", minWidth: "20px", height: "20px", minHeight: "20px", borderRadius: "3px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none" }}
+                                            />
+                                        )}
                                     </td>
                                 </tr>
                                 {/* Grand Total */}
@@ -1347,7 +1381,18 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                                     </td>
                                     <td colSpan={2}>&nbsp;</td>
                                     <td className="q-no-print" style={{ width: "28px", padding: "0 4px", textAlign: "center" }}>
-                                        {ovGrand !== null && <button type="button" aria-label="Genel toplamı otomatik hesaplamaya döndür" style={{ width: "20px", height: "20px", borderRadius: "3px", display: "inline-grid", placeItems: "center", fontSize: "13px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none", cursor: "pointer" }} onClick={() => setOvGrand(null)} title="Otomatik hesaplamaya dön">↻</button>}
+                                        {ovGrand !== null && (
+                                            <Button
+                                                iconOnly
+                                                aria-label="Genel toplamı otomatik hesaplamaya döndür"
+                                                variant="icon"
+                                                size="xs"
+                                                leftIcon={<RotateCcw size={12} />}
+                                                onClick={() => setOvGrand(null)}
+                                                title="Otomatik hesaplamaya dön"
+                                                style={{ width: "20px", minWidth: "20px", height: "20px", minHeight: "20px", borderRadius: "3px", color: "var(--warning-text)", background: "var(--warning-bg)", border: "none" }}
+                                            />
+                                        )}
                                     </td>
                                 </tr>
                             </tbody>

@@ -309,7 +309,7 @@ describe("UI Mod B arşiv linki (detay sayfası)", () => {
         expect(detailPage).toMatch(/window\.open\(/);
     });
     it("Arşiv butonu yalnız gönderilmiş statüde (status !== 'draft')", () => {
-        expect(detailPage).toMatch(/status !== "draft"[\s\S]{0,400}Arşivlenmiş Teklif/);
+        expect(detailPage).toMatch(/status !== "draft"[\s\S]{0,700}Arşivlenmiş Teklif/);
     });
 });
 

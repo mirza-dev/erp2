@@ -171,7 +171,7 @@ export default function PurchaseOrdersPage() {
                     <ButtonLink
                         href="/dashboard/purchase/orders/new"
                         size="cta"
-                        leftIcon={<Plus size={16} />}
+                        leftIcon={<Plus size={15} />}
                         disabled={isDemo}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                     >

@@ -257,7 +257,7 @@ function OrdersList() {
                         <ButtonLink
                             href="/dashboard/orders/new"
                             size="cta"
-                            leftIcon={<Plus size={16} />}
+                            leftIcon={<Plus size={15} />}
                         >
                             Yeni Sipariş
                         </ButtonLink>

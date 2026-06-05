@@ -207,7 +207,7 @@ function QuotesList() {
                         <ButtonLink
                             href="/dashboard/quotes/new"
                             size="cta"
-                            leftIcon={<Plus size={16} />}
+                            leftIcon={<Plus size={15} />}
                         >
                             Yeni Teklif
                         </ButtonLink>

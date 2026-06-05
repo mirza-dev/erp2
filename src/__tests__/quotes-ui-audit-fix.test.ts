@@ -132,12 +132,15 @@ describe("quotes/preview/page.tsx — hardcoded hex → CSS variable", () => {
     });
 
     it("CSS variable'ları kullanılıyor", () => {
+        // Not: eski btnPrimary/btnSecondary inline stilleri (`var(--accent)` +
+        // `0.5px solid var(--border-secondary)`) görsel QA'da Button component'ine
+        // delege edildi (ham <button> → <Button>). Button kullanımı + hardcoded hex
+        // yokluğu button-source-regression.test.ts'te kilitli; preview kalan CSS
+        // variable'ları hâlâ inline kullanır (aşağıdaki assertion'lar bunu doğrular).
         expect(PREVIEW_SRC).toMatch(/background:\s*"var\(--bg-primary\)"/);
-        expect(PREVIEW_SRC).toMatch(/background:\s*"var\(--accent\)"/);
         expect(PREVIEW_SRC).toMatch(/color:\s*"var\(--text-primary\)"/);
         expect(PREVIEW_SRC).toMatch(/color:\s*"var\(--text-secondary\)"/);
         expect(PREVIEW_SRC).toMatch(/color:\s*"var\(--text-tertiary\)"/);
-        expect(PREVIEW_SRC).toMatch(/border:\s*"0\.5px solid var\(--border-secondary\)"/);
         expect(PREVIEW_SRC).toMatch(/borderBottom:\s*"0\.5px solid var\(--border-tertiary\)"/);
     });
 

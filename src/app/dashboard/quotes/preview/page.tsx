@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, Printer } from "lucide-react";
+import Button from "@/components/ui/Button";
 import QuoteDocument from "../components/QuoteDocument";
 import { montserrat, inter } from "../components/quote-fonts";
 import type { QuoteData } from "../components/quote-types";
@@ -34,43 +36,13 @@ export default function QuotePreviewPage() {
         boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
     };
 
-    const btnBase: React.CSSProperties = {
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "7px",
-        padding: "7px 16px",
-        fontSize: "12.5px",
-        fontWeight: 500,
-        borderRadius: "6px",
-        cursor: "pointer",
-        fontFamily: "var(--font-geist-sans), system-ui, sans-serif",
-    };
-
-    const btnPrimary: React.CSSProperties = {
-        ...btnBase,
-        background: "var(--accent)",
-        // Beyaz, accent zemin üzerinde okunaklı; var(--accent-text) projede
-        // accent **rengi** olarak (badge text vs.) farklı amaçla kullanılıyor.
-        color: "white",
-        border: "none",
-    };
-
-    const btnSecondary: React.CSSProperties = {
-        ...btnBase,
-        background: "transparent",
-        color: "var(--text-secondary)",
-        border: "0.5px solid var(--border-secondary)",
-    };
-
     if (notFound) {
         return (
             <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg-primary)", display: "grid", placeItems: "center" }}>
                 <div style={{ textAlign: "center", color: "var(--text-secondary)" }}>
                     <div style={{ fontSize: "16px", marginBottom: "8px", color: "var(--text-primary)" }}>Önizleme verisi bulunamadı</div>
                     <div style={{ fontSize: "12px", marginBottom: "20px" }}>Formu doldurup tekrar deneyin.</div>
-                    <button style={btnPrimary} onClick={() => router.push("/dashboard/quotes/new")}>
-                        ← Forma Dön
-                    </button>
+                    <Button leftIcon={<ArrowLeft size={14} />} onClick={() => router.push("/dashboard/quotes/new")}>Forma Dön</Button>
                 </div>
             </div>
         );
@@ -113,12 +85,9 @@ export default function QuotePreviewPage() {
                 {/* ── Toolbar (hidden on print) ── */}
                 <div className="quote-preview-toolbar" style={toolbarStyle}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <button style={btnSecondary} onClick={() => router.push("/dashboard/quotes/new")}>
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                <path d="M10 3L5 8l5 5" />
-                            </svg>
+                        <Button variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />} onClick={() => router.push("/dashboard/quotes/new")}>
                             Formu Düzenle
-                        </button>
+                        </Button>
                         <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
                             {data.quoteNo} · {{ draft: "Taslak", sent: "Gönderildi", accepted: "Kabul Edildi", rejected: "Reddedildi", expired: "Süresi Doldu" }[data.status] ?? data.status}
                         </span>
@@ -126,16 +95,13 @@ export default function QuotePreviewPage() {
 
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Ctrl+P ile de yazdırabilirsiniz</span>
-                        <button
-                            style={btnPrimary}
+                        <Button
+                            size="sm"
+                            leftIcon={<Printer size={14} />}
                             onClick={() => window.print()}
                         >
-                            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                <path d="M4 6V2h8v4M4 11H3a1 1 0 01-1-1V7a1 1 0 011-1h10a1 1 0 011 1v3a1 1 0 01-1 1h-1M4 11v3h8v-3H4z" />
-                                <circle cx="12.5" cy="8.5" r=".5" fill="currentColor" />
-                            </svg>
                             Yazdır / PDF
-                        </button>
+                        </Button>
                     </div>
                 </div>
 

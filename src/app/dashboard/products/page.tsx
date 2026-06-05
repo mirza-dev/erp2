@@ -496,7 +496,7 @@ export default function ProductsPage() {
                     {has("manage_product_master") && (
                         <Button
                             size="cta"
-                            leftIcon={<Plus size={16} />}
+                            leftIcon={<Plus size={15} />}
                             onClick={() => { setCreateForm({ name: "", sku: "", category: "", unit: "adet", price: 0, currency: "USD", on_hand: 0, minStockLevel: 0, productType: "manufactured", warehouse: "Sevkiyat Deposu", materialQuality: "", originCountry: "", productionSite: "", useCases: "", industries: "", standards: "", certifications: "", productNotes: "", productTypeId: "", attributes: {} }); setCreateTypeFields([]); setCreateOpen(true); }}
                             disabled={isDemo}
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}

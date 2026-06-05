@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, FileText, RefreshCw, Trash2 } from "lucide-react";
 import { formatCurrency, maskCurrency, formatDate } from "@/lib/utils";
 import { useData, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapOrderDetail } from "@/lib/api-mappers";
 import type { OrderDetail } from "@/lib/mock-data";
-import Button from "@/components/ui/Button";
+import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 type ParasutStepKey = "contact" | "product" | "shipment" | "invoice" | "edoc";
@@ -432,27 +433,9 @@ export default function OrderDetailPage() {
                 {/* Header */}
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <Link href="/dashboard/orders">
-                            <button
-                                style={{
-                                    fontSize: "12px",
-                                    padding: "5px 10px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px",
-                                    background: "transparent",
-                                    color: "var(--text-secondary)",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "5px",
-                                }}
-                            >
-                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                    <path d="M8 2L4 6l4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                                Siparişler
-                            </button>
-                        </Link>
+                        <ButtonLink href="/dashboard/orders" variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />}>
+                            Siparişler
+                        </ButtonLink>
                         <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                             <path d="M3 2l3 3-3 3" stroke="var(--text-tertiary)" strokeWidth="1" strokeLinecap="round" />
                         </svg>
@@ -475,24 +458,18 @@ export default function OrderDetailPage() {
                     <div style={{ display: "flex", gap: "8px" }}>
                         {commercialStatus === "draft" && (
                             <>
-                                <button
+                                <Button
+                                    variant="danger"
+                                    size="sm"
+                                    leftIcon={<Trash2 size={14} />}
                                     onClick={() => setHardDeleteOpen(true)}
                                     disabled={isDemo}
                                     title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                    style={{
-                                        fontSize: "11px", padding: "5px 10px",
-                                        borderRadius: "5px", border: "1px solid var(--danger-border)",
-                                        background: "transparent", color: "var(--danger-text)",
-                                        cursor: isDemo ? "not-allowed" : "pointer",
-                                        opacity: isDemo ? 0.5 : 1,
-                                    }}
                                 >
                                     Kalıcı Sil
-                                </button>
+                                </Button>
                                 {has("manage_sales_orders") && (
-                                    <Link href={`/dashboard/orders/${order.id}/edit`}>
-                                        <Button variant="secondary" disabled={loading !== null}>Düzenle</Button>
-                                    </Link>
+                                    <ButtonLink href={`/dashboard/orders/${order.id}/edit`} variant="secondary" disabled={loading !== null}>Düzenle</ButtonLink>
                                 )}
                                 <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
@@ -527,20 +504,16 @@ export default function OrderDetailPage() {
                         {(fulfillmentStatus === "shipped" || commercialStatus === "cancelled") && (
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 {commercialStatus === "cancelled" && (
-                                    <button
+                                    <Button
+                                        variant="danger"
+                                        size="sm"
+                                        leftIcon={<Trash2 size={14} />}
                                         onClick={() => setHardDeleteOpen(true)}
                                         disabled={isDemo}
                                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                        style={{
-                                            fontSize: "11px", padding: "5px 10px",
-                                            borderRadius: "5px", border: "1px solid var(--danger-border)",
-                                            background: "transparent", color: "var(--danger-text)",
-                                            cursor: isDemo ? "not-allowed" : "pointer",
-                                            opacity: isDemo ? 0.5 : 1,
-                                        }}
                                     >
                                         Kalıcı Sil
-                                    </button>
+                                    </Button>
                                 )}
                                 <div style={{ fontSize: "12px", color: "var(--text-tertiary)", padding: "6px 0" }}>
                                     {fulfillmentStatus === "shipped" ? "Teslim edildi — kapalı" : "İptal edildi — kapalı"}
@@ -615,18 +588,17 @@ export default function OrderDetailPage() {
                                     {order.quoteId && order.quotePdfArchiveId && (
                                         <div style={{ display: "flex", gap: "6px", fontSize: "12px" }}>
                                             <span style={{ color: "var(--text-tertiary)", minWidth: "100px", flexShrink: 0 }}>Arşivlenmiş Teklif</span>
-                                            <button
-                                                type="button"
+                                            <Button
+                                                variant="ghost"
+                                                size="xs"
+                                                leftIcon={<FileText size={13} />}
                                                 onClick={() => handleViewArchive(order.quoteId!)}
                                                 disabled={archiveLoading}
                                                 aria-label="Kabulde dondurulan teklif belgesini aç"
-                                                style={{
-                                                    background: "none", border: "none", padding: 0, cursor: archiveLoading ? "default" : "pointer",
-                                                    color: "var(--accent-text)", font: "inherit", textAlign: "left",
-                                                }}
+                                                style={{ justifyContent: "flex-start", padding: "0 4px", minHeight: "20px", height: "20px", color: "var(--accent-text)" }}
                                             >
-                                                {archiveLoading ? "Açılıyor…" : "📄 Belgeyi Aç →"}
-                                            </button>
+                                                {archiveLoading ? "Açılıyor…" : "Belgeyi Aç"}
+                                            </Button>
                                         </div>
                                     )}
                                     {order.quoteId && (
@@ -1349,24 +1321,17 @@ function ParasutStepBadges({
                             />
                             <span>{labelFor(s)}</span>
                             {canRetry && (
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="ghost"
+                                    size="xs"
                                     onClick={() => onRetry(s)}
                                     disabled={retrying === s}
+                                    loading={retrying === s}
                                     title={isDemo ? DEMO_DISABLED_TOOLTIP : `'${STEP_LABELS[s]}' adımını yeniden dene`}
-                                    style={{
-                                        marginLeft: "2px",
-                                        background: "transparent",
-                                        border:     "none",
-                                        color:      c.text,
-                                        cursor:     retrying === s ? "wait" : "pointer",
-                                        fontSize:   "10px",
-                                        textDecoration: "underline",
-                                        padding:    0,
-                                    }}
+                                    style={{ marginLeft: "2px", padding: "0 2px", minHeight: "18px", height: "18px", color: c.text, textDecoration: "underline" }}
                                 >
                                     {retrying === s ? "…" : "yeniden dene"}
-                                </button>
+                                </Button>
                             )}
                         </div>
                     );
@@ -1378,23 +1343,17 @@ function ParasutStepBadges({
                 </div>
             )}
             {!isDemo && (data.parasutStep && data.parasutStep !== "done") && (
-                <button
-                    type="button"
+                <Button
+                    variant="secondary"
+                    size="xs"
+                    leftIcon={<RefreshCw size={13} />}
                     onClick={() => onRetry("all")}
                     disabled={retrying === "all"}
-                    style={{
-                        marginTop:  "8px",
-                        padding:    "4px 10px",
-                        background: "var(--bg-tertiary)",
-                        border:     "0.5px solid var(--border-secondary)",
-                        borderRadius: "4px",
-                        fontSize:   "11px",
-                        color:      "var(--text-secondary)",
-                        cursor:     retrying === "all" ? "wait" : "pointer",
-                    }}
+                    loading={retrying === "all"}
+                    style={{ marginTop: "8px" }}
                 >
                     {retrying === "all" ? "Senkronize ediliyor…" : "Tüm adımları yeniden dene"}
-                </button>
+                </Button>
             )}
         </div>
     );

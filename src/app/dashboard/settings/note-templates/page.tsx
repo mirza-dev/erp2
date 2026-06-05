@@ -155,7 +155,7 @@ export default function NoteTemplatesPage() {
                 </div>
                 <Button
                     size="cta"
-                    leftIcon={<Plus size={16} />}
+                    leftIcon={<Plus size={15} />}
                     onClick={openCreate}
                     disabled={isDemo}
                     title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}

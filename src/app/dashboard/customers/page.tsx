@@ -195,7 +195,7 @@ export default function CustomersPage() {
                         {has("manage_customers") && (
                             <Button
                                 size="cta"
-                                leftIcon={<Plus size={16} />}
+                                leftIcon={<Plus size={15} />}
                                 onClick={() => setShowAddModal(true)}
                                 disabled={isDemo}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
