@@ -5,6 +5,63 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## Son Tamamlanan İş — 2026-06-05 (**Görsel QA (codex) + iki-branch hizalama + PUSH**)
+
+Kullanıcı codex worktree'sinde (`proje-codex`) görsel QA değişiklikleri yaptı; Claude 2-tur inceleyip raporladı, kullanıcı bulguları codex'e düzelttirdi, sonra "commitleyelim + her iki branch'i aynı hizaya getir + pushlayalım" dedi.
+
+**İki ayrı, çakışmayan değişiklik seti:**
+- (a) main `5265a08` — import-fix (CSV injection + AI apply null-clobber + field_key notu; önceki tur, push bekliyordu).
+- (b) codex worktree — görsel QA (Button forwardRef + mobil responsive + ham `<button>`→`Button`/`ButtonLink` + emoji→lucide, 23 dosya).
+
+**Çakışma analizi:** iki setin dosya kesişimi BOŞ (`comm -12` ile doğrulandı; `src/lib/supabase/product-types.ts` helper ≠ `src/app/dashboard/settings/product-types/page.tsx`) → **manuel kod değişikliği gerekmedi.**
+
+**Hizalama yöntemi (worktree-aware):**
+1. codex worktree: görsel QA `git add src/` → commit `4ea770d` (memory/CLAUDE.md hariç).
+2. main worktree (erp2): `git cherry-pick 4ea770d` → çakışmasız, main = `5265a08`+görsel.
+3. **Birleşik suite → 1 regresyon yakalandı** (ikimiz de full-suite çalıştırmamıştık): `quotes-ui-audit-fix.test.ts` "CSS variable kullanılıyor" testi preview'daki `btnPrimary`/`btnSecondary` inline stillerini (`var(--accent)` + `0.5px solid var(--border-secondary)`) arıyordu; görsel QA bunları Button'a delege edince obsolet kaldı → 2 obsolet assertion kaldırıldı + açıklama notu (niyet korundu: hex yok + kalan 5 CSS-var assertion geçiyor + Button geçişi `button-source-regression`'da kilitli). Bu fix görsel QA commit'ine amend edildi (`3261dc0`).
+4. context commit (CLAUDE.md + memory).
+5. codex worktree: `git reset --hard <main HEAD>` → codex-experiment = main (özdeş SHA).
+6. push both.
+
+**Görsel QA içeriği + review bulguları (2-tur, hepsi düzeltildi):** Button `forwardRef<HTMLButtonElement>` (lightbox/modal ref — products/[id] focus, davranışsal test'li); ürün detay mobil header scoped `@media(max-width:640px)`; sipariş formu mobil tablo `overflowX:auto`+`minWidth:720px` + desktop summary `{!isMobile}` gizli → sticky tek aksiyon; iconOnly'ler `aria-label` + readOnly/demo/RBAC/durum-geçiş guard'ları korundu; ButtonLink disabled a11y. **B1** iconOnly leftIcon `aria-hidden` span; **B2** CustomerDetailPanel İptal→Kaydet sırası (kasıtlı, teyit); **B3** ölü `.q-add-btn/.q-btn/.q-btn-primary :hover` CSS silindi; **B4** `order-form-interaction.test.tsx` davranışsal mobil testi (`innerWidth=390`).
+
+**Backend/migration/permission DEĞİŞMEDİ.** Doğrulama (birleşik main): tsc 0 · lint 0 · **4615 test yeşil** (320 dosya) · build 0 (`ƒ Proxy`).
+
+**DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment == <HEAD>` birebir aynı (tree+SHA özdeş); iki Coolify prod deploy tetiklendi. codex worktree main HEAD'e reset edildi.** main geçmişi: `39c0d07 → 5265a08(import) → görsel-QA → context`.
+
+---
+
+<details><summary>Önceki: Branch hizalama audit'i — son commitlerin detaylı kod incelemesi + 3 bulgu (`5265a08`)</summary>
+
+## Son Tamamlanan İş — 2026-06-05 (**Branch hizalama audit'i — son commitlerin detaylı kod incelemesi + 3 bulgu düzeltme**)
+
+Kullanıcı "iki branch aynı mı / son commitlerin kodunu eksiksiz incele, bug/güvenlik/semantik tutarsızlık kalmasın (ultrathink)" dedi.
+
+**Branch durumu doğrulandı:** `main == codex-experiment == 39c0d07` birebir aynı — SHA+tree özdeş, 0/0 ahead-behind, `git diff` boş (`4176c8d` üzerine tek docs commit `39c0d07`). İki worktree branch'i (`worktree-rbac-bulgular-kapatma` `5a86c32`, `worktree-satis-siparisleri-tamamlama` `e9c6ac6`) main'in **atası** = tamamen merge edilmiş, benzersiz iş yok (tek "değişiklik" `.claude/settings.local.json`, kod değil).
+
+**Audit kapsamı (önce-doğrula):** delta = codex feature seti (16 commit `ee3b701`, 129 dosya/~12.5k satır) + merge çözümü (`56ecbd1` el-çözümü 4 dosya). Main'in 13 final-ürün commit'i önceki turlarda canlı-probe'lanmıştı → atlandı. Danışman yönlendirmesiyle persistence (veri-yazma) katmanına odaklanıldı.
+
+**Derin incelenen** (satır-satır): 3 yeni route (exchange-rates/import-templates/import-report), migration 083/084, exchange-rates parser, ai-import-operations, import-center, product-types field_key zinciri (route+helper+UI), import-apply-service, import-service finansal enforcement, settings merge çözümü.
+
+**3 bulgu düzeltildi (`f24afb1`, +4 test):**
+- **#1 [ORTA · güvenlik] CSV formül injection** — `api/import/[batchId]/report/route.ts escapeCsv` yalnız `[",\n\r]` tırnaklıyordu; `= + - @ TAB CR` ile başlayan hücre nötrlenmiyordu. Veri kaynağı yüklenen dosyadan gelen kullanıcı-kontrollü serbest metin (`row_errors`/`risk_flags` asArrayText tek-eleman + ham alanlar; `user_corrections`/`field_approvals` asObjectText `key:` ile başladığından zaten güvenli). Excel/Sheets formül çalıştırır. **Tırnaklama ENGELLEMEZ** (Excel tırnaklı alanda da evaluate eder) → değer-seviyesi `'` prefix (`neutralizeCsvFormula`). XLSX yolu güvenli (`json_to_sheet` `'s'` tipi).
+- **#2 [DÜŞÜK · veri bütünlüğü] AI apply attribute null/boş clobber** — `import-apply-service.ts` matched-update `{...current, ...new}` merge null/""/undefined AI değerini mevcut ürün attribute'una yazıp **siliyordu** (ai-import-operations safetyNote yalnız prompt talimatıydı, enforce yok). Merge öncesi `nonEmptyLineAttributes` filtre; skip kontrolü + `technical_fields_applied` sayacı + no-op update da nonEmpty üzerinden hizalandı.
+- **#3 [DÜŞÜK · sağlamlık] field_key migrasyonu transactional değil** — `dbUpdateProductTypeField` N ürün UPDATE + field UPDATE tek transaction'da değil → kısmi rename riski; UI READ-ONLY + nadir admin → SAĞLAMLIK NOTU dokümante (sıklaşırsa atomik RPC).
+
+**ÇÜRÜTÜLEN (kod karşısında):** field_key orphan riski → backend collision-guard'lı `attributes` JSONB **migrate ediyor** (UI read-only + backend rename = iki katman). Import finansal sızıntı → AI apply'da price/cost_price **yazma yolu YOK** (yalnız name/sku/product_type_id + tip-validated attr); klasik import `canApplyFinancialField` **server-side permission-gate** (price→view_sales_prices+manage_product_master, cost_price→view_purchase_costs) — RBAC redaction'la tutarlı. product_type_id NULL temiz işleniyor. 3 route auth-gated. Migration 083/084 idempotent+RLS. Settings merge çözümü sağlam (a11y gruplu nav `aria-label`+`aria-current`+region, errBody parite, `:1056 &apos;` JSX text = doğru decode, bug değil). `record_stock_transfer` `products.ts:294`'te canlı bağlı (FOR UPDATE).
+
+**Test+build'e güvenilen** (derin okunmadı, regresyon riski düşük): büyük UI rewrite'ları (Button/Topbar/Sidebar/ExchangeRatesTicker/SystemHealthIndicator/ExtractionReview 645 satır) + 9 oto-merge dosyası. Gerekçe: 4608 test yeşil + build 0, veri-bütünlüğü/güvenlik taşımıyor.
+
+**Doğrulama:** tsc 0 · lint 0 · **4604→4608 test yeşil** · build 0 (`ƒ Proxy`). Plan: `~/.claude/plans/tamam-bu-son-commitlerin-precious-fox.md`.
+
+**DURUM: COMMIT EDİLDİ local (`f24afb1`/`5265a08`); push sonraki turda görsel QA ile birlikte yapıldı (yukarı bak).**
+
+</details>
+
+---
+
+<details><summary>Önceki: İki branch'i hizalama — codex ↔ main merge + main hardening re-apply (`56ecbd1`/`4176c8d`)</summary>
+
 ## Son Tamamlanan İş — 2026-06-05 (**İki branch'i hizalama — codex ↔ main merge + main hardening re-apply**)
 
 Codex işini bitirdi (`origin/codex-experiment` @ `ee3b701`, ayrı Coolify deploy). İki branch ayrıştı: codex 16 commit önde (TCMB kur, profil avatar + ayarlar redesign, AI/Excel import merkezi, teknik şablonlar, premium button), main 13 commit önde (bu oturumun final-ürün turları). Kullanıcı: **iki branch'i aynı güncelliğe getir** (kod birebir, branch'ler ayrı deploy kalsın).
@@ -19,6 +76,8 @@ Codex işini bitirdi (`origin/codex-experiment` @ `ee3b701`, ayrı Coolify deplo
 - **Phase 4:** tsc 0 · lint 0 · **4604 test yeşil** (320 dosya) · build 0 (`ƒ Proxy`). 9 oto-merge da bu net'le doğrulandı.
 - **Migrations 083 (technical templates) + 084 (excel import)** deploy'da DB'ye uygulanmalı.
 - **DURUM: TAMAMLANDI.** Kullanıcı onayı (083/084 codex'çe zaten uygulanmış, tek DB → push güvenli) → `4176c8d` her iki branch'e ff+push: `main 0914b28..4176c8d` + `codex-experiment ee3b701..4176c8d`. **`origin/main == origin/codex-experiment == 4176c8d` (birebir aynı).** İki Coolify prod deploy tetiklendi; `integrate-codex` silindi. Mekanik not: codex-experiment proje-codex worktree'sinde checkout'lu → ff worktree içinde yapıldı (`git checkout` çakışması önlendi).
+
+</details>
 
 ---
 
