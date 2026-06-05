@@ -5,6 +5,24 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## Son Tamamlanan İş — 2026-06-05 (**Dashboard: "AI Operasyon Özeti" + "Aktif Uyarılar" tıklanınca açılır (collapsible)**)
+
+Kullanıcı `/dashboard`'daki iki bölümün varsayılan **gizli**, yalnız **tıklanınca görünmesini** istedi (`/frontend-design` skill + ultrathink). **Bölümler:** AI önerileri = `AISummaryCard` ("AI Operasyon Özeti", her mount'ta `POST /api/ai/ops-summary` AI çağrısı yapıyordu) · uyarılar = `AIAlerts` ("Aktif Uyarılar", `useData()` context'inden okur, ekstra fetch yok).
+
+**Kullanıcı kararları (AskUserQuestion):** (1) kapalı görünüm = **başlık + özet rozet** (kapalıyken bile `[AI]` / "N açık" rozeti görünür — göz ucu değeri), (2) **her zaman kapalı başla** (localStorage hatırlama YOK — "tıklanınca görünsün"e birebir uyum).
+
+**Uygulama (`src/app/dashboard/page.tsx`):** yerel `CollapsibleSection` helper — tam-genişlik `<button aria-expanded={open}>` başlık çubuğu (`var(--bg-secondary)` zemin, `0.5px border-secondary`, rotate eden chevron SVG `aria-hidden` + `transition .2s`, sağda `badge` slot) + **`{open && <div>{children}</div>}` → lazy mount** (kapalıyken iç bileşen hiç mount olmaz). İki state `showAiSummary`/`showAlerts` (ikisi `useState(false)`). `useData()` destructure'a `openAlerts`+`loading` eklendi (rozet sayısı). `AISummaryCard` badge=`[AI]`, `AIAlerts` badge=`!loading && openAlerts.length>0 ? "{N} açık" (danger) : null`. **Lazy mount kazanımı:** AI ops-summary çağrısı artık her dashboard yüklemesinde değil, yalnız ilk açılışta (sessionStorage 15dk cache tekrarları engeller — maliyet azalır).
+
+**⚠️ ADVISOR FIX — çift başlık (görünür defekt, tsc/lint/build/source-regex YAKALAYAMAZDI):** iki bileşen kendi başlık+rozetini de render ettiğinden açıkken başlık 2 kez görünürdü. Plandaki "iç bileşenlere dokunma" varsayımı yanlıştı. İç başlıklar kaldırıldı (wrapper tek başlık kaynağı): `AIAlerts` — loading + loaded başlık satırları + "N açık" rozeti silindi, **footer "Tümünü Gör → (N açık uyarı)" KORUNDU** (duplicate olan başlık satırıydı); `AISummaryCard` — disabled/error/loaded 3 state başlığı silindi ama loaded'daki **"Yenile" butonu KORUNDU** (`feedback_no_silent_deletes`; başlığı wholesale silmek Yenile'yi kaybederdi → header div'i `justify-content:flex-end` ile yalnız buton kalacak şekilde yeniden düzenlendi). İki bileşen yalnız dashboard'da kullanılıyor (`grep` doğrulandı) → güvenli.
+
+**+11 test** (`dashboard-collapsible-sections.test.ts` source-regex): varsayılan kapalı `useState(false)` ×2, lazy-mount `open && children` + `<CollapsibleSection><AISummaryCard/>`, `aria-expanded={open}`, `onToggle` setter ters çevirme, rozetler (`openAlerts.length` + "açık" + "AI"), `useData` openAlerts/loading, **iç bileşenler başlığı tekrarlamaz (`Aktif Uyarılar`/`Operasyon Özeti` yok) + Yenile/`fetchSummary(true)` korunur** (advisor-fix kilidi). Brittle "N açık" rozet assertion'ı footer ("N açık uyarı") ile çakıştığı için kaldırıldı, başlık-yokluğu kontrolü tutuldu.
+
+**Backend/migration/permission DEĞİŞMEDİ.** tsc 0 · lint 0 · **4616→4627 test** · build 0 (`ƒ Proxy`). 3 dosya değişti (page.tsx + AIAlerts.tsx + AISummaryCard.tsx) + 1 yeni test + CLAUDE.md/memory. **DURUM: LOCAL — commit + iki-branch hizalama + push kullanıcı onayı bekliyor (plan "ayrı onayla" dedi).**
+
+---
+
+<details><summary>Önceki: Teklif formu ürün açılır-listesi kırpılma fix'i (2026-06-05)</summary>
+
 ## Son Tamamlanan İş — 2026-06-05 (**Teklif formu ürün açılır-listesi kırpılma fix'i**)
 
 Kullanıcı teklif formunda (`/dashboard/quotes/new`) satır eklerken ürün kodu girince açılan autocomplete listesinin kırpık göründüğünü bildirdi (ekran görüntüsü; macOS TCC ilk `Read`'i engelledi → `cp` denendi yine EPERM, ama harness görüntüyü inline gösterdi → teşhis görüntüyle doğrulandı: liste üstten/alttan kesik, kapsayıcıda sıkışık + dikey scrollbar).
@@ -16,6 +34,8 @@ Kullanıcı teklif formunda (`/dashboard/quotes/new`) satır eklerken ürün kod
 **Doğrulama:** tsc 0 · lint 0 · **4615→4616 test** (`quotes-ui-audit-fix` 20/20) · build 0. Backend/migration/permission DEĞİŞMEDİ.
 
 **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA (tree özdeş); iki Coolify prod deploy. codex worktree main HEAD'e reset edildi.**
+
+</details>
 
 ---
 

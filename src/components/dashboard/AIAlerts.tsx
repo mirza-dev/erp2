@@ -41,21 +41,6 @@ const AIAlerts = memo(function AIAlerts() {
           padding: "16px",
         }}
       >
-        <div style={{
-          fontSize: "13px",
-          fontWeight: 600,
-          color: "var(--accent-text)",
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-          marginBottom: "12px",
-        }}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-          Aktif Uyarılar
-        </div>
         {Array.from({ length: 3 }).map((_, i) => (
           <div
             key={i}
@@ -89,42 +74,7 @@ const AIAlerts = memo(function AIAlerts() {
         padding: "16px",
       }}
     >
-      {/* Title row */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: "12px",
-        }}
-      >
-        <div style={{
-          fontSize: "13px",
-          fontWeight: 600,
-          color: "var(--accent-text)",
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-        }}>
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M6 3v3l2 1" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-          Aktif Uyarılar
-        </div>
-        {openAlerts.length > 0 && (
-          <span style={{
-            fontSize: "11px",
-            background: "var(--danger-bg)",
-            color: "var(--danger-text)",
-            padding: "2px 7px",
-            borderRadius: "8px",
-            fontWeight: 600,
-          }}>
-            {openAlerts.length} açık
-          </span>
-        )}
-      </div>
+      {/* Başlık + "N açık" rozeti CollapsibleSection (dashboard) başlık çubuğunda — burada tekrarlanmaz */}
 
       {/* Empty state */}
       {openAlerts.length === 0 && (

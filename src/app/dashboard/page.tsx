@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback, type ReactNode } from "react";
 import Link from "next/link";
 import StatsCards from "@/components/dashboard/StatsCards";
 import StockDataGrid from "@/components/dashboard/StockDataGrid";
@@ -20,12 +20,73 @@ const STATUS_OPTIONS = [
     { key: "tukendi", label: "Tükendi" },
 ];
 
+function CollapsibleSection({
+    title,
+    open,
+    onToggle,
+    badge,
+    children,
+}: {
+    title: string;
+    open: boolean;
+    onToggle: () => void;
+    badge?: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <div>
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={open}
+                style={{
+                    width: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "10px",
+                    padding: "10px 14px",
+                    border: "0.5px solid var(--border-secondary)",
+                    borderRadius: "8px",
+                    background: "var(--bg-secondary)",
+                    color: "var(--text-primary)",
+                    cursor: "pointer",
+                    textAlign: "left",
+                }}
+            >
+                <span style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span
+                        aria-hidden="true"
+                        style={{
+                            display: "inline-flex",
+                            transform: open ? "rotate(0deg)" : "rotate(-90deg)",
+                            transition: "transform 0.2s",
+                            color: "var(--text-tertiary)",
+                        }}
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2.5 4.5L6 8l3.5-3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </span>
+                    <span style={{ fontSize: "13px", fontWeight: 600 }}>{title}</span>
+                </span>
+                {badge}
+            </button>
+            {open && <div style={{ marginTop: "8px" }}>{children}</div>}
+        </div>
+    );
+}
+
 export default function DashboardPage() {
-    const { products, refetchAll } = useData();
+    const { products, refetchAll, openAlerts, loading } = useData();
     const { has } = usePermissions();
     const canCreateOrder = has("manage_sales_orders");
     const [filterOpen, setFilterOpen] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
+    // AI Operasyon Özeti + Aktif Uyarılar: varsayılan kapalı, tıklanınca açılır.
+    // AISummaryCard kapalıyken mount olmaz → AI ops-summary çağrısı yalnız ilk açılışta yapılır.
+    const [showAiSummary, setShowAiSummary] = useState(false);
+    const [showAlerts, setShowAlerts] = useState(false);
 
     const handleRefresh = useCallback(async () => {
         if (refreshing) return;
@@ -60,8 +121,27 @@ export default function DashboardPage() {
             {/* Metrics */}
             <StatsCards />
 
-            {/* AI Ops Summary */}
-            <AISummaryCard />
+            {/* AI Ops Summary — tıklanınca açılır (kapalıyken mount olmaz → AI çağrısı ertelenir) */}
+            <CollapsibleSection
+                title="AI Operasyon Özeti"
+                open={showAiSummary}
+                onToggle={() => setShowAiSummary(o => !o)}
+                badge={
+                    <span style={{
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        background: "var(--accent-bg)",
+                        color: "var(--accent-text)",
+                        border: "1px solid var(--accent-border)",
+                    }}>
+                        AI
+                    </span>
+                }
+            >
+                <AISummaryCard />
+            </CollapsibleSection>
 
             {/* Section header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
@@ -289,7 +369,27 @@ export default function DashboardPage() {
 
             {/* Bottom grid: AI alerts + (recent orders + import zone) */}
             <div className="dashboard-bottom-grid">
-                <AIAlerts />
+                <CollapsibleSection
+                    title="Aktif Uyarılar"
+                    open={showAlerts}
+                    onToggle={() => setShowAlerts(o => !o)}
+                    badge={
+                        !loading && openAlerts.length > 0 ? (
+                            <span style={{
+                                fontSize: "11px",
+                                background: "var(--danger-bg)",
+                                color: "var(--danger-text)",
+                                padding: "2px 7px",
+                                borderRadius: "8px",
+                                fontWeight: 600,
+                            }}>
+                                {openAlerts.length} açık
+                            </span>
+                        ) : null
+                    }
+                >
+                    <AIAlerts />
+                </CollapsibleSection>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                     <RecentOrders />
                     <Link href="/dashboard/import" style={{ textDecoration: "none" }}>

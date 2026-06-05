@@ -219,36 +219,7 @@ export default function AISummaryCard() {
                 borderRadius: "8px",
                 padding: "20px 24px",
             }}>
-                {/* Header */}
-                <div style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "14px",
-                }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            letterSpacing: "0.06em",
-                            textTransform: "uppercase",
-                            color: "var(--accent-text)",
-                        }}>
-                            Operasyon Özeti
-                        </span>
-                        <span style={{
-                            fontSize: "10px",
-                            fontWeight: 600,
-                            padding: "2px 8px",
-                            borderRadius: "4px",
-                            background: "var(--accent-bg)",
-                            color: "var(--accent-text)",
-                            border: "1px solid var(--accent-border)",
-                        }}>
-                            Otomatik
-                        </span>
-                    </div>
-                </div>
+                {/* Başlık + rozet CollapsibleSection (dashboard) başlık çubuğunda — burada tekrarlanmaz */}
                 {data?.metrics && <MetricsContextBar metrics={data.metrics} />}
                 {data?.metrics && <DeterministicSummary metrics={data.metrics} />}
                 <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "12px" }}>
@@ -267,17 +238,7 @@ export default function AISummaryCard() {
                 borderRadius: "8px",
                 padding: "20px 24px",
             }}>
-                {/* Header */}
-                <div style={{
-                    fontSize: "11px",
-                    fontWeight: 700,
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    color: "var(--text-tertiary)",
-                    marginBottom: "14px",
-                }}>
-                    AI Operasyon Özeti
-                </div>
+                {/* Başlık CollapsibleSection (dashboard) başlık çubuğunda — burada tekrarlanmaz */}
                 {data?.metrics && <MetricsContextBar metrics={data.metrics} />}
                 {data?.metrics && <DeterministicSummary metrics={data.metrics} />}
                 <div style={{
@@ -329,35 +290,14 @@ export default function AISummaryCard() {
             borderRadius: "8px",
             padding: "20px 24px",
         }}>
-            {/* Header */}
+            {/* Başlık + AI rozeti CollapsibleSection (dashboard) başlık çubuğunda;
+                burada yalnız "Yenile" aksiyonu kalır */}
             <div style={{
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "space-between",
+                justifyContent: "flex-end",
                 marginBottom: "14px",
             }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        letterSpacing: "0.06em",
-                        textTransform: "uppercase",
-                        color: "var(--accent-text)",
-                    }}>
-                        AI Operasyon Özeti
-                    </span>
-                    <span style={{
-                        fontSize: "10px",
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: "4px",
-                        background: "var(--accent-bg)",
-                        color: "var(--accent-text)",
-                        border: "1px solid var(--accent-border)",
-                    }}>
-                        AI
-                    </span>
-                </div>
                 <button
                     onClick={() => fetchSummary(true)}
                     style={{
