@@ -5,7 +5,6 @@ import type { ExchangeCurrencyCode, ExchangeRatesResponse, ExchangeRatesSource }
 
 const REFRESH_MS = 20 * 60 * 1000;
 const CURRENCIES: ExchangeCurrencyCode[] = ["USD", "EUR"];
-const SYMBOLS: Record<ExchangeCurrencyCode, string> = { USD: "$", EUR: "€" };
 const SOURCE_META: Record<ExchangeRatesSource, { badge: string; label: string }> = {
     LIVE_RATES: { badge: "LIVE", label: "Live-Rates" },
     TCMB: { badge: "TCMB", label: "TCMB" },
@@ -45,62 +44,35 @@ function titleForRates(rates: ExchangeRatesResponse): string {
     return `${meta.label} alış/satış kuru · ${timestamp}`;
 }
 
+// Düz (çip-içinde-çip yok) — sağ kümenin içinde, kendi kutusu yok.
+// borderRight = ticker'a ait ayraç: ticker null dönerse (kur yüklenemezse)
+// ayraç da görünmez (sarkan separatör olmaz).
 const tickerStyle: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: "5px",
-    height: "28px",
-    padding: "2px 4px 2px 5px",
-    border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "7px",
-    background: "var(--bg-secondary)",
-    color: "var(--text-secondary)",
-    boxSizing: "border-box",
-    whiteSpace: "nowrap",
-};
-
-const sourceStyle: React.CSSProperties = {
+    gap: "8px",
     height: "20px",
-    display: "inline-flex",
-    alignItems: "center",
-    padding: "0 6px",
-    border: "0.5px solid var(--accent-border)",
-    borderRadius: "5px",
-    background: "var(--accent-bg)",
-    color: "var(--accent-text)",
-    fontSize: "10px",
-    fontWeight: 700,
-    letterSpacing: "0.04em",
+    paddingRight: "10px",
+    borderRight: "0.5px solid var(--border-tertiary)",
+    color: "var(--text-secondary)",
+    fontSize: "11px",
     lineHeight: 1,
-};
-
-const ratesStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: "2px",
+    whiteSpace: "nowrap",
 };
 
 const rateStyle: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: "3px",
-    height: "22px",
-    padding: "0 5px",
-    borderRadius: "5px",
-    background: "var(--bg-tertiary)",
-    fontSize: "11px",
-    lineHeight: 1,
+    gap: "5px",
+};
+
+const sepStyle: React.CSSProperties = {
+    color: "var(--text-tertiary)",
 };
 
 const codeStyle: React.CSSProperties = {
     color: "var(--text-primary)",
     fontWeight: 700,
-};
-
-const labelStyle: React.CSSProperties = {
-    color: "var(--text-tertiary)",
-    fontSize: "10px",
-    fontWeight: 600,
 };
 
 const valueStyle: React.CSSProperties = {
@@ -146,22 +118,18 @@ const ExchangeRatesTicker = memo(function ExchangeRatesTicker() {
             title={titleForRates(rates)}
             style={tickerStyle}
         >
-            <span style={sourceStyle}>{meta.badge}</span>
-            <span style={ratesStyle}>
-                {CURRENCIES.map((code) => {
-                    const rate = rates.rates[code];
-                    return (
-                        <span key={code} style={rateStyle}>
-                            <span aria-hidden="true">{SYMBOLS[code]}</span>
-                            <span style={codeStyle}>{code}</span>
-                            <span style={labelStyle}>A/S</span>
-                            <span style={valueStyle}>
-                                {formatRate(rate.buying)} / {formatRate(rate.selling)}
-                            </span>
+            {CURRENCIES.map((code, index) => {
+                const rate = rates.rates[code];
+                return (
+                    <span key={code} style={rateStyle}>
+                        {index > 0 && <span aria-hidden="true" style={sepStyle}>·</span>}
+                        <span style={codeStyle}>{code}</span>
+                        <span style={valueStyle}>
+                            {formatRate(rate.buying)} / {formatRate(rate.selling)}
                         </span>
-                    );
-                })}
-            </span>
+                    </span>
+                );
+            })}
         </div>
     );
 });

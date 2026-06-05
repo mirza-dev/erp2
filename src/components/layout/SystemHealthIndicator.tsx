@@ -1,7 +1,6 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, LoaderCircle } from "lucide-react";
 
 const REFRESH_MS = 5 * 60 * 1000;
 
@@ -18,29 +17,20 @@ function metaForState(state: HealthState) {
         return {
             label: "Bağlı",
             aria: "Sistem durumu: Bağlı",
-            icon: CheckCircle2,
             color: "var(--success-text)",
-            border: "var(--success-border)",
-            background: "var(--success-bg)",
         };
     }
     if (state === "degraded") {
         return {
             label: "Sorun var",
             aria: "Sistem durumu: Sorun var",
-            icon: AlertTriangle,
             color: "var(--danger-text)",
-            border: "var(--danger-border)",
-            background: "var(--danger-bg)",
         };
     }
     return {
         label: "Kontrol",
         aria: "Sistem durumu kontrol ediliyor",
-        icon: LoaderCircle,
         color: "var(--text-tertiary)",
-        border: "var(--border-tertiary)",
-        background: "var(--bg-secondary)",
     };
 }
 
@@ -73,36 +63,31 @@ const SystemHealthIndicator = memo(function SystemHealthIndicator() {
     }, []);
 
     const meta = metaForState(state);
-    const Icon = meta.icon;
 
     return (
         <div
             aria-label={meta.aria}
             title={meta.aria}
             style={{
-                height: "28px",
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                padding: "0 8px",
-                border: `0.5px solid ${meta.border}`,
-                borderRadius: "7px",
-                background: meta.background,
                 color: meta.color,
                 fontSize: "12px",
-                fontWeight: 650,
+                fontWeight: 600,
                 lineHeight: 1,
                 whiteSpace: "nowrap",
-                boxSizing: "border-box",
             }}
         >
-            <Icon
-                size={14}
-                strokeWidth={1.9}
+            <span
                 aria-hidden
                 style={{
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "50%",
+                    background: meta.color,
                     flexShrink: 0,
-                    animation: state === "checking" ? "spin 1s linear infinite" : undefined,
+                    animation: state === "checking" ? "pulse-dot 1.4s ease-in-out infinite" : undefined,
                 }}
             />
             <span>{meta.label}</span>

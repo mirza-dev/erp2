@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ReactNode } from "react";
 import Topbar from "@/components/layout/Topbar";
 import { getTopbarTitle } from "@/lib/topbar-title";
 
 const mockState = vi.hoisted(() => ({
     pathname: "/dashboard",
-    alertCount: 15,
 }));
 
 vi.mock("next/link", () => ({
@@ -18,10 +19,6 @@ vi.mock("next/link", () => ({
 
 vi.mock("next/navigation", () => ({
     usePathname: () => mockState.pathname,
-}));
-
-vi.mock("@/lib/data-context", () => ({
-    useData: () => ({ activeAlertCount: mockState.alertCount }),
 }));
 
 const originalFetch = global.fetch;
@@ -62,7 +59,6 @@ afterEach(() => {
     cleanup();
     global.fetch = originalFetch;
     mockState.pathname = "/dashboard";
-    mockState.alertCount = 15;
     vi.restoreAllMocks();
 });
 
@@ -96,18 +92,18 @@ describe("Topbar", () => {
         await waitFor(() => expect(screen.getByText("Bağlı")).toBeTruthy());
     });
 
-    it("uyarı butonu yalnız alertCount > 0 iken görünür", () => {
+    it("uyarı butonu artık topbar'da render edilmez (Sidebar'a taşındı)", () => {
         mockTopbarFetch();
         render(<Topbar />);
 
-        expect(screen.getByText("15 Uyarı")).toBeTruthy();
-
-        cleanup();
-        mockState.alertCount = 0;
-        render(<Topbar key="no-alerts" />);
-
-        expect(screen.queryByText("15 Uyarı")).toBeNull();
-        expect(screen.queryByText("0 Uyarı")).toBeNull();
+        // Uyarı erişimi Sidebar'daki "Uyarılar" sayacında — topbar'da hiçbir
+        // "N Uyarı" çipi olmamalı + /dashboard/alerts linki bulunmamalı.
+        expect(screen.queryByText(/Uyarı/)).toBeNull();
+        expect(screen.queryByRole("link", { name: /aktif uyarı/i })).toBeNull();
+        const alertLinks = screen.queryAllByRole("link").filter(
+            (el) => el.getAttribute("href") === "/dashboard/alerts",
+        );
+        expect(alertLinks).toHaveLength(0);
     });
 
     it("avatar linki ve döviz göstergesi davranışını korur", async () => {
@@ -118,5 +114,42 @@ describe("Topbar", () => {
         await waitFor(() => expect(screen.getByText("MS")).toBeTruthy());
         expect(screen.getByRole("link", { name: "Profil ve ayarlar" }).getAttribute("href")).toBe("/dashboard/settings?tab=kullanici");
         await waitFor(() => expect(screen.getByLabelText("Live-Rates döviz kurları")).toBeTruthy());
+    });
+});
+
+describe("Topbar — Sakin düz tasarım (kaynak regresyonu)", () => {
+    const TOPBAR_SRC = readFileSync(join(process.cwd(), "src/components/layout/Topbar.tsx"), "utf8");
+    const TICKER_SRC = readFileSync(join(process.cwd(), "src/components/layout/ExchangeRatesTicker.tsx"), "utf8");
+    const HEALTH_SRC = readFileSync(join(process.cwd(), "src/components/layout/SystemHealthIndicator.tsx"), "utf8");
+
+    it("Topbar uyarı bağımlılıklarını taşımaz (AlertTriangle / useData / activeAlertCount yok)", () => {
+        expect(TOPBAR_SRC).not.toMatch(/AlertTriangle/);
+        expect(TOPBAR_SRC).not.toMatch(/useData/);
+        expect(TOPBAR_SRC).not.toMatch(/activeAlertCount/);
+        expect(TOPBAR_SRC).not.toMatch(/\/dashboard\/alerts/);
+    });
+
+    it("Topbar başlığı sola taşır (page-context pill yok, divider var)", () => {
+        expect(TOPBAR_SRC).not.toMatch(/topbar-page-context/);
+        expect(TOPBAR_SRC).toMatch(/topbar-divider/);
+        expect(TOPBAR_SRC).toMatch(/topbar-page-title/);
+    });
+
+    it("ExchangeRatesTicker düzleşir (çip-içinde-çip kalkar: rateStyle box / sourceStyle badge / A-S etiketi yok)", () => {
+        // Per-kur dolu pill (background var-bg-tertiary) ve accent kaynak rozeti kaldırıldı.
+        expect(TICKER_SRC).not.toMatch(/var\(--bg-tertiary\)/);
+        expect(TICKER_SRC).not.toMatch(/sourceStyle/);
+        expect(TICKER_SRC).not.toMatch(/labelStyle/);
+        expect(TICKER_SRC).not.toMatch(/A\/S/);
+        // Ayraç ticker'a ait (null ticker'da sarkmaz).
+        expect(TICKER_SRC).toMatch(/borderRight/);
+    });
+
+    it("SystemHealthIndicator dolu pill yerine nokta kullanır (lucide ikon / border+bg pill yok)", () => {
+        expect(HEALTH_SRC).not.toMatch(/lucide-react/);
+        expect(HEALTH_SRC).not.toMatch(/var\(--success-bg\)/);
+        expect(HEALTH_SRC).not.toMatch(/var\(--danger-bg\)/);
+        expect(HEALTH_SRC).toMatch(/borderRadius: "50%"/);
+        expect(HEALTH_SRC).toMatch(/pulse-dot/);
     });
 });
