@@ -13,6 +13,7 @@ import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { Plus } from "lucide-react";
+import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -206,40 +207,17 @@ export default function CustomersPage() {
                     </div>
                 </div>
 
-                {/* Filter Tabs */}
-                <div style={{ display: "flex", gap: "4px" }}>
-                    {([
-                        { key: "all", label: "Tümü", count: mockCustomers.length },
-                        { key: "active", label: "Aktif", count: activeCount },
-                        { key: "passive", label: "Pasif", count: passiveCount },
-                    ] as const).map(tab => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setActiveFilter(tab.key)}
-                            style={{
-                                fontSize: "12px",
-                                padding: "5px 12px",
-                                border: "0.5px solid",
-                                borderColor: activeFilter === tab.key ? "var(--accent-border)" : "var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: activeFilter === tab.key ? "var(--accent-bg)" : "transparent",
-                                color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-secondary)",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                            }}
-                        >
-                            {tab.label}
-                            <span style={{
-                                fontSize: "11px",
-                                padding: "1px 5px",
-                                borderRadius: "10px",
-                                background: activeFilter === tab.key ? "var(--accent-bg-strong)" : "var(--bg-tertiary)",
-                                color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-tertiary)",
-                            }}>{tab.count}</span>
-                        </button>
-                    ))}
+                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                    <UnderlinedFilterTabs
+                        ariaLabel="Cari durumu filtresi"
+                        items={[
+                            { key: "all", label: "Tümü", count: mockCustomers.length },
+                            { key: "active", label: "Aktif", count: activeCount },
+                            { key: "passive", label: "Pasif", count: passiveCount },
+                        ]}
+                        activeKey={activeFilter}
+                        onChange={setActiveFilter}
+                    />
                     <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "auto", alignSelf: "center" }}>
                         {filtered.length} müşteri
                     </span>

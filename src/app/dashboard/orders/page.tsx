@@ -16,6 +16,7 @@ import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { Plus, RefreshCw } from "lucide-react";
+import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral" },
@@ -268,32 +269,12 @@ function OrdersList() {
 
             {/* Toolbar */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                {/* Tabs — bottom border style */}
-                <div style={{ display: "flex", gap: "0px", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
-                    {filterTabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            style={{
-                                fontSize: "12px",
-                                fontWeight: activeTab === tab.id ? 600 : "var(--font-ui-weight)",
-                                padding: "8px 14px",
-                                border: "none",
-                                borderBottom: activeTab === tab.id
-                                    ? "2px solid var(--accent)"
-                                    : "2px solid transparent",
-                                background: "transparent",
-                                color: activeTab === tab.id
-                                    ? "var(--accent-text)"
-                                    : "var(--text-interactive-muted)",
-                                cursor: "pointer",
-                                marginBottom: "-0.5px",
-                            }}
-                        >
-                            {tab.label} ({getCount(tab.id)})
-                        </button>
-                    ))}
-                </div>
+                <UnderlinedFilterTabs
+                    ariaLabel="Sipariş durumu filtresi"
+                    items={filterTabs.map((tab) => ({ key: tab.id, label: tab.label, count: getCount(tab.id) }))}
+                    activeKey={activeTab}
+                    onChange={setActiveTab}
+                />
 
                 {/* Search + Gelişmiş Filtreler */}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>

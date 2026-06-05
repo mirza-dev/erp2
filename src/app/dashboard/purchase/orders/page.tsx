@@ -11,6 +11,7 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import type { PurchaseOrderRow, PurchaseOrderStatus, VendorRow } from "@/lib/database.types";
 import { ButtonLink } from "@/components/ui/Button";
 import { Plus } from "lucide-react";
+import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left", padding: "10px 14px", fontSize: "12px", fontWeight: 500,
@@ -83,11 +84,8 @@ export default function PurchaseOrdersPage() {
         setLoading(true);
         setLoadError(false);
         try {
-            const url = activeTab === "all"
-                ? "/api/purchase-orders"
-                : `/api/purchase-orders?status=${encodeURIComponent(activeTab)}`;
             const [ordersRes, vendorsRes] = await Promise.all([
-                fetch(url),
+                fetch("/api/purchase-orders"),
                 fetch("/api/vendors?all=1"),
             ]);
             // Siparişler kritik: 401/403/500'ü sessizce yutma (yanıltıcı "boş liste"
@@ -109,7 +107,7 @@ export default function PurchaseOrdersPage() {
         } finally {
             setLoading(false);
         }
-    }, [activeTab]);
+    }, []);
 
     useEffect(() => { void loadOrders(); }, [loadOrders]);
 
@@ -119,13 +117,14 @@ export default function PurchaseOrdersPage() {
     }, []);
 
     const filtered = useMemo(() => {
-        if (!search.trim()) return orders;
+        const byStatus = activeTab === "all" ? orders : orders.filter((o) => o.status === activeTab);
+        if (!search.trim()) return byStatus;
         const q = search.toLowerCase();
-        return orders.filter(o =>
+        return byStatus.filter(o =>
             o.po_number.toLowerCase().includes(q) ||
             (vendorMap.get(o.vendor_id) ?? "").toLowerCase().includes(q),
         );
-    }, [orders, search, vendorMap]);
+    }, [activeTab, orders, search, vendorMap]);
 
     const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
         usePagination(filtered, { resetKey: `${search}|${activeTab}` });
@@ -133,6 +132,8 @@ export default function PurchaseOrdersPage() {
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
         useSelection(`${search}|${activeTab}`);
     const cancellablePageIds = pagedItems.filter(isPoCancellable).map(o => o.id);
+    const getStatusCount = (key: StatusFilter) =>
+        key === "all" ? orders.length : orders.filter((o) => o.status === key).length;
 
     const handleBulkCancel = async () => {
         if (isDemo) { toast({ type: "info", message: "Demo modda bu işlem yapılamaz." }); return; }
@@ -180,30 +181,13 @@ export default function PurchaseOrdersPage() {
                 )}
             </div>
 
-            {/* Status tabs */}
-            <div style={{ display: "flex", gap: "4px", marginBottom: "16px", flexWrap: "wrap" }} role="tablist">
-                {STATUS_TABS.map(tab => {
-                    const active = activeTab === tab.key;
-                    return (
-                        <button
-                            key={tab.key}
-                            onClick={() => setActiveTab(tab.key)}
-                            role="tab"
-                            aria-selected={active}
-                            style={{
-                                padding: "6px 14px", fontSize: "13px",
-                                background: active ? "var(--accent-bg)" : "transparent",
-                                color: active ? "var(--accent-text)" : "var(--text-secondary)",
-                                border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-tertiary)"}`,
-                                borderRadius: "6px", cursor: "pointer",
-                                fontWeight: active ? 500 : 400,
-                            }}
-                        >
-                            {tab.label}
-                        </button>
-                    );
-                })}
-            </div>
+            <UnderlinedFilterTabs
+                ariaLabel="Satın alma siparişi durumu filtresi"
+                items={STATUS_TABS.map((tab) => ({ key: tab.key, label: tab.label, count: getStatusCount(tab.key) }))}
+                activeKey={activeTab}
+                onChange={setActiveTab}
+                style={{ marginBottom: "16px" }}
+            />
 
             {/* Search */}
             <div style={{ marginBottom: "16px" }}>

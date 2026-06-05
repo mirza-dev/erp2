@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 import { Plus } from "lucide-react";
+import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 export const KIND_META: Record<NoteTemplateKind, { label: string; badge: string }> = {
     notes: { label: "Notlar & Şartlar", badge: "Not" },
@@ -18,7 +19,6 @@ const KIND_ORDER: NoteTemplateKind[] = ["notes", "delivery", "payment", "general
 
 const containerStyle: React.CSSProperties = { padding: "24px", maxWidth: "900px", margin: "0 auto" };
 const headerStyle: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" };
-const tabsStyle: React.CSSProperties = { display: "flex", gap: "6px", marginBottom: "20px", flexWrap: "wrap" };
 const rowStyle: React.CSSProperties = {
     display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px",
     background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)",
@@ -54,6 +54,10 @@ export default function NoteTemplatesPage() {
     const [formSort, setFormSort] = useState("0");
     const [formError, setFormError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
+    const kindCounts = KIND_ORDER.reduce<Record<NoteTemplateKind, number>>((acc, kind) => {
+        acc[kind] = templates.filter((template) => template.kind === kind).length;
+        return acc;
+    }, { notes: 0, delivery: 0, payment: 0, general: 0 });
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -164,24 +168,16 @@ export default function NoteTemplatesPage() {
                 </Button>
             </div>
 
-            <div style={tabsStyle}>
-                {(["all", ...KIND_ORDER] as FilterKind[]).map((k) => (
-                    <button
-                        key={k}
-                        type="button"
-                        onClick={() => setFilter(k)}
-                        aria-pressed={filter === k}
-                        style={{
-                            fontSize: "12px", padding: "6px 12px", borderRadius: "6px", cursor: "pointer",
-                            border: "0.5px solid var(--border-secondary)",
-                            background: filter === k ? "var(--accent-bg)" : "var(--bg-secondary)",
-                            color: filter === k ? "var(--accent-text)" : "var(--text-secondary)",
-                        }}
-                    >
-                        {k === "all" ? "Tümü" : KIND_META[k].label}
-                    </button>
-                ))}
-            </div>
+            <UnderlinedFilterTabs
+                ariaLabel="Not şablonu kategorisi filtresi"
+                items={[
+                    { key: "all", label: "Tümü", count: templates.length },
+                    ...KIND_ORDER.map((kind) => ({ key: kind, label: KIND_META[kind].label, count: kindCounts[kind] })),
+                ]}
+                activeKey={filter}
+                onChange={setFilter}
+                style={{ marginBottom: "20px" }}
+            />
 
             {loading && <div style={{ color: "var(--text-secondary)" }}>Yükleniyor...</div>}
             {error && (

@@ -14,6 +14,7 @@ import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { getValidUntilBadge, canDeleteQuote, pickSucceededIds } from "./_utils/quote-display";
 import { Plus, RefreshCw } from "lucide-react";
+import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 type QuoteStatus = QuoteSummary["status"];
 type FilterTab = "ALL" | QuoteStatus;
@@ -217,32 +218,12 @@ function QuotesList() {
 
             {/* Toolbar */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                {/* Tabs */}
-                <div style={{ display: "flex", gap: "0px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
-                    {filterTabs.map((tab) => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            style={{
-                                fontSize: "12px",
-                                fontWeight: activeTab === tab.id ? 600 : "var(--font-ui-weight)",
-                                padding: "8px 14px",
-                                border: "none",
-                                borderBottom: activeTab === tab.id
-                                    ? "2px solid var(--accent)"
-                                    : "2px solid transparent",
-                                background: "transparent",
-                                color: activeTab === tab.id
-                                    ? "var(--accent-text)"
-                                    : "var(--text-interactive-muted)",
-                                cursor: "pointer",
-                                marginBottom: "-0.5px",
-                            }}
-                        >
-                            {tab.label} ({getCount(tab.id)})
-                        </button>
-                    ))}
-                </div>
+                <UnderlinedFilterTabs
+                    ariaLabel="Teklif durumu filtresi"
+                    items={filterTabs.map((tab) => ({ key: tab.id, label: tab.label, count: getCount(tab.id) }))}
+                    activeKey={activeTab}
+                    onChange={setActiveTab}
+                />
 
                 {/* Search + Filters */}
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>

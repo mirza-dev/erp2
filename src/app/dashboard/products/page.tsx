@@ -16,6 +16,7 @@ import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 import { Plus, RefreshCw } from "lucide-react";
+import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 
 interface RiskItem {
@@ -686,56 +687,21 @@ export default function ProductsPage() {
                 })}
             </div>
 
-            {/* Signal filter */}
-            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
                 <span style={{ fontSize: "10px", color: "var(--text-tertiary)", marginRight: "2px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
                     Sinyal:
                 </span>
-                {([
-                    { key: "tumu", label: "Tümü", count: mockProducts.length, color: null },
-                    { key: "riskli", label: "Riskli", count: riskLoading ? null : riskliCount, color: "var(--warning-text)" },
-                    { key: "uyarili", label: "Uyarı var", count: uyariliCount, color: "var(--warning-text)" },
-                    { key: "oneri", label: "Öneri bekliyor", count: oneriCount, color: "var(--accent-text)" },
-                ] as const).map(f => {
-                    const active = alertFilter === f.key;
-                    return (
-                        <button
-                            key={f.key}
-                            aria-pressed={active}
-                            onClick={() => setAlertFilter(f.key)}
-                            style={{
-                                fontSize: "11px",
-                                padding: "3px 10px",
-                                border: `var(--line-width) solid ${active ? "var(--border-primary)" : "var(--border-tertiary)"}`,
-                                borderRadius: "5px",
-                                background: active ? "var(--bg-secondary)" : "transparent",
-                                color: active ? "var(--text-primary)" : "var(--text-interactive-muted)",
-                                cursor: "pointer",
-                                fontWeight: active ? 600 : "var(--font-ui-weight)",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "4px",
-                            }}
-                            onMouseEnter={e => {
-                                if (!active) e.currentTarget.style.color = "var(--text-secondary)";
-                            }}
-                            onMouseLeave={e => {
-                                if (!active) e.currentTarget.style.color = "var(--text-interactive-muted)";
-                            }}
-                        >
-                            {f.label}
-                            {f.count !== null && (
-                                <span style={{
-                                    fontSize: "10px",
-                                    fontWeight: 700,
-                                    color: active ? (f.color ?? "var(--text-secondary)") : (f.color ?? "var(--text-interactive-muted)"),
-                                }}>
-                                    {f.count}
-                                </span>
-                            )}
-                        </button>
-                    );
-                })}
+                <UnderlinedFilterTabs
+                    ariaLabel="Ürün sinyal filtresi"
+                    items={[
+                        { key: "tumu", label: "Tümü", count: mockProducts.length },
+                        { key: "riskli", label: "Riskli", count: riskLoading ? null : riskliCount },
+                        { key: "uyarili", label: "Uyarı var", count: uyariliCount },
+                        { key: "oneri", label: "Öneri bekliyor", count: oneriCount },
+                    ]}
+                    activeKey={alertFilter}
+                    onChange={setAlertFilter}
+                />
             </div>
 
             {/* Bulk action bar */}
