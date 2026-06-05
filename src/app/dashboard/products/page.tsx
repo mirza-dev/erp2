@@ -574,8 +574,8 @@ export default function ProductsPage() {
                                 padding: "8px 12px",
                                 fontSize: "12px",
                                 cursor: "pointer",
-                                color: selectedCategories.length === 0 ? "var(--accent-text)" : "var(--text-secondary)",
-                                fontWeight: selectedCategories.length === 0 ? 600 : 400,
+                                color: selectedCategories.length === 0 ? "var(--accent-text)" : "var(--text-interactive-muted)",
+                                fontWeight: selectedCategories.length === 0 ? 600 : "var(--font-ui-weight)",
                                 borderBottom: "var(--line-width) solid var(--border-tertiary)",
                                 display: "flex",
                                 justifyContent: "space-between",
@@ -588,7 +588,7 @@ export default function ProductsPage() {
                             <span style={{
                                 fontSize: "10px", padding: "1px 5px", borderRadius: "10px",
                                 background: selectedCategories.length === 0 ? "var(--accent)" : "var(--bg-tertiary)",
-                                color: selectedCategories.length === 0 ? "#fff" : "var(--text-tertiary)",
+                                color: selectedCategories.length === 0 ? "#fff" : "var(--text-interactive-muted)",
                                 fontWeight: 600, minWidth: "16px", textAlign: "center",
                             }}>
                                 {categoryCounts["Tümü"] ?? 0}
@@ -664,8 +664,8 @@ export default function ProductsPage() {
                                 border: `var(--line-width) solid ${active ? "var(--accent-border)" : "var(--border-secondary)"}`,
                                 borderRadius: "6px",
                                 background: active ? "var(--accent-bg)" : "transparent",
-                                color: active ? "var(--accent-text)" : "var(--text-secondary)",
-                                cursor: "pointer", fontWeight: active ? 600 : 400,
+                                color: active ? "var(--accent-text)" : "var(--text-interactive-muted)",
+                                cursor: "pointer", fontWeight: active ? 600 : "var(--font-ui-weight)",
                             }}
                         >
                             <div style={{
@@ -709,9 +709,9 @@ export default function ProductsPage() {
                                 border: `var(--line-width) solid ${active ? "var(--border-primary)" : "var(--border-tertiary)"}`,
                                 borderRadius: "5px",
                                 background: active ? "var(--bg-secondary)" : "transparent",
-                                color: active ? "var(--text-primary)" : "var(--text-tertiary)",
+                                color: active ? "var(--text-primary)" : "var(--text-interactive-muted)",
                                 cursor: "pointer",
-                                fontWeight: active ? 600 : 400,
+                                fontWeight: active ? 600 : "var(--font-ui-weight)",
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "4px",
@@ -720,7 +720,7 @@ export default function ProductsPage() {
                                 if (!active) e.currentTarget.style.color = "var(--text-secondary)";
                             }}
                             onMouseLeave={e => {
-                                if (!active) e.currentTarget.style.color = "var(--text-tertiary)";
+                                if (!active) e.currentTarget.style.color = "var(--text-interactive-muted)";
                             }}
                         >
                             {f.label}
@@ -728,7 +728,7 @@ export default function ProductsPage() {
                                 <span style={{
                                     fontSize: "10px",
                                     fontWeight: 700,
-                                    color: active ? (f.color ?? "var(--text-secondary)") : (f.color ?? "var(--text-tertiary)"),
+                                    color: active ? (f.color ?? "var(--text-secondary)") : (f.color ?? "var(--text-interactive-muted)"),
                                 }}>
                                     {f.count}
                                 </span>

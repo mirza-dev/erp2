@@ -45,6 +45,7 @@
   --text-primary: #e6edf3;
   --text-secondary: #aeb7c4;
   --text-tertiary: #7a8493;
+  --text-interactive-muted: #96a2b2;
 
   /* Borders — belirgin çizgiler */
   --border-primary: #505a66;
@@ -126,6 +127,7 @@
   --text-primary: #1f2937;
   --text-secondary: #4b5a68;
   --text-tertiary: #6f7b88;
+  --text-interactive-muted: #5f6d7c;
 
   /* Borders — soğuk gri (primary en belirgin → tertiary en soluk) */
   --border-primary: #b8c8d8;

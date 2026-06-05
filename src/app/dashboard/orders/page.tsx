@@ -276,7 +276,7 @@ function OrdersList() {
                             onClick={() => setActiveTab(tab.id)}
                             style={{
                                 fontSize: "12px",
-                                fontWeight: activeTab === tab.id ? 600 : 400,
+                                fontWeight: activeTab === tab.id ? 600 : "var(--font-ui-weight)",
                                 padding: "8px 14px",
                                 border: "none",
                                 borderBottom: activeTab === tab.id
@@ -285,7 +285,7 @@ function OrdersList() {
                                 background: "transparent",
                                 color: activeTab === tab.id
                                     ? "var(--accent-text)"
-                                    : "var(--text-tertiary)",
+                                    : "var(--text-interactive-muted)",
                                 cursor: "pointer",
                                 marginBottom: "-0.5px",
                             }}

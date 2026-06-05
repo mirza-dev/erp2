@@ -124,8 +124,9 @@ const tabBtnStyle = (active: boolean): React.CSSProperties => ({
     border: "var(--line-width) solid " + (active ? "var(--accent-border)" : "var(--border-secondary)"),
     borderRadius: "5px",
     background: active ? "var(--accent-bg)" : "transparent",
-    color: active ? "var(--accent-text)" : "var(--text-secondary)",
+    color: active ? "var(--accent-text)" : "var(--text-interactive-muted)",
     cursor: "pointer", whiteSpace: "nowrap",
+    fontWeight: active ? 600 : "var(--font-ui-weight)",
 });
 
 export function validateFileSize(size: number): { ok: boolean; sizeMb?: string } {
