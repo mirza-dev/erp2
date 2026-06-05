@@ -48,15 +48,16 @@ const thStyle: React.CSSProperties = {
     textAlign: "left",
     padding: "10px 14px",
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: "var(--font-table-heading-weight)",
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--surface-border)",
+    borderBottom: "var(--line-width) solid var(--surface-border)",
 };
 
 const tdStyle: React.CSSProperties = {
     padding: "10px 14px",
     fontSize: "13px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    fontWeight: "var(--font-table-cell-weight)",
+    borderBottom: "var(--line-width) solid var(--border-tertiary)",
     color: "var(--text-primary)",
     lineHeight: 1.4,
 };
@@ -268,7 +269,7 @@ function OrdersList() {
             {/* Toolbar */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                 {/* Tabs — bottom border style */}
-                <div style={{ display: "flex", gap: "0px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                <div style={{ display: "flex", gap: "0px", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
                     {filterTabs.map((tab) => (
                         <button
                             key={tab.id}
@@ -304,7 +305,7 @@ function OrdersList() {
                         style={{
                             fontSize: "12px",
                             padding: "6px 12px",
-                            border: "0.5px solid var(--border-secondary)",
+                            border: "var(--line-width) solid var(--border-secondary)",
                             borderRadius: "6px",
                             background: "var(--input-bg)",
                             color: "var(--text-primary)",
@@ -319,7 +320,7 @@ function OrdersList() {
                         style={{
                             fontSize: "12px",
                             padding: "5px 8px",
-                            border: `0.5px solid ${dateFrom ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            border: `var(--line-width) solid ${dateFrom ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "6px",
                             background: "var(--input-bg)",
                             color: dateFrom ? "var(--text-primary)" : "var(--text-tertiary)",
@@ -335,7 +336,7 @@ function OrdersList() {
                         style={{
                             fontSize: "12px",
                             padding: "5px 8px",
-                            border: `0.5px solid ${dateTo ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            border: `var(--line-width) solid ${dateTo ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "6px",
                             background: "var(--input-bg)",
                             color: dateTo ? "var(--text-primary)" : "var(--text-tertiary)",
@@ -348,7 +349,7 @@ function OrdersList() {
                         style={{
                             fontSize: "12px",
                             padding: "5px 8px",
-                            border: `0.5px solid ${currencyFilter ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            border: `var(--line-width) solid ${currencyFilter ? "var(--accent-border)" : "var(--border-secondary)"}`,
                             borderRadius: "6px",
                             background: "var(--input-bg)",
                             color: currencyFilter ? "var(--text-primary)" : "var(--text-tertiary)",
@@ -371,7 +372,7 @@ function OrdersList() {
                             style={{
                                 fontSize: "11px",
                                 padding: "5px 10px",
-                                border: "0.5px solid var(--border-secondary)",
+                                border: "var(--line-width) solid var(--border-secondary)",
                                 borderRadius: "6px",
                                 background: "transparent",
                                 color: "var(--text-secondary)",
@@ -391,7 +392,7 @@ function OrdersList() {
                     display: "flex", alignItems: "center", gap: "10px",
                     padding: "10px 14px",
                     background: "var(--accent-bg)",
-                    border: "0.5px solid var(--accent-border)",
+                    border: "var(--line-width) solid var(--accent-border)",
                     borderRadius: "6px",
                     fontSize: "13px",
                 }}>
@@ -403,7 +404,7 @@ function OrdersList() {
                         disabled={bulkDeleting}
                         style={{
                             fontSize: "12px", padding: "4px 12px",
-                            border: "0.5px solid var(--danger-border)",
+                            border: "var(--line-width) solid var(--danger-border)",
                             borderRadius: "5px", background: "var(--danger-bg)",
                             color: "var(--danger-text)", cursor: bulkDeleting ? "not-allowed" : "pointer",
                             opacity: bulkDeleting ? 0.6 : 1,
@@ -427,7 +428,7 @@ function OrdersList() {
             <div
                 style={{
                     background: "var(--surface-raised)",
-                    border: "0.5px solid var(--surface-border)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "6px",
                     overflowX: "auto",
                     boxShadow: "var(--surface-shadow-sm)",
@@ -526,7 +527,7 @@ function OrdersList() {
                                                         padding: "1px 5px", borderRadius: "3px",
                                                         background: expired ? "var(--danger-bg)" : urgent ? "var(--warning-bg)" : "var(--bg-tertiary)",
                                                         color: expired ? "var(--danger-text)" : urgent ? "var(--warning-text)" : "var(--text-secondary)",
-                                                        border: `0.5px solid ${expired ? "var(--danger-border)" : urgent ? "var(--warning-border)" : "var(--border-secondary)"}`,
+                                                        border: `var(--line-width) solid ${expired ? "var(--danger-border)" : urgent ? "var(--warning-border)" : "var(--border-secondary)"}`,
                                                         marginLeft: "4px",
                                                     }}>
                                                         {expired ? "Süresi Doldu" : `${daysLeft} gün kaldı`}
@@ -564,7 +565,7 @@ function OrdersList() {
                                                         disabled={deletingId === order.id}
                                                         style={{
                                                             fontSize: "11px", color: "var(--danger-text)",
-                                                            background: "var(--danger-bg)", border: "0.5px solid var(--danger-border)",
+                                                            background: "var(--danger-bg)", border: "var(--line-width) solid var(--danger-border)",
                                                             borderRadius: "4px", padding: "2px 7px", cursor: "pointer",
                                                             whiteSpace: "nowrap",
                                                         }}
@@ -626,7 +627,7 @@ function OrdersList() {
                     <div style={{
                         position: "fixed", top: "50%", left: "50%",
                         transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)",
+                        background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
                         borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
                         boxShadow: "var(--surface-shadow)",
                     }}>
@@ -642,7 +643,7 @@ function OrdersList() {
                                 disabled={bulkDeleting}
                                 style={{
                                     fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
+                                    border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px",
                                     background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
                                 }}
                             >
@@ -653,7 +654,7 @@ function OrdersList() {
                                 disabled={bulkDeleting}
                                 style={{
                                     fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
+                                    border: "var(--line-width) solid var(--danger-border)", borderRadius: "6px",
                                     background: "var(--danger-bg)", color: "var(--danger-text)",
                                     cursor: bulkDeleting ? "not-allowed" : "pointer", opacity: bulkDeleting ? 0.6 : 1,
                                 }}

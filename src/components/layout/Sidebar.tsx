@@ -165,7 +165,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
         <aside
             style={{
                 background: "var(--shell-bg)",
-                borderRight: "0.5px solid var(--shell-border)",
+                borderRight: "var(--line-width) solid var(--shell-border)",
                 boxShadow: "var(--shell-shadow)",
                 padding: "10px 8px 12px",
                 display: "flex",
@@ -186,7 +186,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                                 color: "var(--text-tertiary)",
                                 letterSpacing: 0,
                                 textTransform: "uppercase",
-                                fontWeight: 650,
+                                fontWeight: "var(--font-heading-weight)",
                             }}
                         >
                             {group.label}
@@ -208,7 +208,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                                     minHeight: "36px",
                                     padding: "0 9px 0 10px",
                                     fontSize: "13px",
-                                    fontWeight: active ? 650 : 500,
+                                    fontWeight: active ? "var(--font-heading-weight)" : "var(--font-ui-weight)",
                                     color: active ? "var(--accent-text)" : "var(--text-secondary)",
                                     background: active ? "var(--nav-active-bg)" : "transparent",
                                     textDecoration: "none",
@@ -216,7 +216,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                                     transition: "background 0.14s ease, color 0.14s ease, border-color 0.14s ease",
                                     borderRadius: "7px",
                                     position: "relative",
-                                    border: `0.5px solid ${active ? "var(--nav-active-border)" : "transparent"}`,
+                                    border: `var(--line-width) solid ${active ? "var(--nav-active-border)" : "transparent"}`,
                                     boxSizing: "border-box",
                                 }}
                                 onMouseEnter={(e) => {
@@ -282,7 +282,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                                             fontWeight: 700,
                                             background: badge.background,
                                             color: badge.color,
-                                            border: `0.5px solid ${badge.border}`,
+                                            border: `var(--line-width) solid ${badge.border}`,
                                             padding: "0 6px",
                                             borderRadius: "999px",
                                             boxSizing: "border-box",
@@ -302,7 +302,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                 style={{
                     marginTop: "auto",
                     padding: "12px 16px",
-                    borderTop: "0.5px solid var(--shell-border)",
+                    borderTop: "var(--line-width) solid var(--shell-border)",
                 }}
             >
                 {isDemo ? (
@@ -315,7 +315,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                             fontSize: "12px",
                             color: "var(--accent-text)",
                             background: "var(--accent-bg)",
-                            border: "0.5px solid var(--accent-border)",
+                            border: "var(--line-width) solid var(--accent-border)",
                             borderRadius: "6px",
                             cursor: "pointer",
                             display: "flex",
@@ -338,7 +338,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                             fontSize: "12px",
                             color: "var(--text-tertiary)",
                             background: "transparent",
-                            border: "0.5px solid var(--border-tertiary)",
+                            border: "var(--line-width) solid var(--border-tertiary)",
                             borderRadius: "6px",
                             cursor: "pointer",
                             display: "flex",

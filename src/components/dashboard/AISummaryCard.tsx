@@ -366,7 +366,7 @@ export default function AISummaryCard() {
                     <div style={{
                         display: "flex", gap: "12px", flexWrap: "wrap",
                         marginTop: "-4px", paddingTop: "10px",
-                        borderTop: "0.5px solid var(--border-tertiary)",
+                        borderTop: "var(--line-width) solid var(--border-tertiary)",
                         marginBottom: "14px",
                     }}>
                         {[

@@ -25,15 +25,16 @@ const thStyle: React.CSSProperties = {
     textAlign: "left",
     padding: "10px 14px",
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: "var(--font-table-heading-weight)",
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--surface-border)",
+    borderBottom: "var(--line-width) solid var(--surface-border)",
 };
 
 const tdStyle: React.CSSProperties = {
     padding: "10px 14px",
     fontSize: "13px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    fontWeight: "var(--font-table-cell-weight)",
+    borderBottom: "var(--line-width) solid var(--border-tertiary)",
     color: "var(--text-primary)",
     lineHeight: 1.4,
 };
@@ -93,7 +94,7 @@ const StockDataGrid = memo(function StockDataGrid({
         <div
             style={{
                 background: "var(--surface-raised)",
-                border: "0.5px solid var(--surface-border)",
+                border: "var(--line-width) solid var(--surface-border)",
                 borderRadius: "6px",
                 overflow: "hidden",
                 boxShadow: "var(--surface-shadow-sm)",
@@ -206,7 +207,7 @@ const StockDataGrid = memo(function StockDataGrid({
                 <div
                     style={{
                         padding: "10px 14px",
-                        borderTop: "0.5px solid var(--border-tertiary)",
+                        borderTop: "var(--line-width) solid var(--border-tertiary)",
                         background: "var(--table-header-bg)",
                         textAlign: "right",
                     }}

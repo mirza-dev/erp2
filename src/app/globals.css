@@ -2,7 +2,7 @@
 
 /* ============================================
    AI-ERP KokpitERP — Minimal Enterprise Design
-   Light, clean, 0.5px borders, small fonts
+   Compact ERP surfaces, readable typography, crisp borders
    ============================================ */
 
 :root {
@@ -14,6 +14,15 @@
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
+
+  /* Readability — shared across themes */
+  --line-width: 1px;
+  --font-body-weight: 450;
+  --font-ui-weight: 500;
+  --font-label-weight: 600;
+  --font-heading-weight: 650;
+  --font-table-cell-weight: 500;
+  --font-table-heading-weight: 650;
 }
 
 /* ============================================
@@ -34,13 +43,13 @@
 
   /* Text — parlak, rahat okunur */
   --text-primary: #e6edf3;
-  --text-secondary: #9ca3b0;
-  --text-tertiary: #636d7c;
+  --text-secondary: #aeb7c4;
+  --text-tertiary: #7a8493;
 
   /* Borders — belirgin çizgiler */
-  --border-primary: #444c56;
-  --border-secondary: #373e47;
-  --border-tertiary: #2d333b;
+  --border-primary: #505a66;
+  --border-secondary: #424b57;
+  --border-tertiary: #343d49;
 
   /* Accent — elektrik mavisi, patlayan */
   --accent: #58a6ff;
@@ -82,21 +91,21 @@
   --app-bg: #131518;
   --shell-bg: #1a1d23;
   --shell-bg-subtle: #131518;
-  --shell-border: #2d333b;
+  --shell-border: #39424d;
   --shell-shadow: none;
   --surface: #1a1d23;
   --surface-subtle: #131518;
   --surface-raised: #1a1d23;
-  --surface-border: #373e47;
+  --surface-border: #444d58;
   --surface-shadow: none;
   --surface-shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
   --table-header-bg: #131518;
   --table-row-hover: #22252c;
   --input-bg: #22252c;
-  --input-border: #373e47;
+  --input-border: #444d58;
   --nav-hover-bg: #131518;
   --nav-active-bg: rgba(56, 139, 253, 0.15);
-  --nav-active-border: rgba(56, 139, 253, 0.22);
+  --nav-active-border: rgba(56, 139, 253, 0.32);
   --button-primary-bg: linear-gradient(180deg, #67b3ff 0%, #4a98f5 100%);
   --button-primary-bg-hover: linear-gradient(180deg, #79c0ff 0%, #58a6ff 100%);
   --button-primary-border: rgba(121, 192, 255, 0.55);
@@ -115,13 +124,13 @@
 
   /* Text — slate-siyah */
   --text-primary: #1f2937;
-  --text-secondary: #536171;
-  --text-tertiary: #7b8794;
+  --text-secondary: #4b5a68;
+  --text-tertiary: #6f7b88;
 
   /* Borders — soğuk gri (primary en belirgin → tertiary en soluk) */
-  --border-primary: #c5d2df;
-  --border-secondary: #d5e0ea;
-  --border-tertiary: #e2eaf2;
+  --border-primary: #b8c8d8;
+  --border-secondary: #c7d5e3;
+  --border-tertiary: #d4e0eb;
 
   /* Accent — steel blue */
   --accent: #1f6fd1;
@@ -163,18 +172,18 @@
   --app-bg: #eef3f8;
   --shell-bg: #f8fbff;
   --shell-bg-subtle: #edf3f8;
-  --shell-border: #d9e4ef;
+  --shell-border: #cbd9e7;
   --shell-shadow: 0 1px 0 rgba(255,255,255,0.78), 0 10px 28px -26px rgba(15,23,42,0.35);
   --surface: #ffffff;
   --surface-subtle: #f8fafc;
   --surface-raised: #ffffff;
-  --surface-border: #dce6ef;
+  --surface-border: #ccd9e6;
   --surface-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 14px 34px -30px rgba(15,23,42,0.55);
   --surface-shadow-sm: 0 1px 2px rgba(15,23,42,0.04), 0 8px 22px -20px rgba(15,23,42,0.45);
   --table-header-bg: #f4f7fb;
   --table-row-hover: #f3f8fd;
   --input-bg: #fbfdff;
-  --input-border: #cbd8e6;
+  --input-border: #bdcddd;
   --nav-hover-bg: #edf5ff;
   --nav-active-bg: rgba(31, 111, 209, 0.11);
   --nav-active-border: rgba(31, 111, 209, 0.28);
@@ -235,6 +244,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   font-size: 14px;
+  font-weight: var(--font-body-weight);
   line-height: 1.5;
   letter-spacing: 0.01em;
 }
@@ -318,7 +328,7 @@ body {
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: var(--font-label-weight);
   line-height: 1.6;
   white-space: nowrap;
   letter-spacing: 0.01em;
@@ -336,7 +346,7 @@ body {
    ============================================ */
 
 .border-thin {
-  border-width: 0.5px;
+  border-width: var(--line-width);
 }
 
 /* ============================================
@@ -403,7 +413,7 @@ body {
   height: var(--topbar-height);
   padding: 0 18px 0 20px;
   background: var(--shell-bg);
-  border-bottom: 0.5px solid var(--shell-border);
+  border-bottom: var(--line-width) solid var(--shell-border);
   box-shadow: var(--shell-shadow);
   box-sizing: border-box;
 }
@@ -439,7 +449,7 @@ body {
   gap: 10px;
   height: 32px;
   padding: 0 12px;
-  border: 0.5px solid var(--shell-border);
+  border: var(--line-width) solid var(--shell-border);
   border-radius: 8px;
   background: var(--surface-subtle);
   box-shadow: var(--surface-shadow-sm);
@@ -451,7 +461,7 @@ body {
   min-width: 0;
   color: var(--text-secondary);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: var(--font-label-weight);
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
@@ -530,14 +540,14 @@ body {
 
 .settings-page-header {
   padding: 20px 24px 16px;
-  border-bottom: 0.5px solid var(--border-tertiary);
+  border-bottom: var(--line-width) solid var(--border-tertiary);
 }
 
 .settings-page-header h1 {
   margin: 0;
   color: var(--text-primary);
   font-size: 16px;
-  font-weight: 650;
+  font-weight: var(--font-heading-weight);
   line-height: 1.2;
 }
 
@@ -554,7 +564,7 @@ body {
 }
 
 .settings-tab-nav {
-  border-right: 0.5px solid var(--shell-border);
+  border-right: var(--line-width) solid var(--shell-border);
   padding: 14px 10px;
   background: var(--shell-bg);
 }
@@ -567,7 +577,7 @@ body {
   padding: 8px 10px 6px;
   color: var(--text-tertiary);
   font-size: 10px;
-  font-weight: 650;
+  font-weight: var(--font-heading-weight);
   line-height: 1.2;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -582,13 +592,13 @@ body {
   width: 100%;
   min-height: 38px;
   padding: 0 10px 0 12px;
-  border: 0.5px solid transparent;
+  border: var(--line-width) solid transparent;
   border-radius: 7px;
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
   font-size: 13px;
-  font-weight: 550;
+  font-weight: var(--font-ui-weight);
   line-height: 1.2;
   text-align: left;
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
@@ -616,7 +626,7 @@ body {
   border-color: var(--nav-active-border);
   background: var(--nav-active-bg);
   color: var(--accent-text);
-  font-weight: 650;
+  font-weight: var(--font-heading-weight);
 }
 
 .settings-tab-button.is-active::before {
@@ -660,14 +670,14 @@ body {
   gap: 18px;
   margin-bottom: 22px;
   padding-bottom: 16px;
-  border-bottom: 0.5px solid var(--border-tertiary);
+  border-bottom: var(--line-width) solid var(--border-tertiary);
 }
 
 .settings-content-eyebrow {
   margin-bottom: 5px;
   color: var(--text-tertiary);
   font-size: 10px;
-  font-weight: 650;
+  font-weight: var(--font-heading-weight);
   letter-spacing: 0;
   line-height: 1.2;
   text-transform: uppercase;
@@ -677,7 +687,7 @@ body {
   margin: 0;
   color: var(--text-primary);
   font-size: 18px;
-  font-weight: 650;
+  font-weight: var(--font-heading-weight);
   line-height: 1.25;
 }
 
@@ -695,12 +705,12 @@ body {
   gap: 5px;
   min-height: 24px;
   padding: 0 9px;
-  border: 0.5px solid var(--warning-border);
+  border: var(--line-width) solid var(--warning-border);
   border-radius: 999px;
   background: var(--warning-bg);
   color: var(--warning-text);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: var(--font-heading-weight);
   line-height: 1;
 }
 
@@ -728,7 +738,7 @@ body {
     overflow-x: auto;
     padding: 10px 12px;
     border-right: none;
-    border-bottom: 0.5px solid var(--shell-border);
+    border-bottom: var(--line-width) solid var(--shell-border);
     background: var(--shell-bg);
     scroll-padding-inline: 12px;
     scrollbar-width: none;

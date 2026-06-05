@@ -48,7 +48,7 @@ const StatsCards = memo(function StatsCards() {
                         key={i}
                         style={{
                             background: "var(--surface-raised)",
-                            border: "0.5px solid var(--surface-border)",
+                            border: "var(--line-width) solid var(--surface-border)",
                             borderRadius: "6px",
                             padding: "14px 16px",
                             boxShadow: "var(--surface-shadow-sm)",
@@ -141,7 +141,7 @@ const StatsCards = memo(function StatsCards() {
                     onClick={() => router.push(m.href)}
                     style={{
                         background: "var(--surface-raised)",
-                        border: "0.5px solid var(--surface-border)",
+                        border: "var(--line-width) solid var(--surface-border)",
                         borderRadius: "6px",
                         padding: "14px 16px",
                         cursor: "pointer",

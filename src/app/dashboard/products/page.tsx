@@ -41,16 +41,17 @@ const thStyle: React.CSSProperties = {
     textAlign: "left",
     padding: "10px 14px",
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: "var(--font-table-heading-weight)",
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--surface-border)",
+    borderBottom: "var(--line-width) solid var(--surface-border)",
     whiteSpace: "nowrap",
 };
 
 const tdStyle: React.CSSProperties = {
     padding: "10px 14px",
     fontSize: "13px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    fontWeight: "var(--font-table-cell-weight)",
+    borderBottom: "var(--line-width) solid var(--border-tertiary)",
     color: "var(--text-primary)",
     lineHeight: 1.4,
     whiteSpace: "nowrap",
@@ -59,10 +60,11 @@ const tdStyle: React.CSSProperties = {
 const modalInputStyle: React.CSSProperties = {
     fontSize: "13px",
     padding: "6px 10px",
-    border: "0.5px solid var(--border-secondary)",
+    border: "var(--line-width) solid var(--border-secondary)",
     borderRadius: "6px",
     background: "var(--input-bg)",
     color: "var(--text-primary)",
+    fontWeight: "var(--font-ui-weight)",
     width: "100%",
 };
 
@@ -419,7 +421,7 @@ export default function ProductsPage() {
                 <div style={{
                     padding: "10px 14px",
                     background: "var(--danger-bg)",
-                    border: "0.5px solid var(--danger-border)",
+                    border: "var(--line-width) solid var(--danger-border)",
                     borderRadius: "6px",
                     fontSize: "12px",
                     color: "var(--danger-text)",
@@ -476,7 +478,7 @@ export default function ProductsPage() {
                         style={{
                             fontSize: "12px",
                             padding: "6px 12px",
-                            border: "0.5px solid var(--border-secondary)",
+                            border: "var(--line-width) solid var(--border-secondary)",
                             borderRadius: "6px",
                             background: "var(--input-bg)",
                             color: "var(--text-primary)",
@@ -521,7 +523,7 @@ export default function ProductsPage() {
                     style={{
                         fontSize: "12px",
                         padding: "5px 12px",
-                        border: `0.5px solid ${categoryIsActive ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                        border: `var(--line-width) solid ${categoryIsActive ? "var(--accent-border)" : "var(--border-secondary)"}`,
                         borderRadius: "6px",
                         background: categoryIsActive ? "var(--accent-bg)" : "transparent",
                         color: categoryIsActive ? "var(--accent-text)" : "var(--text-secondary)",
@@ -557,7 +559,7 @@ export default function ProductsPage() {
                         left: 0,
                         minWidth: "220px",
                         background: "var(--surface-raised)",
-                        border: "0.5px solid var(--surface-border)",
+                        border: "var(--line-width) solid var(--surface-border)",
                         borderRadius: "6px",
                         boxShadow: "var(--surface-shadow)",
                         zIndex: 50,
@@ -574,7 +576,7 @@ export default function ProductsPage() {
                                 cursor: "pointer",
                                 color: selectedCategories.length === 0 ? "var(--accent-text)" : "var(--text-secondary)",
                                 fontWeight: selectedCategories.length === 0 ? 600 : 400,
-                                borderBottom: "0.5px solid var(--border-tertiary)",
+                                borderBottom: "var(--line-width) solid var(--border-tertiary)",
                                 display: "flex",
                                 justifyContent: "space-between",
                                 alignItems: "center",
@@ -616,7 +618,7 @@ export default function ProductsPage() {
                                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                         <div style={{
                                             width: "14px", height: "14px", borderRadius: "3px",
-                                            border: `0.5px solid ${checked ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                            border: `var(--line-width) solid ${checked ? "var(--accent-border)" : "var(--border-secondary)"}`,
                                             background: checked ? "var(--accent-bg)" : "transparent",
                                             display: "flex", alignItems: "center", justifyContent: "center",
                                             flexShrink: 0,
@@ -659,7 +661,7 @@ export default function ProductsPage() {
                             style={{
                                 display: "flex", alignItems: "center", gap: "6px",
                                 fontSize: "12px", padding: "5px 10px",
-                                border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                border: `var(--line-width) solid ${active ? "var(--accent-border)" : "var(--border-secondary)"}`,
                                 borderRadius: "6px",
                                 background: active ? "var(--accent-bg)" : "transparent",
                                 color: active ? "var(--accent-text)" : "var(--text-secondary)",
@@ -668,7 +670,7 @@ export default function ProductsPage() {
                         >
                             <div style={{
                                 width: "13px", height: "13px", borderRadius: "3px",
-                                border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                                border: `var(--line-width) solid ${active ? "var(--accent-border)" : "var(--border-secondary)"}`,
                                 background: active ? "var(--accent-bg)" : "transparent",
                                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                             }}>
@@ -704,7 +706,7 @@ export default function ProductsPage() {
                             style={{
                                 fontSize: "11px",
                                 padding: "3px 10px",
-                                border: `0.5px solid ${active ? "var(--border-primary)" : "var(--border-tertiary)"}`,
+                                border: `var(--line-width) solid ${active ? "var(--border-primary)" : "var(--border-tertiary)"}`,
                                 borderRadius: "5px",
                                 background: active ? "var(--bg-secondary)" : "transparent",
                                 color: active ? "var(--text-primary)" : "var(--text-tertiary)",
@@ -742,7 +744,7 @@ export default function ProductsPage() {
                     display: "flex", alignItems: "center", gap: "10px",
                     padding: "10px 14px",
                     background: "var(--accent-bg)",
-                    border: "0.5px solid var(--accent-border)",
+                    border: "var(--line-width) solid var(--accent-border)",
                     borderRadius: "6px",
                     fontSize: "13px",
                 }}>
@@ -771,7 +773,7 @@ export default function ProductsPage() {
             <div
                 style={{
                     background: "var(--surface-raised)",
-                    border: "0.5px solid var(--surface-border)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "6px",
                     overflow: "hidden",
                     overflowX: "auto",
@@ -951,7 +953,7 @@ export default function ProductsPage() {
                     <div style={{
                         position: "fixed", top: "50%", left: "50%",
                         transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)",
+                        background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
                         borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
                         boxShadow: "var(--surface-shadow)",
                     }}>
@@ -1000,7 +1002,7 @@ export default function ProductsPage() {
                         transform: "translate(-50%, -50%)",
                         zIndex: 101,
                         background: "var(--surface-raised)",
-                        border: "0.5px solid var(--surface-border)",
+                        border: "var(--line-width) solid var(--surface-border)",
                         borderRadius: "8px",
                         width: isMobile ? "calc(100vw - 32px)" : "480px",
                         maxHeight: "90vh",
@@ -1010,7 +1012,7 @@ export default function ProductsPage() {
                         {/* Modal header */}
                         <div style={{
                             padding: "14px 16px",
-                            borderBottom: "0.5px solid var(--border-tertiary)",
+                            borderBottom: "var(--line-width) solid var(--border-tertiary)",
                             display: "flex", justifyContent: "space-between", alignItems: "center",
                         }}>
                             <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
@@ -1148,7 +1150,7 @@ export default function ProductsPage() {
 
                             {/* Kimlik Bilgileri — opsiyonel */}
                             <div style={{
-                                borderTop: "0.5px solid var(--border-tertiary)",
+                                borderTop: "var(--line-width) solid var(--border-tertiary)",
                                 paddingTop: "12px",
                                 display: "flex",
                                 flexDirection: "column",
@@ -1236,7 +1238,7 @@ export default function ProductsPage() {
 
                             {/* Teknik Şablon + Dinamik Teknik Alanlar */}
                             <div style={{
-                                borderTop: "0.5px solid var(--border-tertiary)",
+                                borderTop: "var(--line-width) solid var(--border-tertiary)",
                                 paddingTop: "12px",
                                 display: "flex",
                                 flexDirection: "column",
@@ -1262,7 +1264,7 @@ export default function ProductsPage() {
                                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Alanlar yükleniyor…</div>
                                 )}
                                 {createTypeFieldsError && (
-                                    <div role="alert" style={{ fontSize: "12px", color: "var(--danger-text)", padding: "6px 8px", background: "var(--danger-bg)", borderRadius: "4px", border: "0.5px solid var(--danger-border)" }}>
+                                    <div role="alert" style={{ fontSize: "12px", color: "var(--danger-text)", padding: "6px 8px", background: "var(--danger-bg)", borderRadius: "4px", border: "var(--line-width) solid var(--danger-border)" }}>
                                         ⚠ {createTypeFieldsError}
                                     </div>
                                 )}
@@ -1280,7 +1282,7 @@ export default function ProductsPage() {
                                     />
                                 ))}
                                 {createMissingRequired.length > 0 && (
-                                    <div role="alert" style={{ fontSize: "12px", color: "var(--warning-text)", padding: "7px 9px", background: "var(--warning-bg)", borderRadius: "5px", border: "0.5px solid var(--warning-border)" }}>
+                                    <div role="alert" style={{ fontSize: "12px", color: "var(--warning-text)", padding: "7px 9px", background: "var(--warning-bg)", borderRadius: "5px", border: "var(--line-width) solid var(--warning-border)" }}>
                                         Zorunlu teknik bilgi eksik: {createMissingRequired.join(", ")}
                                     </div>
                                 )}
@@ -1290,7 +1292,7 @@ export default function ProductsPage() {
                         {/* Modal footer */}
                         <div style={{
                             padding: "12px 16px",
-                            borderTop: "0.5px solid var(--border-tertiary)",
+                            borderTop: "var(--line-width) solid var(--border-tertiary)",
                             display: "flex", justifyContent: "flex-end", gap: "8px",
                         }}>
                             <Button variant="secondary" onClick={() => setCreateOpen(false)} disabled={createSubmitting}>

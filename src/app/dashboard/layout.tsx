@@ -111,7 +111,7 @@ export default function DashboardLayout({
                                 width: "240px",
                                 zIndex: 100,
                                 background: "var(--shell-bg)",
-                                borderRight: "0.5px solid var(--shell-border)",
+                                borderRight: "var(--line-width) solid var(--shell-border)",
                                 boxShadow: "var(--shell-shadow)",
                                 overflowY: "auto",
                                 animation: "fade-in 0.15s ease-out",

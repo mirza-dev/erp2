@@ -36,7 +36,7 @@ const AIAlerts = memo(function AIAlerts() {
       <div
         style={{
           background: "var(--surface-raised)",
-          border: "0.5px solid var(--accent-border)",
+          border: "var(--line-width) solid var(--accent-border)",
           borderRadius: "6px",
           padding: "16px",
           boxShadow: "var(--surface-shadow-sm)",
@@ -51,7 +51,7 @@ const AIAlerts = memo(function AIAlerts() {
               paddingTop: "8px",
               paddingBottom: "8px",
               marginBottom: i < 2 ? "8px" : 0,
-              borderBottom: i < 2 ? "0.5px solid var(--border-tertiary)" : "none",
+              borderBottom: i < 2 ? "var(--line-width) solid var(--border-tertiary)" : "none",
             }}
           >
             <div style={{ height: "13px", width: "70%", background: "var(--bg-tertiary)", borderRadius: "4px", marginBottom: "6px", animation: "pulse 1.5s ease-in-out infinite" }} />
@@ -70,7 +70,7 @@ const AIAlerts = memo(function AIAlerts() {
     <div
       style={{
         background: "var(--surface-raised)",
-        border: "0.5px solid var(--accent-border)",
+        border: "var(--line-width) solid var(--accent-border)",
         borderRadius: "6px",
         padding: "16px",
         boxShadow: "var(--surface-shadow-sm)",
@@ -95,7 +95,7 @@ const AIAlerts = memo(function AIAlerts() {
             paddingTop: "8px",
             paddingBottom: "8px",
             marginBottom: i < top4.length - 1 ? "8px" : 0,
-            borderBottom: i < top4.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+            borderBottom: i < top4.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
@@ -149,7 +149,7 @@ const AIAlerts = memo(function AIAlerts() {
             textDecoration: "none",
             textAlign: "center",
             padding: "6px",
-            borderTop: "0.5px solid var(--border-tertiary)",
+            borderTop: "var(--line-width) solid var(--border-tertiary)",
           }}
         >
           Tümünü Gör → ({openAlerts.length} açık uyarı)

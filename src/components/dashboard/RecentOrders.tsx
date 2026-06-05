@@ -30,7 +30,7 @@ const RecentOrders = memo(function RecentOrders() {
             <div
                 style={{
                     background: "var(--surface-raised)",
-                    border: "0.5px solid var(--surface-border)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "6px",
                     padding: "16px",
                     boxShadow: "var(--surface-shadow-sm)",
@@ -47,7 +47,7 @@ const RecentOrders = memo(function RecentOrders() {
                             alignItems: "center",
                             justifyContent: "space-between",
                             padding: "8px 0",
-                            borderBottom: "0.5px solid var(--border-tertiary)",
+                            borderBottom: "var(--line-width) solid var(--border-tertiary)",
                         }}
                     >
                         <div>
@@ -68,7 +68,7 @@ const RecentOrders = memo(function RecentOrders() {
         <div
             style={{
                 background: "var(--surface-raised)",
-                border: "0.5px solid var(--surface-border)",
+                border: "var(--line-width) solid var(--surface-border)",
                 borderRadius: "6px",
                 padding: "16px",
                 boxShadow: "var(--surface-shadow-sm)",
@@ -98,7 +98,7 @@ const RecentOrders = memo(function RecentOrders() {
                             alignItems: "center",
                             justifyContent: "space-between",
                             padding: "8px 0",
-                            borderBottom: "0.5px solid var(--border-tertiary)",
+                            borderBottom: "var(--line-width) solid var(--border-tertiary)",
                         }}
                     >
                         <div>

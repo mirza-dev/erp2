@@ -24,6 +24,9 @@ const TOPBAR_SRC = read("src/components/layout/Topbar.tsx");
 const SIDEBAR_SRC = read("src/components/layout/Sidebar.tsx");
 const BUTTON_SRC = read("src/components/ui/Button.tsx");
 const DASH_LAYOUT_SRC = read("src/app/dashboard/layout.tsx");
+const PRODUCTS_SRC = read("src/app/dashboard/products/page.tsx");
+const ORDERS_SRC = read("src/app/dashboard/orders/page.tsx");
+const STOCK_GRID_SRC = read("src/components/dashboard/StockDataGrid.tsx");
 const QUOTE_DOC_SRC = read("src/app/dashboard/quotes/components/QuoteDocument.tsx");
 const PO_DOC_SRC = read("src/components/purchase/PurchaseOrderDocument.tsx");
 
@@ -50,16 +53,30 @@ describe("Tema — palet blokları (globals.css)", () => {
         expect(GLOBALS_SRC).toMatch(/:root\[data-theme="light"\]/);
     });
 
-    it("koyu palet mevcut değerleri birebir korur (sıfır değişiklik)", () => {
+    it("koyu palet mevcut ana karakterini korur", () => {
         expect(GLOBALS_SRC).toMatch(/--bg-primary:\s*#1a1d23/);
         expect(GLOBALS_SRC).toMatch(/--text-primary:\s*#e6edf3/);
         expect(GLOBALS_SRC).toMatch(/--accent:\s*#58a6ff/);
+    });
+
+    it("koyu tema okunurluk için destek metin ve sınır kontrastını artırır", () => {
+        expect(GLOBALS_SRC).toMatch(/--text-secondary:\s*#aeb7c4/);
+        expect(GLOBALS_SRC).toMatch(/--text-tertiary:\s*#7a8493/);
+        expect(GLOBALS_SRC).toMatch(/--surface-border:\s*#444d58/);
+        expect(GLOBALS_SRC).toMatch(/--shell-border:\s*#39424d/);
     });
 
     it("aydınlık palet premium cool slate anahtar değerlerini taşır", () => {
         expect(GLOBALS_SRC).toMatch(/--bg-secondary:\s*#eef3f8/);
         expect(GLOBALS_SRC).toMatch(/--text-primary:\s*#1f2937/);
         expect(GLOBALS_SRC).toMatch(/--accent:\s*#1f6fd1/);
+    });
+
+    it("aydınlık tema okunurluk için destek metin ve sınır kontrastını artırır", () => {
+        expect(GLOBALS_SRC).toMatch(/--text-secondary:\s*#4b5a68/);
+        expect(GLOBALS_SRC).toMatch(/--text-tertiary:\s*#6f7b88/);
+        expect(GLOBALS_SRC).toMatch(/--surface-border:\s*#ccd9e6/);
+        expect(GLOBALS_SRC).toMatch(/--input-border:\s*#bdcddd/);
     });
 
     it("color-scheme her iki temada native uyum için ayarlı", () => {
@@ -73,6 +90,15 @@ describe("Tema — palet blokları (globals.css)", () => {
         expect(GLOBALS_SRC).toMatch(/--success-bg-strong:/);
         expect(GLOBALS_SRC).toMatch(/--danger-bg-strong:/);
         expect(GLOBALS_SRC).toMatch(/--accent-glow:/);
+    });
+
+    it("iki tema için ortak okunurluk tokenları tanımlı", () => {
+        expect(GLOBALS_SRC).toMatch(/--line-width:\s*1px/);
+        expect(GLOBALS_SRC).toMatch(/--font-body-weight:\s*450/);
+        expect(GLOBALS_SRC).toMatch(/--font-ui-weight:\s*500/);
+        expect(GLOBALS_SRC).toMatch(/--font-table-cell-weight:\s*500/);
+        expect(GLOBALS_SRC).toMatch(/--font-table-heading-weight:\s*650/);
+        expect(GLOBALS_SRC).toMatch(/font-weight:\s*var\(--font-body-weight\)/);
     });
 
     it("light tema premium shell/surface materyal tokenlarını taşır", () => {
@@ -159,6 +185,15 @@ describe("Tema — ThemeToggle UI", () => {
         expect(BUTTON_SRC).toContain("var(--button-primary-bg)");
         expect(BUTTON_SRC).toContain("var(--button-primary-shadow)");
         expect(GLOBALS_SRC).toMatch(/--button-primary-bg:/);
+    });
+
+    it("temsilci tablolar line-width ve tablo font ağırlığı tokenlarını kullanır", () => {
+        for (const src of [PRODUCTS_SRC, ORDERS_SRC, STOCK_GRID_SRC]) {
+            expect(src).toContain("var(--line-width) solid var(--surface-border)");
+            expect(src).toContain("var(--line-width) solid var(--border-tertiary)");
+            expect(src).toContain("var(--font-table-heading-weight)");
+            expect(src).toContain("var(--font-table-cell-weight)");
+        }
     });
 });
 

@@ -50,10 +50,11 @@ const settingsGroupLabels: Record<SettingsTabDefinition["scope"], string> = {
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
     padding: "7px 10px",
-    border: "0.5px solid var(--border-secondary)",
+    border: "var(--line-width) solid var(--border-secondary)",
     borderRadius: "6px",
     background: "var(--input-bg)",
     color: "var(--text-primary)",
+    fontWeight: "var(--font-ui-weight)",
     width: "100%",
     boxSizing: "border-box",
 };
@@ -61,6 +62,7 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
     fontSize: "12px",
     color: "var(--text-secondary)",
+    fontWeight: "var(--font-label-weight)",
     marginBottom: "4px",
     display: "block",
     textTransform: "uppercase",
@@ -293,7 +295,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                                 width: "120px",
                                 height: "56px",
                                 borderRadius: "5px",
-                                border: "0.5px solid rgba(255,255,255,0.16)",
+                                border: "var(--line-width) solid rgba(255,255,255,0.16)",
                                 background: "rgba(255,255,255,0.96)",
                                 display: "flex",
                                 alignItems: "center",
@@ -327,7 +329,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                                 width: "56px",
                                 height: "56px",
                                 borderRadius: "7px",
-                                border: "0.5px solid var(--border-secondary)",
+                                border: "var(--line-width) solid var(--border-secondary)",
                                 background: "var(--bg-secondary)",
                                 display: "flex",
                                 alignItems: "center",
@@ -593,7 +595,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                         style={{
                             width: "56px", height: "56px",
                             borderRadius: "50%", objectFit: "cover",
-                            border: "0.5px solid var(--border-secondary)",
+                            border: "var(--line-width) solid var(--border-secondary)",
                             flexShrink: 0,
                         }}
                     />
@@ -601,7 +603,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                     <div
                         style={{
                             width: "56px", height: "56px", borderRadius: "50%",
-                            background: "var(--accent-bg)", border: "0.5px solid var(--accent-border)",
+                            background: "var(--accent-bg)", border: "var(--line-width) solid var(--accent-border)",
                             display: "flex", alignItems: "center", justifyContent: "center",
                             fontSize: "20px", fontWeight: 600, color: "var(--accent-text)",
                             flexShrink: 0,
@@ -621,7 +623,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                             fontSize: "11px",
                             marginTop: "3px",
                             padding: "3px 8px",
-                            border: "0.5px solid var(--border-secondary)",
+                            border: "var(--line-width) solid var(--border-secondary)",
                             borderRadius: "4px",
                             background: "transparent",
                             color: "var(--text-tertiary)",
@@ -780,7 +782,7 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
             <div
                 style={{
                     background: "var(--surface-subtle)",
-                    border: "0.5px solid var(--surface-border)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "8px",
                     overflow: "hidden",
                     boxShadow: "var(--surface-shadow-sm)",
@@ -792,7 +794,7 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                         display: "grid",
                         gridTemplateColumns: "1fr 80px 80px",
                         padding: "8px 16px",
-                        borderBottom: "0.5px solid var(--border-tertiary)",
+                        borderBottom: "var(--line-width) solid var(--border-tertiary)",
                         fontSize: "10px",
                         color: "var(--text-tertiary)",
                         textTransform: "uppercase",
@@ -814,7 +816,7 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                                 display: "grid",
                                 gridTemplateColumns: "1fr 80px 80px",
                                 padding: "12px 16px",
-                                borderBottom: i < NOTIFICATION_TYPES.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+                                borderBottom: i < NOTIFICATION_TYPES.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
                                 alignItems: "center",
                             }}
                         >
@@ -950,7 +952,7 @@ function ApiTab() {
             <div
                 style={{
                     background: "var(--surface-subtle)",
-                    border: "0.5px solid var(--surface-border)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "8px",
                     overflow: "hidden",
                     boxShadow: "var(--surface-shadow-sm)",
@@ -966,7 +968,7 @@ function ApiTab() {
                                 alignItems: "center",
                                 justifyContent: "space-between",
                                 padding: "12px 16px",
-                                borderBottom: i < entries.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+                                borderBottom: i < entries.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
                             }}
                         >
                             <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>
@@ -1017,7 +1019,7 @@ function ApiTab() {
             <div
                 style={{
                     background: "var(--surface-subtle)",
-                    border: "0.5px solid var(--surface-border)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "8px",
                     padding: "14px 16px",
                     boxShadow: "var(--surface-shadow-sm)",
@@ -1050,7 +1052,7 @@ function ApiTab() {
                             style={{
                                 fontSize: "12px",
                                 padding: "6px 14px",
-                                border: "0.5px solid var(--accent-border)",
+                                border: "var(--line-width) solid var(--accent-border)",
                                 borderRadius: "6px",
                                 background: "var(--accent-bg)",
                                 color: "var(--accent-text)",
@@ -1067,7 +1069,7 @@ function ApiTab() {
                             style={{
                                 fontSize: "12px",
                                 padding: "6px 14px",
-                                border: "0.5px solid var(--border-secondary)",
+                                border: "var(--line-width) solid var(--border-secondary)",
                                 borderRadius: "6px",
                                 background: "var(--bg-tertiary)",
                                 color: "var(--text-secondary)",
@@ -1095,7 +1097,7 @@ function ApiTab() {
                             marginTop: "10px",
                             padding: "6px 10px",
                             background: feedback.type === "info" ? "var(--success-bg)" : "var(--danger-bg)",
-                            border: `0.5px solid ${feedback.type === "info" ? "var(--success-border)" : "var(--danger-border)"}`,
+                            border: `var(--line-width) solid ${feedback.type === "info" ? "var(--success-border)" : "var(--danger-border)"}`,
                             borderRadius: "4px",
                             fontSize: "11px",
                             color: feedback.type === "info" ? "var(--success-text)" : "var(--danger-text)",
@@ -1138,7 +1140,7 @@ const featureLabels: Record<string, string> = {
 
 function MetricRow({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
     return (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "5px 0", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "5px 0", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
             <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>{label}</span>
             <span style={{ fontSize: "13px", fontWeight: 500, color: highlight ? "var(--warning-text)" : "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{value}</span>
         </div>
@@ -1201,7 +1203,7 @@ function AiTab() {
                         alignSelf: "flex-start",
                         fontSize: "12px",
                         padding: "6px 14px",
-                        border: "0.5px solid var(--border-secondary)",
+                        border: "var(--line-width) solid var(--border-secondary)",
                         borderRadius: "6px",
                         background: "transparent",
                         color: "var(--text-secondary)",

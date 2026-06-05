@@ -121,7 +121,7 @@ const entityTypeLabels: Record<string, string> = {
 // ─── Styles ────────────────────────────────────────────────────────────────
 const tabBtnStyle = (active: boolean): React.CSSProperties => ({
     fontSize: "12px", padding: "5px 12px",
-    border: "0.5px solid " + (active ? "var(--accent-border)" : "var(--border-secondary)"),
+    border: "var(--line-width) solid " + (active ? "var(--accent-border)" : "var(--border-secondary)"),
     borderRadius: "5px",
     background: active ? "var(--accent-bg)" : "transparent",
     color: active ? "var(--accent-text)" : "var(--text-secondary)",
@@ -591,7 +591,7 @@ export default function ImportPage() {
                 {showClassic && (state !== "idle" && state !== "analyzing") && (
                     <button type="button" onClick={reset} style={{
                         fontSize: "12px", padding: "5px 12px",
-                        border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
+                        border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px",
                         background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
                     }}>Yeni Dosya</button>
                 )}
@@ -607,7 +607,7 @@ export default function ImportPage() {
                         gap: "10px",
                         padding: "14px",
                         background: "var(--surface-subtle)",
-                        border: "0.5px solid var(--surface-border)",
+                        border: "var(--line-width) solid var(--surface-border)",
                         borderRadius: "8px",
                         boxShadow: "var(--surface-shadow-sm)",
                     }}
@@ -652,7 +652,7 @@ export default function ImportPage() {
                                         textAlign: "left",
                                         padding: "10px",
                                         borderRadius: "7px",
-                                        border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-tertiary)"}`,
+                                        border: `var(--line-width) solid ${active ? "var(--accent-border)" : "var(--border-tertiary)"}`,
                                         background: active ? "var(--accent-bg)" : "var(--surface-raised)",
                                         color: "var(--text-primary)",
                                         cursor: aiFiles.length > 0 ? "not-allowed" : "pointer",
@@ -683,7 +683,7 @@ export default function ImportPage() {
                         style={{
                             padding: "16px 18px",
                             background: "var(--surface-subtle)",
-                            border: "0.5px solid var(--surface-border)",
+                            border: "var(--line-width) solid var(--surface-border)",
                             borderRadius: "8px",
                             boxShadow: "var(--surface-shadow-sm)",
                             display: "grid",
@@ -709,7 +709,7 @@ export default function ImportPage() {
                                 fontSize: "12px",
                                 padding: "7px 12px",
                                 borderRadius: "6px",
-                                border: "0.5px solid var(--accent-border)",
+                                border: "var(--line-width) solid var(--accent-border)",
                                 background: "var(--accent-bg)",
                                 color: "var(--accent-text)",
                                 cursor: "pointer",
@@ -733,7 +733,7 @@ export default function ImportPage() {
                                 style={{
                                     padding: "16px 20px",
                                     background: "var(--surface-subtle)",
-                                    border: "0.5px dashed var(--surface-border)",
+                                    border: "var(--line-width) dashed var(--surface-border)",
                                     borderRadius: "8px",
                                     boxShadow: "var(--surface-shadow-sm)",
                                     color: "var(--text-tertiary)",
@@ -771,7 +771,7 @@ export default function ImportPage() {
                 style={{
                     marginTop: "8px",
                     padding: "0",
-                    border: "0.5px solid var(--surface-border)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "8px",
                     background: "var(--surface-subtle)",
                     boxShadow: "var(--surface-shadow-sm)",
@@ -803,7 +803,7 @@ export default function ImportPage() {
                                     fontSize: "10px",
                                     padding: "2px 7px",
                                     borderRadius: "999px",
-                                    border: "0.5px solid var(--surface-border)",
+                                    border: "var(--line-width) solid var(--surface-border)",
                                     color: "var(--text-secondary)",
                                     background: "var(--surface-raised)",
                                     whiteSpace: "nowrap",
@@ -853,7 +853,7 @@ export default function ImportPage() {
                     aria-live="polite"
                     style={{
                         padding: "10px 14px", background: "var(--danger-bg)",
-                        border: "0.5px solid var(--danger-border)", borderRadius: "6px",
+                        border: "var(--line-width) solid var(--danger-border)", borderRadius: "6px",
                         fontSize: "12px", color: "var(--danger-text)", display: "flex", alignItems: "center", gap: "8px",
                     }}
                 >
@@ -916,7 +916,7 @@ export default function ImportPage() {
                                 </div>
                             </div>
                         </div>
-                        <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "7px", padding: "12px", background: "var(--bg-secondary)", display: "flex", flexDirection: "column", gap: "10px" }}>
+                        <div style={{ border: "var(--line-width) solid var(--border-tertiary)", borderRadius: "7px", padding: "12px", background: "var(--bg-secondary)", display: "flex", flexDirection: "column", gap: "10px" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
                                 <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" }}>Örnek şablon indir</div>
                                 <Download size={15} color="var(--text-tertiary)" aria-hidden />
@@ -930,7 +930,7 @@ export default function ImportPage() {
                                             fontSize: "11px",
                                             padding: "6px 8px",
                                             borderRadius: "5px",
-                                            border: "0.5px solid var(--border-tertiary)",
+                                            border: "var(--line-width) solid var(--border-tertiary)",
                                             color: "var(--text-secondary)",
                                             background: "var(--bg-primary)",
                                             textDecoration: "none",
@@ -960,7 +960,7 @@ export default function ImportPage() {
                         ].map(step => {
                             const StepIcon = step.icon;
                             return (
-                            <div key={step.label} style={{ textAlign: "center", padding: "10px 8px", border: "0.5px solid var(--surface-border)", borderRadius: "6px", background: "var(--surface-raised)", boxShadow: "var(--surface-shadow-sm)", display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", minWidth: 0 }}>
+                            <div key={step.label} style={{ textAlign: "center", padding: "10px 8px", border: "var(--line-width) solid var(--surface-border)", borderRadius: "6px", background: "var(--surface-raised)", boxShadow: "var(--surface-shadow-sm)", display: "flex", flexDirection: "column", alignItems: "center", gap: "5px", minWidth: 0 }}>
                                 <StepIcon size={16} color="var(--text-tertiary)" aria-hidden />
                                 <span style={{ fontSize: "10px", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>{step.label}</span>
                             </div>
@@ -976,7 +976,7 @@ export default function ImportPage() {
                         ].map(card => {
                             const CardIcon = card.icon;
                             return (
-                            <div key={card.title} style={{ background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)", borderRadius: "6px", padding: "14px 16px", boxShadow: "var(--surface-shadow-sm)" }}>
+                            <div key={card.title} style={{ background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)", borderRadius: "6px", padding: "14px 16px", boxShadow: "var(--surface-shadow-sm)" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
                                     <CardIcon size={15} aria-hidden />{card.title}
                                 </div>
@@ -990,7 +990,7 @@ export default function ImportPage() {
 
             {/* ───── ANALYZING ───── */}
             {state === "analyzing" && (
-                <div style={{ background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)", borderRadius: "8px", padding: "48px 24px", textAlign: "center", boxShadow: "var(--surface-shadow-sm)" }}>
+                <div style={{ background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)", borderRadius: "8px", padding: "48px 24px", textAlign: "center", boxShadow: "var(--surface-shadow-sm)" }}>
                     <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "24px" }}>
                         {[0, 1, 2].map(i => (
                             <div key={i} style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)", animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
@@ -1008,8 +1008,8 @@ export default function ImportPage() {
             {/* ───── SHEET SELECT ───── */}
             {state === "sheet_select" && (
                 <>
-                    <div style={{ background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)", borderRadius: "8px", overflow: "hidden", boxShadow: "var(--surface-shadow-sm)" }}>
-                        <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--surface-border)", background: "var(--table-header-bg)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div style={{ background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)", borderRadius: "8px", overflow: "hidden", boxShadow: "var(--surface-shadow-sm)" }}>
+                        <div style={{ padding: "12px 16px", borderBottom: "var(--line-width) solid var(--surface-border)", background: "var(--table-header-bg)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div>
                                 <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>Dosyada {sheets.length} sheet bulundu</span>
                                 <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "10px" }}>
@@ -1022,7 +1022,7 @@ export default function ImportPage() {
                             {sheets.map((sheet, idx) => (
                                 <label key={sheet.name} style={{
                                     display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px",
-                                    borderBottom: idx < sheets.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+                                    borderBottom: idx < sheets.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
                                     cursor: sheet.status === "importable" ? "pointer" : "default",
                                     opacity: sheet.status === "unsupported" ? 0.5 : 1,
                                 }}>
@@ -1050,10 +1050,10 @@ export default function ImportPage() {
                         </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button type="button" onClick={reset} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                        <button type="button" onClick={reset} style={{ fontSize: "12px", padding: "7px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
                         <button type="button" onClick={handleDetectColumns} disabled={isDemo || importableSelected.length === 0}
                             title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                            style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: (!isDemo && importableSelected.length > 0) ? "var(--accent-bg)" : "var(--bg-tertiary)", color: (!isDemo && importableSelected.length > 0) ? "var(--accent-text)" : "var(--text-tertiary)", cursor: (!isDemo && importableSelected.length > 0) ? "pointer" : "not-allowed", fontWeight: 600 }}>
+                            style={{ fontSize: "12px", padding: "7px 18px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: (!isDemo && importableSelected.length > 0) ? "var(--accent-bg)" : "var(--bg-tertiary)", color: (!isDemo && importableSelected.length > 0) ? "var(--accent-text)" : "var(--text-tertiary)", cursor: (!isDemo && importableSelected.length > 0) ? "pointer" : "not-allowed", fontWeight: 600 }}>
                             Kolon Eşleştirmeye Geç →
                         </button>
                     </div>
@@ -1064,7 +1064,7 @@ export default function ImportPage() {
             {state === "column_mapping" && (
                 <>
                     {detectingColumns ? (
-                        <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "48px 24px", textAlign: "center" }}>
+                        <div style={{ background: "var(--bg-primary)", border: "var(--line-width) solid var(--border-tertiary)", borderRadius: "8px", padding: "48px 24px", textAlign: "center" }}>
                             <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginBottom: "24px" }}>
                                 {[0, 1, 2].map(i => (
                                     <div key={i} style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--accent)", animation: `pulse-dot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
@@ -1094,8 +1094,8 @@ export default function ImportPage() {
                                 const fields = ERP_FIELDS[sheet.entityType ?? ""] ?? [];
 
                                 return (
-                                    <div key={sheet.name} style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>
-                                        <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--border-tertiary)", background: "var(--bg-secondary)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                                    <div key={sheet.name} style={{ background: "var(--bg-primary)", border: "var(--line-width) solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>
+                                        <div style={{ padding: "12px 16px", borderBottom: "var(--line-width) solid var(--border-tertiary)", background: "var(--bg-secondary)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                                             <div>
                                                 <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>{sheet.displayName}</span>
                                                 <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "10px" }}>{sheet.rows} satır · {sheet.headers.length} kolon</span>
@@ -1104,7 +1104,7 @@ export default function ImportPage() {
                                         </div>
 
                                         {/* Table header */}
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: "0", borderBottom: "0.5px solid var(--border-tertiary)", padding: "8px 16px", background: "var(--bg-secondary)" }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: "0", borderBottom: "var(--line-width) solid var(--border-tertiary)", padding: "8px 16px", background: "var(--bg-secondary)" }}>
                                             <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>Excel Kolonu</span>
                                             <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>ERP Alanı</span>
                                             <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)" }}>Kaynak</span>
@@ -1114,7 +1114,7 @@ export default function ImportPage() {
                                             <div key={m.source_column} style={{
                                                 display: "grid", gridTemplateColumns: "1fr 1fr 80px", gap: "0",
                                                 alignItems: "center", padding: "8px 16px",
-                                                borderBottom: colIdx < mappings.length - 1 ? "0.5px solid var(--border-tertiary)" : "none",
+                                                borderBottom: colIdx < mappings.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
                                                 background: colIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)",
                                             }}>
                                                 <span style={{ fontSize: "12px", color: "var(--text-primary)", fontFamily: "monospace" }}>{m.source_column}</span>
@@ -1124,7 +1124,7 @@ export default function ImportPage() {
                                                     style={{
                                                         fontSize: "12px", padding: "4px 8px", marginRight: "16px",
                                                         background: "var(--bg-primary)", color: "var(--text-primary)",
-                                                        border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
+                                                        border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px",
                                                         cursor: "pointer",
                                                     }}
                                                 >
@@ -1157,8 +1157,8 @@ export default function ImportPage() {
                                 <button type="button" onClick={() => {
                                     if (batchId) { fetch(`/api/import/${batchId}`, { method: "DELETE" }).catch(() => {}); }
                                     setState("sheet_select"); setColumnMappings({}); setBatchId(null);
-                                }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
-                                <button type="button" onClick={handleApplyMappings} style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer", fontWeight: 600 }}>
+                                }} style={{ fontSize: "12px", padding: "7px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                                <button type="button" onClick={handleApplyMappings} style={{ fontSize: "12px", padding: "7px 18px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer", fontWeight: 600 }}>
                                     Eşleştirmeyi Uygula →
                                 </button>
                             </div>
@@ -1222,7 +1222,7 @@ export default function ImportPage() {
                             setBulkValue("");
                         };
                         return (
-                            <div style={{ display: "flex", gap: "8px", padding: "10px 14px", background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", fontSize: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                            <div style={{ display: "flex", gap: "8px", padding: "10px 14px", background: "var(--bg-secondary)", border: "var(--line-width) solid var(--border-tertiary)", borderRadius: "6px", fontSize: "12px", flexWrap: "wrap", alignItems: "center" }}>
                                 <span style={{ color: "var(--text-secondary)" }}>Toplam: <strong>{filteredDrafts.length}</strong> satır</span>
                                 {warningRows > 0 && <span style={{ color: "var(--warning-text)", fontSize: "11px" }}>{warningRows} satır gözden geçirme istiyor</span>}
                                 {skippedFieldCount > 0 && <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>{skippedFieldCount} alan atlanacak</span>}
@@ -1234,13 +1234,13 @@ export default function ImportPage() {
                                 {!batchId && <span style={{ color: "var(--text-tertiary)", fontSize: "11px", marginRight: "auto" }}>Hücreye tıkla → düzelt</span>}
                                 {/* Bulk fill */}
                                 <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Toplu doldur:</span>
-                                <select aria-label="Toplu doldurulacak alan" value={bulkField} onChange={e => setBulkField(e.target.value)} style={{ fontSize: "11px", padding: "3px 6px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px" }}>
+                                <select aria-label="Toplu doldurulacak alan" value={bulkField} onChange={e => setBulkField(e.target.value)} style={{ fontSize: "11px", padding: "3px 6px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px" }}>
                                     <option value="">Alan seç</option>
                                     {entityFields.map(f => <option key={f.field} value={f.field}>{f.label}</option>)}
                                 </select>
                                 <input aria-label="Toplu doldurma değeri" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Değer…" onKeyDown={e => { if (e.key === "Enter") applyBulkFill(); }}
-                                    style={{ fontSize: "11px", padding: "3px 8px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", width: "120px" }} />
-                                <button type="button" onClick={applyBulkFill} disabled={!bulkField || bulkValue === ""} style={{ fontSize: "11px", padding: "3px 10px", background: bulkField && bulkValue ? "var(--accent-bg)" : "var(--bg-tertiary)", color: bulkField && bulkValue ? "var(--accent-text)" : "var(--text-tertiary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: bulkField && bulkValue ? "pointer" : "not-allowed" }}>
+                                    style={{ fontSize: "11px", padding: "3px 8px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px", width: "120px" }} />
+                                <button type="button" onClick={applyBulkFill} disabled={!bulkField || bulkValue === ""} style={{ fontSize: "11px", padding: "3px 10px", background: bulkField && bulkValue ? "var(--accent-bg)" : "var(--bg-tertiary)", color: bulkField && bulkValue ? "var(--accent-text)" : "var(--text-tertiary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px", cursor: bulkField && bulkValue ? "pointer" : "not-allowed" }}>
                                     Boşlara Uygula
                                 </button>
                             </div>
@@ -1249,7 +1249,7 @@ export default function ImportPage() {
 
                     {/* Table preview */}
                     {filteredDrafts.length === 0 ? (
-                        <div style={{ padding: "24px", textAlign: "center", background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", color: "var(--text-tertiary)", fontSize: "12px" }}>
+                        <div style={{ padding: "24px", textAlign: "center", background: "var(--bg-primary)", border: "var(--line-width) solid var(--border-tertiary)", borderRadius: "8px", color: "var(--text-tertiary)", fontSize: "12px" }}>
                             Bu kategoride satır bulunmuyor.
                         </div>
                     ) : (() => {
@@ -1275,14 +1275,14 @@ export default function ImportPage() {
                         const fieldLabels = new Map((ERP_FIELDS[activeTab] ?? []).map(f => [f.field, f.label]));
 
                         return (
-                            <div style={{ background: "var(--surface-raised)", border: "0.5px solid var(--surface-border)", borderRadius: "8px", overflow: "auto", boxShadow: "var(--surface-shadow-sm)" }}>
+                            <div style={{ background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)", borderRadius: "8px", overflow: "auto", boxShadow: "var(--surface-shadow-sm)" }}>
                                 {/* Table header */}
-                                <div style={{ display: "grid", gridTemplateColumns: `72px repeat(${visibleFields.length}, minmax(150px, 1fr))`, borderBottom: "0.5px solid var(--surface-border)", background: "var(--table-header-bg)", minWidth: "760px" }}>
-                                    <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)" }}>Satır</div>
+                                <div style={{ display: "grid", gridTemplateColumns: `72px repeat(${visibleFields.length}, minmax(150px, 1fr))`, borderBottom: "var(--line-width) solid var(--surface-border)", background: "var(--table-header-bg)", minWidth: "760px" }}>
+                                    <div style={{ padding: "8px 12px", fontSize: "11px", fontWeight: "var(--font-table-heading-weight)", color: "var(--text-tertiary)" }}>Satır</div>
                                     {visibleFields.map(f => (
-                                        <div key={f} style={{ padding: "8px 12px", fontSize: "11px", fontWeight: 600, color: required.includes(f) ? "var(--accent-text)" : "var(--text-secondary)", borderLeft: "0.5px solid var(--border-tertiary)", display: "flex", gap: "6px", alignItems: "center", minWidth: 0 }}>
+                                        <div key={f} style={{ padding: "8px 12px", fontSize: "11px", fontWeight: "var(--font-table-heading-weight)", color: required.includes(f) ? "var(--accent-text)" : "var(--text-secondary)", borderLeft: "var(--line-width) solid var(--border-tertiary)", display: "flex", gap: "6px", alignItems: "center", minWidth: 0 }}>
                                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fieldLabels.get(f) ?? f}{required.includes(f) ? " *" : ""}</span>
-                                            {FINANCIAL_IMPORT_FIELDS.has(f) && <span style={{ fontSize: "9px", color: "var(--warning-text)", border: "0.5px solid var(--warning-border)", borderRadius: "999px", padding: "1px 5px", flexShrink: 0 }}>finans</span>}
+                                            {FINANCIAL_IMPORT_FIELDS.has(f) && <span style={{ fontSize: "9px", color: "var(--warning-text)", border: "var(--line-width) solid var(--warning-border)", borderRadius: "999px", padding: "1px 5px", flexShrink: 0 }}>finans</span>}
                                         </div>
                                     ))}
                                 </div>
@@ -1294,9 +1294,9 @@ export default function ImportPage() {
                                         return v === undefined || v === null || v === "";
                                     });
                                     return (
-                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `72px repeat(${visibleFields.length}, minmax(150px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "0.5px solid var(--border-tertiary)" : "none", background: rowHasMissing ? "rgba(var(--danger-rgb,248,81,73),0.06)" : globalIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "760px" }}>
-                                            <div style={{ padding: "6px 10px", fontSize: "11px", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", justifyContent: "center", gap: "3px", minHeight: "42px" }}>
-                                                <span style={{ color: rowHasMissing ? "var(--warning-text)" : "var(--text-secondary)", fontWeight: 600 }}>{draft.row_number ?? globalIdx + 1}</span>
+                                        <div key={draft.id} style={{ display: "grid", gridTemplateColumns: `72px repeat(${visibleFields.length}, minmax(150px, 1fr))`, borderBottom: rowIdx < filteredDrafts.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none", background: rowHasMissing ? "rgba(var(--danger-rgb,248,81,73),0.06)" : globalIdx % 2 === 0 ? "transparent" : "var(--bg-secondary)", minWidth: "760px" }}>
+                                            <div style={{ padding: "6px 10px", fontSize: "11px", fontWeight: "var(--font-table-cell-weight)", color: "var(--text-tertiary)", display: "flex", flexDirection: "column", justifyContent: "center", gap: "3px", minHeight: "42px" }}>
+                                                <span style={{ color: rowHasMissing ? "var(--warning-text)" : "var(--text-secondary)", fontWeight: "var(--font-table-heading-weight)" }}>{draft.row_number ?? globalIdx + 1}</span>
                                                 <span style={{ fontSize: "10px", color: draft.match_status === "blocked" ? "var(--danger-text)" : draft.match_status === "ambiguous" ? "var(--warning-text)" : "var(--text-tertiary)" }}>
                                                     {draft.match_status ?? "new"}
                                                 </span>
@@ -1308,7 +1308,7 @@ export default function ImportPage() {
                                                 const approval = getFieldApproval(draft, f);
                                                 const isSkipped = approval === "skip";
                                                 return (
-                                                    <div key={f} style={{ borderLeft: "0.5px solid var(--border-tertiary)", position: "relative" }}>
+                                                    <div key={f} style={{ borderLeft: "var(--line-width) solid var(--border-tertiary)", position: "relative" }}>
                                                         {isEditing ? (
                                                             <input
                                                                 ref={editInputRef}
@@ -1317,10 +1317,10 @@ export default function ImportPage() {
                                                                 onChange={e => setEditingValue(e.target.value)}
                                                                 onBlur={() => commitEdit(draft.id, f)}
                                                                 onKeyDown={e => { if (e.key === "Enter") commitEdit(draft.id, f); if (e.key === "Escape") setEditingCell(null); }}
-                                                                style={{ width: "100%", padding: "6px 12px", background: "var(--accent-bg)", border: "none", borderTop: "1.5px solid var(--accent)", fontSize: "12px", color: "var(--text-primary)", boxSizing: "border-box" }}
+                                                                style={{ width: "100%", padding: "6px 12px", background: "var(--accent-bg)", border: "none", borderTop: "1.5px solid var(--accent)", fontSize: "12px", fontWeight: "var(--font-table-cell-weight)", color: "var(--text-primary)", boxSizing: "border-box" }}
                                                             />
                                                         ) : (
-                                                            <div style={{ padding: "6px 10px", fontSize: "12px", color: isSkipped ? "var(--text-tertiary)" : isEmpty ? "var(--danger-text)" : "var(--text-primary)", outline: isEmpty && !isSkipped ? "1px solid var(--danger-border)" : "none", minHeight: "42px", display: "grid", gridTemplateColumns: "18px minmax(0, 1fr)", alignItems: "center", gap: "6px", opacity: isSkipped ? 0.62 : 1 }}>
+                                                            <div style={{ padding: "6px 10px", fontSize: "12px", fontWeight: "var(--font-table-cell-weight)", color: isSkipped ? "var(--text-tertiary)" : isEmpty ? "var(--danger-text)" : "var(--text-primary)", outline: isEmpty && !isSkipped ? "1px solid var(--danger-border)" : "none", minHeight: "42px", display: "grid", gridTemplateColumns: "18px minmax(0, 1fr)", alignItems: "center", gap: "6px", opacity: isSkipped ? 0.62 : 1 }}>
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={!isSkipped}
@@ -1361,14 +1361,14 @@ export default function ImportPage() {
                                 {filteredDrafts.length > PAGE_SIZE && (() => {
                                     const totalPages = Math.ceil(filteredDrafts.length / PAGE_SIZE);
                                     return (
-                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "10px 12px", background: "var(--bg-secondary)", borderTop: "0.5px solid var(--border-tertiary)", fontSize: "12px", color: "var(--text-secondary)" }}>
+                                        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "10px 12px", background: "var(--bg-secondary)", borderTop: "var(--line-width) solid var(--border-tertiary)", fontSize: "12px", color: "var(--text-secondary)" }}>
                                             <button type="button" onClick={() => setPreviewPage(p => Math.max(0, p - 1))} disabled={previewPage === 0}
-                                                style={{ fontSize: "12px", padding: "4px 12px", background: previewPage === 0 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage === 0 ? "var(--text-tertiary)" : "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage === 0 ? "not-allowed" : "pointer" }}>
+                                                style={{ fontSize: "12px", padding: "4px 12px", background: previewPage === 0 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage === 0 ? "var(--text-tertiary)" : "var(--text-primary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage === 0 ? "not-allowed" : "pointer" }}>
                                                 ← Önceki
                                             </button>
                                             <span>Sayfa {previewPage + 1} / {totalPages} (toplam {filteredDrafts.length} satır)</span>
                                             <button type="button" onClick={() => setPreviewPage(p => Math.min(totalPages - 1, p + 1))} disabled={previewPage >= totalPages - 1}
-                                                style={{ fontSize: "12px", padding: "4px 12px", background: previewPage >= totalPages - 1 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage >= totalPages - 1 ? "var(--text-tertiary)" : "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage >= totalPages - 1 ? "not-allowed" : "pointer" }}>
+                                                style={{ fontSize: "12px", padding: "4px 12px", background: previewPage >= totalPages - 1 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage >= totalPages - 1 ? "var(--text-tertiary)" : "var(--text-primary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage >= totalPages - 1 ? "not-allowed" : "pointer" }}>
                                                 Sonraki →
                                             </button>
                                         </div>
@@ -1385,16 +1385,16 @@ export default function ImportPage() {
                             required.some(f => { const v = getEffectiveValue(d, f); return v === undefined || v === null || v === ""; })
                         ).length;
                         return missingCount > 0 ? (
-                            <div style={{ padding: "8px 14px", background: "var(--warning-bg)", border: "0.5px solid var(--warning-border)", borderRadius: "6px", fontSize: "12px", color: "var(--warning-text)" }}>
+                            <div style={{ padding: "8px 14px", background: "var(--warning-bg)", border: "var(--line-width) solid var(--warning-border)", borderRadius: "6px", fontSize: "12px", color: "var(--warning-text)" }}>
                                 {missingCount} satırda zorunlu alan eksik (*). İçe aktarımda bu satırlar atlanabilir.
                             </div>
                         ) : null;
                     })()}
 
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button type="button" onClick={() => { setState("column_mapping"); setDrafts([]); }} style={{ fontSize: "12px", padding: "7px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
+                        <button type="button" onClick={() => { setState("column_mapping"); setDrafts([]); }} style={{ fontSize: "12px", padding: "7px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
                         <button type="button" onClick={handleImport} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                            style={{ fontSize: "12px", padding: "7px 18px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: isDemo ? "var(--bg-tertiary)" : "var(--accent-bg)", color: isDemo ? "var(--text-tertiary)" : "var(--accent-text)", cursor: isDemo ? "not-allowed" : "pointer", fontWeight: 600, opacity: isDemo ? 0.5 : 1 }}>
+                            style={{ fontSize: "12px", padding: "7px 18px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: isDemo ? "var(--bg-tertiary)" : "var(--accent-bg)", color: isDemo ? "var(--text-tertiary)" : "var(--accent-text)", cursor: isDemo ? "not-allowed" : "pointer", fontWeight: 600, opacity: isDemo ? 0.5 : 1 }}>
                             Onayla ve İçe Aktar →
                         </button>
                     </div>
@@ -1403,7 +1403,7 @@ export default function ImportPage() {
 
             {/* ───── IMPORTING ───── */}
             {state === "importing" && (
-                <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "24px" }}>
+                <div style={{ background: "var(--bg-primary)", border: "var(--line-width) solid var(--border-tertiary)", borderRadius: "8px", padding: "24px" }}>
                     <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "20px" }}>İçe aktarılıyor…</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                         {sheets.reduce<SheetInfo[]>((acc, sheet) => {
@@ -1434,7 +1434,7 @@ export default function ImportPage() {
 
             {/* ───── DONE ───── */}
             {state === "done" && (
-                <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--success-border)", borderRadius: "8px", padding: "32px 24px" }}>
+                <div style={{ background: "var(--bg-primary)", border: "var(--line-width) solid var(--success-border)", borderRadius: "8px", padding: "32px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
                         <div style={{ width: "36px", height: "36px", background: "var(--success-bg)", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -1500,7 +1500,7 @@ export default function ImportPage() {
                         }, []);
                         if (rows.length === 0) return null;
                         return (
-                            <div style={{ marginBottom: "16px", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", overflow: "hidden" }}>
+                            <div style={{ marginBottom: "16px", border: "var(--line-width) solid var(--border-tertiary)", borderRadius: "6px", overflow: "hidden" }}>
                                 <div style={{
                                     display: "grid",
                                     gridTemplateColumns: "1fr 90px 90px 90px",
@@ -1508,7 +1508,7 @@ export default function ImportPage() {
                                     color: "var(--text-tertiary)", letterSpacing: 0,
                                     padding: "8px 12px",
                                     background: "var(--bg-secondary)",
-                                    borderBottom: "0.5px solid var(--border-tertiary)",
+                                    borderBottom: "var(--line-width) solid var(--border-tertiary)",
                                 }}>
                                     <div>TÜR</div>
                                     <div style={{ textAlign: "right" }}>EKLENDİ</div>
@@ -1522,7 +1522,7 @@ export default function ImportPage() {
                                         fontSize: "12px",
                                         color: "var(--text-secondary)",
                                         padding: "8px 12px",
-                                        borderBottom: "0.5px solid var(--border-tertiary)",
+                                        borderBottom: "var(--line-width) solid var(--border-tertiary)",
                                     }}>
                                         <div style={{ color: "var(--text-primary)" }}>{r.label}</div>
                                         <div style={{ textAlign: "right", color: r.added > 0 ? "var(--success-text)" : "var(--text-tertiary)" }}>{r.added}</div>
@@ -1534,7 +1534,7 @@ export default function ImportPage() {
                         );
                     })()}
                     {confirmResult && confirmResult.errors.length > 0 && (
-                        <div style={{ marginBottom: "16px", background: "var(--danger-bg)", border: "0.5px solid var(--danger-border)", borderRadius: "6px", padding: "12px 14px" }}>
+                        <div style={{ marginBottom: "16px", background: "var(--danger-bg)", border: "var(--line-width) solid var(--danger-border)", borderRadius: "6px", padding: "12px 14px" }}>
                             <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "8px" }}>{confirmResult.errors.length} satırda sorun oluştu</div>
                             <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                                 {confirmResult.errors.map((err) => (
@@ -1546,18 +1546,18 @@ export default function ImportPage() {
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         {batchId && (
                             <>
-                                <Link href={`/api/import/${batchId}/report?format=xlsx`} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-secondary)", color: "var(--text-primary)", textDecoration: "none", fontWeight: 500 }}>
+                                <Link href={`/api/import/${batchId}/report?format=xlsx`} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-secondary)", color: "var(--text-primary)", textDecoration: "none", fontWeight: 500 }}>
                                     <Download size={14} /> Rapor XLSX
                                 </Link>
-                                <Link href={`/api/import/${batchId}/report?format=csv`} style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-secondary)", color: "var(--text-primary)", textDecoration: "none", fontWeight: 500 }}>
+                                <Link href={`/api/import/${batchId}/report?format=csv`} style={{ fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-secondary)", color: "var(--text-primary)", textDecoration: "none", fontWeight: 500 }}>
                                     Rapor CSV
                                 </Link>
                             </>
                         )}
-                        <Link href="/dashboard/customers" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Cariler sayfasına git →</Link>
-                        <Link href="/dashboard/orders" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Siparişler sayfasına git →</Link>
-                        <Link href="/dashboard/products" style={{ fontSize: "12px", padding: "6px 14px", border: "0.5px solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Stok & Ürünler →</Link>
-                        <button type="button" onClick={reset} style={{ fontSize: "12px", padding: "6px 16px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>Yeni Dosya Yükle</button>
+                        <Link href="/dashboard/customers" style={{ fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Cariler sayfasına git →</Link>
+                        <Link href="/dashboard/orders" style={{ fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Siparişler sayfasına git →</Link>
+                        <Link href="/dashboard/products" style={{ fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Stok & Ürünler →</Link>
+                        <button type="button" onClick={reset} style={{ fontSize: "12px", padding: "6px 16px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>Yeni Dosya Yükle</button>
                     </div>
                 </div>
             )}
