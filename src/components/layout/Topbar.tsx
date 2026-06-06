@@ -52,7 +52,7 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                         letterSpacing: 0,
                     }}
                 >
-                    <RovenLogo size={20} wordmarkSize={17} gap={6} />
+                    <RovenLogo size={24} wordmarkSize={19} gap={7} />
                 </div>
 
                 <span className="topbar-divider" aria-hidden="true" />
