@@ -5,7 +5,33 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-06-06 (**README yenileme — Roven premium hero + görsel doku**)
+## Son Tamamlanan İş — 2026-06-06 (**Roven hexagon logo — mark + wordmark + ince ayar**)
+
+Kullanıcı görsel paylaştı: yuvarlatılmış hexagon mark + bold "Roven" wordmark, koyu zeminde near-white. "logo bu olsun". `/frontend-design` yönü: minimal geometrik, monokrom, tema-uyumlu.
+
+**Yapılan (2 commit: `f3cb649` + ince ayar `1b760d6`):**
+- **`src/components/layout/RovenLogo.tsx`** (YENİ, tek kaynak) — yuvarlatılmış hexagon `<polygon>` SVG mark + bold "Roven" wordmark; `currentColor`/inherit → koyu temada near-white (`#e6edf3`), aydınlıkta koyu; sabit hex yok = otomatik temalanır. Props: `size/showWordmark/wordmarkSize/gap`. `showWordmark={false}` → `role="img" aria-label="Roven"` (a11y).
+- **Topbar.tsx** — düz "Roven" metni → `<RovenLogo size={20} wordmarkSize={17} gap={6} />` (ince ayar: mark 18→20, wordmark 17px, gap 8→6 → daha büyük + sıkı lockup, sayfa genelinde daha görünür).
+- **landing `page.tsx`** — nav span → `<RovenLogo size={17} wordmarkSize={15} />`.
+- **login `page.tsx`** — `<h1>` içi → `<RovenLogo size={22} />`.
+- **`src/app/icon.svg`** (YENİ) — App Router favicon; koyu zemin + near-white hexagon (sekme arka planlarında okunur); mevcut `favicon.ico` korundu (Next ikisini servis eder).
+- **`+10 test`** (`roven-logo.test.tsx`): render/tema-uyum/a11y/size-wordmarkSize/3×source-regression/favicon.
+
+**Doğrulama:** tsc 0 · lint 0 · 4688 test (önceki 4678 +10) · build 0 (`ƒ Proxy`). Backend/şema/migration YOK. **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA (`1b760d6`); iki Coolify prod deploy.** Bypass uyarısı (test status check) yetkiyle geçti.
+
+<details><summary>Önceki: README yenileme — Roven premium hero + görsel doku</summary>
+
+### README yenileme — Roven premium hero + görsel doku
+
+Kullanıcı: "GitHub'da main ve codex-experiment README'lerini güncelle, açıklayıcı + görsel dokulu olsun." Görsel yön (AskUserQuestion, preview'li): **Premium merkezli hero**.
+
+**Yapılan (`README.md` tam yeniden yazım, tek dosya):** `<div align=center>` hero (`⬢ Roven` + slogan + **9 shields.io rozeti**: Next/React/TS/Supabase/Claude + tests·4650/migrations·84/deploy/theme) · anchor'lı içindekiler · **emoji bölüm başlıkları** (📦🚀🔑🗄️🏥🚢🧱📁🧪🧭) · 2 kolonlu **özellik kart ızgarası** (8 özellik) · Mimari & Domain bölümü (stok modeli + sipariş çift ekseni + formüller) · Test & Komutlar.
+
+**İçerik tazelendi (bayattı):** stack `Next.js 15`→**Next 16.1 / React 19.2** (gerçek sürüm rozetleri); migration `18-satır tablo`→**84 sıralı migration + `supabase db push` + 10 kritik dönüm noktası**. `feedback_no_silent_deletes`: tablo silinmedi, doğru+öz bilgiyle değiştirildi.
+
+**Doğrulama:** yalnız `README.md` (197+/151−); kod/şema/test SIFIR değişiklik. **DURUM: PUSH EDİLDİ (`b388e90`) — birebir aynı SHA; iki Coolify prod deploy.**
+
+</details>
 
 Kullanıcı: "GitHub'da main ve codex-experiment README'lerini güncelle, açıklayıcı + görsel dokulu olsun." Görsel yön (AskUserQuestion, preview'li): **Premium merkezli hero**.
 
