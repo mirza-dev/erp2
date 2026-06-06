@@ -12,6 +12,8 @@ interface RovenLogoProps {
     className?: string;
 }
 
+const DEFAULT_GAP = 6;
+
 /**
  * Roven marka logosu — yuvarlatılmış hexagon mark + bold wordmark.
  *
@@ -24,7 +26,7 @@ export function RovenLogo({
     size = 20,
     showWordmark = true,
     wordmarkSize,
-    gap = 8,
+    gap = DEFAULT_GAP,
     className,
 }: RovenLogoProps) {
     const mark = (
