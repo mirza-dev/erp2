@@ -1,23 +1,59 @@
-# Roven
+<div align="center">
 
-> AI-powered ERP system for industrial B2B sales, integrating LLM-based document parsing, automated purchase recommendations, and multi-agent workflow orchestration. Built with Next.js, TypeScript, Supabase, and Anthropic Claude API.
+# ⬢ Roven
 
-PMT Endüstriyel için geliştirilmiş yapay zeka destekli ERP sistemi. Endüstriyel vana ticareti (B2B) süreçlerini uçtan uca kapsar.
+### AI Destekli Endüstriyel ERP
 
-## Özellikler
+_Endüstriyel vana ticaretinde **teklif → sipariş → stok → muhasebe**, uçtan uca tek sistem._
 
-- **AI Document Parsing** — Excel/CSV dosyalarını Claude Haiku ile otomatik parse eder; kolon eşleştirmeyi öğrenir ve sonraki import'larda hafızasını kullanır
-- **Automated Purchase Recommendations** — Stok seviyesi, günlük kullanım, tedarik süresi ve aktif teklifleri (promisable stock) birlikte değerlendirerek yeniden sipariş önerileri üretir
-- **Smart Alert Engine** — Kritik stok, sipariş son tarihi, geciken sevkiyat ve sipariş eksikliği alertlerini otomatik tarar; severity değişimlerini ve batch resolve'u yönetir
-- **Order Deadline Tracking** — Stok tükenme tarihi ve en geç sipariş tarihi hesaplar; teklif aşamasındaki miktarları (quoted) göz önünde bulundurur
-- **AI Risk Scoring** — Siparişleri Claude ile değerlendirir; yüksek riskli onayları operasyon özetine dahil eder
-- **Paraşüt Integration** — Onaylanan siparişleri muhasebe yazılımıyla senkronize eder
+![Next.js](https://img.shields.io/badge/Next.js-16.1-000000?logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%2B%20RLS-3ECF8E?logo=supabase&logoColor=white)
+![Claude](https://img.shields.io/badge/AI-Claude%20Haiku-D97757?logo=anthropic&logoColor=white)
 
-**Stack:** Next.js 15 · TypeScript · Supabase (PostgreSQL + RLS) · Anthropic Claude API · Vitest
+![Tests](https://img.shields.io/badge/tests-~4650%20passing-22c55e)
+![Migrations](https://img.shields.io/badge/migrations-84-blue)
+![Deploy](https://img.shields.io/badge/deploy-Coolify%20%C2%B7%20Docker-0b76ef)
+![Theme](https://img.shields.io/badge/theme-dark%20%2B%20light-6366f1)
+
+</div>
 
 ---
 
-## Hızlı Kurulum
+> **Roven**, PMT Endüstriyel için geliştirilmiş yapay zeka destekli bir ERP'dir. Endüstriyel vana (B2B) ticaretini kataloglama, teklif, sipariş çift ekseni, stok rezervasyonu, üretim, satın alma önerisi ve muhasebe entegrasyonuna kadar uçtan uca kapsar. AI; belge okuma, kolon eşleştirme, risk skorlama ve satın alma kopilotunda devrede — anahtarsız çalışır, AI yoksa sistem sade modda devam eder.
+
+## İçindekiler
+
+- [📦 Özellikler](#-özellikler)
+- [🚀 Hızlı Kurulum](#-hızlı-kurulum)
+- [🔑 Ortam Değişkenleri](#-ortam-değişkenleri)
+- [🗄️ Veritabanı & Migration](#️-veritabanı--migration)
+- [🏥 Health Check](#-health-check)
+- [🚢 Deployment (Coolify)](#-deployment-coolify)
+- [🧱 Mimari & Domain](#-mimari--domain)
+- [📁 Proje Yapısı](#-proje-yapısı)
+- [🧪 Test & Komutlar](#-test--komutlar)
+- [🧭 Bu Projeyi İlk Açıyorsan](#-bu-projeyi-i̇lk-açıyorsan)
+
+---
+
+## 📦 Özellikler
+
+| | |
+|---|---|
+| **🤖 AI Belge Okuma** | Excel / CSV / PDF / görsel dosyaları Claude ile sınıflandırır, ürün/sertifika çıkarır, kolon eşleştirmeyi öğrenir ve sonraki içe aktarmalarda hafızasını kullanır. |
+| **📊 Satın Alma Kopilotu** | Stok seviyesi, günlük kullanım, tedarik süresi ve aktif teklifleri (promisable stok) birlikte değerlendirerek yeniden sipariş önerir; karar geçmişini hatırlar. |
+| **🔔 Akıllı Uyarı Motoru** | Kritik stok, sipariş son tarihi, geciken sevkiyat, süresi dolan teklif ve sync hatalarını otomatik tarar; severity değişimini ve toplu çözümü yönetir. |
+| **🧾 Sipariş Çift Ekseni** | `commercial_status` (ticari) ve `fulfillment_status` (lojistik) ayrı eksenlerde ilerler; rezervasyon "Onaya Gönder" anında tetiklenir. |
+| **📄 Teklif Modülü (V7)** | Çift dilli kurumsal PDF, revizyon zinciri, dondurulmuş HTML arşivi, not şablonları ve tek tıkla "Kabul Et → Sipariş" atomik dönüşümü. |
+| **🏭 Üretim & BOM** | Reçete bazlı üretim kaydı, atomik stok tüketimi, eksik bileşen şeffaflığı ve **sesli giriş** (Ctrl+M) ile hızlı kayıt. |
+| **🔗 Paraşüt Entegrasyonu** | Onaylanan cari/ürün/fatura/e-belge/irsaliyeyi muhasebe yazılımıyla senkronize eder; OAuth + retry + reconciliation. |
+| **🛡️ RBAC + Tema** | 6 rollü erişim kontrolü, finansal redaction ve `data-theme` ile **koyu + aydınlık** premium tema (FOUC'suz). |
+
+---
+
+## 🚀 Hızlı Kurulum
 
 ```bash
 # 1. Env dosyasını oluştur ve doldur
@@ -27,6 +63,7 @@ cp .env.example .env.local
 npm install
 
 # 3. Supabase migration'larını uygula (aşağıya bak)
+supabase db push
 
 # 4. Geliştirme sunucusunu başlat
 npm run dev
@@ -35,61 +72,56 @@ npm run dev
 curl http://localhost:3000/api/health
 ```
 
+> İlk admin kullanıcısı: `npm run create-admin email şifre`
+
 ---
 
-## Ortam Değişkenleri
+## 🔑 Ortam Değişkenleri
 
 | Değişken | Zorunlu | Kaynak |
-|----------|---------|--------|
-| `NEXT_PUBLIC_SUPABASE_URL` | ✓ | Supabase Dashboard → Settings → API |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✓ | aynı yer (public, client-side güvenli) |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✓ | aynı yer — **gizli tut**, RLS'i bypass eder |
-| `ANTHROPIC_API_KEY` | Opsiyonel | AI özet, puanlama ve parse için. Eksikse sistem çalışır; AI özellikleri devre dışı kalır. [console.anthropic.com](https://console.anthropic.com/settings/keys) |
-| `PARASUT_CLIENT_ID` | Opsiyonel | Paraşüt Developer Portal → OAuth |
-| `PARASUT_CLIENT_SECRET` | Opsiyonel | aynı yer |
-| `PARASUT_COMPANY_ID` | Opsiyonel | aynı yer |
-
-> Vercel'e deploy ederken: Project → Settings → Environment Variables'dan ekle.
+|----------|:-------:|--------|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase Dashboard → Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | aynı yer (public, client-side güvenli) |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | aynı yer — **gizli tut**, RLS'i bypass eder |
+| `ANTHROPIC_API_KEY` | ⬜ | AI özet, puanlama ve parse için. Eksikse sistem çalışır; AI özellikleri devre dışı kalır. [console.anthropic.com](https://console.anthropic.com/settings/keys) |
+| `RESEND_API_KEY` · `EMAIL_FROM` | ⬜ | E-posta bildirimleri (Resend). Eksikse bildirim sessizce atlanır. |
+| `REDIS_URL` | ⬜ | Rate limiting (self-hosted Redis). Eksikse fail-open (limit yok). |
+| `PARASUT_CLIENT_ID` · `_SECRET` · `_COMPANY_ID` | ⬜ | Paraşüt Developer Portal → OAuth |
+| `CRON_SECRET` | ⬜ | CRON endpoint'leri için Bearer token |
 
 ---
 
-## Migration Sırası
+## 🗄️ Veritabanı & Migration
 
-`supabase/migrations/` altındaki dosyaları **sırayla** uygula:
+`supabase/migrations/` altında **84 sıralı SQL migration** bulunur. **Sırayla** uygulanmalıdır:
 
-| Sıra | Dosya | İçerik |
-|------|-------|--------|
-| 1 | `001_initial_schema.sql` | 14 tablo, index'ler, trigger'lar, CHECK constraint'ler |
-| 2 | `002_stock_rpc_functions.sql` | 4 atomik stok RPC fonksiyonu (`increment_reserved`, `decrement_reserved`, `decrement_on_hand`, `adjust_on_hand`) |
-| 3 | `003_order_rpcs.sql` | Sipariş durum geçiş RPC'leri |
-| 4 | `004_inventory_rpcs.sql` | Gelişmiş envanter yönetim RPC'leri |
-| 5 | `005_faz8910_hardening.sql` | `ai_risk_level` kolonu, parasut/sync-log index'leri |
-| 6 | `006_lead_time.sql` | `products.lead_time_days` kolonu — lead-time-aware satın alma önerisi |
-| 7 | `007_rpc_hotfix.sql` | Sipariş RPC hotfix'leri |
-| 8 | `008_inventory_rpc_hotfix.sql` | Envanter/üretim RPC hotfix'leri |
-| 9 | `009_audit_log_entity_id_text.sql` | `audit_log.entity_id` kolonu `text` hotfix'i — runtime uuid/text hatasını kapatır |
-| 10 | `010_ai_recommendations.sql` | `ai_recommendations` + `ai_feedback` tabloları — AI karar yaşam döngüsü (kabul/düzenle/reddet) |
-| 11 | `011_fix_ship_order_uuid.sql` | `ship_order_full()` RPC'de UUID/text tip uyumsuzluğu hotfix'i |
-| 12 | `012_excel_full_import.sql` | `quotes`, `shipments`, `invoices`, `payments` tabloları + `sales_orders`/`customers`/`products` genişletilmiş alanlar (incoterm, cost_price, weight_kg vb.) |
-| 13 | `013_ai_entity_aliases.sql` | `ai_entity_aliases` tablosu — import dedup öğrenme (ham değer → DB entity eşleşmesi) |
-| 14 | `014_ai_runs.sql` | `ai_runs` tablosu — AI çağrı gözlemlenebilirlik kaydı (fire-and-forget, opsiyonel) |
-| 15 | `015_product_identity_fields.sql` | `products`'a 8 kimlik alanı (material_quality, origin_country, certifications vb.) — products CRUD bağımlı, zorunlu |
-| 16 | `016_health_check_utils.sql` | `check_migration_011_applied()` tanı fonksiyonu — `pg_proc.prosrc` üzerinden 011 UUID fix'ini doğrular, `/api/health` bağımlısı |
-| 17 | `017_enable_rls.sql` | 23 tabloda Row Level Security etkinleştirme — anon key ile doğrudan DB erişimini engeller; `service_role` bypass eder, uygulama etkilenmez |
-| 18 | `018_create_order_rpc.sql` | `create_order_with_lines()` RPC — atomik sipariş oluşturma (header + satırlar tek transaction'da); `dbCreateOrder` bu RPC'ye bağımlı, zorunlu |
-
-**Supabase CLI ile:**
 ```bash
+# Supabase CLI ile (önerilen)
 supabase db push
+
+# veya Dashboard → SQL Editor → her dosyayı 001'den 084'e sırayla çalıştır
 ```
 
-**Dashboard ile:** SQL Editor → her dosyayı sırayla çalıştır.
+> ⚠️ Migration'lar bağımlıdır; sıra atlanamaz. Bir önceki uygulanmadan sonraki çalıştırılırsa runtime hataları (eksik kolon/RPC/constraint) görülür.
 
-> ⚠️ Migration'lar sırayla uygulanmalı. `002` olmadan üretim/sevkiyat, `003`–`004` olmadan sipariş geçişleri ve rezervasyon, `006` olmadan lead-time aware satın alma önerisi, `009` olmadan bazı sipariş transition'larında `entity_id uuid / text` hatası görülebilir. `010` olmadan AI öneri kararları ve satın alma önerileri, `011` olmadan sevkiyat sırasında UUID/text tip hatası, `012` olmadan Excel import flow, `013` olmadan import dedup çalışmaz. `015` olmadan ürün oluşturma ve güncelleme işlemleri kırılır (identity alanları her INSERT/UPDATE'e dahil edilir). `016` olmadan `/api/health` 011 fix'ini doğrulayamaz (`db.migration_011` check'i PGRST202 döndürür). `017` olmadan RLS kapalı kalır ve anon key ile doğrudan veritabanına erişilebilir. `018` olmadan sipariş oluşturma kırılır (`dbCreateOrder` `create_order_with_lines` RPC'ye bağımlıdır).
+**Kritik dönüm noktaları:**
+
+| # | İçerik |
+|---|--------|
+| `001` | İlk şema — 14 tablo, index, trigger, CHECK constraint'ler |
+| `002`–`004` | Atomik stok & sipariş & envanter RPC'leri |
+| `017` | 23 tabloda Row Level Security — anon key ile doğrudan DB erişimini engeller |
+| `018` | `create_order_with_lines` — atomik sipariş oluşturma RPC |
+| `034` | Teklif (quotes) modülü temeli |
+| `047` | `email_logs` — bildirim audit + retry |
+| `056`–`057` | Dinamik ürün tipleri + alanlar + 8 hazır tip seed |
+| `077` | `accept_quote_and_create_order` — atomik teklif → sipariş |
+| `082` | Rezervasyonun `pending_approval` aşamasına taşınması |
+| `083`–`084` | Teknik şablonlar + Excel içe aktarma merkezi |
 
 ---
 
-## Health Check
+## 🏥 Health Check
 
 ```
 GET /api/health
@@ -97,147 +129,161 @@ GET /api/health
 
 Env değişkenlerini ve tablo/migration varlığını kontrol eder.
 
-- **HTTP 200** → sistem hazır (AI ve Paraşüt opsiyonel, eksikse 503 dönmez; `ai_runs` tablosu da opsiyonel)
+- **HTTP 200** → sistem hazır (AI ve Paraşüt opsiyonel, eksikse 503 dönmez)
 - **HTTP 503** → eksik zorunlu env (Supabase) veya uygulanmamış migration
 
 ```jsonc
-// AI yapılandırılmış — tam kapasite
 {
   "env.SUPABASE_URL": "ok",
   "env.SERVICE_ROLE_KEY": "ok",
-  "ai.ANTHROPIC_API_KEY": "ok",
+  "ai.ANTHROPIC_API_KEY": "ok",                 // veya "disabled (AI features unavailable)"
   "env.PARASUT_CLIENT_ID": "MISSING (optional)",
-  "db.customers": "ok",
+  "db.customers": "ok"
   // ...migration check'ler
-}
-
-// AI yapılandırılmamış — sistem çalışıyor, AI özellikleri devre dışı
-{
-  "env.SUPABASE_URL": "ok",
-  "env.SERVICE_ROLE_KEY": "ok",
-  "ai.ANTHROPIC_API_KEY": "disabled (AI features unavailable)",
-  "env.PARASUT_CLIENT_ID": "MISSING (optional)",
-  "db.customers": "ok",
-  // ...
 }
 ```
 
 ---
 
-## Deployment (Coolify)
+## 🚢 Deployment (Coolify)
 
-Production sürümü self-hosted Coolify üzerinde çalışır (Hetzner/Vargonen VPS).
-Vercel'den **2026-05'te** taşındı (cron limit sorunu).
+Production sürümü self-hosted **Coolify** üzerinde çalışır (Hetzner/Vargonen VPS). Vercel'den **2026-05**'te taşındı (cron limit sorunu).
 
 **Mimari:**
-- **Runtime:** Coolify → Docker (Dockerfile multi-stage, Next.js standalone)
+- **Runtime:** Coolify → Docker (multi-stage Dockerfile, Next.js standalone)
 - **Cron:** GitHub Actions (`.github/workflows/crons.yml`) — 6h ve 1h schedule
 - **Source map:** GitHub Actions (`sentry-release.yml`) build sonrası Sentry'e upload
 - **Auto-deploy:** `main` branch push → Coolify webhook → Docker build → swap
 
-**Gerekli GitHub Secrets** (Settings → Secrets → Actions):
-- `APP_URL` — production URL (cron için)
-- `CRON_SECRET` — Coolify env ile aynı
-- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SENTRY_DSN` — sentry-release build için
-- `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` — source map upload
+**Gerekli GitHub Secrets:**
+- `APP_URL`, `CRON_SECRET` (Coolify env ile aynı)
+- `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SENTRY_DSN`
+- `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`
 
-**Local Docker test:**
 ```bash
+# Local Docker testi
 npm run docker:build && npm run docker:run    # http://localhost:3000
 ```
 
-**Rollback:** Coolify dashboard → Deployments → eski commit'e "Redeploy"
+**Rollback:** Coolify dashboard → Deployments → eski commit'e "Redeploy".
 
 ---
 
-## API Hata Kodları
+## 🧱 Mimari & Domain
 
-| HTTP | `code` alanı | Anlam |
-|------|-------------|-------|
-| 503 | `CONFIG_ERROR` | Env var eksik — `/api/health`'e bak |
-| 500 | — | DB veya uygulama hatası |
-| 409 | — | Stok/conflict (beklenen iş mantığı) |
-| 400 | — | Validation hatası (eksik alan vb.) |
-| 404 | — | Kayıt bulunamadı |
+**Katmanlar:** DB (snake_case) → `api-mappers.ts` → Frontend (camelCase)
+
+```
+Product   → id, name, sku, category, unit, price, currency,
+            on_hand, reserved, available_now, productType, attributes (JSONB), ...
+Order     → orderNumber, commercial_status, fulfillment_status, grandTotal, lines[]
+```
+
+**Sipariş çift ekseni:**
+
+```
+commercial_status:   draft → pending_approval → approved → cancelled
+fulfillment_status:  unallocated → partially_allocated → allocated
+                     → partially_shipped → shipped
+```
+
+> Rezervasyon **"Onaya Gönder"** (draft → pending_approval) ile tetiklenir. `approved` = light ticari teyit.
+
+**Stok modeli:**
+
+```
+available_now = on_hand - reserved          # satılabilir fiziksel stok
+quoted        = draft tekliflerdeki miktar  # soft hold
+promisable    = available_now - quoted      # gerçek vaat edilebilir (negatif olabilir)
+incoming      = açık satın alma taahhütleri
+forecasted    = on_hand + incoming - reserved - quoted
+```
+
+**Sipariş hesaplama:**
+
+```ts
+lineTotal  = quantity * unitPrice * (1 - discountPct / 100)
+subtotal   = sum(lineTotals)
+vatTotal   = subtotal * 0.20            // KDV %20
+grandTotal = subtotal + vatTotal
+```
 
 ---
 
-## Proje Yapısı
+## 📁 Proje Yapısı
 
 ```
 src/
 ├── app/
-│   ├── dashboard/
-│   │   ├── page.tsx           — Ana dashboard
-│   │   ├── layout.tsx         — Sidebar + Topbar wrapper
-│   │   ├── orders/            — Sipariş listesi, yeni sipariş, detay
-│   │   ├── products/page.tsx  — Stok & Ürünler
-│   │   ├── customers/page.tsx — Cariler
-│   │   ├── production/page.tsx — Üretim kaydı
-│   │   ├── import/page.tsx    — AI dosya içe aktarma
-│   │   ├── alerts/page.tsx    — Üretim & Stok uyarıları
-│   │   ├── parasut/page.tsx   — Paraşüt muhasebe sync dashboard
-│   │   ├── purchase/suggested/page.tsx — Yeniden sipariş önerileri
-│   │   └── settings/page.tsx  — Firma + kullanıcı + API ayarları
-│   ├── api/                   — Route handler'lar (Next.js App Router)
-│   │   ├── health/route.ts    — Sağlık kontrolü endpoint'i
-│   │   ├── orders/            — CRUD + durum geçişleri
-│   │   ├── products/          — CRUD
-│   │   ├── customers/         — CRUD
-│   │   ├── production/        — CRUD
-│   │   ├── alerts/            — CRUD + scan + AI öneri
-│   │   ├── import/            — AI dosya parse akışı (batch → drafts → confirm)
-│   │   ├── inventory/movements/ — Stok hareketi kayıt (üretim/giriş/düzeltme)
-│   │   ├── purchase/          — scan + suggestions
-│   │   ├── recommendations/   — AI öneri CRUD + karar (kabul/düzenle/reddet)
-│   │   ├── ai/                — parse + score + ops-summary + stock-risk + observability
-│   │   ├── parasut/           — Muhasebe sync
-│   │   └── seed/              — Test verisi seed endpoint'i
-│   └── globals.css            — CSS variables (dark theme)
+│   ├── dashboard/          — tüm dashboard sayfaları
+│   │   ├── orders/         — satış siparişleri (liste, yeni, [id], edit)
+│   │   ├── quotes/         — teklifler (V7: PDF, revizyon, arşiv)
+│   │   ├── products/       — stok & ürünler + dinamik tipler
+│   │   ├── customers/      — cariler
+│   │   ├── production/     — üretim kaydı (ses + form)
+│   │   ├── import/         — AI içe aktarma (sınıflandırma + çıkarım)
+│   │   ├── alerts/         — üretim & stok uyarıları
+│   │   ├── parasut/        — muhasebe sync dashboard
+│   │   ├── purchase/       — satın alma siparişleri + öneriler + tedarikçiler
+│   │   └── settings/       — firma + kullanıcı + tip + şablon + API ayarları
+│   ├── api/                — route handler'lar (Next.js App Router)
+│   └── globals.css         — CSS variables (koyu + aydınlık, :root[data-theme])
 ├── components/
-│   ├── layout/                — Sidebar, Topbar
-│   └── dashboard/             — StatsCards, RecentOrders vb.
+│   ├── layout/             — Sidebar, Topbar, ThemeToggle, ExchangeRatesTicker
+│   ├── dashboard/          — StatsCards, RecentOrders, AIAlerts, AISummaryCard
+│   └── ui/                 — Button, Toast, Pagination, DemoBanner, ...
 └── lib/
-    ├── supabase/              — DB client + tablo query fonksiyonları
-    ├── services/              — İş mantığı servisleri
-    ├── api-error.ts           — Merkezi API hata yönetimi
-    ├── api-mappers.ts         — DB row → frontend model dönüşümleri
-    ├── data-context.tsx       — Client-side React context (gerçek API'ye bağlı)
-    ├── database.types.ts      — Supabase tablo tipleri (snake_case)
-    ├── mock-data.ts           — Frontend interface tanımları (camelCase)
-    └── stock-utils.ts         — coverage_days, daysColor yardımcıları
+    ├── supabase/           — DB client + tablo query fonksiyonları
+    ├── theme/              — use-theme.tsx (ThemeProvider/useTheme)
+    ├── auth/               — RBAC permission guard'ları
+    ├── services/           — iş mantığı (order/alert/production/purchase/parasut/ai)
+    ├── api-mappers.ts      — DB row → frontend model
+    └── database.types.ts   — Supabase tablo tipleri (snake_case)
 supabase/
-└── migrations/                — SQL migration dosyaları (sırayla uygula)
+└── migrations/             — 84 SQL migration (sırayla uygula)
 ```
 
 ---
 
-## Bu Projeyi İlk Açıyorsan
+## 🧪 Test & Komutlar
+
+```bash
+npm test              # Vitest — 319 dosya / ~4650 test
+npm run test:coverage # kapsam raporu
+npm run test:e2e      # Playwright E2E
+npm run lint          # ESLint (0 hata hedefi)
+npm run smoke         # production smoke kontrolü
+npm run doctor        # react-doctor tarama
+```
+
+| Komut | İşlev |
+|-------|-------|
+| `npm run dev` | Geliştirme sunucusu |
+| `npm run build` | Production build (standalone) |
+| `npm run create-admin` | İlk admin kullanıcısı oluştur |
+| `npm run docker:build` / `docker:run` | Local Docker testi |
+
+---
+
+## 🧭 Bu Projeyi İlk Açıyorsan
 
 ### Okuma Sırası
-1. `README.md` (bu dosya) — kurulum ve ortam
-2. `domain-rules.md` — sistemin ne yapması/yapmaması gerektiğini anla
-4. `src/lib/database.types.ts` — DB şemasını anlamak için
-5. `src/lib/api-mappers.ts` — DB ↔ frontend veri akışını anlamak için
-6. `CLAUDE.md` — kodlama kuralları ve mimari özet
+1. **`README.md`** (bu dosya) — kurulum ve ortam
+2. **`domain-rules.md`** — sistemin ne yapması/yapmaması gerektiği (source of truth)
+3. **`src/lib/database.types.ts`** — DB şeması (snake_case)
+4. **`src/lib/api-mappers.ts`** — DB ↔ frontend veri akışı
+5. **`CLAUDE.md`** — kodlama kuralları ve mimari özet
 
-### Kritik Kurallar (hızlı özet)
-- **Stil:** Sadece inline styles + CSS variables. Tailwind class kullanma.
-- **Framer Motion:** Kurulu ama YASAK. Import etme.
-- **`"use client"`:** Tüm interaktif component'larda zorunlu.
-- **Renk:** `var(--text-primary)`, `var(--accent-bg)` vb. CSS variables kullan.
+### Kritik Kurallar
+- 🎨 **Stil:** Sadece inline styles + CSS variables. Tailwind class **kullanma**.
+- 🌗 **Tema:** Renkte **her zaman** `var(--...)` kullan → koyu/aydınlık otomatik çalışır. Sabit hex ekleme.
+- ⚛️ **`"use client"`:** Tüm interaktif component'larda zorunlu.
+- 🚫 **Framer Motion:** Kurulu değil/yasak. CSS animasyon yalnız gerekli yerde.
 
-### Mimari Özet
-- DB → frontend: `src/lib/api-mappers.ts` mapper fonksiyonları
-- Global state: `src/lib/data-context.tsx` (gerçek API'ye bağlı, `refetchAll` expose eder)
-- DB tipleri: `src/lib/database.types.ts` (snake_case, Supabase şemasına parallel)
-- Frontend tipleri: `src/lib/mock-data.ts` (camelCase interfaces)
-- İş mantığı: `src/lib/services/` klasörü (order, alert, production, parasut, AI...)
-- 37 API route: `src/app/api/` altında Next.js App Router route handler'ları
+<div align="center">
 
-### Order Durum Eksenları
-```
-commercial_status:  draft → pending_approval → approved → cancelled
-fulfillment_status: unallocated → partially_allocated → allocated → partially_shipped → shipped
-```
-Rezervasyon sadece `approved` durumda tetiklenir.
+---
+
+**Roven** · PMT Endüstriyel · AI Destekli ERP
+
+</div>
