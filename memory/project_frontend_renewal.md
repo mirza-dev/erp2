@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Frontend Yenileme Planı
+name: Roven — Frontend Yenileme Planı
 description: frontend-renewal.md — DOM mutation fix, component lib, accessibility, görsel yenileme — plan var, uygulama başlamadı
 type: project
 ---

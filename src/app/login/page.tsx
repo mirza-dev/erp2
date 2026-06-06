@@ -67,7 +67,7 @@ export default function LoginPage() {
                             margin: 0,
                         }}
                     >
-                        KokpitERP
+                        Roven
                     </h1>
                     <p
                         style={{

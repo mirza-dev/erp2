@@ -1,4 +1,4 @@
-# KokpitERP
+# Roven
 
 > AI-powered ERP system for industrial B2B sales, integrating LLM-based document parsing, automated purchase recommendations, and multi-agent workflow orchestration. Built with Next.js, TypeScript, Supabase, and Anthropic Claude API.
 

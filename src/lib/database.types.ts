@@ -1,5 +1,5 @@
 // ============================================================
-// KokpitERP — Database Types
+// Roven — Database Types
 // Generated from supabase/migrations/001_initial_schema.sql
 // ============================================================
 

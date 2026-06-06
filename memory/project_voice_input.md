@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Sesli Uretim Girisi
+name: Roven — Sesli Uretim Girisi
 description: Uretim sayfasinda sesli giris — tüm turlar tamamlandı. Final durum, interface, tasarım kararları.
 type: project
 ---

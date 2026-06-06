@@ -113,7 +113,7 @@ export default function PurchaseOrdersPage() {
 
     // Browser tab title — sidebar label ile hizalı (2026-05-27).
     useEffect(() => {
-        document.title = "Satın Alma Siparişleri · KokpitERP";
+        document.title = "Satın Alma Siparişleri · Roven";
     }, []);
 
     const filtered = useMemo(() => {

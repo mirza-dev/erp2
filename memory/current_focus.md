@@ -5,7 +5,21 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-06-05 (**Tema sistemi — Koyu + Aydınlık (Cool slate), premium, sıfır frontend bozulması**)
+## Son Tamamlanan İş — 2026-06-06 (**Marka rename — KokpitERP → Roven**)
+
+Kullanıcı: "SİSTEMİN ADI BUNDAN SONRA ROVEN". Ürün adı `KokpitERP` (+ eski `AI-ERP Micro Kokpit`) → **Roven** (wordmark title-case; caps=vurgu, "ROVEN" istenirse tek komut).
+
+**Rename edildi:** UI wordmark (`Topbar`/landing/login), metadata + `document.title` (`layout.tsx`→"Roven — AI Destekli ERP", orders/purchase-orders), `topbar-title.ts` fallback, Paraşüt fatura `description` (`parasut.ts`+`parasut-service.ts` — yalnız yazılıyor, geri-parse YOK=güvenli), e-posta header (`email/templates.ts`), README + canlı ajan dokümanları (`CLAUDE.md`/`AGENTS.md`/`domain-rules.md`/`ROADMAP.md`/`frontend-renewal.md`/`docs/EMAIL_DEPLOY.md`), tüm `memory/*.md` frontmatter `name:`. Brand-assert testleri güncellendi (topbar `getByText("Roven")`, orders-page-title, parasut-mock-adapter, email-service env). Yöntem: zsh-safe `grep -rIl | xargs perl -pi` + 3 bespoke (layout title, globals yorum, domain-rules "Applies To").
+
+**DEĞİŞMEDİ (kasıtlı):** iç altyapı kimliği (repo `mirza-dev/erp2`, paket adı, `~/.claude/skills/erp2-*`, yollar — ürün adı değil); immutable/arşiv (`supabase/migrations/*.sql` header yorumları, `PARASUT_PLAN.md`+`docs/plans/*` tarihsel snapshot). İstenirse çevrilebilir.
+
+**Doğrulama:** tsc 0 · lint 0 · 4678 test (hepsi yeşil) · build 0 (`ƒ Proxy`). Backend/şema/davranış değişmedi.
+
+**⚠️ BRANCH AYRIŞMASI (kritik):** `origin/codex-experiment`=`4a0161c` (codex ajanının premium-UI/design-token refactor'u ~37 dosya — UnderlinedFilterTabs, globals 214 değişiklik, vb.; rename onun üstünde) ≫ `origin/main`=`995d0b4` (refactor'u almamış). **DURUM: rename codex-experiment'e COMMIT+PUSH;** main hizalama (codex refactor + rename'i main prod'a taşır) **KULLANICI KARARI BEKLİYOR** — sessizce ff EDİLMEDİ. Mirror şu an kırık. **Not:** codex refactor bu oturumun işi değil → ayrı dokümante edilmedi; auto-memory (erp2/memory=main@995d0b4) main hizalanana kadar eski "KokpitERP —" frontmatter adlarını gösterir.
+
+<details><summary>Önceki: Tema sistemi — Koyu + Aydınlık (Cool slate)</summary>
+
+### Tema sistemi — Koyu + Aydınlık (Cool slate)
 
 Sistem yalnız koyu temaydı; kullanıcı koyu+aydınlık istedi (premium, hiçbir frontend bozulmadan; `/frontend-design` + ultrathink, soru sorarak ilerle). **Kullanıcı kararları (AskUserQuestion):** (1) ilk açılış = **sistem tercihini izle** (`prefers-color-scheme`), elle seçim hatırlanır; (2) geçiş = **Topbar küçük ikon** (güneş/ay, avatar öncesi); (3) kayıt = **yalnız localStorage** (backend yok, FOUC-suz); (4) aydınlık palet = **Cool slate** (`#f6f8fa` zemin / `#1f2328` metin / `#0969da` accent — koyu paletle uyumlu).
 
@@ -22,6 +36,8 @@ Sistem yalnız koyu temaydı; kullanıcı koyu+aydınlık istedi (premium, hiçb
 **ADVISOR FIX'leri:** (#1 plan, done-check öncesi) mount noktası `dashboard/layout.tsx` okunarak doğrulandı (zaten client+Topbar orada). (#2) body-only transition reddedildi → anında swap. (#3) toggle `'system'` ulaşılabilirliği uzun-bas ile. (#done-check KRİTİK) root bootstrap landing/login/error'ı global temalar → **tüm `#fff` metinleri statik denetlendi: hepsi `var(--accent)` (doygun mavi, beyaz-üstü kontrast iki temada güçlü) veya `rgba(0,0,0,0.6)` dark scrim üzerinde → `var(--bg-*)` üzerinde görünmez-beyaz YOK** = aydınlıkta first-screen kırılması yok (page.tsx:59/127, login:146, error:57, dashboard/error:37, users:393 + import/purchase butonları + products star/delete scrim icons hepsi denetlendi).
 
 **Doğrulama:** **+18 test** (`theme-system.test.ts`: bootstrap script, palet blokları+cool-slate değerleri, yeni tokenlar, useTheme mantığı [system çözümleme/persist/DOM-okuma/matchMedia/toggle], ThemeToggle [Sun-Moon/aria/uzun-bas]+Topbar entegrasyon, **baskı-belgeleri-tema-muaf regression**) + 3 mevcut test güncellendi (`topbar`/`exchange-rates-ticker` ThemeToggle için useTheme+useToast stub mock; `button-component` toolbar-hover `rgba(240,246,252,0.04)`→`var(--highlight-inset)`). Backend/migration/permission YOK (localStorage). tsc 0 · lint 0 · **4631→4650 test** · build 0 (`ƒ Proxy`). **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA; iki Coolify prod deploy.** Görsel kabul (kontrast/premium + teklif/PO önizleme aydınlıkta beyaz kağıt) kullanıcı gözüyle (deploy sonrası). Plan: `~/.claude/plans/tamam-bu-son-commitlerin-precious-fox.md`.
+
+</details>
 
 <details><summary>Önceki: Topbar "Sakin düz" yeniden tasarım + uyarı butonunu kaldırma (`bf28fb0`)</summary>
 

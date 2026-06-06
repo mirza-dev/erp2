@@ -3,7 +3,7 @@
  * No JSX / external lib — HTML küçük, basit, Resend-friendly.
  *
  * Tasarım: tek <div> container, inline CSS (e-posta client uyumluluğu),
- * branding header (KokpitERP), tek "Detayları Görüntüle" CTA, alt linki
+ * branding header (Roven), tek "Detayları Görüntüle" CTA, alt linki
  * "bildirim tercihlerinizi yönetin" → /dashboard/settings.
  */
 import type { NotificationTypeKey } from "@/lib/notification-types";
@@ -43,7 +43,7 @@ function shell(opts: ShellOpts): string {
 <body style="margin:0;padding:0;background:${COLORS.bg};font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;color:${COLORS.text}">
   <div style="max-width:560px;margin:0 auto;padding:24px 16px">
     <div style="font-size:14px;font-weight:600;color:${COLORS.muted};letter-spacing:0.04em;text-transform:uppercase;padding-bottom:12px;border-bottom:1px solid ${COLORS.border}">
-      KokpitERP
+      Roven
     </div>
     <div style="background:${COLORS.card};border:1px solid ${COLORS.border};border-left:3px solid ${severityColor};border-radius:8px;padding:20px 22px;margin-top:16px">
       <h1 style="font-size:18px;font-weight:600;margin:0 0 14px;color:${COLORS.text}">${escapeHtml(title)}</h1>

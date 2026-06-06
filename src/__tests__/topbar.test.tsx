@@ -96,7 +96,7 @@ describe("Topbar", () => {
 
         render(<Topbar />);
 
-        expect(screen.getByText("KokpitERP")).toBeTruthy();
+        expect(screen.getByText("Roven")).toBeTruthy();
         expect(screen.queryByText("AI")).toBeNull();
         expect(screen.getByText("Ürün Detayı")).toBeTruthy();
         await waitFor(() => expect(screen.getByText("Bağlı")).toBeTruthy());

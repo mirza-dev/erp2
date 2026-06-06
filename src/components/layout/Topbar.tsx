@@ -51,7 +51,7 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                         letterSpacing: 0,
                     }}
                 >
-                    KokpitERP
+                    Roven
                 </div>
 
                 <span className="topbar-divider" aria-hidden="true" />

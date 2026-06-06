@@ -23,8 +23,8 @@ describe("/dashboard/orders — Satış Siparişleri h1 + title", () => {
         expect(SALES_ORDERS).toMatch(/<h1[^>]*>\s*Satış Siparişleri\s*<\/h1>/);
     });
 
-    it("document.title 'Satış Siparişleri · KokpitERP' set ediliyor", () => {
-        expect(SALES_ORDERS).toMatch(/document\.title\s*=\s*"Satış Siparişleri · KokpitERP"/);
+    it("document.title 'Satış Siparişleri · Roven' set ediliyor", () => {
+        expect(SALES_ORDERS).toMatch(/document\.title\s*=\s*"Satış Siparişleri · Roven"/);
     });
 
     it('Eski generic "Siparişler" div başlığı YOK (h1\'a yükseltildi)', () => {
@@ -38,7 +38,7 @@ describe("/dashboard/purchase/orders — Satın Alma Siparişleri h1 + title", (
         expect(PURCHASE_ORDERS).toMatch(/<h1[^>]*>\s*Satın Alma Siparişleri\s*<\/h1>/);
     });
 
-    it("document.title 'Satın Alma Siparişleri · KokpitERP' set ediliyor", () => {
-        expect(PURCHASE_ORDERS).toMatch(/document\.title\s*=\s*"Satın Alma Siparişleri · KokpitERP"/);
+    it("document.title 'Satın Alma Siparişleri · Roven' set ediliyor", () => {
+        expect(PURCHASE_ORDERS).toMatch(/document\.title\s*=\s*"Satın Alma Siparişleri · Roven"/);
     });
 });

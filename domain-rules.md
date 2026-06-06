@@ -1,7 +1,7 @@
 # Domain Rules
 Status: Accepted  
 Last Updated: 2026-03-20  
-Applies To: AI-ERP Micro Kokpit
+Applies To: Roven
 
 ## 1. Amaç
 Bu belge, sistemin operasyonel doğruluğunu koruyan çekirdek kuralları ve AI destekli karar alanlarını tanımlar.

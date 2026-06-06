@@ -27,7 +27,7 @@ Kod **2026-05-06**'dan beri hazır (commit history'de "SMTP/Resend entegrasyonu"
 4. **"Verify DNS" tıkla** — propagation 1-15 dk (TTL 300 önerilir)
 5. **API Key oluştur:** API Keys → Create → "Full access" → değeri kopyala (sadece bir kere gösterilir)
 
-**Önemli:** Domain doğrulanmadan EMAIL_FROM o domain'le çalışmaz. Geçici test için `EMAIL_FROM="KokpitERP <onboarding@resend.dev>"` (Resend test alanı) kullanılabilir ama deliverability düşük — sadece kod test'i için.
+**Önemli:** Domain doğrulanmadan EMAIL_FROM o domain'le çalışmaz. Geçici test için `EMAIL_FROM="Roven <onboarding@resend.dev>"` (Resend test alanı) kullanılabilir ama deliverability düşük — sadece kod test'i için.
 
 ---
 
@@ -38,7 +38,7 @@ Coolify dashboard → ERP project → Environment Variables → 4 değişken:
 | Key | Değer | Not |
 |---|---|---|
 | `RESEND_API_KEY` | `re_xxxxxxxxxxxxxx` | Faz 1.5'te kopyalanan |
-| `EMAIL_FROM` | `KokpitERP <bildirim@bildirim.pmt.com.tr>` | Doğrulanmış domain'den; "Display Name <adres>" formatı önerilir |
+| `EMAIL_FROM` | `Roven <bildirim@bildirim.pmt.com.tr>` | Doğrulanmış domain'den; "Display Name <adres>" formatı önerilir |
 | `NEXT_PUBLIC_APP_URL` | `https://erp.getmedspace.com` | Zaten set ise dokunma — email template'lerinde CTA link |
 | `ADMIN_EMAILS` | `mrzsrbyk06@gmail.com` (opsiyonel) | virgülle ayrılmış admin liste; user_notification_preferences boşsa fallback |
 
@@ -169,7 +169,7 @@ ORDER BY created_at DESC LIMIT 10;
   "status": "sent",
   "resend_message_id": "re_abc123",
   "log_id": "uuid",
-  "from": "KokpitERP <bildirim@pmt.com.tr>",
+  "from": "Roven <bildirim@pmt.com.tr>",
   "to": "admin@example.com",
   "subject": "Kritik stok: Test Ürün"
 }

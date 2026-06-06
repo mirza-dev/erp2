@@ -433,7 +433,7 @@ export function mapOrderToInvoice(order: {
             type: 'sales_invoices',
             attributes: {
                 item_type:      'invoice',
-                description:    `KokpitERP #${order.orderNumber}`,
+                description:    `Roven #${order.orderNumber}`,
                 issue_date:     order.createdAt.slice(0, 10),
                 due_date:       due.toISOString().slice(0, 10),
                 currency:       mapCurr(order.currency),

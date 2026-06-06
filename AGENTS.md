@@ -1,4 +1,4 @@
-# KokpitERP — Codex Rehberi
+# Roven — Codex Rehberi
 
 ## Çift Ajan / Çift Klasör Kuralı
 
@@ -407,7 +407,7 @@ _Son güncelleme: 2026-05-31_
   2. **Dashboard stok widget sınırsız:** `StockDataGrid` tüm aktif ürünleri gösteriyordu → PMT prod'unda 100+ ürün olunca dashboard scroll patlardı.
 - **Sipariş adları:**
   - **Sidebar.tsx**: "Siparişler" → "Satış Siparişleri" (Operasyon) + "Satın Alma Siparişleri" (Satın Alma).
-  - **`/dashboard/orders/page.tsx`**: div → h1 "Satış Siparişleri" + `useEffect document.title = "Satış Siparişleri · KokpitERP"` (browser tab).
+  - **`/dashboard/orders/page.tsx`**: div → h1 "Satış Siparişleri" + `useEffect document.title = "Satış Siparişleri · Roven"` (browser tab).
   - **`/dashboard/purchase/orders/page.tsx`**: h1 zaten "Satın Alma Siparişleri"ydi, sadece document.title eklendi.
 - **StockDataGrid (`src/components/dashboard/StockDataGrid.tsx`):**
   - Yeni opsiyonel prop: `limit?: number` + `showViewAllLink?: boolean`.

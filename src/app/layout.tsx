@@ -4,7 +4,7 @@ import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "AI-ERP Micro Kokpit",
+  title: "Roven — AI Destekli ERP",
   description:
     "AI destekli sipariş ve stok yönetim sistemi — PMT Endüstriyel",
 };

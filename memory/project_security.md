@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Güvenlik ve Demo Mode
+name: Roven — Güvenlik ve Demo Mode
 description: RLS, auth middleware, demo mode mimarisi, credential güvenliği, audit fix durumu
 type: project
 originSessionId: 9b856903-3698-4fae-92be-9c687d469cdf

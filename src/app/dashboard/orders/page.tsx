@@ -104,7 +104,7 @@ function OrdersList() {
 
     // Browser tab title — sidebar label ile hizalı (2026-05-27).
     useEffect(() => {
-        document.title = "Satış Siparişleri · KokpitERP";
+        document.title = "Satış Siparişleri · Roven";
     }, []);
 
     // Initialize from DataContext on first non-empty load (avoids redundant fetch after navigation)

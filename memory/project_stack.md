@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Stack ve Kodlama Kuralları
+name: Roven — Stack ve Kodlama Kuralları
 description: Teknoloji stack, kritik kodlama kuralları, klasör yapısı ve veri modelleri
 type: project
 originSessionId: f81399bb-e89a-4404-bdd5-9b4a0afc0d53

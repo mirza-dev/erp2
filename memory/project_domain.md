@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Domain Kuralları ve İş Mantığı
+name: Roven — Domain Kuralları ve İş Mantığı
 description: Sipariş çift ekseni, stok modeli, KDV hesaplama, import kontratı, teklif süresi, alert tipleri, tamamlanan fazlar
 type: project
 ---

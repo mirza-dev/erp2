@@ -33,7 +33,7 @@ import { notifyUsersByEmail, retryFailedEmails } from "@/lib/services/email-serv
 beforeEach(() => {
     vi.clearAllMocks();
     process.env.RESEND_API_KEY = "re_test";
-    process.env.EMAIL_FROM = "KokpitERP <test@resend.dev>";
+    process.env.EMAIL_FROM = "Roven <test@resend.dev>";
     mockResendSend.mockResolvedValue({ data: { id: "rs_msg_1" }, error: null });
     mockCheckDup.mockResolvedValue(false);
     mockCreateLog.mockResolvedValue("log-1");

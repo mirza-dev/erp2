@@ -563,7 +563,7 @@ async function upsertShipment(order: OrderWithLines): Promise<void> {
             shipment_date:      shippedAt,
             inflow:             false,
             procurement_number: order.order_number,
-            description:        `KokpitERP #${order.order_number}`,
+            description:        `Roven #${order.order_number}`,
             city:               customer.city     ?? undefined,
             district:           customer.district ?? undefined,
             address:            customer.address  ?? undefined,
@@ -722,7 +722,7 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
                 due_date:          dueDate,
                 currency:          mapCurrency(order.currency),
                 shipment_included: false, // KESIN false — shipment ayrı belgede (stok invariant)
-                description:       `KokpitERP #${order.order_number}`,
+                description:       `Roven #${order.order_number}`,
                 details,
             }),
         );

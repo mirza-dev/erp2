@@ -1,4 +1,4 @@
-# KokpitERP Frontend Yenileme Planı
+# Roven Frontend Yenileme Planı
 
 _Oluşturulma: 2026-04-08_
 

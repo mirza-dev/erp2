@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import DemoButton from "@/components/ui/DemoButton";
 
 export const metadata: Metadata = {
-    title: "KokpitERP — AI Destekli ERP",
+    title: "Roven — AI Destekli ERP",
     description: "PMT Endüstriyel için yapay zeka destekli ERP sistemi. Sipariş yönetimi, stok takibi, Paraşüt entegrasyonu.",
 };
 
@@ -39,7 +39,7 @@ export default function LandingPage() {
                 }}
             >
                 <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)" }}>
-                    KokpitERP
+                    Roven
                 </span>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                     <a

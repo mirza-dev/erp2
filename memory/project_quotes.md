@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Teklif Modülü Roadmap
+name: Roven — Teklif Modülü Roadmap
 description: Teklif (quotes) modülünün tamamlanan fazları, V2 master plan referansı, kalan işler
 type: project
 originSessionId: f2c7abb6-e108-4254-b294-f3de57424ee3

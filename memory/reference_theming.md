@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Tema Sistemi (Koyu + Aydınlık)
+name: Roven — Tema Sistemi (Koyu + Aydınlık)
 description: data-theme token sistemi, FOUC bootstrap, ThemeToggle, tema-muaf yüzeyler — yeni renk eklerken kırılmayı önler
 metadata:
   type: reference

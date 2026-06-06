@@ -33,5 +33,5 @@ export function getTopbarTitle(pathname: string | null | undefined): string {
     if (/^\/dashboard\/purchase\/orders\/[^/]+$/.test(path)) return "Satın Alma Detayı";
     if (/^\/dashboard\/settings\/product-types\/[^/]+$/.test(path)) return "Teknik Şablon Detayı";
     if (/^\/dashboard\/import\/extract\/[^/]+$/.test(path)) return "Veri İnceleme";
-    return "KokpitERP";
+    return "Roven";
 }

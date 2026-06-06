@@ -147,7 +147,7 @@ describe("SalesInvoice — stok invariant", () => {
             due_date:          "2026-05-25",
             currency:          "TRL" as const,
             shipment_included: false as const,
-            description:       "KokpitERP #ORD-2026-0042",
+            description:       "Roven #ORD-2026-0042",
             details: [{
                 quantity:    10,
                 unit_price:  100,
@@ -219,7 +219,7 @@ describe("ShipmentDocument", () => {
             shipment_date:      "2026-04-24",
             inflow:             false as const,
             procurement_number: "ORD-2026-0042",
-            description:        "KokpitERP #ORD-2026-0042",
+            description:        "Roven #ORD-2026-0042",
             details: [{
                 quantity:    10,
                 product_id:  "product-uuid-1",

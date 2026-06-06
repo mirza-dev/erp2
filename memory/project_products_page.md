@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Products Page Mimarisi
+name: Roven — Products Page Mimarisi
 description: products/page.tsx veri akışı, tam ekran detay sayfası, kategori yönetimi ve önemli pattern'ler
 type: project
 originSessionId: 7a43eaa4-1c39-4659-9d1b-98c8a329ce4f

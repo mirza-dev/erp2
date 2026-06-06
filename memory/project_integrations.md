@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Entegrasyonlar, AI ve Test Altyapısı
+name: Roven — Entegrasyonlar, AI ve Test Altyapısı
 description: Paraşüt mock, AI kolon eşleştirme, health check, test altyapısı ve mock pattern'ler
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9

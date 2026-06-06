@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Worktree / İki-Branch / Memory Symlink Mekanizması
+name: Roven — Worktree / İki-Branch / Memory Symlink Mekanizması
 description: erp2=main + proje-codex=codex-experiment birebir-ayna; push akışı; ~/.claude memory symlink — her iki ajanın senkron çalışması için
 metadata:
   type: reference

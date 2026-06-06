@@ -1,5 +1,5 @@
 ---
-name: KokpitERP — Auth ve Kullanıcı Yönetimi
+name: Roven — Auth ve Kullanıcı Yönetimi
 description: Login akışı, kullanıcı yönetimi, admin API, landing page
 type: project
 ---
