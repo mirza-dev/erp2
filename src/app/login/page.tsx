@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { clearDemoMode } from "@/lib/demo-utils";
 import DemoButton from "@/components/ui/DemoButton";
+import RovenLogo from "@/components/layout/RovenLogo";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -62,12 +63,12 @@ export default function LoginPage() {
                     <h1
                         style={{
                             fontSize: "20px",
-                            fontWeight: 600,
                             color: "var(--text-primary)",
                             margin: 0,
+                            display: "inline-flex",
                         }}
                     >
-                        Roven
+                        <RovenLogo size={22} />
                     </h1>
                     <p
                         style={{

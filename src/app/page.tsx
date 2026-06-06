@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import DemoButton from "@/components/ui/DemoButton";
+import RovenLogo from "@/components/layout/RovenLogo";
 
 export const metadata: Metadata = {
     title: "Roven — AI Destekli ERP",
@@ -38,8 +39,8 @@ export default function LandingPage() {
                     justifyContent: "space-between",
                 }}
             >
-                <span style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)" }}>
-                    Roven
+                <span style={{ display: "inline-flex", color: "var(--text-primary)" }}>
+                    <RovenLogo size={17} wordmarkSize={15} />
                 </span>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                     <a

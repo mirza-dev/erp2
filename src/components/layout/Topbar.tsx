@@ -7,6 +7,7 @@ import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
 import SystemHealthIndicator from "@/components/layout/SystemHealthIndicator";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import UserAvatarLink from "@/components/layout/UserAvatarLink";
+import RovenLogo from "@/components/layout/RovenLogo";
 import { getTopbarTitle } from "@/lib/topbar-title";
 
 interface TopbarProps {
@@ -51,7 +52,7 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                         letterSpacing: 0,
                     }}
                 >
-                    Roven
+                    <RovenLogo size={18} />
                 </div>
 
                 <span className="topbar-divider" aria-hidden="true" />
