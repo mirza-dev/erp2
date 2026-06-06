@@ -1,5 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
-  <rect width="24" height="24" rx="5" fill="#0d1117"/>
-  <polygon points="12,5 18.06,8.5 18.06,15.5 12,19 5.94,15.5 5.94,8.5"
-    fill="#e6edf3" stroke="#e6edf3" stroke-width="2" stroke-linejoin="round"/>
+  <style>
+    .mark { fill: #1f2937; stroke: #1f2937; }
+    @media (prefers-color-scheme: dark) {
+      .mark { fill: #e6edf3; stroke: #e6edf3; }
+    }
+  </style>
+  <polygon class="mark" points="12,2.6 20.2,7.3 20.2,16.7 12,21.4 3.8,16.7 3.8,7.3"
+    stroke-width="2.4" stroke-linejoin="round"/>
 </svg>
