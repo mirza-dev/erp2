@@ -5,7 +5,19 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-06-06 (**Marka rename — KokpitERP → Roven**)
+## Son Tamamlanan İş — 2026-06-06 (**README yenileme — Roven premium hero + görsel doku**)
+
+Kullanıcı: "GitHub'da main ve codex-experiment README'lerini güncelle, açıklayıcı + görsel dokulu olsun." Görsel yön (AskUserQuestion, preview'li): **Premium merkezli hero**.
+
+**Yapılan (`README.md` tam yeniden yazım, tek dosya):** `<div align=center>` hero (`⬢ Roven` + slogan + **9 shields.io rozeti**: Next/React/TS/Supabase/Claude + tests·4650/migrations·84/deploy/theme) · anchor'lı içindekiler · **emoji bölüm başlıkları** (📦🚀🔑🗄️🏥🚢🧱📁🧪🧭) · 2 kolonlu **özellik kart ızgarası** (8 özellik) · Mimari & Domain bölümü (stok modeli + sipariş çift ekseni + formüller) · Test & Komutlar.
+
+**İçerik tazelendi (bayattı):** stack `Next.js 15`→**Next 16.1 / React 19.2** (gerçek sürüm rozetleri); migration `18-satır tablo`→**84 sıralı migration + `supabase db push` + 10 kritik dönüm noktası** (001 şema, 017 RLS, 034 quotes, 056/057 ürün tipleri, 077 accept→sipariş, 082 rezervasyon pending). `feedback_no_silent_deletes`: tablo silinmedi, doğru+öz bilgiyle değiştirildi.
+
+**Doğrulama:** yalnız `README.md` (197+/151−); kod/şema/test SIFIR değişiklik → build/test çalıştırılmadı. **DURUM: PUSH EDİLDİ (`b388e90`) — `origin/main == origin/codex-experiment` birebir aynı SHA; iki Coolify prod deploy.** Push'ta `Required status check "test"` bypass (branch protection, yetkiyle geçti). Plan: `~/.claude/plans/tamam-bu-son-commitlerin-precious-fox.md`.
+
+<details><summary>Önceki: Marka rename (KokpitERP → Roven) + branch hizalama</summary>
+
+### Marka rename — KokpitERP → Roven + main hizalama
 
 Kullanıcı: "SİSTEMİN ADI BUNDAN SONRA ROVEN". Ürün adı `KokpitERP` (+ eski `AI-ERP Micro Kokpit`) → **Roven** (wordmark title-case; caps=vurgu, "ROVEN" istenirse tek komut).
 
@@ -15,7 +27,9 @@ Kullanıcı: "SİSTEMİN ADI BUNDAN SONRA ROVEN". Ürün adı `KokpitERP` (+ esk
 
 **Doğrulama:** tsc 0 · lint 0 · 4678 test (hepsi yeşil) · build 0 (`ƒ Proxy`). Backend/şema/davranış değişmedi.
 
-**⚠️ BRANCH AYRIŞMASI (kritik):** `origin/codex-experiment`=`4a0161c` (codex ajanının premium-UI/design-token refactor'u ~37 dosya — UnderlinedFilterTabs, globals 214 değişiklik, vb.; rename onun üstünde) ≫ `origin/main`=`995d0b4` (refactor'u almamış). **DURUM: rename codex-experiment'e COMMIT+PUSH;** main hizalama (codex refactor + rename'i main prod'a taşır) **KULLANICI KARARI BEKLİYOR** — sessizce ff EDİLMEDİ. Mirror şu an kırık. **Not:** codex refactor bu oturumun işi değil → ayrı dokümante edilmedi; auto-memory (erp2/memory=main@995d0b4) main hizalanana kadar eski "KokpitERP —" frontmatter adlarını gösterir.
+**Branch ayrışması → ÇÖZÜLDÜ:** rename önce codex-experiment'e push edildi (`d73e25a`); o sırada codex ajanının premium-UI/design-token refactor'u (`4a0161c`, ~37 dosya — UnderlinedFilterTabs, globals 214 değişiklik) yalnız codex-experiment'teydi, main (`995d0b4`) gerisindeydi. Kullanıcı "maini de hizala" dedi → `main` ff-only `995d0b4`→`d73e25a` (codex refactor + rename main prod'a gitti) + iki branch push → **mirror geri sağlandı (`git diff --stat` boş)**. İki Coolify prod deploy. Bypass uyarısı (test status check) yetkiyle geçti.
+
+</details>
 
 <details><summary>Önceki: Tema sistemi — Koyu + Aydınlık (Cool slate)</summary>
 
