@@ -12,6 +12,8 @@ import { formatCurrency } from "@/lib/utils";
 import { computeOrderTotals, scheduleRefetchAfterMutation, shouldSkipAiFetch } from "@/lib/purchase-utils";
 import PurchaseOrderModal, { type ModalItem, type VendorOption, type PoModalMode } from "@/components/purchase/PurchaseOrderModal";
 import type { LinkedPO } from "@/lib/supabase/purchase-orders";
+import Button from "@/components/ui/Button";
+import { Check, CircleOff, ClipboardList, Pencil } from "lucide-react";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -560,26 +562,19 @@ function RecActionCell({
                     }}
                 />
                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{unit}</span>
-                <button
+                <Button
+                    size="xs"
                     onClick={() => { onEdit(productId, editQty, unit); setEditMode(false); }}
-                    style={{
-                        fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
-                        background: "var(--accent-bg)", color: "var(--accent-text)",
-                        border: "0.5px solid var(--accent-border)", cursor: "pointer",
-                    }}
                 >
                     Kaydet
-                </button>
-                <button
+                </Button>
+                <Button
+                    variant="secondary"
+                    size="xs"
                     onClick={() => setEditMode(false)}
-                    style={{
-                        fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
-                        background: "transparent", color: "var(--text-tertiary)",
-                        border: "0.5px solid var(--border-secondary)", cursor: "pointer",
-                    }}
                 >
                     İptal
-                </button>
+                </Button>
             </div>
         );
     }
@@ -606,26 +601,21 @@ function RecActionCell({
                     }}
                 />
                 <div style={{ display: "flex", gap: "6px" }}>
-                    <button
+                    <Button
+                        variant="danger"
+                        size="xs"
+                        leftIcon={<CircleOff size={13} />}
                         onClick={() => { onReject(productId, rejectNote || undefined); setRejectMode(false); setRejectNote(""); }}
-                        style={{
-                            fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
-                            background: "transparent", color: "var(--danger-text)",
-                            border: "0.5px solid var(--danger)", cursor: "pointer",
-                        }}
                     >
                         Reddet
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="xs"
                         onClick={() => { setRejectMode(false); setRejectNote(""); }}
-                        style={{
-                            fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
-                            background: "transparent", color: "var(--text-tertiary)",
-                            border: "0.5px solid var(--border-secondary)", cursor: "pointer",
-                        }}
                     >
                         İptal
-                    </button>
+                    </Button>
                 </div>
             </div>
         );
@@ -646,60 +636,48 @@ function RecActionCell({
 
     return (
         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-            <button
+            <Button
+                variant="success"
+                size="xs"
+                leftIcon={<Check size={13} />}
                 onClick={() => onAccept(productId)}
                 disabled={isDemo}
                 title={isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın." : undefined}
-                style={{
-                    fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
-                    background: "var(--success-bg)", color: "var(--success-text)",
-                    border: "0.5px solid var(--success-border)", cursor: isDemo ? "not-allowed" : "pointer",
-                    opacity: isDemo ? 0.5 : 1,
-                }}
             >
                 Kabul Et
-            </button>
-            <button
+            </Button>
+            <Button
+                variant="secondary"
+                size="xs"
+                leftIcon={<Pencil size={13} />}
                 onClick={() => { setEditQty(suggestQty); setEditMode(true); }}
                 disabled={isDemo}
                 title={isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın." : undefined}
-                style={{
-                    fontSize: "11px", fontWeight: 600, padding: "3px 8px", borderRadius: "4px",
-                    background: "var(--accent-bg)", color: "var(--accent-text)",
-                    border: "0.5px solid var(--accent-border)", cursor: isDemo ? "not-allowed" : "pointer",
-                    opacity: isDemo ? 0.5 : 1,
-                }}
             >
                 Düzenle
-            </button>
-            <button
+            </Button>
+            <Button
+                variant="dangerSoft"
+                size="xs"
+                leftIcon={<CircleOff size={13} />}
                 onClick={() => { setRejectNote(""); setRejectMode(true); }}
                 disabled={isDemo}
                 title={isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın." : undefined}
-                style={{
-                    fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
-                    background: "transparent", color: "var(--text-tertiary)",
-                    border: "0.5px solid var(--border-secondary)", cursor: isDemo ? "not-allowed" : "pointer",
-                    opacity: isDemo ? 0.5 : 1,
-                }}
             >
                 Reddet
-            </button>
+            </Button>
             {onOpenPoModal && (
-                <button
+                <Button
+                    variant="secondary"
+                    size="xs"
+                    leftIcon={<ClipboardList size={13} />}
                     onClick={() => onOpenPoModal(productId)}
                     disabled={isDemo}
                     title={isDemo ? "Demo modunda devre dışı — değişiklik yapmak için giriş yapın." : "Bu öneriden satın alma siparişi oluştur"}
-                    style={{
-                        fontSize: "11px", padding: "3px 8px", borderRadius: "4px",
-                        background: "var(--bg-secondary)", color: "var(--text-secondary)",
-                        border: "0.5px solid var(--border-secondary)", cursor: isDemo ? "not-allowed" : "pointer",
-                        opacity: isDemo ? 0.5 : 1,
-                    }}
                     aria-label="Satın alma siparişi oluştur"
                 >
-                    📋 Sipariş Aç
-                </button>
+                    Sipariş Aç
+                </Button>
             )}
         </div>
     );

@@ -9,7 +9,7 @@ import { useSelection } from "@/hooks/useSelection";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { VendorRow } from "@/lib/database.types";
 import Button from "@/components/ui/Button";
-import { Plus } from "lucide-react";
+import { CircleOff, Pencil, Plus, RotateCcw } from "lucide-react";
 
 // ── Styles ────────────────────────────────────────────────────
 
@@ -352,8 +352,9 @@ export default function VendorsPage() {
                         {selectedIds.size} tedarikçi seçildi
                     </span>
                     <Button
-                        variant="danger"
+                        variant="dangerSoft"
                         size="sm"
+                        leftIcon={<CircleOff size={14} />}
                         onClick={() => setBulkDeactivateConfirm(true)}
                         disabled={bulkDeactivating}
                     >
@@ -503,6 +504,7 @@ export default function VendorsPage() {
                                             <Button
                                                 variant="secondary"
                                                 size="sm"
+                                                leftIcon={<Pencil size={14} />}
                                                 onClick={() => openEdit(v)}
                                                 disabled={isDemo}
                                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : "Düzenle"}
@@ -511,8 +513,9 @@ export default function VendorsPage() {
                                             </Button>
                                             {v.is_active ? (
                                                 <Button
-                                                    variant="danger"
+                                                    variant="dangerSoft"
                                                     size="sm"
+                                                    leftIcon={<CircleOff size={14} />}
                                                     onClick={() => handleDeactivate(v)}
                                                     disabled={isDemo || deactivatingId === v.id}
                                                     title={isDemo ? DEMO_DISABLED_TOOLTIP : "Pasife al"}
@@ -523,6 +526,7 @@ export default function VendorsPage() {
                                                 <Button
                                                     variant="success"
                                                     size="sm"
+                                                    leftIcon={<RotateCcw size={14} />}
                                                     onClick={() => handleReactivate(v)}
                                                     disabled={isDemo || reactivatingId === v.id}
                                                     title={isDemo ? DEMO_DISABLED_TOOLTIP : "Aktifleştir"}
@@ -585,6 +589,7 @@ export default function VendorsPage() {
                             <Button
                                 variant="danger"
                                 size="md"
+                                leftIcon={<CircleOff size={14} />}
                                 onClick={handleBulkDeactivate}
                                 disabled={bulkDeactivating}
                             >

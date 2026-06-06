@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Download, RefreshCw, Star, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, CircleOff, Download, Pencil, RefreshCw, Star, Trash2, X } from "lucide-react";
 import { formatCurrency, maskCurrency, formatNumber } from "@/lib/utils";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapProduct } from "@/lib/api-mappers";
@@ -941,6 +941,7 @@ export default function ProductDetailPage() {
                         <>
                             <Button
                                 variant="secondary"
+                                leftIcon={<Pencil size={14} />}
                                 onClick={handleEditClick}
                                 disabled={isDemo}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
@@ -949,7 +950,8 @@ export default function ProductDetailPage() {
                             </Button>
                             {product.isActive && (
                                 <Button
-                                    variant="danger"
+                                    variant="dangerSoft"
+                                    leftIcon={<CircleOff size={14} />}
                                     onClick={() => setConfirmDeactivate(true)}
                                     disabled={isDemo}
                                     title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
@@ -1409,7 +1411,7 @@ export default function ProductDetailPage() {
                             >
                                 <span>⚠ {attachmentsError}</span>
                                 <Button
-                                    variant="danger"
+                                    variant="secondary"
                                     size="xs"
                                     leftIcon={<RefreshCw size={13} />}
                                     onClick={() => fetchAttachments()}
@@ -1745,7 +1747,7 @@ export default function ProductDetailPage() {
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
                             <Button variant="secondary" onClick={cancelTypeChange}>Vazgeç</Button>
-                            <Button variant="danger" onClick={confirmTypeChange}>Tipi Değiştir</Button>
+                            <Button variant="danger" leftIcon={<RefreshCw size={14} />} onClick={confirmTypeChange}>Tipi Değiştir</Button>
                         </div>
                     </div>
                 </div>
@@ -1843,7 +1845,7 @@ export default function ProductDetailPage() {
                             <Button variant="secondary" onClick={() => setConfirmDeactivate(false)} disabled={deactivating}>
                                 Vazgeç
                             </Button>
-                            <Button variant="danger" onClick={handleDeactivate} loading={deactivating} disabled={deactivating}>
+                            <Button variant="danger" leftIcon={<CircleOff size={14} />} onClick={handleDeactivate} loading={deactivating} disabled={deactivating}>
                                 Devre Dışı Bırak
                             </Button>
                         </div>

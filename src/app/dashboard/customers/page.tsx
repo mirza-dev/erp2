@@ -12,7 +12,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 const thStyle: React.CSSProperties = {
@@ -237,8 +237,9 @@ export default function CustomersPage() {
                             {selectedIds.size} müşteri seçildi
                         </span>
                         <Button
-                            variant="danger"
+                            variant="dangerSoft"
                             size="sm"
+                            leftIcon={<Trash2 size={14} />}
                             onClick={() => setBulkDeleteConfirm(true)}
                             disabled={bulkDeleting}
                         >
@@ -377,6 +378,7 @@ export default function CustomersPage() {
                                                 <Button
                                                     variant="danger"
                                                     size="xs"
+                                                    leftIcon={<Trash2 size={13} />}
                                                     disabled={deletingId === customer.id}
                                                     onClick={() => handleDelete(customer.id)}
                                                 >
@@ -392,8 +394,9 @@ export default function CustomersPage() {
                                             </span>
                                         ) : (
                                             <Button
-                                                variant="danger"
+                                                variant="dangerSoft"
                                                 size="xs"
+                                                leftIcon={<Trash2 size={13} />}
                                                 onClick={() => setConfirmDeleteId(customer.id)}
                                                 disabled={isDemo}
                                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
@@ -459,6 +462,7 @@ export default function CustomersPage() {
                             <Button
                                 variant="danger"
                                 size="md"
+                                leftIcon={<Trash2 size={14} />}
                                 onClick={handleBulkDelete}
                                 disabled={bulkDeleting}
                             >

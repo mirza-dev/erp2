@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, FileText, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, CircleOff, FileText, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { formatCurrency, maskCurrency, formatDate } from "@/lib/utils";
 import { useData, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
@@ -459,7 +459,7 @@ export default function OrderDetailPage() {
                         {commercialStatus === "draft" && (
                             <>
                                 <Button
-                                    variant="danger"
+                                    variant="dangerSoft"
                                     size="sm"
                                     leftIcon={<Trash2 size={14} />}
                                     onClick={() => setHardDeleteOpen(true)}
@@ -469,9 +469,9 @@ export default function OrderDetailPage() {
                                     Kalıcı Sil
                                 </Button>
                                 {has("manage_sales_orders") && (
-                                    <ButtonLink href={`/dashboard/orders/${order.id}/edit`} variant="secondary" disabled={loading !== null}>Düzenle</ButtonLink>
+                                    <ButtonLink href={`/dashboard/orders/${order.id}/edit`} variant="secondary" leftIcon={<Pencil size={14} />} disabled={loading !== null}>Düzenle</ButtonLink>
                                 )}
-                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                <Button variant="dangerSoft" leftIcon={<CircleOff size={14} />} onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
                                 <Button variant="primary" onClick={() => requestTransition("pending_approval")} disabled={isDemo || loading !== null} loading={loading === "pending_approval"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
@@ -481,7 +481,7 @@ export default function OrderDetailPage() {
                         )}
                         {commercialStatus === "pending_approval" && (
                             <>
-                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                <Button variant="dangerSoft" leftIcon={<CircleOff size={14} />} onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
                                 <Button variant="primary" onClick={() => requestTransition("approved")} disabled={isDemo || loading !== null} loading={loading === "approved"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
@@ -491,7 +491,7 @@ export default function OrderDetailPage() {
                         )}
                         {commercialStatus === "approved" && fulfillmentStatus !== "shipped" && (
                             <>
-                                <Button variant="danger" onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                <Button variant="dangerSoft" leftIcon={<CircleOff size={14} />} onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
                                 {has("ship_sales_orders") && (
@@ -505,7 +505,7 @@ export default function OrderDetailPage() {
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 {commercialStatus === "cancelled" && (
                                     <Button
-                                        variant="danger"
+                                        variant="dangerSoft"
                                         size="sm"
                                         leftIcon={<Trash2 size={14} />}
                                         onClick={() => setHardDeleteOpen(true)}
@@ -1108,7 +1108,7 @@ export default function OrderDetailPage() {
                             <Button variant="secondary" onClick={() => setHardDeleteOpen(false)} disabled={hardDeleteLoading} style={{ flex: 1 }}>
                                 Vazgeç
                             </Button>
-                            <Button variant="danger" onClick={handleHardDelete} disabled={hardDeleteLoading} style={{ flex: 1 }}>
+                            <Button variant="danger" leftIcon={<Trash2 size={14} />} onClick={handleHardDelete} disabled={hardDeleteLoading} style={{ flex: 1 }}>
                                 {hardDeleteLoading ? "Siliniyor..." : "Evet, kalıcı sil"}
                             </Button>
                         </div>

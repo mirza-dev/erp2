@@ -123,7 +123,7 @@ describe("Faz 4 follow-up — detail page UI gap'leri kapandı", () => {
     });
 
     it("P2.2 — Revize Et butonu sadece isSent koşulunda render edilir", () => {
-        expect(detailSrc).toMatch(/\{isSent && \(\s*<button[^]*Revize Et/);
+        expect(detailSrc).toMatch(/\{isSent && \(\s*<Button[^]*Revize Et/);
         expect(detailSrc).toContain('doTransition("revise"');
     });
 

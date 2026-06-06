@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type CSSProperties, type ComponentProps, type ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "danger" | "success" | "ghost" | "toolbar" | "icon";
+type Variant = "primary" | "secondary" | "dangerSoft" | "danger" | "success" | "ghost" | "toolbar" | "icon";
 type Size = "xs" | "sm" | "md" | "lg" | "cta";
 
 type ButtonBaseProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
@@ -73,18 +73,31 @@ const VARIANT_STYLES: Record<Variant, VariantStyle> = {
         hoverShadow: "var(--button-primary-shadow-hover)",
     },
     secondary: {
-        bg: "var(--highlight-inset)",
-        border: "var(--border-secondary)",
+        bg: "var(--button-secondary-bg)",
+        border: "var(--button-secondary-border)",
         color: "var(--text-primary)",
-        hoverBg: "var(--bg-tertiary)",
-        hoverBorder: "var(--border-primary)",
+        hoverBg: "var(--button-secondary-bg-hover)",
+        hoverBorder: "var(--button-secondary-border-hover)",
+        shadow: "var(--button-secondary-shadow)",
+        hoverShadow: "var(--button-secondary-shadow-hover)",
+    },
+    dangerSoft: {
+        bg: "var(--button-danger-soft-bg)",
+        border: "var(--button-danger-soft-border)",
+        color: "var(--button-danger-soft-text)",
+        hoverBg: "var(--button-danger-soft-bg-hover)",
+        hoverBorder: "var(--button-danger-soft-border-hover)",
+        shadow: "var(--button-danger-soft-shadow)",
+        hoverShadow: "var(--button-danger-soft-shadow-hover)",
     },
     danger: {
-        bg: "var(--danger-bg)",
-        border: "var(--danger-border)",
-        color: "var(--danger-text)",
-        hoverBg: "var(--danger-bg-strong)",
-        hoverBorder: "var(--danger)",
+        bg: "var(--button-danger-bg)",
+        border: "var(--button-danger-border)",
+        color: "#ffffff",
+        hoverBg: "var(--button-danger-bg-hover)",
+        hoverBorder: "var(--button-danger-border-hover)",
+        shadow: "var(--button-danger-shadow)",
+        hoverShadow: "var(--button-danger-shadow-hover)",
     },
     success: {
         bg: "var(--success-bg)",
@@ -150,14 +163,14 @@ function getButtonStyle({
         minWidth: iconOnly ? `${s.height}px` : s.minWidth ? `${s.minWidth}px` : undefined,
         width: fullWidth ? "100%" : iconOnly ? `${s.height}px` : undefined,
         padding: iconOnly ? 0 : s.padding,
-        border: `0.5px solid ${v.border}`,
+        border: `var(--line-width) solid ${v.border}`,
         borderRadius: "8px",
         background: v.bg,
         color: v.color,
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.56 : 1,
         fontSize: s.fontSize,
-        fontWeight: variant === "primary" ? 650 : 560,
+        fontWeight: variant === "primary" || variant === "danger" ? 650 : 560,
         letterSpacing: 0,
         lineHeight: 1,
         display: "inline-flex",
@@ -193,6 +206,12 @@ function applyHover(el: HTMLElement, variant: Variant, isDisabled: boolean, acti
     el.style.borderColor = active ? (v.hoverBorder ?? v.border) : v.border;
     el.style.color = active ? (v.hoverColor ?? v.color) : v.color;
     el.style.boxShadow = active ? (v.hoverShadow ?? v.shadow ?? "none") : (v.shadow ?? "none");
+}
+
+function applyFocus(el: HTMLElement, isDisabled: boolean, active: boolean) {
+    if (isDisabled) return;
+    el.style.outline = active ? "2px solid var(--accent-border)" : "none";
+    el.style.outlineOffset = active ? "2px" : "0";
 }
 
 function renderButtonContent({
@@ -243,6 +262,8 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
     type = "button",
     onMouseEnter,
     onMouseLeave,
+    onFocus,
+    onBlur,
     ...rest
 }, ref) {
     const isDisabled = disabled || loading;
@@ -260,6 +281,14 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
             onMouseLeave={(e) => {
                 applyHover(e.currentTarget, variant, isDisabled, false);
                 onMouseLeave?.(e);
+            }}
+            onFocus={(e) => {
+                applyFocus(e.currentTarget, isDisabled, true);
+                onFocus?.(e);
+            }}
+            onBlur={(e) => {
+                applyFocus(e.currentTarget, isDisabled, false);
+                onBlur?.(e);
             }}
             {...rest}
         >
@@ -283,6 +312,8 @@ export function ButtonLink({
     onClick,
     onMouseEnter,
     onMouseLeave,
+    onFocus,
+    onBlur,
     href,
     ...rest
 }: ButtonLinkProps) {
@@ -307,6 +338,14 @@ export function ButtonLink({
             onMouseLeave={(e) => {
                 applyHover(e.currentTarget, variant, disabled, false);
                 onMouseLeave?.(e);
+            }}
+            onFocus={(e) => {
+                applyFocus(e.currentTarget, disabled, true);
+                onFocus?.(e);
+            }}
+            onBlur={(e) => {
+                applyFocus(e.currentTarget, disabled, false);
+                onBlur?.(e);
             }}
         >
             {renderButtonContent({ children, iconOnly, leftIcon, rightIcon, size })}

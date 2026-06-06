@@ -9,8 +9,8 @@ import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { PurchaseOrderRow, PurchaseOrderStatus, VendorRow } from "@/lib/database.types";
-import { ButtonLink } from "@/components/ui/Button";
-import { Plus } from "lucide-react";
+import Button, { ButtonLink } from "@/components/ui/Button";
+import { CircleOff, Plus } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 const thStyle: React.CSSProperties = {
@@ -219,28 +219,22 @@ export default function PurchaseOrdersPage() {
                     <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
                         {selectedIds.size} sipariş seçildi
                     </span>
-                    <button
+                    <Button
+                        variant="dangerSoft"
+                        size="sm"
+                        leftIcon={<CircleOff size={14} />}
                         onClick={() => setBulkCancelConfirm(true)}
                         disabled={bulkCancelling}
-                        style={{
-                            fontSize: "12px", padding: "4px 12px",
-                            border: "0.5px solid var(--danger-border)",
-                            borderRadius: "5px", background: "var(--danger-bg)",
-                            color: "var(--danger-text)", cursor: bulkCancelling ? "not-allowed" : "pointer",
-                            opacity: bulkCancelling ? 0.6 : 1,
-                        }}
                     >
                         {bulkCancelling ? "İptal ediliyor…" : "İptal Et"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={clearAll}
-                        style={{
-                            fontSize: "12px", padding: "4px 10px", border: "none",
-                            background: "transparent", color: "var(--accent-text)", cursor: "pointer",
-                        }}
                     >
                         Seçimi Temizle
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -388,29 +382,21 @@ export default function PurchaseOrdersPage() {
                             Seçili siparişleri iptal etmek istediğinizden emin misiniz?
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => setBulkCancelConfirm(false)}
                                 disabled={bulkCancelling}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                                    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                                }}
                             >
                                 Vazgeç
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="danger"
+                                leftIcon={<CircleOff size={14} />}
                                 onClick={handleBulkCancel}
                                 disabled={bulkCancelling}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
-                                    background: "var(--danger-bg)", color: "var(--danger-text)",
-                                    cursor: bulkCancelling ? "not-allowed" : "pointer", opacity: bulkCancelling ? 0.6 : 1,
-                                }}
                             >
                                 {bulkCancelling ? "İptal ediliyor…" : "İptal Et"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </>

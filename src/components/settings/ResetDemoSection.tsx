@@ -4,6 +4,7 @@ import { useState } from "react";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import { RotateCcw } from "lucide-react";
 
 type SeedResponse = {
     ok: true;
@@ -103,7 +104,8 @@ export default function ResetDemoSection() {
                 <strong style={{ color: "var(--danger-text)" }}> Bu işlem geri alınamaz.</strong>
             </div>
             <Button
-                variant="danger"
+                variant="dangerSoft"
+                leftIcon={<RotateCcw size={14} />}
                 onClick={handleClick}
                 disabled={isDemo || busy}
                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
@@ -183,6 +185,7 @@ export default function ResetDemoSection() {
                             </Button>
                             <Button
                                 variant="danger"
+                                leftIcon={<RotateCcw size={14} />}
                                 onClick={handleConfirm}
                                 disabled={busy}
                             >

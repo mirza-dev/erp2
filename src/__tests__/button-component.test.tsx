@@ -56,12 +56,34 @@ describe("Button premium system", () => {
         expect(button.style.background).toBe("transparent");
     });
 
-    it("danger varyantı sakin/soft kalır", () => {
+    it("dangerSoft normal ekrandaki yıkıcı aksiyonları sakin tutar", () => {
+        render(<Button variant="dangerSoft">Devre Dışı Bırak</Button>);
+
+        const button = screen.getByRole("button", { name: "Devre Dışı Bırak" });
+        expect(button.style.background).toBe("var(--button-danger-soft-bg)");
+        expect(button.style.border).toContain("var(--button-danger-soft-border)");
+        expect(button.style.color).toBe("var(--button-danger-soft-text)");
+    });
+
+    it("danger son onay aksiyonunda güçlü ve beyaz metinli kalır", () => {
         render(<Button variant="danger">Sil</Button>);
 
         const button = screen.getByRole("button", { name: "Sil" });
-        expect(button.style.background).toBe("var(--danger-bg)");
-        expect(button.style.color).toBe("var(--danger-text)");
+        expect(button.style.background).toBe("var(--button-danger-bg)");
+        expect(button.style.color).toBe("rgb(255, 255, 255)");
+        expect(button.style.fontWeight).toBe("650");
+    });
+
+    it("secondary premium yüzey ve klavye focus halkası kullanır", () => {
+        render(<Button variant="secondary">Düzenle</Button>);
+
+        const button = screen.getByRole("button", { name: "Düzenle" });
+        expect(button.style.background).toBe("var(--button-secondary-bg)");
+        expect(button.style.boxShadow).toBe("var(--button-secondary-shadow)");
+        fireEvent.focus(button);
+        expect(button.style.outline).toBe("2px solid var(--accent-border)");
+        fireEvent.blur(button);
+        expect(button.style.outline).toBe("none");
     });
 
     it("form içinde yanlışlıkla submit tetiklememek için default type button'dır", () => {
@@ -105,5 +127,17 @@ describe("Button premium system", () => {
         expect(link.getAttribute("tabindex")).toBe("-1");
         fireEvent.click(link);
         expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it("ButtonLink dangerSoft varyantını destekler", () => {
+        render(
+            <ButtonLink href="/dashboard/products" variant="dangerSoft">
+                Pasifleştir
+            </ButtonLink>,
+        );
+
+        const link = screen.getByRole("link", { name: "Pasifleştir" });
+        expect(link.style.background).toBe("var(--button-danger-soft-bg)");
+        expect(link.style.color).toBe("var(--button-danger-soft-text)");
     });
 });

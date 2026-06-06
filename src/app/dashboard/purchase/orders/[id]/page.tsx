@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Check, CircleOff, Pencil, Printer, RotateCcw, Send, Truck } from "lucide-react";
+import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { PurchaseOrderRow, PurchaseOrderLineRow, PurchaseOrderStatus, VendorRow, ProductRow } from "@/lib/database.types";
@@ -240,32 +242,28 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 {/* Status action buttons */}
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     {isDraft && (
-                        <button onClick={() => doTransition("send", "Sipariş gönderildi olarak işaretlendi.")}
+                        <Button variant="secondary" leftIcon={<Send size={14} />} onClick={() => doTransition("send", "Sipariş gönderildi olarak işaretlendi.")}
                             disabled={isDemo || actionBusy !== null}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                            style={btnSecondary(isDemo || actionBusy !== null)}>Gönder</button>
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Gönder</Button>
                     )}
                     {(isDraft || isSent) && (
-                        <button onClick={() => doTransition("confirm", "Sipariş onaylandı.")}
+                        <Button leftIcon={<Check size={14} />} onClick={() => doTransition("confirm", "Sipariş onaylandı.")}
                             disabled={isDemo || actionBusy !== null}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                            style={btnPrimary(isDemo || actionBusy !== null)}>Onayla</button>
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Onayla</Button>
                     )}
                     {isSent && (
-                        <button onClick={() => doTransition("revise", "Sipariş taslağa geri alındı.",
+                        <Button variant="secondary" leftIcon={<RotateCcw size={14} />} onClick={() => doTransition("revise", "Sipariş taslağa geri alındı.",
                             "Bu sipariş 'Taslak' durumuna geri alınacak. Devam edilsin mi?")}
                             disabled={isDemo || actionBusy !== null}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sent → Draft (M1 revize)"}
-                            style={btnSecondary(isDemo || actionBusy !== null)}>Revize Et</button>
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sent → Draft (M1 revize)"}>Revize Et</Button>
                     )}
                     {isDraft && (
-                        <button onClick={() => router.push(`/dashboard/purchase/orders/new?fromDraft=${id}`)}
+                        <Button variant="secondary" leftIcon={<Pencil size={14} />} onClick={() => router.push(`/dashboard/purchase/orders/new?fromDraft=${id}`)}
                             disabled={isDemo}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Bu siparişin satırlarını kopyalayarak yeni taslak"}
-                            style={btnSecondary(isDemo)}>Düzenle</button>
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Bu siparişin satırlarını kopyalayarak yeni taslak"}>Düzenle</Button>
                     )}
                     {isReceivable && !receiveMode && (
-                        <button onClick={() => {
+                        <Button leftIcon={<Truck size={14} />} onClick={() => {
                             setReceiveMode(true);
                             // kalan miktarları varsayılan olarak doldur
                             const defaults: Record<string, string> = {};
@@ -276,22 +274,21 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                             setReceiveQtys(defaults);
                         }}
                             disabled={isDemo || actionBusy !== null}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Mal kabul girişi"}
-                            style={btnPrimary(isDemo || actionBusy !== null)}>Mal Kabul</button>
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Mal kabul girişi"}>Mal Kabul</Button>
                     )}
                     {isCancelable && (
-                        <button onClick={() => setCancelOpen(true)} disabled={isDemo}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sipariş iptal (admin)"}
-                            style={btnDanger(isDemo)}>İptal Et</button>
+                        <Button variant="dangerSoft" leftIcon={<CircleOff size={14} />} onClick={() => setCancelOpen(true)} disabled={isDemo}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sipariş iptal (admin)"}>İptal Et</Button>
                     )}
-                    <Link
+                    <ButtonLink
                         href={`/dashboard/purchase/orders/${po.id}/print`}
                         target="_blank"
                         rel="noopener"
+                        variant="secondary"
+                        leftIcon={<Printer size={14} />}
                         title="Sipariş belgesini yazdır veya PDF olarak kaydet"
                         aria-label="Sipariş belgesini yazdır veya PDF olarak kaydet"
-                        style={{ ...btnSecondary(false), textDecoration: "none", display: "inline-block" }}
-                    >📄 Yazdır / PDF</Link>
+                    >Yazdır / PDF</ButtonLink>
                 </div>
             </div>
 
@@ -312,8 +309,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                         <strong style={{ fontSize: "13px", color: "var(--warning-text)" }}>Mal Kabul Girişi</strong>
-                        <button onClick={() => { setReceiveMode(false); setReceiveQtys({}); }}
-                            style={btnSecondary(false)}>Vazgeç</button>
+                        <Button variant="secondary" onClick={() => { setReceiveMode(false); setReceiveQtys({}); }}>Vazgeç</Button>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "12px" }}>
                         {po.lines.map(l => {
@@ -366,12 +362,11 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                         })}
                     </div>
                     <div aria-live="polite" />
-                    <button onClick={handleReceive}
+                    <Button onClick={handleReceive}
                         disabled={isDemo || actionBusy !== null}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                        style={btnPrimary(isDemo || actionBusy !== null)}>
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                         {actionBusy === "receive" ? "Kaydediliyor..." : "Kabulü Kaydet"}
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -516,13 +511,12 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                             }}
                         />
                         <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                            <button onClick={() => { setCancelOpen(false); setCancelReason(""); }}
-                                style={btnSecondary(false)}>Vazgeç</button>
-                            <button onClick={handleCancel} disabled={isDemo || actionBusy !== null || !cancelReason.trim()}
+                            <Button variant="secondary" onClick={() => { setCancelOpen(false); setCancelReason(""); }}>Vazgeç</Button>
+                            <Button variant="danger" leftIcon={<CircleOff size={14} />} onClick={handleCancel} disabled={isDemo || actionBusy !== null || !cancelReason.trim()}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                style={btnDanger(isDemo || actionBusy !== null || !cancelReason.trim())}>
+                            >
                                 {actionBusy === "cancel" ? "İptal ediliyor..." : "İptal Et"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -546,32 +540,4 @@ function SummaryCard({ label, value, highlight }: { label: string; value: string
             }}>{value}</div>
         </div>
     );
-}
-
-function btnPrimary(disabled: boolean): React.CSSProperties {
-    return {
-        padding: "6px 14px", fontSize: "13px",
-        background: disabled ? "var(--bg-tertiary)" : "var(--accent)",
-        color: disabled ? "var(--text-tertiary)" : "#fff",
-        border: "none", borderRadius: "6px",
-        cursor: disabled ? "not-allowed" : "pointer", fontWeight: 500,
-    };
-}
-function btnSecondary(disabled: boolean): React.CSSProperties {
-    return {
-        padding: "6px 14px", fontSize: "13px",
-        background: disabled ? "var(--bg-tertiary)" : "transparent",
-        color: disabled ? "var(--text-tertiary)" : "var(--text-secondary)",
-        border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-        cursor: disabled ? "not-allowed" : "pointer",
-    };
-}
-function btnDanger(disabled: boolean): React.CSSProperties {
-    return {
-        padding: "6px 14px", fontSize: "13px",
-        background: disabled ? "var(--bg-tertiary)" : "var(--danger)",
-        color: disabled ? "var(--text-tertiary)" : "#fff",
-        border: "none", borderRadius: "6px",
-        cursor: disabled ? "not-allowed" : "pointer", fontWeight: 500,
-    };
 }

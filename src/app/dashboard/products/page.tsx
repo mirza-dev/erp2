@@ -15,7 +15,7 @@ import { useSelection } from "@/hooks/useSelection";
 import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 
@@ -718,8 +718,9 @@ export default function ProductsPage() {
                         {selectedIds.size} ürün seçildi
                     </span>
                     <Button
-                        variant="danger"
+                        variant="dangerSoft"
                         size="sm"
+                        leftIcon={<Trash2 size={14} />}
                         onClick={() => setBulkDeleteConfirm(true)}
                         disabled={bulkDeleting}
                     >
@@ -835,6 +836,7 @@ export default function ProductsPage() {
                                                 <Button
                                                     variant="danger"
                                                     size="xs"
+                                                    leftIcon={<Trash2 size={13} />}
                                                     disabled={deletingId === product.id}
                                                     onClick={() => handleDelete(product.id)}
                                                 >
@@ -850,8 +852,9 @@ export default function ProductsPage() {
                                             </span>
                                         ) : (
                                             <Button
-                                                variant="danger"
+                                                variant="dangerSoft"
                                                 size="xs"
+                                                leftIcon={<Trash2 size={13} />}
                                                 onClick={() => !isDemo && setConfirmDeleteId(product.id)}
                                                 disabled={isDemo}
                                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
@@ -941,6 +944,7 @@ export default function ProductsPage() {
                             <Button
                                 variant="danger"
                                 size="md"
+                                leftIcon={<Trash2 size={14} />}
                                 onClick={handleBulkDelete}
                                 disabled={bulkDeleting}
                             >

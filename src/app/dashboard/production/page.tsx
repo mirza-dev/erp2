@@ -10,6 +10,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { useVoiceRecorder, type VoiceRecorderResult } from "@/hooks/useVoiceRecorder";
 import type { VoiceProductionEntry } from "@/lib/services/voice-service";
 import { mergeFireIntoNote } from "@/lib/voice-note-helpers";
+import { Trash2 } from "lucide-react";
 
 interface FormLine {
     id: string;
@@ -610,7 +611,11 @@ function ProductionPageInner() {
                                     </td>
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.notlar || "—"}</td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
-                                        <button
+                                        <Button
+                                            variant="dangerSoft"
+                                            size="xs"
+                                            iconOnly
+                                            leftIcon={<Trash2 size={13} />}
                                             onClick={() => {
                                                 if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
                                                 if (deletingId) return;
@@ -619,17 +624,7 @@ function ProductionPageInner() {
                                             disabled={isDemo || deletingId === kaydi.id}
                                             aria-label={`${kaydi.productName} üretim kaydını sil`}
                                             title={isDemo ? DEMO_DISABLED_TOOLTIP : "Kaydı sil (stok geri alınır)"}
-                                            style={{
-                                                fontSize: "14px",
-                                                color: "var(--danger-text)",
-                                                background: "transparent",
-                                                border: "none",
-                                                cursor: "pointer",
-                                                opacity: 0.6,
-                                            }}
-                                            onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                                            onMouseLeave={e => (e.currentTarget.style.opacity = "0.6")}
-                                        >×</button>
+                                        />
                                     </td>
                                 </tr>
                             ))}
@@ -716,31 +711,21 @@ function ProductionPageInner() {
                                 Bu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.
                             </div>
                             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
-                                <button
+                                <Button
+                                    variant="secondary"
                                     onClick={() => setConfirmDeleteId(null)}
                                     disabled={busy}
-                                    style={{
-                                        fontSize: "13px", padding: "6px 14px",
-                                        border: "0.5px solid var(--border-secondary)",
-                                        borderRadius: "6px", background: "transparent",
-                                        color: "var(--text-secondary)", cursor: busy ? "not-allowed" : "pointer",
-                                    }}
                                 >
                                     Vazgeç
-                                </button>
-                                <button
+                                </Button>
+                                <Button
+                                    variant="danger"
+                                    leftIcon={<Trash2 size={14} />}
                                     onClick={() => void performDelete(confirmDeleteId)}
                                     disabled={busy}
-                                    style={{
-                                        fontSize: "13px", padding: "6px 14px",
-                                        border: "0.5px solid var(--danger-border)",
-                                        borderRadius: "6px", background: "var(--danger-bg)",
-                                        color: "var(--danger-text)", cursor: busy ? "not-allowed" : "pointer",
-                                        opacity: busy ? 0.6 : 1,
-                                    }}
                                 >
                                     {busy ? "Siliniyor..." : "Evet, sil (stok geri alınır)"}
-                                </button>
+                                </Button>
                             </div>
                         </div>
                     </div>

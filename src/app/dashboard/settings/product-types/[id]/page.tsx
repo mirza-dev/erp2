@@ -464,12 +464,12 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                     </div>
                 </div>
                 <Button
-                    variant={template.is_active ? "danger" : "secondary"}
+                    variant={template.is_active ? "dangerSoft" : "success"}
+                    leftIcon={template.is_active ? <ArchiveRestore size={14} /> : <RotateCcw size={14} />}
                     onClick={() => void setTemplateActive(!template.is_active)}
                     disabled={isDemo}
                     title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                 >
-                    {template.is_active ? <ArchiveRestore size={14} /> : <RotateCcw size={14} />}
                     {template.is_active ? "Pasifleştir" : "Aktifleştir"}
                 </Button>
             </div>
@@ -566,18 +566,19 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                                                             <Pencil size={13} />
                                                         </button>
                                                         {field.is_active && (
-                                                            <button type="button" onClick={() => void toggleRequired(field)} disabled={isDemo} style={smallButtonStyle}>
+                                                            <Button variant="toolbar" size="xs" onClick={() => void toggleRequired(field)} disabled={isDemo}>
                                                                 {field.required ? "Opsiyonel" : "Zorunlu"}
-                                                            </button>
+                                                            </Button>
                                                         )}
-                                                        <button
-                                                            type="button"
+                                                        <Button
+                                                            variant={field.is_active ? "dangerSoft" : "success"}
+                                                            size="xs"
+                                                            leftIcon={field.is_active ? <ArchiveRestore size={13} /> : <RotateCcw size={13} />}
                                                             onClick={() => void setFieldActive(field, !field.is_active)}
                                                             disabled={isDemo}
-                                                            style={field.is_active ? dangerTextButtonStyle : smallButtonStyle}
                                                         >
                                                             {field.is_active ? "Pasifleştir" : "Aktifleştir"}
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -630,7 +631,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                                 {inactiveFields.map(field => (
                                     <div key={field.id} style={{ display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "center", fontSize: "12px" }}>
                                         <span style={{ color: "var(--text-secondary)" }}>{field.label_tr}</span>
-                                        <button type="button" onClick={() => void setFieldActive(field, true)} disabled={isDemo} style={smallButtonStyle}>Aktifleştir</button>
+                                        <Button variant="success" size="xs" leftIcon={<RotateCcw size={13} />} onClick={() => void setFieldActive(field, true)} disabled={isDemo}>Aktifleştir</Button>
                                     </div>
                                 ))}
                             </div>
@@ -743,20 +744,4 @@ const iconButtonStyle: React.CSSProperties = {
     alignItems: "center",
     justifyContent: "center",
     cursor: "pointer",
-};
-
-const smallButtonStyle: React.CSSProperties = {
-    fontSize: "11px",
-    padding: "5px 8px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "6px",
-    background: "transparent",
-    color: "var(--text-secondary)",
-    cursor: "pointer",
-};
-
-const dangerTextButtonStyle: React.CSSProperties = {
-    ...smallButtonStyle,
-    color: "var(--danger-text)",
-    borderColor: "var(--danger-border)",
 };

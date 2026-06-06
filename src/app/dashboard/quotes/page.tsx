@@ -13,7 +13,7 @@ import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { getValidUntilBadge, canDeleteQuote, pickSucceededIds } from "./_utils/quote-display";
-import { Plus, RefreshCw } from "lucide-react";
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 type QuoteStatus = QuoteSummary["status"];
@@ -328,28 +328,22 @@ function QuotesList() {
                     <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
                         {selectedIds.size} teklif seçildi
                     </span>
-                    <button
+                    <Button
+                        variant="dangerSoft"
+                        size="sm"
+                        leftIcon={<Trash2 size={14} />}
                         onClick={() => setBulkDeleteConfirm(true)}
                         disabled={bulkDeleting}
-                        style={{
-                            fontSize: "12px", padding: "4px 12px",
-                            border: "0.5px solid var(--danger-border)",
-                            borderRadius: "5px", background: "var(--danger-bg)",
-                            color: "var(--danger-text)", cursor: bulkDeleting ? "not-allowed" : "pointer",
-                            opacity: bulkDeleting ? 0.6 : 1,
-                        }}
                     >
                         {bulkDeleting ? "Siliniyor…" : "Sil"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={clearAll}
-                        style={{
-                            fontSize: "12px", padding: "4px 10px", border: "none",
-                            background: "transparent", color: "var(--accent-text)", cursor: "pointer",
-                        }}
                     >
                         Seçimi Temizle
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -482,38 +476,27 @@ function QuotesList() {
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
                                                 {deletable && canDeleteQuotes && (
                                                     confirmId === q.id ? (
-                                                        <button
+                                                        <Button
+                                                            variant="danger"
+                                                            size="xs"
+                                                            leftIcon={<Trash2 size={13} />}
                                                             onClick={(e) => handleDelete(e, q.id)}
                                                             disabled={deletingId === q.id}
-                                                            style={{
-                                                                fontSize: "11px", color: "var(--danger-text)",
-                                                                background: "var(--danger-bg)", border: "0.5px solid var(--danger-border)",
-                                                                borderRadius: "4px", padding: "2px 7px", cursor: "pointer",
-                                                                whiteSpace: "nowrap",
-                                                            }}
                                                         >
                                                             Evet, sil
-                                                        </button>
+                                                        </Button>
                                                     ) : (
-                                                        <button
+                                                        <Button
+                                                            variant="dangerSoft"
+                                                            size="xs"
+                                                            iconOnly
                                                             onClick={(e) => handleDelete(e, q.id)}
                                                             disabled={isDemo || deletingId === q.id}
                                                             title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                                                             aria-label="Teklifi sil"
-                                                            style={{
-                                                                opacity: isHovered ? 1 : 0,
-                                                                background: "transparent", border: "none",
-                                                                cursor: isDemo ? "not-allowed" : "pointer", color: "var(--text-tertiary)",
-                                                                padding: "2px 4px", borderRadius: "3px",
-                                                                display: "flex", alignItems: "center",
-                                                                transition: "opacity 0.1s, color 0.1s",
-                                                            }}
-                                                        >
-                                                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                                                                <path d="M2 3.5h9M5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v3.5M7.5 6v3.5M3 3.5l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7"
-                                                                    stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
-                                                            </svg>
-                                                        </button>
+                                                            leftIcon={<Trash2 size={13} />}
+                                                            style={{ opacity: isHovered ? 1 : 0 }}
+                                                        />
                                                     )
                                                 )}
                                                 <span aria-hidden="true" style={{ opacity: isHovered ? 1 : 0, color: "var(--text-tertiary)" }}>
@@ -561,29 +544,21 @@ function QuotesList() {
                             Seçili teklifleri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => setBulkDeleteConfirm(false)}
                                 disabled={bulkDeleting}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                                    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                                }}
                             >
                                 İptal
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="danger"
+                                leftIcon={<Trash2 size={14} />}
                                 onClick={handleBulkDelete}
                                 disabled={bulkDeleting}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "0.5px solid var(--danger-border)", borderRadius: "6px",
-                                    background: "var(--danger-bg)", color: "var(--danger-text)",
-                                    cursor: bulkDeleting ? "not-allowed" : "pointer", opacity: bulkDeleting ? 0.6 : 1,
-                                }}
                             >
                                 {bulkDeleting ? "Siliniyor…" : "Sil"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </>

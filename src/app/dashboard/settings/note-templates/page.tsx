@@ -5,7 +5,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
-import { Plus } from "lucide-react";
+import { CircleOff, Pencil, Plus } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 export const KIND_META: Record<NoteTemplateKind, { label: string; badge: string }> = {
@@ -200,8 +200,8 @@ export default function NoteTemplatesPage() {
                         }}>{t.body}</div>
                     </div>
                     <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                        <Button variant="ghost" onClick={() => openEdit(t)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Düzenle</Button>
-                        <Button variant="ghost" onClick={() => deactivate(t)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Pasifleştir</Button>
+                        <Button variant="secondary" leftIcon={<Pencil size={14} />} onClick={() => openEdit(t)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Düzenle</Button>
+                        <Button variant="dangerSoft" leftIcon={<CircleOff size={14} />} onClick={() => deactivate(t)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Pasifleştir</Button>
                     </div>
                 </div>
             ))}

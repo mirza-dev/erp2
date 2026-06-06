@@ -29,6 +29,24 @@ const DETAIL_BUTTON_FILES = {
     customerPanel: "src/components/customers/CustomerDetailPanel.tsx",
 } as const;
 
+const ACTION_BUTTON_FILES = {
+    products: "src/app/dashboard/products/page.tsx",
+    productDetail: "src/app/dashboard/products/[id]/page.tsx",
+    customers: "src/app/dashboard/customers/page.tsx",
+    vendors: "src/app/dashboard/vendors/page.tsx",
+    orders: "src/app/dashboard/orders/page.tsx",
+    orderDetail: "src/app/dashboard/orders/[id]/page.tsx",
+    purchaseOrders: "src/app/dashboard/purchase/orders/page.tsx",
+    purchaseOrderDetail: "src/app/dashboard/purchase/orders/[id]/page.tsx",
+    purchaseSuggested: "src/app/dashboard/purchase/suggested/page.tsx",
+    noteTemplates: "src/app/dashboard/settings/note-templates/page.tsx",
+    productTypeDetail: "src/app/dashboard/settings/product-types/[id]/page.tsx",
+    users: "src/app/dashboard/settings/users/page.tsx",
+    resetDemo: "src/components/settings/ResetDemoSection.tsx",
+    quotes: "src/app/dashboard/quotes/page.tsx",
+    production: "src/app/dashboard/production/page.tsx",
+} as const;
+
 describe("premium button source regression", () => {
     it("ana CTA'larda literal '+ Yeni' metni kullanılmaz", () => {
         for (const file of PRIMARY_CTA_FILES) {
@@ -99,5 +117,46 @@ describe("premium button source regression", () => {
         expect(productDetail).toContain("leftIcon={<Download");
         expect(productDetail).toContain("ref={lightboxCloseBtnRef}");
         expect(productDetail).not.toContain("✕ Kapat");
+    });
+
+    it("normal ekran yıkıcı aksiyonları dangerSoft, final onaylar güçlü danger kullanır", () => {
+        for (const [name, file] of Object.entries(ACTION_BUTTON_FILES)) {
+            const source = readFileSync(join(projectRoot, file), "utf8");
+            expect(source, name).toContain("dangerSoft");
+        }
+
+        const productDetail = readFileSync(join(projectRoot, ACTION_BUTTON_FILES.productDetail), "utf8");
+        expect(productDetail).toMatch(/variant="dangerSoft"[\s\S]{0,700}Devre Dışı Bırak/);
+        expect(productDetail).toMatch(/variant="danger"[\s\S]{0,700}Devre Dışı Bırak/);
+
+        const orderDetail = readFileSync(join(projectRoot, ACTION_BUTTON_FILES.orderDetail), "utf8");
+        expect(orderDetail).toContain('variant="dangerSoft"');
+        expect(orderDetail).toMatch(/variant="danger"[\s\S]{0,300}Evet, kalıcı sil/);
+
+        const resetDemo = readFileSync(join(projectRoot, ACTION_BUTTON_FILES.resetDemo), "utf8");
+        expect(resetDemo).toContain('variant="dangerSoft"');
+        expect(resetDemo).toMatch(/variant="danger"[\s\S]{0,420}Evet, sıfırla/);
+    });
+
+    it("düzenleme aksiyonları secondary + Lucide Pencil standardını kullanır", () => {
+        for (const file of [
+            ACTION_BUTTON_FILES.productDetail,
+            ACTION_BUTTON_FILES.vendors,
+            ACTION_BUTTON_FILES.purchaseOrderDetail,
+            ACTION_BUTTON_FILES.noteTemplates,
+            ACTION_BUTTON_FILES.users,
+        ]) {
+            const source = readFileSync(join(projectRoot, file), "utf8");
+            expect(source, file).toContain("<Pencil");
+            expect(source, file).toContain('variant="secondary"');
+        }
+    });
+
+    it("satın alma siparişi detayındaki eski style helper aksiyonları Button sistemine taşınır", () => {
+        const source = readFileSync(join(projectRoot, ACTION_BUTTON_FILES.purchaseOrderDetail), "utf8");
+        expect(source).toContain('from "@/components/ui/Button"');
+        expect(source).toContain("ButtonLink");
+        expect(source).not.toMatch(/btnPrimary|btnSecondary|btnDanger/);
+        expect(source).not.toContain("📄 Yazdır / PDF");
     });
 });

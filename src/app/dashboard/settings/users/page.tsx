@@ -6,7 +6,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { createClient } from "@/lib/supabase/client";
 import { ROLES, ROLE_LABELS, type Role } from "@/lib/auth/permissions";
 import Button from "@/components/ui/Button";
-import { Plus } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 
 interface User {
     id: string;
@@ -386,28 +386,20 @@ export default function UsersPage() {
                                                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                                     <RoleCheckboxes selected={editRolesDraft} onToggle={toggleEditRole} disabled={isDemo} />
                                                     <div style={{ display: "flex", gap: "8px" }}>
-                                                        <button
+                                                        <Button
+                                                            size="xs"
                                                             onClick={() => handleSaveRoles(user)}
                                                             disabled={isDemo || savingRoles}
-                                                            style={{
-                                                                padding: "4px 12px", fontSize: "12px", color: "#fff",
-                                                                background: "var(--accent)", border: "none", borderRadius: "5px",
-                                                                cursor: isDemo || savingRoles ? "not-allowed" : "pointer",
-                                                                opacity: savingRoles ? 0.6 : 1,
-                                                            }}
                                                         >
                                                             {savingRoles ? "Kaydediliyor..." : "Kaydet"}
-                                                        </button>
-                                                        <button
+                                                        </Button>
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="xs"
                                                             onClick={() => setEditingRolesId(null)}
-                                                            style={{
-                                                                padding: "4px 12px", fontSize: "12px", color: "var(--text-secondary)",
-                                                                background: "transparent", border: "0.5px solid var(--border-tertiary)",
-                                                                borderRadius: "5px", cursor: "pointer",
-                                                            }}
                                                         >
                                                             İptal
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 </div>
                                             ) : (
@@ -424,20 +416,17 @@ export default function UsersPage() {
                                                             {ROLE_LABELS[r] ?? r}
                                                         </span>
                                                     ))}
-                                                    <button
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="xs"
+                                                        leftIcon={<Pencil size={13} />}
                                                         onClick={() => startEditRoles(user)}
                                                         disabled={isDemo}
                                                         title={isDemo ? DEMO_DISABLED_TOOLTIP : "Rolleri düzenle"}
                                                         aria-label={`${user.email} rollerini düzenle`}
-                                                        style={{
-                                                            fontSize: "11px", color: "var(--accent-text)",
-                                                            background: "transparent", border: "none",
-                                                            cursor: isDemo ? "not-allowed" : "pointer", padding: "1px 4px",
-                                                            opacity: isDemo ? 0.5 : 1, textDecoration: "underline",
-                                                        }}
                                                     >
                                                         Düzenle
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             )}
                                         </td>
@@ -470,23 +459,16 @@ export default function UsersPage() {
                                                 textAlign: "right",
                                             }}
                                         >
-                                            <button
+                                            <Button
+                                                variant="dangerSoft"
+                                                size="xs"
+                                                leftIcon={<Trash2 size={13} />}
                                                 onClick={() => handleDelete(user)}
                                                 disabled={isDemo || isSelf || deletingId === user.id}
                                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                                style={{
-                                                    padding: "4px 10px",
-                                                    fontSize: "12px",
-                                                    color: isSelf ? "var(--text-tertiary)" : "var(--danger-text)",
-                                                    background: "transparent",
-                                                    border: `0.5px solid ${isSelf ? "var(--border-tertiary)" : "var(--danger-border)"}`,
-                                                    borderRadius: "5px",
-                                                    cursor: isDemo || isSelf ? "not-allowed" : "pointer",
-                                                    opacity: isDemo || deletingId === user.id ? 0.5 : 1,
-                                                }}
                                             >
                                                 {deletingId === user.id ? "Siliniyor..." : "Sil"}
-                                            </button>
+                                            </Button>
                                         </td>
                                     </tr>
                                 );

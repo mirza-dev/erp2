@@ -15,7 +15,7 @@ import { dateDaysFromToday } from "@/lib/stock-utils";
 import { usePagination } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
-import { Plus, RefreshCw } from "lucide-react";
+import { CircleOff, Plus, RefreshCw } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
@@ -380,28 +380,22 @@ function OrdersList() {
                     <span style={{ color: "var(--accent-text)", fontWeight: 500 }}>
                         {selectedIds.size} sipariş seçildi
                     </span>
-                    <button
+                    <Button
+                        variant="dangerSoft"
+                        size="sm"
+                        leftIcon={<CircleOff size={14} />}
                         onClick={() => setBulkDeleteConfirm(true)}
                         disabled={bulkDeleting}
-                        style={{
-                            fontSize: "12px", padding: "4px 12px",
-                            border: "var(--line-width) solid var(--danger-border)",
-                            borderRadius: "5px", background: "var(--danger-bg)",
-                            color: "var(--danger-text)", cursor: bulkDeleting ? "not-allowed" : "pointer",
-                            opacity: bulkDeleting ? 0.6 : 1,
-                        }}
                     >
                         {bulkDeleting ? "İptal ediliyor…" : "İptal Et"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={clearAll}
-                        style={{
-                            fontSize: "12px", padding: "4px 10px", border: "none",
-                            background: "transparent", color: "var(--accent-text)", cursor: "pointer",
-                        }}
                     >
                         Seçimi Temizle
-                    </button>
+                    </Button>
                 </div>
             )}
 
@@ -541,37 +535,27 @@ function OrdersList() {
                                         >
                                             <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
                                                 {has("delete_sales_orders") && (confirmId === order.id ? (
-                                                    <button
+                                                    <Button
+                                                        variant="danger"
+                                                        size="xs"
+                                                        leftIcon={<CircleOff size={13} />}
                                                         onClick={(e) => handleDelete(e, order.id)}
                                                         disabled={deletingId === order.id}
-                                                        style={{
-                                                            fontSize: "11px", color: "var(--danger-text)",
-                                                            background: "var(--danger-bg)", border: "var(--line-width) solid var(--danger-border)",
-                                                            borderRadius: "4px", padding: "2px 7px", cursor: "pointer",
-                                                            whiteSpace: "nowrap",
-                                                        }}
                                                     >
                                                         Evet, iptal et
-                                                    </button>
+                                                    </Button>
                                                 ) : (
-                                                    <button
+                                                    <Button
+                                                        variant="dangerSoft"
+                                                        size="xs"
+                                                        iconOnly
+                                                        leftIcon={<CircleOff size={13} />}
                                                         onClick={(e) => handleDelete(e, order.id)}
                                                         disabled={isDemo || deletingId === order.id}
                                                         title={isDemo ? DEMO_DISABLED_TOOLTIP : "İptal et"}
                                                         aria-label={`${order.orderNumber} iptal et`}
-                                                        style={{
-                                                            opacity: isHovered ? 1 : 0, background: "transparent", border: "none",
-                                                            cursor: isDemo ? "not-allowed" : "pointer", color: "var(--text-tertiary)",
-                                                            padding: "2px 4px", borderRadius: "3px",
-                                                            display: "flex", alignItems: "center",
-                                                            transition: "opacity 0.1s, color 0.1s",
-                                                        }}
-                                                    >
-                                                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                                                            <path d="M2 3.5h9M5 3.5V2.5a.5.5 0 01.5-.5h2a.5.5 0 01.5.5v1M5.5 6v3.5M7.5 6v3.5M3 3.5l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7"
-                                                                stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
-                                                        </svg>
-                                                    </button>
+                                                        style={{ opacity: isHovered ? 1 : 0 }}
+                                                    />
                                                 ))}
                                                 <span style={{ opacity: isHovered ? 1 : 0, color: "var(--text-tertiary)" }} aria-hidden="true">
                                                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -619,29 +603,21 @@ function OrdersList() {
                             Seçili siparişler iptal edilecek (rezerve stoklar serbest bırakılır). Devam edilsin mi?
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <button
+                            <Button
+                                variant="secondary"
                                 onClick={() => setBulkDeleteConfirm(false)}
                                 disabled={bulkDeleting}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px",
-                                    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                                }}
                             >
                                 İptal
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                                variant="danger"
+                                leftIcon={<CircleOff size={14} />}
                                 onClick={handleBulkDelete}
                                 disabled={bulkDeleting}
-                                style={{
-                                    fontSize: "13px", padding: "6px 16px",
-                                    border: "var(--line-width) solid var(--danger-border)", borderRadius: "6px",
-                                    background: "var(--danger-bg)", color: "var(--danger-text)",
-                                    cursor: bulkDeleting ? "not-allowed" : "pointer", opacity: bulkDeleting ? 0.6 : 1,
-                                }}
                             >
                                 {bulkDeleting ? "İptal ediliyor…" : "İptal Et"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </>

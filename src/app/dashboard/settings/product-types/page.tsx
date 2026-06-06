@@ -8,10 +8,11 @@ import {
     Boxes,
     CheckCircle2,
     Eye,
+    Pencil,
     Plus,
     SlidersHorizontal,
 } from "lucide-react";
-import Button from "@/components/ui/Button";
+import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-utils";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
@@ -356,9 +357,9 @@ export default function TechnicalTemplatesPage() {
                                     )}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: "right" }}>
-                                    <Link href={`/dashboard/settings/product-types/${template.id}`} style={{ color: "var(--accent-text)", textDecoration: "none", fontWeight: 600 }}>
+                                    <ButtonLink href={`/dashboard/settings/product-types/${template.id}`} variant="secondary" size="sm" leftIcon={<Pencil size={14} />}>
                                         Düzenle
-                                    </Link>
+                                    </ButtonLink>
                                 </td>
                             </tr>
                         ))}
