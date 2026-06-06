@@ -24,6 +24,8 @@ Genelde proje-codex'te (codex-experiment) çalışılıp commit atılır, sonra:
 2. `git push origin codex-experiment` + `git push origin main`.
 3. **Doğrula:** `git diff --stat origin/main origin/codex-experiment` → BOŞ (özdeş tree). `git rev-parse origin/main origin/codex-experiment` → aynı SHA.
 
+**⚠️ TEKRARLAYAN TUZAK — ff'yi proje-codex cwd'sinde çalıştırma (bu oturumda 3 kez yaşandı):** commit proje-codex'te (codex-experiment) atılır; eğer ff komutunu `cd erp2` OLMADAN, çıplak `git merge --ff-only <sha>` olarak proje-codex cwd'sinde çalıştırırsan → HEAD zaten o sha'da olduğu için **"Already up to date"** der, **main HİÇ ilerlemez**, sessizce ayrışır (codex önde, main geride). Ardından `git push origin main` de proje-codex'ten "Everything up-to-date" der → push'lanmış sanırsın ama main eski SHA'da kalır. **Kural:** ff + push main MUTLAKA ya `git -C /Users/mirzasaribiyik/Projects/erp2 merge --ff-only <sha>` (`-C` ile, cwd değiştirmeden) ya da ayrı `cd /Users/mirzasaribiyik/Projects/erp2 && git merge --ff-only <sha> && git push origin main` bloğunda. Push sonrası 3. adım doğrulaması (diff BOŞ) bu sapmayı yakalar — atlanmamalı.
+
 **React Doctor** pre-commit advisory uyarı verir ama **commit'i BLOKLAMAZ** (advisory).
 
 ## Memory symlink (KRİTİK — her iki ajan senkronu)
