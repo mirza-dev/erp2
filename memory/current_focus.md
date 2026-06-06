@@ -5,7 +5,21 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-06-06 (**Roven hexagon logo — component + topbar büyütme + favicon ince ayarları**)
+## Son Tamamlanan İş — 2026-06-06 (**Veri Aktarım Merkezi — rehber + şeffaflık katmanı**)
+
+Kullanıcı: "ne nereye nasıl kaydedilir, kullanıcı ne yapacağını bilsin — detaylı/değerli olsun" (ultrathink, screenshot/websearch izni). `/dashboard/import` işlevseldi (Faz 3a-3d AI + klasik Excel wizard) ama rehberlik/şeffaflık zayıftı. Web araştırması (Smashing/UX Design Institute): hassas veri import'unda **şeffaflık + net talimat = güven**. **Kullanıcı kararları (AskUserQuestion):** (1) **rehber + şeffaflık katmanı** — mevcut akış KORUNUR (çok testli); (2) **üstte görünür özet + collapsible detay**.
+
+**Yapılan (`fd4499b`, 5 dosya / 566+):**
+- **`src/lib/import-guide.ts`** (YENİ, tek kaynak [[feedback_global_over_hardcode]]) — `IMPORT_STEPS` (3 adım) · `IMPORT_DATA_TARGETS` (scope→{module/href/action}) · `buildOperationTargets()` (aktif AI işlemleri × hedef; safetyNote/evidenceHint taşır) · `IMPORT_TRUST_NOTES` · `getActiveTemplateLinks()` (6 Excel şablonu → `/api/import/templates?kind=`). İçerik `ai-import-operations` + `import-center`'dan TÜRETİLDİ (yeni içerik uydurulmadı).
+- **`src/components/import/ImportGuide.tsx`** (YENİ) — üstte her zaman görünür 3-adım şeridi + seçili-işlem "veri nereye gider" özeti; collapsible (controlled `<details>` + `▸/▾` chevron, sayfa accordion paterni) "Nasıl çalışır" → veri hedefleri haritası (işlem→modül link→ne olur→ne aranır→ne korunur) + 6 şablon indirme (`<a download>`) + güven notları. Tema-uyumlu (`var(--surface-*)`/`--accent-*`, sabit hex yok).
+- **`page.tsx`** — header altına `<ImportGuide selectedOperation={selectedAiOperation} />` mount; mevcut AI/Excel akışı + accordion + testler DOKUNULMADI.
+- **+24 test** (`import-guide.test.ts` pure + `import-guide-render.test.tsx` renderToStaticMarkup).
+
+**ADVISOR düzeltmeleri (done-öncesi, kritik):** (1) **yanlış güven notu** — apply path'leri trace edildi: klasik Excel **tarayıcıda parse** (`xlsx`, storage upload YOK), AI akışı `product-files` bucket'a yükler → not dürüstleştirildi ("Excel/CSV tarayıcında işlenir, sunucuya yüklenmez; AI akışı depoda saklar"); finansal koruma `canApplyFinancialField` + `FINANCIAL_IMPORT_FIELDS` skip ikisinde de doğrulandı. (2) **chevron eklendi** (en değerli içerik açılabilir olduğu görünür). (3) **demo/permission** — sayfa + template route ikisi de `view_import`, divergence yok. (4) ulaşılamaz `planned` dalı kaldırıldı.
+
+**Doğrulama:** tsc 0 · lint 0 · 4688→4711 test · build 0 (`ƒ Proxy`). Backend/şema/migration YOK. **DURUM: PUSH EDİLDİ (`fd4499b`) — `origin/main == origin/codex-experiment` birebir aynı SHA; iki Coolify deploy.** React Doctor advisory bloklamadı.
+
+<details><summary>Önceki: Roven hexagon logo — component + topbar/login/favicon ince ayarları</summary>
 
 Kullanıcı görsel paylaştı: yuvarlatılmış hexagon mark + bold "Roven" wordmark, koyu zeminde near-white. "logo bu olsun". `/frontend-design` yönü: minimal geometrik, monokrom, tema-uyumlu. Birkaç ardışık ince ayar turu.
 
@@ -18,7 +32,9 @@ Kullanıcı görsel paylaştı: yuvarlatılmış hexagon mark + bold "Roven" wor
 
 **Doğrulama:** tsc 0 · lint 0 · 4688 test · build 0 (`ƒ Proxy` + `/icon.svg`). Backend/şema/migration YOK. **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA (`e8f44c4`); her tur iki Coolify prod deploy.**
 
-**⚠️ Push dersi (tekrar yaşandı):** `git merge --ff-only` mutlaka `cd /Users/mirzasaribiyik/Projects/erp2` İÇİNDE çalıştırılmalı — bir turda atlandı, main geride kaldı + kullanıcının **login redesign** commit'i (`fee0943` "Redesign premium login experience": `login/page.tsx` yeniden + yeni `login/layout.tsx` + `globals.css` ~298 satır + `login-page.test.tsx`) yalnız codex-experiment'teydi. Düzeltilirken fark edildi, login redesign + topbar büyütme birlikte main'e ff edildi → mirror geri sağlandı. (Login redesign artık main prod'da, kullanıcı onaylı.)
+**⚠️ Push dersi (tekrar yaşandı):** `git merge --ff-only` mutlaka `cd /Users/mirzasaribiyik/Projects/erp2` İÇİNDE çalıştırılmalı — bir turda atlandı, main geride kaldı + kullanıcının **login redesign** commit'i (`fee0943` "Redesign premium login experience": `login/page.tsx` yeniden + yeni `login/layout.tsx` + `globals.css` ~298 satır + `login-page.test.tsx`) yalnız codex-experiment'teydi. Düzeltilirken fark edildi, login redesign + topbar büyütme birlikte main'e ff edildi → mirror geri sağlandı. (Login redesign artık main prod'da, kullanıcı onaylı.) Detay: [[reference_worktree_branches]] "TEKRARLAYAN TUZAK".
+
+</details>
 
 <details><summary>Önceki: README yenileme — Roven premium hero + görsel doku</summary>
 
