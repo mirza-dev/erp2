@@ -20,6 +20,7 @@ import { useToast } from "@/components/ui/Toast";
 import { IMPORT_FIELDS, REQUIRED_FIELDS } from "@/lib/import-fields";
 import DropZone from "@/components/import/DropZone";
 import ClassifierQueue from "@/components/import/ClassifierQueue";
+import ImportGuide from "@/components/import/ImportGuide";
 import type { ProductTypeRow } from "@/lib/database.types";
 import {
     DEFAULT_AI_IMPORT_OPERATION,
@@ -597,6 +598,9 @@ export default function ImportPage() {
                     }}>Yeni Dosya</button>
                 )}
             </div>
+
+            {/* Rehber + şeffaflık katmanı — 3 adım + veri hedefleri + şablonlar + güven notları */}
+            <ImportGuide selectedOperation={selectedAiOperation} />
 
             {/* AI default akış (her zaman görünür); Excel/CSV toplu aktarım alt accordion'da */}
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
