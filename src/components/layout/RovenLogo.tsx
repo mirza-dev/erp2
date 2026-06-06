@@ -12,7 +12,7 @@ interface RovenLogoProps {
     className?: string;
 }
 
-const DEFAULT_GAP = 6;
+const DEFAULT_GAP = 5;
 
 /**
  * Roven marka logosu — yuvarlatılmış hexagon mark + bold wordmark.
