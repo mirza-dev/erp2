@@ -45,7 +45,7 @@ export default function LoginPage() {
 
             <section className="login-access" aria-labelledby="login-title">
                 <div className="login-brand">
-                    <RovenLogo size={28} wordmarkSize={22} gap={9} />
+                    <RovenLogo size={32} wordmarkSize={26} gap={6} />
                 </div>
 
                 <form className="login-panel" onSubmit={handleSubmit}>
