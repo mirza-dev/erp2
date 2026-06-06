@@ -9,14 +9,14 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 Kullanıcı görsel paylaştı: yuvarlatılmış hexagon mark + bold "Roven" wordmark, koyu zeminde near-white. "logo bu olsun". `/frontend-design` yönü: minimal geometrik, monokrom, tema-uyumlu. Birkaç ardışık ince ayar turu.
 
-**Yapılan (commit zinciri `f3cb649` → `1b760d6` → `079df51` → `7861594`):**
-- **`src/components/layout/RovenLogo.tsx`** (YENİ, tek kaynak) — yuvarlatılmış hexagon `<polygon>` SVG mark + bold "Roven" wordmark; `currentColor`/inherit → koyu temada near-white (`#e6edf3`), aydınlıkta koyu; sabit hex yok = otomatik temalanır. Props: `size/showWordmark/wordmarkSize/gap` (varsayılan gap 6). `showWordmark={false}` → `role="img" aria-label="Roven"` (a11y).
-- **Topbar.tsx** — düz metin → `<RovenLogo size={24} wordmarkSize={19} gap={7} />` (iki tur büyütme: 18→20→24, wordmark→19, sayfaya oranla marka görünürlüğü; 52px bar'da güvenli).
-- **landing `page.tsx`** `<RovenLogo size={17} wordmarkSize={15} />` · **login `page.tsx`** kullanıcı redesign'ında `size={28} wordmarkSize={22} gap={9}`.
+**Yapılan (commit zinciri `f3cb649` → `1b760d6` → `079df51` → `7861594` → `2fd2ef6`):**
+- **`src/components/layout/RovenLogo.tsx`** (YENİ, tek kaynak) — yuvarlatılmış hexagon `<polygon>` SVG mark + bold "Roven" wordmark; `currentColor`/inherit → koyu temada near-white (`#e6edf3`), aydınlıkta koyu; sabit hex yok = otomatik temalanır. Props: `size/showWordmark/wordmarkSize/gap`. **`DEFAULT_GAP=5`** (global yakınlık — kullanıcı "global de değiştir" dedi → topbar'a hardcode etmek yerine component varsayılanı; [[feedback_global_over_hardcode]]). `showWordmark={false}` → `role="img" aria-label="Roven"` (a11y).
+- **Topbar.tsx** — düz metin → `<RovenLogo size={22} wordmarkSize={19} />` (büyütme turları 18→20→24→**22** son ayar; gap hardcode KALDIRILDI → global 5).
+- **landing `page.tsx`** `<RovenLogo size={17} wordmarkSize={15} />` (global gap 5 alır) · **login `page.tsx`** kullanıcı redesign'ında `size={28} wordmarkSize={22} gap={9}` (explicit → global'den izole).
 - **`src/app/icon.svg`** (YENİ→revize) — App Router favicon. İlk hali koyu kutu+hexagondu, kullanıcı beğenmedi → **kutusuz + tema-uyumlu**: `<rect>` zemin kaldırıldı, `<polygon>` + SVG-içi `<style>` `prefers-color-scheme` (koyu sekme→`#e6edf3`, açık→`#1f2937`). `favicon.ico` korundu (Next ikisini servis eder, modern tarayıcı svg'yi tercih eder → media query çalışır). **Favicon tarayıcıda agresif cache'lenir → hard-refresh gerekebilir.**
 - **`+10 test`** (`roven-logo.test.tsx`): render/tema-uyum/a11y/size-wordmarkSize/3×source-regression/favicon.
 
-**Doğrulama:** tsc 0 · lint 0 · 4688 test · build 0 (`ƒ Proxy` + `/icon.svg`). Backend/şema/migration YOK. **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA (`7861594`); her tur iki Coolify prod deploy.**
+**Doğrulama:** tsc 0 · lint 0 · 4688 test · build 0 (`ƒ Proxy` + `/icon.svg`). Backend/şema/migration YOK. **DURUM: PUSH EDİLDİ — `origin/main == origin/codex-experiment` birebir aynı SHA (`2fd2ef6`); her tur iki Coolify prod deploy.**
 
 **⚠️ Push dersi (tekrar yaşandı):** `git merge --ff-only` mutlaka `cd /Users/mirzasaribiyik/Projects/erp2` İÇİNDE çalıştırılmalı — bir turda atlandı, main geride kaldı + kullanıcının **login redesign** commit'i (`fee0943` "Redesign premium login experience": `login/page.tsx` yeniden + yeni `login/layout.tsx` + `globals.css` ~298 satır + `login-page.test.tsx`) yalnız codex-experiment'teydi. Düzeltilirken fark edildi, login redesign + topbar büyütme birlikte main'e ff edildi → mirror geri sağlandı. (Login redesign artık main prod'da, kullanıcı onaylı.)
 
