@@ -110,6 +110,23 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             }
         }
 
+        // Null-SKU kapatma: kullanıcı yeni-ürün satırına SKU girer.
+        // undefined → patch yok; null veya boş → clear; string → trim + set.
+        let skuPatch: string | null | undefined = undefined;
+        if (body.extracted_sku !== undefined) {
+            if (body.extracted_sku === null) {
+                skuPatch = null;
+            } else if (typeof body.extracted_sku === "string") {
+                const trimmed = body.extracted_sku.trim();
+                if (trimmed.length > 100) {
+                    return NextResponse.json({ error: "SKU en fazla 100 karakter olabilir." }, { status: 400 });
+                }
+                skuPatch = trimmed.length > 0 ? trimmed : null;
+            } else {
+                return NextResponse.json({ error: "extracted_sku string veya null olmalı." }, { status: 400 });
+            }
+        }
+
         let attributesPatch: Record<string, unknown> | undefined = undefined;
         if (body.extracted_attributes !== undefined) {
             if (!body.extracted_attributes || typeof body.extracted_attributes !== "object" || Array.isArray(body.extracted_attributes)) {
@@ -171,6 +188,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             product_type_id: productTypeIdPatch,
             extracted_attributes: attributesPatch,
             extraction_evidence: evidencePatch,
+            extracted_sku: skuPatch,
         });
 
         return NextResponse.json({ ok: true, line: updated });

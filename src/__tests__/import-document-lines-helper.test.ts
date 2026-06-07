@@ -180,6 +180,28 @@ describe("dbUpdateLineMatch", () => {
         expect(patch.product_type_id).toBeNull();
     });
 
+    // Null-SKU kapatma: extracted_sku pass-through
+    it("extracted_sku undefined → patch'e yazılmaz (mevcut korunur)", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { id: "l-1" }, error: null });
+        await dbUpdateLineMatch("l-1", { match_action: "new_product" });
+        const patch = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(Object.prototype.hasOwnProperty.call(patch, "extracted_sku")).toBe(false);
+    });
+
+    it("extracted_sku string → patch'e yazılır", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { id: "l-1" }, error: null });
+        await dbUpdateLineMatch("l-1", { match_action: "new_product", extracted_sku: "GLB-800LB" });
+        const patch = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(patch.extracted_sku).toBe("GLB-800LB");
+    });
+
+    it("extracted_sku null → patch'e null yazılır (explicit clear)", async () => {
+        mockSingle.mockResolvedValueOnce({ data: { id: "l-1" }, error: null });
+        await dbUpdateLineMatch("l-1", { match_action: "new_product", extracted_sku: null });
+        const patch = mockUpdate.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(patch.extracted_sku).toBeNull();
+    });
+
     it("extracted_attributes + extraction_evidence patch'e yazılır", async () => {
         mockSingle.mockResolvedValueOnce({ data: { id: "l-1" }, error: null });
         await dbUpdateLineMatch("l-1", {

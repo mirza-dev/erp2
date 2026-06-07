@@ -270,4 +270,51 @@ describe("PATCH /api/import/document-lines/[id]", () => {
         const res = await callPATCH("l-1", { match_action: "skipped" });
         expect(res.status).toBe(200);
     });
+
+    // ── Null-SKU kapatma: extracted_sku düzenleme ──
+    it("extracted_sku string → trim + dbUpdateLineMatch'e geçer", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
+        mockUpdateLine.mockResolvedValueOnce({ id: "l-1", extracted_sku: "GLB-800LB-DN50" });
+        const res = await callPATCH("l-1", { match_action: "new_product", extracted_sku: "  GLB-800LB-DN50  " });
+        expect(res.status).toBe(200);
+        const args = mockUpdateLine.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(args.extracted_sku).toBe("GLB-800LB-DN50");
+    });
+
+    it("extracted_sku boş string → null (clear)", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
+        mockUpdateLine.mockResolvedValueOnce({ id: "l-1" });
+        const res = await callPATCH("l-1", { match_action: "new_product", extracted_sku: "   " });
+        expect(res.status).toBe(200);
+        const args = mockUpdateLine.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(args.extracted_sku).toBeNull();
+    });
+
+    it("extracted_sku >100 karakter → 400, dbUpdateLineMatch çağrılmaz", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
+        const res = await callPATCH("l-1", { match_action: "new_product", extracted_sku: "X".repeat(101) });
+        expect(res.status).toBe(400);
+        expect(mockUpdateLine).not.toHaveBeenCalled();
+    });
+
+    it("extracted_sku non-string/non-null (number) → 400", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
+        const res = await callPATCH("l-1", { match_action: "new_product", extracted_sku: 123 });
+        expect(res.status).toBe(400);
+        expect(mockUpdateLine).not.toHaveBeenCalled();
+    });
+
+    it("extracted_sku gönderilmedi → patch'e extracted_sku=undefined (mevcut korunur)", async () => {
+        mockRequireRole.mockResolvedValueOnce(null);
+        mockGetLine.mockResolvedValueOnce({ id: "l-1", document_id: "doc-1" });
+        mockUpdateLine.mockResolvedValueOnce({ id: "l-1" });
+        const res = await callPATCH("l-1", { match_action: "skipped" });
+        expect(res.status).toBe(200);
+        const args = mockUpdateLine.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(args.extracted_sku).toBeUndefined();
+    });
 });

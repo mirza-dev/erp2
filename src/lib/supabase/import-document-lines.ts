@@ -48,6 +48,13 @@ export interface UpdateLineMatchInput {
     product_type_id?: string | null;
     extracted_attributes?: Record<string, unknown>;
     extraction_evidence?: TechnicalExtractionEvidence;
+    /**
+     * Null-SKU kapatma: datasheet'ler SKU vermez → yeni-ürün açma yolu SKU
+     * gerektirir (buildCreateProductInput "SKU eksik" fırlatır). Kullanıcı
+     * İncele ekranında yeni-ürün satırına SKU girer; apply `extracted_sku`'yu
+     * doğrudan okur. undefined = patch'e yazma; null/"" = clear; string = set.
+     */
+    extracted_sku?: string | null;
 }
 
 const VALID_MATCH_ACTIONS: ImportDocumentLineMatchAction[] = [
@@ -143,6 +150,10 @@ export async function dbUpdateLineMatch(
     }
     if (input.extraction_evidence !== undefined) {
         patch.extraction_evidence = input.extraction_evidence;
+    }
+    // Null-SKU kapatma: undefined → patch'e yazma; null → clear; string → set.
+    if (input.extracted_sku !== undefined) {
+        patch.extracted_sku = input.extracted_sku;
     }
 
     const sb = createServiceClient();

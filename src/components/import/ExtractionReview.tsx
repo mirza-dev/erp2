@@ -234,6 +234,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
         product_type_id?: string | null;
         extracted_attributes?: Record<string, unknown>;
         extraction_evidence?: TechnicalExtractionEvidence;
+        extracted_sku?: string | null;
     }) {
         if (isDemo) {
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
@@ -271,6 +272,20 @@ export default function ExtractionReview({ document: doc, initialLines, productT
 
     function handleSkip(line: ImportDocumentLineRow) {
         void patchLine(line.id, { match_action: "skipped", matched_product_id: null });
+    }
+
+    // Null-SKU kapatma: datasheet'ler SKU vermez → yeni-ürün açma SKU gerektirir.
+    // Kullanıcı İncele ekranında SKU girer; match_action korunur (satır
+    // new_product'tan düşmez). Server trim/clear yapar; no-op'ta PATCH atılmaz.
+    function handleSkuChange(line: ImportDocumentLineRow, raw: string) {
+        const next = raw.trim();
+        if (next === (line.extracted_sku ?? "").trim()) return;
+        void patchLine(line.id, {
+            match_action: line.match_action,
+            matched_product_id: line.matched_product_id,
+            match_confidence: line.match_confidence,
+            extracted_sku: next,
+        });
     }
 
     async function handleTypeChange(line: ImportDocumentLineRow, newTypeId: string | null) {
@@ -659,8 +674,35 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                 <td style={td}>{line.line_number}</td>
                                                 <td style={td}>
                                                     <div style={{ fontWeight: 600, color: "var(--text-primary)" }}>{line.extracted_name ?? "—"}</div>
-                                                    {line.extracted_sku && (
-                                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>{line.extracted_sku}</div>
+                                                    {/* Null-SKU kapatma: yeni-ürün satırında SKU düzenlenebilir
+                                                        (datasheet vermezse kullanıcı girer); diğer satırlarda salt metin. */}
+                                                    {isNewProductLine ? (
+                                                        <div style={{ marginTop: "4px" }}>
+                                                            <input
+                                                                type="text"
+                                                                defaultValue={line.extracted_sku ?? ""}
+                                                                disabled={isDemo || isDocApplied || isDocApplying}
+                                                                onBlur={event => handleSkuChange(line, event.target.value)}
+                                                                placeholder="SKU gir (zorunlu)"
+                                                                aria-label={`Satır ${line.line_number} SKU`}
+                                                                style={{
+                                                                    ...techInputStyle,
+                                                                    fontFamily: "monospace",
+                                                                    fontSize: "11px",
+                                                                    padding: "4px 8px",
+                                                                    borderColor: line.extracted_sku ? "var(--border-secondary)" : "var(--danger-border)",
+                                                                }}
+                                                            />
+                                                            {!line.extracted_sku && (
+                                                                <div style={{ fontSize: "10px", color: "var(--danger-text)", marginTop: "3px", lineHeight: 1.3 }}>
+                                                                    Datasheet SKU vermedi — yeni ürün açmak için SKU girin
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        line.extracted_sku && (
+                                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace" }}>{line.extracted_sku}</div>
+                                                        )
                                                     )}
                                                     {!isCertFlow && (
                                                         <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "7px" }}>

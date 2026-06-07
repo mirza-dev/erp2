@@ -145,3 +145,19 @@ describe("Faz D — ExtractionReview katalog görsel önizleme (source-regressio
         expect(src).toContain("katalog görseli eklendi");
     });
 });
+
+describe("Null-SKU kapatma — ExtractionReview yeni-ürün SKU girişi (source-regression)", () => {
+    it("new_product satırında düzenlenebilir SKU input + handleSkuChange render edilir", () => {
+        const src = read("src/components/import/ExtractionReview.tsx");
+        expect(src).toContain("handleSkuChange");
+        expect(src).toContain("isNewProductLine ?");
+        expect(src).toContain("SKU gir (zorunlu)");
+        // SKU boşken zorunlu uyarısı (datasheet vermedi) gösterilir
+        expect(src).toContain("yeni ürün açmak için SKU girin");
+    });
+    it("handleSkuChange match_action korur ve extracted_sku gönderir (satır new_product'tan düşmez)", () => {
+        const src = read("src/components/import/ExtractionReview.tsx");
+        expect(src).toContain("extracted_sku: next");
+        expect(src).toMatch(/handleSkuChange[\s\S]*match_action: line\.match_action/);
+    });
+});

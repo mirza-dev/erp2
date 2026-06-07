@@ -189,6 +189,36 @@ describe("serviceApplyImportDocument — product flow", () => {
         expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
     });
 
+    it("null-SKU kapatma: İncele'de girilen SKU ile new_product oluşur (datasheet boş bırakmıştı)", async () => {
+        // Datasheet SKU vermemişti (null); kullanıcı İncele ekranında "GLB-800LB-DN50"
+        // girdi → PATCH extracted_sku'yu yazdı → apply artık "SKU eksik" fırlatmaz.
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { extracted_name: "GLOBE VALVE 800LB", extracted_sku: "GLB-800LB-DN50" }),
+        ]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.products_created).toBe(1);
+        expect(r.errors).toHaveLength(0);
+        const arg = mockCreateProduct.mock.calls[0]?.[0] as { sku: string; name: string };
+        expect(arg.sku).toBe("GLB-800LB-DN50");
+        expect(arg.name).toBe("GLOBE VALVE 800LB");
+    });
+
+    it("new_product SKU boş (datasheet vermedi, kullanıcı girmedi) → 'SKU eksik' + skipped++", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { extracted_name: "GLOBE VALVE 800LB", extracted_sku: "" }),
+        ]);
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.products_created).toBe(0);
+        expect(r.skipped).toBe(1);
+        expect(r.errors.some(e => /SKU eksik/.test(e))).toBe(true);
+        expect(mockCreateProduct).not.toHaveBeenCalled();
+    });
+
     it("matched satır → attributes FILL-EMPTY (dolu dn KORUNUR, boş pn_class eklenir)", async () => {
         mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
