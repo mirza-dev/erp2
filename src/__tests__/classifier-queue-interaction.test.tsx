@@ -100,7 +100,7 @@ describe("ClassifierQueue — happy path (P2 + mountedRef fix)", () => {
             />,
         );
 
-        await screen.findByText(/İşlem: Doküman ekle/, {}, { timeout: 3000 });
+        await screen.findByText(/İşlem: Görsel\/doküman ekle/, {}, { timeout: 3000 });
         const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
         expect((init.body as FormData).get("operation_type")).toBe("product_documents");
     });

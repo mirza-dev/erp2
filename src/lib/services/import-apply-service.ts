@@ -17,7 +17,7 @@ import {
     dbClaimImportDocumentForApply,
 } from "@/lib/supabase/import-documents";
 import { dbListLinesByDocument } from "@/lib/supabase/import-document-lines";
-import { dbCreateProduct, dbUpdateProduct, dbGetProductById } from "@/lib/supabase/products";
+import { dbCreateProduct, dbUpdateProduct, dbGetProductById, type CreateProductInput } from "@/lib/supabase/products";
 import {
     dbCreateAttachment,
     dbListAttachmentsByProduct,
@@ -25,6 +25,7 @@ import {
     dbSupersedeCertificatesByName,
 } from "@/lib/supabase/product-attachments";
 import { dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
+import { normalizeCoreProductFields, IMPORT_CORE_PRODUCT_FIELD_KEYS } from "@/lib/import-center";
 import type {
     DocumentType,
     ImportDocumentLineRow,
@@ -55,6 +56,13 @@ export interface ApplyResult {
 export interface ApplyFieldApproval {
     productFields?: string[];
     technicalAttributeKeys: string[];
+    /**
+     * Faz A — onaylanan core master-data alan anahtarları (category,
+     * material_quality vb.). undefined/approval yok → tüm core_fields
+     * uygulanır (attributes paterniyle simetrik). Belirtilirse yalnız
+     * listedekiler uygulanır.
+     */
+    coreFields?: string[];
 }
 
 export interface ApplyOptions {
@@ -86,22 +94,50 @@ function buildCreateProductInput(
     line: ImportDocumentLineRow,
     attributes: Record<string, unknown>,
     productTypeId: string | null,
-): {
-    name: string; sku: string; unit: string;
-    product_type_id: string | null;
-    attributes: Record<string, unknown>;
-} {
+    coreFields: Record<string, string | number>,
+): CreateProductInput & { attributes: Record<string, unknown>; product_type_id: string | null } {
     const name = (line.extracted_name ?? "").trim();
     const sku = (line.extracted_sku ?? "").trim();
     if (!name) throw new Error("ad eksik");
     if (!sku) throw new Error("SKU eksik");
+    // core_fields.unit varsa onu kullan; yoksa PMT varsayılanı "adet".
+    const unit = typeof coreFields.unit === "string" && coreFields.unit.trim().length > 0
+        ? String(coreFields.unit).trim()
+        : "adet";
+    // core_fields'tan unit dışındakileri CreateProductInput'a serp (whitelist
+    // + finansal drop + tip normalizeCoreProductFields'te garanti edildi; tüm
+    // anahtarlar IMPORT_CORE_PRODUCT_FIELDS = CreateProductInput alt kümesi).
+    const { unit: _unit, ...restCore } = coreFields;
+    void _unit;
     return {
+        ...(restCore as Partial<CreateProductInput>),
         name,
         sku,
-        unit: "adet", // PMT için varsayılan; UI sonra düzeltebilir
+        unit,
         product_type_id: productTypeId,
         attributes,
     };
+}
+
+/**
+ * Faz A — satır için onaylanan core master-data alanlarını döndürür.
+ * approval yok → tüm core_fields uygulanır (attributes paterniyle simetrik);
+ * approval.coreFields belirtilmişse yalnız listedekiler. Her durumda
+ * normalize (whitelist + finansal drop + tip) tekrar uygulanır (defansif).
+ */
+function pickApprovedCoreFields(
+    line: ImportDocumentLineRow,
+    options?: ApplyOptions,
+): Record<string, string | number> {
+    const normalized = normalizeCoreProductFields(line.extracted_core_fields);
+    const approval = options?.fieldApprovals?.[line.id];
+    if (!approval || approval.coreFields === undefined) {
+        return normalized;
+    }
+    const allowed = new Set(approval.coreFields.filter(f => IMPORT_CORE_PRODUCT_FIELD_KEYS.has(f)));
+    return Object.fromEntries(
+        Object.entries(normalized).filter(([k]) => allowed.has(k)),
+    );
 }
 
 const PRODUCT_CORE_FIELDS = new Set(["name", "sku", "product_type_id"]);
@@ -297,13 +333,14 @@ export async function serviceApplyImportDocument(
                 if (line.extraction_type === "product") {
                     const approved = pickApprovedTechnicalAttributes(line, options);
                     const approvedProductFields = approvedProductFieldsForLine(line, options);
+                    const approvedCoreFields = pickApprovedCoreFields(line, options);
                     if (line.match_action === "new_product") {
                         const productTypeApproved = approvedProductFields === null
                             ? true
                             : approvedProductFields.has("product_type_id");
                         const createProductTypeId = productTypeApproved ? line.product_type_id : null;
                         const createAttributes = productTypeApproved ? approved.attributes : {};
-                        const input = buildCreateProductInput(line, createAttributes, createProductTypeId);
+                        const input = buildCreateProductInput(line, createAttributes, createProductTypeId, approvedCoreFields);
                         input.attributes = await validateTechnicalAttributesForApply(input.attributes, input.product_type_id);
                         const created = await dbCreateProduct(input);
                         await auditTechnicalTemplateApply({
@@ -336,16 +373,20 @@ export async function serviceApplyImportDocument(
                             effectiveProductTypeId ? approved.attributes : {},
                             effectiveProductTypeId,
                         );
-                        // attributes merge: { ...current, ...new } — yeni ezerler.
-                        // null/undefined/"" gelen AI değerleri mevcut ürün
-                        // attribute'unu SİLMEZ (ai-import-operations safetyNote
-                        // "boş alanlar mevcut veriyi silmez" — prompt talimatı
-                        // değil, burada kodda enforce edilir). Anahtarı temizleme
-                        // istenirse ayrı explicit "clear" akışı gerekir.
+                        // Faz C — attributes FILL-EMPTY (kullanıcı kararıyla
+                        // tutarlı, advisor): null/undefined/"" gelen değerler
+                        // mevcut veriyi silmez VE mevcut DOLU attribute üzerine
+                        // YAZILMAZ (önceki davranış {...current,...new} eziyordu;
+                        // review mevcut değeri göstermediğinden curated dn=99'u
+                        // dn=50 ile sessiz ezmeyi engeller). Yalnız mevcutta boş
+                        // olan teknik alanlar doldurulur.
+                        const currentAttrsForMerge = (current.attributes ?? {}) as Record<string, unknown>;
                         const nonEmptyLineAttributes = Object.fromEntries(
-                            Object.entries(safeLineAttributes).filter(
-                                ([, v]) => v !== null && v !== undefined && v !== "",
-                            ),
+                            Object.entries(safeLineAttributes).filter(([k, v]) => {
+                                if (v === null || v === undefined || v === "") return false;
+                                const cur = currentAttrsForMerge[k];
+                                return cur === null || cur === undefined || cur === "";
+                            }),
                         );
                         const productPatch: Record<string, unknown> = {};
                         if (
@@ -370,6 +411,19 @@ export async function serviceApplyImportDocument(
                         if (shouldSetProductType) {
                             productPatch.product_type_id = effectiveProductTypeId;
                         }
+                        // Faz A — core master-data alanları (kategori, malzeme,
+                        // standart, birim, para birimi vb.). Kullanıcı kararı:
+                        // eşleşen üründe YALNIZ BOŞ alanları doldur (mevcut/elle
+                        // düzeltilmiş değerleri EZME). normalizeCoreProductFields
+                        // zaten boş/null/finansal değerleri drop etti; burada da
+                        // mevcut ürün değeri doluysa atla → birim/para birimi gibi
+                        // kritik alanlar yanlış katalogdan sessizce bozulmaz.
+                        const currentRecord = current as unknown as Record<string, unknown>;
+                        for (const [k, v] of Object.entries(approvedCoreFields)) {
+                            const existing = currentRecord[k];
+                            const isEmpty = existing === null || existing === undefined || existing === "";
+                            if (isEmpty) productPatch[k] = v;
+                        }
                         // Uygulanacak gerçek bir şey yoksa (boş/null attr + boş patch)
                         // satırı atla — gereksiz no-op update + yanıltıcı sayaç önlenir.
                         if (Object.keys(nonEmptyLineAttributes).length === 0 && Object.keys(productPatch).length === 0) {
@@ -377,7 +431,7 @@ export async function serviceApplyImportDocument(
                             continue;
                         }
                         const mergedAttributes = {
-                            ...(current.attributes ?? {}),
+                            ...currentAttrsForMerge,
                             ...nonEmptyLineAttributes,
                         };
                         await dbUpdateProduct(line.matched_product_id, {

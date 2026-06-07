@@ -44,6 +44,11 @@ describe("import-guide — IMPORT_DATA_TARGETS", () => {
         expect(IMPORT_DATA_TARGETS.customer.href).toBe("/dashboard/customers");
         expect(IMPORT_DATA_TARGETS.vendor.href).toBe("/dashboard/vendors");
     });
+
+    it("Faz D: product_document hedefi görsel→kapak (primary) bilgisi içerir", () => {
+        expect(IMPORT_DATA_TARGETS.product_document.action.toLowerCase()).toContain("kapak");
+        expect(IMPORT_DATA_TARGETS.product_document.action.toLowerCase()).toContain("primary");
+    });
 });
 
 describe("import-guide — buildOperationTargets", () => {

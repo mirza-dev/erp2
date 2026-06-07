@@ -14,11 +14,18 @@ export async function POST(
 
         const guard = await requirePermission(_req, "manage_import");
         if (guard) return guard;
+        // Faz C — opsiyonel overwrite flag (varsayılan fill-empty). Geçersiz/eksik
+        // body güvenli: yalnız body.overwrite === true ise üzerine yazar.
+        let overwrite = false;
+        try {
+            const body = await _req.json();
+            overwrite = body?.overwrite === true;
+        } catch { /* body yok → fill-empty */ }
         const [actorUserId, permissions] = await Promise.all([
             getCurrentUserId(_req),
             getCurrentUserPermissions(_req),
         ]);
-        const result = await serviceConfirmBatch(batchId, { actorUserId, permissions });
+        const result = await serviceConfirmBatch(batchId, { actorUserId, permissions, overwrite });
         revalidateTag("products", "max");
         return NextResponse.json(result);
     } catch (err) {

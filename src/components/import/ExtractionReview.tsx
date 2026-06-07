@@ -31,6 +31,7 @@ import {
 } from "@/lib/extraction-review-helpers";
 import type { ApplyResultSummary } from "@/lib/extraction-review-helpers";
 import { confidenceLabel } from "@/lib/technical-templates";
+import { coreFieldLabel } from "@/lib/import-center";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -857,6 +858,31 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                                         </div>
                                                                     );
                                                                 })}
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {!isCertFlow && Object.keys(line.extracted_core_fields ?? {}).length > 0 && (
+                                                <tr key={`${line.id}-core`}>
+                                                    <td colSpan={detailColSpan} style={{ padding: "0 10px 12px", background: "var(--bg-primary)" }}>
+                                                        <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "10px", background: "var(--bg-secondary)" }}>
+                                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                                                Genel bilgiler · ürün kartına yazılacak
+                                                            </div>
+                                                            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                                                {Object.entries(line.extracted_core_fields ?? {}).map(([key, value]) => (
+                                                                    <span key={key} style={{
+                                                                        fontSize: "11px",
+                                                                        padding: "3px 8px",
+                                                                        borderRadius: "999px",
+                                                                        background: "var(--bg-primary)",
+                                                                        border: "0.5px solid var(--border-tertiary)",
+                                                                        color: "var(--text-secondary)",
+                                                                    }}>
+                                                                        <span style={{ color: "var(--text-tertiary)" }}>{coreFieldLabel(key)}:</span> {String(value)}
+                                                                    </span>
+                                                                ))}
                                                             </div>
                                                         </div>
                                                     </td>

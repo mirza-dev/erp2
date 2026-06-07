@@ -663,6 +663,7 @@ export interface ImportDocumentLineRow {
     extracted_name: string | null
     extracted_sku: string | null
     extracted_attributes: Record<string, unknown>
+    extracted_core_fields: Record<string, string | number>
     extraction_evidence: TechnicalExtractionEvidence
     candidate_matches: ImportDocumentLineCandidate[]
     matched_product_id: string | null

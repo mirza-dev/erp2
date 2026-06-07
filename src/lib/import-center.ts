@@ -1,4 +1,5 @@
 import { IMPORT_FIELDS } from "@/lib/import-fields";
+import type { ProductTypeFieldRow, ProductFieldType } from "@/lib/database.types";
 
 export const EXCEL_IMPORT_TEMPLATE_VERSION = "2026-06-03.1";
 export const COLUMN_MAPPING_COMPANY_SCOPE = "default";
@@ -23,6 +24,91 @@ export type ImportFieldApprovals = Record<string, ImportFieldApproval>;
 
 export const FINANCIAL_IMPORT_FIELDS = new Set(["price", "cost_price"]);
 export const EXCEL_IMPORT_ENTITY_TYPES: ClassicImportEntityType[] = ["product", "customer", "vendor", "stock"];
+
+/**
+ * Faz A — AI katalog/datasheet extraction'ından ürün kartına yazılabilecek
+ * "core" (sabit kolon) master-data alanları. Ürün-tipi teknik `attributes`
+ * JSONB'sinden AYRIDIR (o ürün tipinin field_key'leriyle sınırlı).
+ *
+ * Finansal alanlar (price/cost_price) bu listede YOK — bilinçli: extraction
+ * onları çıkarsa bile apply etmez; finansal yazma ayrı yetki+onay kapısında
+ * (Faz C). Stok (on_hand) da yok — master-data akışı stok güncellemez.
+ *
+ * Her alanın tipi: "string" | "number". apply tarafı buna göre normalize eder.
+ */
+export const IMPORT_CORE_PRODUCT_FIELDS: Record<string, "string" | "number"> = {
+    category: "string",
+    unit: "string",
+    currency: "string",
+    min_stock_level: "number",
+    reorder_qty: "number",
+    product_family: "string",
+    sub_category: "string",
+    material_quality: "string",
+    origin_country: "string",
+    production_site: "string",
+    standards: "string",
+    certifications: "string",
+    use_cases: "string",
+    industries: "string",
+    weight_kg: "number",
+    lead_time_days: "number",
+};
+
+export const IMPORT_CORE_PRODUCT_FIELD_KEYS = new Set(Object.keys(IMPORT_CORE_PRODUCT_FIELDS));
+
+/** Core alan anahtarı → Türkçe etiket (review ekranı gösterimi). */
+export const IMPORT_CORE_PRODUCT_FIELD_LABELS: Record<string, string> = {
+    category: "Kategori",
+    unit: "Birim",
+    currency: "Para Birimi",
+    min_stock_level: "Min. Stok",
+    reorder_qty: "Yeniden Sipariş Miktarı",
+    product_family: "Ürün Ailesi",
+    sub_category: "Alt Kategori",
+    material_quality: "Malzeme Kalitesi",
+    origin_country: "Menşei",
+    production_site: "Üretim Tesisi",
+    standards: "Standartlar",
+    certifications: "Sertifikalar",
+    use_cases: "Kullanım Alanları",
+    industries: "Sektörler",
+    weight_kg: "Ağırlık (kg)",
+    lead_time_days: "Tedarik Süresi (gün)",
+};
+
+export function coreFieldLabel(key: string): string {
+    return IMPORT_CORE_PRODUCT_FIELD_LABELS[key] ?? key;
+}
+
+/**
+ * Ham (AI'dan gelen) core_fields objesini whitelist + tip-normalize eder.
+ * - Bilinmeyen anahtar → drop.
+ * - Finansal anahtar → drop (FINANCIAL_IMPORT_FIELDS).
+ * - number alan: sonlu sayıya çevrilebiliyorsa number, değilse drop.
+ * - string alan: trim; boş → drop (boş değer mevcut veriyi silmemeli).
+ * - null/undefined/"" → drop (silme yok).
+ */
+export function normalizeCoreProductFields(raw: unknown): Record<string, string | number> {
+    if (!raw || typeof raw !== "object") return {};
+    const out: Record<string, string | number> = {};
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+        const expectedType = IMPORT_CORE_PRODUCT_FIELDS[key];
+        if (!expectedType) continue;
+        if (FINANCIAL_IMPORT_FIELDS.has(key)) continue;
+        if (value === null || value === undefined || value === "") continue;
+        if (expectedType === "number") {
+            const num = typeof value === "number" ? value : Number(String(value).replace(",", "."));
+            if (!Number.isFinite(num)) continue;
+            out[key] = num;
+        } else {
+            const str = String(value).trim();
+            if (str.length === 0) continue;
+            out[key] = str.slice(0, 500);
+        }
+    }
+    return out;
+}
 
 export interface ExcelTemplateColumn {
     field: string;
@@ -256,6 +342,103 @@ export const IMPORT_ALIAS_FIELD_MAP: Record<ClassicImportEntityType, Record<stri
 
 export function getAliasFieldMap(entityType: string): Record<string, string> {
     return IMPORT_ALIAS_FIELD_MAP[entityType as ClassicImportEntityType] ?? {};
+}
+
+// ── Faz B — Tip-özel Excel şablonu + satırdan teknik attributes ─────────────
+
+/** Tip-özel şablonda ürün tipini taşıyan kolon (önceden doldurulur). */
+export const PRODUCT_TYPE_TEMPLATE_COLUMN = "urun_tipi";
+
+export interface ProductTypeTemplateColumn {
+    field: string;          // başlık (field_key veya sabit kolon adı)
+    label: string;          // Türkçe başlık
+    required: boolean;
+    example: string | number | boolean;
+    note: string;
+    /** AI/confirm tarafı için: bu kolon ürün-tipi teknik alanı mı? */
+    isAttribute: boolean;
+}
+
+const PRODUCT_FIELD_TYPE_HINT: Record<ProductFieldType, string> = {
+    text: "metin",
+    number: "sayı",
+    select: "tek seçim",
+    multiselect: "çoklu seçim (virgülle)",
+    date: "tarih (YYYY-AA-GG)",
+    boolean: "evet/hayır",
+    longtext: "uzun metin",
+};
+
+/**
+ * Bir ürün tipi için indirilebilir Excel şablonunun kolonlarını üretir.
+ * Sabit kimlik kolonları (sku/name/unit) + tip kolonu (önceden doldurulu) +
+ * seçili core master-data alanları + tipin teknik field_key kolonları.
+ */
+export function buildProductTypeTemplateColumns(
+    typeName: string,
+    fields: ProductTypeFieldRow[],
+): ProductTypeTemplateColumn[] {
+    const base: ProductTypeTemplateColumn[] = [
+        { field: "sku", label: "SKU", required: true, example: "GV-A105-600", note: "Ürün için benzersiz kod.", isAttribute: false },
+        { field: "name", label: "Ürün Adı", required: true, example: "Sürgülü Vana A105", note: "Ürün adı.", isAttribute: false },
+        { field: "unit", label: "Birim", required: true, example: "adet", note: "adet, kg, metre gibi.", isAttribute: false },
+        { field: PRODUCT_TYPE_TEMPLATE_COLUMN, label: "Ürün Tipi", required: true, example: typeName, note: "Bu sütunu değiştirme — teknik alanların hangi tipe ait olduğunu belirler.", isAttribute: false },
+        { field: "category", label: "Kategori", required: false, example: "Vana", note: "Opsiyonel serbest kategori.", isAttribute: false },
+        { field: "material_quality", label: "Malzeme Kalitesi", required: false, example: "A105", note: "Opsiyonel.", isAttribute: false },
+        { field: "standards", label: "Standartlar", required: false, example: "API 600", note: "Virgülle ayrılabilir.", isAttribute: false },
+    ];
+
+    const techCols: ProductTypeTemplateColumn[] = fields.map(f => {
+        const opts = f.options?.length ? ` Seçenekler: ${f.options.join(", ")}.` : "";
+        const unit = f.unit ? ` Birim: ${f.unit}.` : "";
+        return {
+            field: f.field_key,
+            label: f.label_tr,
+            required: f.required,
+            example: f.options?.length ? f.options[0] : (f.field_type === "number" ? 0 : ""),
+            note: `${PRODUCT_FIELD_TYPE_HINT[f.field_type]}.${unit}${opts}`.trim(),
+            isAttribute: true,
+        };
+    });
+
+    return [...base, ...techCols];
+}
+
+/**
+ * Confirm sırasında bir ürün satırının ham verisinden, verilen ürün tipinin
+ * teknik field_key'lerine uyan değerleri toplar + normalize eder.
+ * - select/multiselect: değer string'e indirgenir (multiselect virgülle parse).
+ * - number: sonlu sayı; değilse drop.
+ * - boolean: parseBooleanLike.
+ * - boş/null → drop (silme yok; fill-empty/overwrite kararı apply'da).
+ */
+export function collectTypeAttributesFromRow(
+    data: Record<string, unknown>,
+    fields: ProductTypeFieldRow[],
+): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const f of fields) {
+        const raw = data[f.field_key];
+        if (raw === null || raw === undefined || raw === "") continue;
+        if (f.field_type === "number") {
+            const num = typeof raw === "number" ? raw : Number(String(raw).replace(",", "."));
+            if (!Number.isFinite(num)) continue;
+            out[f.field_key] = num;
+        } else if (f.field_type === "boolean") {
+            const b = parseBooleanLike(raw);
+            if (b === undefined) continue;
+            out[f.field_key] = b;
+        } else if (f.field_type === "multiselect") {
+            const arr = String(raw).split(",").map(s => s.trim()).filter(Boolean);
+            if (arr.length === 0) continue;
+            out[f.field_key] = arr;
+        } else {
+            const s = String(raw).trim();
+            if (s.length === 0) continue;
+            out[f.field_key] = s.slice(0, 500);
+        }
+    }
+    return out;
 }
 
 export function getAllowedFieldLabels(entityType: string): Map<string, string> {

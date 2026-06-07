@@ -14,8 +14,10 @@ import {
     defaultFieldApprovals,
     riskFlagsForFields,
     suggestSkuFromName,
+    PRODUCT_TYPE_TEMPLATE_COLUMN,
     type ImportMatchStatus,
 } from "@/lib/import-center";
+import { dbListProductTypes, dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
 
 function parseTRNumber(raw: string): number | null {
     const s = raw.toString().trim();
@@ -121,6 +123,24 @@ export async function POST(
         // increment success_count only after a successful import, not here.
         const columnMappingMeta: Array<{ entity_type: string; normalized_columns: string[] }> = [];
 
+        // Faz B — tip-özel şablon teknik kolonları (field_key) IMPORT_FIELD_SET'te
+        // yok → normal mapping'de düşerdi. Aktif tüm ürün tiplerinin field_key
+        // union'ı + tip kolonu (urun_tipi/product_type) product satırlarında
+        // HAM passthrough edilir; confirm tipi çözüp collectTypeAttributesFromRow
+        // ile ayıklar (yabancı/boş değerler zaten orada drop edilir).
+        const productPassthroughKeys = new Set<string>([PRODUCT_TYPE_TEMPLATE_COLUMN, "product_type"]);
+        if (body.sheets.some(s => s.entity_type === "product")) {
+            try {
+                const types = await dbListProductTypes();
+                for (const t of types) {
+                    const wf = await dbGetProductTypeWithFields(t.id);
+                    for (const f of wf?.fields ?? []) productPassthroughKeys.add(f.field_key);
+                }
+            } catch (err) {
+                console.warn("[apply-mappings] ürün tipi alanları yüklenemedi (teknik passthrough atlanır):", err);
+            }
+        }
+
         for (const sheet of body.sheets) {
             const { entity_type, mappings, rows, remember } = sheet;
             const sheetOperationType = inferOperationForSheet({
@@ -166,6 +186,18 @@ export async function POST(
                         const coerced = coerceValue(target_field, rawVal);
                         if (coerced !== undefined) {
                             parsed_data[target_field] = coerced;
+                        }
+                    }
+                }
+                // Faz B — tip-özel teknik kolon passthrough (yalnız product).
+                // Şablon başlığı = field_key olduğundan ham satırdan doğrudan
+                // taşınır; mapping gerektirmez. confirm tipe göre ayıklar.
+                if (entity_type === "product") {
+                    for (const key of productPassthroughKeys) {
+                        if (key in parsed_data) continue; // mapped alan önceliklidir
+                        const rawVal = row[key];
+                        if (rawVal !== undefined && rawVal !== null && rawVal !== "") {
+                            parsed_data[key] = rawVal; // ham; confirm normalize eder
                         }
                     }
                 }

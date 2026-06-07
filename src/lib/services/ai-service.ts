@@ -19,7 +19,7 @@ import {
 import { normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { IMPORT_FIELD_NAMES } from "@/lib/import-fields";
 import { normalizeTechnicalEvidence } from "@/lib/technical-templates";
-import { IMPORT_ALIAS_FIELD_MAP } from "@/lib/import-center";
+import { IMPORT_ALIAS_FIELD_MAP, IMPORT_CORE_PRODUCT_FIELDS, normalizeCoreProductFields } from "@/lib/import-center";
 import type { TechnicalExtractionEvidence } from "@/lib/database.types";
 
 export function isAIAvailable(): boolean {
@@ -1413,6 +1413,14 @@ export interface ExtractedProductLine {
      */
     product_type_id: string | null;
     attributes: Record<string, unknown>;
+    /**
+     * Faz A — ürün-tipinden bağımsız "core" master-data alanları (kategori,
+     * malzeme, menşei, standart, sertifika, ağırlık, tedarik süresi vb.).
+     * `attributes`'tan AYRI: attributes ürün-tipi şablon field_key'leriyle
+     * sınırlı; core_fields sabit ürün kolonları (IMPORT_CORE_PRODUCT_FIELDS).
+     * Finansal alanlar (price/cost_price) burada YOK — normalize drop eder.
+     */
+    core_fields: Record<string, string | number>;
     extraction_evidence: TechnicalExtractionEvidence;
     confidence: number;
 }
@@ -1470,6 +1478,11 @@ function buildExtractionSystemPrompt(input: ExtractProductsInput): string {
         ? "Belge bir KATALOG; her benzersiz ürün satırını ayrı item olarak çıkar (karışık tipte ürünler olabilir)."
         : "Belge tek bir ürünün VERİ SAYFASI; yalnız bir item üret (line=1).";
 
+    // Faz A — core master-data alanları (ürün-tipinden bağımsız sabit kolonlar)
+    const coreFieldsList = Object.entries(IMPORT_CORE_PRODUCT_FIELDS)
+        .map(([key, type]) => `  - ${key} (${type})`)
+        .join("\n");
+
     return `Sen bir endüstriyel ekipman kataloğunu analiz eden ekstraksiyon asistanısın.
 Kullanıcının seçtiği işlem:
 - ${operation.title}
@@ -1487,6 +1500,9 @@ Kurallar:
 - Dosyada olmayan alanı doldurma; boş alan mevcut ERP değerinin silineceği anlamına gelmez.
 - Her item için en uygun tipin UUID'sini "product_type_id" alanına yaz. Hiçbiri uymuyorsa null bırak.
 - "attributes" objesinde YALNIZ seçtiğin tipin field_key'lerini kullan; başka tipin alanlarını yazma.
+- "core_fields" objesine ürün-tipinden bağımsız genel master-data alanlarını yaz (yalnız belgede AÇIKÇA görünenler). İzinli core anahtarlar:
+${coreFieldsList}
+  number alanları sayı tipinde; diğerlerini kısa metin olarak yaz. Belgede yoksa hiç ekleme. Fiyat/maliyet/stok miktarını core_fields'a YAZMA.
 - Her dolu teknik attribute için "extraction_evidence" içinde aynı field_key ile kanıt yaz.
 - Kanıt güveni: "high" yalnız değer kaynak metinde açıkça görünüyorsa; normalize/tahmin varsa "medium" veya "low"; bulunamadıysa "not_found".
 - "high" için evidence_text boş olamaz. Kanıt yoksa değeri yazma veya güveni düşür.
@@ -1505,6 +1521,7 @@ Kurallar:
       "sku": "...",
       "product_type_id": "<yukarıdaki UUID'lerden biri veya null>",
       "attributes": { "field_key": value, ... },
+      "core_fields": { "category": "...", "material_quality": "...", ... },
       "extraction_evidence": {
         "field_key": {
           "confidence": "high|medium|low|not_found",
@@ -1586,7 +1603,10 @@ export function parseExtractionResponse(
         ) as Record<string, unknown>;
         const extraction_evidence = normalizeTechnicalEvidence(rawEvidence, new Set(Object.keys(attributes)));
 
-        out.push({ line, name, sku, product_type_id, attributes, extraction_evidence, confidence });
+        // Faz A — core master-data alanları (whitelist + tip-normalize + finansal drop)
+        const core_fields = normalizeCoreProductFields(it.core_fields);
+
+        out.push({ line, name, sku, product_type_id, attributes, core_fields, extraction_evidence, confidence });
     }
     return { items: out };
 }

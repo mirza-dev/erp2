@@ -65,12 +65,30 @@ describe("ImportGuide render", () => {
         const html = render("product_update");
         expect(html).not.toMatch(/#[0-9a-fA-F]{6}/);
     });
+
+    it("Faz B: productTypes verilince tip-özel şablon seçici render edilir", () => {
+        const html = renderToStaticMarkup(
+            <ImportGuide
+                selectedOperation={getAiImportOperation("product_update")}
+                productTypes={[{ id: "t-1", name: "Vana" }, { id: "t-2", name: "Conta" }]}
+            />,
+        );
+        expect(html).toContain("Ürün tipine özel şablon");
+        expect(html).toContain("Vana");
+        expect(html).toContain("Conta");
+    });
+
+    it("Faz B: productTypes boşsa tip-özel bölüm render edilmez", () => {
+        const html = render("product_update");
+        expect(html).not.toContain("Ürün tipine özel şablon");
+    });
 });
 
 describe("ImportGuide entegrasyon (source-regression)", () => {
     it("import sayfası ImportGuide'ı mount eder (selectedAiOperation ile)", () => {
         const src = read("src/app/dashboard/import/page.tsx");
         expect(src).toContain('import ImportGuide from "@/components/import/ImportGuide"');
-        expect(src).toContain("<ImportGuide selectedOperation={selectedAiOperation} />");
+        expect(src).toContain("<ImportGuide selectedOperation={selectedAiOperation}");
+        expect(src).toContain("productTypes={aiSuggestedTypes}");
     });
 });

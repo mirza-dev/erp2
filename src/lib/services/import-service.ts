@@ -34,8 +34,13 @@ import {
     FINANCIAL_IMPORT_FIELDS,
     normalizeStockDirection,
     parseBooleanLike,
+    normalizeImportToken,
+    collectTypeAttributesFromRow,
+    PRODUCT_TYPE_TEMPLATE_COLUMN,
     type ImportFieldApproval,
 } from "@/lib/import-center";
+import { dbListProductTypes, dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
+import type { ProductTypeWithFieldsRow } from "@/lib/supabase/product-types";
 
 // ── Batch ────────────────────────────────────────────────────
 
@@ -82,6 +87,13 @@ export interface ConfirmResult {
 export interface ConfirmBatchOptions {
     actorUserId?: string | null;
     permissions?: Set<Permission>;
+    /**
+     * Faz C — mevcut ürün güncellemesinde dolu alanların davranışı.
+     * false (varsayılan): yalnız boş alanlar doldurulur (fill-empty; mevcut/elle
+     * düzeltilmiş veri korunur). true: çıkarılan dolu değerler mevcut dolu
+     * değerin de üzerine yazılır (bayat veriyi tazelemek için kullanıcı seçer).
+     */
+    overwrite?: boolean;
 }
 
 function makeEmptyByEntity(): Record<ConfirmEntityType, EntityCounts> {
@@ -223,6 +235,22 @@ export async function serviceConfirmBatch(batchId: string, options: ConfirmBatch
 async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}): Promise<ConfirmResult> {
     const actorUserId = options.actorUserId ?? null;
     const perms = options.permissions ?? DEFAULT_CONFIRM_PERMS;
+    const overwrite = options.overwrite ?? false;
+    // Faz C — fill-empty/overwrite seçici. overwrite=false ise mevcut dolu değer
+    // korunur (yalnız boş alan doldurulur). İSTİSNA: kullanıcı önizlemede o alanı
+    // ELLE düzelttiyse (correctedFields) explicit niyet sayılır ve her zaman
+    // uygulanır — fill-empty yalnız dosyadan-otomatik gelen değerleri kısıtlar.
+    const pickUpdate = <T,>(
+        existing: unknown,
+        next: T | undefined,
+        field: string,
+        correctedFields: Set<string>,
+    ): T | undefined => {
+        if (next === undefined) return undefined;
+        if (overwrite || correctedFields.has(field)) return next;
+        const isEmpty = existing === null || existing === undefined || existing === "";
+        return isEmpty ? next : undefined;
+    };
     const drafts = await dbListDrafts(batchId);
     const toMerge = drafts
         .filter(d => d.status === "confirmed" || d.status === "pending")
@@ -258,6 +286,22 @@ async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}
     // Per-order cache ile sıralı sort_order garanti.
     const nextSortByOrder = new Map<string, number>();
 
+    // Faz B — tip-özel Excel şablonuyla gelen ürün-tipi teknik alanlarını
+    // (attributes) confirm'de yazabilmek için tipleri normalize-ad → fields ile
+    // yükle. Yalnız product draft varsa (gereksiz I/O önlenir).
+    const productTypesByName = new Map<string, ProductTypeWithFieldsRow>();
+    if (toMerge.some(d => d.entity_type === "product")) {
+        try {
+            const types = await dbListProductTypes();
+            for (const t of types) {
+                const wf = await dbGetProductTypeWithFields(t.id);
+                if (wf) productTypesByName.set(normalizeImportToken(t.name), wf);
+            }
+        } catch (err) {
+            console.warn("[import-confirm] ürün tipleri yüklenemedi (teknik alanlar atlanır):", err);
+        }
+    }
+
     let rowNum = 0;
     for (const draft of toMerge) {
         rowNum++;
@@ -266,6 +310,8 @@ async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}
         const base = (draft.parsed_data ?? {}) as Record<string, unknown>;
         const corrections = (draft.user_corrections ?? {}) as Record<string, unknown>;
         const rawData = { ...base, ...corrections };
+        // Faz C — kullanıcının elle düzelttiği alanlar (fill-empty istisnası).
+        const correctedFields = new Set(Object.keys(corrections));
         const approvals = parseApprovals(draft.field_approvals, rawData);
         const data = buildApprovedData({ data: rawData, approvals, perms });
         const importOperation = typeof data[IMPORT_OPERATION_FIELD] === "string"
@@ -407,35 +453,69 @@ async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}
                 const sku = String(data.sku);
                 const existingProduct = await dbFindProductBySku(sku);
                 let productId: string;
+                // Faz B — tip-özel şablonla gelen ürün tipi + teknik alanlar.
+                // `urun_tipi` (şablon kolonu) veya `product_type` → normalize ad
+                // eşleşmesiyle tip çözülür; o tipin field_key'lerine uyan kolonlar
+                // attributes olarak toplanır (normalize). Tip yoksa attributes boş.
+                const rawTypeName = data[PRODUCT_TYPE_TEMPLATE_COLUMN] ?? data.product_type;
+                const typeName = typeof rawTypeName === "string" ? rawTypeName.trim() : "";
+                const matchedType = typeName
+                    ? productTypesByName.get(normalizeImportToken(typeName))
+                    : undefined;
+                const typeAttributes = matchedType
+                    ? collectTypeAttributesFromRow(data, matchedType.fields)
+                    : {};
                 if (existingProduct) {
                     // ── Master-data update ─────────────────────────────────────────
                     // Product import = identity/catalog data only.
                     // on_hand is NEVER updated here — stock changes require the
                     // dedicated "stock" entity_type sheet.  See stock branch below.
                     // ──────────────────────────────────────────────────────────────
+                    // Faz C — fill-empty/overwrite: sabit kolonlar VE teknik
+                    // attributes mevcut değere göre pickUpdate ile süzülür.
+                    // overwrite=false → dolu alan korunur (unit/currency gibi
+                    // kritik alanlar yanlış katalogdan bozulmaz); true → tazelenir.
+                    const ex = existingProduct as unknown as Record<string, unknown>;
+                    const currentAttrs = (existingProduct.attributes ?? {}) as Record<string, unknown>;
+                    const mergedAttrs: Record<string, unknown> = { ...currentAttrs };
+                    for (const [k, v] of Object.entries(typeAttributes)) {
+                        const cur = currentAttrs[k];
+                        // fill-empty + overwrite + elle düzeltme istisnası (sabit
+                        // kolonlarla aynı kural): kullanıcı teknik kolonu önizlemede
+                        // elle düzelttiyse dolu mevcut üstüne de uygulanır.
+                        if (overwrite || correctedFields.has(k) || cur === null || cur === undefined || cur === "") {
+                            mergedAttrs[k] = v;
+                        }
+                    }
+                    const attrsChanged = Object.keys(typeAttributes).some(
+                        k => mergedAttrs[k] !== currentAttrs[k],
+                    );
                     const updatedProduct = await dbUpdateProduct(existingProduct.id, {
-                        name: String(data.name),
-                        category: data.category ? String(data.category) : undefined,
-                        unit: String(data.unit),
-                        price: parseNumeric(data.price),
-                        currency: data.currency ? String(data.currency) : undefined,
-                        min_stock_level: parseNumeric(data.min_stock_level),
-                        reorder_qty: parseNumeric(data.reorder_qty),
-                        preferred_vendor: data.preferred_vendor ? String(data.preferred_vendor) : undefined,
-                        product_family: data.product_family ? String(data.product_family) : undefined,
-                        sub_category: data.sub_category ? String(data.sub_category) : undefined,
-                        sector_compatibility: data.sector_compatibility ? String(data.sector_compatibility) : undefined,
-                        cost_price: parseNumeric(data.cost_price),
-                        weight_kg: parseNumeric(data.weight_kg),
-                        material_quality: data.material_quality ? String(data.material_quality) : undefined,
-                        production_site: data.production_site ? String(data.production_site) : undefined,
-                        use_cases: data.use_cases ? String(data.use_cases) : undefined,
-                        industries: data.industries ? String(data.industries) : undefined,
-                        standards: data.standards ? String(data.standards) : undefined,
-                        certifications: data.certifications ? String(data.certifications) : undefined,
-                        product_notes: data.product_notes ? String(data.product_notes) : undefined,
-                        origin_country: data.origin_country ? String(data.origin_country) : undefined,
-                        lead_time_days: parseNumeric(data.lead_time_days),
+                        // tip yalnız mevcut boşsa set edilir (fill-empty; overwrite tipi değiştirmez)
+                        ...(matchedType && !existingProduct.product_type_id ? { product_type_id: matchedType.id } : {}),
+                        ...(attrsChanged ? { attributes: mergedAttrs } : {}),
+                        name: pickUpdate(ex.name, String(data.name), "name", correctedFields),
+                        category: pickUpdate(ex.category, data.category ? String(data.category) : undefined, "category", correctedFields),
+                        unit: pickUpdate(ex.unit, String(data.unit), "unit", correctedFields),
+                        price: pickUpdate(ex.price, parseNumeric(data.price), "price", correctedFields),
+                        currency: pickUpdate(ex.currency, data.currency ? String(data.currency) : undefined, "currency", correctedFields),
+                        min_stock_level: pickUpdate(ex.min_stock_level, parseNumeric(data.min_stock_level), "min_stock_level", correctedFields),
+                        reorder_qty: pickUpdate(ex.reorder_qty, parseNumeric(data.reorder_qty), "reorder_qty", correctedFields),
+                        preferred_vendor: pickUpdate(ex.preferred_vendor, data.preferred_vendor ? String(data.preferred_vendor) : undefined, "preferred_vendor", correctedFields),
+                        product_family: pickUpdate(ex.product_family, data.product_family ? String(data.product_family) : undefined, "product_family", correctedFields),
+                        sub_category: pickUpdate(ex.sub_category, data.sub_category ? String(data.sub_category) : undefined, "sub_category", correctedFields),
+                        sector_compatibility: pickUpdate(ex.sector_compatibility, data.sector_compatibility ? String(data.sector_compatibility) : undefined, "sector_compatibility", correctedFields),
+                        cost_price: pickUpdate(ex.cost_price, parseNumeric(data.cost_price), "cost_price", correctedFields),
+                        weight_kg: pickUpdate(ex.weight_kg, parseNumeric(data.weight_kg), "weight_kg", correctedFields),
+                        material_quality: pickUpdate(ex.material_quality, data.material_quality ? String(data.material_quality) : undefined, "material_quality", correctedFields),
+                        production_site: pickUpdate(ex.production_site, data.production_site ? String(data.production_site) : undefined, "production_site", correctedFields),
+                        use_cases: pickUpdate(ex.use_cases, data.use_cases ? String(data.use_cases) : undefined, "use_cases", correctedFields),
+                        industries: pickUpdate(ex.industries, data.industries ? String(data.industries) : undefined, "industries", correctedFields),
+                        standards: pickUpdate(ex.standards, data.standards ? String(data.standards) : undefined, "standards", correctedFields),
+                        certifications: pickUpdate(ex.certifications, data.certifications ? String(data.certifications) : undefined, "certifications", correctedFields),
+                        product_notes: pickUpdate(ex.product_notes, data.product_notes ? String(data.product_notes) : undefined, "product_notes", correctedFields),
+                        origin_country: pickUpdate(ex.origin_country, data.origin_country ? String(data.origin_country) : undefined, "origin_country", correctedFields),
+                        lead_time_days: pickUpdate(ex.lead_time_days, parseNumeric(data.lead_time_days), "lead_time_days", correctedFields),
                     });
                     productId = updatedProduct.id;
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: updatedProduct.id });
@@ -447,6 +527,9 @@ async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}
                     // go through the "stock" entity_type sheet.
                     // ──────────────────────────────────────────────────────────────
                     const product = await dbCreateProduct({
+                        // Faz B — yeni ürün tip + teknik alanlarla eksiksiz açılır.
+                        product_type_id: matchedType?.id ?? null,
+                        attributes: typeAttributes,
                         name: String(data.name),
                         sku,
                         category: data.category ? String(data.category) : undefined,

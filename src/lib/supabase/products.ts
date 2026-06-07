@@ -190,14 +190,34 @@ export async function dbCreateProduct(input: CreateProductInput): Promise<Produc
     return { ...data, available_now: data.on_hand - data.reserved };
 }
 
+/**
+ * Faz C — dbUpdateProduct yazılabilir alan allow-list'i (savunma-derinliği).
+ * Ham `.update(updates)` yerine yalnız bu alanlar geçer → import veya başka bir
+ * çağıran yanlışlıkla `reserved`/`id`/rastgele kolon gönderse bile yazılmaz.
+ * `undefined` değerler de düşer (fill-empty akışında "bu alanı yazma" demek).
+ */
+const PRODUCT_UPDATE_ALLOWED_FIELDS = new Set<string>([
+    "name", "sku", "category", "unit", "price", "currency", "on_hand",
+    "min_stock_level", "product_type", "warehouse", "reorder_qty",
+    "preferred_vendor", "daily_usage", "lead_time_days", "product_family",
+    "sub_category", "sector_compatibility", "cost_price", "weight_kg",
+    "material_quality", "origin_country", "production_site", "use_cases",
+    "industries", "standards", "certifications", "product_notes",
+    "product_type_id", "attributes", "hs_code", "size_text", "is_active",
+]);
+
 export async function dbUpdateProduct(
     id: string,
-    updates: Partial<CreateProductInput>
+    updates: Partial<CreateProductInput> & { is_active?: boolean }
 ): Promise<ProductWithStock> {
     const supabase = createServiceClient();
+    const clean: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(updates)) {
+        if (PRODUCT_UPDATE_ALLOWED_FIELDS.has(k) && v !== undefined) clean[k] = v;
+    }
     const { data, error } = await supabase
         .from("products")
-        .update(updates)
+        .update(clean)
         .eq("id", id)
         .select("*")
         .single();

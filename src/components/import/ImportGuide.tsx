@@ -22,7 +22,12 @@ import {
 
 interface ImportGuideProps {
     selectedOperation: AiImportOperationDefinition;
+    /** Faz B — tip-özel Excel şablonu indirmek için aktif ürün tipleri. */
+    productTypes?: Array<{ id: string; name: string }>;
 }
+
+/** Modül seviyesi sabit referans — default prop `[]` her render'da yeni dizi yaratmasın. */
+const EMPTY_PRODUCT_TYPES: Array<{ id: string; name: string }> = [];
 
 const cardStyle: React.CSSProperties = {
     padding: "14px",
@@ -32,8 +37,9 @@ const cardStyle: React.CSSProperties = {
     boxShadow: "var(--surface-shadow-sm)",
 };
 
-export default function ImportGuide({ selectedOperation }: ImportGuideProps) {
+export default function ImportGuide({ selectedOperation, productTypes = EMPTY_PRODUCT_TYPES }: ImportGuideProps) {
     const [open, setOpen] = useState(false);
+    const [selectedTypeId, setSelectedTypeId] = useState("");
     const target = getTargetForOperation(selectedOperation);
     const operationTargets = buildOperationTargets();
     const templates = getActiveTemplateLinks();
@@ -210,6 +216,59 @@ export default function ImportGuide({ selectedOperation }: ImportGuideProps) {
                                 </a>
                             ))}
                         </div>
+
+                        {/* Faz B — tip-özel şablon (ürün tipi teknik alanları dahil) */}
+                        {productTypes.length > 0 && (
+                            <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "var(--line-width) dashed var(--surface-border)" }}>
+                                <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "4px" }}>
+                                    Ürün tipine özel şablon
+                                </div>
+                                <p style={{ fontSize: "11px", color: "var(--text-tertiary)", margin: "0 0 8px", lineHeight: 1.5 }}>
+                                    Tip seç; teknik alanları (DN, PN, gövde malzemesi vb.) <b>sütun olarak</b> içeren Excel iner. Doldurup yükleyince ürünün teknik bilgileri de yazılır.
+                                </p>
+                                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                                    <select
+                                        value={selectedTypeId}
+                                        onChange={e => setSelectedTypeId(e.target.value)}
+                                        aria-label="Ürün tipi seç"
+                                        style={{
+                                            fontSize: "12px",
+                                            padding: "7px 10px",
+                                            borderRadius: "6px",
+                                            border: "var(--line-width) solid var(--border-secondary)",
+                                            background: "var(--surface-raised)",
+                                            color: "var(--text-primary)",
+                                        }}
+                                    >
+                                        <option value="">Tip seçin…</option>
+                                        {productTypes.map(t => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                    {selectedTypeId ? (
+                                        <a
+                                            href={`/api/import/templates?kind=product_type&typeId=${selectedTypeId}`}
+                                            download
+                                            aria-label="Seçili ürün tipi şablonunu indir"
+                                            style={{
+                                                display: "inline-flex", alignItems: "center", gap: "6px",
+                                                fontSize: "12px", fontWeight: 600,
+                                                padding: "7px 12px", borderRadius: "6px",
+                                                background: "var(--accent-bg)", color: "var(--accent-text)",
+                                                border: "var(--line-width) solid var(--accent-border)",
+                                                textDecoration: "none",
+                                            }}
+                                        >
+                                            <Download size={14} aria-hidden /> Şablonu indir
+                                        </a>
+                                    ) : (
+                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                            indirmek için tip seçin
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Güven notları */}

@@ -212,6 +212,8 @@ export default function ImportPage() {
     const [sheets, setSheets] = useState<SheetInfo[]>([]);
     const [activeTab, setActiveTab] = useState("");
     const [importProgress, setImportProgress] = useState<Record<string, number>>({});
+    // Faz C — mevcut dolu alanların üzerine yazma (varsayılan: yalnız boş doldur)
+    const [overwriteExisting, setOverwriteExisting] = useState(false);
     const [confirmResult, setConfirmResult] = useState<{
         added: number;
         updated: number;
@@ -522,7 +524,11 @@ export default function ImportPage() {
         }, 100);
 
         try {
-            const confirmRes = await fetch(`/api/import/${batchId}/confirm`, { method: "POST" });
+            const confirmRes = await fetch(`/api/import/${batchId}/confirm`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ overwrite: overwriteExisting }),
+            });
             clearInterval(ticker); ticker = null;
 
             const done: Record<string, number> = {};
@@ -556,6 +562,7 @@ export default function ImportPage() {
         setImportProgress({}); setConfirmResult(null); setDrafts([]); setSheets([]);
         setActiveTab(""); setBatchId(null); setParseError(null);
         setColumnMappings({}); setDetectingColumns(false); setDraftEdits({}); setDraftApprovals({});
+        setOverwriteExisting(false);
     };
 
     const importableSelected = sheets.filter(s => s.status === "importable" && s.selected);
@@ -600,7 +607,7 @@ export default function ImportPage() {
             </div>
 
             {/* Rehber + şeffaflık katmanı — 3 adım + veri hedefleri + şablonlar + güven notları */}
-            <ImportGuide selectedOperation={selectedAiOperation} />
+            <ImportGuide selectedOperation={selectedAiOperation} productTypes={aiSuggestedTypes} />
 
             {/* AI default akış (her zaman görünür); Excel/CSV toplu aktarım alt accordion'da */}
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -1395,6 +1402,21 @@ export default function ImportPage() {
                             </div>
                         ) : null;
                     })()}
+
+                    {/* Faz C — mevcut dolu alanların üzerine yazma toggle'ı */}
+                    <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "10px 12px", background: "var(--surface-subtle)", border: "var(--line-width) solid var(--surface-border)", borderRadius: "6px", cursor: "pointer" }}>
+                        <input
+                            type="checkbox"
+                            checked={overwriteExisting}
+                            onChange={e => setOverwriteExisting(e.target.checked)}
+                            aria-label="Mevcut dolu alanların üzerine yaz"
+                            style={{ width: "14px", height: "14px", marginTop: "1px", accentColor: "var(--accent)" }}
+                        />
+                        <span style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                            <b style={{ color: "var(--text-primary)" }}>Mevcut dolu alanların üzerine yaz</b><br />
+                            Varsayılan olarak yalnız <b>boş</b> alanlar doldurulur; mevcut/elle düzeltilmiş değerler korunur. İşaretlersen dosyadaki dolu değerler mevcut değerin de üzerine yazılır (birim, para birimi gibi alanlar dahil — dikkatli kullan).
+                        </span>
+                    </label>
 
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
                         <button type="button" onClick={() => { setState("column_mapping"); setDrafts([]); }} style={{ fontSize: "12px", padding: "7px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>

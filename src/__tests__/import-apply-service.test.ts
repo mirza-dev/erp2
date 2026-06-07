@@ -83,6 +83,7 @@ function makeLine(id: string, overrides: Record<string, unknown> = {}) {
         extracted_name: `Vana ${id}`,
         extracted_sku: `SKU-${id}`,
         extracted_attributes: { dn: 50 },
+        extracted_core_fields: {},
         extraction_evidence: { dn: { confidence: "high", evidence_text: "DN50" } },
         candidate_matches: [],
         matched_product_id: null,
@@ -176,7 +177,7 @@ describe("serviceApplyImportDocument — product flow", () => {
         expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
     });
 
-    it("matched satır → dbUpdateProduct attributes merge ({...current, ...new})", async () => {
+    it("matched satır → attributes FILL-EMPTY (dolu dn KORUNUR, boş pn_class eklenir)", async () => {
         mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
             makeLine("1", { match_action: "matched", matched_product_id: "p-existing", extracted_attributes: { dn: 50, pn_class: "PN16" } }),
@@ -189,8 +190,9 @@ describe("serviceApplyImportDocument — product flow", () => {
         const r = await serviceApplyImportDocument("doc-1", "user-1");
         expect(r.products_updated).toBe(1);
         const args = mockUpdateProduct.mock.calls[0]?.[1] as { attributes: Record<string, unknown> };
-        // merge: material korunur, dn yeni değer (50) eski (25)'i ezer, pn_class eklenir
-        expect(args.attributes).toEqual({ material: "A105", dn: 50, pn_class: "PN16" });
+        // Faz C fill-empty: material korunur, dn DOLU (25) → KORUNUR (50 ezmez),
+        // pn_class mevcutta YOK → eklenir (kullanıcı kararı: curated değer ezilmez)
+        expect(args.attributes).toEqual({ material: "A105", dn: 25, pn_class: "PN16" });
     });
 
     it("null/boş AI değeri mevcut ürün attribute'unu SİLMEZ (clobber koruması)", async () => {
@@ -882,5 +884,112 @@ describe("serviceApplyImportDocument — Faz 3c Review 4.tur (P2 post-commit)", 
         // İki 'classified' denemesi (ilki normal flow, ikincisi outer catch rollback)
         const classifiedCalls = mockUpdateDocStatus.mock.calls.filter(c => c[1] === "classified");
         expect(classifiedCalls.length).toBeGreaterThanOrEqual(1);
+    });
+});
+
+describe("serviceApplyImportDocument — Faz A core master-data", () => {
+    it("new_product: core_fields dbCreateProduct'a geçirilir (kategori/malzeme/menşei vb.)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", {
+                extracted_core_fields: {
+                    category: "Vana",
+                    material_quality: "A105",
+                    origin_country: "TR",
+                    weight_kg: 12.5,
+                    lead_time_days: 21,
+                },
+            }),
+        ]);
+        mockCreateProduct.mockResolvedValue({ id: "p-new" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.products_created).toBe(1);
+        const input = mockCreateProduct.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(input.category).toBe("Vana");
+        expect(input.material_quality).toBe("A105");
+        expect(input.origin_country).toBe("TR");
+        expect(input.weight_kg).toBe(12.5);
+        expect(input.lead_time_days).toBe(21);
+    });
+
+    it("new_product: core_fields.unit varsa create'te unit onu kullanır", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { extracted_core_fields: { unit: "kg" } }),
+        ]);
+        mockCreateProduct.mockResolvedValue({ id: "p-new" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await serviceApplyImportDocument("doc-1", "user-1");
+        const input = mockCreateProduct.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(input.unit).toBe("kg");
+    });
+
+    it("FİNANSAL GÜVENLİK: core_fields'a sızan price/cost_price create'e YAZILMAZ", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            // normalize zaten finansal drop eder; defansif: apply de yazmamalı
+            makeLine("1", { extracted_core_fields: { category: "Vana", price: 1000, cost_price: 800 } }),
+        ]);
+        mockCreateProduct.mockResolvedValue({ id: "p-new" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await serviceApplyImportDocument("doc-1", "user-1");
+        const input = mockCreateProduct.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(input.category).toBe("Vana");
+        expect(input.price).toBeUndefined();
+        expect(input.cost_price).toBeUndefined();
+    });
+
+    it("matched: core_fields YALNIZ boş alanları doldurur, dolu alanı EZMEZ (kullanıcı kararı)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        // Mevcut üründe: category dolu (Eski Kategori), unit dolu (adet),
+        // currency dolu (USD); material_quality + standards BOŞ.
+        mockGetProductById.mockResolvedValue({
+            id: "p-existing", name: "Eski", sku: "SKU-1", product_type_id: "type-vana",
+            attributes: {}, category: "Eski Kategori", unit: "adet", currency: "USD",
+            material_quality: null, standards: "",
+        });
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", {
+                match_action: "matched",
+                matched_product_id: "p-existing",
+                extracted_attributes: {},
+                extracted_core_fields: {
+                    category: "Yeni Kategori", // dolu → EZİLMEZ
+                    unit: "kg",                 // dolu → EZİLMEZ (stok anlamı korunur)
+                    currency: "EUR",            // dolu → EZİLMEZ (para birimi bozulmaz)
+                    material_quality: "A105",   // boş → DOLDURULUR
+                    standards: "API 600",       // boş → DOLDURULUR
+                },
+            }),
+        ]);
+        mockUpdateProduct.mockResolvedValue({ id: "p-existing" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.products_updated).toBe(1);
+        const patch = mockUpdateProduct.mock.calls[0]?.[1] as Record<string, unknown>;
+        // boş alanlar dolduruldu
+        expect(patch.material_quality).toBe("A105");
+        expect(patch.standards).toBe("API 600");
+        // dolu alanlar patch'e HİÇ girmedi (ezme yok)
+        expect(patch.category).toBeUndefined();
+        expect(patch.unit).toBeUndefined();
+        expect(patch.currency).toBeUndefined();
+    });
+
+    it("approval.coreFields belirtilirse yalnız onaylı core alanlar uygulanır", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockCreateProduct.mockResolvedValue({ id: "p-new" });
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { extracted_core_fields: { category: "Vana", material_quality: "A105", origin_country: "TR" } }),
+        ]);
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await serviceApplyImportDocument("doc-1", "user-1", {
+            fieldApprovals: { "1": { technicalAttributeKeys: [], coreFields: ["category"] } },
+        });
+        const input = mockCreateProduct.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(input.category).toBe("Vana");
+        expect(input.material_quality).toBeUndefined();
+        expect(input.origin_country).toBeUndefined();
     });
 });

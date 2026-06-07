@@ -30,6 +30,8 @@ const mockDbSaveEntityAlias = vi.fn();
 const mockDbCreateProduct = vi.fn();
 const mockDbFindProductBySku = vi.fn();
 const mockDbUpdateProduct = vi.fn();
+const mockDbListProductTypes = vi.fn();
+const mockDbGetProductTypeWithFields = vi.fn();
 const mockDbRecordMovementAtomic = vi.fn();
 const mockDbRecordStockTransfer = vi.fn();
 const mockDbListVendors = vi.fn();
@@ -82,6 +84,10 @@ vi.mock("@/lib/supabase/products", () => ({
     dbRecordMovementAtomic: (...args: unknown[]) => mockDbRecordMovementAtomic(...args),
     dbRecordStockTransfer: (...args: unknown[]) => mockDbRecordStockTransfer(...args),
     dbUpdateProduct: (...args: unknown[]) => mockDbUpdateProduct(...args),
+}));
+vi.mock("@/lib/supabase/product-types", () => ({
+    dbListProductTypes: (...args: unknown[]) => mockDbListProductTypes(...args),
+    dbGetProductTypeWithFields: (...args: unknown[]) => mockDbGetProductTypeWithFields(...args),
 }));
 vi.mock("@/lib/supabase/product-vendor-links", () => ({
     dbUpsertProductVendorLink: (...args: unknown[]) => mockDbUpsertProductVendorLink(...args),
@@ -161,6 +167,10 @@ beforeEach(() => {
     mockDbRecordStockTransfer.mockResolvedValue({ success: true });
     mockDbUpsertProductVendorLink.mockResolvedValue({ id: "link-1" });
     mockDbListVendors.mockResolvedValue([]);
+    // Faz B — varsayılan: tip yok (mevcut testler attributes/tip beklemiyor).
+    // Tip-özel testler bunları kendi içinde override eder.
+    mockDbListProductTypes.mockResolvedValue([]);
+    mockDbGetProductTypeWithFields.mockResolvedValue(null);
 });
 
 // ─── Batch lifecycle ─────────────────────────────────────────────────────────
@@ -479,7 +489,8 @@ describe("serviceConfirmBatch — product SKU dedup contract", () => {
             parsed_data: { name: "Gate Valve DN50", sku: "GV-050", unit: "adet" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
-        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "Gate Valve" });
+        // Faz C fill-empty: mevcut name BOŞ → dosyadan gelen değer doldurur.
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", name: "" });
         mockDbUpdateProduct.mockResolvedValue({ id: "existing-p" });
 
         const result = await serviceConfirmBatch("batch-1");
@@ -2465,5 +2476,146 @@ describe("serviceConfirmBatch — meta processing (column_mapping_meta)", () => 
 
         // added + updated = 0 → no call
         expect(mockDbIncrementMappingSuccess).not.toHaveBeenCalled();
+    });
+});
+
+// ─── Faz B — tip-özel teknik attributes (Excel toplu akışı) ──────────────────
+
+describe("serviceConfirmBatch — Faz B ürün-tipi teknik attributes", () => {
+    const VANA_FIELDS = [
+        { field_key: "dn", field_type: "number", options: null, label_tr: "DN" },
+        { field_key: "pn_class", field_type: "select", options: ["PN16", "PN25"], label_tr: "PN" },
+        { field_key: "govde", field_type: "text", options: null, label_tr: "Gövde" },
+    ];
+    const VANA_TYPE = { id: "type-vana", name: "Vana", is_active: true, fields: VANA_FIELDS };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+        mockDbListProductTypes.mockResolvedValue([{ id: "type-vana", name: "Vana" }]);
+        mockDbGetProductTypeWithFields.mockResolvedValue(VANA_TYPE);
+    });
+
+    it("yeni ürün: urun_tipi=Vana → product_type_id + normalize attributes yazılır", async () => {
+        mockDbListDrafts.mockResolvedValue([makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Sürgülü Vana", sku: "SV-1", unit: "adet", urun_tipi: "Vana", dn: "50", pn_class: "PN16", govde: "A105" },
+        })]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "p-new" });
+
+        const r = await serviceConfirmBatch("batch-1");
+        expect(r.added).toBe(1);
+        const input = mockDbCreateProduct.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(input.product_type_id).toBe("type-vana");
+        expect(input.attributes).toEqual({ dn: 50, pn_class: "PN16", govde: "A105" }); // dn string→number
+    });
+
+    it("tip eşleşmezse (urun_tipi yok) attributes boş + product_type_id null", async () => {
+        mockDbListDrafts.mockResolvedValue([makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Vana", sku: "SV-2", unit: "adet", dn: "50" },
+        })]);
+        mockDbFindProductBySku.mockResolvedValue(null);
+        mockDbCreateProduct.mockResolvedValue({ id: "p-new" });
+
+        await serviceConfirmBatch("batch-1");
+        const input = mockDbCreateProduct.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(input.product_type_id).toBeNull();
+        expect(input.attributes).toEqual({});
+    });
+
+    it("eşleşen ürün: dolu attribute KORUNUR, boş olan doldurulur (fill-empty)", async () => {
+        mockDbListDrafts.mockResolvedValue([makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Sürgülü Vana", sku: "SV-1", unit: "adet", urun_tipi: "Vana", dn: "50", govde: "A105" },
+        })]);
+        // mevcut üründe dn dolu (99), govde yok → dn korunur, govde doldurulur
+        mockDbFindProductBySku.mockResolvedValue({
+            id: "p-ex", sku: "SV-1", name: "Eski", product_type_id: "type-vana",
+            attributes: { dn: 99 },
+        });
+        mockDbUpdateProduct.mockResolvedValue({ id: "p-ex" });
+
+        const r = await serviceConfirmBatch("batch-1");
+        expect(r.updated).toBe(1);
+        const patch = mockDbUpdateProduct.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(patch.attributes).toEqual({ dn: 99, govde: "A105" }); // dn ezilmedi, govde eklendi
+    });
+
+    it("eşleşen ürün tip-özel attribute getirmezse attributes patch'e girmez", async () => {
+        mockDbListDrafts.mockResolvedValue([makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Vana", sku: "SV-1", unit: "adet" }, // urun_tipi yok
+        })]);
+        mockDbFindProductBySku.mockResolvedValue({
+            id: "p-ex", sku: "SV-1", name: "Eski", product_type_id: "type-vana", attributes: { dn: 99 },
+        });
+        mockDbUpdateProduct.mockResolvedValue({ id: "p-ex" });
+
+        await serviceConfirmBatch("batch-1");
+        const patch = mockDbUpdateProduct.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(patch.attributes).toBeUndefined(); // no-op → mevcut attributes dokunulmaz
+    });
+});
+
+// ─── Faz C — fill-empty / overwrite / elle düzeltme istisnası ────────────────
+
+describe("serviceConfirmBatch — Faz C fill-empty/overwrite (sabit kolonlar)", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDbGetBatch.mockResolvedValue(makeBatch());
+        mockDbUpdateBatchStatus.mockResolvedValue(makeBatch({ status: "confirmed" }));
+        mockDbUpdateDraft.mockResolvedValue({ ...makeDraft(), status: "merged" });
+        mockDbListProductTypes.mockResolvedValue([]);
+        mockDbGetProductTypeWithFields.mockResolvedValue(null);
+    });
+
+    it("varsayılan (fill-empty): dolu kolon KORUNUR, boş kolon doldurulur", async () => {
+        mockDbListDrafts.mockResolvedValue([makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Yeni Ad", sku: "P1", unit: "kg", category: "Vana" },
+        })]);
+        // mevcut: unit dolu (adet), category boş
+        mockDbFindProductBySku.mockResolvedValue({ id: "p-ex", sku: "P1", name: "Eski Ad", unit: "adet", category: "" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "p-ex" });
+
+        await serviceConfirmBatch("batch-1");
+        const patch = mockDbUpdateProduct.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(patch.unit).toBeUndefined();   // dolu → korunur (kg ezmez)
+        expect(patch.name).toBeUndefined();   // dolu → korunur
+        expect(patch.category).toBe("Vana");  // boş → doldurulur
+    });
+
+    it("overwrite=true: dolu kolon da üzerine yazılır", async () => {
+        mockDbListDrafts.mockResolvedValue([makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Yeni Ad", sku: "P1", unit: "kg", currency: "EUR" },
+        })]);
+        mockDbFindProductBySku.mockResolvedValue({ id: "p-ex", sku: "P1", name: "Eski", unit: "adet", currency: "USD" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "p-ex" });
+
+        await serviceConfirmBatch("batch-1", { overwrite: true });
+        const patch = mockDbUpdateProduct.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(patch.unit).toBe("kg");
+        expect(patch.currency).toBe("EUR");
+        expect(patch.name).toBe("Yeni Ad");
+    });
+
+    it("elle düzeltme (user_corrections): fill-empty'de bile dolu alana uygulanır", async () => {
+        mockDbListDrafts.mockResolvedValue([makeDraft({
+            entity_type: "product",
+            parsed_data: { name: "Dosya Adı", sku: "P1", unit: "adet" },
+            user_corrections: { name: "Elle Düzeltilmiş Ad" },
+        })]);
+        // mevcut name DOLU; normalde fill-empty korur ama kullanıcı elle düzeltti
+        mockDbFindProductBySku.mockResolvedValue({ id: "p-ex", sku: "P1", name: "Eski Ad", unit: "adet" });
+        mockDbUpdateProduct.mockResolvedValue({ id: "p-ex" });
+
+        await serviceConfirmBatch("batch-1");
+        const patch = mockDbUpdateProduct.mock.calls[0]?.[1] as Record<string, unknown>;
+        expect(patch.name).toBe("Elle Düzeltilmiş Ad"); // elle düzeltme her zaman uygulanır
     });
 });

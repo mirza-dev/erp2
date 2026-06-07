@@ -59,9 +59,9 @@ export const IMPORT_DATA_TARGETS: Record<AiImportOperationScope, ImportDataTarge
         action: "Yeni ürün oluşturur veya mevcut ürünü eşleştirip günceller.",
     },
     product_document: {
-        module: "Ürün Ekleri",
+        module: "Ürün Ekleri & Kapak Görseli",
         href: "/dashboard/products",
-        action: "Sertifika, doküman veya görseli ilgili ürüne ek olarak bağlar.",
+        action: "Sertifika/doküman/görseli ürüne ek olarak bağlar; yüklenen ilk görsel ürün kapak görseli (primary) olur.",
     },
     product_type: {
         module: "Ürün Tipleri",

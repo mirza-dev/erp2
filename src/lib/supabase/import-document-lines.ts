@@ -24,6 +24,7 @@ export interface CreateExtractedLineInput {
     extracted_name?: string | null;
     extracted_sku?: string | null;
     extracted_attributes?: Record<string, unknown>;
+    extracted_core_fields?: Record<string, string | number>;
     extraction_evidence?: TechnicalExtractionEvidence;
     candidate_matches?: ImportDocumentLineCandidate[];
     matched_product_id?: string | null;
@@ -69,6 +70,7 @@ export async function dbCreateExtractedLines(
         extracted_name: l.extracted_name ?? null,
         extracted_sku: l.extracted_sku ?? null,
         extracted_attributes: l.extracted_attributes ?? {},
+        extracted_core_fields: l.extracted_core_fields ?? {},
         extraction_evidence: l.extraction_evidence ?? {},
         candidate_matches: l.candidate_matches ?? [],
         matched_product_id: l.matched_product_id ?? null,

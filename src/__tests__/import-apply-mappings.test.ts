@@ -22,6 +22,8 @@ const mockDbDeletePendingDrafts = vi.fn();
 const mockDbUpdateBatchStatus   = vi.fn();
 const mockDbCreateDrafts        = vi.fn();
 const mockDbSaveColumnMappings  = vi.fn();
+const mockDbListProductTypes    = vi.fn();
+const mockDbGetProductTypeWithFields = vi.fn();
 
 vi.mock("@/lib/supabase/import", () => ({
     dbGetBatch:            (...args: unknown[]) => mockDbGetBatch(...args),
@@ -34,6 +36,10 @@ vi.mock("@/lib/supabase/column-mappings", () => ({
     dbSaveColumnMappings: (...args: unknown[]) => mockDbSaveColumnMappings(...args),
     normalizeColumnName:  (col: string) =>
         col.trim().toLowerCase().replace(/[^a-z0-9]/g, "_"),
+}));
+vi.mock("@/lib/supabase/product-types", () => ({
+    dbListProductTypes: (...args: unknown[]) => mockDbListProductTypes(...args),
+    dbGetProductTypeWithFields: (...args: unknown[]) => mockDbGetProductTypeWithFields(...args),
 }));
 
 import { POST } from "@/app/api/import/[batchId]/apply-mappings/route";
@@ -68,6 +74,9 @@ describe("POST /api/import/[batchId]/apply-mappings", () => {
         mockDbUpdateBatchStatus.mockResolvedValue({ id: BATCH_ID, status: "processing" });
         mockDbCreateDrafts.mockResolvedValue([makeDraft()]);
         mockDbSaveColumnMappings.mockResolvedValue(undefined);
+        // Faz B varsayılan: tip yok (mevcut testler teknik passthrough beklemiyor)
+        mockDbListProductTypes.mockResolvedValue([]);
+        mockDbGetProductTypeWithFields.mockResolvedValue(null);
     });
 
     it("returns 404 when batch not found", async () => {
@@ -372,5 +381,57 @@ describe("POST /api/import/[batchId]/apply-mappings", () => {
 
         expect(res.status).toBe(400);
         expect(mockDbCreateDrafts).not.toHaveBeenCalled();
+    });
+
+    // ── Faz B — tip-özel teknik kolon passthrough (parse-survival) ───────────
+    it("product: urun_tipi + tip field_key kolonları parsed_data'ya passthrough edilir", async () => {
+        mockDbListProductTypes.mockResolvedValue([{ id: "type-vana", name: "Vana" }]);
+        mockDbGetProductTypeWithFields.mockResolvedValue({
+            id: "type-vana", name: "Vana", is_active: true,
+            fields: [
+                { field_key: "dn", field_type: "number", label_tr: "DN", unit: "mm", options: null, required: false },
+                { field_key: "pn_class", field_type: "select", label_tr: "PN", unit: null, options: ["PN16"], required: false },
+            ],
+        });
+        await POST(makeReq({
+            sheets: [{
+                sheet_name: "Urunler", entity_type: "product",
+                // teknik kolonlar mapping'de YOK — yine de passthrough olmalı
+                mappings: [
+                    { source_column: "sku", target_field: "sku" },
+                    { source_column: "name", target_field: "name" },
+                    { source_column: "unit", target_field: "unit" },
+                ],
+                rows: [{ sku: "SV-1", name: "Vana", unit: "adet", urun_tipi: "Vana", dn: "50", pn_class: "PN16" }],
+                remember: false,
+            }],
+        }), makeCtx());
+
+        const draftInputs: Array<{ parsed_data: Record<string, unknown> }> = mockDbCreateDrafts.mock.calls[0][0];
+        const pd = draftInputs[0].parsed_data;
+        expect(pd).toHaveProperty("urun_tipi", "Vana");
+        expect(pd).toHaveProperty("dn", "50");        // ham; confirm normalize eder
+        expect(pd).toHaveProperty("pn_class", "PN16");
+    });
+
+    it("product: ürün tipi field_key'i OLMAYAN rastgele kolon passthrough EDİLMEZ", async () => {
+        mockDbListProductTypes.mockResolvedValue([{ id: "type-vana", name: "Vana" }]);
+        mockDbGetProductTypeWithFields.mockResolvedValue({
+            id: "type-vana", name: "Vana", is_active: true,
+            fields: [{ field_key: "dn", field_type: "number", label_tr: "DN", unit: null, options: null, required: false }],
+        });
+        await POST(makeReq({
+            sheets: [{
+                sheet_name: "Urunler", entity_type: "product",
+                mappings: [{ source_column: "sku", target_field: "sku" }, { source_column: "name", target_field: "name" }, { source_column: "unit", target_field: "unit" }],
+                rows: [{ sku: "SV-1", name: "Vana", unit: "adet", dn: "50", rastgele_kolon: "sızinti" }],
+                remember: false,
+            }],
+        }), makeCtx());
+
+        const draftInputs: Array<{ parsed_data: Record<string, unknown> }> = mockDbCreateDrafts.mock.calls[0][0];
+        const pd = draftInputs[0].parsed_data;
+        expect(pd).toHaveProperty("dn", "50");
+        expect(pd).not.toHaveProperty("rastgele_kolon");
     });
 });

@@ -258,6 +258,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                     extracted_name: item.name,
                     extracted_sku: item.sku,
                     extracted_attributes: item.attributes,
+                    extracted_core_fields: item.core_fields,
                     extraction_evidence: item.extraction_evidence,
                     candidate_matches: candidates,
                     matched_product_id: initialAction === "matched" ? top!.id : null,
