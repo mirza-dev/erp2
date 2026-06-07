@@ -264,6 +264,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
                     matched_product_id: initialAction === "matched" ? top!.id : null,
                     match_confidence: top?.score ?? null,
                     match_action: initialAction,
+                    source_page: item.source_page,
+                    image_region: item.image_region,
                 });
             }
         } else if (isAttachmentTargetFlow) {

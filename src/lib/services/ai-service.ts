@@ -1423,6 +1423,18 @@ export interface ExtractedProductLine {
     core_fields: Record<string, string | number>;
     extraction_evidence: TechnicalExtractionEvidence;
     confidence: number;
+    /**
+     * Faz D — ürünün/foto'sunun göründüğü PDF sayfası (1-tabanlı). Yalnız
+     * çok-sayfalı render edilebilir belgelerde (PDF) anlamlı; yoksa null.
+     * Apply bu sayfayı mupdf ile PNG render edip ürün görseli/kapağı yapar.
+     */
+    source_page: number | null;
+    /**
+     * Faz D — ürün fotoğrafının sayfadaki yaklaşık normalize bbox'ı (0-1) +
+     * güven. Hibrit: güven eşiği geçerse kırpılır, yoksa tam sayfa render edilir.
+     * Claude pixel-kesin veremez → emin değilse null (tam sayfa fallback).
+     */
+    image_region: { x0: number; y0: number; x1: number; y1: number; confidence: number } | null;
 }
 
 export interface ProductTypeForExtraction {
@@ -1458,7 +1470,7 @@ export interface ExtractProductsResult {
     items: ExtractedProductLine[];
 }
 
-function buildExtractionSystemPrompt(input: ExtractProductsInput): string {
+export function buildExtractionSystemPrompt(input: ExtractProductsInput): string {
     const operation = getAiImportOperation(input.operationType ?? DEFAULT_AI_IMPORT_OPERATION);
     const types = input.availableProductTypes;
     const typesBlock = types.length === 0
@@ -1475,13 +1487,28 @@ function buildExtractionSystemPrompt(input: ExtractProductsInput): string {
         }).join("\n\n");
 
     const cardinality = input.multiRow
-        ? "Belge bir KATALOG; her benzersiz ürün satırını ayrı item olarak çıkar (karışık tipte ürünler olabilir)."
+        ? `Belge bir KATALOG; içindeki her benzersiz ÜRÜNÜ ayrı item olarak çıkar (karışık tipte ürünler olabilir).
+GRANÜLARİTE — PMT ürünleri DN (çap) / basınç sınıfı / malzeme kombinasyonuna göre ayrı ürün olarak tutulur. Bir varyant/ölçü tablosundaki bir satır FARKLI bir DN/basınç/malzeme ürününü temsil ediyorsa AYRI item olarak çıkar (örn. "DN50 PN40" ile "DN80 300LB" ayrı ürünlerdir; "CLASS 800" ile "CLASS 1500" ayrı ürünlerdir).
+ANCAK satır UYDURMA veya ÇOĞALTMA: yalnızca belgede AÇIKÇA listelenen ürünleri/varyantları çıkar. Ürün kimliği taşımayan salt ölçü/ağırlık referans satırları, tekrarlanan başlıklar veya boş satırlar için item ÜRETME. Belgede gerçekte kaç ayrı ürün varsa o kadar item olsun — ne eksik (farklı ürünleri tek item'a toplama) ne fazla (var olmayan satır türetme).`
         : "Belge tek bir ürünün VERİ SAYFASI; yalnız bir item üret (line=1).";
 
     // Faz A — core master-data alanları (ürün-tipinden bağımsız sabit kolonlar)
     const coreFieldsList = Object.entries(IMPORT_CORE_PRODUCT_FIELDS)
         .map(([key, type]) => `  - ${key} (${type})`)
         .join("\n");
+
+    // Faz D — yalnız PDF'lerde sayfa render edilebilir; ürün görseli için
+    // sayfa numarası + (mümkünse) yaklaşık normalize bbox iste.
+    const isPdf = input.mimeType === "application/pdf";
+    const imageRule = isPdf
+        ? `- "source_page": ürünün/fotoğrafının göründüğü PDF sayfa numarası (1-tabanlı tam sayı). Tek sayfaysa 1.
+- "image_region": ürün FOTOĞRAFININ sayfadaki yaklaşık konumu — normalize (0-1) {x0,y0,x1,y1} (x soldan, y üstten) + 0-1 arası "confidence". Görseli net konumlandıramıyorsan image_region'ı null bırak (tam sayfa kullanılır). UYDURMA.`
+        : "";
+    const imageSchema = isPdf
+        ? `,
+      "source_page": 1,
+      "image_region": { "x0": 0.1, "y0": 0.1, "x1": 0.6, "y1": 0.5, "confidence": 0.0 }`
+        : "";
 
     return `Sen bir endüstriyel ekipman kataloğunu analiz eden ekstraksiyon asistanısın.
 Kullanıcının seçtiği işlem:
@@ -1503,6 +1530,7 @@ Kurallar:
 - "core_fields" objesine ürün-tipinden bağımsız genel master-data alanlarını yaz (yalnız belgede AÇIKÇA görünenler). İzinli core anahtarlar:
 ${coreFieldsList}
   number alanları sayı tipinde; diğerlerini kısa metin olarak yaz. Belgede yoksa hiç ekleme. Fiyat/maliyet/stok miktarını core_fields'a YAZMA.
+${imageRule}
 - Her dolu teknik attribute için "extraction_evidence" içinde aynı field_key ile kanıt yaz.
 - Kanıt güveni: "high" yalnız değer kaynak metinde açıkça görünüyorsa; normalize/tahmin varsa "medium" veya "low"; bulunamadıysa "not_found".
 - "high" için evidence_text boş olamaz. Kanıt yoksa değeri yazma veya güveni düşür.
@@ -1529,13 +1557,30 @@ ${coreFieldsList}
           "normalization_note": "opsiyonel kısa not"
         }
       },
-      "confidence": 0.92
+      "confidence": 0.92${imageSchema}
     }
   ]
 }`;
 }
 
 const EXTRACTION_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Faz D — AI'dan gelen image_region'ı doğrula. Geçerli normalize bbox (0-1,
+ * x0<x1, y0<y1) + clamp confidence değilse null (apply tam sayfaya düşer).
+ */
+export function parseImageRegion(
+    raw: unknown,
+): { x0: number; y0: number; x1: number; y1: number; confidence: number } | null {
+    if (!raw || typeof raw !== "object") return null;
+    const r = raw as Record<string, unknown>;
+    const nums = [r.x0, r.y0, r.x1, r.y1];
+    if (nums.some(v => typeof v !== "number" || !Number.isFinite(v) || v < 0 || v > 1)) return null;
+    const x0 = r.x0 as number, y0 = r.y0 as number, x1 = r.x1 as number, y1 = r.y1 as number;
+    if (!(x0 < x1) || !(y0 < y1)) return null;
+    const confidence = clampConfidence(typeof r.confidence === "number" ? r.confidence : 0);
+    return { x0, y0, x1, y1, confidence };
+}
 
 export function parseExtractionResponse(
     text: string,
@@ -1606,7 +1651,13 @@ export function parseExtractionResponse(
         // Faz A — core master-data alanları (whitelist + tip-normalize + finansal drop)
         const core_fields = normalizeCoreProductFields(it.core_fields);
 
-        out.push({ line, name, sku, product_type_id, attributes, core_fields, extraction_evidence, confidence });
+        // Faz D — source_page (1-tabanlı int) + image_region (normalize bbox + güven)
+        const source_page = typeof it.source_page === "number" && it.source_page >= 1
+            ? Math.floor(it.source_page)
+            : null;
+        const image_region = parseImageRegion(it.image_region);
+
+        out.push({ line, name, sku, product_type_id, attributes, core_fields, extraction_evidence, confidence, source_page, image_region });
     }
     return { items: out };
 }
@@ -1636,7 +1687,12 @@ export async function aiExtractProductsFromDocument(
         const message = await client.messages.create(
             {
                 model: MODEL,
-                max_tokens: 4096, // catalog 50-100 satır için yeterli
+                // Faz D probe: PMT per-DN granülaritesi gerçek datasheet'te 14 meşru
+                // ürün üretti (CLASS 800/1500 × DN15-50); 4096 ve 8192 truncate
+                // ediyordu (her ürün zengin attributes+evidence+bbox taşır). 16384
+                // bu yasal hacme yeter. Çok büyük fiyat listeleri (50+ SKU) için
+                // sayfalama gelecek tur — POC kapsamı tipik 1-2 sayfa datasheet.
+                max_tokens: 16384,
                 system: systemPrompt,
                 messages: [{ role: "user", content: userBlocks as unknown as Anthropic.MessageParam["content"] }],
             },

@@ -130,3 +130,18 @@ describe("ExtractionReview — core_fields gösterimi (source-regression)", () =
         expect(src).toContain("coreFieldLabel");
     });
 });
+
+describe("Faz D — ExtractionReview katalog görsel önizleme (source-regression)", () => {
+    it("source_page olan satırda lazy preview-image + önizleme butonu render edilir", () => {
+        const src = read("src/components/import/ExtractionReview.tsx");
+        expect(src).toContain("previewLineId");
+        expect(src).toContain("line.source_page != null");
+        expect(src).toContain("/preview-image");
+        expect(src).toContain("Katalog görseli");
+    });
+    it("apply özeti images_extracted sayacını gösterir", () => {
+        const src = read("src/components/import/ExtractionReview.tsx");
+        expect(src).toContain("images_extracted");
+        expect(src).toContain("katalog görseli eklendi");
+    });
+});

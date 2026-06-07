@@ -1,6 +1,6 @@
 # Veri Aktarım — Yazma Yolları Geliştirme (Master Plan)
 
-> **Durum:** Faz A·B·C·D ✅ TAMAMLANDI (2026-06-07). Faz D tam-otomatik katalog→görsel (mupdf WASM) ayrı POC turuna bırakıldı (pragmatik kapsam uygulandı). İki worktree (erp2/main + proje-codex/codex-experiment) birebir-ayna.
+> **Durum:** Faz A·B·C·D ✅ TAMAMLANDI + **Faz D-POC tam-otomatik katalog→görsel (mupdf WASM) ✅ UYGULANDI (2026-06-07)**. İki worktree (erp2/main + proje-codex/codex-experiment) birebir-ayna. Migration 086 push öncesi kullanıcı uygular.
 
 ## Amaç
 
@@ -73,7 +73,35 @@ Kullanıcı vizyonu: **"Katalog/dosya yüklendiğinde AI, ürünün her bilgisin
 
 **Bu fazda yapılan (görünürlük/rehber):** `ai-import-operations` `product_documents` metni görsel+kapak vurgulu güçlendirildi (description/evidenceHint/safetyNote: "ilk görsel ürün kapak görseli olur", "katalogdaki görselleri kaydedip yükleyin", çoklu dosya); `import-guide` hedef haritası `product_document` → "Ürün Ekleri & Kapak Görseli" + primary açıklaması. +1 test.
 
-**Tam-otomatik katalog→görsel (mupdf WASM) → ayrı POC turu** (Coolify build-probe + eşleme tasarımı gerektirir; bu epic'in kapsamı dışı bırakıldı, kullanıcı onayıyla).
+### Faz D-POC — Tam-otomatik katalog→görsel (mupdf WASM)  ✅ UYGULANDI (2026-06-07)
+
+**Kullanıcı kararı:** tam POC planı + uygula; görsel kapsamı **Hibrit** (AI bbox güvenliyse kırp, değilse tam sayfa; review önizleme + apply-onay güvenlik ağı).
+
+**Fizibilite probe (gate):** `mupdf@1.27.0` (MuPDF.js, WASM, native-dep yok) lokalde render+crop doğrulandı (tam sayfa + DrawDevice clip → geçerli PNG). Build: `serverExternalPackages:["mupdf"]` + `outputFileTracingIncludes` → wasm standalone'a doğru konuma trace edildi (`import.meta.url` node_modules'ı gösterir; external stub runtime'da yükler). **Alpine/musl runtime smoke = Coolify deploy'da** (WASM mimari-bağımsız, düşük risk).
+
+**Pipeline:** `pdf-render.ts` (`renderPdfPageToPng` lazy mupdf import + `pickRenderClip` saf hibrit eşik 0.6) · `ai-service` extraction `source_page`+`image_region` (yalnız PDF prompt) · migration **086** (`source_page`/`image_region` kolonları) · lazy `GET .../lines/[lineId]/preview-image` (storage'a yazmaz) · apply'da product satırında render→`dbCreateAttachment(kind=image)`→`ensurePrimaryImageIfMissing` (NON-FATAL, görsel hatası ürün yazımını bozmaz) · `ExtractionReview` per-satır "📷 Katalog görseli" önizleme + apply özeti `images_extracted`.
+
+**Mevcut altyapı yeniden kullanıldı:** `dbCreateAttachment` (3-adım orphan-safe), `ensurePrimaryImageIfMissing`, storage download (apply'da bir kez).
+
+**+39 test** (pdf-render render+crop+clip / parse source_page+image_region / apply image-attach+non-fatal+no-op-görsel / preview-route 400/404/502/200 / extract persist / UI source-regression / extraction cardinality+max_tokens kuralı). tsc 0 · lint 0 · 4757→4796 test · build 0 (wasm trace doğrulandı). **Migration 086 KULLANICI UYGULAR (push öncesi).**
+
+**CANLI PROBE (gerçek key + gerçek PMT datasheet, salt-okuma):** mupdf gerçek katalog PDF'ini render etti (A4 1190×1686 @2x, kırpma çalışıyor). Gerçek Claude extraction'ı çağrıldı → **iki bulgu:**
+
+1. **Pre-existing truncation bug:** `max_tokens` zengin attributes+evidence+bbox ile dolup JSON'u truncate ediyordu → parse 0 ürün. Tüm katalog extraction'ını etkiliyordu, mock'lu testler göremezdi.
+
+2. **Granülarite kararı (advisor + canlı `products` doğrulaması):** İlk fix denemem "ölçü tablosu = tek modele topla" idi ama canlı veri PMT'nin **DN/basınç/malzeme bazında ayrı ürün** tuttuğunu gösterdi (`KV-3P-DN50-PN40-CF8M` ≠ `KV-3P-DN80-300LB-WCB`; 9/7 DN-spesifik SKU). Toplama kuralı **under-extract** ederdi. **Kullanıcı kararı:** PMT modeline hizala — cardinality prompt'u "PMT DN/basınç/malzeme bazında ayrı ürün tutar; gerçekten farklı varyantları AYRI çıkar AMA satır UYDURMA/ÇOĞALTMA" şeklinde yumuşatıldı. Bu Faz A/B production extraction'ını da etkiler (doğru yönde).
+
+**FIX:** `max_tokens` 4096→**16384** (per-DN granülarite gerçek datasheet'te 14-17 meşru ürün üretti; 4096 ve 8192 truncate ediyordu).
+
+**Re-probe #2 (yumuşatılmış kural, gerçek key, salt-okuma) — DOĞRULANDI:** GLOB VALF datasheet → **17 temiz ürün** (`stop_reason=end_turn`, truncation YOK), PMT-doğru per-DN: DN15/20/25/32/40/50 × CLASS 800 (SW+Threaded) × CLASS 1500 (SW), her biri Vana tipine bağlı + zengin teknik attributes (dn/pn_class/valve_type/end_connection/body_material/max_pressure_bar/face_to_face_mm). bbox hibrit doğru: datasheet'te 2-3 ürün fotoğrafı var → AI yalnız onlara güvenli bbox verdi (kırpılır), kalan boyut-varyantları `image_region:null` → tam sayfa fallback (tasarlandığı gibi). İlk probe'da kırpılmış görsel gözle doğrulandı = gerçek valf fotoğrafı.
+
+**Bilinen sınırlar (dürüst):**
+- **null SKU (dominant pratik sınır):** datasheet'ler model/spec verir, SKU değil → 17 ürünün hepsi `sku=null`. `buildCreateProductInput` boş SKU'da "SKU eksik" fırlatır → **bu datasheet'ten yeni ürün açma yolu 17 üründe de per-row hata verir** (çökmez, raporlanır). "Katalog→yeni ürün→otomatik kapak" vizyonu SKU kaynağı gerektirir: (a) eşleşen ürün yolu görseli sorunsuz ekler, (b) Excel şablonu (Faz B) SKU kolonu taşır, (c) kullanıcı review'da SKU girer / (d) AI-SKU üretimi = ayrı tur. **POC bunu ölçüp ortaya çıkardı.**
+- **source_page** yalnız tek-sayfa datasheet'te kanıtlandı; çok-sayfalı sayfa-atfı doğrulanmadı.
+- **Büyük fiyat listesi (50+ SKU)** 16384'ü de aşabilir → sayfalama ayrı tur (POC kapsamı tipik 1-2 sayfa datasheet).
+- **Alpine/musl runtime smoke** yalnız Coolify deploy'da (WASM mimari-bağımsız, düşük risk).
+
+**Önceki pragmatik tur (görünürlük):** `ai-import-operations` `product_documents` + `import-guide` görsel→kapak metinleri güçlendirilmişti (korundu); bu POC tam-otomatik katalog→render→kapak zincirini ekledi.
 
 ---
 

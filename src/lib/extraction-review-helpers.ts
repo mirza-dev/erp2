@@ -52,6 +52,8 @@ export interface ApplyResultSummary {
     attachments_created: number;
     attachments_superseded: number;
     technical_fields_applied?: number;
+    // Faz D — katalog PDF'inden render edilip eklenen ürün görseli sayısı.
+    images_extracted?: number;
     skipped: number;
     errors: string[];
     untyped_products: number;

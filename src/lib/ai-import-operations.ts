@@ -31,9 +31,9 @@ export const AI_IMPORT_OPERATIONS = [
         scope: "product",
         title: "Yeni ürün oluştur",
         shortTitle: "Yeni ürün",
-        description: "Katalog, datasheet veya Excel'den yeni ürün adayları çıkarır.",
-        evidenceHint: "Ad, SKU, ürün tipi ve teknik alanlar için sayfa/satır kanıtı aranır.",
-        safetyNote: "Fiyat ve maliyet pasif raporlanır; ürün finansal alanlarına yazılmaz.",
+        description: "Katalog, datasheet veya Excel'den yeni ürün adayları çıkarır. Katalog PDF'lerinde ürünün sayfadaki görseli de otomatik render edilip ürün kartına kapak (primary) olarak eklenir.",
+        evidenceHint: "Ad, SKU, ürün tipi ve teknik alanlar için sayfa/satır kanıtı aranır; PDF katalogda ürün görselinin sayfası da işaretlenir.",
+        safetyNote: "Fiyat ve maliyet pasif raporlanır; ürün finansal alanlarına yazılmaz. Görsel render başarısızsa ürün verisi yine de yazılır (görsel atlanır).",
         promptContext: "Kullanıcı yeni ürün oluşturmak istiyor. Dosyada ürün adı, SKU veya teknik bilgi arayarak yeni ürün adayları çıkar. Fiyat ve maliyet alanlarını uygulama alanı olarak önerme.",
     },
     {

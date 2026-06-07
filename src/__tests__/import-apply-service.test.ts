@@ -44,6 +44,16 @@ vi.mock("@/lib/supabase/product-types", () => ({
     dbGetProductTypeWithFields: (...a: unknown[]) => mockGetProductTypeWithFields(...a),
 }));
 
+// Faz D — pdf-render mock (gerçek mupdf çalıştırmadan apply davranışı test edilir).
+const mockRenderPdf = vi.fn();
+vi.mock("@/lib/services/pdf-render", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/services/pdf-render")>("@/lib/services/pdf-render");
+    return {
+        ...actual, // pickRenderClip saf — gerçek kalır
+        renderPdfPageToPng: (...a: unknown[]) => mockRenderPdf(...a),
+    };
+});
+
 const mockAuditInsert = vi.fn(() => Promise.resolve({ error: null }));
 vi.mock("@/lib/supabase/service", async () => {
     const actual = await vi.importActual<typeof import("@/lib/supabase/service")>("@/lib/supabase/service");
@@ -115,6 +125,8 @@ beforeEach(() => {
     mockSetPrimaryImage.mockResolvedValue(undefined);
     mockAuditInsert.mockReset();
     mockAuditInsert.mockImplementation(() => Promise.resolve({ error: null }));
+    mockRenderPdf.mockReset();
+    mockRenderPdf.mockResolvedValue(Buffer.from([0x89, 0x50, 0x4e, 0x47])); // sahte PNG
     mockStorageDownload.mockResolvedValue({
         data: { arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer },
         error: null,
@@ -991,5 +1003,104 @@ describe("serviceApplyImportDocument — Faz A core master-data", () => {
         expect(input.category).toBe("Vana");
         expect(input.material_quality).toBeUndefined();
         expect(input.origin_country).toBeUndefined();
+    });
+});
+
+describe("serviceApplyImportDocument — Faz D katalog görseli", () => {
+    it("new_product + source_page (PDF, region yok) → tam sayfa render + image attachment + primary", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { source_page: 2, image_region: null }),
+        ]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        mockCreateAttachment.mockResolvedValueOnce({ id: "att-img" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.products_created).toBe(1);
+        expect(r.images_extracted).toBe(1);
+        // render: 0-tabanlı sayfa (2-1=1), clip null (region yok → tam sayfa)
+        expect(mockRenderPdf).toHaveBeenCalledWith(expect.anything(), 1, { clip: null });
+        const attArgs = mockCreateAttachment.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect(attArgs.kind).toBe("image");
+        expect(attArgs.mimeType).toBe("image/png");
+        expect((attArgs.metadata as Record<string, unknown>).source).toBe("catalog_extract");
+        // ilk görsel → primary (mevcut görsel yok)
+        expect(mockSetPrimaryImage).toHaveBeenCalled();
+    });
+
+    it("güvenli image_region → mupdf clip ile kırpma (pickRenderClip gerçek)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { source_page: 1, image_region: { x0: 0.1, y0: 0.1, x1: 0.7, y1: 0.6, confidence: 0.9 } }),
+        ]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        mockCreateAttachment.mockResolvedValueOnce({ id: "att-img" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await serviceApplyImportDocument("doc-1", "user-1");
+        expect(mockRenderPdf).toHaveBeenCalledWith(expect.anything(), 0, { clip: [0.1, 0.1, 0.7, 0.6] });
+        const attArgs = mockCreateAttachment.mock.calls[0]?.[0] as Record<string, unknown>;
+        expect((attArgs.metadata as Record<string, unknown>).cropped).toBe(true);
+    });
+
+    it("düşük güven region → tam sayfa fallback (clip null)", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { source_page: 1, image_region: { x0: 0.1, y0: 0.1, x1: 0.7, y1: 0.6, confidence: 0.2 } }),
+        ]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        mockCreateAttachment.mockResolvedValueOnce({ id: "att-img" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        await serviceApplyImportDocument("doc-1", "user-1");
+        expect(mockRenderPdf).toHaveBeenCalledWith(expect.anything(), 0, { clip: null });
+    });
+
+    it("render hatası NON-FATAL → ürün yine yaratılır, errors uyarısı, images_extracted=0", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { source_page: 2, image_region: null }),
+        ]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        mockRenderPdf.mockRejectedValueOnce(new Error("wasm patladı"));
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.products_created).toBe(1); // ürün yazıldı
+        expect(r.images_extracted).toBe(0);
+        expect(mockCreateAttachment).not.toHaveBeenCalled();
+        expect(r.errors.some(e => /katalog görseli eklenemedi/.test(e))).toBe(true);
+        // status yine 'applied' (görsel hatası apply'ı bozmaz)
+        expect(mockUpdateDocStatus).toHaveBeenCalledWith("doc-1", "applied");
+    });
+
+    it("source_page var ama doc PDF değil (Excel) → render edilmez", async () => {
+        const XLSX_DOC = { ...DOC, mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" };
+        mockClaim.mockResolvedValueOnce(XLSX_DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { source_page: 1, image_region: null }),
+        ]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(mockRenderPdf).not.toHaveBeenCalled();
+        expect(r.images_extracted).toBe(0);
+    });
+
+    it("matched no-op master-data ama görsel var → atlanmaz, görsel eklenir", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", {
+                match_action: "matched", matched_product_id: "p-existing",
+                extracted_attributes: {}, extracted_core_fields: {}, extracted_name: "", extracted_sku: "",
+                source_page: 3, image_region: null,
+            }),
+        ]);
+        mockGetProductById.mockResolvedValueOnce({
+            id: "p-existing", attributes: {}, name: "Mevcut", sku: "SKU-X", on_hand: 0, reserved: 0, is_active: true,
+        });
+        mockCreateAttachment.mockResolvedValueOnce({ id: "att-img" });
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.images_extracted).toBe(1);
+        // görsel eklendiği için "atlandı" sayılmaz
+        expect(r.skipped).toBe(0);
     });
 });

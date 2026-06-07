@@ -26,6 +26,7 @@ import {
 } from "@/lib/supabase/product-attachments";
 import { dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
 import { normalizeCoreProductFields, IMPORT_CORE_PRODUCT_FIELD_KEYS } from "@/lib/import-center";
+import { renderPdfPageToPng, pickRenderClip } from "@/lib/services/pdf-render";
 import type {
     DocumentType,
     ImportDocumentLineRow,
@@ -42,6 +43,8 @@ export interface ApplyResult {
     attachments_created: number;
     attachments_superseded: number;
     technical_fields_applied: number;
+    // Faz D — katalog PDF'inden render edilip ürüne eklenen görsel sayısı.
+    images_extracted: number;
     skipped: number;
     errors: string[]; // "Satır N: <reason>"
     untyped_products: number;
@@ -76,6 +79,7 @@ function emptyResult(): ApplyResult {
         attachments_created: 0,
         attachments_superseded: 0,
         technical_fields_applied: 0,
+        images_extracted: 0,
         skipped: 0,
         errors: [],
         untyped_products: 0,
@@ -178,6 +182,58 @@ async function ensurePrimaryImageIfMissing(input: {
         const msg = err instanceof Error ? err.message : String(err);
         input.result.errors.push(
             `Satır ${input.lineNumber}: ana görsel uyarısı — ${msg}`,
+        );
+    }
+}
+
+/**
+ * Faz D — katalog PDF satırından ürün görseli render edip ekler (NON-FATAL).
+ * `source_page` olan product satırlarında çağrılır; mupdf ile sayfa (hibrit:
+ * güvenli bbox varsa kırpılmış, yoksa tam sayfa) PNG render → kind=image
+ * attachment → ilk görselse kapak (primary). Render/attach hatası ürünün
+ * master-data yazımını GERİ ALMAZ; yalnız `errors[]`'e uyarı eklenir.
+ */
+async function attachCatalogImageIfPresent(input: {
+    productId: string;
+    line: ImportDocumentLineRow;
+    docBuffer: Buffer | null;
+    mimeType: string;
+    actorUserId: string | null;
+    result: ApplyResult;
+}): Promise<void> {
+    const { line, docBuffer, mimeType } = input;
+    if (line.source_page == null) return;
+    if (mimeType !== "application/pdf") return; // yalnız PDF render edilebilir
+    if (!docBuffer) return;
+
+    try {
+        const clip = pickRenderClip(line.image_region);
+        const png = await renderPdfPageToPng(docBuffer, line.source_page - 1, { clip });
+        const attachment = await dbCreateAttachment({
+            productId: input.productId,
+            file: png,
+            fileName: `${line.extracted_sku ?? "urun"}-sayfa${line.source_page}.png`,
+            fileSize: png.length,
+            mimeType: "image/png",
+            kind: "image",
+            metadata: {
+                source: "catalog_extract",
+                page: line.source_page,
+                cropped: clip !== null,
+            },
+            uploadedBy: input.actorUserId,
+        });
+        input.result.images_extracted += 1;
+        await ensurePrimaryImageIfMissing({
+            productId: input.productId,
+            attachmentId: attachment.id,
+            result: input.result,
+            lineNumber: line.line_number,
+        });
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        input.result.errors.push(
+            `Satır ${line.line_number}: katalog görseli eklenemedi — ${msg}`,
         );
     }
 }
@@ -313,10 +369,13 @@ export async function serviceApplyImportDocument(
             return result;
         }
 
-        // 3. Storage download (dosya ekleme flow'larında kullanılır; bir kere yükle)
+        // 3. Storage download (dosya ekleme + Faz D katalog görseli için; bir kere yükle)
         let docBuffer: Buffer | null = null;
         const hasAttachmentTarget = eligible.some(l => l.extraction_type === "certificate_target");
-        if (hasAttachmentTarget) {
+        // Faz D — PDF katalog satırlarında source_page varsa görsel render için buffer gerekir.
+        const hasCatalogImage = doc.mime_type === "application/pdf"
+            && eligible.some(l => l.extraction_type === "product" && l.source_page != null);
+        if (hasAttachmentTarget || hasCatalogImage) {
             const sb = createServiceClient();
             const { data: blob, error: dlErr } = await sb.storage
                 .from(STORAGE_BUCKET)
@@ -355,6 +414,15 @@ export async function serviceApplyImportDocument(
                         result.products_created += 1;
                         result.technical_fields_applied += Object.keys(input.attributes).length;
                         if (!input.product_type_id) result.untyped_products += 1;
+                        // Faz D — katalog PDF'inden ürün görseli render edip ekle (non-fatal).
+                        await attachCatalogImageIfPresent({
+                            productId: created.id,
+                            line,
+                            docBuffer,
+                            mimeType: doc.mime_type,
+                            actorUserId,
+                            result,
+                        });
                     } else {
                         // matched | reviewed
                         if (!line.matched_product_id) {
@@ -364,6 +432,18 @@ export async function serviceApplyImportDocument(
                         if (!current) {
                             throw new Error("eşleşen ürün bulunamadı");
                         }
+                        // Faz D — katalog görselini eşleşen ürüne ekle (master-data
+                        // no-op olsa bile; non-fatal). source_page yoksa erken döner.
+                        const imagesBefore = result.images_extracted;
+                        await attachCatalogImageIfPresent({
+                            productId: line.matched_product_id,
+                            line,
+                            docBuffer,
+                            mimeType: doc.mime_type,
+                            actorUserId,
+                            result,
+                        });
+                        const imageAdded = result.images_extracted > imagesBefore;
                         const productTypeApproved = approvedProductFields === null
                             ? true
                             : approvedProductFields.has("product_type_id");
@@ -427,7 +507,8 @@ export async function serviceApplyImportDocument(
                         // Uygulanacak gerçek bir şey yoksa (boş/null attr + boş patch)
                         // satırı atla — gereksiz no-op update + yanıltıcı sayaç önlenir.
                         if (Object.keys(nonEmptyLineAttributes).length === 0 && Object.keys(productPatch).length === 0) {
-                            result.skipped += 1;
+                            // Görsel eklendiyse satır "atlandı" sayılmaz (Faz D).
+                            if (!imageAdded) result.skipped += 1;
                             continue;
                         }
                         const mergedAttributes = {

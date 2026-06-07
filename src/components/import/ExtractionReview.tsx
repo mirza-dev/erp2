@@ -103,6 +103,8 @@ export default function ExtractionReview({ document: doc, initialLines, productT
     // Faz 3c — Apply pipeline state
     const [applying, setApplying] = useState(false);
     const [applyResult, setApplyResult] = useState<ApplyResultSummary | null>(null);
+    // Faz D — açık olan satırın katalog görseli önizlemesi (lazy render endpoint).
+    const [previewLineId, setPreviewLineId] = useState<string | null>(null);
     const [docStatus, setDocStatus] = useState<typeof doc.status>(doc.status);
     const isDocApplied = docStatus === "applied";
     // Faz 3c Review 4.tur (P3): başka oturum apply'ı sürüyor veya post-commit
@@ -888,6 +890,43 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                     </td>
                                                 </tr>
                                             )}
+                                            {/* Faz D — katalog PDF görsel önizleme (lazy render) */}
+                                            {!isCertFlow && line.source_page != null && (
+                                                <tr key={`${line.id}-image`}>
+                                                    <td colSpan={detailColSpan} style={{ padding: "0 10px 12px", background: "var(--bg-primary)" }}>
+                                                        <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "10px", background: "var(--bg-secondary)" }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setPreviewLineId(previewLineId === line.id ? null : line.id)}
+                                                                aria-expanded={previewLineId === line.id}
+                                                                aria-label={`Satır ${line.line_number} katalog görseli önizle`}
+                                                                style={{
+                                                                    fontSize: "12px", color: "var(--accent)", background: "none",
+                                                                    border: "none", cursor: "pointer", padding: 0, textAlign: "left",
+                                                                }}
+                                                            >
+                                                                📷 Katalog görseli {previewLineId === line.id ? "▾" : "▸"}
+                                                                <span style={{ color: "var(--text-tertiary)" }}>
+                                                                    {" "}· sayfa {line.source_page}{line.image_region ? " · kırpma adayı" : " · tam sayfa"}
+                                                                </span>
+                                                            </button>
+                                                            {previewLineId === line.id && (
+                                                                <div style={{ marginTop: "8px" }}>
+                                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                                    <img
+                                                                        src={`/api/import/documents/${doc.id}/lines/${line.id}/preview-image`}
+                                                                        alt={`Satır ${line.line_number} katalog görseli önizleme`}
+                                                                        style={{ maxWidth: "320px", maxHeight: "240px", border: "0.5px solid var(--border-tertiary)", borderRadius: "4px", background: "#fff" }}
+                                                                    />
+                                                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                                                                        Apply sırasında bu görsel ürün kartına kapak olarak eklenir.
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            )}
                                         </Fragment>
                                     );
                                 })}
@@ -915,6 +954,9 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                 {applyResult.products_created} yeni ürün · {applyResult.products_updated} güncelleme · {applyResult.attachments_created} ek · {applyResult.skipped} atlandı
                                 {applyResult.technical_fields_applied !== undefined && (
                                     <> · {applyResult.technical_fields_applied} teknik alan uygulandı</>
+                                )}
+                                {applyResult.images_extracted !== undefined && applyResult.images_extracted > 0 && (
+                                    <> · {applyResult.images_extracted} ürüne katalog görseli eklendi</>
                                 )}
                                 {applyResult.attachments_superseded > 0 && (
                                     <> · {applyResult.attachments_superseded} eski sertifika önceki versiyona alındı</>

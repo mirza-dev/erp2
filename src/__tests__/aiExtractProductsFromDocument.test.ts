@@ -357,4 +357,118 @@ describe("aiExtractProductsFromDocument — behavior (multi-type)", () => {
         expect(call.system).toMatch(/sistem tipi yok|name \+ sku/i);
         vi.unstubAllEnvs();
     });
+
+    it("Faz D probe fix — catalog prompt'unda ölçü tablosu=varyant kuralı (fantom önleme)", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockResolvedValueOnce(aiResponse({ items: [] }));
+        const { aiExtractProductsFromDocument } = await import("@/lib/services/ai-service");
+        await aiExtractProductsFromDocument({
+            buffer: Buffer.from("x"), mimeType: "application/pdf",
+            fileName: "katalog.pdf", availableProductTypes: AVAILABLE_TYPES, multiRow: true,
+        });
+        const call = mockMessagesCreate.mock.calls[0]?.[0] as { system: string; max_tokens: number };
+        // PMT granülarite: DN/basınç/malzeme bazında ayrı ürün; ama satır uydurma/çoğaltma yok
+        // (probe bulgusu: 21+ fantom → truncate; kullanıcı kararı: PMT per-DN modeline hizala)
+        expect(call.system).toMatch(/GRANÜLARİTE/);
+        expect(call.system).toMatch(/DN.*basınç.*malzeme|ayrı ürün/i);
+        expect(call.system).toMatch(/UYDURMA|ÇOĞALTMA/);
+        // max_tokens probe sonrası 16384'e çıkarıldı (per-DN granülarite 14-17
+        // meşru ürün üretti, 4096+8192 truncate ediyordu)
+        expect(call.max_tokens).toBe(16384);
+        vi.unstubAllEnvs();
+    });
+});
+
+describe("Faz D — parseImageRegion", () => {
+    it("geçerli bbox + güven → normalize döner", async () => {
+        const { parseImageRegion } = await import("@/lib/services/ai-service");
+        expect(parseImageRegion({ x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.7, confidence: 0.8 }))
+            .toEqual({ x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.7, confidence: 0.8 });
+    });
+    it("null/obje değil → null", async () => {
+        const { parseImageRegion } = await import("@/lib/services/ai-service");
+        expect(parseImageRegion(null)).toBeNull();
+        expect(parseImageRegion("x")).toBeNull();
+        expect(parseImageRegion(undefined)).toBeNull();
+    });
+    it("koordinat 0-1 dışı → null", async () => {
+        const { parseImageRegion } = await import("@/lib/services/ai-service");
+        expect(parseImageRegion({ x0: -0.1, y0: 0.2, x1: 0.6, y1: 0.7, confidence: 0.8 })).toBeNull();
+        expect(parseImageRegion({ x0: 0.1, y0: 0.2, x1: 1.2, y1: 0.7, confidence: 0.8 })).toBeNull();
+    });
+    it("x0>=x1 veya y0>=y1 → null", async () => {
+        const { parseImageRegion } = await import("@/lib/services/ai-service");
+        expect(parseImageRegion({ x0: 0.6, y0: 0.2, x1: 0.6, y1: 0.7, confidence: 0.8 })).toBeNull();
+        expect(parseImageRegion({ x0: 0.1, y0: 0.7, x1: 0.6, y1: 0.2, confidence: 0.8 })).toBeNull();
+    });
+    it("confidence yok/NaN → 0'a clamp (region yine geçerli)", async () => {
+        const { parseImageRegion } = await import("@/lib/services/ai-service");
+        const r = parseImageRegion({ x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.7 });
+        expect(r?.confidence).toBe(0);
+    });
+});
+
+describe("Faz D — parseExtractionResponse source_page + image_region", () => {
+    it("source_page int + image_region geçerli → taşınır", async () => {
+        const { parseExtractionResponse } = await import("@/lib/services/ai-service");
+        const r = parseExtractionResponse(
+            JSON.stringify({ items: [{
+                line: 1, name: "Vana DN50", sku: "KV-50", product_type_id: VANA_ID,
+                attributes: { dn: 50 }, confidence: 0.9,
+                source_page: 3,
+                image_region: { x0: 0.1, y0: 0.1, x1: 0.5, y1: 0.5, confidence: 0.7 },
+            }] }),
+            AVAILABLE_TYPES,
+        );
+        expect(r.items[0].source_page).toBe(3);
+        expect(r.items[0].image_region).toEqual({ x0: 0.1, y0: 0.1, x1: 0.5, y1: 0.5, confidence: 0.7 });
+    });
+    it("source_page yok / image_region geçersiz → null", async () => {
+        const { parseExtractionResponse } = await import("@/lib/services/ai-service");
+        const r = parseExtractionResponse(
+            JSON.stringify({ items: [{
+                line: 1, name: "Vana", sku: "X", product_type_id: VANA_ID,
+                attributes: {}, confidence: 0.5,
+                image_region: { x0: 2, y0: 0.1, x1: 0.5, y1: 0.5, confidence: 0.7 },
+            }] }),
+            AVAILABLE_TYPES,
+        );
+        expect(r.items[0].source_page).toBeNull();
+        expect(r.items[0].image_region).toBeNull();
+    });
+    it("source_page < 1 → null (float floor)", async () => {
+        const { parseExtractionResponse } = await import("@/lib/services/ai-service");
+        const r = parseExtractionResponse(
+            JSON.stringify({ items: [{ line: 1, name: "A", sku: "A", product_type_id: VANA_ID, attributes: {}, confidence: 0.5, source_page: 0 }] }),
+            AVAILABLE_TYPES,
+        );
+        expect(r.items[0].source_page).toBeNull();
+    });
+    it("PDF extraction prompt source_page + image_region talimatı içerir", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockResolvedValueOnce(aiResponse({ items: [] }));
+        const { aiExtractProductsFromDocument } = await import("@/lib/services/ai-service");
+        await aiExtractProductsFromDocument({
+            buffer: Buffer.from("x"), mimeType: "application/pdf",
+            fileName: "katalog.pdf", availableProductTypes: AVAILABLE_TYPES, multiRow: true,
+        });
+        const call = mockMessagesCreate.mock.calls[0]?.[0] as { system: string };
+        expect(call.system).toMatch(/source_page/);
+        expect(call.system).toMatch(/image_region/);
+        vi.unstubAllEnvs();
+    });
+    it("Excel extraction prompt'unda source_page talimatı YOK (render edilemez)", async () => {
+        vi.stubEnv("ANTHROPIC_API_KEY", "key");
+        mockMessagesCreate.mockResolvedValueOnce(aiResponse({ items: [] }));
+        const { aiExtractProductsFromDocument } = await import("@/lib/services/ai-service");
+        await aiExtractProductsFromDocument({
+            buffer: Buffer.from("x"),
+            mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            fileName: "katalog.xlsx", availableProductTypes: AVAILABLE_TYPES, multiRow: true,
+            excelTextSample: "ad sku",
+        });
+        const call = mockMessagesCreate.mock.calls[0]?.[0] as { system: string };
+        expect(call.system).not.toMatch(/source_page/);
+        vi.unstubAllEnvs();
+    });
 });

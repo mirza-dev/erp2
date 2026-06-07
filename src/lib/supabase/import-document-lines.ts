@@ -30,6 +30,9 @@ export interface CreateExtractedLineInput {
     matched_product_id?: string | null;
     match_confidence?: number | null;
     match_action?: ImportDocumentLineMatchAction;
+    // Faz D — katalog PDF görsel render (migration 086)
+    source_page?: number | null;
+    image_region?: { x0: number; y0: number; x1: number; y1: number; confidence: number } | null;
 }
 
 export interface UpdateLineMatchInput {
@@ -76,6 +79,8 @@ export async function dbCreateExtractedLines(
         matched_product_id: l.matched_product_id ?? null,
         match_confidence: l.match_confidence ?? null,
         match_action: l.match_action ?? "pending",
+        source_page: l.source_page ?? null,
+        image_region: l.image_region ?? null,
     }));
 
     const { data, error } = await sb

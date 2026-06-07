@@ -211,6 +211,28 @@ describe("POST /api/import/documents/[id]/extract — happy product flow", () =>
         expect(linesArg[0].matched_product_id).toBe("p-1");
     });
 
+    it("Faz D — source_page + image_region satıra persist edilir", async () => {
+        mockGetDoc.mockResolvedValueOnce(PROD_DOC);
+        mockExtractProducts.mockResolvedValueOnce({
+            items: [
+                {
+                    line: 1, name: "Vana DN50", sku: "KV-50", attributes: { dn: 50 },
+                    confidence: 0.9, product_type_id: null,
+                    source_page: 4,
+                    image_region: { x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.7, confidence: 0.8 },
+                },
+            ],
+        });
+        mockFindCandidates.mockResolvedValue([]);
+        mockReplaceLines.mockResolvedValueOnce([{ id: "l-1", line_number: 1 }]);
+
+        const res = await callPOST(makeReq("doc-1"), "doc-1");
+        expect(res.status).toBe(201);
+        const linesArg = mockReplaceLines.mock.calls[0]?.[1] as Array<Record<string, unknown>>;
+        expect(linesArg[0].source_page).toBe(4);
+        expect(linesArg[0].image_region).toEqual({ x0: 0.1, y0: 0.2, x1: 0.6, y1: 0.7, confidence: 0.8 });
+    });
+
     it("body productTypeId override → passed to dbGetProductTypeWithFields", async () => {
         mockGetDoc.mockResolvedValueOnce(PROD_DOC);
         mockExtractProducts.mockResolvedValueOnce({ items: [] });

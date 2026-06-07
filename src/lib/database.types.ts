@@ -672,6 +672,9 @@ export interface ImportDocumentLineRow {
     extracted_at: string
     reviewed_at: string | null
     reviewed_by: string | null
+    // Faz D — katalog PDF görsel render (migration 086)
+    source_page: number | null
+    image_region: { x0: number; y0: number; x1: number; y1: number; confidence: number } | null
 }
 
 export interface ImportDraftRow {
