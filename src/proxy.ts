@@ -8,13 +8,13 @@ import {
     type RateCheckResult,
 } from "@/lib/rate-limit";
 // RBAC Faz 2 — pure helper'lar (next/supabase import etmez → middleware-safe).
-import { parseRoles, permissionsForRoles } from "@/lib/auth/permissions";
+import { parseRoles, permissionsForRoles, isProvisionedUser } from "@/lib/auth/permissions";
 import { canAccessPath } from "@/lib/auth/page-access";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
 // /api/alerts/scan is listed here because it handles its own auth (CRON_SECRET OR session)
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback"];
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/auth/callback"];
 
 // Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
 // Not: /api/alerts/scan buraya dahil değil — kendi içinde session OR CRON_SECRET kontrolü yapar
@@ -223,6 +223,30 @@ export async function proxy(request: NextRequest) {
         // Diğer sayfalar → /login'e yönlendir
         const url = request.nextUrl.clone();
         url.pathname = "/login";
+        return withRateHeaders(NextResponse.redirect(url), rate);
+    }
+
+    // ── Davetiye-bazlı erişim kilidi (yalnız bizim oluşturduğumuz kullanıcılar) ──
+    // Birincil kilit = Supabase "Allow new users to sign up" OFF (self-signup oturum
+    // bile yaratamaz). Bu kod tarafı = İKİNCİ kilit (defense-in-depth): signup ayarı
+    // açık kalır/geri açılırsa veya kilitten önce kaydolan bir hesap kalırsa yakalar.
+    // Google OAuth ile kendi kaydolan kullanıcıda app_metadata.roles HİÇ yoktur →
+    // provize değil → reddet. Admin-created kullanıcılar (panel/create-admin) +
+    // ADMIN_EMAILS bootstrap geçer.
+    if (!isProvisionedUser(user.app_metadata, user.email, adminEmailsFromEnv())) {
+        if (pathname.startsWith("/api/")) {
+            return withRateHeaders(
+                NextResponse.json({ error: "Hesabınız yetkili değil. Yöneticinizle iletişime geçin." }, { status: 403 }),
+                rate,
+            );
+        }
+        // /login → hata mesajıyla göster (döngü yok); diğer tüm sayfalar → /login?error=unauthorized
+        if (pathname === "/login") {
+            return withRateHeaders(NextResponse.next(), rate);
+        }
+        const url = request.nextUrl.clone();
+        url.pathname = "/login";
+        url.searchParams.set("error", "unauthorized");
         return withRateHeaders(NextResponse.redirect(url), rate);
     }
 

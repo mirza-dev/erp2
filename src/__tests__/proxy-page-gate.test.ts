@@ -44,8 +44,9 @@ describe("page-gate — authenticated", () => {
         expect(decodeURIComponent(loc)).toContain("/dashboard/parasut");
     });
 
-    it("no-role authd kullanıcı = viewer → /dashboard ve kişisel settings 200", async () => {
-        mockGetUser.mockResolvedValue({ data: { user: { id: "u2", email: "y@pmt.com", app_metadata: {}, user_metadata: {} } } });
+    it("provize viewer → /dashboard ve kişisel settings 200, yönetim alt sayfası forbidden", async () => {
+        // Admin-created viewer (app_metadata.roles=['viewer']) — page-gate davranışı.
+        mockGetUser.mockResolvedValue(authWithRoles(["viewer"]));
         expect((await middleware(req("/dashboard"))).status).toBe(200);
         expect((await middleware(req("/dashboard/settings"))).status).toBe(200);
 
@@ -53,6 +54,17 @@ describe("page-gate — authenticated", () => {
         expect(blocked.status).toBeGreaterThanOrEqual(300);
         expect(blocked.status).toBeLessThan(400);
         expect(blocked.headers.get("location")).toContain("forbidden=");
+    });
+
+    it("provize EDİLMEMİŞ (rolsüz, self-signup) authd kullanıcı → /login?error=unauthorized", async () => {
+        // app_metadata.roles HİÇ yok → davetiye kilidi reddeder (page-gate'e ulaşmaz).
+        mockGetUser.mockResolvedValue({ data: { user: { id: "u2", email: "random@gmail.com", app_metadata: {}, user_metadata: {} } } });
+        const res = await middleware(req("/dashboard"));
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        const loc = res.headers.get("location") ?? "";
+        expect(loc).toContain("/login");
+        expect(loc).toContain("error=unauthorized");
     });
 
     it("/dashboard exact her role'de erişilir (redirect loop yok)", async () => {

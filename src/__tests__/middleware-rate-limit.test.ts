@@ -132,7 +132,7 @@ describe("middleware rate-limit — eski ALWAYS_PUBLIC artık rate limit'te", ()
 describe("middleware rate-limit — auth-cookie hibrit policy seçimi", () => {
     it("Supabase auth cookie var → API_AUTH policy (300/dk)", async () => {
         // Authenticated user da set et — başarı response'ında header'lar dönsün
-        mockGetUser.mockResolvedValue({ data: { user: { id: "u1", email: "x@y.com" } } });
+        mockGetUser.mockResolvedValue({ data: { user: { id: "u1", email: "x@y.com", app_metadata: { roles: ["admin"] } } } });
         const res = await middleware(makeRequest("/api/orders", {
             cookies: { "sb-abcd-auth-token": "fake-token-value" },
         }));

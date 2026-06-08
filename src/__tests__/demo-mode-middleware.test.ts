@@ -47,7 +47,7 @@ function makeRequest(
 }
 
 const ANON = { data: { user: null } };
-const AUTH = { data: { user: { id: "u1", email: "admin@pmt.com" } } };
+const AUTH = { data: { user: { id: "u1", email: "admin@pmt.com", app_metadata: { roles: ["admin"] } } } };
 const DEMO_COOKIE = { demo_mode: "1" };
 
 // ─── Demo mode — anonymous with cookie ────────────────────────────────────────

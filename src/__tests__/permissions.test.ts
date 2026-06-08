@@ -17,6 +17,7 @@ import {
     ROLE_PERMISSIONS,
     normalizeRole,
     parseRoles,
+    isProvisionedUser,
     permissionsForRoles,
     hasPermission,
     hasRole,
@@ -76,6 +77,32 @@ describe("parseRoles — kaynak önceliği", () => {
 
     it("explicit roles, ADMIN_EMAILS'i ezmez (bootstrap sadece metadata yoksa)", () => {
         expect(parseRoles({ role: "viewer" }, "boss@pmt.com", ["boss@pmt.com"])).toEqual(["viewer"]);
+    });
+});
+
+describe("isProvisionedUser — davetiye-bazlı erişim kilidi", () => {
+    it("app_metadata.roles dolu (admin) → true", () => {
+        expect(isProvisionedUser({ roles: ["admin"] }, "a@x.com", [])).toBe(true);
+    });
+    it("app_metadata.roles=['viewer'] (admin-created viewer) → true", () => {
+        expect(isProvisionedUser({ roles: ["viewer"] }, "v@x.com", [])).toBe(true);
+    });
+    it("legacy tekil app_metadata.role → true", () => {
+        expect(isProvisionedUser({ role: "sales" }, "s@x.com", [])).toBe(true);
+    });
+    it("ADMIN_EMAILS bootstrap (roles yok ama email listede) → true", () => {
+        expect(isProvisionedUser({}, "boss@pmt.com", ["boss@pmt.com"])).toBe(true);
+    });
+    it("self-signup: app_metadata.roles HİÇ yok + ADMIN_EMAILS dışı → false", () => {
+        expect(isProvisionedUser({}, "random@gmail.com", [])).toBe(false);
+        expect(isProvisionedUser(null, "random@gmail.com", ["boss@pmt.com"])).toBe(false);
+        expect(isProvisionedUser(undefined, null, [])).toBe(false);
+    });
+    it("boş roles dizisi → false (provize sayılmaz)", () => {
+        expect(isProvisionedUser({ roles: [] }, "x@x.com", [])).toBe(false);
+    });
+    it("yalnız geçersiz roller → false", () => {
+        expect(isProvisionedUser({ roles: ["superhero"] }, "x@x.com", [])).toBe(false);
     });
 });
 

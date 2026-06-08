@@ -34,7 +34,10 @@ function makeRequest(pathname: string, headers?: Record<string, string>): NextRe
 }
 
 const ANON = { data: { user: null } };
-const AUTH = { data: { user: { id: "u1", email: "admin@pmt.com" } } };
+// Provize edilmiş kullanıcı: admin createUser her zaman app_metadata.roles set eder.
+const AUTH = { data: { user: { id: "u1", email: "admin@pmt.com", app_metadata: { roles: ["admin"] } } } };
+// Self-signup (Google OAuth ile kendi kaydolan): app_metadata.roles HİÇ yok.
+const UNPROVISIONED = { data: { user: { id: "u9", email: "random@gmail.com", app_metadata: {} } } };
 
 // ─── Anonymous user ────────────────────────────────────────────────────────────
 
@@ -77,6 +80,49 @@ describe("middleware — authenticated user", () => {
         expect(res.status).toBeGreaterThanOrEqual(300);
         expect(res.status).toBeLessThan(400);
         expect(res.headers.get("location")).toContain("/dashboard");
+    });
+});
+
+// ─── Provize edilmemiş kullanıcı (self-signup) — davetiye-bazlı kilit ──────────
+
+describe("middleware — unprovisioned (self-signup) user", () => {
+    const originalAdminEmails = process.env.ADMIN_EMAILS;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        process.env.ADMIN_EMAILS = ""; // random@gmail.com bootstrap admin DEĞİL
+        mockGetUser.mockResolvedValue(UNPROVISIONED);
+    });
+
+    afterEach(() => {
+        process.env.ADMIN_EMAILS = originalAdminEmails;
+    });
+
+    it("GET /dashboard → /login?error=unauthorized'a yönlendirir", async () => {
+        const res = await middleware(makeRequest("/dashboard"));
+        expect(res.status).toBeGreaterThanOrEqual(300);
+        expect(res.status).toBeLessThan(400);
+        const loc = res.headers.get("location") ?? "";
+        expect(loc).toContain("/login");
+        expect(loc).toContain("error=unauthorized");
+    });
+
+    it("GET /api/orders → 403 (yetkili değil)", async () => {
+        const res = await middleware(makeRequest("/api/orders"));
+        expect(res.status).toBe(403);
+        const body = await res.json();
+        expect(body.error).toContain("yetkili değil");
+    });
+
+    it("GET /login → döngü yok, login'i gösterir (200)", async () => {
+        const res = await middleware(makeRequest("/login"));
+        expect(res.status).toBe(200);
+    });
+
+    it("ADMIN_EMAILS'te ise bootstrap admin geçer (/dashboard 200)", async () => {
+        process.env.ADMIN_EMAILS = "random@gmail.com";
+        const res = await middleware(makeRequest("/dashboard"));
+        expect(res.status).toBe(200);
     });
 });
 

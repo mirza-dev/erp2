@@ -76,7 +76,7 @@ vi.mock("@supabase/ssr", () => ({
 import { middleware } from "../proxy";
 
 const ANON = { data: { user: null } };
-const AUTH = { data: { user: { id: "u1", email: "admin@pmt.com" } } };
+const AUTH = { data: { user: { id: "u1", email: "admin@pmt.com", app_metadata: { roles: ["admin"] } } } };
 const DEMO_COOKIE = { demo_mode: "1" };
 const PROD = "00000000-0000-4000-8000-000000000001";
 const ATT = "00000000-0000-4000-8000-000000000010";

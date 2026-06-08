@@ -16,17 +16,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
+import { parseRoles } from "@/lib/auth/permissions";
 
 async function checkAuth(request: NextRequest): Promise<boolean> {
     // 1. CRON_SECRET (cron veya curl tetikleme)
     const secret = process.env.CRON_SECRET;
     if (secret && request.headers.get("authorization") === `Bearer ${secret}`) return true;
 
-    // 2. Authenticated user session (UI'dan tetikleme — settings → reset butonu)
+    // 2. Authenticated user session (UI'dan tetikleme — settings → reset butonu).
+    //    YIKICI endpoint (tüm veriyi siler+yeniden seed) → yalnız ADMIN.
+    //    `/api/seed` ALWAYS_PUBLIC'te (proxy.ts) olduğundan middleware davetiye-kilidini
+    //    BYPASS eder; bu yüzden provize/admin kontrolü burada zorunlu (defense-in-depth:
+    //    self-signup oturumu DB'yi silemez). Eski `!!user` herhangi bir oturumu kabul ediyordu.
     try {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
-        return !!user;
+        if (!user) return false;
+        const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
+        return parseRoles(user.app_metadata, user.email, adminEmails).includes("admin");
     } catch {
         return false;
     }

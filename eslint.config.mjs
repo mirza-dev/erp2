@@ -29,6 +29,9 @@ const eslintConfig = defineConfig([
     // Playwright generated artifacts (test-results + HTML report; .gitignored zaten)
     "playwright-report/**",
     "test-results/**",
+    // Tasarım handoff referans paketleri (HTML/JSX prototip + CSS) — uygulama
+    // kaynağı DEĞİL, production'a dahil edilmez (.agents/skills ile aynı mantık).
+    "design_handoff_*/**",
   ]),
   // "_"-prefix konvansiyonu: kullanılmayan args/vars/catch error'lar ESLint'te
   // sessize alınır (TS/JS topluluk standardı). Mevcut `_code`, `_input`, `_maxLen`

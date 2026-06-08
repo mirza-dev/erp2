@@ -154,6 +154,31 @@ export function parseRoles(
     return ["viewer"];
 }
 
+/**
+ * Kullanıcı "sistemde provize edilmiş" (= admin tarafından oluşturulmuş) mi?
+ *
+ * Davetiye-bazlı erişim kilidi: yalnız bizim oluşturduğumuz kullanıcılar girebilir.
+ * Admin createUser HER ZAMAN `app_metadata.roles` set eder (panel → en az ["viewer"],
+ * create-admin → ["admin"]). Google OAuth ile KENDİ kaydolan kullanıcıda
+ * `app_metadata.roles` HİÇ yoktur → false. ADMIN_EMAILS bootstrap admini de
+ * provize sayılır (henüz roles set edilmemiş olabilir).
+ *
+ * `parseRoles`'tan farkı: fallback ["viewer"] DÖNMEZ — provize değilse açıkça false.
+ * (parseRoles hem self-signup hem admin-created-viewer için ["viewer"] döndürür →
+ * ayrım yapamaz; bu helper ham app_metadata.roles VARLIĞINA bakar.)
+ */
+export function isProvisionedUser(
+    appMetadata: Record<string, unknown> | null | undefined,
+    email: string | null | undefined,
+    adminEmails: string[] = [],
+): boolean {
+    const rolesRaw = appMetadata?.roles;
+    if (Array.isArray(rolesRaw) && rolesRaw.some(r => normalizeRole(r) !== null)) return true;
+    if (normalizeRole(appMetadata?.role) !== null) return true;
+    if (email && adminEmails.map(e => e.trim().toLowerCase()).includes(email.trim().toLowerCase())) return true;
+    return false;
+}
+
 /** Rol dizisinden permission seti. admin → tüm permission'lar; diğer → union. */
 export function permissionsForRoles(roles: Role[]): Set<Permission> {
     if (roles.includes("admin")) return new Set(ALL_PERMISSIONS);
