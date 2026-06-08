@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { SevBadge } from "./SevBadge";
 import {
@@ -115,6 +115,14 @@ export function AlertCalendarDrawer({
         return () => window.removeEventListener("keydown", handler);
     }, [onClose]);
 
+    // Focus dönüşü (a11y): açılışta ilk odak kapat butonuna, kapanışta tetikleyiciye geri.
+    const closeBtnRef = useRef<HTMLButtonElement>(null);
+    useEffect(() => {
+        const prevFocus = document.activeElement as HTMLElement | null;
+        closeBtnRef.current?.focus();
+        return () => { prevFocus?.focus?.(); };
+    }, []);
+
     // İlgili siparişleri yükle (yalnız order_shortage + ürün entity'si varken)
     useEffect(() => {
         if (alert.type !== "order_shortage" || !entityId) return;
@@ -194,7 +202,7 @@ export function AlertCalendarDrawer({
 
     return (
         <>
-            <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)" }} />
+            <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", animation: "fade-in 0.2s ease-out" }} />
             <div
                 role="dialog"
                 aria-modal="true"
@@ -220,7 +228,7 @@ export function AlertCalendarDrawer({
                         </div>
                         {p && <div style={{ fontSize: "12px", fontFamily: "var(--font-mono, monospace)", color: "var(--text-tertiary)", marginTop: "4px" }}>{p.sku}</div>}
                     </div>
-                    <Button variant="icon" size="md" iconOnly aria-label="Kapat" onClick={onClose}>
+                    <Button ref={closeBtnRef} variant="icon" size="md" iconOnly aria-label="Kapat" onClick={onClose}>
                         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
                     </Button>
                 </div>

@@ -126,6 +126,17 @@ export default function AlertsPage() {
     const [search, setSearch] = useState("");
     const [drawerAlertId, setDrawerAlertId] = useState<string | null>(null);
 
+    // ── Responsive (OrderForm precedent) — <768 tek kolon + doküman scroll ──
+    const [windowWidth, setWindowWidth] = useState<number>(
+        typeof window !== "undefined" ? window.innerWidth : 1200,
+    );
+    useEffect(() => {
+        function handleResize() { setWindowWidth(window.innerWidth); }
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+    const isMobile = windowWidth < 768;
+
     // ── Fetch ──
     const refetch = useCallback(async () => {
         const [alertsRes, productsRes] = await Promise.all([
@@ -383,9 +394,14 @@ export default function AlertsPage() {
                 />
             )}
 
-            <div style={layoutStyle} className="alerts-calendar-layout">
+            <div
+                style={isMobile
+                    ? { ...layoutStyle, gridTemplateColumns: "1fr", height: "auto", overflow: "visible" }
+                    : layoutStyle}
+                className="alerts-calendar-layout"
+            >
                 {/* Takvim ana kolon */}
-                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, overflow: isMobile ? "visible" : "hidden" }}>
                     <CalendarHeader
                         year={viewYear}
                         month={viewMonth}
@@ -417,7 +433,9 @@ export default function AlertsPage() {
                         </div>
                     </div>
 
-                    <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                    <div style={isMobile
+                        ? { flex: "none" }
+                        : { flex: 1, overflowY: "auto", minHeight: 0 }}>
                         <CalendarGrid
                             year={viewYear}
                             month={viewMonth}
@@ -429,7 +447,12 @@ export default function AlertsPage() {
                 </div>
 
                 {/* Gün detay paneli */}
-                <div style={dayPanelStyle} className="alerts-day-panel">
+                <div
+                    style={isMobile
+                        ? { ...dayPanelStyle, borderLeft: "none", borderTop: "0.5px solid var(--border-tertiary)", maxHeight: "50vh" }
+                        : dayPanelStyle}
+                    className="alerts-day-panel"
+                >
                     {dayHasOpen && (
                         <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 20px 0" }}>
                             <button type="button" onClick={dismissDay} disabled={isDemo} style={dismissDayBtnStyle}>
