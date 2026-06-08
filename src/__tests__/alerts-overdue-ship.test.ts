@@ -242,36 +242,24 @@ describe("POST /api/orders/[id]/ship", () => {
     });
 });
 
-// ── Source-regression tests ───────────────────────────────────
+// ── Source-regression (takvim drawer, Faz 1) ───────────────────
+// TAKVİM GEÇİŞİ: Faz 7 inline sevk formu takvim drawer'ına Faz 2'de taşınacak
+// (ALERTS_CALENDAR_PLAN.md Faz 2). Endpoint testleri (yukarıda) tam kapsamda kalır.
+// Faz 1: overdue_shipment uyarısı drawer'da "Sevkiyatı Yönet" nav linkiyle ele alınır.
 
-const alertsSource = readFileSync(
-    resolve(process.cwd(), "src/app/dashboard/alerts/page.tsx"),
+const drawerSource = readFileSync(
+    resolve(process.cwd(), "src/components/alerts/AlertCalendarDrawer.tsx"),
     "utf-8",
 );
 
-describe("actionFor + OrderAlertDrawer (source-regression)", () => {
-    it("actionFor switch'inde overdue_shipment → 'Sevkiyatı yönet' + /dashboard/orders", () => {
-        expect(alertsSource).toMatch(
-            /types\.includes\(\s*["']overdue_shipment["']\s*\)[^}]*label\s*:\s*["']Sevkiyatı yönet["']/,
-        );
-        expect(alertsSource).toMatch(
-            /types\.includes\(\s*["']overdue_shipment["']\s*\)[^}]*href\s*:\s*["']\/dashboard\/orders["']/,
-        );
+describe("overdue_shipment — takvim drawer (Faz 1) kaynak regresyonu", () => {
+    it("AlertCalendarDrawer overdue_shipment nav linki: 'Sevkiyatı Yönet' + /dashboard/orders", () => {
+        const block = drawerSource.split("overdue_shipment:")[1]?.slice(0, 300) ?? "";
+        expect(block).toContain("Sevkiyatı Yönet");
+        expect(block).toContain("/dashboard/orders");
     });
 
-    it("OrderAlertDrawer overdue_shipment branch inline ship formu içeriyor", () => {
-        // isOverdueShipment flag
-        expect(alertsSource).toMatch(/isOverdueShipment\s*=\s*alert\.type\s*===\s*["']overdue_shipment["']/);
-        // Sevk Et butonu
-        expect(alertsSource).toMatch(/Sevk Et/);
-        // Sevkiyat tarihi aria-label
-        expect(alertsSource).toMatch(/aria-label\s*=\s*["']Sevkiyat tarihi["']/);
-        // POST /api/orders/.../ship çağrısı
-        expect(alertsSource).toMatch(/\/api\/orders\/.*\/ship/);
-    });
-
-    it("onShipped callback OrderAlertDrawer props'unda mevcut", () => {
-        expect(alertsSource).toMatch(/onShipped\s*:/);
-        expect(alertsSource).toMatch(/onShipped\s*\(\s*\)/);
-    });
+    // ── Faz 2'ye taşınacak (drawer zenginliği) ──
+    it.todo("Faz 2: overdue_shipment inline sevk formu (shipDate/tracking/carrier → POST /api/orders/[id]/ship)");
+    it.todo("Faz 2: başarılı sevk → alert resolve + Paraşüt/email fire-and-forget");
 });

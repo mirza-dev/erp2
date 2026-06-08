@@ -692,6 +692,20 @@ body {
   50% { opacity: 0.4; }
 }
 
+/* Uyarılar takvim görünümü animasyonları (reduced-motion guard yukarıda * ile kapsar) */
+@keyframes cal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cal-pop-in {
+  from { opacity: 0; transform: translate(-50%, var(--cal-pop-from, 0)) scale(0.96); }
+  to { opacity: 1; }
+}
+@keyframes cal-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .animate-fade-in {
   animation: fade-in 0.15s ease-out;
 }

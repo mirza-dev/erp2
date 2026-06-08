@@ -1,878 +1,144 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import Link from "next/link";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { mapProduct } from "@/lib/api-mappers";
 import type { Product } from "@/lib/mock-data";
 import { useToast } from "@/components/ui/Toast";
-import { computeCoverageDays, daysColor } from "@/lib/stock-utils";
-import { EmptyState, LoadingState } from "@/components/ui/StateViews";
-import type { AlertRow } from "@/lib/database.types";
-import type { OpenShortageDetailRow } from "@/lib/supabase/products";
-import { extractShortageQty, shortReason, shortImpact } from "@/lib/alert-ui-helpers";
-import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
+import { computeCoverageDays } from "@/lib/stock-utils";
+import { LoadingState } from "@/components/ui/StateViews";
+import type { AlertWithDueMeta } from "@/lib/services/alert-due-dates";
+import { shortReason, shortImpact } from "@/lib/alert-ui-helpers";
+import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
-import { AI_SUMMARY_LABELS } from "@/lib/ai-summary-labels";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
-import { PARASUT_SYNC_ALERT_ENTITY_IDS, PARASUT_ALERT_ENTITY_TYPES } from "@/lib/parasut-constants";
-
-// ── Module-level styles (no-inline-exhaustive-style) ──────────
-
-const aiBadgePillStyle: React.CSSProperties = {
-    fontSize: "9px", fontWeight: 700, letterSpacing: "0.05em",
-    padding: "1px 5px", borderRadius: "3px", flexShrink: 0,
-    background: "var(--accent-bg)", color: "var(--accent-text)",
-    border: "0.5px solid var(--accent-border)",
-};
-
-const tabButtonBaseStyle: React.CSSProperties = {
-    fontSize: "12px",
-    padding: "10px 14px",
-    border: "none",
-    background: "transparent",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    whiteSpace: "nowrap",
-    flexShrink: 0,
-};
-
-// ── B1: Static styles ──
-
-const pageRootStyle: React.CSSProperties = { padding: 0 };
-
-const headerContainerStyle: React.CSSProperties = {
-    padding: "18px 24px 14px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "8px",
-    flexWrap: "wrap",
-};
-
-const headerTitleStyle: React.CSSProperties = {
-    fontSize: "15px",
-    fontWeight: 600,
-    color: "var(--text-primary)",
-    margin: 0,
-};
-
-const headerSubtitleStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    marginTop: "2px",
-};
-
-const headerButtonRowStyle: React.CSSProperties = { display: "flex", gap: "6px" };
-
-const aiUnavailableBannerStyle: React.CSSProperties = { margin: "12px 24px 0" };
-
-const tabsInnerRowBaseStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    padding: "0 24px",
-};
-
-const tabsButtonGroupStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    flexShrink: 0,
-};
-
-const tabsRightGroupStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    flexShrink: 0,
-};
-
-const tabSearchInputStyle: React.CSSProperties = {
-    fontSize: "12px",
-    padding: "5px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "6px",
-    background: "var(--bg-primary)",
-    color: "var(--text-primary)",
-    width: "180px",
-};
-
-const tabMobileWrapperStyle: React.CSSProperties = {
-    padding: "6px 24px 6px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-};
-
-const systemAlertsContainerStyle: React.CSSProperties = {
-    marginBottom: "20px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "8px",
-    background: "var(--bg-secondary)",
-    overflow: "hidden",
-};
-
-const systemAlertsHeaderStyle: React.CSSProperties = {
-    padding: "10px 20px",
-    background: "var(--bg-tertiary)",
-    borderBottom: "0.5px solid var(--border-secondary)",
-    fontSize: "11px",
-    fontWeight: 600,
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-};
-
-const aiSectionContainerStyle: React.CSSProperties = {
-    borderTop: "0.5px solid var(--border-tertiary)",
-};
-
-const aiSectionHeaderStyle: React.CSSProperties = {
-    padding: "12px 24px 10px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "8px",
-};
-
-const aiSectionTitleStyle: React.CSSProperties = {
-    fontSize: "11px",
-    fontWeight: 600,
-    color: "var(--text-tertiary)",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-};
-
-const aiSectionEmptyTextWrapperStyle: React.CSSProperties = { padding: "0 24px 16px" };
-
-const aiSectionEmptyTextStyle: React.CSSProperties = {
-    fontSize: "12px",
-    color: "var(--text-tertiary)",
-};
-
-const aiAlertsListStyle: React.CSSProperties = {
-    padding: "0 24px 16px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-};
-
-const aiOverallSummaryStyle: React.CSSProperties = {
-    padding: "9px 12px",
-    background: "var(--accent-bg)",
-    border: "0.5px solid var(--accent-border)",
-    borderRadius: "5px",
-    fontSize: "12px",
-    color: "var(--accent-text)",
-    lineHeight: 1.5,
-};
-
-const aiOverallSummaryLabelStyle: React.CSSProperties = {
-    fontWeight: 600,
-    marginRight: "6px",
-};
-
-const aiAlertRowStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "9px 12px",
-    background: "var(--bg-secondary)",
-    border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "5px",
-};
-
-const aiAlertTitleStyle: React.CSSProperties = {
-    fontSize: "12px",
-    color: "var(--text-secondary)",
-    flex: 1,
-    lineHeight: 1.45,
-};
-
-const aiAlertConfidenceStyle: React.CSSProperties = {
-    fontSize: "10px",
-    fontWeight: 600,
-    padding: "2px 6px",
-    borderRadius: "3px",
-    background: "var(--accent-bg)",
-    color: "var(--accent-text)",
-    border: "0.5px solid var(--accent-border)",
-    flexShrink: 0,
-};
-
-const aiAlertRelTimeStyle: React.CSSProperties = {
-    fontSize: "10px",
-    color: "var(--text-tertiary)",
-    flexShrink: 0,
-};
-
-const aiAlertModelStyle: React.CSSProperties = {
-    fontSize: "10px",
-    color: "var(--text-tertiary)",
-    marginTop: "4px",
-    paddingLeft: "2px",
-};
-
-const drawerBackdropStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    zIndex: 200,
-    background: "rgba(0,0,0,0.45)",
-};
-
-const drawerPanelStyle: React.CSSProperties = {
-    position: "fixed",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 201,
-    width: "min(440px, 100vw)",
-    background: "var(--bg-primary)",
-    borderLeft: "0.5px solid var(--border-secondary)",
-    boxShadow: "-8px 0 32px rgba(0,0,0,0.25)",
-    display: "flex",
-    flexDirection: "column",
-    animation: "slide-in-right 0.2s ease-out",
-};
-
-const drawerHeaderStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: "16px 20px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    flexShrink: 0,
-    gap: "10px",
-};
-
-const drawerHeaderLeftStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    minWidth: 0,
-};
-
-const drawerSkuStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    fontFamily: "monospace",
-    flexShrink: 0,
-};
-
-const drawerCloseButtonStyle: React.CSSProperties = {
-    background: "transparent",
-    border: "none",
-    cursor: "pointer",
-    color: "var(--text-tertiary)",
-    fontSize: "20px",
-    lineHeight: 1,
-    padding: "4px 8px",
-    borderRadius: "4px",
-    flexShrink: 0,
-};
-
-const drawerBodyStyle: React.CSSProperties = {
-    flex: 1,
-    overflowY: "auto",
-    padding: "20px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px",
-};
-
-const drawerSectionLabelStyle: React.CSSProperties = {
-    fontSize: "10px",
-    fontWeight: 600,
-    color: "var(--text-tertiary)",
-    letterSpacing: "0.07em",
-    textTransform: "uppercase",
-    marginBottom: "8px",
-};
-
-const drawerOrphanedTextStyle: React.CSSProperties = {
-    margin: 0,
-    fontSize: "13px",
-    color: "var(--text-secondary)",
-    lineHeight: 1.6,
-};
-
-const drawerReasonTextStyle: React.CSSProperties = {
-    margin: "0 0 12px",
-    fontSize: "13px",
-    color: "var(--text-primary)",
-    lineHeight: 1.6,
-};
-
-const drawerStatsGridStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr 1fr",
-    gap: "10px",
-    padding: "10px 12px",
-    background: "var(--bg-secondary)",
-    border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "5px",
-};
-
-const drawerImpactTextStyle: React.CSSProperties = {
-    margin: 0,
-    fontSize: "13px",
-    color: "var(--text-primary)",
-    lineHeight: 1.6,
-};
-
-const drawerActionsContainerStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "7px",
-};
-
-const drawerRelatedLinksContainerStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-};
-
-// ── OrderAlertRow / SystemAlertCard static styles ──
-
-const alertRowWrapperStyle: React.CSSProperties = {
-    padding: "14px 20px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    display: "flex",
-    flexDirection: "column",
-    gap: "10px",
-};
-
-const alertRowFlexRowStyle: React.CSSProperties = {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "16px",
-};
-
-const alertRowMainColStyle: React.CSSProperties = { flex: 1, minWidth: 0 };
-
-const alertRowTitleStyle: React.CSSProperties = {
-    fontSize: "13px",
-    fontWeight: 500,
-    color: "var(--text-primary)",
-};
-
-const alertRowDescStyle: React.CSSProperties = {
-    fontSize: "12px",
-    color: "var(--text-secondary)",
-    marginTop: "3px",
-};
-
-const alertRowMetaStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    marginTop: "4px",
-};
-
-const alertRowActionsColStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    alignItems: "flex-end",
-    flexShrink: 0,
-};
-
-const alertRowDetailButtonStyle: React.CSSProperties = {
-    fontSize: "11px",
-    padding: "4px 9px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px",
-    background: "transparent",
-    color: "var(--text-secondary)",
-    cursor: "pointer",
-    whiteSpace: "nowrap",
-};
-
-const alertRowOrderLinkStyle: React.CSSProperties = {
-    fontSize: "12px",
-    color: "var(--accent)",
-    whiteSpace: "nowrap",
-    textDecoration: "none",
-};
-
-const extendFormContainerStyle: React.CSSProperties = {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    padding: "10px 12px",
-    background: "var(--bg-secondary)",
-    border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "5px",
-};
-
-const extendFormLabelStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    fontWeight: 600,
-    letterSpacing: "0.04em",
-};
-
-const extendFormControlsRowStyle: React.CSSProperties = {
-    display: "flex",
-    gap: "8px",
-    alignItems: "center",
-    flexWrap: "wrap",
-};
-
-const extendFormDateInputStyle: React.CSSProperties = {
-    fontSize: "12px",
-    padding: "5px 8px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px",
-    background: "var(--bg-primary)",
-    color: "var(--text-primary)",
-};
-
-const extendFormErrorStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--danger-text)",
-};
-
-const systemAlertHeaderRowStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    marginBottom: "4px",
-};
-
-const systemAlertParaSutLabelStyle: React.CSSProperties = {
-    fontSize: "10px",
-    fontWeight: 600,
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-};
-
-// ── B3: SEV badge lookup map (3 callsites: ProductRow mobile/desktop + drawer + SystemAlertCard) ──
-
-const SEV_BADGE_PILL_STYLES: Record<Severity, React.CSSProperties> = {
-    critical: {
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        padding: "1px 5px",
-        borderRadius: "3px",
-        flexShrink: 0,
-        background: "var(--danger-bg)",
-        color: "var(--danger-text)",
-        border: "0.5px solid var(--danger-border)",
-    },
-    warning: {
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        padding: "1px 5px",
-        borderRadius: "3px",
-        flexShrink: 0,
-        background: "var(--warning-bg)",
-        color: "var(--warning-text)",
-        border: "0.5px solid var(--warning-border)",
-    },
-    info: {
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        padding: "1px 5px",
-        borderRadius: "3px",
-        flexShrink: 0,
-        background: "var(--accent-bg)",
-        color: "var(--accent-text)",
-        border: "0.5px solid var(--accent-border)",
-    },
-};
-
-const SEV_SUMMARY_PANEL_STYLES: Record<Severity, React.CSSProperties> = {
-    critical: {
-        padding: "14px",
-        background: "var(--danger-bg)",
-        border: "0.5px solid var(--danger-border)",
-        borderRadius: "6px",
-    },
-    warning: {
-        padding: "14px",
-        background: "var(--warning-bg)",
-        border: "0.5px solid var(--warning-border)",
-        borderRadius: "6px",
-    },
-    info: {
-        padding: "14px",
-        background: "var(--accent-bg)",
-        border: "0.5px solid var(--accent-border)",
-        borderRadius: "6px",
-    },
-};
-
-const SEV_DRAWER_HEADER_BADGE_STYLES: Record<Severity, React.CSSProperties> = {
-    critical: {
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        padding: "2px 6px",
-        borderRadius: "3px",
-        flexShrink: 0,
-        background: "var(--danger-bg)",
-        color: "var(--danger-text)",
-        border: "0.5px solid var(--danger-border)",
-    },
-    warning: {
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        padding: "2px 6px",
-        borderRadius: "3px",
-        flexShrink: 0,
-        background: "var(--warning-bg)",
-        color: "var(--warning-text)",
-        border: "0.5px solid var(--warning-border)",
-    },
-    info: {
-        fontSize: "9px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        padding: "2px 6px",
-        borderRadius: "3px",
-        flexShrink: 0,
-        background: "var(--accent-bg)",
-        color: "var(--accent-text)",
-        border: "0.5px solid var(--accent-border)",
-    },
-};
-
-// ── B2: Conditional / spread base styles ──
-
-const headerAiButtonBaseStyle: React.CSSProperties = {
-    fontSize: "12px", padding: "6px 12px",
-    border: "0.5px solid var(--accent-border)",
-    borderRadius: "5px", background: "var(--accent-bg)",
-    color: "var(--accent-text)", fontWeight: 500,
-};
-
-const headerRefreshButtonBaseStyle: React.CSSProperties = {
-    fontSize: "12px", padding: "6px 12px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "5px", background: "transparent",
-    color: "var(--text-secondary)",
-};
-
-const tabButtonDotBaseStyle: React.CSSProperties = {
-    width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0,
-};
-
-const tabButtonCountBaseStyle: React.CSSProperties = {
-    fontSize: "10px", padding: "1px 5px", borderRadius: "10px", fontWeight: 500,
-};
-
-const showResolvedButtonBaseStyle: React.CSSProperties = {
-    fontSize: "11px",
-    padding: "4px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px",
-    cursor: "pointer",
-    flexShrink: 0,
-};
-
-const aiAnalysisStartButtonBaseStyle: React.CSSProperties = {
-    fontSize: "11px", padding: "4px 10px",
-    border: "0.5px solid var(--accent-border)",
-    borderRadius: "4px", background: "var(--accent-bg)",
-    color: "var(--accent-text)", fontWeight: 500,
-};
-
-const aiAlertDetailButtonStyle: React.CSSProperties = {
-    fontSize: "10px", padding: "3px 8px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px", background: "transparent",
-    color: "var(--text-tertiary)", cursor: "pointer",
-    flexShrink: 0, whiteSpace: "nowrap",
-};
-
-const orderAlertExtendOpenButtonBaseStyle: React.CSSProperties = {
-    fontSize: "12px", padding: "5px 11px",
-    border: "0.5px solid var(--accent-border)",
-    borderRadius: "4px", background: "var(--accent-bg)",
-    color: "var(--accent-text)",
-    whiteSpace: "nowrap", fontWeight: 500,
-};
-
-const orderAlertExtendSaveButtonBaseStyle: React.CSSProperties = {
-    fontSize: "12px", padding: "5px 12px",
-    border: "0.5px solid var(--success-border)",
-    borderRadius: "4px",
-    background: "var(--success-bg)",
-    color: "var(--success-text)",
-    fontWeight: 500,
-};
-
-const orderAlertExtendCancelButtonBaseStyle: React.CSSProperties = {
-    fontSize: "12px", padding: "5px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px",
-    background: "transparent",
-    color: "var(--text-secondary)",
-};
-
-const systemAlertRetryButtonBaseStyle: React.CSSProperties = {
-    fontSize: "12px", padding: "5px 11px",
-    border: "0.5px solid var(--accent-border)",
-    borderRadius: "4px", background: "var(--accent-bg)",
-    color: "var(--accent-text)",
-    whiteSpace: "nowrap",
-};
-
-const systemAlertParaSutLinkStyle: React.CSSProperties = {
-    fontSize: "11px", padding: "4px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px", background: "transparent",
-    color: "var(--text-secondary)",
-    textDecoration: "none", whiteSpace: "nowrap",
-};
-
-const systemAlertDismissButtonBaseStyle: React.CSSProperties = {
-    fontSize: "11px", padding: "4px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px", background: "transparent",
-    color: "var(--text-tertiary)",
-    whiteSpace: "nowrap",
-};
-
-const productRowMobileWrapperBaseStyle: React.CSSProperties = {
-    display: "flex",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-};
-
-const productRowMobileStripeBaseStyle: React.CSSProperties = {
-    width: "3px", flexShrink: 0,
-};
-
-const productRowMobileCardStyle: React.CSSProperties = {
-    flex: 1,
-    padding: "12px 14px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "5px",
-    minWidth: 0,
-};
-
-const productRowSevRowStyle: React.CSSProperties = {
-    display: "flex", alignItems: "center", gap: "7px",
-};
-
-const productRowNameStyle: React.CSSProperties = {
-    fontSize: "13px", fontWeight: 500, color: "var(--text-primary)",
-    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-};
-
-const productRowSkuRowStyle: React.CSSProperties = {
-    display: "flex", alignItems: "center", gap: "8px",
-};
-
-const productRowSkuStyle: React.CSSProperties = {
-    fontSize: "11px", color: "var(--text-tertiary)", fontFamily: "monospace",
-};
-
-const productRowReasonStyle: React.CSSProperties = {
-    fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.4,
-};
-
-const productRowActionsRowStyle: React.CSSProperties = {
-    display: "flex", alignItems: "center", gap: "8px",
-    flexWrap: "wrap", marginTop: "4px",
-};
-
-const productRowDetailButtonStyle: React.CSSProperties = {
-    fontSize: "11px", padding: "5px 12px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px", background: "transparent",
-    color: "var(--text-secondary)", cursor: "pointer",
-    whiteSpace: "nowrap",
-};
-
-const productRowMobileDismissButtonStyle: React.CSSProperties = {
-    fontSize: "13px", padding: "3px 9px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px", background: "transparent",
-    color: "var(--text-tertiary)", cursor: "pointer",
-    lineHeight: 1,
-};
-
-const productRowSeenLabelStyle: React.CSSProperties = {
-    fontSize: "10px", color: "var(--text-tertiary)",
-};
-
-const productRowDesktopWrapperBaseStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "3px 1fr 170px 120px 80px 148px 110px",
-    alignItems: "center",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    transition: "background 0.1s",
-};
-
-const productRowDesktopStripeBaseStyle: React.CSSProperties = {
-    alignSelf: "stretch", minHeight: "52px",
-};
-
-const productRowDesktopCellStyle: React.CSSProperties = {
-    padding: "12px 16px", minWidth: 0,
-};
-
-const productRowReasonCellStyle: React.CSSProperties = {
-    padding: "12px 12px",
-};
-
-const productRowReasonTextStyle: React.CSSProperties = {
-    fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.45,
-};
-
-const productRowOpenOrderCellStyle: React.CSSProperties = {
-    padding: "12px 12px",
-};
-
-const productRowActionLinkCellStyle: React.CSSProperties = {
-    padding: "12px 12px",
-};
-
-const productRowQuickActionsCellStyle: React.CSSProperties = {
-    padding: "12px 12px", display: "flex", alignItems: "center", gap: "6px",
-};
-
-const productRowDesktopDetailButtonStyle: React.CSSProperties = {
-    fontSize: "11px", padding: "4px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px", background: "transparent",
-    color: "var(--text-secondary)", cursor: "pointer",
-    whiteSpace: "nowrap",
-};
-
-const productRowDesktopDismissButtonStyle: React.CSSProperties = {
-    fontSize: "13px", padding: "2px 7px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px", background: "transparent",
-    color: "var(--text-tertiary)", cursor: "pointer",
-    lineHeight: 1,
-};
-
-const productRowDesktopSeenLabelStyle: React.CSSProperties = {
-    fontSize: "10px", color: "var(--text-tertiary)", whiteSpace: "nowrap",
-};
-
-// ── Types ──────────────────────────────────────────────────────
-
-type Severity = "critical" | "warning" | "info";
-type AlertFilter = "all" | "critical" | "warning" | "order_shortage" | "quote_expired" | "overdue_shipment";
-
-interface ProductAlertGroup {
-    entityId: string;
-    productName: string;
-    sku: string;
-    available: number;
-    minStock: number;
-    reserved: number;
-    openOrderCount: number;
-    unit: string;
-    coverageDays: number | null;
-    topSeverity: "critical" | "warning";
-    alerts: AlertRow[];
-    reason: string;
-    impact: string;
-    actionLabel: string;
-    actionHref: string;
-    isOrphaned: boolean;
+import {
+    ALERT_CLASSES, expandAlertOccurrences, getOccurrencesForDate, getCalendarStats,
+    timeFromISO, type CalendarAlert, type Occurrence,
+} from "@/lib/alert-calendar";
+import { CalendarHeader } from "@/components/alerts/CalendarHeader";
+import { ClassificationTabs } from "@/components/alerts/ClassificationTabs";
+import { CalendarGrid } from "@/components/alerts/CalendarGrid";
+import { DayDetailPanel } from "@/components/alerts/DayDetailPanel";
+import { AlertCalendarDrawer } from "@/components/alerts/AlertCalendarDrawer";
+
+// ── AlertRow (+ due meta) → takvim görünüm modeli ─────────────────────────────
+/**
+ * Her uyarıyı CalendarAlert'e dönüştürür. Ürün-entity alertleri productMap'ten
+ * stok bilgisi + (order_deadline için) stok-tükenme hedef tarihini alır;
+ * order-entity alertlerinin hedef tarihi/kodu server enrichment'tan gelir.
+ */
+export function toCalendarAlert(row: AlertWithDueMeta, productMap: Map<string, Product>): CalendarAlert {
+    const isProductEntity = row.entity_type === "product" && !!row.entity_id;
+    const product = isProductEntity ? productMap.get(row.entity_id as string) : undefined;
+    const orphaned = isProductEntity && !product;
+
+    let cp: CalendarAlert["product"] = null;
+    let covDays: number | null = null;
+    if (product) {
+        const available = product.available_now ?? 0;
+        const reserved = product.reserved ?? 0;
+        const unit = product.unit ?? "adet";
+        covDays = computeCoverageDays(available, product.dailyUsage ?? null);
+        cp = {
+            name: product.name,
+            sku: product.sku,
+            available,
+            minStock: product.minStockLevel ?? 0,
+            reserved,
+            unit,
+            coverageDays: covDays,
+        };
+    }
+
+    // Neden / Etki
+    let reason: string;
+    let impact: string;
+    if (orphaned) {
+        reason = "Ürün silindi, uyarı geçersiz";
+        impact = "Bu uyarı kapatılabilir";
+    } else if (product && cp) {
+        reason = shortReason([row]);
+        impact = shortImpact([row], cp.available, cp.reserved, cp.unit, covDays);
+    } else {
+        reason = row.description || (ALERT_TYPE_LABEL[row.type] ?? row.type);
+        impact = row.description || (ALERT_TYPE_LABEL[row.type] ?? "");
+    }
+
+    // Hedef tarih: server (order alertleri) → yoksa order_deadline için ürün stok-tükenme
+    let dueDate = row.due_date;
+    let dueLabel = row.due_label;
+    if (!dueDate && row.type === "order_deadline" && product) {
+        dueDate = product.orderDeadline ?? product.stockoutDate ?? null;
+        dueLabel = dueDate ? "Stok Tükenme" : null;
+    }
+
+    return {
+        id: row.id,
+        type: row.type,
+        severity: row.severity,
+        status: row.status,
+        title: row.title,
+        reason,
+        impact,
+        date: row.created_at,
+        time: timeFromISO(row.created_at),
+        resolution: row.resolution_reason ?? null,
+        dueDate,
+        dueLabel,
+        orderCode: row.order_code ?? null,
+        entityId: row.entity_id ?? null,
+        entityType: row.entity_type ?? null,
+        product: cp,
+        source: row.source ?? null,
+        aiConfidence: row.ai_confidence ?? null,
+        aiReason: row.ai_reason ?? null,
+        aiModelVersion: row.ai_model_version ?? null,
+    };
 }
 
-// ── Helpers ────────────────────────────────────────────────────
-
-function actionFor(alerts: AlertRow[]): { label: string; href: string } {
-    const types = alerts.map((a) => a.type);
-    // Faz 1: sync_issue defansif fallback (normal akışta SystemAlertCard üzerinden inline retry yapılır,
-    // ürün gruplarından ayrı bölümde gösterilir; bu satır arşiv görünümü için yedek).
-    if (types.includes("sync_issue"))         return { label: "Paraşüt sayfasına git",  href: "/dashboard/parasut" };
-    if (types.includes("order_shortage"))     return { label: "Siparişleri incele",     href: "/dashboard/orders" };
-    if (types.includes("overdue_shipment"))   return { label: "Sevkiyatı yönet",        href: "/dashboard/orders" };
-    if (types.includes("stock_critical"))     return { label: "Satın alma planla",      href: "/dashboard/purchase/suggested" };
-    if (types.includes("order_deadline"))     return { label: "Satın alma planla",      href: "/dashboard/purchase/suggested" };
-    return { label: "Stoku izle", href: "/dashboard/products" };
+/** Sınıflandırma sekmesine göre filtre. */
+export function applyClassFilter(alerts: CalendarAlert[], classId: string): CalendarAlert[] {
+    const cat = ALERT_CLASSES.find((c) => c.id === classId);
+    if (!cat || !cat.types) return alerts;
+    return alerts.filter((a) => cat.types!.includes(a.type));
 }
-
-function formatRelTime(iso: string): string {
-    const diff = Date.now() - new Date(iso).getTime();
-    const h = Math.floor(diff / 3_600_000);
-    const m = Math.floor(diff / 60_000);
-    if (h >= 24) return `${Math.floor(h / 24)}g önce`;
-    if (h >= 1)  return `${h}s önce`;
-    if (m >= 1)  return `${m}dk önce`;
-    return "az önce";
-}
-
-const SEV: Record<"critical" | "warning" | "info", {
-    dot: string; text: string; bg: string; border: string; label: string;
-}> = {
-    critical: { dot: "var(--danger)",  text: "var(--danger-text)",  bg: "var(--danger-bg)",  border: "var(--danger-border)",  label: "KRİTİK" },
-    warning:  { dot: "var(--warning)", text: "var(--warning-text)", bg: "var(--warning-bg)", border: "var(--warning-border)", label: "UYARI"  },
-    info:     { dot: "var(--accent)",  text: "var(--accent-text)",  bg: "var(--accent-bg)",  border: "var(--accent-border)",  label: "AI"     },
-};
-
-
-// ── useIsMobile ────────────────────────────────────────────────
-
-function useIsMobile(breakpoint = 768): boolean {
-    const [isMobile, setIsMobile] = useState(() =>
-        typeof window !== "undefined"
-            ? window.matchMedia(`(max-width: ${breakpoint - 1}px)`).matches
-            : false
-    );
-    useEffect(() => {
-        const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
-        const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-        mq.addEventListener("change", handler);
-        return () => mq.removeEventListener("change", handler);
-    }, [breakpoint]);
-    return isMobile;
-}
-
-// ── Page ──────────────────────────────────────────────────────
 
 export default function AlertsPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
-    const isMobile = useIsMobile();
 
-    const [rawAlerts, setRawAlerts]         = useState<AlertRow[]>([]);
-    const [products, setProducts]           = useState<Product[]>([]);
-    const [openOrderCounts, setOpenOrderCounts] = useState<Record<string, number>>({});
-    const [loading, setLoading]             = useState(true);
-    const [activeFilter, setActiveFilter]   = useState<AlertFilter>("all");
-    const [showResolved, setShowResolved]   = useState(false);
-    const [search, setSearch]               = useState("");
-    const [refreshing, setRefreshing]       = useState(false);
-    const [aiGenerating, setAiGenerating]   = useState(false);
+    const [rawAlerts, setRawAlerts] = useState<AlertWithDueMeta[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [aiGenerating, setAiGenerating] = useState(false);
     const [aiUnavailable, setAiUnavailable] = useState<{ reason: "not_configured" | "error" } | null>(null);
-    const [drawerGroup, setDrawerGroup]         = useState<ProductAlertGroup | null>(null);
-    const [drawerOrderAlert, setDrawerOrderAlert] = useState<AlertRow | null>(null);
-    const [drawerAiAlert, setDrawerAiAlert]       = useState<AlertRow | null>(null);
-    const [lastRefreshed, setLastRefreshed] = useState("az önce");
+    const [syncRetrying, setSyncRetrying] = useState<string | null>(null);
+
+    // Takvim durumu
+    const now = useMemo(() => new Date(), []);
+    const [viewYear, setViewYear] = useState(now.getFullYear());
+    const [viewMonth, setViewMonth] = useState(now.getMonth());
+    const [selectedDate, setSelectedDate] = useState<Date | null>(now);
+    const [activeClass, setActiveClass] = useState("all");
+    // Varsayılan: çözülenler de görünür (tasarım vaadi "hangi gün ne olmuş" — geçmişi gez).
+    const [showResolved, setShowResolved] = useState(true);
+    const [search, setSearch] = useState("");
+    const [drawerAlertId, setDrawerAlertId] = useState<string | null>(null);
 
     // ── Fetch ──
     const refetch = useCallback(async () => {
-        const [alertsRes, productsRes, openCountRes] = await Promise.all([
-            fetch("/api/alerts"),
+        const [alertsRes, productsRes] = await Promise.all([
+            fetch("/api/alerts/calendar"),
             fetch("/api/products"),
-            fetch("/api/orders/open-count-by-product"),
         ]);
         if (alertsRes.ok) {
             const data = await alertsRes.json();
-            if (Array.isArray(data)) setRawAlerts(data as AlertRow[]);
+            if (Array.isArray(data)) setRawAlerts(data as AlertWithDueMeta[]);
         }
         if (productsRes.ok) {
             const data = await productsRes.json();
             if (Array.isArray(data)) setProducts(data.map(mapProduct));
-        }
-        if (openCountRes.ok) {
-            const data = await openCountRes.json();
-            if (data && typeof data === "object") setOpenOrderCounts(data as Record<string, number>);
         }
     }, []);
 
@@ -880,113 +146,73 @@ export default function AlertsPage() {
         refetch().catch(console.error).finally(() => setLoading(false));
     }, [refetch]);
 
-    // ── Group by product ──
+    // ── Türetilen veriler ──
     const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
-    const activeAlerts = useMemo(() => showResolved
-        ? rawAlerts
-        : rawAlerts.filter((a) => a.status === "open" || a.status === "acknowledged"),
-    [rawAlerts, showResolved]);
-
-    const productGroups: ProductAlertGroup[] = useMemo(() => {
-        const sysAlerts = activeAlerts.filter((a) => a.source !== "ai" && a.entity_id);
-        // Sipariş bazlı alertları (quote_expired, overdue_shipment) + Paraşüt sync_issue
-        // alertlerini ürün gruplarından ayır.
-        // Faz 1 (advisor P2): Paraşüt alertleri parasut + parasut_auth entity_type
-        // VEYA bilinen entity_id whitelist'i ile eşleşmeli (parasut-oauth.ts CAS
-        // çakışmasında 'parasut_auth' kullanıyor; entity_type listesi tek kaynak değil).
-        const productSysAlerts = sysAlerts.filter((a) => {
-            if (a.entity_type === "sales_order") return false;
-            if (PARASUT_ALERT_ENTITY_TYPES.has(a.entity_type ?? "")) return false;
-            if (a.entity_id && PARASUT_SYNC_ALERT_ENTITY_IDS.has(a.entity_id)) return false;
-            return true;
-        });
-        const byProduct = new Map<string, AlertRow[]>();
-        for (const alert of productSysAlerts) {
-            const id = alert.entity_id!;
-            if (!byProduct.has(id)) byProduct.set(id, []);
-            byProduct.get(id)!.push(alert);
-        }
-
-        const groups: ProductAlertGroup[] = [];
-        for (const [entityId, alerts] of byProduct) {
-            const product   = productMap.get(entityId);
-            const isOrphaned = !product;
-            const topSev    = alerts.some((a) => a.severity === "critical") ? "critical" : "warning";
-            const available = product?.available_now ?? 0;
-            const minStock  = product?.minStockLevel  ?? 0;
-            const reserved  = product?.reserved       ?? 0;
-            const unit      = product?.unit           ?? "adet";
-            const dailyUsage= product?.dailyUsage     ?? null;
-            const covDays   = computeCoverageDays(available, dailyUsage);
-            const action    = actionFor(alerts);
-
-            groups.push({
-                entityId,
-                productName: product?.name ?? "Silinmiş Ürün",
-                sku:         product?.sku  ?? "—",
-                available,
-                minStock,
-                reserved,
-                openOrderCount: openOrderCounts[entityId] ?? 0,
-                unit,
-                coverageDays: covDays,
-                topSeverity:  topSev as "critical" | "warning",
-                alerts,
-                reason:       isOrphaned ? "Ürün silindi, uyarı geçersiz" : shortReason(alerts),
-                impact:       isOrphaned ? "Bu uyarı kapatılabilir" : shortImpact(alerts, available, reserved, unit, covDays),
-                actionLabel:  action.label,
-                actionHref:   action.href,
-                isOrphaned,
-            });
-        }
-
-        return groups.sort((a, b) => {
-            if (a.topSeverity !== b.topSeverity) return a.topSeverity === "critical" ? -1 : 1;
-            return (a.coverageDays ?? 999) - (b.coverageDays ?? 999);
-        });
-    }, [activeAlerts, productMap, openOrderCounts]);
-
-    const aiAlerts           = useMemo(() => activeAlerts.filter((a) => a.source === "ai"), [activeAlerts]);
-    const orderAlerts        = useMemo(() => activeAlerts.filter((a) => a.source !== "ai" && a.entity_type === "sales_order"), [activeAlerts]);
-    // Faz 1 (advisor P2): Paraşüt sync_issue alertleri ayrı sistem grubu — inline retry CTA.
-    // entity_type 'parasut' veya 'parasut_auth' (CAS çakışması) + bilinen entity_id whitelist.
-    // İki katmanlı kontrol (entity_type VEYA entity_id) sayesinde her iki tip kayıp olmaz.
-    const systemAlerts       = useMemo(
-        () => activeAlerts.filter((a) => {
-            if (a.source === "ai" || a.type !== "sync_issue") return false;
-            const typeMatch = PARASUT_ALERT_ENTITY_TYPES.has(a.entity_type ?? "");
-            const idMatch   = !!a.entity_id && PARASUT_SYNC_ALERT_ENTITY_IDS.has(a.entity_id);
-            return typeMatch || idMatch;
-        }),
-        [activeAlerts],
+    const calendarAlerts = useMemo(
+        () => rawAlerts.map((r) => toCalendarAlert(r, productMap)),
+        [rawAlerts, productMap],
     );
-    const criticalCount      = useMemo(() => productGroups.filter((g) => g.topSeverity === "critical").length, [productGroups]);
-    const warningCount       = useMemo(() => productGroups.filter((g) => g.topSeverity === "warning").length, [productGroups]);
-    const shortageCount      = useMemo(() => productGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage")).length, [productGroups]);
-    const quoteExpiredCount  = useMemo(() => orderAlerts.filter((a) => a.type === "quote_expired").length, [orderAlerts]);
-    const overdueCount       = useMemo(() => orderAlerts.filter((a) => a.type === "overdue_shipment").length, [orderAlerts]);
 
-    const filtered = useMemo(() => {
-        const searched = search.trim().toLowerCase();
-        const searchedGroups = searched
-            ? productGroups.filter(
-                (g) =>
-                    g.productName.toLowerCase().includes(searched) ||
-                    g.sku.toLowerCase().includes(searched)
-              )
-            : productGroups;
-        const isOrderAlertTab = activeFilter === "quote_expired" || activeFilter === "overdue_shipment";
-        if (isOrderAlertTab) return [];
-        if (activeFilter === "all")      return searchedGroups;
-        if (activeFilter === "critical") return searchedGroups.filter((g) => g.topSeverity === "critical");
-        if (activeFilter === "warning")  return searchedGroups.filter((g) => g.topSeverity === "warning");
-        return searchedGroups.filter((g) => g.alerts.some((a) => a.type === "order_shortage"));
-    }, [productGroups, search, activeFilter]);
+    const visibleAlerts = useMemo(
+        () => showResolved
+            ? calendarAlerts
+            : calendarAlerts.filter((a) => a.status === "open" || a.status === "acknowledged"),
+        [calendarAlerts, showResolved],
+    );
 
-    const isOrderAlertTab = activeFilter === "quote_expired" || activeFilter === "overdue_shipment";
+    const filteredAlerts = useMemo(() => {
+        let list = applyClassFilter(visibleAlerts, activeClass);
+        const q = search.trim().toLowerCase();
+        if (q) {
+            list = list.filter((a) =>
+                (a.product?.name.toLowerCase().includes(q)) ||
+                (a.product?.sku.toLowerCase().includes(q)) ||
+                a.title.toLowerCase().includes(q) ||
+                (a.orderCode?.toLowerCase().includes(q)),
+            );
+        }
+        return list;
+    }, [visibleAlerts, activeClass, search]);
 
-    // ── Actions ──
+    const occurrences = useMemo(() => expandAlertOccurrences(filteredAlerts), [filteredAlerts]);
+    const stats = useMemo(() => getCalendarStats(calendarAlerts), [calendarAlerts]);
+    const dayOccurrences = useMemo(
+        () => (selectedDate ? getOccurrencesForDate(occurrences, selectedDate) : []),
+        [occurrences, selectedDate],
+    );
+
+    // Drawer canlı: rawAlerts mutasyonu otomatik yansır; silinince undefined → kapanır
+    const drawerAlert = useMemo(
+        () => (drawerAlertId ? calendarAlerts.find((a) => a.id === drawerAlertId) ?? null : null),
+        [drawerAlertId, calendarAlerts],
+    );
+    useEffect(() => {
+        if (drawerAlertId && !drawerAlert) setDrawerAlertId(null);
+    }, [drawerAlertId, drawerAlert]);
+
+    // ── Navigasyon ──
+    const goPrev = useCallback(() => {
+        setViewMonth((m) => { if (m === 0) { setViewYear((y) => y - 1); return 11; } return m - 1; });
+    }, []);
+    const goNext = useCallback(() => {
+        setViewMonth((m) => { if (m === 11) { setViewYear((y) => y + 1); return 0; } return m + 1; });
+    }, []);
+    const goToday = useCallback(() => {
+        const t = new Date();
+        setViewYear(t.getFullYear());
+        setViewMonth(t.getMonth());
+        setSelectedDate(t);
+    }, []);
+    const handleSelectDate = useCallback((date: Date) => {
+        setSelectedDate(date);
+        if (date.getMonth() !== viewMonth || date.getFullYear() !== viewYear) {
+            setViewMonth(date.getMonth());
+            setViewYear(date.getFullYear());
+        }
+    }, [viewMonth, viewYear]);
+
+    // ── Aksiyonlar (mevcut davranışlar korunur) ──
     const handleRefresh = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (refreshing) return;
@@ -995,12 +221,9 @@ export default function AlertsPage() {
             const res = await fetch("/api/alerts/scan?force=true", { method: "POST" });
             if (!res.ok) throw new Error(String(res.status));
             await refetch();
-            setLastRefreshed(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }));
             toast({ type: "success", message: "Uyarılar güncellendi" });
         } catch (err) {
-            const msg = err instanceof Error && err.message === "409"
-                ? "Tarama zaten devam ediyor"
-                : "Yenileme başarısız";
+            const msg = err instanceof Error && err.message === "409" ? "Tarama zaten devam ediyor" : "Yenileme başarısız";
             toast({ type: "error", message: msg });
         } finally {
             setRefreshing(false);
@@ -1015,10 +238,7 @@ export default function AlertsPage() {
             const res = await fetch("/api/alerts/ai-suggest", { method: "POST" });
             if (!res.ok) throw new Error(String(res.status));
             const data = await res.json();
-            if (!data.aiAvailable) {
-                setAiUnavailable({ reason: "not_configured" });
-                return;
-            }
+            if (!data.aiAvailable) { setAiUnavailable({ reason: "not_configured" }); return; }
             setAiUnavailable(null);
             await refetch();
             toast({ type: "success", message: `${data.created} AI önerisi oluşturuldu` });
@@ -1033,59 +253,70 @@ export default function AlertsPage() {
         }
     };
 
+    const patchStatus = (alertId: string, status: AlertWithDueMeta["status"]) =>
+        setRawAlerts((prev) => prev.map((a) => (a.id === alertId ? { ...a, status } : a)));
+
+    const acknowledgeAlert = async (alertId: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        try {
+            const res = await fetch(`/api/alerts/${alertId}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "acknowledged" }),
+            });
+            if (!res.ok) throw new Error(String(res.status));
+            patchStatus(alertId, "acknowledged");
+            toast({ type: "success", message: "Uyarı kabul edildi" });
+        } catch { toast({ type: "error", message: "İşlem başarısız" }); }
+    };
+
     const resolveAlert = async (alertId: string) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         try {
             const res = await fetch(`/api/alerts/${alertId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                method: "PATCH", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ status: "resolved" }),
             });
             if (!res.ok) throw new Error(String(res.status));
-            const patch = (a: AlertRow) =>
-                a.id === alertId ? { ...a, status: "resolved" as const } : a;
-            setRawAlerts((prev) => prev.map(patch));
-            if (drawerGroup) setDrawerGroup({ ...drawerGroup, alerts: drawerGroup.alerts.map(patch) });
+            patchStatus(alertId, "resolved");
             toast({ type: "success", message: "Uyarı çözüldü" });
-        } catch {
-            toast({ type: "error", message: "İşlem başarısız" });
-        }
+        } catch { toast({ type: "error", message: "İşlem başarısız" }); }
     };
 
-    const dismissGroup = async (group: ProductAlertGroup) => {
+    const dismissAlert = async (alertId: string) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
-        const open = group.alerts.filter((a) => a.status === "open" || a.status === "acknowledged");
-        if (open.length === 0) return;
+        try {
+            const res = await fetch(`/api/alerts/${alertId}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "dismissed" }),
+            });
+            if (!res.ok) throw new Error(String(res.status));
+            setRawAlerts((prev) => prev.filter((a) => a.id !== alertId));
+            toast({ type: "info", message: "Uyarı yoksayıldı. 24 saat içinde durum kötüleşmezse yeniden açılmaz." });
+        } catch { toast({ type: "error", message: "İşlem başarısız" }); }
+    };
 
-        const results = await Promise.allSettled(
-            open.map(async (a) => {
-                const res = await fetch(`/api/alerts/${a.id}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ status: "dismissed" }),
-                });
-                if (!res.ok) throw new Error(String(res.status));
-                return a.id;
-            })
-        );
-
-        const succeeded = results
-            .filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled")
-            .map((r) => r.value);
+    // Toplu yoksay çekirdeği (24h bypass server-side; demo guard). Gün + ürün toplu
+    // yoksaymanın ortak motoru (eski grup-yoksay davranışı korunur).
+    const bulkDismiss = async (rawIds: string[]) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        const ids = Array.from(new Set(rawIds));
+        if (ids.length === 0) return;
+        const results = await Promise.allSettled(ids.map(async (id) => {
+            const res = await fetch(`/api/alerts/${id}`, {
+                method: "PATCH", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "dismissed" }),
+            });
+            if (!res.ok) throw new Error(String(res.status));
+            return id;
+        }));
+        const succeeded = results.filter((r): r is PromiseFulfilledResult<string> => r.status === "fulfilled").map((r) => r.value);
         const failedCount = results.filter((r) => r.status === "rejected").length;
-
         if (succeeded.length > 0) {
-            const successIds = new Set(succeeded);
-            setRawAlerts((prev) => prev.filter((a) => !successIds.has(a.id)));
-            if (drawerGroup?.entityId === group.entityId) {
-                const remaining = drawerGroup.alerts.filter((a) => !successIds.has(a.id));
-                if (remaining.length === 0) setDrawerGroup(null);
-                else setDrawerGroup({ ...drawerGroup, alerts: remaining });
-            }
+            const ok = new Set(succeeded);
+            setRawAlerts((prev) => prev.filter((a) => !ok.has(a.id)));
         }
-
         if (failedCount > 0 && succeeded.length > 0) {
-            toast({ type: "warning", message: `${succeeded.length} uyarı yoksayıldı (24 saat boyunca yeniden açılmaz). ${failedCount} işlem başarısız.` });
+            toast({ type: "warning", message: `${succeeded.length} uyarı yoksayıldı. ${failedCount} işlem başarısız.` });
         } else if (failedCount > 0) {
             toast({ type: "error", message: "Yoksayma işlemi başarısız" });
         } else {
@@ -1093,49 +324,22 @@ export default function AlertsPage() {
         }
     };
 
-    const dismissAlert = async (alertId: string) => {
-        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
-        try {
-            const res = await fetch(`/api/alerts/${alertId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "dismissed" }),
-            });
-            if (!res.ok) throw new Error(String(res.status));
-            setRawAlerts((prev) => prev.filter((a) => a.id !== alertId));
-            if (drawerGroup) {
-                const remaining = drawerGroup.alerts.filter((a) => a.id !== alertId);
-                if (remaining.length === 0) setDrawerGroup(null);
-                else setDrawerGroup({ ...drawerGroup, alerts: remaining });
-            }
-            toast({ type: "info", message: "Uyarı yoksayıldı. 24 saat içinde durum kötüleşmezse yeniden açılmaz." });
-        } catch {
-            toast({ type: "error", message: "İşlem başarısız" });
-        }
-    };
+    // Gün toplu yoksay (seçili günün tüm açık uyarıları)
+    const dismissDay = () =>
+        bulkDismiss(
+            dayOccurrences
+                .filter((o) => o.occKind === "event" && (o.status === "open" || o.status === "acknowledged"))
+                .map((o) => o.id),
+        );
 
-    const acknowledgeAlert = async (alertId: string) => {
-        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
-        try {
-            const res = await fetch(`/api/alerts/${alertId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: "acknowledged" }),
-            });
-            if (!res.ok) throw new Error(String(res.status));
-            const patch = (a: AlertRow) =>
-                a.id === alertId ? { ...a, status: "acknowledged" as const } : a;
-            setRawAlerts((prev) => prev.map(patch));
-            if (drawerGroup) setDrawerGroup({ ...drawerGroup, alerts: drawerGroup.alerts.map(patch) });
-            toast({ type: "success", message: "Uyarı kabul edildi" });
-        } catch {
-            toast({ type: "error", message: "İşlem başarısız" });
-        }
-    };
+    // Ürün-bazlı toplu yoksay (bir ürünün TÜM açık uyarıları — eski grup-yoksay paritesi)
+    const dismissProduct = (entityId: string) =>
+        bulkDismiss(
+            rawAlerts
+                .filter((a) => a.entity_id === entityId && (a.status === "open" || a.status === "acknowledged"))
+                .map((a) => a.id),
+        );
 
-    // Faz 1: sync_issue alert için Paraşüt retry tetikleme (oauth refresh veya sync-all dispatch'i
-    // backend'de). Başarı: alert'i optimistic resolved düşür + toast.
-    const [syncRetrying, setSyncRetrying] = useState<string | null>(null);
     const retrySyncAlert = async (alertId: string) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (syncRetrying) return;
@@ -1146,64 +350,25 @@ export default function AlertsPage() {
                 const body = await res.json().catch(() => ({}));
                 throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
             }
-            setRawAlerts((prev) => prev.map((a) =>
-                a.id === alertId ? { ...a, status: "resolved" as const } : a
-            ));
+            patchStatus(alertId, "resolved");
             toast({ type: "success", message: "Paraşüt yeniden senkronize edildi, uyarı kapatıldı." });
         } catch (e) {
-            toast({
-                type: "error",
-                message: e instanceof Error ? e.message : "Yeniden deneme başarısız.",
-            });
+            toast({ type: "error", message: e instanceof Error ? e.message : "Yeniden deneme başarısız." });
         } finally {
             setSyncRetrying(null);
         }
     };
 
-    // ── Render ────────────────────────────────────────────────
+    const openDrawer = (occ: Occurrence) => setDrawerAlertId(occ.id);
+
+    const dayHasOpen = dayOccurrences.some(
+        (o) => o.occKind === "event" && (o.status === "open" || o.status === "acknowledged"),
+    );
+
+    if (loading) return <LoadingState message="Uyarılar yükleniyor..." />;
 
     return (
         <div style={pageRootStyle}>
-
-            {/* ── Header ── */}
-            <div style={headerContainerStyle}>
-                <div>
-                    <h1 style={headerTitleStyle}>
-                        Üretim & Stok Uyarıları
-                    </h1>
-                    <div style={headerSubtitleStyle}>
-                        Son tarama: {lastRefreshed}
-                    </div>
-                </div>
-                <div style={headerButtonRowStyle}>
-                    <button
-                        onClick={handleAiSuggest}
-                        disabled={isDemo || aiGenerating}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                        style={{
-                            ...headerAiButtonBaseStyle,
-                            cursor: isDemo || aiGenerating ? "not-allowed" : "pointer",
-                            opacity: isDemo || aiGenerating ? 0.6 : 1,
-                        }}
-                    >
-                        {aiGenerating ? "Analiz..." : "✦ AI Analiz"}
-                    </button>
-                    <button
-                        onClick={handleRefresh}
-                        disabled={isDemo || refreshing}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                        style={{
-                            ...headerRefreshButtonBaseStyle,
-                            cursor: isDemo || refreshing ? "not-allowed" : "pointer",
-                            opacity: isDemo || refreshing ? 0.6 : 1,
-                        }}
-                    >
-                        {refreshing ? "Yükleniyor..." : "↻ Tara"}
-                    </button>
-                </div>
-            </div>
-
-            {/* ── AI Unavailable Banner (Sprint A G3) ── */}
             {aiUnavailable && (
                 <AiUnavailableBanner
                     message={
@@ -1214,1754 +379,125 @@ export default function AlertsPage() {
                     onRetry={aiUnavailable.reason === "error" ? handleAiSuggest : undefined}
                     retryDisabled={aiGenerating}
                     onClose={() => setAiUnavailable(null)}
-                    style={aiUnavailableBannerStyle}
+                    style={{ marginBottom: "12px" }}
                 />
             )}
 
-            {/* ── Filter Tabs ── */}
-            <div style={{
-                borderBottom: isMobile ? "none" : "0.5px solid var(--border-tertiary)",
-            }}>
-                <div style={{
-                    ...tabsInnerRowBaseStyle,
-                    justifyContent: isMobile ? undefined : "space-between",
-                    borderBottom: isMobile ? "0.5px solid var(--border-tertiary)" : "none",
-                    overflowX: isMobile ? "auto" : undefined,
-                    scrollbarWidth: "none",
-                    WebkitOverflowScrolling: "touch",
-                }}>
-                    <div style={tabsButtonGroupStyle}>
-                        {(
-                            [
-                                { key: "all"              as AlertFilter, label: "Tümü",             count: productGroups.length, dot: null                },
-                                { key: "critical"         as AlertFilter, label: "Kritik",            count: criticalCount,        dot: "var(--danger)"     },
-                                { key: "warning"          as AlertFilter, label: "Uyarı",             count: warningCount,         dot: "var(--warning)"    },
-                                { key: "order_shortage"   as AlertFilter, label: "Sipariş Eksik",     count: shortageCount,        dot: "var(--danger)"     },
-                                { key: "quote_expired"    as AlertFilter, label: "Teklif Süresi",     count: quoteExpiredCount,    dot: "var(--warning)"    },
-                                { key: "overdue_shipment" as AlertFilter, label: "Geciken Sevkiyat",  count: overdueCount,         dot: "var(--danger)"     },
-                            ]
-                        ).map((tab) => (
-                            <button
-                                key={tab.key}
-                                onClick={() => setActiveFilter(tab.key)}
-                                style={{
-                                    ...tabButtonBaseStyle,
-                                    borderBottom: activeFilter === tab.key ? "2px solid var(--accent)" : "2px solid transparent",
-                                    color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-secondary)",
-                                    fontWeight: activeFilter === tab.key ? 500 : 400,
-                                }}
-                            >
-                                {tab.dot && (
-                                    <span style={{ ...tabButtonDotBaseStyle, background: tab.dot }} />
-                                )}
-                                {tab.label}
-                                {tab.count > 0 && (
-                                    <span style={{
-                                        ...tabButtonCountBaseStyle,
-                                        background: activeFilter === tab.key ? "var(--accent-bg)" : "var(--bg-tertiary)",
-                                        color: activeFilter === tab.key ? "var(--accent-text)" : "var(--text-tertiary)",
-                                    }}>
-                                        {tab.count}
-                                    </span>
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                    {!isMobile && (
-                        <div style={tabsRightGroupStyle}>
+            <div style={layoutStyle} className="alerts-calendar-layout">
+                {/* Takvim ana kolon */}
+                <div style={{ display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden" }}>
+                    <CalendarHeader
+                        year={viewYear}
+                        month={viewMonth}
+                        onPrev={goPrev}
+                        onNext={goNext}
+                        onToday={goToday}
+                        stats={stats}
+                        onRefresh={handleRefresh}
+                        refreshing={refreshing}
+                        onAiSuggest={handleAiSuggest}
+                        aiGenerating={aiGenerating}
+                    />
+
+                    <div style={controlsRowStyle}>
+                        <ClassificationTabs activeClass={activeClass} onSelect={setActiveClass} visibleAlerts={visibleAlerts} />
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0, paddingBottom: "14px" }}>
                             <input
-                                type="text"
+                                type="search"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
-                                placeholder="Ürün adı veya SKU..."
-                                style={tabSearchInputStyle}
+                                placeholder="Ara…"
+                                aria-label="Uyarılarda ara"
+                                style={searchStyle}
                             />
-                            <button
-                                onClick={() => setShowResolved((v) => !v)}
-                                style={{
-                                    ...showResolvedButtonBaseStyle,
-                                    background: showResolved ? "var(--bg-tertiary)" : "transparent",
-                                    color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
-                                }}
-                            >
-                                {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
+                            <label style={toggleLabelStyle}>
+                                <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} aria-label="Çözülenleri göster" />
+                                Çözülenler
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+                        <CalendarGrid
+                            year={viewYear}
+                            month={viewMonth}
+                            occurrences={occurrences}
+                            selectedDate={selectedDate}
+                            onSelectDate={handleSelectDate}
+                        />
+                    </div>
+                </div>
+
+                {/* Gün detay paneli */}
+                <div style={dayPanelStyle} className="alerts-day-panel">
+                    {dayHasOpen && (
+                        <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 20px 0" }}>
+                            <button type="button" onClick={dismissDay} disabled={isDemo} style={dismissDayBtnStyle}>
+                                Günü Yoksay
                             </button>
                         </div>
                     )}
+                    <DayDetailPanel
+                        selectedDate={selectedDate}
+                        occurrences={dayOccurrences}
+                        onDetail={openDrawer}
+                        onDismiss={dismissAlert}
+                    />
                 </div>
-                {isMobile && (
-                    <div style={tabMobileWrapperStyle}>
-                        <button
-                            onClick={() => setShowResolved((v) => !v)}
-                            style={{
-                                ...showResolvedButtonBaseStyle,
-                                background: showResolved ? "var(--bg-tertiary)" : "transparent",
-                                color: showResolved ? "var(--text-secondary)" : "var(--text-tertiary)",
-                            }}
-                        >
-                            {showResolved ? "✓ Çözülenleri göster" : "Çözülenleri göster"}
-                        </button>
-                    </div>
-                )}
             </div>
 
-            {/* ── System (Paraşüt) Alerts ── */}
-            {/* Faz 1: sync_issue alertleri tüm sekmelerde her zaman tepede görünür —
-                tıkla-tıkla retry'ı drawer'a sokmadan öne çıkarır. Yalnızca
-                showResolved=false durumunda 'open/acknowledged' alertleri filtrelenir
-                (activeAlerts zaten o filtreyi uyguluyor). */}
-            {!loading && systemAlerts.length > 0 && !isOrderAlertTab && (
-                <div style={systemAlertsContainerStyle}>
-                    <div style={systemAlertsHeaderStyle}>
-                        Paraşüt Sync Uyarıları ({systemAlerts.length})
-                    </div>
-                    {systemAlerts.map((alert) => (
-                        <SystemAlertCard
-                            key={alert.id}
-                            alert={alert}
-                            isDemo={isDemo}
-                            retrying={syncRetrying === alert.id}
-                            onRetry={retrySyncAlert}
-                            onDismiss={dismissAlert}
-                        />
-                    ))}
-                </div>
-            )}
-
-            {/* ── Product Alert Table ── */}
-            {loading ? (
-                <LoadingState message="Uyarılar yükleniyor..." />
-            ) : isOrderAlertTab ? (
-                /* ── Sipariş Uyarıları Section ── */
-                (() => {
-                    const visibleOrderAlerts = orderAlerts.filter((a) => a.type === activeFilter);
-                    return visibleOrderAlerts.length === 0 ? (
-                        <EmptyState
-                            title={activeFilter === "quote_expired" ? "Süresi dolmuş teklif yok" : "Geciken sevkiyat yok"}
-                            description={activeFilter === "quote_expired" ? "Tüm tekliflerin geçerlilik tarihi uygun." : "Tüm onaylı siparişler zamanında sevk edilmiş."}
-                        />
-                    ) : (
-                        <div>
-                            {visibleOrderAlerts.map((alert) => (
-                                <OrderAlertRow
-                                    key={alert.id}
-                                    alert={alert}
-                                    isDemo={isDemo}
-                                    onOpenDrawer={setDrawerOrderAlert}
-                                    onExtended={() => {
-                                        // Süre uzatıldı → bu alert'i UI'dan resolved olarak düş
-                                        setRawAlerts((prev) => prev.map((a) =>
-                                            a.id === alert.id ? { ...a, status: "resolved" as const } : a
-                                        ));
-                                        toast({ type: "success", message: "Teklif süresi güncellendi ve uyarı kapatıldı." });
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    );
-                })()
-            ) : productGroups.length === 0 ? (
-                <EmptyState
-                    title="Tüm ürünler sağlıklı"
-                    description="Stok veya sipariş kaynaklı uyarı bulunmuyor."
-                    action={{ label: "↻ Şimdi Tara", onClick: handleRefresh }}
-                />
-            ) : filtered.length === 0 ? (
-                <EmptyState
-                    title={
-                        activeFilter === "critical"       ? "Kritik uyarı yok" :
-                        activeFilter === "warning"        ? "Uyarı seviyesinde ürün yok" :
-                        activeFilter === "order_shortage" ? "Sipariş eksik yok" :
-                        "Bu filtrede uyarı yok"
-                    }
-                    description={
-                        activeFilter === "critical"       ? "Tüm ürünler güvenli stok seviyesinde." :
-                        activeFilter === "warning"        ? "Şu an uyarı eşiğini geçen ürün yok." :
-                        activeFilter === "order_shortage" ? "Tüm siparişler mevcut stokla karşılanabiliyor." :
-                        "Farklı bir filtre seçin veya tümünü görün."
-                    }
-                />
-            ) : (
-                <div>
-                    {/* Column headers — desktop only */}
-                    {!isMobile && (
-                        <div style={{
-                            display: "grid",
-                            gridTemplateColumns: "3px 1fr 170px 120px 80px 148px 110px",
-                            alignItems: "center",
-                            borderBottom: "0.5px solid var(--border-tertiary)",
-                        }}>
-                            <div />
-                            {[
-                                { label: "ÜRÜN",            pad: "8px 16px", tooltip: undefined },
-                                { label: "NEDEN",           pad: "8px 12px", tooltip: undefined },
-                                { label: "ETKİ",            pad: "8px 12px", tooltip: undefined },
-                                { label: "Açık Sipariş",   pad: "8px 12px", tooltip: "Onaylı ve henüz sevk edilmemiş sipariş sayısı" },
-                                { label: "ÖNERİLEN ADIM",  pad: "8px 12px", tooltip: undefined },
-                                { label: "",               pad: "8px 12px", tooltip: undefined },
-                            ].map(({ label, pad, tooltip }) => (
-                                <div key={label || "_actions"} title={tooltip} style={{
-                                    padding: pad,
-                                    fontSize: "10px",
-                                    color: "var(--text-tertiary)",
-                                    fontWeight: 600,
-                                    letterSpacing: "0.06em",
-                                    cursor: tooltip ? "help" : undefined,
-                                }}>
-                                    {label}
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    {/* Rows */}
-                    {filtered.map((group) => (
-                        <ProductRow
-                            key={group.entityId}
-                            group={group}
-                            onOpenDrawer={() => setDrawerGroup(group)}
-                            onDismissGroup={() => dismissGroup(group)}
-                            isMobile={isMobile}
-                        />
-                    ))}
-                </div>
-            )}
-
-            {/* ── AI Alerts Section ── */}
-            <div style={aiSectionContainerStyle}>
-                <div style={aiSectionHeaderStyle}>
-                    <span style={aiSectionTitleStyle}>
-                        ✦ AI Önerileri
-                    </span>
-                    {aiAlerts.length === 0 && (
-                        <button
-                            onClick={handleAiSuggest}
-                            disabled={isDemo || aiGenerating}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                            style={{
-                                ...aiAnalysisStartButtonBaseStyle,
-                                cursor: isDemo || aiGenerating ? "not-allowed" : "pointer",
-                                opacity: isDemo || aiGenerating ? 0.6 : 1,
-                            }}
-                        >
-                            {aiGenerating ? "Analiz..." : "Analizi Başlat"}
-                        </button>
-                    )}
-                </div>
-
-                {aiAlerts.length === 0 ? (
-                    <div style={aiSectionEmptyTextWrapperStyle}>
-                        <span style={aiSectionEmptyTextStyle}>
-                            Henüz çalıştırılmadı — stok riski, sipariş anomalileri ve tedarik boşluklarını analiz eder.
-                        </span>
-                    </div>
-                ) : (
-                    <div style={aiAlertsListStyle}>
-                        {/* G7 — Genel durum özeti (tüm insight'lar için aynı; tek sefer gösterilir) */}
-                        {aiAlerts[0]?.description && (
-                            <div style={aiOverallSummaryStyle}>
-                                <span style={aiOverallSummaryLabelStyle}>Genel durum:</span>
-                                {aiAlerts[0].description}
-                            </div>
-                        )}
-                        {aiAlerts.map((alert) => {
-                            const confidencePct = alert.ai_confidence != null
-                                ? Math.round(alert.ai_confidence * 100)
-                                : null;
-                            return (
-                                <div key={alert.id} style={aiAlertRowStyle}>
-                                    <span style={aiBadgePillStyle}>
-                                        AI
-                                    </span>
-                                    <span style={aiAlertTitleStyle}>
-                                        {alert.title}
-                                    </span>
-                                    {confidencePct !== null && (
-                                        <span
-                                            title="AI'ın bu öneriye olan güveni"
-                                            style={aiAlertConfidenceStyle}
-                                        >
-                                            %{confidencePct}
-                                        </span>
-                                    )}
-                                    <span style={aiAlertRelTimeStyle}>
-                                        {formatRelTime(alert.created_at)}
-                                    </span>
-                                    <button
-                                        onClick={() => setDrawerAiAlert(alert)}
-                                        style={aiAlertDetailButtonStyle}
-                                    >
-                                        Detay
-                                    </button>
-                                </div>
-                            );
-                        })}
-                        {aiAlerts[0]?.ai_model_version && (
-                            <div style={aiAlertModelStyle}>
-                                Model: {aiAlerts[0].ai_model_version}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-
-            {/* ── Detail Drawer ── */}
-            {drawerGroup && (
-                <AlertDetailDrawer
-                    group={drawerGroup}
-                    onClose={() => setDrawerGroup(null)}
-                    onDismiss={dismissAlert}
+            {drawerAlert && (
+                <AlertCalendarDrawer
+                    alert={drawerAlert}
+                    onClose={() => setDrawerAlertId(null)}
                     onAcknowledge={acknowledgeAlert}
                     onResolve={resolveAlert}
-                />
-            )}
-
-            {/* ── G6: Sipariş Uyarısı Drawer ── */}
-            {drawerOrderAlert && (
-                <OrderAlertDrawer
-                    alert={drawerOrderAlert}
+                    onDismiss={dismissAlert}
+                    onSyncRetry={retrySyncAlert}
+                    onDismissProduct={dismissProduct}
                     isDemo={isDemo}
-                    onClose={() => setDrawerOrderAlert(null)}
-                    onExtended={() => {
-                        setRawAlerts((prev) => prev.map((a) =>
-                            a.id === drawerOrderAlert.id ? { ...a, status: "resolved" as const } : a
-                        ));
-                        setDrawerOrderAlert(null);
-                        toast({ type: "success", message: "Teklif süresi güncellendi ve uyarı kapatıldı." });
-                    }}
-                    onShipped={() => {
-                        setRawAlerts((prev) => prev.map((a) =>
-                            a.id === drawerOrderAlert.id ? { ...a, status: "resolved" as const } : a
-                        ));
-                        setDrawerOrderAlert(null);
-                        toast({ type: "success", message: "Sevkiyat kaydedildi ve uyarı kapatıldı." });
-                    }}
-                />
-            )}
-
-            {/* ── G7: AI Uyarısı Drawer ── */}
-            {drawerAiAlert && (
-                <AiAlertDrawer
-                    alert={drawerAiAlert}
-                    onClose={() => setDrawerAiAlert(null)}
+                    syncRetrying={syncRetrying === drawerAlert.id}
                 />
             )}
         </div>
     );
 }
 
-// ── OrderAlertRow ────────────────────────────────────────────
-// Sipariş bazlı uyarı satırı. quote_expired için inline "Süreyi Uzat" formu içerir.
-
-interface OrderAlertRowProps {
-    alert: AlertRow;
-    isDemo: boolean;
-    onExtended: () => void;
-    onOpenDrawer: (alert: AlertRow) => void;
-}
-
-function OrderAlertRow({ alert, isDemo, onExtended, onOpenDrawer }: OrderAlertRowProps) {
-    const [extending, setExtending] = useState(false);
-    const [showExtend, setShowExtend] = useState(false);
-    const [newDate, setNewDate] = useState(() => {
-        const d = new Date();
-        d.setDate(d.getDate() + 30);
-        return d.toISOString().slice(0, 10);
-    });
-    const [error, setError] = useState<string | null>(null);
-    const isQuoteExpired = alert.type === "quote_expired";
-    const todayStr = new Date().toISOString().slice(0, 10);
-
-    const handleExtend = async () => {
-        if (isDemo || extending) return;
-        if (!newDate || newDate < todayStr) {
-            setError("Lütfen bugünden ileri bir tarih seçin.");
-            return;
-        }
-        setExtending(true);
-        setError(null);
-        try {
-            const res = await fetch(`/api/orders/${alert.entity_id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ quote_valid_until: newDate }),
-            });
-            if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                throw new Error(body.error || `HTTP ${res.status}`);
-            }
-            onExtended();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : "Süre uzatılamadı.");
-        } finally {
-            setExtending(false);
-        }
-    };
-
-    return (
-        <div style={alertRowWrapperStyle}>
-            <div style={alertRowFlexRowStyle}>
-                <div style={alertRowMainColStyle}>
-                    <div style={alertRowTitleStyle}>
-                        {alert.title}
-                    </div>
-                    {alert.description && (
-                        <div style={alertRowDescStyle}>
-                            {alert.description}
-                        </div>
-                    )}
-                    <div style={alertRowMetaStyle}>
-                        {new Date(alert.created_at).toLocaleDateString("tr-TR")}
-                    </div>
-                </div>
-                <div style={alertRowActionsColStyle}>
-                    {isQuoteExpired && !showExtend && (
-                        <button
-                            onClick={() => setShowExtend(true)}
-                            disabled={isDemo}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Teklifin geçerlilik süresini uzat"}
-                            style={{
-                                ...orderAlertExtendOpenButtonBaseStyle,
-                                cursor: isDemo ? "not-allowed" : "pointer",
-                                opacity: isDemo ? 0.6 : 1,
-                            }}
-                        >
-                            Süreyi Uzat
-                        </button>
-                    )}
-                    <button
-                        onClick={() => onOpenDrawer(alert)}
-                        style={alertRowDetailButtonStyle}
-                    >
-                        Detay
-                    </button>
-                    {alert.entity_id && (
-                        <Link
-                            href={`/dashboard/orders/${alert.entity_id}`}
-                            style={alertRowOrderLinkStyle}
-                        >
-                            Siparişe Git →
-                        </Link>
-                    )}
-                </div>
-            </div>
-            {isQuoteExpired && showExtend && (
-                <div style={extendFormContainerStyle}>
-                    <label style={extendFormLabelStyle}>
-                        YENİ GEÇERLİLİK TARİHİ
-                    </label>
-                    <div style={extendFormControlsRowStyle}>
-                        <input
-                            type="date"
-                            value={newDate}
-                            min={todayStr}
-                            onChange={(e) => { setNewDate(e.target.value); setError(null); }}
-                            disabled={extending}
-                            style={extendFormDateInputStyle}
-                        />
-                        <button
-                            onClick={handleExtend}
-                            disabled={isDemo || extending}
-                            style={{
-                                ...orderAlertExtendSaveButtonBaseStyle,
-                                cursor: isDemo || extending ? "not-allowed" : "pointer",
-                                opacity: isDemo || extending ? 0.6 : 1,
-                            }}
-                        >
-                            {extending ? "Kaydediliyor..." : "Kaydet"}
-                        </button>
-                        <button
-                            onClick={() => { setShowExtend(false); setError(null); }}
-                            disabled={extending}
-                            style={{
-                                ...orderAlertExtendCancelButtonBaseStyle,
-                                cursor: extending ? "not-allowed" : "pointer",
-                            }}
-                        >
-                            Vazgeç
-                        </button>
-                    </div>
-                    {error && (
-                        <div style={extendFormErrorStyle}>
-                            {error}
-                        </div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-}
-
-// ── SystemAlertCard ───────────────────────────────────────────
-// Faz 1: Paraşüt sync_issue alertleri için inline kart — "Yeniden Dene" CTA + hata
-// detayı + Paraşüt sayfa linki. quote_expired drawer-içi-form paterniyle paralel.
-
-interface SystemAlertCardProps {
-    alert: AlertRow;
-    isDemo: boolean;
-    retrying: boolean;
-    onRetry: (alertId: string) => void;
-    onDismiss: (alertId: string) => void;
-}
-
-function SystemAlertCard({ alert, isDemo, retrying, onRetry, onDismiss }: SystemAlertCardProps) {
-    const sev = SEV[alert.severity as Severity] ?? SEV.warning;
-    const sevKey: Severity = (alert.severity as Severity) in SEV ? (alert.severity as Severity) : "warning";
-    return (
-        <div style={alertRowWrapperStyle}>
-            <div style={alertRowFlexRowStyle}>
-                <div style={alertRowMainColStyle}>
-                    <div style={systemAlertHeaderRowStyle}>
-                        <span style={SEV_BADGE_PILL_STYLES[sevKey]}>{sev.label}</span>
-                        <span style={systemAlertParaSutLabelStyle}>PARAŞÜT</span>
-                    </div>
-                    <div style={alertRowTitleStyle}>
-                        {alert.title}
-                    </div>
-                    {alert.description && (
-                        <div style={alertRowDescStyle}>
-                            {alert.description}
-                        </div>
-                    )}
-                    <div style={alertRowMetaStyle}>
-                        {formatRelTime(alert.created_at)}
-                    </div>
-                </div>
-                <div style={alertRowActionsColStyle}>
-                    <button
-                        onClick={() => onRetry(alert.id)}
-                        disabled={isDemo || retrying}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Paraşüt senkronizasyonunu yeniden dene"}
-                        style={{
-                            ...systemAlertRetryButtonBaseStyle,
-                            cursor: (isDemo || retrying) ? "not-allowed" : "pointer",
-                            opacity: (isDemo || retrying) ? 0.6 : 1,
-                        }}
-                    >
-                        {retrying ? "Deneniyor…" : "↻ Yeniden Dene"}
-                    </button>
-                    <Link
-                        href="/dashboard/parasut"
-                        style={systemAlertParaSutLinkStyle}
-                    >
-                        Paraşüt sayfasına git
-                    </Link>
-                    <button
-                        onClick={() => onDismiss(alert.id)}
-                        disabled={isDemo}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Bu uyarıyı yoksay"}
-                        style={{
-                            ...systemAlertDismissButtonBaseStyle,
-                            cursor: isDemo ? "not-allowed" : "pointer",
-                            opacity: isDemo ? 0.6 : 1,
-                        }}
-                    >
-                        Yoksay
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-// ── ProductRow ────────────────────────────────────────────────
-
-interface ProductRowProps {
-    group: ProductAlertGroup;
-    onOpenDrawer: () => void;
-    onDismissGroup: () => void;
-    isMobile: boolean;
-}
-
-function ProductRow({ group, onOpenDrawer, onDismissGroup, isMobile }: ProductRowProps) {
-    const sev      = SEV[group.topSeverity];
-    const isAllAck = group.alerts.every((a) => a.status === "acknowledged" || a.status === "resolved" || a.status === "dismissed");
-    const covDays  = group.coverageDays;
-
-    // ── Mobile card layout ──
-    if (isMobile) {
-        return (
-            <div
-                style={{
-                    ...productRowMobileWrapperBaseStyle,
-                    opacity: isAllAck ? 0.6 : 1,
-                }}
-            >
-                {/* Severity stripe */}
-                <div style={{ ...productRowMobileStripeBaseStyle, background: sev.dot }} />
-
-                {/* Card content */}
-                <div style={productRowMobileCardStyle}>
-                    {/* Row 1: severity badge + product name */}
-                    <div style={productRowSevRowStyle}>
-                        <span style={SEV_BADGE_PILL_STYLES[group.topSeverity]}>
-                            {sev.label}
-                        </span>
-                        <span style={productRowNameStyle}>
-                            {group.productName}
-                        </span>
-                    </div>
-
-                    {/* Row 2: SKU + coverage */}
-                    <div style={productRowSkuRowStyle}>
-                        <span style={productRowSkuStyle}>
-                            {group.sku}
-                        </span>
-                        {covDays !== null && (
-                            <span style={{ fontSize: "10px", fontWeight: 600, color: daysColor(covDays) }}>
-                                ~{covDays}g
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Row 3: reason */}
-                    <span style={productRowReasonStyle}>
-                        {group.reason}
-                    </span>
-
-                    {/* Row 4: impact */}
-                    <span style={{
-                        fontSize: "12px", fontWeight: 600,
-                        color: group.topSeverity === "critical" ? "var(--danger-text)" : "var(--warning-text)",
-                    }}>
-                        {group.impact}
-                    </span>
-
-                    {/* Row 5: actions */}
-                    <div style={productRowActionsRowStyle}>
-                        <Link
-                            href={group.actionHref}
-                            style={{
-                                fontSize: "12px", fontWeight: 500,
-                                padding: "5px 12px", borderRadius: "4px",
-                                background: sev.bg, color: sev.text,
-                                border: `0.5px solid ${sev.border}`,
-                                textDecoration: "none", whiteSpace: "nowrap",
-                            }}
-                        >
-                            {group.actionLabel} →
-                        </Link>
-                        <button
-                            onClick={onOpenDrawer}
-                            aria-label={`${group.productName} detayını aç`}
-                            style={productRowDetailButtonStyle}
-                        >
-                            Detay
-                        </button>
-                        {!isAllAck ? (
-                            <button
-                                onClick={onDismissGroup}
-                                aria-label={`${group.productName} uyarılarını yoksay`}
-                                title="Tüm uyarıları yoksay"
-                                style={productRowMobileDismissButtonStyle}
-                            >
-                                ×
-                            </button>
-                        ) : (
-                            <span style={productRowSeenLabelStyle}>Görüldü</span>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    // ── Desktop grid layout ──
-    return (
-        <div
-            style={{
-                ...productRowDesktopWrapperBaseStyle,
-                opacity: isAllAck ? 0.6 : 1,
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--bg-secondary)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
-        >
-            {/* Severity stripe */}
-            <div style={{ ...productRowDesktopStripeBaseStyle, background: sev.dot }} />
-
-            {/* Product */}
-            <div style={productRowDesktopCellStyle}>
-                <div style={{ ...productRowSevRowStyle, marginBottom: "3px" }}>
-                    <span style={SEV_BADGE_PILL_STYLES[group.topSeverity]}>
-                        {sev.label}
-                    </span>
-                    <span style={productRowNameStyle}>
-                        {group.productName}
-                    </span>
-                </div>
-                <div style={productRowSkuRowStyle}>
-                    <span style={productRowSkuStyle}>
-                        {group.sku}
-                    </span>
-                    {covDays !== null && (
-                        <span style={{ fontSize: "10px", fontWeight: 600, color: daysColor(covDays) }}>
-                            ~{covDays}g
-                        </span>
-                    )}
-                </div>
-            </div>
-
-            {/* Reason */}
-            <div style={productRowReasonCellStyle}>
-                <span style={productRowReasonTextStyle}>
-                    {group.reason}
-                </span>
-            </div>
-
-            {/* Impact */}
-            <div style={productRowReasonCellStyle}>
-                <span style={{
-                    fontSize: "12px", fontWeight: 600,
-                    color: group.topSeverity === "critical" ? "var(--danger-text)" : "var(--warning-text)",
-                }}>
-                    {group.impact}
-                </span>
-            </div>
-
-            {/* Açık Sipariş — onaylı + sevk edilmemiş sipariş sayısı */}
-            <div style={productRowOpenOrderCellStyle}
-                title="Bu ürün için onaylı ve henüz sevk edilmemiş sipariş sayısı">
-                <span style={{
-                    fontSize: "13px", fontWeight: 600,
-                    color: group.openOrderCount > 0 ? "var(--accent-text)" : "var(--text-tertiary)",
-                }}>
-                    {group.openOrderCount}
-                </span>
-            </div>
-
-            {/* Recommended action */}
-            <div style={productRowActionLinkCellStyle}>
-                <Link
-                    href={group.actionHref}
-                    style={{
-                        fontSize: "12px", fontWeight: 500,
-                        padding: "4px 10px", borderRadius: "4px",
-                        background: sev.bg, color: sev.text,
-                        border: `0.5px solid ${sev.border}`,
-                        textDecoration: "none", display: "inline-block",
-                        whiteSpace: "nowrap",
-                    }}
-                >
-                    {group.actionLabel} →
-                </Link>
-            </div>
-
-            {/* Quick actions */}
-            <div style={productRowQuickActionsCellStyle}>
-                <button
-                    onClick={onOpenDrawer}
-                    aria-label={`${group.productName} detayını aç`}
-                    style={productRowDesktopDetailButtonStyle}
-                >
-                    Detay
-                </button>
-                {!isAllAck ? (
-                    <button
-                        onClick={onDismissGroup}
-                        aria-label={`${group.productName} uyarılarını yoksay`}
-                        title="Tüm uyarıları yoksay"
-                        style={productRowDesktopDismissButtonStyle}
-                    >
-                        ×
-                    </button>
-                ) : (
-                    <span style={productRowDesktopSeenLabelStyle}>
-                        Görüldü
-                    </span>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// ── Drawer helpers ────────────────────────────────────────────
-
-function drawerDetailedReason(group: ProductAlertGroup): string {
-    const types = group.alerts.map((a) => a.type);
-    if (types.includes("order_shortage")) {
-        const qty = extractShortageQty(group.alerts);
-        return qty !== null
-            ? `Onaylı sipariş için ${qty} ${group.unit} eksik — mevcut stok yetersiz.`
-            : "Onaylı sipariş stokla karşılanamıyor.";
-    }
-    if (types.includes("stock_critical")) {
-        return `Mevcut stok (${group.available} ${group.unit}), minimum güvenlik seviyesi olan ${group.minStock} ${group.unit} altına indi.`;
-    }
-    if (types.includes("stock_risk")) {
-        return `Mevcut stok (${group.available} ${group.unit}), uyarı eşiğine yaklaştı (min: ${group.minStock} ${group.unit}). Kısa vadede kritik seviyeye düşme riski var.`;
-    }
-    return `Bu ürün için stok riski tespit edildi. Mevcut: ${group.available} ${group.unit}, minimum: ${group.minStock} ${group.unit}.`;
-}
-
-function drawerDetailedImpact(group: ProductAlertGroup): string {
-    const types = group.alerts.map((a) => a.type);
-    if (types.includes("order_shortage")) {
-        const qty = extractShortageQty(group.alerts);
-        return qty !== null
-            ? `${qty} ${group.unit} eksik. Onaylı siparişler tam karşılanamıyor. Teslimatta gecikme veya kısmi sevkiyat riski var.`
-            : "Onaylı siparişler tam karşılanamıyor. Teslimatta gecikme riski var.";
-    }
-    const { coverageDays } = group;
-    if (coverageDays === 0) return "Stok tükendi. Mevcut siparişler karşılanamıyor.";
-    if (coverageDays !== null && coverageDays <= 7) return `~${coverageDays} gün içinde stok tükeniyor. Acil satın alma yapılmalı.`;
-    if (coverageDays !== null) {
-        if (group.topSeverity === "critical") return `Stok minimum seviyenin altında. ~${coverageDays} günlük kullanım kapasitesi var.`;
-        return `~${coverageDays} günlük stok var — yakında minimum seviyeye düşebilir.`;
-    }
-    return "Stok minimum seviyenin altında. Yeni siparişler tam karşılanamayabilir.";
-}
-
-function drawerActionLinks(group: ProductAlertGroup): Array<{ label: string; href: string; primary: boolean; newTab?: boolean }> {
-    const types = group.alerts.map((a) => a.type);
-    if (types.includes("order_shortage")) {
-        // Faz 10 §9.4.4: iki yönlendirme — üretim emri (yeni sekme) + satın alma.
-        // "Kısmi sevk planla" inline değil — İLGİLİ SİPARİŞLER bölümünde her sipariş
-        // ayrı "Siparişe git" link'i ile sunulur (drawer "tek başına yeterli bilgi" DoD).
-        const qty = extractShortageQty(group.alerts);
-        const qtyParam = qty != null && qty > 0 ? `&qty=${qty}` : "";
-        return [
-            {
-                label: "Üretim emri başlat (yeni sekmede)",
-                href: `/dashboard/production?productId=${group.entityId}${qtyParam}`,
-                primary: true,
-                newTab: true,
-            },
-            { label: "Satın alma planla", href: "/dashboard/purchase/suggested", primary: false },
-        ];
-    }
-    if (types.includes("stock_critical")) return [
-        { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: true  },
-        { label: "Siparişleri incele",      href: "/dashboard/orders",              primary: false },
-    ];
-    return [
-        { label: "Satın alma planla",      href: "/dashboard/purchase/suggested",  primary: true  },
-    ];
-}
-
-function drawerRelatedLinks(group: ProductAlertGroup): Array<{ label: string; href: string }> {
-    const types = group.alerts.map((a) => a.type);
-    const productHref = `/dashboard/products?highlight=${group.entityId}`;
-    // order_shortage: Önerilen Aksiyon'da zaten /orders (primary) ve /purchase/suggested (secondary) var.
-    // Tekrar eden linkleri İlgili Kayıtlar'dan çıkar; sadece ürün kartı göster.
-    if (types.includes("order_shortage")) {
-        return [
-            { label: "Ürün kartına git", href: productHref },
-        ];
-    }
-    return [
-        { label: "Ürün kartına git",           href: productHref },
-        { label: "Satın alma önerisine git",   href: "/dashboard/purchase/suggested" },
-    ];
-}
-
-// ── DrawerSection ─────────────────────────────────────────────
-
-function DrawerSection({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div>
-            <div style={drawerSectionLabelStyle}>
-                {title}
-            </div>
-            {children}
-        </div>
-    );
-}
-
-// ── AlertDetailDrawer ─────────────────────────────────────────
-
-interface DrawerProps {
-    group: ProductAlertGroup;
-    onClose: () => void;
-    onDismiss: (alertId: string) => void;
-    onAcknowledge: (alertId: string) => void;
-    onResolve: (alertId: string) => void;
-}
-
-function AlertDetailDrawer({ group, onClose, onDismiss, onAcknowledge, onResolve }: DrawerProps) {
-    const panelRef    = useRef<HTMLDivElement>(null);
-    const closeBtnRef = useRef<HTMLButtonElement>(null);
-    const sev         = SEV[group.topSeverity];
-    const covDays     = group.coverageDays;
-
-    // Faz 10 §9.4.4 — order_shortage bilgi paneli: ürün için açık shortage'ları
-    // sipariş bağlamıyla fetch eder, drawer "tek başına yeterli bilgi" sağlar.
-    const hasOrderShortage = group.alerts.some((a) => a.type === "order_shortage");
-    const [shortageDetails, setShortageDetails]   = useState<OpenShortageDetailRow[] | null>(null);
-    const [shortageLoading, setShortageLoading]   = useState(false);
-    const [shortageError,   setShortageError]     = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!hasOrderShortage || group.isOrphaned) return;
-        let cancelled = false;
-        // void (async IIFE) — react-hooks/set-state-in-effect kuralından kaçınma
-        // (proje paterni: src/app/dashboard/purchase/orders/new/page.tsx fromDraft fetch'i).
-        void (async () => {
-            setShortageLoading(true);
-            setShortageError(null);
-            try {
-                const res = await fetch(`/api/products/${group.entityId}/shortages`);
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json() as { items: OpenShortageDetailRow[] };
-                if (!cancelled) setShortageDetails(data.items ?? []);
-            } catch (e) {
-                if (!cancelled) {
-                    setShortageError(e instanceof Error ? e.message : "Sipariş detayı yüklenemedi.");
-                }
-            } finally {
-                if (!cancelled) setShortageLoading(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [hasOrderShortage, group.isOrphaned, group.entityId]);
-
-    // ESC + Tab focus trap
-    useEffect(() => {
-        function onKey(e: KeyboardEvent) {
-            if (e.key === "Escape") { onClose(); return; }
-            if (e.key === "Tab") {
-                const panel = panelRef.current;
-                if (!panel) return;
-                const focusable = panel.querySelectorAll<HTMLElement>(
-                    'button:not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-                );
-                if (!focusable.length) return;
-                const first = focusable[0];
-                const last  = focusable[focusable.length - 1];
-                if (e.shiftKey) {
-                    if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-                } else {
-                    if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
-                }
-            }
-        }
-        document.addEventListener("keydown", onKey);
-        return () => document.removeEventListener("keydown", onKey);
-    }, [onClose]);
-
-    // Restore focus on close
-    useEffect(() => {
-        const prev = document.activeElement;
-        closeBtnRef.current?.focus();
-        return () => { if (prev instanceof HTMLElement) prev.focus(); };
-    }, []);
-
-    const actionLinks  = drawerActionLinks(group);
-    const relatedLinks = drawerRelatedLinks(group);
-
-    return (
-        <>
-            {/* Backdrop */}
-            <div
-                aria-hidden="true"
-                onClick={onClose}
-                style={drawerBackdropStyle}
-            />
-
-            {/* Panel */}
-            <div
-                ref={panelRef}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="alert-drawer-title"
-                style={drawerPanelStyle}
-            >
-                {/* Header */}
-                <div style={drawerHeaderStyle}>
-                    <div style={drawerHeaderLeftStyle}>
-                        <span style={SEV_DRAWER_HEADER_BADGE_STYLES[group.topSeverity]}>
-                            {sev.label}
-                        </span>
-                        <span
-                            id="alert-drawer-title"
-                            style={{
-                                fontSize: "14px", fontWeight: 600, color: "var(--text-primary)",
-                                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                            }}
-                        >
-                            {group.productName}
-                        </span>
-                        <span style={drawerSkuStyle}>
-                            {group.sku}
-                        </span>
-                    </div>
-                    <button
-                        ref={closeBtnRef}
-                        onClick={onClose}
-                        aria-label="Kapat"
-                        style={drawerCloseButtonStyle}
-                    >
-                        ✕
-                    </button>
-                </div>
-
-                {/* Scrollable body */}
-                <div style={drawerBodyStyle}>
-
-                    {/* ── 1. Uyarı Özeti ── */}
-                    <div style={SEV_SUMMARY_PANEL_STYLES[group.topSeverity]}>
-                        <div style={{
-                            fontSize: "10px", fontWeight: 700, color: sev.text,
-                            letterSpacing: "0.06em", marginBottom: "6px",
-                        }}>
-                            UYARI ÖZETİ
-                        </div>
-                        <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)", marginBottom: "8px", lineHeight: 1.45 }}>
-                            {group.reason}
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "12px", color: sev.text, fontWeight: 600 }}>
-                                {group.available} / min {group.minStock} {group.unit}
-                            </span>
-                            {covDays !== null && (
-                                <span style={{
-                                    fontSize: "11px", fontWeight: 600, color: daysColor(covDays),
-                                    padding: "1px 6px", borderRadius: "3px",
-                                    background: "rgba(0,0,0,0.15)",
-                                }}>
-                                    ~{covDays} gün
-                                </span>
-                            )}
-                            <span style={{ fontSize: "11px", color: sev.text, opacity: 0.7 }}>
-                                {group.alerts.length} aktif uyarı
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* ── 2. Neden ── */}
-                    <DrawerSection title="NEDEN">
-                        {group.isOrphaned ? (
-                            <p style={drawerOrphanedTextStyle}>
-                                Bu uyarının bağlı olduğu ürün sistemden silinmiş.
-                                Uyarı artık geçersiz — aşağıdan &quot;Yoksay&quot; ile kapatabilirsiniz.
-                            </p>
-                        ) : (
-                            <>
-                                <p style={drawerReasonTextStyle}>
-                                    {drawerDetailedReason(group)}
-                                </p>
-                                <div style={drawerStatsGridStyle}>
-                                    {[
-                                        { label: "Mevcut",  value: group.available, color: sev.text },
-                                        { label: "Minimum", value: group.minStock,  color: "var(--text-secondary)" },
-                                        { label: "Rezerve", value: group.reserved,  color: "var(--text-secondary)" },
-                                    ].map(({ label, value, color }) => (
-                                        <div key={label}>
-                                            <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{label}</div>
-                                            <div style={{ fontSize: "15px", fontWeight: 700, color, lineHeight: 1.2 }}>
-                                                {value}
-                                                <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "3px" }}>
-                                                    {group.unit}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </DrawerSection>
-
-                    {/* ── 3. Etki ── */}
-                    {!group.isOrphaned && (
-                        <DrawerSection title="ETKİ">
-                            <p style={drawerImpactTextStyle}>
-                                {drawerDetailedImpact(group)}
-                            </p>
-                        </DrawerSection>
-                    )}
-
-                    {/* ── 3.5 İlgili Siparişler (sadece order_shortage) — Faz 10 §9.4.4 ── */}
-                    {hasOrderShortage && !group.isOrphaned && (
-                        <DrawerSection title="İLGİLİ SİPARİŞLER">
-                            {shortageLoading && (
-                                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                    Yükleniyor…
-                                </p>
-                            )}
-                            {shortageError && (
-                                <p role="alert" aria-live="polite" style={{ margin: 0, fontSize: "12px", color: "var(--danger-text)" }}>
-                                    {shortageError}
-                                </p>
-                            )}
-                            {!shortageLoading && !shortageError && shortageDetails && shortageDetails.length === 0 && (
-                                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                    Açık shortage kalmadı (uyarı yakında otomatik kapanacak).
-                                </p>
-                            )}
-                            {!shortageLoading && !shortageError && shortageDetails && shortageDetails.length > 0 && (
-                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                                    {shortageDetails.map((row) => (
-                                        <Link
-                                            key={row.shortageId}
-                                            href={`/dashboard/orders/${row.orderId}`}
-                                            aria-label={`${row.orderNumber} siparişine git (eksik ${row.shortageQty} ${group.unit})`}
-                                            style={{
-                                                display: "grid",
-                                                gridTemplateColumns: "1fr auto",
-                                                gap: "6px 12px",
-                                                padding: "10px 12px",
-                                                background: "var(--bg-secondary)",
-                                                border: "0.5px solid var(--border-tertiary)",
-                                                borderRadius: "5px",
-                                                textDecoration: "none",
-                                                color: "var(--text-primary)",
-                                            }}
-                                        >
-                                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", minWidth: 0 }}>
-                                                <span style={{
-                                                    fontSize: "12px", fontWeight: 600, color: "var(--text-primary)",
-                                                    fontFamily: "monospace",
-                                                }}>
-                                                    {row.orderNumber}
-                                                </span>
-                                                <span style={{
-                                                    fontSize: "11px", color: "var(--text-secondary)",
-                                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                                }}>
-                                                    {row.customerName}
-                                                </span>
-                                            </div>
-                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
-                                                <span style={{
-                                                    fontSize: "12px", fontWeight: 700, color: "var(--danger-text)",
-                                                }}>
-                                                    {row.shortageQty} {group.unit} eksik
-                                                </span>
-                                                <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                                                    İhtiyaç: {row.requestedQty} · Mevcut: {row.availableQty} →
-                                                </span>
-                                            </div>
-                                        </Link>
-                                    ))}
-                                </div>
-                            )}
-                        </DrawerSection>
-                    )}
-
-                    {/* ── 4. Önerilen Aksiyon ── */}
-                    <DrawerSection title="ÖNERİLEN AKSİYON">
-                        <div style={drawerActionsContainerStyle}>
-                            {actionLinks.map((link) => (
-                                <Link
-                                    key={link.href}
-                                    href={link.href}
-                                    target={link.newTab ? "_blank" : undefined}
-                                    rel={link.newTab ? "noopener" : undefined}
-                                    style={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "space-between",
-                                        padding: "10px 14px",
-                                        background: link.primary ? sev.bg : "transparent",
-                                        border: `0.5px solid ${link.primary ? sev.border : "var(--border-secondary)"}`,
-                                        borderRadius: "5px",
-                                        fontSize: "13px",
-                                        fontWeight: link.primary ? 600 : 400,
-                                        color: link.primary ? sev.text : "var(--text-secondary)",
-                                        textDecoration: "none",
-                                    }}
-                                >
-                                    <span>{link.label}</span>
-                                    <span>{link.newTab ? "↗" : "→"}</span>
-                                </Link>
-                            ))}
-                        </div>
-                    </DrawerSection>
-
-                    {/* ── 5. İlgili Kayıtlar ── */}
-                    {!group.isOrphaned && (
-                        <DrawerSection title="İLGİLİ KAYITLAR">
-                            <div style={drawerRelatedLinksContainerStyle}>
-                                {relatedLinks.map((link) => (
-                                    <Link
-                                        key={link.href + link.label}
-                                        href={link.href}
-                                        style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "space-between",
-                                            padding: "8px 12px",
-                                            background: "var(--bg-secondary)",
-                                            border: "0.5px solid var(--border-tertiary)",
-                                            borderRadius: "5px",
-                                            fontSize: "12px",
-                                            color: "var(--text-secondary)",
-                                            textDecoration: "none",
-                                        }}
-                                    >
-                                        <span>{link.label}</span>
-                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>→</span>
-                                    </Link>
-                                ))}
-                            </div>
-                        </DrawerSection>
-                    )}
-
-                    {/* ── 6. Uyarı Durumu (ack / dismiss) ── */}
-                    <DrawerSection title="UYARI DURUMU">
-                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                            {group.alerts.map((alert) => {
-                                const alertSev  = SEV[alert.severity as Severity] ?? SEV.info;
-                                const isSettled = alert.status === "resolved" || alert.status === "dismissed";
-                                return (
-                                    <div
-                                        key={alert.id}
-                                        style={{
-                                            padding: "10px 12px",
-                                            background: "var(--bg-secondary)",
-                                            border: "0.5px solid var(--border-tertiary)",
-                                            borderLeft: `3px solid ${alertSev.dot}`,
-                                            borderRadius: "5px",
-                                            opacity: isSettled ? 0.55 : 1,
-                                        }}
-                                    >
-                                                        <div style={{
-                                            display: "flex", alignItems: "center",
-                                            justifyContent: "space-between",
-                                            marginBottom: "8px",
-                                        }}>
-                                            <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-primary)" }}>
-                                                {ALERT_TYPE_LABEL[alert.type] ?? alert.type}
-                                            </span>
-                                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>
-                                                {formatRelTime(alert.created_at)}
-                                            </span>
-                                        </div>
-                                        {alert.status === "open" && (
-                                            <div style={{ display: "flex", gap: "6px" }}>
-                                                <button
-                                                    onClick={() => onAcknowledge(alert.id)}
-                                                    style={{
-                                                        fontSize: "11px", padding: "4px 10px",
-                                                        border: "0.5px solid var(--border-secondary)",
-                                                        borderRadius: "4px", background: "transparent",
-                                                        color: "var(--text-secondary)", cursor: "pointer",
-                                                    }}
-                                                >
-                                                    Görüldü
-                                                </button>
-                                                <button
-                                                    onClick={() => onDismiss(alert.id)}
-                                                    style={{
-                                                        fontSize: "11px", padding: "4px 10px",
-                                                        border: "0.5px solid var(--border-secondary)",
-                                                        borderRadius: "4px", background: "transparent",
-                                                        color: "var(--text-tertiary)", cursor: "pointer",
-                                                    }}
-                                                >
-                                                    Yoksay
-                                                </button>
-                                            </div>
-                                        )}
-                                        {alert.status === "acknowledged" && (
-                                            <div style={{ display: "flex", gap: "6px" }}>
-                                                <button
-                                                    onClick={() => onResolve(alert.id)}
-                                                    style={{
-                                                        fontSize: "11px", padding: "4px 10px",
-                                                        border: "0.5px solid var(--success-border)",
-                                                        borderRadius: "4px", background: "var(--success-bg)",
-                                                        color: "var(--success-text)", cursor: "pointer",
-                                                    }}
-                                                >
-                                                    Çözüldü
-                                                </button>
-                                                <button
-                                                    onClick={() => onDismiss(alert.id)}
-                                                    style={{
-                                                        fontSize: "11px", padding: "4px 10px",
-                                                        border: "0.5px solid var(--border-secondary)",
-                                                        borderRadius: "4px", background: "transparent",
-                                                        color: "var(--text-tertiary)", cursor: "pointer",
-                                                    }}
-                                                >
-                                                    Yoksay
-                                                </button>
-                                            </div>
-                                        )}
-                                        {alert.status === "resolved" && (
-                                            <span style={{ fontSize: "10px", color: "var(--success-text)" }}>Çözüldü ✓</span>
-                                        )}
-                                        {alert.status === "dismissed" && (
-                                            <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>Yoksayıldı</span>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </DrawerSection>
-
-                </div>
-            </div>
-        </>
-    );
-}
-
-// ── OrderAlertDrawer (G6) ─────────────────────────────────────────────────────
-// Sipariş uyarısı detay paneli.
-// quote_expired → "Süreyi Uzat" inline form
-// overdue_shipment → inline ship form (Faz 7)
-// diğer tipler → sipariş linki
-
-interface OrderAlertDrawerProps {
-    alert: AlertRow;
-    isDemo: boolean;
-    onClose: () => void;
-    onExtended: () => void;
-    onShipped: () => void;
-}
-
-function OrderAlertDrawer({ alert, isDemo, onClose, onExtended, onShipped }: OrderAlertDrawerProps) {
-    const panelRef = useRef<HTMLDivElement>(null);
-    const isQuoteExpired     = alert.type === "quote_expired";
-    const isOverdueShipment  = alert.type === "overdue_shipment";
-    const todayStr = new Date().toISOString().slice(0, 10);
-
-    // quote_expired state
-    const [newDate, setNewDate] = useState(() => {
-        const d = new Date();
-        d.setDate(d.getDate() + 30);
-        return d.toISOString().slice(0, 10);
-    });
-    const [extending, setExtending] = useState(false);
-    const [extError, setExtError] = useState<string | null>(null);
-
-    // overdue_shipment state
-    const [shipDate, setShipDate]           = useState(todayStr);
-    const [trackingNumber, setTrackingNumber] = useState("");
-    const [carrier, setCarrier]             = useState("");
-    const [shipping, setShipping]           = useState(false);
-    const [shipError, setShipError]         = useState<string | null>(null);
-
-    useEffect(() => {
-        function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
-        document.addEventListener("keydown", onKey);
-        return () => document.removeEventListener("keydown", onKey);
-    }, [onClose]);
-
-    const handleExtend = async () => {
-        if (isDemo || extending) return;
-        if (!newDate || newDate < todayStr) { setExtError("Bugünden ileri bir tarih seçin."); return; }
-        setExtending(true);
-        setExtError(null);
-        try {
-            const res = await fetch(`/api/orders/${alert.entity_id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ quote_valid_until: newDate }),
-            });
-            if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                throw new Error(body.error || `HTTP ${res.status}`);
-            }
-            onExtended();
-        } catch (e) {
-            setExtError(e instanceof Error ? e.message : "Süre uzatılamadı.");
-        } finally {
-            setExtending(false);
-        }
-    };
-
-    const handleShip = async () => {
-        if (isDemo || shipping) return;
-        if (!shipDate) { setShipError("Sevkiyat tarihi zorunludur."); return; }
-        setShipping(true);
-        setShipError(null);
-        try {
-            const body: Record<string, unknown> = { shipDate };
-            if (trackingNumber.trim()) body.trackingNumber = trackingNumber.trim();
-            if (carrier.trim()) body.carrier = carrier.trim();
-            const res = await fetch(`/api/orders/${alert.entity_id}/ship`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            if (!res.ok) {
-                const json = await res.json().catch(() => ({}));
-                throw new Error(json.error || `HTTP ${res.status}`);
-            }
-            onShipped();
-        } catch (e) {
-            setShipError(e instanceof Error ? e.message : "Sevkiyat kaydedilemedi.");
-        } finally {
-            setShipping(false);
-        }
-    };
-
-    return (
-        <>
-            <div
-                onClick={onClose}
-                style={{
-                    position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-                    zIndex: 49,
-                }}
-            />
-            <div
-                ref={panelRef}
-                role="dialog"
-                aria-modal="true"
-                style={{
-                    position: "fixed", top: 0, right: 0, bottom: 0, width: "360px",
-                    background: "var(--bg-primary)", borderLeft: "1px solid var(--border-secondary)",
-                    zIndex: 50, overflowY: "auto", display: "flex", flexDirection: "column",
-                }}
-            >
-                {/* Header */}
-                <div style={{
-                    padding: "16px 20px", borderBottom: "0.5px solid var(--border-tertiary)",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                }}>
-                    <div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--warning-text)", letterSpacing: "0.06em" }}>
-                            {ALERT_TYPE_LABEL[alert.type] ?? alert.type}
-                        </div>
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginTop: "3px" }}>
-                            {alert.title}
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        aria-label="Kapat"
-                        style={{
-                            fontSize: "18px", lineHeight: 1, padding: "2px 8px",
-                            border: "none", background: "transparent",
-                            color: "var(--text-tertiary)", cursor: "pointer",
-                        }}
-                    >
-                        ×
-                    </button>
-                </div>
-
-                <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
-                    {/* ÖNERİLEN AKSİYON */}
-                    <DrawerSection title="ÖNERİLEN AKSİYON">
-                        {isQuoteExpired ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                                    Teklifin geçerlilik süresini uzatarak müşteriyle görüşmeye devam edebilirsiniz.
-                                </p>
-                                <div style={{
-                                    padding: "12px 14px", background: "var(--bg-secondary)",
-                                    border: "0.5px solid var(--border-tertiary)", borderRadius: "6px",
-                                    display: "flex", flexDirection: "column", gap: "8px",
-                                }}>
-                                    <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}>
-                                        YENİ GEÇERLİLİK TARİHİ
-                                    </label>
-                                    <input
-                                        type="date"
-                                        value={newDate}
-                                        min={todayStr}
-                                        onChange={e => { setNewDate(e.target.value); setExtError(null); }}
-                                        disabled={isDemo || extending}
-                                        style={{
-                                            fontSize: "13px", padding: "7px 10px",
-                                            border: "0.5px solid var(--border-secondary)",
-                                            borderRadius: "4px", background: "var(--bg-primary)",
-                                            color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
-                                        }}
-                                    />
-                                    {extError && (
-                                        <span role="alert" aria-live="polite" style={{ fontSize: "11px", color: "var(--danger-text)" }}>{extError}</span>
-                                    )}
-                                    <button
-                                        onClick={handleExtend}
-                                        disabled={isDemo || extending}
-                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                        style={{
-                                            fontSize: "13px", fontWeight: 600, padding: "8px 14px",
-                                            border: "0.5px solid var(--accent-border)",
-                                            borderRadius: "5px", background: "var(--accent-bg)",
-                                            color: "var(--accent-text)",
-                                            cursor: (isDemo || extending) ? "not-allowed" : "pointer",
-                                            opacity: (isDemo || extending) ? 0.6 : 1,
-                                        }}
-                                    >
-                                        {extending ? "Uzatılıyor..." : "Süreyi Uzat"}
-                                    </button>
-                                </div>
-                            </div>
-                        ) : isOverdueShipment ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                                <p style={{ margin: 0, fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                                    Sevkiyat bilgilerini girerek bu siparişi sevk edilmiş olarak işaretleyebilirsiniz.
-                                </p>
-                                <div style={{
-                                    padding: "12px 14px", background: "var(--bg-secondary)",
-                                    border: "0.5px solid var(--border-tertiary)", borderRadius: "6px",
-                                    display: "flex", flexDirection: "column", gap: "10px",
-                                }}>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                        <label
-                                            htmlFor="drawer-ship-date"
-                                            style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}
-                                        >
-                                            SEVKİYAT TARİHİ
-                                        </label>
-                                        <input
-                                            id="drawer-ship-date"
-                                            type="date"
-                                            aria-label="Sevkiyat tarihi"
-                                            value={shipDate}
-                                            onChange={e => { setShipDate(e.target.value); setShipError(null); }}
-                                            disabled={isDemo || shipping}
-                                            style={{
-                                                fontSize: "13px", padding: "7px 10px",
-                                                border: "0.5px solid var(--border-secondary)",
-                                                borderRadius: "4px", background: "var(--bg-primary)",
-                                                color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
-                                            }}
-                                        />
-                                    </div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                        <label
-                                            htmlFor="drawer-tracking"
-                                            style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}
-                                        >
-                                            TAKİP NUMARASI <span style={{ fontWeight: 400 }}>(opsiyonel)</span>
-                                        </label>
-                                        <input
-                                            id="drawer-tracking"
-                                            type="text"
-                                            aria-label="Takip numarası"
-                                            placeholder="ör. 1Z999AA10123456784"
-                                            value={trackingNumber}
-                                            onChange={e => { setTrackingNumber(e.target.value); setShipError(null); }}
-                                            disabled={isDemo || shipping}
-                                            maxLength={100}
-                                            style={{
-                                                fontSize: "13px", padding: "7px 10px",
-                                                border: "0.5px solid var(--border-secondary)",
-                                                borderRadius: "4px", background: "var(--bg-primary)",
-                                                color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
-                                            }}
-                                        />
-                                    </div>
-                                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                                        <label
-                                            htmlFor="drawer-carrier"
-                                            style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)", letterSpacing: "0.04em" }}
-                                        >
-                                            KARGO FİRMASI <span style={{ fontWeight: 400 }}>(opsiyonel)</span>
-                                        </label>
-                                        <input
-                                            id="drawer-carrier"
-                                            type="text"
-                                            aria-label="Kargo firması"
-                                            placeholder="ör. UPS, DHL, MNG Kargo"
-                                            value={carrier}
-                                            onChange={e => { setCarrier(e.target.value); setShipError(null); }}
-                                            disabled={isDemo || shipping}
-                                            maxLength={100}
-                                            style={{
-                                                fontSize: "13px", padding: "7px 10px",
-                                                border: "0.5px solid var(--border-secondary)",
-                                                borderRadius: "4px", background: "var(--bg-primary)",
-                                                color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
-                                            }}
-                                        />
-                                    </div>
-                                    {shipError && (
-                                        <span role="alert" aria-live="polite" style={{ fontSize: "11px", color: "var(--danger-text)" }}>{shipError}</span>
-                                    )}
-                                    <button
-                                        onClick={handleShip}
-                                        disabled={isDemo || shipping}
-                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                        style={{
-                                            fontSize: "13px", fontWeight: 600, padding: "8px 14px",
-                                            border: "0.5px solid var(--accent-border)",
-                                            borderRadius: "5px", background: "var(--accent-bg)",
-                                            color: "var(--accent-text)",
-                                            cursor: (isDemo || shipping) ? "not-allowed" : "pointer",
-                                            opacity: (isDemo || shipping) ? 0.6 : 1,
-                                        }}
-                                    >
-                                        {shipping ? "Kaydediliyor..." : "Sevk Et"}
-                                    </button>
-                                </div>
-                            </div>
-                        ) : (
-                            alert.entity_id && (
-                                <Link
-                                    href={`/dashboard/orders/${alert.entity_id}`}
-                                    style={{
-                                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                                        padding: "10px 14px",
-                                        background: "var(--warning-bg)", border: "0.5px solid var(--warning-border)",
-                                        borderRadius: "5px", fontSize: "13px", fontWeight: 600,
-                                        color: "var(--warning-text)", textDecoration: "none",
-                                    }}
-                                >
-                                    <span>Siparişi incele</span>
-                                    <span>→</span>
-                                </Link>
-                            )
-                        )}
-                    </DrawerSection>
-
-                    {/* İLGİLİ KAYITLAR */}
-                    {alert.entity_id && (
-                        <DrawerSection title="İLGİLİ KAYITLAR">
-                            <Link
-                                href={`/dashboard/orders/${alert.entity_id}`}
-                                style={{
-                                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                                    padding: "8px 12px",
-                                    background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)",
-                                    borderRadius: "5px", fontSize: "12px",
-                                    color: "var(--text-secondary)", textDecoration: "none",
-                                }}
-                            >
-                                <span>Sipariş detayına git</span>
-                                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>→</span>
-                            </Link>
-                        </DrawerSection>
-                    )}
-                </div>
-            </div>
-        </>
-    );
-}
-
-// ── AiAlertDrawer (G7) ────────────────────────────────────────────────────────
-// AI uyarısı detay paneli; ai_inputs_summary alanlarını Türkçe etiketle
-// kapanabilir "AI ANALİZİ" accordion'ında gösterir.
-
-interface AiAlertDrawerProps {
-    alert: AlertRow;
-    onClose: () => void;
-}
-
-function AiAlertDrawer({ alert, onClose }: AiAlertDrawerProps) {
-    const [accordionOpen, setAccordionOpen] = useState(false);
-    const summary = alert.ai_inputs_summary as Record<string, unknown> | null;
-    const summaryEntries = summary
-        ? Object.entries(summary).filter(([, v]) => v != null)
-        : [];
-
-    useEffect(() => {
-        function onKey(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
-        document.addEventListener("keydown", onKey);
-        return () => document.removeEventListener("keydown", onKey);
-    }, [onClose]);
-
-    const confidencePct = alert.ai_confidence != null ? Math.round(alert.ai_confidence * 100) : null;
-
-    return (
-        <>
-            <div
-                onClick={onClose}
-                style={{
-                    position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)",
-                    zIndex: 49,
-                }}
-            />
-            <div
-                role="dialog"
-                aria-modal="true"
-                style={{
-                    position: "fixed", top: 0, right: 0, bottom: 0, width: "360px",
-                    background: "var(--bg-primary)", borderLeft: "1px solid var(--border-secondary)",
-                    zIndex: 50, overflowY: "auto", display: "flex", flexDirection: "column",
-                }}
-            >
-                {/* Header */}
-                <div style={{
-                    padding: "16px 20px", borderBottom: "0.5px solid var(--border-tertiary)",
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                }}>
-                    <div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--accent-text)", letterSpacing: "0.06em" }}>
-                            AI ANALİZİ
-                        </div>
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginTop: "3px" }}>
-                            {alert.title}
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        aria-label="Kapat"
-                        style={{
-                            fontSize: "18px", lineHeight: 1, padding: "2px 8px",
-                            border: "none", background: "transparent",
-                            color: "var(--text-tertiary)", cursor: "pointer",
-                        }}
-                    >
-                        ×
-                    </button>
-                </div>
-
-                <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "20px" }}>
-                    {/* AI Önerisi açıklaması */}
-                    {alert.description && (
-                        <DrawerSection title="AI ÖNERİSİ">
-                            <p style={{ margin: 0, fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
-                                {alert.description}
-                            </p>
-                        </DrawerSection>
-                    )}
-
-                    {/* AI ANALİZİ accordion — ai_inputs_summary */}
-                    {summaryEntries.length > 0 && (
-                        <div>
-                            <button
-                                onClick={() => setAccordionOpen(o => !o)}
-                                style={{
-                                    width: "100%", display: "flex", alignItems: "center",
-                                    justifyContent: "space-between", padding: "0 0 8px",
-                                    border: "none", background: "transparent", cursor: "pointer",
-                                    fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)",
-                                    letterSpacing: "0.07em", textTransform: "uppercase",
-                                }}
-                            >
-                                <span>AI GİRDİLERİ</span>
-                                <span style={{ fontSize: "12px", lineHeight: 1 }}>{accordionOpen ? "▲" : "▼"}</span>
-                            </button>
-                            {accordionOpen && (
-                                <div style={{
-                                    display: "flex", flexDirection: "column", gap: "6px",
-                                    padding: "10px 12px",
-                                    background: "var(--bg-secondary)",
-                                    border: "0.5px solid var(--border-tertiary)",
-                                    borderRadius: "6px",
-                                }}>
-                                    {summaryEntries.map(([key, value]) => (
-                                        <div key={key} style={{
-                                            display: "flex", alignItems: "center",
-                                            justifyContent: "space-between", gap: "8px",
-                                        }}>
-                                            <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                                {AI_SUMMARY_LABELS[key] ?? key}
-                                            </span>
-                                            <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
-                                                {String(value)}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Metadata */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                        {confidencePct !== null && (
-                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                Güven: <span style={{ fontWeight: 600, color: "var(--accent-text)" }}>%{confidencePct}</span>
-                            </div>
-                        )}
-                        {alert.ai_model_version && (
-                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                Model: {alert.ai_model_version}
-                            </div>
-                        )}
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                            {formatRelTime(alert.created_at)} oluşturuldu
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </>
-    );
-}
+// ── Stiller (inline + CSS değişkenleri) ──────────────────────────────────────
+const pageRootStyle: React.CSSProperties = {
+    display: "flex", flexDirection: "column", minWidth: 0,
+};
+const layoutStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "1fr 380px",
+    // Topbar (52px) + main padding (18px*2) çıkarılır → içerik-alanı yüksekliği
+    height: "calc(100vh - 52px - 36px)",
+    minHeight: "480px",
+    border: "0.5px solid var(--border-tertiary)",
+    borderRadius: "10px",
+    overflow: "hidden",
+    background: "var(--surface-subtle)",
+};
+const controlsRowStyle: React.CSSProperties = {
+    display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+    gap: "12px", padding: "0 4px", flexWrap: "wrap",
+};
+const dayPanelStyle: React.CSSProperties = {
+    display: "flex", flexDirection: "column",
+    borderLeft: "0.5px solid var(--border-tertiary)",
+    background: "var(--surface-subtle)", minWidth: 0, overflow: "hidden",
+};
+const searchStyle: React.CSSProperties = {
+    height: "32px", padding: "0 10px", borderRadius: "8px",
+    border: "1px solid var(--border-tertiary)", background: "var(--bg-primary)",
+    color: "var(--text-primary)", fontSize: "12px", width: "140px",
+};
+const toggleLabelStyle: React.CSSProperties = {
+    display: "inline-flex", alignItems: "center", gap: "6px",
+    fontSize: "12px", color: "var(--text-secondary)", cursor: "pointer", whiteSpace: "nowrap",
+};
+const dismissDayBtnStyle: React.CSSProperties = {
+    fontSize: "11px", fontWeight: 500, padding: "4px 10px",
+    border: "1px solid var(--border-tertiary)", borderRadius: "8px",
+    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
+};

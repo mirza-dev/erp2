@@ -5,6 +5,25 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## Son Tamamlanan İş — 2026-06-08 (**Uyarılar → Takvim Görünümü — Faz 1 (iskelet + hedef-tarih enrichment + temel drawer)**)
+
+`design_handoff_alerts_calendar/` tasarımı uygulanıyor (Apple Calendar tarzı aylık takvim). **Fazlı plan kalıcı:** `ALERTS_CALENDAR_PLAN.md` (repo kökü) — "nerede kaldık?" oradaki Durum Takibi. **Kullanıcı kararları:** hedef-tarih TAM ilk sürümde / drawer zenginliği ayrı faz / fazlı ilerle + MD'ye kaydet. **Kritik gerçek:** prototip mock; gerçek `AlertRow` `dueDate`/`time`/`resolution` taşımaz → bu iş 2.967 satırlık olgun sayfanın takvime **yeniden-derilemesi** (tüm RBAC/demo/scan/ai-suggest/Faz7 sevk/Faz10 shortage/sync-retry KORUNUR — `feedback_no_silent_deletes`).
+
+**Faz 1 YAPILDI (ÇALIŞILDI/green, COMMIT/PUSH bekliyor):**
+- **`alert-calendar.ts`** (YENİ pure) — tarih matematiği + occurrence (event+due) + CalendarAlert/Occurrence tipleri + getMonthDays(35/42 Pzt-başı) + SEVERITY_CONFIG + ALERT_CLASSES (+24 test).
+- **`alert-due-dates.ts`** (YENİ server) — `enrichAlertsWithDueMeta`: order-entity due TEK batch sales_orders join (overdue→planned_shipment_date, quote→quote_valid_until) + order_code; **order_deadline (product entity) due'su client'ta productMap.orderDeadline'dan türetilir** (products endpoint zaten veriyor) (+7 test). **MİGRASYON YOK.**
+- **`GET /api/alerts/calendar`** (YENİ) — /api/alerts paterni + enrichment; eski /api/alerts SÖZLEŞMESİ DOKUNULMADI (16 test kilitli) (+3 test).
+- **`src/components/alerts/`** — CalendarHeader (Tara+✦AI Analiz korundu), ClassificationTabs (role=tablist), CalendarGrid+DayCell+DayPopover(portal), DayDetailPanel+AlertCard(timeline+stagger), AlertCalendarDrawer (role=dialog+aria-modal+ESC; tip-bazlı nav linkleri + **gerçek sync retry**), SevBadge. **`@/components/ui/Button` reuse** (RovenBtn yeniden yazılmadı).
+- **`page.tsx` TAM yeniden yazıldı** — `toCalendarAlert`/`applyClassFilter` export (+13 test); tüm fetch(/api/alerts/calendar+/api/products)/handler/demo guard/scan/ai-suggest/ack/resolve/dismiss/sync-retry KORUNDU; **dismissGroup→dismissDay** (gün toplu yoksay, 24h bypass mesajı korundu); search + showResolved korundu; RBAC page'de yok (server-side); **100vh DEĞİL** `calc(100vh - 52px - 36px)` (Topbar+padding) içerik-alanı.
+- **`globals.css`** — keyframes `cal-fade`/`cal-pop-in`/`cal-fade-up` (reduced-motion guard `*` kapsar).
+- **Test migrasyonu:** `alerts-sync-retry` source-regression yeni yapıya migrate (davranış korundu — drawer "Yeniden Dene"); `alerts-order-shortage-drawer` + `alerts-overdue-ship` inline-form source-regression'ları → **Faz 2 `it.todo`** (endpoint testleri [shortages route, ship route, production-prefill] TAM kapsamda kaldı = backend sözleşmesi korunur). +render smoke (renderToStaticMarkup) +preservation source-regression.
+
+**Doğrulama:** tsc 0 · lint 0 · build 0 (`ƒ /api/alerts/calendar` + `ƒ Proxy` + `○ /dashboard/alerts`) · vitest tam yeşil (+44 net yeni test, 5 it.todo Faz 2; pdf-render mupdf kuruldu→11/11). **mupdf yerel kuruldu** (package.json'da `^1.27.0` kayıtlıydı, node_modules eksikti).
+
+**DURUM: Faz 1 ÇALIŞILDI/green; COMMIT/PUSH onayı bekliyor (push = 2 Coolify prod deploy).** **Sıradaki:** Faz 2 (drawer zenginliği — order_deadline süre uzatma + overdue_shipment inline sevk formu + order_shortage related-orders/üretim deep-link) → Faz 3 (cila/responsive/a11y/animasyon). **⚠️ Push-öncesi:** worktree mirror (erp2=main / proje-codex=codex-experiment) hizalaması + manuel tarayıcı smoke (takvim render/ay gezinme/gün paneli/drawer aksiyonları/koyu+aydınlık).
+
+<details><summary>Önceki: Login "Monolith" (F) redesign — TR/EN + tema + Google OAuth + reset</summary>
+
 ## Son Tamamlanan İş — 2026-06-08 (**Login "Monolith" (F) redesign — TR/EN + tema + Google OAuth + reset**)
 
 `design_handoff_login_monolith/` tasarım paketi (`README.md`+`roven-login.css`+`LoginMonolith.jsx`) `/login`'e uygulandı. Editöryel full-bleed düzen: sol marka kilidi + bare form, sağ ekrandan-taşan hexagon, sağ üst TR/EN dil + tema. İşlevsel davranış AYNEN korundu (`signInWithPassword`→`clearDemoMode()`→`/dashboard`).
@@ -28,6 +47,8 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 **DURUM: ÇALIŞILDI/green, COMMIT+PUSH onayı bekliyor.**
 
 ⚠️ **DEPLOY ÖN KOŞULLARI (kullanıcı doğrulamalı, yeşil test kapsamaz):** (1) **Supabase signup OFF** (birincil kilit, henüz teyit yok); (2) **⚠️ BRICK RİSKİ:** prod admin `app_metadata.roles` taşımalı VEYA `ADMIN_EMAILS` her iki Coolify env'inde — guard zero-admin bootstrap'tan önce çalışır, admin rolsüz+ADMIN_EMAILS yoksa herkes kilitlenir (create-admin admin'i güvenli `["admin"]`); (3) Canlı Google OAuth turu mock'lu = doğrulanmadı (provider etkin + redirect-URL allowlist `…/auth/callback` + tarayıcı smoke). Şifremi unuttum yalnız ADIM 1. Plan: `~/.claude/plans/design-handoff-login-monolith-dosyas-n-inherited-bunny.md`. **NOT (worktree sapması):** bu proje-codex/memory kopyası önceki turlarda erp2-auto-memory'nin gerisindeydi; push akışında ff main hizalar.
+
+</details>
 
 <details><summary>Önceki: Veri Aktarım Merkezi — rehber + şeffaflık katmanı (`fd4499b`)</summary>
 

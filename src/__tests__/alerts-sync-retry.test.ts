@@ -223,37 +223,34 @@ describe("POST /api/alerts/[id]/sync-retry", () => {
 // değiştirmemek için source-level pattern matching ile doğrulanır.
 
 const pageSource = readFileSync(
-    resolve(process.cwd(), "src/app/dashboard/purchase/suggested/page.tsx"),
-    "utf-8",
-).slice(0, 0) + readFileSync(
     resolve(process.cwd(), "src/app/dashboard/alerts/page.tsx"),
     "utf-8",
 );
+const drawerSource = readFileSync(
+    resolve(process.cwd(), "src/components/alerts/AlertCalendarDrawer.tsx"),
+    "utf-8",
+);
 
-describe("actionFor + UI filter (source-regression) — sync_issue case", () => {
-    it("actionFor switch'inde sync_issue case mevcut", () => {
-        // Pattern: types.includes("sync_issue") ... href: "/dashboard/parasut"
-        expect(pageSource).toMatch(
-            /types\.includes\(\s*["']sync_issue["']\s*\)[^}]*href\s*:\s*["']\/dashboard\/parasut["']/,
-        );
+// TAKVİM GEÇİŞİ (Faz 1): sync_issue retry davranışı KORUNDU — eski ayrı
+// SystemAlertCard yerine takvim drawer'ında (AlertCalendarDrawer) "Yeniden Dene"
+// + sayfa içi retrySyncAlert handler ile. Paraşüt alertleri artık ayrı bölüme
+// filtrelenmez; takvimde tespit gününde diğer uyarılar gibi görünür.
+describe("sync_issue retry — takvim kaynak regresyonu (Faz 1)", () => {
+    it("page retrySyncAlert handler /api/alerts/[id]/sync-retry çağırır + resolved düşürür", () => {
+        expect(pageSource).toMatch(/const retrySyncAlert\s*=\s*async/);
+        expect(pageSource).toMatch(/\/api\/alerts\/\$\{alertId\}\/sync-retry/);
+        expect(pageSource).toMatch(/patchStatus\(\s*alertId\s*,\s*["']resolved["']\s*\)/);
     });
 
-    it("Paraşüt sync alert kartı SystemAlertCard component'ine ayrılmış", () => {
-        expect(pageSource).toMatch(/function SystemAlertCard\b/);
+    it("AlertCalendarDrawer sync_issue 'Yeniden Dene' butonu + onSyncRetry tetikler", () => {
+        expect(drawerSource).toContain("Yeniden Dene");
+        expect(drawerSource).toMatch(/onSyncRetry\(\s*alert\.id\s*\)/);
     });
 
-    it("systemAlerts useMemo PARASUT_ALERT_ENTITY_TYPES VEYA PARASUT_SYNC_ALERT_ENTITY_IDS kullanıyor", () => {
-        // P2 fix: hem entity_type listesi hem entity_id whitelist kombinasyonu
-        expect(pageSource).toMatch(/PARASUT_ALERT_ENTITY_TYPES\.has/);
-        expect(pageSource).toMatch(/PARASUT_SYNC_ALERT_ENTITY_IDS\.has/);
-        // type === 'sync_issue' kontrolü hâlâ var
-        expect(pageSource).toMatch(/a\.type\s*!==\s*["']sync_issue["']/);
-    });
-
-    it("productSysAlerts filter Paraşüt alertlerini whitelist üzerinden dışlıyor", () => {
-        // P2 fix: entity_type listesi + entity_id whitelist iki katmanlı dışlama
-        expect(pageSource).toMatch(/PARASUT_ALERT_ENTITY_TYPES\.has\(\s*a\.entity_type/);
-        expect(pageSource).toMatch(/PARASUT_SYNC_ALERT_ENTITY_IDS\.has\(\s*a\.entity_id/);
+    it("AlertCalendarDrawer sync_issue nav linki '/dashboard/parasut'", () => {
+        const block = drawerSource.split("sync_issue:")[1]?.slice(0, 250) ?? "";
+        expect(block).toContain("Paraşüt Ayarları");
+        expect(block).toContain("/dashboard/parasut");
     });
 
     it("parasut-constants.ts whitelist sabitleri export ediyor (parasut_auth dahil)", () => {
