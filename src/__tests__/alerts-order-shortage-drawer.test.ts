@@ -33,7 +33,36 @@ describe("order_shortage — takvim drawer (Faz 1) kaynak regresyonu", () => {
     });
 
     // ── Faz 2'ye taşınacak (drawer zenginliği) ──
-    it.todo("Faz 2: İLGİLİ SİPARİŞLER bölümü (/api/products/[id]/shortages fetch + loading/error/empty/list)");
-    it.todo("Faz 2: üretim derin-linki '/dashboard/production?productId&qty' yeni sekmede");
-    it.todo("Faz 2: shortage satırı aria-label + 'Siparişe git' linki + orphan guard");
+    it("Faz 2: İLGİLİ SİPARİŞLER bölümü (/api/products/[id]/shortages fetch + loading/error/empty/list)", () => {
+        expect(drawerSrc).toContain("İlgili Siparişler");
+        expect(drawerSrc).toContain("isOrderShortage");
+        // doğru endpoint
+        expect(drawerSrc).toMatch(/\/api\/products\/\$\{entityId\}\/shortages/);
+        // 4 durum dalı
+        expect(drawerSrc).toContain("shortageLoading");
+        expect(drawerSrc).toContain("shortageError");
+        expect(drawerSrc).toMatch(/shortageRows && shortageRows\.length === 0/);
+        expect(drawerSrc).toMatch(/shortageRows && shortageRows\.length > 0/);
+        // response shape (items + totalShortage)
+        expect(drawerSrc).toContain("data.items");
+        expect(drawerSrc).toContain("data.totalShortage");
+    });
+
+    it("Faz 2: üretim derin-linki '/dashboard/production?productId&qty' yeni sekmede", () => {
+        expect(drawerSrc).toMatch(/\/dashboard\/production\?productId=\$\{entityId\}/);
+        expect(drawerSrc).toMatch(/qty=\$\{shortageTotal\}/);
+        expect(drawerSrc).toContain('target="_blank"');
+        expect(drawerSrc).toContain('rel="noopener"');
+        expect(drawerSrc).toContain("Üretim Emri Başlat");
+    });
+
+    it("Faz 2: shortage satırı aria-label + 'Siparişe git' linki + orphan guard", () => {
+        // sipariş satırı linki + aria-label
+        expect(drawerSrc).toMatch(/\/dashboard\/orders\/\$\{row\.orderId\}/);
+        expect(drawerSrc).toMatch(/siparişine git/);
+        expect(drawerSrc).toContain("row.shortageQty");
+        // orphan guard: entityId yoksa fetch/section render edilmez
+        expect(drawerSrc).toMatch(/alert\.type !== "order_shortage" \|\| !entityId/);
+        expect(drawerSrc).toMatch(/alert\.type === "order_shortage" && !!entityId/);
+    });
 });

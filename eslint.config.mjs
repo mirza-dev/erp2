@@ -32,6 +32,11 @@ const eslintConfig = defineConfig([
     // Tasarım handoff referans paketleri (HTML/JSX prototip + CSS) — uygulama
     // kaynağı DEĞİL, production'a dahil edilmez (.agents/skills ile aynı mantık).
     "design_handoff_*/**",
+    // Scrape/upload çıktıları — repo kökündeki `dashboard/` dizini (charts.jsx,
+    // dashboard-app.jsx, data.js, uploads/…) vendor JS, uygulama kaynağı DEĞİL.
+    // Path cwd-relative → yalnız kök `dashboard/`; `src/app/dashboard` ETKİLENMEZ.
+    // `eslint .` çalıştırılırsa sahte hata üretmesin.
+    "dashboard/**",
   ]),
   // "_"-prefix konvansiyonu: kullanılmayan args/vars/catch error'lar ESLint'te
   // sessize alınır (TS/JS topluluk standardı). Mevcut `_code`, `_input`, `_maxLen`

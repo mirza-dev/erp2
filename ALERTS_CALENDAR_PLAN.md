@@ -211,7 +211,7 @@ tema sabit-hex-yok denetimi, responsive source-regression.
 ## Durum Takibi (her faz sonunda güncelle)
 - [x] **Faz 0** — bu plan `ALERTS_CALENDAR_PLAN.md` olarak repoya kaydedildi
 - [x] **Faz 1** — iskelet + enrichment + temel drawer + koruma listesi ✅ (tsc 0 · lint 0 · build 0 [`ƒ /api/alerts/calendar` + `ƒ Proxy`] · +44 yeni test, 5 it.todo Faz 2). COMMIT/PUSH bekliyor.
-- [ ] **Faz 2** — drawer zenginliği (Faz 7 + Faz 10) · COMMIT/PUSH —
+- [x] **Faz 2** — drawer zenginliği (Faz 7 + Faz 10) ✅ — `AlertCalendarDrawer`'a 3 tip-özel zengin bölüm eklendi: **quote_expired** süre uzatma formu (PATCH `/api/orders/[id]` `{quote_valid_until}`; server `serviceUpdateQuoteDeadline`→`resolveQuoteExpiredAlerts` yeni-tarih≥bugün ise alert resolve eder → `onExtended`=refetch yeterli), **overdue_shipment** inline sevk formu (shipDate/trackingNumber/carrier → POST `/api/orders/[id]/ship`; endpoint Faz 7 awaited `dbBatchResolveAlerts` ile overdue resolve eder), **order_shortage** İLGİLİ SİPARİŞLER (GET `/api/products/[id]/shortages` → loading/error/empty/list + üretim derin-linki `/dashboard/production?productId&qty=totalShortage` yeni sekme). `onExtended`/`onShipped` parent callback'leri → `refetch()`+toast; tümü `!isResolved`+`entityId` guard'lı, mevcut nav linkleri korundu (`feedback_no_silent_deletes`); `Section` reuse (eski `DrawerSection` değil); üretim qty = endpoint canlı `totalShortage` (`extractShortageQty` AlertRow[] alıyordu, CalendarAlert taşımıyor → daha doğru/canlı). 5 it.todo → 5 gerçek source-regression. tsc 0 · my-files lint 0 · build 0 · 13 alert test dosyası/104 test yeşil. COMMIT/PUSH bekliyor.
 - [ ] **Faz 3** — cila + responsive + a11y + animasyon · COMMIT/PUSH —
 
 ### Faz 1 — yapılan dosyalar (tamamlandı)

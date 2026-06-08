@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId } from "react";
+import { useEffect, useId, useState } from "react";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { SevBadge } from "./SevBadge";
 import {
@@ -52,24 +52,141 @@ interface Props {
     onSyncRetry: (id: string) => void;
     /** Ürün-entity uyarılarında: bu ürünün TÜM açık uyarılarını toplu yoksay. */
     onDismissProduct?: (entityId: string) => void;
+    /** quote_expired: teklif süresi uzatıldıktan sonra (PATCH başarılı). */
+    onExtended?: () => void;
+    /** overdue_shipment: sevkiyat kaydedildikten sonra (POST /ship başarılı). */
+    onShipped?: () => void;
     isDemo: boolean;
     syncRetrying: boolean;
 }
 
+/** İlgili sipariş satırı (GET /api/products/[id]/shortages → items). */
+interface ShortageDetailRow {
+    shortageId: string;
+    orderId: string;
+    orderNumber: string;
+    customerName: string;
+    requestedQty: number;
+    availableQty: number;
+    shortageQty: number;
+}
+
 export function AlertCalendarDrawer({
-    alert, onClose, onAcknowledge, onResolve, onDismiss, onSyncRetry, onDismissProduct, isDemo, syncRetrying,
+    alert, onClose, onAcknowledge, onResolve, onDismiss, onSyncRetry, onDismissProduct,
+    onExtended, onShipped, isDemo, syncRetrying,
 }: Props) {
     const titleId = useId();
     const c = SEVERITY_CONFIG[alert.severity];
     const p = alert.product;
     const isResolved = alert.status === "resolved";
     const links = DRAWER_LINKS[alert.type] ?? [];
+    const entityId = alert.entityId;
+    const todayStr = new Date().toISOString().slice(0, 10);
+
+    const isQuoteExpired    = alert.type === "quote_expired" && !!entityId && !isResolved;
+    const isOverdueShipment = alert.type === "overdue_shipment" && !!entityId && !isResolved;
+    const isOrderShortage   = alert.type === "order_shortage" && !!entityId;
+
+    // ── quote_expired: süre uzatma formu ──
+    const [newDate, setNewDate] = useState(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 30);
+        return d.toISOString().slice(0, 10);
+    });
+    const [extending, setExtending] = useState(false);
+    const [extError, setExtError]   = useState<string | null>(null);
+
+    // ── overdue_shipment: sevk formu ──
+    const [shipDate, setShipDate]             = useState(todayStr);
+    const [trackingNumber, setTrackingNumber] = useState("");
+    const [carrier, setCarrier]               = useState("");
+    const [shipping, setShipping]             = useState(false);
+    const [shipError, setShipError]           = useState<string | null>(null);
+
+    // ── order_shortage: İLGİLİ SİPARİŞLER ──
+    const [shortageRows, setShortageRows]       = useState<ShortageDetailRow[] | null>(null);
+    const [shortageTotal, setShortageTotal]     = useState(0);
+    const [shortageLoading, setShortageLoading] = useState(false);
+    const [shortageError, setShortageError]     = useState<string | null>(null);
 
     useEffect(() => {
         const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
         window.addEventListener("keydown", handler);
         return () => window.removeEventListener("keydown", handler);
     }, [onClose]);
+
+    // İlgili siparişleri yükle (yalnız order_shortage + ürün entity'si varken)
+    useEffect(() => {
+        if (alert.type !== "order_shortage" || !entityId) return;
+        let cancelled = false;
+        void (async () => {
+            setShortageLoading(true);
+            setShortageError(null);
+            try {
+                const res = await fetch(`/api/products/${entityId}/shortages`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json() as { items?: ShortageDetailRow[]; totalShortage?: number };
+                if (!cancelled) {
+                    setShortageRows(data.items ?? []);
+                    setShortageTotal(data.totalShortage ?? 0);
+                }
+            } catch (e) {
+                if (!cancelled) setShortageError(e instanceof Error ? e.message : "Sipariş detayı yüklenemedi.");
+            } finally {
+                if (!cancelled) setShortageLoading(false);
+            }
+        })();
+        return () => { cancelled = true; };
+    }, [alert.type, entityId]);
+
+    const handleExtend = async () => {
+        if (isDemo || extending || !entityId) return;
+        if (!newDate || newDate < todayStr) { setExtError("Bugünden ileri bir tarih seçin."); return; }
+        setExtending(true);
+        setExtError(null);
+        try {
+            const res = await fetch(`/api/orders/${entityId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ quote_valid_until: newDate }),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
+            }
+            onExtended?.();
+        } catch (e) {
+            setExtError(e instanceof Error ? e.message : "Süre uzatılamadı.");
+        } finally {
+            setExtending(false);
+        }
+    };
+
+    const handleShip = async () => {
+        if (isDemo || shipping || !entityId) return;
+        if (!shipDate) { setShipError("Sevkiyat tarihi zorunludur."); return; }
+        setShipping(true);
+        setShipError(null);
+        try {
+            const body: Record<string, unknown> = { shipDate };
+            if (trackingNumber.trim()) body.trackingNumber = trackingNumber.trim();
+            if (carrier.trim()) body.carrier = carrier.trim();
+            const res = await fetch(`/api/orders/${entityId}/ship`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error((json as { error?: string }).error || `HTTP ${res.status}`);
+            }
+            onShipped?.();
+        } catch (e) {
+            setShipError(e instanceof Error ? e.message : "Sevkiyat kaydedilemedi.");
+        } finally {
+            setShipping(false);
+        }
+    };
 
     const covColor = p && p.coverageDays != null
         ? (p.coverageDays <= 3 ? "var(--danger-text)" : p.coverageDays <= 14 ? "var(--warning-text)" : "var(--success-text)")
@@ -170,6 +287,137 @@ export function AlertCalendarDrawer({
                         </Section>
                     )}
 
+                    {/* quote_expired → süre uzatma formu */}
+                    {isQuoteExpired && (
+                        <Section label="Teklif Süresini Uzat">
+                            <p style={{ ...textBlock, color: "var(--text-secondary)", marginTop: 0, marginBottom: "10px" }}>
+                                Teklifin geçerlilik süresini uzatarak müşteriyle görüşmeye devam edebilirsiniz.
+                            </p>
+                            <div style={formBoxStyle}>
+                                <label htmlFor={`ext-${alert.id}`} style={formLabelStyle}>YENİ GEÇERLİLİK TARİHİ</label>
+                                <input
+                                    id={`ext-${alert.id}`}
+                                    type="date"
+                                    value={newDate}
+                                    min={todayStr}
+                                    onChange={(e) => { setNewDate(e.target.value); setExtError(null); }}
+                                    disabled={isDemo || extending}
+                                    aria-label="Yeni geçerlilik tarihi"
+                                    style={formInputStyle}
+                                />
+                                {extError && <span role="alert" aria-live="polite" style={formErrorStyle}>{extError}</span>}
+                                <Button variant="primary" size="md" fullWidth disabled={isDemo || extending} onClick={handleExtend}>
+                                    {extending ? "Uzatılıyor..." : "Süreyi Uzat"}
+                                </Button>
+                            </div>
+                        </Section>
+                    )}
+
+                    {/* overdue_shipment → inline sevk formu */}
+                    {isOverdueShipment && (
+                        <Section label="Sevkiyatı Kaydet">
+                            <p style={{ ...textBlock, color: "var(--text-secondary)", marginTop: 0, marginBottom: "10px" }}>
+                                Sevkiyat bilgilerini girerek siparişi sevk edebilirsiniz.
+                            </p>
+                            <div style={formBoxStyle}>
+                                <label htmlFor={`ship-date-${alert.id}`} style={formLabelStyle}>SEVK TARİHİ</label>
+                                <input
+                                    id={`ship-date-${alert.id}`}
+                                    type="date"
+                                    value={shipDate}
+                                    onChange={(e) => { setShipDate(e.target.value); setShipError(null); }}
+                                    disabled={isDemo || shipping}
+                                    aria-label="Sevk tarihi"
+                                    style={formInputStyle}
+                                />
+                                <label htmlFor={`ship-track-${alert.id}`} style={formLabelStyle}>TAKİP NUMARASI (opsiyonel)</label>
+                                <input
+                                    id={`ship-track-${alert.id}`}
+                                    type="text"
+                                    value={trackingNumber}
+                                    maxLength={100}
+                                    placeholder="1Z…"
+                                    onChange={(e) => { setTrackingNumber(e.target.value); setShipError(null); }}
+                                    disabled={isDemo || shipping}
+                                    aria-label="Takip numarası"
+                                    style={formInputStyle}
+                                />
+                                <label htmlFor={`ship-carrier-${alert.id}`} style={formLabelStyle}>TAŞIYICI (opsiyonel)</label>
+                                <input
+                                    id={`ship-carrier-${alert.id}`}
+                                    type="text"
+                                    value={carrier}
+                                    maxLength={100}
+                                    placeholder="UPS, Aras…"
+                                    onChange={(e) => { setCarrier(e.target.value); setShipError(null); }}
+                                    disabled={isDemo || shipping}
+                                    aria-label="Taşıyıcı"
+                                    style={formInputStyle}
+                                />
+                                {shipError && <span role="alert" aria-live="polite" style={formErrorStyle}>{shipError}</span>}
+                                <Button variant="primary" size="md" fullWidth disabled={isDemo || shipping} onClick={handleShip}>
+                                    {shipping ? "Sevk ediliyor..." : "Sevk Et"}
+                                </Button>
+                            </div>
+                        </Section>
+                    )}
+
+                    {/* order_shortage → İLGİLİ SİPARİŞLER + üretim derin-linki */}
+                    {isOrderShortage && (
+                        <Section label="İlgili Siparişler">
+                            {shortageLoading && (
+                                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-tertiary)" }}>Yükleniyor…</p>
+                            )}
+                            {shortageError && (
+                                <p role="alert" aria-live="polite" style={{ margin: 0, fontSize: "12px", color: "var(--danger-text)" }}>
+                                    {shortageError}
+                                </p>
+                            )}
+                            {!shortageLoading && !shortageError && shortageRows && shortageRows.length === 0 && (
+                                <p style={{ margin: 0, fontSize: "12px", color: "var(--text-tertiary)" }}>
+                                    Açık shortage kalmadı (uyarı yakında otomatik kapanacak).
+                                </p>
+                            )}
+                            {!shortageLoading && !shortageError && shortageRows && shortageRows.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                                    {shortageRows.map((row) => (
+                                        <ButtonLink
+                                            key={row.shortageId}
+                                            href={`/dashboard/orders/${row.orderId}`}
+                                            variant="ghost"
+                                            size="md"
+                                            fullWidth
+                                            aria-label={`${row.orderNumber} siparişine git (eksik ${row.shortageQty}${p ? " " + p.unit : ""})`}
+                                            style={{ justifyContent: "space-between" }}
+                                        >
+                                            <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0 }}>
+                                                <span style={{ fontSize: "12px", fontWeight: 600, fontFamily: "var(--font-mono, monospace)" }}>{row.orderNumber}</span>
+                                                <span style={{ fontSize: "11px", color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{row.customerName}</span>
+                                            </span>
+                                            <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--danger-text)" }}>
+                                                {row.shortageQty}{p ? ` ${p.unit}` : ""} eksik →
+                                            </span>
+                                        </ButtonLink>
+                                    ))}
+                                </div>
+                            )}
+                            {!isResolved && entityId && (
+                                <ButtonLink
+                                    href={`/dashboard/production?productId=${entityId}${shortageTotal > 0 ? `&qty=${shortageTotal}` : ""}`}
+                                    variant="primary"
+                                    size="md"
+                                    fullWidth
+                                    target="_blank"
+                                    rel="noopener"
+                                    aria-label="Üretim emri başlat (yeni sekmede)"
+                                    style={{ marginTop: "8px" }}
+                                >
+                                    Üretim Emri Başlat ↗
+                                </ButtonLink>
+                            )}
+                        </Section>
+                    )}
+
                     {!isResolved && (links.length > 0 || alert.type === "sync_issue") && (
                         <Section label="Önerilen Aksiyonlar">
                             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -236,3 +484,20 @@ function Stat({ value, label }: { value: number; label: string }) {
 }
 
 const textBlock: React.CSSProperties = { fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.65 };
+
+const formBoxStyle: React.CSSProperties = {
+    display: "flex", flexDirection: "column", gap: "8px",
+    padding: "12px 14px", borderRadius: "8px",
+    background: "var(--surface-subtle)", border: "0.5px solid var(--border-tertiary)",
+};
+const formLabelStyle: React.CSSProperties = {
+    fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)",
+    letterSpacing: "0.04em", textTransform: "uppercase",
+};
+const formInputStyle: React.CSSProperties = {
+    fontSize: "13px", padding: "8px 10px",
+    border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
+    background: "var(--bg-primary)", color: "var(--text-primary)",
+    width: "100%", boxSizing: "border-box",
+};
+const formErrorStyle: React.CSSProperties = { fontSize: "11px", color: "var(--danger-text)" };

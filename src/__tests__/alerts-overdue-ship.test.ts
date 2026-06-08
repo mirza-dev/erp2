@@ -259,7 +259,28 @@ describe("overdue_shipment — takvim drawer (Faz 1) kaynak regresyonu", () => {
         expect(block).toContain("/dashboard/orders");
     });
 
-    // ── Faz 2'ye taşınacak (drawer zenginliği) ──
-    it.todo("Faz 2: overdue_shipment inline sevk formu (shipDate/tracking/carrier → POST /api/orders/[id]/ship)");
-    it.todo("Faz 2: başarılı sevk → alert resolve + Paraşüt/email fire-and-forget");
+    // ── Faz 2: drawer zenginliği — inline sevk formu drawer'a taşındı ──
+    it("Faz 2: overdue_shipment inline sevk formu (shipDate/tracking/carrier → POST /api/orders/[id]/ship)", () => {
+        expect(drawerSource).toContain("isOverdueShipment");
+        expect(drawerSource).toContain("Sevkiyatı Kaydet");
+        expect(drawerSource).toContain("const handleShip");
+        expect(drawerSource).toContain("shipDate");
+        expect(drawerSource).toContain("trackingNumber");
+        expect(drawerSource).toContain("carrier");
+        expect(drawerSource).toMatch(/\/api\/orders\/\$\{entityId\}\/ship/);
+        expect(drawerSource).toMatch(/method:\s*["']POST["']/);
+        // opsiyonel alanlar 100 karakter sınırı (endpoint validation paritesi)
+        expect(drawerSource).toMatch(/maxLength=\{100\}/);
+    });
+
+    it("Faz 2: başarılı sevk → onShipped callback (parent refetch; endpoint Faz 7'de alert resolve eder)", () => {
+        expect(drawerSource).toContain("onShipped?.()");
+        const pageSource = readFileSync(
+            resolve(process.cwd(), "src/app/dashboard/alerts/page.tsx"),
+            "utf-8",
+        );
+        const block = pageSource.split("onShipped={")[1]?.slice(0, 200) ?? "";
+        expect(block).toContain("refetch()");
+        expect(block).toMatch(/Sevkiyat kaydedildi/);
+    });
 });

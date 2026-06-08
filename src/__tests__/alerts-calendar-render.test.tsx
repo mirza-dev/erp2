@@ -6,7 +6,20 @@ import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CalendarGrid } from "@/components/alerts/CalendarGrid";
 import { DayDetailPanel } from "@/components/alerts/DayDetailPanel";
+import { AlertCalendarDrawer } from "@/components/alerts/AlertCalendarDrawer";
 import { expandAlertOccurrences, type CalendarAlert } from "@/lib/alert-calendar";
+
+const noop = () => {};
+function renderDrawer(over: Partial<CalendarAlert>) {
+    return renderToStaticMarkup(
+        <AlertCalendarDrawer
+            alert={ca(over)}
+            onClose={noop} onAcknowledge={noop} onResolve={noop} onDismiss={noop}
+            onSyncRetry={noop} onDismissProduct={noop} onExtended={noop} onShipped={noop}
+            isDemo={false} syncRetrying={false}
+        />,
+    );
+}
 
 function ca(over: Partial<CalendarAlert>): CalendarAlert {
     return {
@@ -78,5 +91,57 @@ describe("DayDetailPanel render", () => {
             <DayDetailPanel selectedDate={today} occurrences={[]} onDetail={() => {}} onDismiss={() => {}} />,
         );
         expect(html).toContain("BUGÜN");
+    });
+});
+
+// Faz 2: tip-özel zengin bölümler gerçekten render ediliyor mu (gating doğru mu)
+describe("AlertCalendarDrawer render — Faz 2 zengin bölümler", () => {
+    it("quote_expired (open) → süre uzatma formu render", () => {
+        const html = renderDrawer({
+            type: "quote_expired", product: null, orderCode: "TKL-1", status: "open",
+            entityId: "ord-1", entityType: "order",
+        });
+        expect(html).toContain("Teklif Süresini Uzat");
+        expect(html).toContain("Süreyi Uzat");
+        expect(html).toContain('type="date"');
+    });
+
+    it("overdue_shipment (open) → inline sevk formu render (3 alan)", () => {
+        const html = renderDrawer({
+            type: "overdue_shipment", product: null, orderCode: "SIP-1", status: "open",
+            entityId: "ord-2", entityType: "order",
+        });
+        expect(html).toContain("Sevkiyatı Kaydet");
+        expect(html).toContain("SEVK TARİHİ");
+        expect(html).toContain("TAKİP NUMARASI");
+        expect(html).toContain("TAŞIYICI");
+        expect(html).toContain("Sevk Et");
+    });
+
+    it("order_shortage (open) → İlgili Siparişler + üretim derin-linki render", () => {
+        const html = renderDrawer({
+            type: "order_shortage", status: "open", entityId: "p1", entityType: "product",
+        });
+        expect(html).toContain("İlgili Siparişler");
+        expect(html).toContain("Üretim Emri Başlat");
+        expect(html).toContain("/dashboard/production?productId=p1");
+    });
+
+    it("resolved quote_expired → süre uzatma formu GİZLİ (isResolved gating)", () => {
+        const html = renderDrawer({
+            type: "quote_expired", product: null, orderCode: "TKL-1", status: "resolved",
+            entityId: "ord-1", entityType: "order",
+        });
+        expect(html).not.toContain("Teklif Süresini Uzat");
+        expect(html).toContain("Çözüldü"); // footer resolved durumu
+    });
+
+    it("entityId null (orphaned) → zengin form render edilmez, nav linki kalır", () => {
+        const html = renderDrawer({
+            type: "overdue_shipment", product: null, orderCode: "SIP-1", status: "open",
+            entityId: null, entityType: "order",
+        });
+        expect(html).not.toContain("Sevkiyatı Kaydet");
+        expect(html).toContain("Sevkiyatı Yönet"); // DRAWER_LINKS nav fallback
     });
 });

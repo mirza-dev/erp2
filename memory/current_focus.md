@@ -5,9 +5,13 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-06-08 (**Uyarılar → Takvim Görünümü — Faz 1 (iskelet + hedef-tarih enrichment + temel drawer)**)
+## Son Tamamlanan İş — 2026-06-08 (**Uyarılar → Takvim Görünümü — Faz 2 (drawer zenginliği: inline formlar + related-orders)**)
 
 `design_handoff_alerts_calendar/` tasarımı uygulanıyor (Apple Calendar tarzı aylık takvim). **Fazlı plan kalıcı:** `ALERTS_CALENDAR_PLAN.md` (repo kökü) — "nerede kaldık?" oradaki Durum Takibi. **Kullanıcı kararları:** hedef-tarih TAM ilk sürümde / drawer zenginliği ayrı faz / fazlı ilerle + MD'ye kaydet. **Kritik gerçek:** prototip mock; gerçek `AlertRow` `dueDate`/`time`/`resolution` taşımaz → bu iş 2.967 satırlık olgun sayfanın takvime **yeniden-derilemesi** (tüm RBAC/demo/scan/ai-suggest/Faz7 sevk/Faz10 shortage/sync-retry KORUNUR — `feedback_no_silent_deletes`).
+
+**Faz 2 YAPILDI (ÇALIŞILDI/green, COMMIT/PUSH bekliyor — Faz 1 `4d55d9b` local'den AYRI commit):** `AlertCalendarDrawer`'a 3 tip-özel zengin bölüm + `onExtended`/`onShipped` parent callback'leri (→ `refetch()`+toast). **quote_expired:** süre uzatma formu (PATCH `/api/orders/[id]` `{quote_valid_until}`; `newDate≥bugün` validate; server `serviceUpdateQuoteDeadline`→`resolveQuoteExpiredAlerts` yeni-tarih≥bugün ise alert resolve eder → `onExtended`=refetch yeterli, toast "kapatıldı" optimistik DEĞİL). **overdue_shipment:** inline sevk formu (shipDate zorunlu + trackingNumber/carrier opsiyonel maxLength 100 → POST `/api/orders/[id]/ship`; endpoint Faz 7 awaited `dbBatchResolveAlerts` ile overdue resolve eder). **order_shortage:** İLGİLİ SİPARİŞLER (`useEffect` GET `/api/products/[id]/shortages` → loading/error/empty/list satırları [orderNumber+customerName+shortageQty link `aria-label`] + üretim derin-linki `/dashboard/production?productId&qty=totalShortage` yeni sekme `target=_blank rel=noopener`). Tümü `!isResolved`+`entityId` guard'lı; mevcut nav linkleri KORUNDU; `Section` reuse (eski `DrawerSection` değil); üretim qty = endpoint canlı `totalShortage` (eski `extractShortageQty` AlertRow[] alıyordu, CalendarAlert taşımıyor → **davranış değişimi**: tüm açık shortage toplamı, daha doğru — kullanıcı smoke'ta prefill qty doğrulamalı). **ADVISOR done-check:** extend-resolution zinciri doğrulandı (tek blocker, çözüldü); source-regression yetmez uyarısıyla `alerts-calendar-render.test.tsx`'e **5 gerçek `renderToStaticMarkup` fixture** eklendi (open→form render / resolved→gizli / entityId null→nav fallback; effect SSR'da çalışmaz=fetch mock gerekmez). 5 it.todo → 5 gerçek source-regression. tsc 0 · my-files lint 0 · build 0 (`○ /dashboard/alerts`) · 13 alert test dosyası/**109 test** yeşil. **Lint regresyonu DÜZELTİLDİ:** repo kökü `dashboard/` scraped junk (charts.jsx/dashboard-app.jsx/data.js/uploads) + `lint` script bare `eslint`'e regresse olmuştu → `npm run lint` repo geneli kırmızıydı. Çözüm: `package.json` `lint`→`eslint src` (memory baseline) + `eslint.config.mjs` globalIgnores'a `dashboard/**` (cwd-relative=yalnız kök dashboard; `src/app/dashboard` lint edilmeye devam, doğrulandı). `npm run lint` + `eslint .` ikisi de EXIT 0. **Sıradaki:** Faz 1+2 PUSH (kullanıcı browser smoke + worktree mirror) → Faz 3 (cila/responsive/a11y/animasyon).
+
+<details><summary>Önceki: Faz 1 (iskelet + hedef-tarih enrichment + temel drawer)</summary>
 
 **Faz 1 YAPILDI (ÇALIŞILDI/green, COMMIT/PUSH bekliyor):**
 - **`alert-calendar.ts`** (YENİ pure) — tarih matematiği + occurrence (event+due) + CalendarAlert/Occurrence tipleri + getMonthDays(35/42 Pzt-başı) + SEVERITY_CONFIG + ALERT_CLASSES (+24 test).
@@ -20,7 +24,9 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 **Doğrulama:** tsc 0 · lint 0 · build 0 (`ƒ /api/alerts/calendar` + `ƒ Proxy` + `○ /dashboard/alerts`) · vitest tam yeşil (+44 net yeni test, 5 it.todo Faz 2; pdf-render mupdf kuruldu→11/11). **mupdf yerel kuruldu** (package.json'da `^1.27.0` kayıtlıydı, node_modules eksikti).
 
-**DURUM: Faz 1 ÇALIŞILDI/green; COMMIT/PUSH onayı bekliyor (push = 2 Coolify prod deploy).** **Sıradaki:** Faz 2 (drawer zenginliği — order_deadline süre uzatma + overdue_shipment inline sevk formu + order_shortage related-orders/üretim deep-link) → Faz 3 (cila/responsive/a11y/animasyon). **⚠️ Push-öncesi:** worktree mirror (erp2=main / proje-codex=codex-experiment) hizalaması + manuel tarayıcı smoke (takvim render/ay gezinme/gün paneli/drawer aksiyonları/koyu+aydınlık).
+**DURUM: Faz 1 ÇALIŞILDI/green; COMMIT/PUSH onayı bekliyor (push = 2 Coolify prod deploy).** Faz 1 commit `4d55d9b` (local, unpushed).
+
+</details>
 
 <details><summary>Önceki: Login "Monolith" (F) redesign — TR/EN + tema + Google OAuth + reset</summary>
 

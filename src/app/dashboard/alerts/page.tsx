@@ -455,6 +455,16 @@ export default function AlertsPage() {
                     onDismiss={dismissAlert}
                     onSyncRetry={retrySyncAlert}
                     onDismissProduct={dismissProduct}
+                    onExtended={() => {
+                        setDrawerAlertId(null);
+                        void refetch();
+                        toast({ type: "success", message: "Teklif süresi güncellendi ve uyarı kapatıldı." });
+                    }}
+                    onShipped={() => {
+                        setDrawerAlertId(null);
+                        void refetch();
+                        toast({ type: "success", message: "Sevkiyat kaydedildi ve uyarı kapatıldı." });
+                    }}
                     isDemo={isDemo}
                     syncRetrying={syncRetrying === drawerAlert.id}
                 />
