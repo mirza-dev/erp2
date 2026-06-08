@@ -219,6 +219,23 @@ describe("serviceApplyImportDocument — product flow", () => {
         expect(mockCreateProduct).not.toHaveBeenCalled();
     });
 
+    it("SKU çakışması (unique violation) → ham Postgres yerine dostça mesaj + skipped++", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([
+            makeLine("1", { extracted_name: "GLOBE VALVE", extracted_sku: "DUP-SKU" }),
+        ]);
+        mockCreateProduct.mockRejectedValueOnce(
+            new Error('duplicate key value violates unique constraint "products_sku_key"'),
+        );
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", "user-1");
+        expect(r.products_created).toBe(0);
+        expect(r.skipped).toBe(1);
+        // dostça mesaj + SKU; ham "duplicate key" sızmaz
+        expect(r.errors.some(e => e.includes("Bu SKU zaten kullanımda") && e.includes("DUP-SKU"))).toBe(true);
+        expect(r.errors.some(e => /duplicate key/i.test(e))).toBe(false);
+    });
+
     it("matched satır → attributes FILL-EMPTY (dolu dn KORUNUR, boş pn_class eklenir)", async () => {
         mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([
@@ -1132,5 +1149,28 @@ describe("serviceApplyImportDocument — Faz D katalog görseli", () => {
         expect(r.images_extracted).toBe(1);
         // görsel eklendiği için "atlandı" sayılmaz
         expect(r.skipped).toBe(0);
+    });
+});
+
+describe("friendlyApplyRowError — SKU çakışması dostça mesaj (pure)", () => {
+    it("unique violation + sku → dostça mesaj + sku içerir", async () => {
+        const { friendlyApplyRowError } = await import("@/lib/services/import-apply-service");
+        const out = friendlyApplyRowError('duplicate key value violates unique constraint "products_sku_key"', "ABC-1");
+        expect(out).toContain("Bu SKU zaten kullanımda");
+        expect(out).toContain("ABC-1");
+        expect(out).not.toMatch(/duplicate key/i);
+    });
+
+    it('"unique" kelimesi geçen hata + sku boş → sku eki olmadan dostça mesaj', async () => {
+        const { friendlyApplyRowError } = await import("@/lib/services/import-apply-service");
+        const out = friendlyApplyRowError("unique constraint violation", null);
+        expect(out).toContain("Bu SKU zaten kullanımda");
+        expect(out).not.toContain(":");
+    });
+
+    it("unique ile ilgisiz hata → olduğu gibi geçer (passthrough)", async () => {
+        const { friendlyApplyRowError } = await import("@/lib/services/import-apply-service");
+        expect(friendlyApplyRowError("SKU eksik", "X")).toBe("SKU eksik");
+        expect(friendlyApplyRowError("ad eksik", null)).toBe("ad eksik");
     });
 });

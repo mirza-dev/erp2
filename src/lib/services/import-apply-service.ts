@@ -88,6 +88,22 @@ function emptyResult(): ApplyResult {
 }
 
 /**
+ * Per-row apply hatasını kullanıcı-dostu mesaja çevirir. products tablosunda
+ * tek UNIQUE kısıt `sku` → create veya SKU-değiştiren update unique ihlali
+ * verirse ham Postgres mesajı (`duplicate key value violates unique
+ * constraint ...`) yerine net Türkçe rehber gösterilir. Diğer hatalar
+ * olduğu gibi geçer. POST /api/products `msg.includes("unique")` paterniyle
+ * tutarlı (kök helper'a dokunmadan, downstream map).
+ */
+export function friendlyApplyRowError(raw: string, sku: string | null): string {
+    if (/unique/i.test(raw) || /duplicate key/i.test(raw)) {
+        const skuPart = sku && sku.trim().length > 0 ? `: ${sku.trim()}` : "";
+        return `Bu SKU zaten kullanımda${skuPart} — farklı bir SKU girin veya eşleşen ürünü seçin.`;
+    }
+    return raw;
+}
+
+/**
  * Yeni ürün adayı satırından minimal `CreateProductInput` üretir. Mevcut
  * `extracted_name`/`extracted_sku` yoksa hata fırlatır (DB NOT NULL).
  * AI attributes Faz 1 dinamik şema slot'una geçer; product_type tekstüel
@@ -589,7 +605,8 @@ export async function serviceApplyImportDocument(
                     }
                 }
             } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
+                const raw = err instanceof Error ? err.message : String(err);
+                const msg = friendlyApplyRowError(raw, line.extracted_sku);
                 result.errors.push(`Satır ${line.line_number}: ${msg}`);
                 result.skipped += 1;
             }
