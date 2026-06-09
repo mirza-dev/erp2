@@ -16,7 +16,8 @@ const SOURCE = readFileSync(
 
 describe("QuoteForm Faz 2 — GTİP soft warn (V3-A1)", () => {
     it("findMissingHsLines @/lib/quote-validation'tan import edilir", () => {
-        expect(SOURCE).toMatch(/import\s*\{\s*findMissingHsLines\s*\}\s*from\s*"@\/lib\/quote-validation"/);
+        // 088 inline-send ile aynı modülden ek named import'lar eklendi; findMissingHsLines yine import edilmeli.
+        expect(SOURCE).toMatch(/import\s*\{[^}]*\bfindMissingHsLines\b[^}]*\}\s*from\s*"@\/lib\/quote-validation"/);
     });
 
     it("missingHsLines derived (rows.map → findMissingHsLines)", () => {

@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { getQuoteActions, isQuoteEditable, getQuoteConvertAction, getQuoteReviseEligible, type QuoteAction } from "../_utils/quote-display";
+import { applySendResultToast, sendQuoteEmail } from "../_utils/send-result";
 import QuoteForm from "../_components/QuoteForm";
 import type { QuoteDetail } from "@/lib/mock-data";
 import type { QuoteStatus } from "@/lib/database.types";
@@ -122,17 +123,11 @@ export default function QuoteDetailPage() {
             setQuote(data);
 
             // Faz 4 + 088: send sonucu — arşiv/rezervasyon uyarısı veya shortage görünür
-            // (sessiz değil). Öncelik: arşiv fail > rezervasyon fail > shortage > başarı.
-            if (transition === "sent" && data.archiveWarning) {
-                toast({ type: "warning", message: "Teklif gönderildi ancak arşiv oluşturulamadı." });
-            } else if (transition === "sent" && data.reservationWarning) {
-                toast({ type: "warning", message: "Teklif gönderildi ancak stok rezervasyonu (bekleyen sipariş) oluşturulamadı." });
-            } else if (transition === "sent" && Array.isArray(data.shortages) && data.shortages.length > 0) {
-                const total = data.shortages.reduce((s: number, x: { shortage: number }) => s + x.shortage, 0);
-                toast({ type: "warning", message: `Teklif gönderildi · stok kısmen rezerve edildi (${total} birim yetersiz). Bekleyen sipariş: ${data.reservedOrderNumber ?? "—"}` });
+            // (sessiz değil). Cascade paylaşılan helper'da (yeni-teklif formu ile kilit adımda).
+            if (transition === "sent") {
+                applySendResultToast(toast, data);
             } else {
                 const labels: Record<string, string> = {
-                    sent: "Teklif gönderildi · stok rezerve edildi (bekleyen sipariş)",
                     accepted: "Teklif kabul edildi",
                     rejected: "Teklif reddedildi · stok rezervasyonu kaldırıldı",
                 };
@@ -142,7 +137,7 @@ export default function QuoteDetailPage() {
             // Gönder onayında "müşteriye e-posta da gönder" işaretliyse, başarılı
             // transition SONRASI ayrı endpoint'i çağır (transition'ı bozmaz).
             if (transition === "sent" && sendEmailChecked && data.customerEmail?.trim()) {
-                await sendQuoteToCustomer();
+                await sendQuoteEmail(params.id, toast);
             }
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.";
@@ -152,22 +147,8 @@ export default function QuoteDetailPage() {
         }
     };
 
-    // ── Müşteriye teklif e-postası (HTML ek) ─────────────────────────────────
+    // ── Müşteriye teklif e-postası: paylaşılan `sendQuoteEmail` (_utils/send-result).
     // "Gönder" transition'ı başarılı olduktan sonra çağrılır (checkbox işaretliyse).
-    // Transition'dan bağımsız endpoint; başarısızlık transition'ı geri almaz.
-    const sendQuoteToCustomer = async () => {
-        try {
-            const res = await fetch(`/api/quotes/${params.id}/send-email`, { method: "POST" });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok) {
-                toast({ type: "success", message: "Teklif müşteriye e-posta ile gönderildi." });
-            } else {
-                toast({ type: "warning", message: data.error || "Teklif gönderildi ancak e-posta iletilemedi." });
-            }
-        } catch {
-            toast({ type: "warning", message: "Teklif gönderildi ancak e-posta iletilemedi." });
-        }
-    };
 
     // ── Accept + sipariş handler (Faz 6, atomik) ─────────────────────────────
     // Eski "Kabul Et" (PATCH transition) + "Siparişe Dönüştür" (/convert) iki

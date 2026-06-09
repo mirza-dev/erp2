@@ -198,9 +198,25 @@ describe("Teklif detay UI — gönder rezervasyon notu + shortage toast", () => 
         expect(PAGE).toMatch(/role="note"/);
     });
 
-    it("send sonucu shortage/rezervasyon uyarısı toast'ları", () => {
-        expect(PAGE).toMatch(/data\.reservationWarning/);
-        expect(PAGE).toMatch(/data\.shortages/);
-        expect(PAGE).toMatch(/reservedOrderNumber/);
+    it("send sonucu toast cascade paylaşılan helper'a delege edildi", () => {
+        // Cascade artık _utils/send-result.ts'te (yeni-teklif inline-send ile ortak).
+        expect(PAGE).toMatch(/applySendResultToast/);
+    });
+});
+
+// ── Paylaşılan send-result helper ─────────────────────────────
+describe("send-result helper — toast cascade + e-posta", () => {
+    const HELPER = readFileSync(join(process.cwd(), "src/app/dashboard/quotes/_utils/send-result.ts"), "utf8");
+
+    it("cascade önceliği: arşiv > rezervasyon > shortage > başarı", () => {
+        expect(HELPER).toMatch(/data\.archiveWarning/);
+        expect(HELPER).toMatch(/data\.reservationWarning/);
+        expect(HELPER).toMatch(/data\.shortages/);
+        expect(HELPER).toMatch(/reservedOrderNumber/);
+    });
+
+    it("sendQuoteEmail /send-email POST eder", () => {
+        expect(HELPER).toMatch(/\/send-email/);
+        expect(HELPER).toMatch(/method:\s*"POST"/);
     });
 });

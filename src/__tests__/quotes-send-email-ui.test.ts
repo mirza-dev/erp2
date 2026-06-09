@@ -35,10 +35,14 @@ describe("[id]/page.tsx: müşteriye e-posta checkbox + gönderim", () => {
         expect(src).toMatch(/Bu teklifte müşteri e-postası yok/);
     });
 
-    it("başarılı sent transition sonrası /send-email çağrılır", () => {
-        expect(src).toContain("/send-email");
-        expect(src).toContain("sendQuoteToCustomer");
+    it("başarılı sent transition sonrası /send-email çağrılır (paylaşılan helper)", () => {
+        // sendQuoteToCustomer inline'dı; artık paylaşılan sendQuoteEmail (_utils/send-result).
+        expect(src).toContain("sendQuoteEmail");
         // yalnız checkbox işaretli + e-posta varsa
         expect(src).toMatch(/sendEmailChecked\s*&&\s*data\.customerEmail/);
+    });
+
+    it("send sonucu toast cascade paylaşılan helper'a delege edildi", () => {
+        expect(src).toContain("applySendResultToast");
     });
 });

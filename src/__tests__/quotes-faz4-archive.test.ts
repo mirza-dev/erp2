@@ -382,14 +382,22 @@ describe("archiveWarning wiring (send arşiv fail görünür)", () => {
     it("route sent success response'una archiveWarning ekler", () => {
         expect(transitionRoute).toMatch(/archiveWarning:\s*result\.archiveWarning/);
     });
-    it("UI: data.archiveWarning → warning toast (success yerine)", () => {
-        expect(detailPage).toMatch(/data\.archiveWarning/);
-        expect(detailPage).toMatch(/arşiv oluşturulamadı/i);
+    it("UI: data.archiveWarning → warning toast (paylaşılan helper)", () => {
+        // Cascade _utils/send-result.ts'e taşındı; detay sayfası onu çağırır.
+        expect(detailPage).toMatch(/applySendResultToast/);
+        const helper = readFileSync(
+            join(process.cwd(), "src/app/dashboard/quotes/_utils/send-result.ts"), "utf8",
+        );
+        expect(helper).toMatch(/data\.archiveWarning/);
+        expect(helper).toMatch(/arşiv oluşturulamadı/i);
     });
     // Bulgu 3 (2. review tur): yanıltıcı "otomatik denenecek" vaadi kaldırıldı
     // (gerçek recover yalnız Faz 6 accept'te — reject/expire'da hiç denenmez).
     it("UI: archive-fail toast yanıltıcı 'otomatik denenecek' vaadi İÇERMEZ", () => {
-        expect(detailPage).not.toMatch(/otomatik denenecek/i);
+        const helper = readFileSync(
+            join(process.cwd(), "src/app/dashboard/quotes/_utils/send-result.ts"), "utf8",
+        );
+        expect(helper).not.toMatch(/otomatik denenecek/i);
     });
 });
 

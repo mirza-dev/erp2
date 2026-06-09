@@ -2,15 +2,17 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Eraser, FileText, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
+import { Eraser, FileText, Plus, RotateCcw, Save, Send, Trash2 } from "lucide-react";
 import type { QuoteData } from "../components/quote-types";
 import Button from "@/components/ui/Button";
+import { useToast } from "@/components/ui/Toast";
 import { useData } from "@/lib/data-context";
 import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import type { QuoteStatus } from "@/lib/database.types";
 import { buildQuoteLineDescription } from "@/lib/quote-description-builder";
-import { findMissingHsLines } from "@/lib/quote-validation";
+import { findMissingHsLines, validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
+import { applySendResultToast, sendQuoteEmail } from "../_utils/send-result";
 import { applyTemplateToField, templatesForField } from "@/lib/quote-note-templates";
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 
@@ -76,13 +78,20 @@ interface QuoteFormProps {
     initialData?: QuoteDetail;
     readOnly?: boolean;
     status?: QuoteStatus;
+    // Yeni-teklif sayfasında inline "Gönder" butonu + çift onay akışı (yalnız
+    // /quotes/new'de true; detay sayfasının kendi header Gönder'i var → çift buton önlenir).
+    enableInlineSend?: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function QuoteForm({ initialData, readOnly, status }: QuoteFormProps) {
+export default function QuoteForm({ initialData, readOnly, status, enableInlineSend }: QuoteFormProps) {
     // ── Data context ──────────────────────────────────────────────────────────
     const { customers, products } = useData();
+    // Global toast (dashboard layout'ta ToastProvider) — gönderim akışı mesajları
+    // client-side navigasyonda da hayatta kalır (yerel showToast yalnız "Kaydet").
+    // `pushToast`: yerel `toast` state'i (alt taraftaki bildirim) ile ad çakışmasını önler.
+    const { toast: pushToast } = useToast();
 
     // ── State ────────────────────────────────────────────────────────────────
     const [rows, setRows] = useState<QuoteRow[]>([]);
@@ -98,6 +107,14 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
     // DB persistence state
     const [quoteId, setQuoteId] = useState<string | null>(initialData?.id ?? null);
     const [saving, setSaving] = useState(false);
+
+    // Inline "Gönder" çift-onay akışı (enableInlineSend). 0=kapalı · 1=gözden geçir · 2=son onay.
+    const [sendStep, setSendStep] = useState<0 | 1 | 2>(0);
+    const [sending, setSending] = useState(false);
+    const [sendEmailChecked, setSendEmailChecked] = useState(true);
+    // Gönderim sonrası draft localStorage temizliği ile unmount arasında autoSave'in
+    // teklif_v3'ü geri yazmasını önler (clear→push penceresinde).
+    const suppressAutoSaveRef = useRef(false);
 
     // Manual total overrides
     const [ovSub, setOvSub] = useState<number | null>(null);
@@ -488,7 +505,7 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
 
     // ── Auto-save to localStorage ─────────────────────────────────────────────
     const autoSave = useCallback(() => {
-        if (readOnly) return;
+        if (readOnly || suppressAutoSaveRef.current) return;
         try {
             // Faz 4b Review P2-B: descDirty boolean[] index-aligned persist.
             // Refresh sonrası "auto-generated vs user-edited" ayrımı korunur;
@@ -704,35 +721,119 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
         };
     }
 
-    async function handleSave() {
-        setSaving(true);
+    // Teklifi kaydet (yeni → POST, mevcut → PATCH) ve quote id'sini döndür.
+    // Hata → null. `skipUrlSync` (inline-send): replaceState YAPMA — sonrasında
+    // router.push ile detaya gidilir; replaceState/push desync hazard'ını eler.
+    async function persistQuote(opts?: { skipUrlSync?: boolean }): Promise<string | null> {
+        const payload = buildQuotePayload();
         try {
-            const payload = buildQuotePayload();
             if (quoteId === null) {
                 const res = await fetch("/api/quotes", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
                 });
-                if (!res.ok) throw new Error("Kaydetme başarısız");
+                if (!res.ok) return null;
                 const data = await res.json() as QuoteDetail;
                 setQuoteId(data.id);
                 setQuoteNo(data.quoteNumber);
-                window.history.replaceState(null, "", "/dashboard/quotes/" + data.id);
-            } else {
-                const res = await fetch("/api/quotes/" + quoteId, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                });
-                if (!res.ok) throw new Error("Güncelleme başarısız");
+                if (!opts?.skipUrlSync) {
+                    window.history.replaceState(null, "", "/dashboard/quotes/" + data.id);
+                }
+                return data.id;
             }
+            const res = await fetch("/api/quotes/" + quoteId, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) return null;
+            return quoteId;
+        } catch {
+            return null;
+        }
+    }
+
+    async function handleSave() {
+        setSaving(true);
+        const id = await persistQuote();
+        if (id !== null) {
             autoSave();
             showToast("Kaydedildi", "success");
-        } catch {
+        } else {
             showToast("Kaydetme hatası", "error");
-        } finally {
-            setSaving(false);
+        }
+        setSaving(false);
+    }
+
+    // ── Inline "Gönder" (çift onay) ────────────────────────────────────────────
+    // Adım 0: ön-validasyon (sunucu gönderim sözleşmesini BİREBİR aynalar — iki
+    // onaydan sonra 400 yememek için). Temizse Modal 1 (gözden geçir) açılır.
+    function handleRequestSend() {
+        if (!custCompany.trim()) {
+            pushToast({ type: "error", message: "Teklifi göndermeden önce müşteri firma adı girilmeli." });
+            return;
+        }
+        // buildQuotePayload ile aynı satır filtresi → hata satır numaraları persist
+        // edilen kalemlerle (sunucunun gördüğüyle) birebir hizalı.
+        const valLines = rows
+            .filter(r => r.code.trim() || r.desc.trim())
+            .map(r => ({
+                product_id: r.productId || null,
+                unit_price: parseFloat(r.price) || 0,
+                quantity: parseFloat(r.qty) || 0,
+                hs_code: r.hs,
+            }));
+        if (valLines.length === 0) {
+            pushToast({ type: "error", message: "Gönderilecek en az bir kalem girilmeli." });
+            return;
+        }
+        const qtyErr = validateQuoteLineQuantities(valLines);
+        if (qtyErr) { pushToast({ type: "error", message: qtyErr }); return; }
+        const sendErr = validateQuoteForSend({ customer_address: custAddress, lines: valLines });
+        if (sendErr) { pushToast({ type: "error", message: sendErr }); return; }
+        setSendStep(1);
+    }
+
+    // Final onay: kaydet → sent transition → sonuç toast → (e-posta) → detaya git.
+    async function handleSendInline() {
+        setSendStep(0);
+        setSending(true);
+        suppressAutoSaveRef.current = true;
+        try {
+            const id = await persistQuote({ skipUrlSync: true });
+            if (id === null) {
+                pushToast({ type: "error", message: "Teklif kaydedilemedi, gönderilemedi." });
+                suppressAutoSaveRef.current = false;
+                setSending(false);
+                return;
+            }
+            const res = await fetch("/api/quotes/" + id, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ transition: "sent" }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                pushToast({ type: "error", message: data.error || "Teklif gönderilemedi." });
+                suppressAutoSaveRef.current = false;
+                setSending(false);
+                return;
+            }
+            applySendResultToast(pushToast, data);
+            if (sendEmailChecked && custEmail.trim()) {
+                await sendQuoteEmail(id, pushToast);
+            }
+            // Sonraki "Yeni Teklif" gönderilmiş teklifi restore etmesin.
+            try {
+                localStorage.removeItem("teklif_v3");
+                localStorage.removeItem("teklif_v3_full");
+            } catch { /* noop */ }
+            router.push("/dashboard/quotes/" + id);
+        } catch (err) {
+            pushToast({ type: "error", message: err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu." });
+            suppressAutoSaveRef.current = false;
+            setSending(false);
         }
     }
 
@@ -863,10 +964,23 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
                             size="sm"
                             leftIcon={<Save size={14} />}
                             onClick={handleSave}
-                            disabled={saving}
+                            disabled={saving || sending}
                             loading={saving}
                         >
                             {saving ? "Kaydediliyor…" : "Kaydet"}
+                        </Button>
+                        )}
+                        {/* 088: yeni-teklif inline "Gönder" — çift onay (handleRequestSend → modal). */}
+                        {enableInlineSend && !readOnly && (
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            leftIcon={<Send size={14} />}
+                            onClick={handleRequestSend}
+                            disabled={saving || sending}
+                            loading={sending}
+                        >
+                            {sending ? "Gönderiliyor…" : "Gönder"}
                         </Button>
                         )}
                     </div>
@@ -1490,6 +1604,86 @@ export default function QuoteForm({ initialData, readOnly, status }: QuoteFormPr
 
                 </div>{/* /form-card */}
             </div>{/* /page-wrapper */}
+
+            {/* ── Inline Gönder — çift onay modalları (enableInlineSend) ── */}
+            {sendStep > 0 && (
+                <>
+                    <div
+                        onClick={() => setSendStep(0)}
+                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)" }}
+                    />
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="quote-send-dialog-title"
+                        style={{
+                            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+                            zIndex: 101, background: "var(--bg-primary)",
+                            border: "0.5px solid var(--accent-border)", borderRadius: "8px",
+                            padding: "20px 24px", width: "400px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                        }}
+                    >
+                        <div id="quote-send-dialog-title" style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "12px" }}>
+                            {sendStep === 1 ? "Teklifi Gönder (1/2)" : "Son Onay (2/2)"}
+                        </div>
+
+                        {sendStep === 1 ? (
+                            <>
+                                <div role="note" style={{
+                                    marginBottom: "16px", fontSize: "12px", lineHeight: 1.5,
+                                    color: "var(--accent-text)", background: "var(--accent-bg)",
+                                    border: "0.5px solid var(--accent-border)", borderRadius: "6px", padding: "8px 10px",
+                                }}>
+                                    Gönderince bu teklif için <strong>bekleyen sipariş</strong> oluşturulur ve satırlardaki stok <strong>rezerve edilir</strong> (başka satışçı aynı stoğu teklif edemez). Reddedilir/süresi dolarsa rezervasyon kaldırılır.
+                                </div>
+                                <div style={{ marginBottom: "16px" }}>
+                                    <label style={{
+                                        display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px",
+                                        color: custEmail.trim() ? "var(--text-primary)" : "var(--text-tertiary)",
+                                        cursor: custEmail.trim() ? "pointer" : "not-allowed",
+                                    }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={!!custEmail.trim() && sendEmailChecked}
+                                            disabled={!custEmail.trim()}
+                                            onChange={(e) => setSendEmailChecked(e.target.checked)}
+                                            aria-label="Müşteriye teklif belgesini e-posta ile gönder"
+                                            style={{ marginTop: "2px", cursor: custEmail.trim() ? "pointer" : "not-allowed" }}
+                                        />
+                                        <span>
+                                            Müşteriye e-posta da gönder
+                                            {custEmail.trim() && (
+                                                <span style={{ color: "var(--text-tertiary)", display: "block", fontSize: "12px", marginTop: "2px" }}>
+                                                    {custEmail} · teklif belgesi ek olarak iletilir
+                                                </span>
+                                            )}
+                                        </span>
+                                    </label>
+                                    {!custEmail.trim() && (
+                                        <div role="alert" style={{ marginTop: "6px", fontSize: "12px", color: "var(--warning-text)" }}>
+                                            Bu teklifte müşteri e-postası yok — yalnız durum güncellenecek.
+                                        </div>
+                                    )}
+                                </div>
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <Button variant="secondary" onClick={() => setSendStep(0)} style={{ flex: 1 }}>Vazgeç</Button>
+                                    <Button variant="primary" onClick={() => setSendStep(2)} style={{ flex: 1 }}>Devam Et</Button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "16px" }}>
+                                    Teklif kaydedilip müşteriye gönderilecek ve stok <strong>rezerve edilecek</strong> (bekleyen sipariş). Geri almak için teklifi reddetmek gerekir. Kesin gönderiyor musunuz?
+                                </div>
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <Button variant="secondary" onClick={() => setSendStep(0)} style={{ flex: 1 }}>Vazgeç</Button>
+                                    <Button variant="primary" onClick={handleSendInline} style={{ flex: 1 }}>Evet, Gönder</Button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </>
+            )}
 
             {/* ── Toast ── */}
             {toast && (
