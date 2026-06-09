@@ -187,7 +187,7 @@ const SEED_PRODUCTS = [
 const SEED_CUSTOMERS = [
     {
         name: "Tüpraş İzmit Rafinerisi",
-        email: "tedarik.izmit@tupras.com.tr",
+        email: "tedarik.izmit@tupras.example.com",   // RFC 2606 — gerçek firmaya gönderim önlemek için
         phone: "+90 262 316 0000",
         address: "TÜPRAŞ İzmit Rafinerisi, Körfez, Kocaeli",
         tax_number: "6440012345",
@@ -201,7 +201,7 @@ const SEED_CUSTOMERS = [
     },
     {
         name: "Abdi İbrahim İlaç A.Ş.",
-        email: "procurement@abdibrahim.com.tr",
+        email: "procurement@abdibrahim.example.com",
         phone: "+90 212 366 0000",
         address: "Esenyurt, İstanbul",
         tax_number: "3810234567",
@@ -215,7 +215,7 @@ const SEED_CUSTOMERS = [
     },
     {
         name: "Enerjisa Üretim Santralleri",
-        email: "tedarik@enerjisa.com.tr",
+        email: "tedarik@enerjisa.example.com",
         phone: "+90 212 375 0000",
         address: "Nişantepe, İstanbul",
         tax_number: "7230145678",
@@ -229,7 +229,7 @@ const SEED_CUSTOMERS = [
     },
     {
         name: "Ülker Gıda — Demo Şube",
-        email: "demo.satin.alma@ulker.com.tr",
+        email: "demo.satin.alma@ulker.example.com",
         phone: "+90 212 867 0000",
         address: "Kısıklı Mahallesi, Üsküdar, İstanbul",
         tax_number: null,                    // Paraşüt VKN-eksik preflight örneği

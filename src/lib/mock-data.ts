@@ -574,7 +574,7 @@ export const mockCustomers: Customer[] = [
     {
         id: "5",
         name: "Tüpraş",
-        email: "satin.alma@tupras.com.tr",
+        email: "satin.alma@tupras.example.com",
         phone: "+90 262 316 30 00",
         address: "Körfez, Kocaeli, Türkiye",
         taxNumber: "5150003271",
@@ -704,7 +704,7 @@ export const mockOrderDetails: OrderDetail[] = [
         orderNumber: "ORD-2026-0041",
         customerName: "Tüpraş",
         customerId: "5",
-        customerEmail: "satin.alma@tupras.com.tr",
+        customerEmail: "satin.alma@tupras.example.com",
         customerCountry: "TR",
         customerTaxOffice: "Körfez VD",
         customerTaxNumber: "5150003271",
