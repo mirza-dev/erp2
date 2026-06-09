@@ -7,7 +7,15 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-09 (**Teklif "Gönder" → müşteriye HTML ekli e-posta — PUSH EDİLDİ, smoke bekliyor**)
+## Son Tamamlanan İş — 2026-06-09 (**Arşiv belgesi render fix + demo e-posta nötrleştirme — PUSH EDİLDİ, doğrulama bekliyor**)
+
+**(A) Arşiv "Belgeyi Aç" bug:** belge yeni sekmede ham HTML kaynağı + UTF-8 mojibake gösteriyordu. Kök neden: Supabase storage signed URL'i donmuş arşiv HTML'ini `text/html` render etmiyor (stored-XSS koruması → metin). Çözüm: arşiv route'una **`?view=1` modu** (`dbDownloadArchiveHtml` → `Content-Type: text/html; charset=utf-8` ile stream) + buton **senkron `window.open`** (popup-blocker de elendi). Eksik arşiv/403 → dostça HTML hata sayfası. JSON modu geriye uyumlu. `orders/[id]`+`quotes/[id]` butonlarından `archiveLoading` kaldırıldı. Commit `6ea6045`.
+
+**(B) Demo e-posta mayını:** seed + mock-data'daki 4 müşteri gerçek firma domain'lerine işaret ediyordu; smoke'ta yanlışlıkla `procurement@abdibrahim.com.tr`'ye gerçek teklif gitti (Resend Sent, bounce yok → muhtemelen spam; özür gereksiz). Fix: tüm müşteri e-postaları `@*.example.com` (RFC 2606); `info@pmt.com.tr` satıcı, dokunulmadı. Commit `fe96937`.
+
+**+6 test · tsc 0 · lint 0 · 5004 test · build 0.** Bounce yok = EMAIL_FROM+Resend+`.html` pipeline çalışıyor (smoke Aşama 1 fiilen yeşil). **Sıradaki:** (1) arşiv fix deploy sonrası görsel doğrula (render + doğru Türkçe); (2) `.html` smoke Aşama 2 (kendi Gmail+Outlook, müşteri e-postasını kendine çevir).
+
+## Önceki — 2026-06-09 (**Teklif "Gönder" → müşteriye HTML ekli e-posta — PUSH `5ecc104`**)
 
 **Kullanıcı isteği:** Teklif detay sayfasında "Gönder"e basınca müşteriye teklif belgesi e-posta ile gitsin (kullanıcı isterse). **Kararlar:** ek = **HTML eki** (binary PDF yok; dondurulmuş arşiv HTML — gerçek PDF chromium/dış-API gerektirir, reddedildi); tetik = **"Gönder" onayına checkbox** (varsayılan işaretli, transition'a bağlı tek-sefer).
 

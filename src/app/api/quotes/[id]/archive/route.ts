@@ -45,7 +45,10 @@ export async function GET(
         // fiyat belgesi; viewer/demo/production/purchasing erişemez). Live preview detay
         // GET'ten beslendiği için redaction'ı zaten miras alır.
         const guard = await requirePermission(req, "view_sales_prices");
-        if (guard) return guard;
+        if (guard) {
+            // view modunda yeni sekme açılır → ham JSON yerine dostça HTML 403.
+            return view ? htmlError("Bu belgeyi görüntüleme yetkiniz yok.", 403) : guard;
+        }
 
         const { id } = await params;
 

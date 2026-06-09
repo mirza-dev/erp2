@@ -20,8 +20,9 @@ const mockGetCompany = vi.fn();
 const mockDownloadHtml = vi.fn();
 
 // Faz 8a: RBAC guard — varsayılan izinli (mevcut testler davranışı korur).
+const mockRequirePermission = vi.fn().mockResolvedValue(null);
 vi.mock("@/lib/auth/role-guard", () => ({
-    requirePermission: vi.fn().mockResolvedValue(null),
+    requirePermission: (...a: unknown[]) => mockRequirePermission(...a),
     requireRole: vi.fn().mockResolvedValue(null),
 }));
 
@@ -294,6 +295,13 @@ describe("GET /api/quotes/[id]/archive", () => {
         expect(res.status).toBe(404);
         expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
         expect(await res.text()).toContain("arşiv bulunamadı");
+    });
+
+    it("?view=1 + view_sales_prices yok → 403 dostça HTML (ham JSON guard yerine)", async () => {
+        mockRequirePermission.mockResolvedValueOnce({ status: 403 });   // guard truthy
+        const res = await call(true);
+        expect(res.status).toBe(403);
+        expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
     });
 });
 
