@@ -3,6 +3,12 @@
  * sales_orders 4 yeni kolon + accept_quote_and_create_order atomik RPC sözleşmesi.
  * DB-side davranış (FOR UPDATE/RAISE/ROW_COUNT) yalnız manuel smoke'ta tam doğrulanır;
  * bu test SQL'in kritik invariant'larını kilitler (drift-guard).
+ *
+ * ⚠️ NOT (088): `accept_quote_and_create_order`'ın CANLI gövdesini artık migration 088
+ * (`CREATE OR REPLACE`) sahipler — bağlı pending siparişi approve_order ile onaylar,
+ * yoksa legacy draft create'e düşer. Bu dosya 077'nin LEGACY create sözleşmesini
+ * kilitler (088'in fallback yolu onu birebir korur). 088 davranışı için
+ * `quotes-send-reservation.test.ts`.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "fs";
