@@ -71,6 +71,25 @@ describe("tasarım panelleri render edilir (DashDetailed)", () => {
     });
 });
 
+describe("panel yerleşimi — yeni diziliş (Stok|Finans / Üretim|Sipariş / alt alta)", () => {
+    it("iki adet overview-grid-1-1 satırı (Satır 1 + Satır 2)", () => {
+        const matches = PAGE.match(/className="overview-grid-1-1"/g) ?? [];
+        expect(matches.length).toBe(2);
+    });
+    it("Satır 1: StockPanel, FinancePanel'den önce", () => {
+        expect(PAGE.indexOf("<StockPanel")).toBeLessThan(PAGE.indexOf("<FinancePanel"));
+    });
+    it("Satır 2: ProductionPanel, OrdersPanel'den önce", () => {
+        expect(PAGE.indexOf("<ProductionPanel")).toBeLessThan(PAGE.indexOf("<OrdersPanel"));
+    });
+    it("AiPanel alt alta blokta — Reorder/Alerts ile birlikte ve hepsinden sonra", () => {
+        expect(PAGE.indexOf("<ReorderPanel")).toBeLessThan(PAGE.indexOf("<AlertsPanel"));
+        expect(PAGE.indexOf("<AlertsPanel")).toBeLessThan(PAGE.indexOf("<AiPanel"));
+        // AiPanel artık panellerin sonunda (en son render edilen panel)
+        expect(PAGE.indexOf("<AiPanel")).toBeGreaterThan(PAGE.indexOf("<OrdersPanel"));
+    });
+});
+
 describe("RBAC finansal gating", () => {
     it("sales/cost/financial_summary yetkileri kullanılır", () => {
         expect(PAGE).toMatch(/canViewSalesPrices/);

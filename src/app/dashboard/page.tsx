@@ -183,22 +183,24 @@ export default function DashboardPage() {
                 )}
             </OverviewPanel>
 
-            {/* İki kolon */}
+            {/* Satır 1: Stok Dağılımı + Finansal Özet */}
             <div className="overview-grid-1-1" style={{ marginBottom: gap }}>
-                <div style={{ display: "flex", flexDirection: "column", gap }}>
-                    <FinancePanel reporting={reporting} monthLabel={monthLabel} finance={financePanel} canViewCosts={canViewSalesPrices && canViewPurchaseCosts} receivables={receivables} />
-                    <ProductionPanel days={production.days} good={production.good} scrap={production.scrap} />
-                    <OrdersPanel rows={orderRows} />
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap }}>
-                    <StockPanel segments={stock.segments} currency={reporting} canView={canViewSalesPrices} />
-                    <ReorderPanel rows={reorderRows} />
-                    <AlertsPanel rows={alertRows} total={openAlerts.length} />
-                </div>
+                <StockPanel segments={stock.segments} currency={reporting} canView={canViewSalesPrices} />
+                <FinancePanel reporting={reporting} monthLabel={monthLabel} finance={financePanel} canViewCosts={canViewSalesPrices && canViewPurchaseCosts} receivables={receivables} />
             </div>
 
-            {/* AI Operasyon Özeti */}
-            <AiPanel />
+            {/* Satır 2: Üretim + Son Siparişler */}
+            <div className="overview-grid-1-1" style={{ marginBottom: gap }}>
+                <ProductionPanel days={production.days} good={production.good} scrap={production.scrap} />
+                <OrdersPanel rows={orderRows} />
+            </div>
+
+            {/* Alt alta tam genişlik: Satın Alma Önerileri · Kritik Uyarılar · AI Önerileri */}
+            <div style={{ display: "flex", flexDirection: "column", gap }}>
+                <ReorderPanel rows={reorderRows} />
+                <AlertsPanel rows={alertRows} total={openAlerts.length} />
+                <AiPanel />
+            </div>
         </div>
     );
 }
