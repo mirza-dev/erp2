@@ -265,3 +265,47 @@ export async function dbAcceptQuoteAndCreateOrder(
     if (error) throw error;
     return data as AcceptOrderResult;
 }
+
+/** Teklif gönderilince yaratılan bekleyen sipariş + rezervasyon sonucu (088). */
+export interface SendQuoteOrderResult {
+    order_id: string;
+    order_number: string;
+    /** Bu teklif için (cancelled olmayan) sipariş zaten vardı → yeniden yaratılmadı. */
+    already: boolean;
+    /** allocate_order_lines shortage listesi (kısmi/yetersiz rezerve). */
+    shortages: Array<{ product_name: string; requested: number; reserved: number; shortage: number }>;
+    total_reserved: number;
+    total_requested: number;
+}
+
+/**
+ * Teklif GÖNDERİLİNCE (088): bağlı 'pending_approval' sipariş yaratır + stok HARD
+ * rezerve eder (allocate_order_lines). Servis quote'u önce 'sent'e flip eder, sonra
+ * bunu çağırır. İdempotent: cancelled-olmayan sipariş varsa onu döndürür. RPC hata
+ * kodları (P0002/42501/23502/22003) servis katmanında map'lenir. Zero-stock'ta RAISE
+ * ETMEZ — kısmi rezerve + shortage döner (teklif yine gönderilir).
+ */
+export async function dbSendQuoteCreatePendingOrder(
+    quoteId: string,
+    actor: string | null,
+): Promise<SendQuoteOrderResult> {
+    const sb = createServiceClient();
+    const { data, error } = await sb.rpc("send_quote_and_create_pending_order", {
+        p_quote_id: quoteId,
+        p_actor: actor,
+    });
+    if (error) throw error;
+    return data as SendQuoteOrderResult;
+}
+
+/**
+ * Teklife bağlı bekleyen siparişi iptal eder (088) → rezerv release. reject/expire/
+ * revise yollarından çağrılır. Bağlı (cancelled olmayan) sipariş yoksa no-op
+ * (`no_order: true`). cancel_order'ın shipped guard'ı korunur (sevk başlamışsa iptal
+ * etmez — döndürdüğü success:false best-effort olarak yutulur, caller throw etmez).
+ */
+export async function dbCancelQuoteLinkedOrder(quoteId: string): Promise<void> {
+    const sb = createServiceClient();
+    const { error } = await sb.rpc("cancel_quote_linked_order", { p_quote_id: quoteId });
+    if (error) throw error;
+}

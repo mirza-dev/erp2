@@ -121,14 +121,20 @@ export default function QuoteDetailPage() {
             setStatus(data.status);
             setQuote(data);
 
-            // Faz 4: send başarılı ama arşiv üretilemediyse görünür uyarı (sessiz değil).
+            // Faz 4 + 088: send sonucu — arşiv/rezervasyon uyarısı veya shortage görünür
+            // (sessiz değil). Öncelik: arşiv fail > rezervasyon fail > shortage > başarı.
             if (transition === "sent" && data.archiveWarning) {
                 toast({ type: "warning", message: "Teklif gönderildi ancak arşiv oluşturulamadı." });
+            } else if (transition === "sent" && data.reservationWarning) {
+                toast({ type: "warning", message: "Teklif gönderildi ancak stok rezervasyonu (bekleyen sipariş) oluşturulamadı." });
+            } else if (transition === "sent" && Array.isArray(data.shortages) && data.shortages.length > 0) {
+                const total = data.shortages.reduce((s: number, x: { shortage: number }) => s + x.shortage, 0);
+                toast({ type: "warning", message: `Teklif gönderildi · stok kısmen rezerve edildi (${total} birim yetersiz). Bekleyen sipariş: ${data.reservedOrderNumber ?? "—"}` });
             } else {
                 const labels: Record<string, string> = {
-                    sent: "Teklif gönderildi",
+                    sent: "Teklif gönderildi · stok rezerve edildi (bekleyen sipariş)",
                     accepted: "Teklif kabul edildi",
-                    rejected: "Teklif reddedildi",
+                    rejected: "Teklif reddedildi · stok rezervasyonu kaldırıldı",
                 };
                 toast({ type: transition === "rejected" ? "warning" : "success", message: labels[transition] || "Durum güncellendi" });
             }
@@ -502,6 +508,22 @@ export default function QuoteDetailPage() {
                         }}>
                             {confirmDialog.message}
                         </div>
+
+                        {/* 088: gönderince stok rezerve edilecek bilgisi — yalnız "Gönder" onayında */}
+                        {confirmDialog.action === "sent" && (
+                            <div role="note" style={{
+                                marginBottom: "16px",
+                                fontSize: "12px",
+                                lineHeight: 1.5,
+                                color: "var(--accent-text)",
+                                background: "var(--accent-bg)",
+                                border: "0.5px solid var(--accent-border)",
+                                borderRadius: "6px",
+                                padding: "8px 10px",
+                            }}>
+                                Gönderince bu teklif için <strong>bekleyen sipariş</strong> oluşturulur ve satırlardaki stok <strong>rezerve edilir</strong> (başka satışçı aynı stoğu teklif edemez). Reddedilir/süresi dolarsa rezervasyon kaldırılır.
+                            </div>
+                        )}
 
                         {/* Müşteriye e-posta gönder seçeneği — yalnız "Gönder" onayında */}
                         {confirmDialog.action === "sent" && (

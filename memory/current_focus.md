@@ -7,7 +7,11 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-09 (**Arşiv belgesi render fix + demo e-posta nötrleştirme — PUSH EDİLDİ, doğrulama bekliyor**)
+## Son Tamamlanan İş — 2026-06-10 (**Teklif gönderilince stok rezervasyonu (bekleyen sipariş) — GREEN, PUSH/APPLY BEKLİYOR**)
+
+**Senaryo:** aynı 10 stoğu iki satışçı iki müşteriye teklif → ikisi de kabul → -10 oversell. **Kullanıcı kararı:** rezervasyon teklif GÖNDERİLİNCE (accept'te değil); kabul→sipariş Onaylı. **Strateji A:** `draft→sent`'te accept'in teklif→sipariş dönüşümünü öne çek ama `pending_approval`+`allocate_order_lines` ile rezerve et (sipariş-merkezli motoru reuse). **Yaşam döngüsü:** sent→pending+rezerve · accepted→approve_order · rejected/expired/revised→cancel_order (release). **Migration 088:** `send_quote_and_create_pending_order` (pending+allocate, **zero-stock lenient** kısmi+shortage, arşiv NULL OK, idempotent) + `accept_quote_and_create_order` revize (bağlı pending→approve, yoksa legacy draft) + `cancel_quote_linked_order`. **Servis/route/UI:** sent sonucu reservationWarning/shortages/reservedOrderNumber; reject/expire/revise→cancel (best-effort); gönder onayında rezerve notu + shortage toast. Stok modeli değişmedi (pending zaten reserved). **+16 test · tsc 0 · lint 0 · 5021 test · build 0.** **Sıradaki:** push + **migration 088 APPLY (Supabase)** + smoke (gönder→available_now düşer→ikinci kısmi→reddet→geri→kabul→Onaylı). Edge: pending'i orders'tan elle iptal → rezerv gider teklif sent kalır (kabul).
+
+## Önceki — 2026-06-09 (**Arşiv belgesi render fix + demo e-posta nötrleştirme — PUSH `d9ef1c3`**)
 
 **(A) Arşiv "Belgeyi Aç" bug:** belge yeni sekmede ham HTML kaynağı + UTF-8 mojibake gösteriyordu. Kök neden: Supabase storage signed URL'i donmuş arşiv HTML'ini `text/html` render etmiyor (stored-XSS koruması → metin). Çözüm: arşiv route'una **`?view=1` modu** (`dbDownloadArchiveHtml` → `Content-Type: text/html; charset=utf-8` ile stream) + buton **senkron `window.open`** (popup-blocker de elendi). Eksik arşiv/403 → dostça HTML hata sayfası. JSON modu geriye uyumlu. `orders/[id]`+`quotes/[id]` butonlarından `archiveLoading` kaldırıldı. Commit `6ea6045`.
 

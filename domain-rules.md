@@ -146,6 +146,16 @@ zaten yapılmıştır (light geçiş). Gerekçe: müşteriye teklif verilirken s
 bekleyen siparişler için aşırı-satış olmaz. (migration 082; eski sürümde rezervasyon
 `approved`'da olurdu.)
 
+**Teklif gönderimi de rezervasyon tetikler (migration 088).** Teklifler modülünde bir
+teklif **gönderilince** (`draft → sent`), o teklif için otomatik bir `pending_approval`
+sipariş yaratılır (`quote_id` ile bağlı) ve `allocate_order_lines` ile stok hard rezerve
+edilir — `send_quote_and_create_pending_order` RPC. Gerekçe: iki satışçı aynı stoğu
+paralel teklif edip ikisi de kabul ederse oversell olur; gönderimde rezerve ederek ilk
+teklif stoğu kilitler, ikinci satışçı azalmış `available_now` görür. **Fark:** send-yolu
+zero-stock'ta REDDETMEZ (teklif üretilecek ürünü kapsayabilir) — ne ayrılırsa ayrılır,
+kalan shortage olur, teklif yine gönderilir. Bağlı teklif `accepted` → sipariş `approved`;
+`rejected`/`expired`/`revised` → sipariş `cancelled` (rezerv release, `cancel_quote_linked_order`).
+
 ### 4.5 Sipariş İptali
 Sipariş iptal edilirse:
 - açık rezervler çözülür
@@ -157,11 +167,14 @@ Sipariş iptal edilirse:
 ## 5. Inventory ve Reservation Domain
 
 ### 5.1 Rezervasyon Ne Zaman Oluşur
-Hard reservation `pending_approval` (Onaya Gönder) durumunda oluşur ve sonrasında
-(`approved`) korunur. (migration 082 — eski sürümde yalnız `approved`'daydı.)
+Hard reservation iki "taahhüt" anında oluşur ve sonrasında korunur:
+- Sipariş `draft → pending_approval` (Onaya Gönder) — migration 082.
+- **Teklif `draft → sent` (Gönder)** — migration 088: bağlı `pending_approval` sipariş
+  yaratılır + rezerve edilir (oversell önleme).
 
 Aşağıdaki durumda rezervasyon oluşmaz:
-- `draft` (yalnız `quoted` soft-hold; `available_now`'u düşürmez)
+- Sipariş `draft` (yalnız `quoted` soft-hold; `available_now`'u düşürmez)
+- Teklif `draft` (gönderilmemiş — hiç stok etkisi yok)
 
 Not: `quoted` = yalnız draft siparişlerin miktarı; `reserved` = pending_approval ve
 sonrası. Böylece `promisable = available_now - quoted` çift saymaz.

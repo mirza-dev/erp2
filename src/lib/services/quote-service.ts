@@ -8,7 +8,8 @@
 
 import { createHash } from "crypto";
 import type { QuoteStatus } from "@/lib/database.types";
-import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision, dbAcceptQuoteAndCreateOrder } from "@/lib/supabase/quotes";
+import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision, dbAcceptQuoteAndCreateOrder, dbSendQuoteCreatePendingOrder, dbCancelQuoteLinkedOrder } from "@/lib/supabase/quotes";
+import type { SendQuoteOrderResult } from "@/lib/supabase/quotes";
 import { dbGetCompanySettings } from "@/lib/supabase/company-settings";
 import { dbGetQuoteArchive, dbCreateQuoteArchive, dbArchiveObjectStatus, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
 import { buildQuoteDataFromDetail, renderQuoteArchiveHtml } from "@/lib/quote-archive-html";
@@ -33,6 +34,12 @@ export interface QuoteTransitionResult {
     validationFailed?: boolean;
     /** Faz 4: send başarılı ama arşiv üretilemedi → UI warning toast (sessiz değil). */
     archiveWarning?: boolean;
+    /** 088: send başarılı ama bekleyen sipariş/rezervasyon yaratılamadı → UI warning. */
+    reservationWarning?: boolean;
+    /** 088: send sonrası bağlı siparişin stok kısmi/yetersiz rezerve shortage listesi. */
+    shortages?: SendQuoteOrderResult["shortages"];
+    /** 088: send'te yaratılan bekleyen siparişin numarası (UI bilgi/toast). */
+    reservedOrderNumber?: string;
 }
 
 // ── Transition map ───────────────────────────────────────────
@@ -98,6 +105,34 @@ export async function serviceTransitionQuote(
         }
     }
 
+    // 088: teklif gönderilince stok HARD rezerve → bağlı 'pending_approval' sipariş
+    // yarat (oversell önleme; ürün-sahibi kararı). Rezervasyon asıl amaç olduğundan
+    // başarısızlık SESSİZ DEĞİL — reservationWarning UI'a taşınır (archiveWarning paterni).
+    // status zaten 'sent'e flip oldu; RPC idempotent (yeniden denenebilir).
+    let reservationWarning = false;
+    let shortages: SendQuoteOrderResult["shortages"] | undefined;
+    let reservedOrderNumber: string | undefined;
+    if (target === "sent") {
+        try {
+            const res = await dbSendQuoteCreatePendingOrder(quoteId, null);
+            reservedOrderNumber = res.order_number;
+            if (res.shortages && res.shortages.length > 0) shortages = res.shortages;
+        } catch (err) {
+            console.error(`[quote-reserve] sent rezervasyonu başarısız (quote ${quoteId}):`, err);
+            reservationWarning = true;
+        }
+    }
+
+    // sent→rejected: bağlı bekleyen siparişi iptal et → rezerv release (088).
+    // Best-effort: release başarısızlığı reddetme geçişini bozmaz (status zaten flip).
+    if (target === "rejected") {
+        try {
+            await dbCancelQuoteLinkedOrder(quoteId);
+        } catch (err) {
+            console.error(`[quote-reserve] reddetmede bağlı sipariş iptali başarısız (quote ${quoteId}):`, err);
+        }
+    }
+
     // Bilinen kabul edilen boşluk (Bulgu 3 / P2-B, 2026-05-30): arşiv yalnız SEND
     // anında üretilir; accept belgeyi değiştirmez. Send arşivi başarısız olur
     // (archiveWarning) ve kullanıcı yine "Kabul Et" derse accepted teklif arşivsiz
@@ -106,7 +141,7 @@ export async function serviceTransitionQuote(
     // çözüm = Faz 6 accept recover/generate (V7-A5, serviceArchiveQuotePdf reuse);
     // o güne dek arşivi tüketen bir akış yok → bugünkü etki sıfır.
 
-    return { success: true, archiveWarning };
+    return { success: true, archiveWarning, reservationWarning, shortages, reservedOrderNumber };
 }
 
 // ── PDF Arşiv (Faz 4) ────────────────────────────────────────
@@ -409,6 +444,14 @@ export async function serviceCreateQuoteRevision(sourceId: string): Promise<Quot
         if (code === "P0002") return { success: false, error: "Kaynak teklif bulunamadı.", notFound: true };
         throw err;
     }
+    // 088: kaynak teklif 'revised' oldu (RPC 074) → revizyon supersede eder, eski
+    // bağlı bekleyen siparişi iptal et → rezerv release. Yeni draft teklif gönderilene
+    // dek stok tutulmaz. Best-effort.
+    try {
+        await dbCancelQuoteLinkedOrder(sourceId);
+    } catch (err) {
+        console.error(`[quote-reserve] revize'de kaynak siparişi iptali başarısız (quote ${sourceId}):`, err);
+    }
     const created = await dbGetQuote(newId);
     return { success: true, newQuoteId: newId, newQuoteNumber: created?.quote_number };
 }
@@ -426,7 +469,16 @@ export async function serviceExpireQuotes(): Promise<{ expired: number; expiredI
     const expiredIds: string[] = [];
     for (const q of expiredQuotes) {
         const updated = await dbUpdateQuoteStatus(q.id, "expired", q.status as QuoteStatus);
-        if (updated) expiredIds.push(q.id);
+        if (updated) {
+            expiredIds.push(q.id);
+            // 088: süresi dolan teklifin bağlı bekleyen siparişini iptal et → rezerv
+            // release (spekülatif teklif stoğu tutmasın). Best-effort.
+            try {
+                await dbCancelQuoteLinkedOrder(q.id);
+            } catch (err) {
+                console.error(`[quote-reserve] expire'da bağlı sipariş iptali başarısız (quote ${q.id}):`, err);
+            }
+        }
         // else: status already changed by concurrent action, skip
     }
     return { expired: expiredIds.length, expiredIds };

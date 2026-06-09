@@ -110,9 +110,16 @@ export async function PATCH(
             const updated = await dbGetQuote(id);
             revalidateTag("quotes", "max");
             revalidateTag(`quote-${id}`, "max");
-            // Faz 4: send'te arşiv üretilemezse archiveWarning taşınır (UI warning toast).
+            // Faz 4: send'te arşiv üretilemezse archiveWarning (UI warning toast).
+            // 088: send'te bağlı bekleyen sipariş + rezervasyon sonucu (shortage/uyarı) taşınır.
             return NextResponse.json(
-                updated ? { ...mapQuoteDetail(updated), archiveWarning: result.archiveWarning } : null,
+                updated ? {
+                    ...mapQuoteDetail(updated),
+                    archiveWarning: result.archiveWarning,
+                    reservationWarning: result.reservationWarning,
+                    shortages: result.shortages,
+                    reservedOrderNumber: result.reservedOrderNumber,
+                } : null,
             );
         }
 

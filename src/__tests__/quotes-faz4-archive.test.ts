@@ -26,11 +26,15 @@ vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: vi.fn().mockResolvedValue(null),
 }));
 
+const mockSendReserve = vi.fn();
+const mockCancelLinked = vi.fn();
 vi.mock("@/lib/supabase/quotes", () => ({
     dbGetQuote: (...a: unknown[]) => mockDbGetQuote(...a),
     dbUpdateQuoteStatus: (...a: unknown[]) => mockDbUpdateStatus(...a),
     dbListExpiredQuotes: vi.fn(),
     dbCreateQuoteRevision: vi.fn(),
+    dbSendQuoteCreatePendingOrder: (...a: unknown[]) => mockSendReserve(...a),
+    dbCancelQuoteLinkedOrder: (...a: unknown[]) => mockCancelLinked(...a),
 }));
 vi.mock("@/lib/supabase/quote-pdf-archives", () => ({
     dbGetQuoteArchive: (...a: unknown[]) => mockGetArchive(...a),
@@ -85,6 +89,8 @@ beforeEach(() => {
     mockDeleteArchive.mockResolvedValue(undefined);
     mockGetCompany.mockResolvedValue(null);
     mockDownloadHtml.mockResolvedValue("<html>frozen-archive</html>");  // view modu: varsayılan HTML
+    mockSendReserve.mockReset().mockResolvedValue({ order_id: "o1", order_number: "ORD-1", already: false, shortages: [], total_reserved: 0, total_requested: 0 });
+    mockCancelLinked.mockReset().mockResolvedValue(undefined);
 });
 
 // ── serviceArchiveQuotePdf ───────────────────────────────────
@@ -194,6 +200,10 @@ describe("send hook: draft→sent arşivi tetikler (non-fatal)", () => {
         expect(r.success).toBe(true);
         expect(r.archiveWarning).toBeFalsy();
         expect(mockCreateArchive).toHaveBeenCalled();
+        // 088: send ayrıca bağlı bekleyen sipariş + rezervasyon yaratır.
+        expect(mockSendReserve).toHaveBeenCalledWith(QID, null);
+        expect(r.reservationWarning).toBeFalsy();
+        expect(r.reservedOrderNumber).toBe("ORD-1");
     });
 
     it("arşivleme PATLASA da send başarılı + archiveWarning=true (görünür, non-fatal)", async () => {
@@ -218,6 +228,9 @@ describe("send hook: draft→sent arşivi tetikler (non-fatal)", () => {
         const r = await serviceTransitionQuote(QID, "rejected");
         expect(r.success).toBe(true);
         expect(mockCreateArchive).not.toHaveBeenCalled();
+        // 088: reddetmede bağlı bekleyen sipariş iptal edilir (rezerv release); send rezervasyonu çalışmaz.
+        expect(mockSendReserve).not.toHaveBeenCalled();
+        expect(mockCancelLinked).toHaveBeenCalledWith(QID);
     });
 });
 
