@@ -28,7 +28,7 @@ vi.mock("resend", () => ({
     },
 }));
 
-import { notifyUsersByEmail, retryFailedEmails } from "@/lib/services/email-service";
+import { notifyUsersByEmail, retryFailedEmails, sendDirectEmail } from "@/lib/services/email-service";
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -177,5 +177,45 @@ describe("retryFailedEmails", () => {
         const r = await retryFailedEmails();
         expect(r.failed).toBe(1);
         expect(mockUpdateLog).toHaveBeenCalledWith("log-1", "failed", { error: "Bounce" });
+    });
+});
+
+describe("sendDirectEmail", () => {
+    it("ek (attachment) Resend'e iletilir + ok:true + messageId", async () => {
+        const r = await sendDirectEmail({
+            to: "musteri@firma.com",
+            subject: "Teklifimiz — TKL-1",
+            html: "<p>body</p>",
+            text: "body",
+            attachments: [{ filename: "Teklif-TKL-1.html", content: Buffer.from("<html></html>", "utf-8") }],
+        });
+        expect(r.ok).toBe(true);
+        expect(r.messageId).toBe("rs_msg_1");
+        const arg = mockResendSend.mock.calls[0][0];
+        expect(arg.to).toBe("musteri@firma.com");
+        expect(arg.attachments).toHaveLength(1);
+        expect(arg.attachments[0].filename).toBe("Teklif-TKL-1.html");
+        expect(Buffer.isBuffer(arg.attachments[0].content)).toBe(true);
+    });
+
+    it("ek yoksa attachments alanı Resend payload'ına eklenmez", async () => {
+        await sendDirectEmail({ to: "a@b.com", subject: "S", html: "<p>h</p>", text: "t" });
+        const arg = mockResendSend.mock.calls[0][0];
+        expect("attachments" in arg).toBe(false);
+    });
+
+    it("config eksik (EMAIL_FROM yok) → ok:false config_missing, Resend çağrılmaz", async () => {
+        delete process.env.EMAIL_FROM;
+        const r = await sendDirectEmail({ to: "a@b.com", subject: "S", html: "<p>h</p>", text: "t" });
+        expect(r.ok).toBe(false);
+        expect(r.error).toBe("config_missing");
+        expect(mockResendSend).not.toHaveBeenCalled();
+    });
+
+    it("Resend error → ok:false + error mesajı (throw etmez)", async () => {
+        mockResendSend.mockResolvedValue({ data: null, error: { message: "Invalid from" } });
+        const r = await sendDirectEmail({ to: "a@b.com", subject: "S", html: "<p>h</p>", text: "t" });
+        expect(r.ok).toBe(false);
+        expect(r.error).toBe("Invalid from");
     });
 });

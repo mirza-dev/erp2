@@ -119,12 +119,18 @@ export async function dbListFailedEmailsForRetry(
 ): Promise<EmailLogRow[]> {
     const supabase = createServiceClient();
     const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+    // entity_type='quote' (müşteriye giden teklif e-postası) generic retry'a GİRMEZ:
+    // retryFailedEmails ekleri (HTML belge) yeniden ekleyemez → içeriksiz fallback
+    // metin gönderirdi. Audit için email_logs kaydı 'failed' olarak kalır.
+    // NULL-safe: PostgreSQL'de NULL != 'quote' → NULL (false değil) → düz .neq
+    // entity_type=NULL satırlarını da yutardı; .or ile NULL'lar retry'da kalır.
     const { data, error } = await supabase
         .from("email_logs")
         .select("*")
         .eq("status", "failed")
         .lt("attempt_count", maxAttempts)
         .gte("last_attempt_at", cutoff)
+        .or("entity_type.is.null,entity_type.neq.quote")
         .order("last_attempt_at", { ascending: true })
         .limit(50);
     if (error) throw new Error(error.message);

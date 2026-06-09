@@ -152,6 +152,50 @@ export async function notifyUsersByEmail(opts: NotifyOpts): Promise<NotifyResult
 }
 
 /**
+ * Tek alıcıya doğrudan e-posta gönderir (tercih/dedup/recipient-lookup BYPASS).
+ * `notifyUsersByEmail`'den farkı: iç bildirim değil, çağıranın belirlediği tek
+ * adrese (örn. teklif → müşteri) gönderir; ek (attachment) destekler.
+ *
+ * Loglama YAPMAZ — caller `email_logs` kaydını kendi tutar (entity context'i
+ * orada). Config eksikse `{ ok:false, error:"config_missing" }` (fail-safe).
+ * Resend hatası throw edilmez; `{ ok:false, error }` döner.
+ */
+export interface SendDirectEmailOpts {
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+    attachments?: { filename: string; content: Buffer }[];
+}
+
+export async function sendDirectEmail(
+    opts: SendDirectEmailOpts,
+): Promise<{ ok: boolean; messageId?: string; error?: string }> {
+    const resend = getResend();
+    const from = getEmailFrom();
+    if (!resend || !from) return { ok: false, error: "config_missing" };
+
+    try {
+        const sendRes = await resend.emails.send({
+            from,
+            to: opts.to,
+            subject: opts.subject,
+            html: opts.html,
+            text: opts.text,
+            ...(opts.attachments && opts.attachments.length > 0
+                ? { attachments: opts.attachments }
+                : {}),
+        });
+        if (sendRes.error) return { ok: false, error: sendRes.error.message };
+        return { ok: true, messageId: sendRes.data?.id };
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : "Resend send error";
+        console.error("[email-service] sendDirectEmail failed", err);
+        return { ok: false, error: msg };
+    }
+}
+
+/**
  * CRON tarafından çağrılır — failed kayıtları yeniden dener.
  * Max 3 deneme; son 24 saat penceresi.
  */

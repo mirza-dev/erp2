@@ -5,7 +5,19 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
-## Son Tamamlanan İş — 2026-06-09 (**Genel Bakış (Executive Dashboard) — TAM-SADIK yeniden kurulum (GREEN, PUSH BEKLİYOR)**)
+## Son Tamamlanan İş — 2026-06-09 (**Teklif "Gönder" → müşteriye HTML ekli e-posta — PUSH EDİLDİ, smoke bekliyor**)
+
+**Kullanıcı isteği:** Teklif detay sayfasında "Gönder"e basınca müşteriye teklif belgesi e-posta ile gitsin (kullanıcı isterse). **Kararlar:** ek = **HTML eki** (binary PDF yok; dondurulmuş arşiv HTML — gerçek PDF chromium/dış-API gerektirir, reddedildi); tetik = **"Gönder" onayına checkbox** (varsayılan işaretli, transition'a bağlı tek-sefer).
+
+**Yapılanlar (6 kod + 6 test):** (1) `sendDirectEmail` attachment primitifi (`email-service.ts`); (2) `renderQuoteToCustomer` müşteri şablonu (`templates.ts`, `shell()`+`hideManageFooter` → müşteriye giden e-postada dashboard footer'ı gizli, XSS escape); (3) `serviceSendQuoteToCustomer` (`quote-service.ts`, arşivle birebir HTML pipeline reuse, `no_email` guard, `email_logs` entity_type='quote'); (4) **`POST /api/quotes/[id]/send-email`** (`manage_quotes` RBAC; 404/400/503/502 map); (5) `dbListFailedEmailsForRetry` NULL-safe `.or("entity_type.is.null,entity_type.neq.quote")` (quote retry exclusion); (6) frontend `[id]/page.tsx`+`quote-display.ts` (draft Gönder confirm + checkbox + post-transition `/send-email`).
+
+**ADVISOR (bug yok, 4 not):** #1 done=kod-complete+green AMA uçtan uca DOĞRULANMADI (EMAIL_FROM altyapısı; kullanıcı düzeltti); #2 **`.html` eki Exchange/Outlook strip/karantina riski** → kullanıcı kararı **önce smoke ile ölç** (Gmail+Outlook), sorunsa PDF-API; #3 RBAC temiz (manage_quotes=admin+sales, ikisi view_sales_prices tutar); #4 frozen arşiv yerine re-render (gelecek "Tekrar Gönder" frozen ekle — kod yorumu). tsc 0 · lint 0 · **4999 test** · build 0 (`ƒ /api/quotes/[id]/send-email`). Migration YOK.
+
+**DURUM: PUSH EDİLDİ** (drift fix `458c14b` + bu iş; mirror main==codex-experiment). **Sıradaki smoke:** Aşama 1 `/api/email/test` EMAIL_FROM doğrula → Aşama 2 gerçek teklif → kendi Gmail+Outlook → `.html` eki geliyor mu/spam mı.
+
+---
+
+## Önceki — 2026-06-09 (**Genel Bakış (Executive Dashboard) — TAM-SADIK yeniden kurulum (GREEN, PUSH BEKLİYOR)**)
 
 **Kullanıcı geri bildirimi:** Faz 1 tasarıma ne görünüm ne işlev uyuyordu (5 KPI/6 yerine, maliyet kapalı, Finansal Özet+Üretim panelleri YOK, sol kolonda uydurma link kartları). Yeni direktif: **`roven-dashboard 2/` tasarımına BİREBİR + EKSİKSİZ uy; eksik backend'i kur.** **Kalıcı plan:** `DASHBOARD_OVERVIEW_PLAN.md` + plan-modu MD (TAM-SADIK versiyon). **Görsel doğrulama (kullanıcı istedi): Playwright login→screenshot — 6 KPI şeridi + Ciro&Maliyet trendi(maliyet kesik çizgi) + Finansal Özet(brüt kâr+money-flow+AgingBars) + Üretim BarChart + Son Siparişler + Stok Donut(457K) + Öneriler + Uyarılar(8 acil) + AI = `DashDetailed` BİREBİR; koyu+aydınlık + mobil 2'li→tek kolon doğrulandı.**
 

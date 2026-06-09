@@ -60,6 +60,10 @@ export default function QuoteDetailPage() {
         confirmLabel: string;
         variant: "primary" | "danger";
     } | null>(null);
+    // "Gönder" onayında müşteriye e-posta da gönderilsin mi (default işaretli).
+    const [sendEmailChecked, setSendEmailChecked] = useState(true);
+
+    const hasCustomerEmail = !!quote?.customerEmail?.trim();
 
     // ── Fetch quote ──────────────────────────────────────────────────────────
 
@@ -129,11 +133,34 @@ export default function QuoteDetailPage() {
                 };
                 toast({ type: transition === "rejected" ? "warning" : "success", message: labels[transition] || "Durum güncellendi" });
             }
+
+            // Gönder onayında "müşteriye e-posta da gönder" işaretliyse, başarılı
+            // transition SONRASI ayrı endpoint'i çağır (transition'ı bozmaz).
+            if (transition === "sent" && sendEmailChecked && data.customerEmail?.trim()) {
+                await sendQuoteToCustomer();
+            }
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Beklenmeyen bir hata oluştu.";
             toast({ type: "error", message: msg });
         } finally {
             setLoading(null);
+        }
+    };
+
+    // ── Müşteriye teklif e-postası (HTML ek) ─────────────────────────────────
+    // "Gönder" transition'ı başarılı olduktan sonra çağrılır (checkbox işaretliyse).
+    // Transition'dan bağımsız endpoint; başarısızlık transition'ı geri almaz.
+    const sendQuoteToCustomer = async () => {
+        try {
+            const res = await fetch(`/api/quotes/${params.id}/send-email`, { method: "POST" });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok) {
+                toast({ type: "success", message: "Teklif müşteriye e-posta ile gönderildi." });
+            } else {
+                toast({ type: "warning", message: data.error || "Teklif gönderildi ancak e-posta iletilemedi." });
+            }
+        } catch {
+            toast({ type: "warning", message: "Teklif gönderildi ancak e-posta iletilemedi." });
         }
     };
 
@@ -487,6 +514,46 @@ export default function QuoteDetailPage() {
                         }}>
                             {confirmDialog.message}
                         </div>
+
+                        {/* Müşteriye e-posta gönder seçeneği — yalnız "Gönder" onayında */}
+                        {confirmDialog.action === "sent" && (
+                            <div style={{ marginBottom: "16px" }}>
+                                <label style={{
+                                    display: "flex",
+                                    alignItems: "flex-start",
+                                    gap: "8px",
+                                    fontSize: "13px",
+                                    color: hasCustomerEmail ? "var(--text-primary)" : "var(--text-tertiary)",
+                                    cursor: hasCustomerEmail ? "pointer" : "not-allowed",
+                                }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={hasCustomerEmail && sendEmailChecked}
+                                        disabled={!hasCustomerEmail}
+                                        onChange={(e) => setSendEmailChecked(e.target.checked)}
+                                        aria-label="Müşteriye teklif belgesini e-posta ile gönder"
+                                        style={{ marginTop: "2px", cursor: hasCustomerEmail ? "pointer" : "not-allowed" }}
+                                    />
+                                    <span>
+                                        Müşteriye e-posta da gönder
+                                        {hasCustomerEmail && (
+                                            <span style={{ color: "var(--text-tertiary)", display: "block", fontSize: "12px", marginTop: "2px" }}>
+                                                {quote?.customerEmail} · teklif belgesi ek olarak iletilir
+                                            </span>
+                                        )}
+                                    </span>
+                                </label>
+                                {!hasCustomerEmail && (
+                                    <div role="alert" style={{
+                                        marginTop: "6px",
+                                        fontSize: "12px",
+                                        color: "var(--warning-text)",
+                                    }}>
+                                        Bu teklifte müşteri e-postası yok — yalnız durum güncellenecek.
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         <div style={{ display: "flex", gap: "8px" }}>
                             <Button variant="secondary" onClick={() => setConfirmDialog(null)} style={{ flex: 1 }}>

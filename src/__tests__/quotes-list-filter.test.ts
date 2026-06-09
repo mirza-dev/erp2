@@ -150,13 +150,14 @@ describe("matchesSearch logic", () => {
 // ─── getQuoteActions ─────────────────────────────────────────────────────────
 
 describe("getQuoteActions", () => {
-    it("draft → 1 aksiyon: Gönder, primary, confirm yok", () => {
+    it("draft → 1 aksiyon: Gönder, primary, confirm var (müşteriye e-posta onayı)", () => {
         const actions = getQuoteActions("draft", "TKL-2026-001");
         expect(actions).toHaveLength(1);
         expect(actions[0].transition).toBe("sent");
         expect(actions[0].label).toBe("Gönder");
         expect(actions[0].variant).toBe("primary");
-        expect(actions[0].confirm).toBeUndefined();
+        // Müşteriye e-posta checkbox'ı bu onay diyaloğunda gösterilir → confirm zorunlu.
+        expect(actions[0].confirm?.title).toBe("Teklifi Gönder");
     });
 
     it("sent → 2 aksiyon: Reddet (danger, confirm) + Kabul Et (primary, confirm)", () => {

@@ -33,10 +33,16 @@ interface ShellOpts {
     bodyHtml: string;               // ana içerik (paragraflar + key/value satırları)
     ctaLabel?: string;
     ctaUrl?: string;
+    /**
+     * Alt "bildirim tercihlerinizden yönetebilirsiniz → /dashboard/settings"
+     * footer'ını gizler. İç bildirimlerde gösterilir (default); müşteriye giden
+     * e-postada (dashboard'a erişimi yok) gizlenir.
+     */
+    hideManageFooter?: boolean;
 }
 
 function shell(opts: ShellOpts): string {
-    const { title, severityColor, bodyHtml, ctaLabel, ctaUrl } = opts;
+    const { title, severityColor, bodyHtml, ctaLabel, ctaUrl, hideManageFooter } = opts;
     return `<!doctype html>
 <html lang="tr">
 <head><meta charset="utf-8"><title>${escapeHtml(title)}</title></head>
@@ -55,9 +61,9 @@ function shell(opts: ShellOpts): string {
           </a>
         </div>` : ""}
     </div>
-    <div style="margin-top:18px;font-size:11px;color:${COLORS.muted};line-height:1.6">
+    ${hideManageFooter ? "" : `<div style="margin-top:18px;font-size:11px;color:${COLORS.muted};line-height:1.6">
       Bu bildirimi <a href="${APP_URL}/dashboard/settings" style="color:${COLORS.muted};text-decoration:underline">bildirim tercihlerinizden</a> yönetebilirsiniz.
-    </div>
+    </div>`}
   </div>
 </body>
 </html>`;
@@ -227,6 +233,49 @@ export function renderOrderShipped(ctx: OrderShippedCtx): EmailContent {
     const text = `Sipariş sevk edildi: ${ctx.orderNumber}\n` +
         `Müşteri: ${ctx.customerName}\n` +
         `Detay: ${APP_URL}/dashboard/orders`;
+    return { subject, html, text };
+}
+
+// ─── quote_customer_send (müşteriye giden teklif e-postası) ───────────────────
+
+export interface QuoteToCustomerCtx {
+    quoteNumber: string;
+    customerName: string;
+    validUntil?: string | null;   // ISO veya boş — varsa "geçerlilik" satırı
+    companyName?: string | null;  // gönderen firma adı (company_settings); yoksa "Roven"
+}
+
+function fmtDateTr(iso: string): string {
+    try {
+        return new Date(`${iso}T00:00:00Z`).toLocaleDateString("tr-TR", {
+            day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC",
+        });
+    } catch {
+        return iso;
+    }
+}
+
+export function renderQuoteToCustomer(ctx: QuoteToCustomerCtx): EmailContent {
+    const sender = ctx.companyName?.trim() || "Roven";
+    const subject = `Teklifimiz — ${ctx.quoteNumber}`;
+    const validRow = ctx.validUntil ? row("Geçerlilik Tarihi", fmtDateTr(ctx.validUntil)) : "";
+    const html = shell({
+        title: "Teklifimiz",
+        severityColor: COLORS.accent,
+        hideManageFooter: true,
+        bodyHtml: `
+            <p>Sayın ${escapeHtml(ctx.customerName)},</p>
+            <p>${escapeHtml(ctx.quoteNumber)} numaralı teklifimizi ekte bulabilirsiniz. Ekteki belgeyi tarayıcınızda açıp yazdırarak PDF olarak da kaydedebilirsiniz.</p>
+            ${row("Teklif No", ctx.quoteNumber)}
+            ${validRow}
+            <p style="margin-top:14px">Görüşleriniz için teşekkür eder, iş birliğimizin devamını dileriz.</p>
+            <p style="color:${COLORS.muted}">${escapeHtml(sender)}</p>
+        `,
+    });
+    const text = `Sayın ${ctx.customerName},\n\n` +
+        `${ctx.quoteNumber} numaralı teklifimizi ekte bulabilirsiniz.\n` +
+        (ctx.validUntil ? `Geçerlilik Tarihi: ${fmtDateTr(ctx.validUntil)}\n` : "") +
+        `\n${sender}`;
     return { subject, html, text };
 }
 

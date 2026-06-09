@@ -14,6 +14,9 @@ import { dbGetQuoteArchive, dbCreateQuoteArchive, dbArchiveObjectStatus, dbDelet
 import { buildQuoteDataFromDetail, renderQuoteArchiveHtml } from "@/lib/quote-archive-html";
 import { mapQuoteDetail } from "@/lib/api-mappers";
 import { validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
+import { sendDirectEmail } from "@/lib/services/email-service";
+import { renderQuoteToCustomer } from "@/lib/email/templates";
+import { dbCreateEmailLog, dbUpdateEmailLogStatus } from "@/lib/supabase/email-logs";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -192,6 +195,98 @@ export async function serviceArchiveQuotePdf(
     }
 
     return { archived: true, existing: false, revisionNo };
+}
+
+// ── Müşteriye teklif e-postası (HTML ek) ─────────────────────
+
+const QUOTE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export interface SendQuoteToCustomerResult {
+    ok: boolean;
+    notFound?: boolean;
+    /** Teklifte müşteri e-postası yok/geçersiz → route 400 (gönderim atılmaz). */
+    reason?: "no_email";
+    /** Resend/config hatası → route 502/503. */
+    error?: string;
+    messageId?: string;
+}
+
+/**
+ * Teklif belgesini (arşivle birebir dondurulmuş HTML) teklifte yazan müşteri
+ * e-postasına EK olarak gönderir. Status transition'dan bağımsız, reusable.
+ *
+ * Belge HTML'i = serviceArchiveQuotePdf ile AYNI pipeline (deterministik):
+ *   mapQuoteDetail → buildQuoteDataFromDetail → renderQuoteArchiveHtml.
+ * `email_logs` kaydı tutar (entity_type='quote'); generic retry'a girmez
+ * (dbListFailedEmailsForRetry quote'u dışlar — ek yeniden eklenemez).
+ *
+ * NOT (gelecek "Tekrar Gönder"): burada arşiv BUCKET'ından değil, yeniden
+ * render'dan ek üretiyoruz. Normal akışta (send → anında e-posta, aynı deploy)
+ * byte-identical + archiveWarning durumunda da çalışır (daha sağlam). Ancak
+ * post-redeploy template değişiminde dondurulmuş arşivden sapabilir. Resend
+ * özelliği eklenirse `dbGetArchiveSignedUrl` ile FROZEN arşivi ek yapmayı tercih et.
+ */
+export async function serviceSendQuoteToCustomer(
+    quoteId: string,
+    actorUserId?: string | null,
+): Promise<SendQuoteToCustomerResult> {
+    const quote = await dbGetQuote(quoteId);
+    if (!quote) return { ok: false, notFound: true };
+
+    const detail = mapQuoteDetail(quote);
+    const to = detail.customerEmail?.trim() ?? "";
+    if (!QUOTE_EMAIL_RE.test(to)) return { ok: false, reason: "no_email" };
+
+    // Belge HTML'i — arşivle birebir
+    const company = await dbGetCompanySettings().catch(() => null);
+    const data = buildQuoteDataFromDetail(detail, company);
+    const docHtml = await renderQuoteArchiveHtml(data);
+
+    const body = renderQuoteToCustomer({
+        quoteNumber: detail.quoteNumber,
+        customerName: detail.customerName,
+        validUntil: detail.validUntil,
+        companyName: company?.name ?? null,
+    });
+
+    // Log (pending) — fail olursa gönderimi yine de dene (best-effort audit)
+    let logId: string | null = null;
+    try {
+        logId = await dbCreateEmailLog({
+            user_id: actorUserId ?? "00000000-0000-0000-0000-000000000000",
+            notification_type: "quote_customer_send",
+            entity_type: "quote",
+            entity_id: quoteId,
+            recipient_email: to,
+            subject: body.subject,
+        });
+    } catch (err) {
+        console.error("[quote-service] email log create failed", err);
+    }
+
+    const sendRes = await sendDirectEmail({
+        to,
+        subject: body.subject,
+        html: body.html,
+        text: body.text,
+        attachments: [{
+            filename: `Teklif-${detail.quoteNumber}.html`,
+            content: Buffer.from(docHtml, "utf-8"),
+        }],
+    });
+
+    if (logId) {
+        try {
+            await dbUpdateEmailLogStatus(
+                logId,
+                sendRes.ok ? "sent" : "failed",
+                sendRes.ok ? { resend_message_id: sendRes.messageId } : { error: sendRes.error },
+            );
+        } catch { /* best-effort log update */ }
+    }
+
+    if (!sendRes.ok) return { ok: false, error: sendRes.error };
+    return { ok: true, messageId: sendRes.messageId };
 }
 
 // ── Accept → Sipariş (Faz 6, atomik) ─────────────────────────

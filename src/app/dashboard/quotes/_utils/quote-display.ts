@@ -49,7 +49,16 @@ export type QuoteAction = {
 export function getQuoteActions(status: QuoteStatus, quoteNumber: string): QuoteAction[] {
     switch (status) {
         case "draft":
-            return [{ transition: "sent", label: "Gönder", variant: "primary" }];
+            return [{
+                transition: "sent",
+                label: "Gönder",
+                variant: "primary",
+                confirm: {
+                    title: "Teklifi Gönder",
+                    message: `${quoteNumber} numaralı teklif "gönderildi" olarak işaretlenecek ve belgesi dondurulacak (immutable arşiv).`,
+                    confirmLabel: "Gönder",
+                },
+            }];
         case "sent":
             return [
                 {

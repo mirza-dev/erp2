@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const insertCalls: unknown[][] = [];
 const updateCalls: unknown[][] = [];
 const selectCalls: unknown[][] = [];
+const orCalls: string[] = [];
 
 let insertResponse: { data: unknown; error: { message: string } | null } = { data: { id: "log-1" }, error: null };
 let getResponse: { data: { attempt_count: number; metadata: unknown } | null; error: { message: string } | null } = {
@@ -35,6 +36,7 @@ function makeQueryBuilder() {
         in: vi.fn(() => builder),
         gte: vi.fn(() => builder),
         lt: vi.fn(() => builder),
+        or: vi.fn((expr: string) => { orCalls.push(expr); return builder; }),
         order: vi.fn(() => builder),
         limit: vi.fn(() => Promise.resolve(listResponse)),
         single: vi.fn(() => Promise.resolve(getResponse)),
@@ -80,6 +82,7 @@ beforeEach(() => {
     insertCalls.length = 0;
     updateCalls.length = 0;
     selectCalls.length = 0;
+    orCalls.length = 0;
     insertResponse = { data: { id: "log-1" }, error: null };
     getResponse = { data: { attempt_count: 0, metadata: {} }, error: null };
     updateResponse = { data: null, error: null };
@@ -187,5 +190,12 @@ describe("dbListFailedEmailsForRetry", () => {
         listResponse = { data: [], error: null };
         const failed = await dbListFailedEmailsForRetry(3, 24);
         expect(failed.length).toBe(0);
+    });
+
+    it("entity_type='quote' kayıtlarını NULL-safe dışlar (.or filtresi)", async () => {
+        await dbListFailedEmailsForRetry(3, 24);
+        // quote'u dışla AMA entity_type=NULL iç bildirimleri retry'da tut:
+        // PostgREST düz .neq NULL satırlarını da yutardı → .or kullanılır.
+        expect(orCalls).toContain("entity_type.is.null,entity_type.neq.quote");
     });
 });
