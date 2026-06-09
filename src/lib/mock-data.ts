@@ -8,6 +8,7 @@ export interface UretimKaydi {
     productName: string;
     productSku: string;
     adet: number;
+    scrap: number;          // fire adedi (production_entries.scrap_qty; çoğu kayıtta 0)
     tarih: string;          // "YYYY-MM-DD"
     girenKullanici: string;
     notlar: string;

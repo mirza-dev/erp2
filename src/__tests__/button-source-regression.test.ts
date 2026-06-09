@@ -4,8 +4,9 @@ import { describe, expect, it } from "vitest";
 
 const projectRoot = process.cwd();
 
+// NOT: Genel Bakış (dashboard/page.tsx) tasarıma sadık SALT-BAKIŞ ekranıdır —
+// "Yeni Sipariş" CTA'sı yok (segment + Rapor indir header'ı); ana-CTA listesinden çıkarıldı.
 const PRIMARY_CTA_FILES = [
-    "src/app/dashboard/page.tsx",
     "src/app/dashboard/vendors/page.tsx",
     "src/app/dashboard/customers/page.tsx",
     "src/app/dashboard/products/page.tsx",

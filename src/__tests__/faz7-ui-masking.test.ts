@@ -40,7 +40,8 @@ describe("Faz 7 — liste/detay finansal maskeleme", () => {
 
 describe("Faz 7 — birincil CTA permission gating", () => {
     const ctas: { file: string; perm: string }[] = [
-        { file: "src/app/dashboard/page.tsx", perm: "manage_sales_orders" },
+        // NOT: Genel Bakış (dashboard/page.tsx) tasarıma sadık SALT-BAKIŞ ekranıdır;
+        // "Yeni Sipariş" CTA'sı liste sayfasında (orders/page.tsx) — burada aranmaz.
         { file: "src/app/dashboard/orders/page.tsx", perm: "manage_sales_orders" },
         { file: "src/app/dashboard/quotes/page.tsx", perm: "manage_quotes" },
         { file: "src/app/dashboard/customers/page.tsx", perm: "manage_customers" },

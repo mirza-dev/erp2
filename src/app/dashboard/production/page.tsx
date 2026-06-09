@@ -229,6 +229,7 @@ function ProductionPageInner() {
                     productName: product.name,
                     productSku: product.sku,
                     adet: parseInt(line.adet),
+                    scrap: 0,
                     tarih,
                     girenKullanici: "Usta",
                     notlar: line.notlar,

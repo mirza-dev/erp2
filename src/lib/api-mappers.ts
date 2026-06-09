@@ -354,6 +354,7 @@ export function mapProductionEntry(row: ProductionEntryRow): UretimKaydi {
     productName: row.product_name,
     productSku: row.product_sku,
     adet: row.produced_qty,
+    scrap: row.scrap_qty ?? 0,
     tarih: row.production_date,
     girenKullanici: row.entered_by ?? "",
     notlar: row.notes ?? "",
