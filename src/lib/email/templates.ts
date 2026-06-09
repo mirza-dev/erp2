@@ -14,7 +14,7 @@ export interface EmailContent {
     text: string;
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://erp2-sigma.vercel.app";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://erp.getmedspace.com";
 const COLORS = {
     bg:     "#0d0d0d",
     card:   "#1a1a1a",
