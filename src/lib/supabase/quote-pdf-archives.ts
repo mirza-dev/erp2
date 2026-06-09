@@ -99,6 +99,20 @@ export async function dbDeleteQuoteArchive(id: string, filePath?: string): Promi
     if (error) throw new Error(error.message);
 }
 
+/**
+ * Donmuş arşiv HTML'inin GÖVDESİNİ indirir (string). Supabase storage signed/public
+ * URL'i HTML'i `text/html` olarak render ETMEYEBİLİR (stored-XSS koruması → metin/indirme
+ * gibi sunar → tarayıcıda ham kaynak + UTF-8 mojibake). Çözüm: arşivi kendi route'umuzdan
+ * `Content-Type: text/html; charset=utf-8` ile servis ederiz → bu helper bytes'ı çeker.
+ * Obje yoksa/erişilemezse null.
+ */
+export async function dbDownloadArchiveHtml(filePath: string): Promise<string | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.storage.from(STORAGE_BUCKET).download(filePath);
+    if (error || !data) return null;
+    return await data.text();
+}
+
 /** İmzalı (signed) URL — donmuş HTML'in geçici erişim linki (default 1 saat). */
 export async function dbGetArchiveSignedUrl(filePath: string, expiresIn = 3600): Promise<string | null> {
     const supabase = createServiceClient();

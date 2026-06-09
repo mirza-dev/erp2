@@ -88,7 +88,8 @@ describe("Sipariş detay arşiv PDF linki — Bulgu #3", () => {
     it("quotePdfArchiveId varsa arşiv belgesi linki + handleViewArchive", () => {
         expect(PAGE).toMatch(/order\.quoteId && order\.quotePdfArchiveId/);
         expect(PAGE).toMatch(/const handleViewArchive = useCallback/);
-        expect(PAGE).toMatch(/fetch\(`\/api\/quotes\/\$\{quoteId\}\/archive`\)/);
+        // ?view=1 route'u HTML'i text/html ile stream eder → senkron window.open (popup-blocker güvenli + render).
+        expect(PAGE).toMatch(/window\.open\(`\/api\/quotes\/\$\{quoteId\}\/archive\?view=1`/);
         expect(PAGE).toMatch(/Arşivlenmiş Teklif/);
     });
 });

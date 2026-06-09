@@ -125,28 +125,17 @@ export default function OrderDetailPage() {
     const [shortageDialogOpen, setShortageDialogOpen] = useState(false);
     const [shortages, setShortages] = useState<ShortageItem[]>([]);
     const [loading, setLoading] = useState<string | null>(null);
-    const [archiveLoading, setArchiveLoading] = useState(false);
     const [justTransitionedCommercial, setJustTransitionedCommercial] = useState<CommercialStatus | null>(null);
 
-    // Faz 6 (Bulgu #3): kabulde dondurulan teklif arşivinin (PDF/HTML) signed URL'ini
-    // açar. Arşiv quote'a bağlı (GET /api/quotes/[id]/archive son revizyonu döner;
-    // kabul edilen teklifin revizyonu sabit → doğru donmuş belge). Read-only → demo OK.
-    const handleViewArchive = useCallback(async (quoteId: string) => {
-        setArchiveLoading(true);
-        try {
-            const res = await fetch(`/api/quotes/${quoteId}/archive`);
-            const data = await res.json();
-            if (!res.ok || !data.url) {
-                toast({ type: "info", message: data.error || "Arşiv bulunamadı." });
-                return;
-            }
-            window.open(data.url, "_blank", "noopener");
-        } catch (err) {
-            toast({ type: "error", message: err instanceof Error ? err.message : "Arşiv açılamadı." });
-        } finally {
-            setArchiveLoading(false);
-        }
-    }, [toast]);
+    // Faz 6 (Bulgu #3): kabulde dondurulan teklif arşivini açar. Arşiv quote'a bağlı
+    // (kabul edilen teklifin revizyonu sabit → doğru donmuş belge). Read-only → demo OK.
+    // `?view=1` route'u HTML'i `text/html; charset=utf-8` ile stream eder (Supabase signed
+    // URL'i HTML'i render etmiyor + mojibake yapıyordu). Senkron window.open → popup-blocker
+    // güvenli (fetch'ten SONRA açmak Safari/Chrome'da engelleniyordu). Eksik arşiv → yeni
+    // sekmede dostça HTML hata sayfası (route view modu).
+    const handleViewArchive = useCallback((quoteId: string) => {
+        window.open(`/api/quotes/${quoteId}/archive?view=1`, "_blank", "noopener");
+    }, []);
     const [justTransitionedFulfillment, setJustTransitionedFulfillment] = useState<FulfillmentStatus | null>(null);
 
     // Confirmation dialog state
@@ -593,11 +582,10 @@ export default function OrderDetailPage() {
                                                 size="xs"
                                                 leftIcon={<FileText size={13} />}
                                                 onClick={() => handleViewArchive(order.quoteId!)}
-                                                disabled={archiveLoading}
                                                 aria-label="Kabulde dondurulan teklif belgesini aç"
                                                 style={{ justifyContent: "flex-start", padding: "0 4px", minHeight: "20px", height: "20px", color: "var(--accent-text)" }}
                                             >
-                                                {archiveLoading ? "Açılıyor…" : "Belgeyi Aç"}
+                                                Belgeyi Aç
                                             </Button>
                                         </div>
                                     )}

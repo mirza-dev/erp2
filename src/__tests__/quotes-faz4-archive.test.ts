@@ -17,6 +17,7 @@ const mockObjectExists = vi.fn();
 const mockObjectStatus = vi.fn();
 const mockDeleteArchive = vi.fn();
 const mockGetCompany = vi.fn();
+const mockDownloadHtml = vi.fn();
 
 // Faz 8a: RBAC guard — varsayılan izinli (mevcut testler davranışı korur).
 vi.mock("@/lib/auth/role-guard", () => ({
@@ -37,6 +38,7 @@ vi.mock("@/lib/supabase/quote-pdf-archives", () => ({
     dbArchiveObjectExists: (...a: unknown[]) => mockObjectExists(...a),
     dbArchiveObjectStatus: (...a: unknown[]) => mockObjectStatus(...a),
     dbDeleteQuoteArchive: (...a: unknown[]) => mockDeleteArchive(...a),
+    dbDownloadArchiveHtml: (...a: unknown[]) => mockDownloadHtml(...a),
 }));
 vi.mock("@/lib/supabase/company-settings", () => ({
     dbGetCompanySettings: (...a: unknown[]) => mockGetCompany(...a),
@@ -74,13 +76,14 @@ const stubQuote = (over: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
-    [mockDbGetQuote, mockDbUpdateStatus, mockGetArchive, mockCreateArchive, mockGetSignedUrl, mockObjectExists, mockObjectStatus, mockDeleteArchive, mockGetCompany]
+    [mockDbGetQuote, mockDbUpdateStatus, mockGetArchive, mockCreateArchive, mockGetSignedUrl, mockObjectExists, mockObjectStatus, mockDeleteArchive, mockGetCompany, mockDownloadHtml]
         .forEach((m) => m.mockReset());
     mockDbUpdateStatus.mockResolvedValue(true);
     mockObjectExists.mockResolvedValue(true);       // GET route: varsayılan dosya var
     mockObjectStatus.mockResolvedValue("present");  // service: varsayılan obje present
     mockDeleteArchive.mockResolvedValue(undefined);
     mockGetCompany.mockResolvedValue(null);
+    mockDownloadHtml.mockResolvedValue("<html>frozen-archive</html>");  // view modu: varsayılan HTML
 });
 
 // ── serviceArchiveQuotePdf ───────────────────────────────────
@@ -219,7 +222,11 @@ describe("send hook: draft→sent arşivi tetikler (non-fatal)", () => {
 
 // ── GET /api/quotes/[id]/archive ─────────────────────────────
 describe("GET /api/quotes/[id]/archive", () => {
-    const call = () => ARCHIVE_GET({} as never, { params: Promise.resolve({ id: QID }) });
+    // Route req.nextUrl.searchParams okur (?view=1). Gerçek NextURL benzeri stub geç.
+    const call = (view = false) => ARCHIVE_GET(
+        { nextUrl: new URL(`http://localhost/api/quotes/${QID}/archive${view ? "?view=1" : ""}`) } as never,
+        { params: Promise.resolve({ id: QID }) },
+    );
 
     it("arşiv var → 200 {url, expires_in, revision_no}; file_path/content_hash SIZMAZ", async () => {
         mockDbGetQuote.mockResolvedValue(stubQuote());
@@ -254,6 +261,39 @@ describe("GET /api/quotes/[id]/archive", () => {
         const res = await call();
         expect(res.status).toBe(404);
         expect(mockGetSignedUrl).not.toHaveBeenCalled();
+    });
+
+    // ?view=1: HTML'i text/html; charset=utf-8 ile DOĞRUDAN stream eder (Supabase signed
+    // URL'i HTML'i render etmediği + mojibake yaptığı için kendi origin'imizden servis).
+    it("?view=1 → 200 text/html; charset=utf-8, HTML gövdesi stream edilir, signed URL üretilmez", async () => {
+        mockDbGetQuote.mockResolvedValue(stubQuote());
+        mockGetArchive.mockResolvedValue({ id: "a1", file_path: "quotes/x/r1.html", content_hash: "secret" });
+        mockDownloadHtml.mockResolvedValue("<!doctype html><html>ARŞİV</html>");
+        const res = await call(true);
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+        const text = await res.text();
+        expect(text).toContain("<!doctype html>");
+        expect(text).toContain("ARŞİV");
+        expect(mockGetSignedUrl).not.toHaveBeenCalled();   // view modu signed URL kullanmaz
+    });
+
+    it("?view=1 + download null → 404 HTML hata sayfası (text/html)", async () => {
+        mockDbGetQuote.mockResolvedValue(stubQuote());
+        mockGetArchive.mockResolvedValue({ id: "a1", file_path: "quotes/x/r1.html" });
+        mockDownloadHtml.mockResolvedValue(null);
+        const res = await call(true);
+        expect(res.status).toBe(404);
+        expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    });
+
+    it("?view=1 + arşiv yok → 404 ham JSON DEĞİL, dostça HTML hata sayfası", async () => {
+        mockDbGetQuote.mockResolvedValue(stubQuote());
+        mockGetArchive.mockResolvedValue(null);
+        const res = await call(true);
+        expect(res.status).toBe(404);
+        expect(res.headers.get("content-type")).toBe("text/html; charset=utf-8");
+        expect(await res.text()).toContain("arşiv bulunamadı");
     });
 });
 
@@ -303,10 +343,10 @@ const quoteDoc = readFileSync(
 );
 
 describe("UI Mod B arşiv linki (detay sayfası)", () => {
-    it("handleViewArchive fetch /api/quotes/${id}/archive → window.open", () => {
+    it("handleViewArchive senkron window.open(?view=1) — fetch yok (popup-blocker güvenli + HTML render)", () => {
         expect(detailPage).toMatch(/handleViewArchive/);
-        expect(detailPage).toMatch(/\/api\/quotes\/\$\{params\.id\}\/archive/);
-        expect(detailPage).toMatch(/window\.open\(/);
+        // view=1 route'u HTML'i text/html ile stream eder; senkron açılır (fetch+sonra-open değil).
+        expect(detailPage).toMatch(/window\.open\(`\/api\/quotes\/\$\{params\.id\}\/archive\?view=1`/);
     });
     it("Arşiv butonu yalnız gönderilmiş statüde (status !== 'draft')", () => {
         expect(detailPage).toMatch(/status !== "draft"[\s\S]{0,700}Arşivlenmiş Teklif/);

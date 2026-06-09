@@ -50,7 +50,6 @@ export default function QuoteDetailPage() {
     const [loading, setLoading] = useState<string | null>(null);
     const [converting, setConverting] = useState(false);
     const [revising, setRevising] = useState(false);
-    const [archiveLoading, setArchiveLoading] = useState(false);
     const [convertedOrderId, setConvertedOrderId] = useState<string | null>(null);
     const [convertedOrderNumber, setConvertedOrderNumber] = useState<string | null>(null);
     const [confirmDialog, setConfirmDialog] = useState<{
@@ -220,21 +219,11 @@ export default function QuoteDetailPage() {
     // Gönderilmiş teklifin dondurulmuş HTML arşivinin signed URL'ini açar.
     // Read-only → demo modda izinli.
 
-    const handleViewArchive = async () => {
-        setArchiveLoading(true);
-        try {
-            const res = await fetch(`/api/quotes/${params.id}/archive`);
-            const data = await res.json();
-            if (!res.ok || !data.url) {
-                toast({ type: "info", message: data.error || "Arşiv bulunamadı." });
-                return;
-            }
-            window.open(data.url, "_blank", "noopener");
-        } catch (err) {
-            toast({ type: "error", message: err instanceof Error ? err.message : "Arşiv açılamadı." });
-        } finally {
-            setArchiveLoading(false);
-        }
+    // `?view=1` route'u HTML'i `text/html; charset=utf-8` ile stream eder (Supabase signed
+    // URL'i render etmiyor + mojibake yapıyordu). Senkron window.open → popup-blocker güvenli;
+    // eksik arşiv → yeni sekmede dostça HTML hata sayfası (route view modu).
+    const handleViewArchive = () => {
+        window.open(`/api/quotes/${params.id}/archive?view=1`, "_blank", "noopener");
     };
 
     // ── Loading / Not Found ──────────────────────────────────────────────────
@@ -407,10 +396,9 @@ export default function QuoteDetailPage() {
                         variant="secondary"
                         leftIcon={<FileText size={14} />}
                         onClick={handleViewArchive}
-                        loading={archiveLoading}
                         title="Gönderilen teklifin dondurulmuş (immutable) kopyası"
                     >
-                        {archiveLoading ? "Açılıyor..." : "Arşivlenmiş Teklif"}
+                        Arşivlenmiş Teklif
                     </Button>
                 )}
 

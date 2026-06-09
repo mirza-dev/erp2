@@ -16,6 +16,7 @@ const mockStorageUpload = vi.fn();
 const mockStorageSigned = vi.fn();
 const mockStorageList = vi.fn();
 const mockStorageRemove = vi.fn();
+const mockStorageDownload = vi.fn();
 
 let _terminal: { data: unknown; error: unknown } = { data: null, error: null };
 function setTerminal(v: { data: unknown; error: unknown }) { _terminal = v; }
@@ -41,18 +42,19 @@ const mockSupabase = {
             createSignedUrl: (...a: unknown[]) => mockStorageSigned(...a),
             list: (...a: unknown[]) => mockStorageList(...a),
             remove: (...a: unknown[]) => mockStorageRemove(...a),
+            download: (...a: unknown[]) => mockStorageDownload(...a),
         }),
     },
 };
 
 vi.mock("@/lib/supabase/service", () => ({ createServiceClient: () => mockSupabase }));
 
-import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists, dbArchiveObjectStatus, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
+import { dbGetQuoteArchive, dbCreateQuoteArchive, dbGetArchiveSignedUrl, dbArchiveObjectExists, dbArchiveObjectStatus, dbDeleteQuoteArchive, dbDownloadArchiveHtml } from "@/lib/supabase/quote-pdf-archives";
 
 const QID = "00000000-0000-4000-8000-000000000001";
 
 beforeEach(() => {
-    [mockFrom, mockInsert, mockDelete, mockSelect, mockEq, mockMaybeSingle, mockSingle, mockStorageUpload, mockStorageSigned, mockStorageList, mockStorageRemove]
+    [mockFrom, mockInsert, mockDelete, mockSelect, mockEq, mockMaybeSingle, mockSingle, mockStorageUpload, mockStorageSigned, mockStorageList, mockStorageRemove, mockStorageDownload]
         .forEach((m) => m.mockReset());
     mockStorageRemove.mockResolvedValue({ data: [], error: null });
     setTerminal({ data: null, error: null });
@@ -129,6 +131,19 @@ describe("dbGetArchiveSignedUrl", () => {
     it("hata → null", async () => {
         mockStorageSigned.mockResolvedValueOnce({ data: null, error: { message: "no" } });
         expect(await dbGetArchiveSignedUrl("quotes/x/r1.html")).toBeNull();
+    });
+});
+
+describe("dbDownloadArchiveHtml", () => {
+    it("obje var → HTML string döner (.text())", async () => {
+        mockStorageDownload.mockResolvedValueOnce({ data: { text: async () => "<html>arşiv</html>" }, error: null });
+        expect(await dbDownloadArchiveHtml("quotes/x/r1.html")).toBe("<html>arşiv</html>");
+        expect(mockStorageDownload).toHaveBeenCalledWith("quotes/x/r1.html");
+    });
+
+    it("hata → null", async () => {
+        mockStorageDownload.mockResolvedValueOnce({ data: null, error: { message: "yok" } });
+        expect(await dbDownloadArchiveHtml("quotes/x/r1.html")).toBeNull();
     });
 });
 
