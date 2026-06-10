@@ -1251,6 +1251,9 @@ select:focus-visible {
 }
 
 /* ============ PRINT ============ */
+/* Genel Bakış yazdırılabilir rapor — ekranda gizli, yalnız @media print'te görünür. */
+.dashboard-print-report { display: none; }
+
 @media print {
   /* 2. boş sayfa önleme — tüm height constraint'leri kaldır */
   html, body { height: auto !important; min-height: 0 !important; font-size: 9px !important; }
@@ -1264,6 +1267,17 @@ select:focus-visible {
   /* Grid → block, height serbest */
   .dashboard-grid { display: block !important; min-height: 0 !important; height: auto !important; }
   .dashboard-grid > main { padding: 0 !important; overflow: visible !important; min-height: 0 !important; }
+
+  /* Genel Bakış: ekran içeriği gizlenir, amaca özel rapor basılır (ekran görüntüsü değil) */
+  .dashboard-screen-only { display: none !important; }
+  .dashboard-print-report {
+    display: block !important;
+    font-size: 11px !important;            /* global 9px override'ını ez */
+    color: #111 !important;
+    font-family: -apple-system, "Helvetica Neue", Arial, sans-serif !important;
+  }
+  .dashboard-print-report table { width: 100% !important; border-collapse: collapse !important; }
+  .dashboard-print-report section { break-inside: avoid; }
 
   /* No-print */
   .q-no-print { display: none !important; }

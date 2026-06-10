@@ -10,11 +10,12 @@ import FinancePanel from "@/components/dashboard/overview/FinancePanel";
 import ProductionPanel from "@/components/dashboard/overview/ProductionPanel";
 import AiPanel from "@/components/dashboard/overview/AiPanel";
 import { StockPanel, ReorderPanel, AlertsPanel, OrdersPanel } from "@/components/dashboard/overview/RealPanels";
+import DashboardReport from "@/components/dashboard/overview/DashboardReport";
 import {
-    buildKpis, monthLabels, monthlyRevenueReporting, monthlyOrderCounts, cogsToReporting,
+    buildKpis, periodModel, revenueByPeriod, orderCountsByPeriod, cogsByPeriod,
     stockValueByCategoryReporting, receivablesAging, financeSummary, grossToNetRevenue, productionDailySeries,
     reorderView, alertsView, recentOrdersView,
-    type ExchangeRates, type CogsRow,
+    type ExchangeRates, type CogsRow, type RangeKey,
 } from "@/lib/dashboard-view-model";
 
 interface FinanceData {
@@ -23,7 +24,7 @@ interface FinanceData {
     cogs: CogsRow[] | null;
 }
 
-const RANGES = ["Bugün", "Hafta", "Ay", "Çeyrek"] as const;
+const RANGES: RangeKey[] = ["Bugün", "Hafta", "Ay", "Çeyrek"];
 
 /** Ciro / Maliyet legend (trend paneli aksiyonu). */
 const TrendLegend = (
@@ -39,9 +40,10 @@ export default function DashboardPage() {
     const { products, orders, uretimKayitlari, openAlerts, reorderSuggestions } = useData();
     const { canViewSalesPrices, canViewPurchaseCosts, canViewFinancialSummary } = usePermissions();
 
-    const [range, setRange] = useState<(typeof RANGES)[number]>("Ay");
+    const [range, setRange] = useState<RangeKey>("Ay");
     const [finance, setFinance] = useState<FinanceData>({ reportingCurrency: "USD", canViewCosts: false, cogs: null });
     const [rates, setRates] = useState<ExchangeRates | null>(null);
+    const [preparedBy, setPreparedBy] = useState<string | null>(null);
 
     // Maliyet + raporlama para birimi + döviz kurları (mount'ta bir kez)
     useEffect(() => {
@@ -58,32 +60,49 @@ export default function DashboardPage() {
                 if (r.ok && alive) setRates(await r.json());
             } catch { /* defansif: TRY=1, diğerleri dönüştürülmez */ }
         })();
+        (async () => {
+            try {
+                const r = await fetch("/api/settings/user/profile");
+                if (r.ok && alive) {
+                    const d = await r.json() as { fullName?: string | null; email?: string | null };
+                    setPreparedBy(d.fullName || d.email || null);
+                }
+            } catch { /* defansif: hazırlayan satırı gizlenir */ }
+        })();
         return () => { alive = false; };
     }, []);
 
     const now = useMemo(() => new Date(), []);
     const reporting = finance.reportingCurrency;
+    const period = useMemo(() => periodModel(range, now), [range, now]);
 
     const kpis = useMemo(
         () => buildKpis(
             { products, orders, uretimKayitlari, openAlerts, reporting, rates },
             { canViewSalesPrices, canViewFinancialSummary },
             now,
+            period,
         ),
-        [products, orders, uretimKayitlari, openAlerts, reporting, rates, canViewSalesPrices, canViewFinancialSummary, now],
+        [products, orders, uretimKayitlari, openAlerts, reporting, rates, canViewSalesPrices, canViewFinancialSummary, now, period],
     );
 
-    // ── Trend (ciro + maliyet + sipariş) ──
-    const months = useMemo(() => monthLabels(now), [now]);
+    // ── Trend (ciro + maliyet + sipariş) — seçili döneme göre ──
     const revenueSeries = useMemo(
-        () => (canViewSalesPrices ? monthlyRevenueReporting(orders, reporting, rates, now) : null),
-        [orders, reporting, rates, canViewSalesPrices, now],
+        () => (canViewSalesPrices ? revenueByPeriod(orders, reporting, rates, period) : null),
+        [orders, reporting, rates, canViewSalesPrices, period],
     );
     const costSeries = useMemo(
-        () => (canViewPurchaseCosts && finance.cogs ? cogsToReporting(finance.cogs, reporting, rates, now) : null),
-        [finance.cogs, reporting, rates, canViewPurchaseCosts, now],
+        () => (canViewPurchaseCosts && finance.cogs ? cogsByPeriod(finance.cogs, reporting, rates, period) : null),
+        [finance.cogs, reporting, rates, canViewPurchaseCosts, period],
     );
-    const orderCounts = useMemo(() => monthlyOrderCounts(orders, now), [orders, now]);
+    const orderCounts = useMemo(() => orderCountsByPeriod(orders, period), [orders, period]);
+    const trendEmpty = useMemo(() => orderCounts.reduce((a, b) => a + b, 0) === 0, [orderCounts]);
+    // Maliyet bu dönemde kovalanamıyorsa (Hafta/Bugün) — veri-bug değil, granülerlik sınırı.
+    const costGranularityNote = useMemo(
+        () => (canViewSalesPrices && canViewPurchaseCosts && !!finance.cogs && !period.monthAligned
+            ? "Maliyet aylık/çeyreklik bazda gösterilir" : undefined),
+        [canViewSalesPrices, canViewPurchaseCosts, finance.cogs, period],
+    );
 
     // ── Stok donut ──
     const stock = useMemo(
@@ -95,8 +114,8 @@ export default function DashboardPage() {
     const financePanel = useMemo(() => {
         if (!(canViewSalesPrices && canViewPurchaseCosts) || !revenueSeries || !costSeries) return null;
         // Ciro grandTotal (KDV dahil), COGS vergisiz → kâr/marj NET ciro tabanında hesaplanır.
-        return financeSummary(grossToNetRevenue(revenueSeries[11] ?? 0), costSeries[11] ?? 0);
-    }, [canViewSalesPrices, canViewPurchaseCosts, revenueSeries, costSeries]);
+        return financeSummary(grossToNetRevenue(revenueSeries[period.currentIndex] ?? 0), costSeries[period.currentIndex] ?? 0);
+    }, [canViewSalesPrices, canViewPurchaseCosts, revenueSeries, costSeries, period]);
     const receivables = useMemo(
         () => (canViewFinancialSummary ? receivablesAging(orders, reporting, rates, now) : null),
         [orders, reporting, rates, canViewFinancialSummary, now],
@@ -112,13 +131,15 @@ export default function DashboardPage() {
         () => recentOrdersView(orders, reporting, rates, canViewSalesPrices),
         [orders, reporting, rates, canViewSalesPrices],
     );
+    // Rapor: ekran panelleri top-5; rapor TÜM uyarı + ilk 10 sipariş taşır.
+    const reportAlertRows = useMemo(() => alertsView(openAlerts, openAlerts.length, now), [openAlerts, now]);
+    const reportOrderRows = useMemo(
+        () => recentOrdersView(orders, reporting, rates, canViewSalesPrices, 10),
+        [orders, reporting, rates, canViewSalesPrices],
+    );
 
     const dateStr = useMemo(
         () => new Intl.DateTimeFormat("tr-TR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(now),
-        [now],
-    );
-    const monthLabel = useMemo(
-        () => new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(now),
         [now],
     );
 
@@ -126,6 +147,7 @@ export default function DashboardPage() {
 
     return (
         <div>
+        <div className="dashboard-screen-only">
             {/* PageHeader */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
                 <div>
@@ -135,7 +157,7 @@ export default function DashboardPage() {
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <div className="seg" role="group" aria-label="Dönem aralığı">
                         {RANGES.map((r) => (
-                            <button key={r} className={range === r ? "on" : ""} onClick={() => setRange(r)} type="button">{r}</button>
+                            <button key={r} className={range === r ? "is-active" : ""} aria-pressed={range === r} onClick={() => setRange(r)} type="button">{r}</button>
                         ))}
                     </div>
                     <button
@@ -163,30 +185,34 @@ export default function DashboardPage() {
             {/* Ciro & Maliyet Trendi */}
             <OverviewPanel
                 title="Ciro & Maliyet Trendi"
-                sub={`Son 12 ay · ${reporting}`}
+                sub={`${period.trendSub} · ${reporting}`}
                 style={{ marginBottom: gap }}
                 actions={TrendLegend}
             >
-                {revenueSeries ? (
+                {!revenueSeries ? (
+                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "40px 0" }}>
+                        Ciro görüntüleme yetkiniz yok.
+                    </div>
+                ) : trendEmpty ? (
+                    <div style={{ fontSize: 12.5, color: "var(--text-tertiary)", textAlign: "center", padding: "48px 0" }}>
+                        Bu dönemde sipariş yok.
+                    </div>
+                ) : (
                     <TrendChart
-                        months={months}
+                        months={period.labels}
                         revenue={revenueSeries}
                         cost={costSeries ?? []}
                         orders={orderCounts}
                         currency={reporting}
                         showCost={!!costSeries}
                     />
-                ) : (
-                    <div style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "40px 0" }}>
-                        Ciro görüntüleme yetkiniz yok.
-                    </div>
                 )}
             </OverviewPanel>
 
             {/* Satır 1: Stok Dağılımı + Finansal Özet */}
             <div className="overview-grid-1-1" style={{ marginBottom: gap }}>
                 <StockPanel segments={stock.segments} currency={reporting} canView={canViewSalesPrices} />
-                <FinancePanel reporting={reporting} monthLabel={monthLabel} finance={financePanel} canViewCosts={canViewSalesPrices && canViewPurchaseCosts} receivables={receivables} />
+                <FinancePanel reporting={reporting} monthLabel={period.currentLabel} finance={financePanel} canViewCosts={canViewSalesPrices && canViewPurchaseCosts} receivables={receivables} costGranularityNote={costGranularityNote} />
             </div>
 
             {/* Satır 2: Üretim + Son Siparişler */}
@@ -201,6 +227,30 @@ export default function DashboardPage() {
                 <AlertsPanel rows={alertRows} total={openAlerts.length} />
                 <AiPanel />
             </div>
+        </div>
+
+        {/* Yazdırılabilir rapor — ekranda gizli, yalnız baskıda (Rapor indir → PDF) */}
+        <DashboardReport
+            range={range}
+            dateStr={dateStr}
+            reporting={reporting}
+            preparedBy={preparedBy}
+            kpis={kpis}
+            trendSub={period.trendSub}
+            labels={period.labels}
+            revenue={revenueSeries}
+            cost={costSeries ?? null}
+            counts={orderCounts}
+            trendEmpty={trendEmpty}
+            finance={financePanel}
+            financeNote={costGranularityNote}
+            stockSegments={stock.segments}
+            receivables={receivables}
+            orderRows={reportOrderRows}
+            alertRows={reportAlertRows}
+            canViewPrices={canViewSalesPrices}
+            canViewFinance={canViewFinancialSummary}
+        />
         </div>
     );
 }

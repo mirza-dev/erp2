@@ -42,7 +42,7 @@ describe("değiştirme — sessiz silme değil", () => {
 describe("view-model normalizasyon fonksiyonları import edilir", () => {
     it("buildKpis + revenue/cost + stock + receivables + production + reorder/alerts/orders", () => {
         for (const fn of [
-            "buildKpis", "monthlyRevenueReporting", "cogsToReporting",
+            "buildKpis", "revenueByPeriod", "cogsByPeriod",
             "stockValueByCategoryReporting", "receivablesAging", "financeSummary",
             "productionDailySeries", "reorderView", "alertsView", "recentOrdersView",
         ]) {

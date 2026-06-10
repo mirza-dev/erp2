@@ -145,13 +145,15 @@ describe("Topbar — Sakin düz tasarım (kaynak regresyonu)", () => {
         expect(TOPBAR_SRC).toMatch(/topbar-page-title/);
     });
 
-    it("ExchangeRatesTicker düzleşir (çip-içinde-çip kalkar: rateStyle box / sourceStyle badge / A-S etiketi yok)", () => {
-        // Per-kur dolu pill (background var-bg-tertiary) ve accent kaynak rozeti kaldırıldı.
+    it("ExchangeRatesTicker tasarım RateChip'i kullanır (Alış/Satış etiketli, satış yeşil; dolu pill/kaynak rozeti yok)", () => {
+        // Per-kur dolu pill (background var-bg-tertiary) ve accent kaynak rozeti yok.
         expect(TICKER_SRC).not.toMatch(/var\(--bg-tertiary\)/);
         expect(TICKER_SRC).not.toMatch(/sourceStyle/);
-        expect(TICKER_SRC).not.toMatch(/labelStyle/);
-        expect(TICKER_SRC).not.toMatch(/A\/S/);
-        // Ayraç ticker'a ait (null ticker'da sarkmaz).
+        // Tasarım RateChip: Alış/Satış iki satır; satış --success-text (yeşil).
+        expect(TICKER_SRC).toMatch(/Alış/);
+        expect(TICKER_SRC).toMatch(/Satış/);
+        expect(TICKER_SRC).toMatch(/var\(--success-text\)/);
+        // Çipler arası dikey ayraç + ticker'a ait sağ ayraç (null ticker'da sarkmaz).
         expect(TICKER_SRC).toMatch(/borderRight/);
     });
 

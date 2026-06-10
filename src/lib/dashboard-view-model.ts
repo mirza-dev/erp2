@@ -207,6 +207,172 @@ export function cogsToReporting(
     return out;
 }
 
+// ════════════════════════════════════════════════════════════════
+//  Dönem modeli (Bugün / Hafta / Ay / Çeyrek) — segment filtresi
+// ════════════════════════════════════════════════════════════════
+
+export type RangeKey = "Bugün" | "Hafta" | "Ay" | "Çeyrek";
+
+/**
+ * Seçili dönemin kova (bucket) modeli. Saf — UI yalnız tüketir.
+ * `indexOf` bir tarihi kovaya eşler (aralık dışı → null); `currentIndex` = güncel dönem.
+ * `monthAligned` yalnız Ay/Çeyrek'te true → COGS (aylık RPC) yalnız bunlarda kovalanabilir.
+ */
+export interface PeriodModel {
+    range: RangeKey;
+    labels: string[];
+    bucketCount: number;
+    indexOf: (iso: string) => number | null;
+    currentIndex: number;
+    prevIndex: number;
+    monthAligned: boolean;
+    /** KPI ön-eki: "Aylık" / "Çeyreklik" / "Haftalık" / "Günlük". */
+    kpiLabel: string;
+    /** Güncel dönem etiketi (Ciro KPI alt-yazısı + finans paneli). */
+    currentLabel: string;
+    /** Üretim KPI etiketi ("Bugünkü / Bu Hafta / Bu Ay / Bu Çeyrek Üretim"). */
+    prodLabel: string;
+    /** Trend paneli alt-yazısı ("Son 12 ay" vb.). */
+    trendSub: string;
+}
+
+/** Yerel gün başlangıcı (00:00). */
+function startOfDay(d: Date): Date {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+/** ISO/tarih dizesinin tarih kısmından (slice 0–10) yerel gün. TZ-tutarlı (monthKey ile aynı disiplin). */
+function dateOnly(iso: string): Date {
+    return new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+}
+/** now gün başlangıcı ile iso günü arasındaki tam gün farkı (geçmiş → pozitif). */
+function daysAgo(now: Date, iso: string): number {
+    return Math.floor((startOfDay(now).getTime() - dateOnly(iso).getTime()) / 86_400_000);
+}
+function addDays(d: Date, n: number): Date {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+
+/** Seçili aralık için dönem modeli üretir (saf). */
+export function periodModel(range: RangeKey, now: Date = new Date()): PeriodModel {
+    if (range === "Çeyrek") {
+        const qCur = now.getFullYear() * 4 + Math.floor(now.getMonth() / 3);
+        const base = qCur - 3;
+        const labels: string[] = [];
+        for (let pos = 0; pos < 4; pos++) {
+            const qi = base + pos;
+            labels.push(`Ç${(qi % 4) + 1}'${String(Math.floor(qi / 4)).slice(2)}`);
+        }
+        return {
+            range, labels, bucketCount: 4, currentIndex: 3, prevIndex: 2, monthAligned: true,
+            kpiLabel: "Çeyreklik", currentLabel: labels[3], prodLabel: "Bu Çeyrek Üretim", trendSub: "Son 4 çeyrek",
+            indexOf: (iso) => {
+                const qi = Number(iso.slice(0, 4)) * 4 + Math.floor((Number(iso.slice(5, 7)) - 1) / 3);
+                const pos = qi - base;
+                return pos >= 0 && pos <= 3 ? pos : null;
+            },
+        };
+    }
+    if (range === "Hafta") {
+        const today = startOfDay(now);
+        const labels: string[] = [];
+        for (let pos = 0; pos < 12; pos++) {
+            const start = addDays(today, -((11 - pos) * 7 + 6));
+            labels.push(`${start.getDate()} ${MONTH_ABBR_TR[start.getMonth()]}`);
+        }
+        return {
+            range, labels, bucketCount: 12, currentIndex: 11, prevIndex: 10, monthAligned: false,
+            kpiLabel: "Haftalık", currentLabel: `${labels[11]} haftası`, prodLabel: "Bu Hafta Üretim", trendSub: "Son 12 hafta",
+            indexOf: (iso) => {
+                const pos = 11 - Math.floor(daysAgo(now, iso) / 7);
+                return pos >= 0 && pos <= 11 ? pos : null;
+            },
+        };
+    }
+    if (range === "Bugün") {
+        const today = startOfDay(now);
+        const labels: string[] = [];
+        for (let pos = 0; pos < 14; pos++) labels.push(String(addDays(today, -(13 - pos)).getDate()));
+        return {
+            range, labels, bucketCount: 14, currentIndex: 13, prevIndex: 12, monthAligned: false,
+            kpiLabel: "Günlük", currentLabel: "bugün", prodLabel: "Bugünkü Üretim", trendSub: "Son 14 gün",
+            indexOf: (iso) => {
+                const pos = 13 - daysAgo(now, iso);
+                return pos >= 0 && pos <= 13 ? pos : null;
+            },
+        };
+    }
+    // Ay (varsayılan) — mevcut 12-ay davranışı.
+    const keys = last12MonthKeys(now);
+    const idx = new Map(keys.map((k, i) => [k, i]));
+    return {
+        range: "Ay", labels: monthLabels(now), bucketCount: 12, currentIndex: 11, prevIndex: 10, monthAligned: true,
+        kpiLabel: "Aylık", currentLabel: `${MONTH_ABBR_TR[now.getMonth()]} ayı`, prodLabel: "Bu Ay Üretim", trendSub: "Son 12 ay",
+        indexOf: (iso) => {
+            const v = idx.get(iso.slice(0, 7));
+            return v === undefined ? null : v;
+        },
+    };
+}
+
+/** Dönem bazında ciro (raporlama para birimi). `monthlyRevenueReporting` genellemesi. */
+export function revenueByPeriod(
+    orders: Order[], reporting: string, rates: ExchangeRates | null, period: PeriodModel,
+): number[] {
+    const out = new Array(period.bucketCount).fill(0);
+    for (const o of orders) {
+        if (!isRevenueOrder(o)) continue;
+        const i = period.indexOf(o.createdAt);
+        if (i !== null) out[i] += toReporting(o.grandTotal, o.currency, reporting, rates);
+    }
+    return out;
+}
+
+/** Dönem bazında sipariş adedi (boş-durum tespiti + trend tooltip'i). */
+export function orderCountsByPeriod(orders: Order[], period: PeriodModel): number[] {
+    const out = new Array(period.bucketCount).fill(0);
+    for (const o of orders) {
+        if (!isRevenueOrder(o)) continue;
+        const i = period.indexOf(o.createdAt);
+        if (i !== null) out[i] += 1;
+    }
+    return out;
+}
+
+/**
+ * Dönem bazında COGS (raporlama para birimi) — yalnız `monthAligned` (Ay/Çeyrek).
+ * Hafta/Bugün → null (aylık RPC günlük/haftalık kovalanamaz; maliyet hattı gizlenir).
+ * COGS satır anahtarı `YYYY-MM` → `-01` ile gün verilir (indexOf slice/quarter ile eşler).
+ */
+export function cogsByPeriod(
+    rows: CogsRow[], reporting: string, rates: ExchangeRates | null, period: PeriodModel,
+): number[] | null {
+    if (!period.monthAligned) return null;
+    const out = new Array(period.bucketCount).fill(0);
+    for (const r of rows) {
+        const i = period.indexOf(`${r.month}-01`);
+        if (i !== null) out[i] += toReporting(r.cogs, r.currency, reporting, rates);
+    }
+    return out;
+}
+
+/**
+ * GÜNCEL dönem üretimi: toplam adet + ürün türü sayısı (Üretim KPI).
+ * Yalnız `currentIndex` kovası sayılır (tüm pencere değil) — etiket "Bu Ay/Bugünkü" ile tutarlı,
+ * Ciro KPI'ın `revenue[currentIndex]` davranışını aynalar.
+ */
+export function productionInPeriod(
+    uretim: UretimKaydi[], period: PeriodModel,
+): { qty: number; types: number } {
+    let qty = 0;
+    const types = new Set<string>();
+    for (const u of uretim) {
+        if (period.indexOf(u.tarih) !== period.currentIndex) continue;
+        qty += u.adet;
+        types.add(u.productId);
+    }
+    return { qty, types: types.size };
+}
+
 /** Açık siparişlerin raporlama-para toplam değeri. */
 export function openOrdersValueReporting(orders: Order[], reporting: string, rates: ExchangeRates | null): number {
     let s = 0;
@@ -580,36 +746,39 @@ export interface KpiPerms {
  * 6 KPI: Aylık Ciro · Açık Siparişler · Stok Değeri · Bugünkü Üretim · Açık Alacak · Kritik Uyarılar.
  * Finansal değerler raporlama para birimine normalize + RBAC ile maskeli.
  */
-export function buildKpis(input: KpiInput, perms: KpiPerms, now: Date = new Date()): DashboardKpi[] {
+export function buildKpis(
+    input: KpiInput, perms: KpiPerms, now: Date = new Date(), period: PeriodModel = periodModel("Ay", now),
+): DashboardKpi[] {
     const { products, orders, uretimKayitlari, openAlerts, reporting, rates } = input;
     const canPrices = perms.canViewSalesPrices;
     const canFin = perms.canViewFinancialSummary;
 
-    // ── Aylık Ciro ──
-    const revenue = monthlyRevenueReporting(orders, reporting, rates, now);
-    const ordersByMonth = monthlyOrderCounts(orders, now);
-    const thisRev = revenue[11] ?? 0;
-    const prevRev = revenue[10] ?? 0;
+    // ── Dönem Ciro (Aylık/Çeyreklik/Haftalık/Günlük) ──
+    const revenue = revenueByPeriod(orders, reporting, rates, period);
+    const counts = orderCountsByPeriod(orders, period);
+    const thisRev = revenue[period.currentIndex] ?? 0;
+    const prevRev = revenue[period.prevIndex] ?? 0;
+    const ciroEmpty = (counts[period.currentIndex] ?? 0) === 0;
     let revDelta: string | undefined;
     let revUp: boolean | undefined;
-    if (prevRev > 0) {
+    if (!ciroEmpty && prevRev > 0) {
         const pct = ((thisRev - prevRev) / prevRev) * 100;
         revDelta = `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}%`;
         revUp = pct >= 0;
     }
 
-    // ── Açık Siparişler ──
+    // ── Açık Siparişler (anlık) ──
     const open = orders.filter(isOpenOrder);
     const pending = orders.filter((o) => o.commercial_status === "pending_approval").length;
     const openVal = openOrdersValueReporting(orders, reporting, rates);
 
-    // ── Stok Değeri ──
+    // ── Stok Değeri (anlık) ──
     const stockVal = stockValueReporting(products, reporting, rates);
     const availVal = availableStockValueReporting(products, reporting, rates);
     const activeCount = products.filter((p) => p.isActive).length;
 
-    // ── Bugünkü Üretim ──
-    const prod = todayProduction(uretimKayitlari, now);
+    // ── Dönem Üretim ──
+    const prod = productionInPeriod(uretimKayitlari, period);
     const prodSpark = lastNProductionTotals(uretimKayitlari, 6);
 
     // ── Açık Alacak ──
@@ -623,36 +792,36 @@ export function buildKpis(input: KpiInput, perms: KpiPerms, now: Date = new Date
     return [
         {
             id: "ciro",
-            label: "Aylık Ciro",
-            value: formatReportingM(thisRev, reporting, canPrices),
+            label: `${period.kpiLabel} Ciro`,
+            value: ciroEmpty ? "—" : formatReportingM(thisRev, reporting, canPrices),
             tone: "accent",
-            sub: `${MONTH_ABBR_TR[now.getMonth()]} ayı`,
+            sub: ciroEmpty ? "Bu dönemde sipariş yok" : period.currentLabel,
             delta: revDelta,
             up: revUp,
-            spark: canPrices ? revenue.slice(-6) : undefined,
+            spark: canPrices && !ciroEmpty ? revenue.slice(-6) : undefined,
         },
         {
             id: "siparis",
             label: "Açık Siparişler",
             value: formatNumber(open.length),
             tone: "accent",
-            sub: `${formatReportingCompact(openVal, reporting, canPrices)} değerinde`,
+            sub: `${formatReportingCompact(openVal, reporting, canPrices)} değerinde · anlık`,
             delta: pending > 0 ? `${pending} onay bekliyor` : undefined,
             up: true,
-            spark: ordersByMonth.slice(-6),
+            spark: counts.slice(-6),
         },
         {
             id: "stok",
             label: "Stok Değeri",
             value: formatReportingM(stockVal, reporting, canPrices),
             tone: "success",
-            sub: canPrices ? `Satılabilir ${formatReportingCompact(availVal, reporting, true)}` : `${formatNumber(activeCount)} aktif ürün`,
+            sub: canPrices ? `Satılabilir ${formatReportingCompact(availVal, reporting, true)} · anlık` : `${formatNumber(activeCount)} aktif ürün · anlık`,
             delta: `${formatNumber(activeCount)} aktif ürün`,
             up: true,
         },
         {
             id: "uretim",
-            label: "Bugünkü Üretim",
+            label: period.prodLabel,
             value: prod.qty > 0 ? `${formatNumber(prod.qty)} adet` : "—",
             tone: "success",
             sub: prod.types > 0 ? `${prod.types} ürün türü` : "Henüz giriş yok",
@@ -665,7 +834,7 @@ export function buildKpis(input: KpiInput, perms: KpiPerms, now: Date = new Date
             value: formatReportingM(recv.total, reporting, canFin),
             tone: recv.total > 0 ? "warning" : "success",
             sub: canFin
-                ? (recv.overdue60 > 0 ? `${formatReportingCompact(recv.overdue60, reporting, true)} (60+ gün)` : "Vadeler temiz")
+                ? (recv.overdue60 > 0 ? `${formatReportingCompact(recv.overdue60, reporting, true)} (60+ gün) · anlık` : "Vadeler temiz · anlık")
                 : "Görüntüleme yetkisi yok",
             delta: canFin && recv.total > 0 ? `%${recv.overduePct} vadesi geçmiş` : undefined,
             up: recv.overduePct < 20,
@@ -675,7 +844,7 @@ export function buildKpis(input: KpiInput, perms: KpiPerms, now: Date = new Date
             label: "Kritik Uyarılar",
             value: String(critical),
             tone: critical > 0 ? "danger" : "success",
-            sub: critical > 0 ? `${stockAlerts} stok · ${critical - stockAlerts} diğer` : "Acil uyarı yok",
+            sub: critical > 0 ? `${stockAlerts} stok · ${critical - stockAlerts} diğer · anlık` : "Acil uyarı yok · anlık",
             delta: urgent > 0 ? `${urgent} acil` : undefined,
             up: false,
         },

@@ -16,10 +16,12 @@ interface FinancePanelProps {
     canViewCosts: boolean;
     /** alacak yaşlandırma; view_financial_summary yoksa null. */
     receivables: ReceivablesView | null;
+    /** Maliyet bu dönemde kovalanamıyorsa (Hafta/Bugün) granülerlik notu — veri-bug değil. */
+    costGranularityNote?: string;
 }
 
 /** Finansal Özet — brüt kâr hero + money-flow bar + alacak yaşlandırma. */
-export default function FinancePanel({ reporting, monthLabel, finance, canViewCosts, receivables }: FinancePanelProps) {
+export default function FinancePanel({ reporting, monthLabel, finance, canViewCosts, receivables, costGranularityNote }: FinancePanelProps) {
     const sym = currencySymbol(reporting);
     const marjBadge = finance
         ? <span className="badge badge-success" style={{ fontSize: 10 }}>%{finance.marginPct.toFixed(0)} marj</span>
@@ -72,7 +74,9 @@ export default function FinancePanel({ reporting, monthLabel, finance, canViewCo
                 </>
             ) : (
                 <div style={{ fontSize: 12, color: "var(--text-tertiary)", padding: "8px 0", marginBottom: receivables ? 14 : 0 }}>
-                    {canViewCosts ? "Maliyet verisi henüz hazır değil." : "Maliyet/kâr görüntüleme yetkiniz yok."}
+                    {canViewCosts
+                        ? (costGranularityNote ?? "Maliyet verisi henüz hazır değil.")
+                        : "Maliyet/kâr görüntüleme yetkiniz yok."}
                 </div>
             )}
 

@@ -19,7 +19,8 @@ import {
     todayProduction, lastNProductionTotals,
     reorderView, alertsView, relativeTime, recentOrdersView,
     aiPointsFromOpsSummary, buildKpis,
-    type ExchangeRates,
+    periodModel, revenueByPeriod, orderCountsByPeriod, cogsByPeriod, productionInPeriod,
+    type ExchangeRates, type CogsRow,
 } from "@/lib/dashboard-view-model";
 
 const NOW = new Date(2026, 5, 15, 12, 0, 0); // 15 Haziran 2026
@@ -338,5 +339,131 @@ describe("buildKpis", () => {
         const k = buildKpis(input, { canViewSalesPrices: false, canViewFinancialSummary: true }, NOW);
         expect(k.find((x) => x.id === "ciro")!.value).toBe("—");
         expect(k.find((x) => x.id === "tahsilat")!.value).not.toBe("—");
+    });
+});
+
+// ════════════════════════════════════════════════════════════════
+//  Dönem modeli (segment filtresi) — periodModel + *ByPeriod
+// ════════════════════════════════════════════════════════════════
+describe("periodModel — Bugün/Hafta/Ay/Çeyrek", () => {
+    it("her aralık doğru kova sayısı / currentIndex / monthAligned / kpiLabel verir", () => {
+        const ay = periodModel("Ay", NOW);
+        expect([ay.bucketCount, ay.currentIndex, ay.monthAligned, ay.kpiLabel]).toEqual([12, 11, true, "Aylık"]);
+        const ceyrek = periodModel("Çeyrek", NOW);
+        expect([ceyrek.bucketCount, ceyrek.currentIndex, ceyrek.monthAligned, ceyrek.kpiLabel]).toEqual([4, 3, true, "Çeyreklik"]);
+        const hafta = periodModel("Hafta", NOW);
+        expect([hafta.bucketCount, hafta.currentIndex, hafta.monthAligned, hafta.kpiLabel]).toEqual([12, 11, false, "Haftalık"]);
+        const bugun = periodModel("Bugün", NOW);
+        expect([bugun.bucketCount, bugun.currentIndex, bugun.monthAligned, bugun.kpiLabel]).toEqual([14, 13, false, "Günlük"]);
+    });
+
+    it("indexOf bugünü güncel kovaya, aralık dışını null'a eşler (her aralık)", () => {
+        const today = "2026-06-15T10:00:00Z";
+        const old = "2020-01-01T00:00:00Z";
+        for (const r of ["Bugün", "Hafta", "Ay", "Çeyrek"] as const) {
+            const p = periodModel(r, NOW);
+            expect(p.indexOf(today)).toBe(p.currentIndex);
+            expect(p.indexOf(old)).toBeNull();
+        }
+    });
+
+    it("Çeyrek currentLabel Ç2'26 (Haziran = 2. çeyrek)", () => {
+        expect(periodModel("Çeyrek", NOW).labels[3]).toBe("Ç2'26");
+    });
+
+    it("Çeyrek: Nis/May/Haz aynı (güncel) kovaya düşer; Mart önceki kovada", () => {
+        const p = periodModel("Çeyrek", NOW);
+        expect(p.indexOf("2026-04-10")).toBe(3);
+        expect(p.indexOf("2026-05-10")).toBe(3);
+        expect(p.indexOf("2026-06-10")).toBe(3);
+        expect(p.indexOf("2026-03-31")).toBe(2);
+    });
+});
+
+describe("revenueByPeriod / orderCountsByPeriod", () => {
+    const orders = [
+        mkOrder({ id: "a", createdAt: "2026-06-15T09:00:00Z", grandTotal: 1000, currency: "TRY", commercial_status: "approved" }),
+        mkOrder({ id: "b", createdAt: "2026-06-15T11:00:00Z", grandTotal: 500, currency: "TRY", commercial_status: "approved" }),
+        mkOrder({ id: "c", createdAt: "2026-03-01T00:00:00Z", grandTotal: 9999, currency: "TRY", commercial_status: "approved" }),
+        mkOrder({ id: "d", createdAt: "2026-06-15T12:00:00Z", grandTotal: 7777, currency: "TRY", commercial_status: "draft" }), // taslak hariç
+    ];
+    it("Ay: güncel ay cirosu toplar (taslak hariç), eski ay ayrı kovada", () => {
+        const p = periodModel("Ay", NOW);
+        const rev = revenueByPeriod(orders, "TRY", null, p);
+        expect(rev[p.currentIndex]).toBe(1500);
+        expect(rev[8]).toBe(9999); // Mart (index 11-3)
+    });
+    it("orderCountsByPeriod taslağı saymaz", () => {
+        const p = periodModel("Ay", NOW);
+        const counts = orderCountsByPeriod(orders, p);
+        expect(counts[p.currentIndex]).toBe(2);
+    });
+    it("Bugün: bugünkü ciro currentIndex'te", () => {
+        const p = periodModel("Bugün", NOW);
+        expect(revenueByPeriod(orders, "TRY", null, p)[p.currentIndex]).toBe(1500);
+    });
+});
+
+describe("cogsByPeriod — yalnız monthAligned", () => {
+    const rows: CogsRow[] = [
+        { month: "2026-06", currency: "TRY", cogs: 100 },
+        { month: "2026-05", currency: "TRY", cogs: 100 },
+        { month: "2026-04", currency: "TRY", cogs: 100 },
+    ];
+    it("Hafta/Bugün → null (aylık RPC kovalanamaz)", () => {
+        expect(cogsByPeriod(rows, "TRY", null, periodModel("Hafta", NOW))).toBeNull();
+        expect(cogsByPeriod(rows, "TRY", null, periodModel("Bugün", NOW))).toBeNull();
+    });
+    it("Çeyrek → Q2 (Nis+May+Haz) tek kovada toplanır (300)", () => {
+        const p = periodModel("Çeyrek", NOW);
+        const c = cogsByPeriod(rows, "TRY", null, p)!;
+        expect(c[p.currentIndex]).toBe(300);
+    });
+    it("Ay → Haziran kovasında 100", () => {
+        const p = periodModel("Ay", NOW);
+        expect(cogsByPeriod(rows, "TRY", null, p)![p.currentIndex]).toBe(100);
+    });
+});
+
+describe("productionInPeriod + buildKpis dönem entegrasyonu", () => {
+    it("productionInPeriod YALNIZ güncel kovayı sayar (pencere değil)", () => {
+        const u = [
+            mkUretim({ tarih: "2026-06-15", adet: 50, productId: "p1" }), // bugün (currentIndex)
+            mkUretim({ tarih: "2026-06-15", adet: 30, productId: "p2" }), // bugün
+            mkUretim({ tarih: "2026-06-10", adet: 7, productId: "p4" }),  // 5 gün önce: pencerede AMA güncel kova değil
+            mkUretim({ tarih: "2020-01-01", adet: 999, productId: "p3" }), // pencere dışı
+        ];
+        // Pencere-toplamı olsa {qty:87,types:3} olurdu; doğru = yalnız bugün.
+        expect(productionInPeriod(u, periodModel("Bugün", NOW))).toEqual({ qty: 80, types: 2 });
+    });
+
+    it("buildKpis: Çeyrek dönem → Ciro etiketi 'Çeyreklik Ciro'", () => {
+        const input = {
+            products: [mkProduct({})], orders: [mkOrder({ createdAt: "2026-06-15T09:00:00Z", grandTotal: 1000, currency: "TRY", commercial_status: "approved" })],
+            uretimKayitlari: [], openAlerts: [], reporting: "TRY", rates: null,
+        };
+        const k = buildKpis(input, { canViewSalesPrices: true, canViewFinancialSummary: true }, NOW, periodModel("Çeyrek", NOW));
+        expect(k.find((x) => x.id === "ciro")!.label).toBe("Çeyreklik Ciro");
+    });
+
+    it("buildKpis: dönemde sipariş yoksa Ciro '—' + 'Bu dönemde sipariş yok'", () => {
+        const input = {
+            products: [mkProduct({})], orders: [], uretimKayitlari: [], openAlerts: [], reporting: "TRY", rates: null,
+        };
+        const k = buildKpis(input, { canViewSalesPrices: true, canViewFinancialSummary: true }, NOW, periodModel("Bugün", NOW));
+        const ciro = k.find((x) => x.id === "ciro")!;
+        expect(ciro.value).toBe("—");
+        expect(ciro.sub).toBe("Bu dönemde sipariş yok");
+    });
+
+    it("buildKpis: snapshot KPI'lar 'anlık' etiketi taşır", () => {
+        const input = {
+            products: [mkProduct({})], orders: [mkOrder({ commercial_status: "approved", fulfillment_status: "allocated" })],
+            uretimKayitlari: [], openAlerts: [mkAlert({ severity: "critical", type: "stock_risk" })], reporting: "TRY", rates: null,
+        };
+        const k = buildKpis(input, { canViewSalesPrices: true, canViewFinancialSummary: true }, NOW);
+        expect(k.find((x) => x.id === "siparis")!.sub).toMatch(/anlık/);
+        expect(k.find((x) => x.id === "stok")!.sub).toMatch(/anlık/);
+        expect(k.find((x) => x.id === "uyari")!.sub).toMatch(/anlık/);
     });
 });

@@ -10,8 +10,8 @@ const SOURCE_META: Record<ExchangeRatesSource, { badge: string; label: string }>
     TCMB: { badge: "TCMB", label: "TCMB" },
 };
 const RATE_FORMATTER = new Intl.NumberFormat("tr-TR", {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
 });
 
 function isRatePayload(value: unknown): value is ExchangeRatesResponse {
@@ -50,8 +50,8 @@ function titleForRates(rates: ExchangeRatesResponse): string {
 const tickerStyle: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: "8px",
-    height: "20px",
+    gap: "10px",
+    height: "30px",
     paddingRight: "10px",
     borderRight: "0.5px solid var(--border-tertiary)",
     color: "var(--text-secondary)",
@@ -60,25 +60,37 @@ const tickerStyle: React.CSSProperties = {
     whiteSpace: "nowrap",
 };
 
+// Çip: kod + iki satır kolon (Alış kalın · Satış yeşil) — tasarım RateChip'i.
 const rateStyle: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
-    gap: "5px",
+    gap: "7px",
 };
 
+// Çipler arası dikey ayraç (nokta yerine).
 const sepStyle: React.CSSProperties = {
-    color: "var(--text-tertiary)",
+    width: "1px",
+    height: "20px",
+    background: "var(--border-tertiary)",
 };
 
 const codeStyle: React.CSSProperties = {
     color: "var(--text-primary)",
     fontWeight: 700,
+    fontSize: "11.5px",
 };
 
-const valueStyle: React.CSSProperties = {
-    color: "var(--text-secondary)",
+const colStyle: React.CSSProperties = {
+    display: "inline-flex",
+    flexDirection: "column",
+    lineHeight: 1.2,
     fontVariantNumeric: "tabular-nums",
 };
+
+const lineStyle: React.CSSProperties = { fontSize: "10px" };
+const labelStyle: React.CSSProperties = { color: "var(--text-tertiary)" };
+const buyValStyle: React.CSSProperties = { color: "var(--text-primary)", fontWeight: 700 };
+const sellValStyle: React.CSSProperties = { color: "var(--success-text)", fontWeight: 700 };
 
 const ExchangeRatesTicker = memo(function ExchangeRatesTicker() {
     const [rates, setRates] = useState<ExchangeRatesResponse | null>(null);
@@ -122,10 +134,15 @@ const ExchangeRatesTicker = memo(function ExchangeRatesTicker() {
                 const rate = rates.rates[code];
                 return (
                     <span key={code} style={rateStyle}>
-                        {index > 0 && <span aria-hidden="true" style={sepStyle}>·</span>}
+                        {index > 0 && <span aria-hidden="true" style={sepStyle} />}
                         <span style={codeStyle}>{code}</span>
-                        <span style={valueStyle}>
-                            {formatRate(rate.buying)} / {formatRate(rate.selling)}
+                        <span style={colStyle}>
+                            <span style={lineStyle}>
+                                <span style={labelStyle}>Alış</span> <b style={buyValStyle}>{formatRate(rate.buying)}</b>
+                            </span>
+                            <span style={lineStyle}>
+                                <span style={labelStyle}>Satış</span> <b style={sellValStyle}>{formatRate(rate.selling)}</b>
+                            </span>
                         </span>
                     </span>
                 );
