@@ -557,6 +557,9 @@ export interface AlertFindingsResult {
     findings: AiAlertFinding[];
     summary: string;
     modelVersion: string;
+    /** AI çağrısı başarısız oldu (API hatası vb.) — "gerçekten bulgu yok"tan FARKLI.
+     *  Tüketici degraded'da mevcut AI uyarılarını temizlememeli. */
+    degraded: boolean;
 }
 
 const ALERT_FINDINGS_SYSTEM = `Sen endüstriyel ERP stok/tedarik analistisin. B2B vana satan bir firmanın riskli ürün alt kümesini inceliyorsun.
@@ -617,7 +620,7 @@ const ALERT_FINDINGS_TOOL = {
  */
 export async function aiGenerateAlertFindings(input: AlertFindingsInput): Promise<AlertFindingsResult> {
     if (!isAIAvailable() || input.products.length === 0) {
-        return { findings: [], summary: "", modelVersion: MODEL };
+        return { findings: [], summary: "", modelVersion: MODEL, degraded: false };
     }
 
     const t0 = Date.now();
@@ -674,10 +677,11 @@ export async function aiGenerateAlertFindings(input: AlertFindingsInput): Promis
             findings,
             summary: sanitizeAiOutput(String(raw?.summary ?? ""), 800),
             modelVersion: MODEL,
+            degraded: false,
         };
     } catch (err) {
         console.error("[AI AlertFindings] graceful degradation:", err);
-        return { findings: [], summary: "", modelVersion: MODEL };
+        return { findings: [], summary: "", modelVersion: MODEL, degraded: true };
     }
 }
 

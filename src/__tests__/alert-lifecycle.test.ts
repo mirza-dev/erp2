@@ -241,7 +241,25 @@ describe("AI regenerasyon — entity-bağlı dedup, churn yok", () => {
             findings: [],
             summary: "",
             modelVersion: "test-model",
+            degraded: false,
         });
+    });
+
+    it("DEGRADED (API hatası): mevcut AI uyarılarına dokunulmaz — resolve/dismiss YOK", async () => {
+        mockDbListActiveAlerts.mockResolvedValue([
+            { id: "ai-1", type: "stock_risk", entity_id: "prod-1", source: "ai", status: "open", severity: "warning" },
+            { id: "legacy-1", type: "purchase_recommended", entity_id: null, source: "ai", status: "open", severity: "info" },
+        ]);
+        mockAiGenerateAlertFindings.mockResolvedValue({
+            findings: [], summary: "", modelVersion: "test-model", degraded: true,
+        });
+
+        const result = await serviceGenerateAiAlerts();
+
+        expect(result).toEqual({ aiAvailable: true, dismissed: 0, created: 0, updated: 0, summary: "" });
+        expect(mockDbBatchResolveAlerts).not.toHaveBeenCalled();
+        expect(mockDbUpdateAlertStatus).not.toHaveBeenCalled();
+        expect(mockDbCreateAlert).not.toHaveBeenCalled();
     });
 
     it("bulgusu geçen entity'li AI alert (acknowledged dahil) ai_finding_cleared ile resolve edilir", async () => {
@@ -282,6 +300,7 @@ describe("AI regenerasyon — entity-bağlı dedup, churn yok", () => {
             findings: [{ productId: "prod-1", title: "Bulgu", detail: "Detay", action: "Aksiyon", severity: "warning", confidence: 0.8 }],
             summary: "özet",
             modelVersion: "test-model",
+            degraded: false,
         });
 
         const result = await serviceGenerateAiAlerts();
@@ -305,6 +324,7 @@ describe("AI regenerasyon — entity-bağlı dedup, churn yok", () => {
             findings: [{ productId: "prod-1", title: "Bulgu", detail: "Detay", action: "Aksiyon", severity: "warning", confidence: 0.8 }],
             summary: "özet",
             modelVersion: "test-model",
+            degraded: false,
         });
 
         const result = await serviceGenerateAiAlerts();

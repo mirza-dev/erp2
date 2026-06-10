@@ -50,6 +50,7 @@ beforeEach(() => {
         findings: [],
         summary: "Özet",
         modelVersion: "test-model",
+        degraded: false,
     });
 });
 

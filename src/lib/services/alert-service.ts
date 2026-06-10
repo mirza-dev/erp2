@@ -366,6 +366,13 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
         products: subset,
     });
 
+    // AI çağrısı başarısız olduysa (401, ağ, vb.) mevcut AI uyarılarına DOKUNMA:
+    // "bulgu yok" ile "AI cevap veremedi" farklı — degraded'da temizlik yapılırsa
+    // geçerli bulgular API arızasında sessizce silinir (smoke 2026-06-11 bulgusu).
+    if (result.degraded) {
+        return { aiAvailable: true, dismissed: 0, created: 0, updated: 0, summary: "" };
+    }
+
     // Aktif AI uyarıları (entity'li) + kural-bazlı stok uyarısı olan ürünler.
     const activeAiByEntity = new Map<string, { type: AlertType }>();
     const ruleStockEntities = new Set<string>();

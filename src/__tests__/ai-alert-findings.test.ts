@@ -103,17 +103,25 @@ describe("aiGenerateAlertFindings", () => {
         expect(result.findings.every(f => f.confidence <= 1)).toBe(true);
     });
 
-    it("ürün listesi boşsa API çağrısı ATILMAZ", async () => {
+    it("ürün listesi boşsa API çağrısı ATILMAZ (degraded DEĞİL — gerçekten bulgu yok)", async () => {
         const result = await aiGenerateAlertFindings(input([]));
         expect(result.findings).toEqual([]);
+        expect(result.degraded).toBe(false);
         expect(mockCreate).not.toHaveBeenCalled();
     });
 
-    it("API hatası → graceful degradation (boş sonuç, throw yok)", async () => {
+    it("API hatası → graceful degradation (boş sonuç + degraded:true, throw yok)", async () => {
         mockCreate.mockRejectedValue(new Error("api down"));
         const result = await aiGenerateAlertFindings(input([{ id: "prod-0" }]));
         expect(result.findings).toEqual([]);
         expect(result.summary).toBe("");
+        expect(result.degraded).toBe(true);
+    });
+
+    it("başarılı çağrı → degraded:false", async () => {
+        mockCreate.mockResolvedValue(toolResponse([]));
+        const result = await aiGenerateAlertFindings(input([{ id: "prod-0" }]));
+        expect(result.degraded).toBe(false);
     });
 
     it("system prompt kural-tekrarını yasaklar (prompt sözleşmesi)", async () => {
