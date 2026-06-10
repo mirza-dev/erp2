@@ -12,7 +12,7 @@ import type { StockPanelStats } from "@/components/dashboard/overview/RealPanels
 import {
     formatReportingCompact, currencySymbol,
     type DashboardKpi, type CategorySegment,
-    type ReceivablesView, type RecentOrderRow, type AlertRow, type RangeKey,
+    type RecentOrderRow, type AlertRow, type RangeKey,
 } from "@/lib/dashboard-view-model";
 
 interface DashboardReportProps {
@@ -31,11 +31,9 @@ interface DashboardReportProps {
     stockSegments: CategorySegment[];
     /** Stok özet istatistikleri (aktif/kritik/risk) — ekran paneliyle aynı kaynak. */
     stockStats?: StockPanelStats;
-    receivables: ReceivablesView | null;
     orderRows: RecentOrderRow[];
     alertRows: AlertRow[];
     canViewPrices: boolean;
-    canViewFinance: boolean;
 }
 
 const th: React.CSSProperties = { textAlign: "left", fontWeight: 700, padding: "4px 6px", borderBottom: "1px solid #999" };
@@ -54,7 +52,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function DashboardReport({
     range, dateStr, reporting, preparedBy, kpis, trendSub, labels, revenue, cost, counts, trendEmpty,
-    stockSegments, stockStats, receivables, orderRows, alertRows, canViewPrices, canViewFinance,
+    stockSegments, stockStats, orderRows, alertRows, canViewPrices,
 }: DashboardReportProps) {
     const fmt = (v: number, can = canViewPrices) => formatReportingCompact(v, reporting, can);
     const sym = currencySymbol(reporting);
@@ -159,22 +157,6 @@ export default function DashboardReport({
                     </>
                 )}
             </Section>
-
-            {/* Alacak yaşlandırma */}
-            {receivables && (
-                <Section title="Alacak Yaşlandırma">
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead><tr><th style={th}>Vade</th><th style={{ ...th, textAlign: "right" }}>Tutar</th></tr></thead>
-                        <tbody>
-                            {receivables.buckets.map((b) => (
-                                <tr key={b.label}><td style={td}>{b.label}</td><td style={tdR}>{fmt(b.value, canViewFinance)}</td></tr>
-                            ))}
-                            <tr><td style={{ ...td, fontWeight: 700 }}>Toplam</td><td style={{ ...tdR, fontWeight: 700 }}>{fmt(receivables.total, canViewFinance)}</td></tr>
-                        </tbody>
-                    </table>
-                    <div style={{ fontSize: 10, color: "#666", marginTop: 4 }}>Faturalanan siparişlerden tahmini · ödeme entegrasyonu beklemede</div>
-                </Section>
-            )}
 
             {/* Son siparişler */}
             <Section title="Son Siparişler">

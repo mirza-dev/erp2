@@ -40,14 +40,17 @@ describe("değiştirme — sessiz silme değil", () => {
 });
 
 describe("view-model normalizasyon fonksiyonları import edilir", () => {
-    it("buildKpis + revenue/cost + stock + receivables + production + reorder/alerts/orders", () => {
+    it("buildKpis + revenue/cost + stock + production + reorder/alerts/orders", () => {
         for (const fn of [
             "buildKpis", "revenueByPeriod", "cogsByPeriod",
-            "stockValueByCategoryReporting", "receivablesAging",
+            "stockValueByCategoryReporting",
             "productionDailySeries", "reorderView", "alertsView", "recentOrdersView",
         ]) {
             expect(PAGE).toMatch(new RegExp(fn));
         }
+        // Alacak Yaşlandırma ekrandan VE rapordan kaldırıldı — page artık
+        // receivablesAging çağırmaz (Açık Alacak KPI'ı buildKpis içinde hesaplar).
+        expect(PAGE).not.toMatch(/receivablesAging/);
     });
 });
 

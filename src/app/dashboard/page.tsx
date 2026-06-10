@@ -12,7 +12,7 @@ import { StockPanel, ReorderPanel, AlertsPanel, OrdersPanel, type StockPanelStat
 import DashboardReport from "@/components/dashboard/overview/DashboardReport";
 import {
     buildKpis, periodModel, revenueByPeriod, orderCountsByPeriod, cogsByPeriod,
-    stockValueByCategoryReporting, receivablesAging, productionDailySeries,
+    stockValueByCategoryReporting, productionDailySeries,
     reorderView, alertsView, recentOrdersView,
     type ExchangeRates, type CogsRow, type RangeKey,
 } from "@/lib/dashboard-view-model";
@@ -120,12 +120,6 @@ export default function DashboardPage() {
         }
         return { productCount: active.length, criticalCount, riskCount };
     }, [products]);
-
-    // ── Alacak (yalnız rapor tüketir; ekran paneli kaldırıldı) ──
-    const receivables = useMemo(
-        () => (canViewFinancialSummary ? receivablesAging(orders, reporting, rates, now) : null),
-        [orders, reporting, rates, canViewFinancialSummary, now],
-    );
 
     // ── Üretim good/scrap ──
     const production = useMemo(() => productionDailySeries(uretimKayitlari, now, 14), [uretimKayitlari, now]);
@@ -255,11 +249,9 @@ export default function DashboardPage() {
             trendEmpty={trendEmpty}
             stockSegments={stock.segments}
             stockStats={stockStats}
-            receivables={receivables}
             orderRows={reportOrderRows}
             alertRows={reportAlertRows}
             canViewPrices={canViewSalesPrices}
-            canViewFinance={canViewFinancialSummary}
         />
         </div>
     );

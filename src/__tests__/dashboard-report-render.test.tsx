@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import DashboardReport from "@/components/dashboard/overview/DashboardReport";
 import type {
-    DashboardKpi, CategorySegment, ReceivablesView, RecentOrderRow, AlertRow,
+    DashboardKpi, CategorySegment, RecentOrderRow, AlertRow,
 } from "@/lib/dashboard-view-model";
 
 const KPIS: DashboardKpi[] = [
@@ -18,10 +18,6 @@ const KPIS: DashboardKpi[] = [
     { id: "stok", label: "Stok Değeri", value: "$0.46M", tone: "success", sub: "Satılabilir $337K · anlık" },
 ];
 const SEGMENTS: CategorySegment[] = [{ name: "Vana", value: 1000, color: "var(--accent)" }];
-const RECV: ReceivablesView = {
-    buckets: [{ label: "Vadesi gelmemiş", value: 500, tone: "success" }],
-    total: 500, overdue60: 0, overduePct: 0,
-};
 const ORDERS: RecentOrderRow[] = [{ id: "o1", no: "SO-1", customer: "Müşteri", amount: "$10K", status: "Rezerveli", tone: "info" }];
 const ALERTS: AlertRow[] = [{ id: "al1", title: "Kritik stok", desc: "Vana DN50", tone: "danger", time: "2 sa önce" }];
 const STATS = { productCount: 42, criticalCount: 3, riskCount: 5 };
@@ -42,11 +38,9 @@ function render(extra: Partial<React.ComponentProps<typeof DashboardReport>> = {
             trendEmpty={false}
             stockSegments={SEGMENTS}
             stockStats={STATS}
-            receivables={RECV}
             orderRows={ORDERS}
             alertRows={ALERTS}
             canViewPrices
-            canViewFinance
             {...extra}
         />,
     );
@@ -73,7 +67,8 @@ describe("DashboardReport", () => {
         expect(html).toContain("%100");
         expect(html).toContain("Aktif ürün");
         expect(html).toContain("Toplam");
-        expect(html).toContain("Alacak Yaşlandırma");
+        // Alacak Yaşlandırma bölümü kaldırıldı (kullanıcı kararı 2026-06-11)
+        expect(html).not.toContain("Alacak Yaşlandırma");
         expect(html).toContain("Son Siparişler");
         expect(html).toContain("Kritik Uyarılar");
     });
@@ -91,7 +86,7 @@ describe("DashboardReport", () => {
     it("boş veriyle crash etmez (boş-durum metinleri)", () => {
         const html = render({
             revenue: null, cost: null, counts: [], trendEmpty: true,
-            stockSegments: [], receivables: null, orderRows: [], alertRows: [],
+            stockSegments: [], orderRows: [], alertRows: [],
         });
         expect(html).toContain("Genel Bakış Raporu");
         expect(html).toContain("Sipariş yok.");
