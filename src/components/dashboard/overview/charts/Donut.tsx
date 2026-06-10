@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { currencySymbol } from "@/lib/dashboard-view-model";
 
 export interface DonutSegment {
     name: string;
@@ -35,7 +36,7 @@ export default function Donut({ data, size = 148, stroke = 19, currency = null }
         return { d, i, frac: fracs[i], off, dash: fracs[i] * circ };
     });
     const active = hover != null ? data[hover] : null;
-    const cur = currency ? ` ${currency}` : "";
+    const sym = currency ? currencySymbol(currency) : "";
     return (
         <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block" }} role="img" aria-label="Stok dağılımı">
             <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--chart-track)" strokeWidth={stroke} />
@@ -49,10 +50,10 @@ export default function Donut({ data, size = 148, stroke = 19, currency = null }
                     onMouseEnter={() => setHover(s.i)} onMouseLeave={() => setHover(null)} />
             ))}
             <text x={cx} y={cy - 3} textAnchor="middle" fontSize="16" fontWeight="650" fill="var(--text-primary)" className="mono">
-                {active ? compact(active.value) : compact(total)}
+                {sym}{active ? compact(active.value) : compact(total)}
             </text>
             <text x={cx} y={cy + 13} textAnchor="middle" fontSize="9.5" fill="var(--text-tertiary)">
-                {active ? `${total > 0 ? Math.round((active.value / total) * 100) : 0}%` : `toplam${cur}`}
+                {active ? `${total > 0 ? Math.round((active.value / total) * 100) : 0}%` : "toplam"}
             </text>
         </svg>
     );

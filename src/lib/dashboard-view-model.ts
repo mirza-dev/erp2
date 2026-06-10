@@ -793,7 +793,7 @@ export function buildKpis(
         {
             id: "ciro",
             label: `${period.kpiLabel} Ciro`,
-            value: ciroEmpty ? "—" : formatReportingM(thisRev, reporting, canPrices),
+            value: ciroEmpty ? "—" : formatReportingCompact(thisRev, reporting, canPrices),
             tone: "accent",
             sub: ciroEmpty ? "Bu dönemde sipariş yok" : period.currentLabel,
             delta: revDelta,
@@ -813,7 +813,7 @@ export function buildKpis(
         {
             id: "stok",
             label: "Stok Değeri",
-            value: formatReportingM(stockVal, reporting, canPrices),
+            value: formatReportingCompact(stockVal, reporting, canPrices),
             tone: "success",
             sub: canPrices ? `Satılabilir ${formatReportingCompact(availVal, reporting, true)} · anlık` : `${formatNumber(activeCount)} aktif ürün · anlık`,
             delta: `${formatNumber(activeCount)} aktif ürün`,
@@ -831,7 +831,7 @@ export function buildKpis(
         {
             id: "tahsilat",
             label: "Açık Alacak",
-            value: formatReportingM(recv.total, reporting, canFin),
+            value: formatReportingCompact(recv.total, reporting, canFin),
             tone: recv.total > 0 ? "warning" : "success",
             sub: canFin
                 ? (recv.overdue60 > 0 ? `${formatReportingCompact(recv.overdue60, reporting, true)} (60+ gün) · anlık` : "Vadeler temiz · anlık")

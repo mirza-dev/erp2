@@ -10,6 +10,8 @@ interface OverviewPanelProps {
     pad?: number;
     collapsible?: boolean;
     defaultOpen?: boolean;
+    /** Gövde kart yüksekliğini doldursun (flex:1) — eş-yükseklik gridde ölü alanı dağıtmak için. */
+    fill?: boolean;
     style?: React.CSSProperties;
     /** collapsible toggle bildirimi (lazy fetch tetiklemek için). */
     onToggle?: (open: boolean) => void;
@@ -17,11 +19,16 @@ interface OverviewPanelProps {
 
 /** Genel Bakış kart kabuğu (başlık/alt-başlık/aksiyon + opsiyonel collapsible). */
 export default function OverviewPanel({
-    title, sub, actions, children, pad = 16, collapsible = false, defaultOpen = true, style, onToggle,
+    title, sub, actions, children, pad = 16, collapsible = false, defaultOpen = true, fill = false, style, onToggle,
 }: OverviewPanelProps) {
     const [open, setOpen] = useState(defaultOpen);
     const showHead = title || actions || collapsible;
-    const body = <div style={{ padding: pad, paddingTop: title ? 12 : pad }}>{children}</div>;
+    const body = (
+        <div style={{
+            padding: pad, paddingTop: title ? 12 : pad,
+            ...(fill ? { flex: 1, display: "flex", flexDirection: "column", minHeight: 0 } : null),
+        }}>{children}</div>
+    );
     const toggle = () => setOpen((o) => { const next = !o; onToggle?.(next); return next; });
     return (
         <section className="r-card" style={{ display: "flex", flexDirection: "column", ...style }}>

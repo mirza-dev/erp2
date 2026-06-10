@@ -11,7 +11,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import FinancePanel from "@/components/dashboard/overview/FinancePanel";
 import ProductionPanel from "@/components/dashboard/overview/ProductionPanel";
 import AiPanel from "@/components/dashboard/overview/AiPanel";
-import type { FinanceSummary, ReceivablesView } from "@/lib/dashboard-view-model";
+import { StockPanel } from "@/components/dashboard/overview/RealPanels";
+import type { FinanceSummary, ReceivablesView, CategorySegment } from "@/lib/dashboard-view-model";
 
 const FIN: FinanceSummary = { revenue: 1_000_000, cost: 710_000, grossProfit: 290_000, marginPct: 29, costPct: 71 };
 const RECV: ReceivablesView = {
@@ -72,5 +73,23 @@ describe("AiPanel", () => {
         const html = renderToStaticMarkup(<AiPanel />);
         expect(html).toContain("AI Operasyon Özeti");
         expect(html).toContain("AI");
+    });
+});
+
+describe("StockPanel — değerler para birimi sembolü taşır + milyon-zorlaması yok", () => {
+    const SEGS: CategorySegment[] = [
+        { name: "Küresel Vanalar", value: 264_000, color: "var(--accent)" },
+        { name: "Kelebek Vanalar", value: 19_000, color: "var(--success)" },
+    ];
+    it("USD → legend + donut merkezi '$' ile (milyon değil, gerçek büyüklük)", () => {
+        const html = renderToStaticMarkup(<StockPanel segments={SEGS} currency="USD" canView />);
+        expect(html).toContain("$264K");   // legend
+        expect(html).toContain("$19K");
+        expect(html).toContain("$283K");   // donut merkezi toplam (milyon-zorlama yok)
+        expect(html).not.toContain("0.28M");
+    });
+    it("TRY → '₺' sembolü", () => {
+        const html = renderToStaticMarkup(<StockPanel segments={SEGS} currency="TRY" canView />);
+        expect(html).toContain("₺264K");
     });
 });

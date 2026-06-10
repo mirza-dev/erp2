@@ -3,7 +3,7 @@
 import OverviewPanel from "./OverviewPanel";
 import AgingBars from "./charts/AgingBars";
 import {
-    formatReportingM, formatReportingCompact, currencySymbol,
+    formatReportingCompact, currencySymbol,
     type FinanceSummary, type ReceivablesView,
 } from "@/lib/dashboard-view-model";
 
@@ -36,13 +36,13 @@ export default function FinancePanel({ reporting, monthLabel, finance, canViewCo
                         <div>
                             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Brüt Kâr</div>
                             <div className="mono" style={{ fontSize: 30, fontWeight: 700, color: "var(--success-text)", lineHeight: 1 }}>
-                                {formatReportingM(finance.grossProfit, reporting, true)}
+                                {formatReportingCompact(finance.grossProfit, reporting, true)}
                             </div>
                         </div>
                         <div style={{ textAlign: "right" }}>
                             <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }} title="KDV hariç — kâr hesabı tabanı">Net Ciro</div>
                             <div className="mono" style={{ fontSize: 16, fontWeight: 650, color: "var(--text-primary)", lineHeight: 1.1 }}>
-                                {formatReportingM(finance.revenue, reporting, true)}
+                                {formatReportingCompact(finance.revenue, reporting, true)}
                             </div>
                         </div>
                     </div>
@@ -68,8 +68,8 @@ export default function FinancePanel({ reporting, monthLabel, finance, canViewCo
                         </div>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-tertiary)", marginBottom: receivables ? 18 : 0 }}>
-                        <span style={{ whiteSpace: "nowrap" }}>Maliyet <span className="mono" style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{formatReportingM(finance.cost, reporting, true)}</span></span>
-                        <span style={{ whiteSpace: "nowrap" }}>Brüt Kâr <span className="mono" style={{ color: "var(--success-text)", fontWeight: 600 }}>{formatReportingM(finance.grossProfit, reporting, true)}</span></span>
+                        <span style={{ whiteSpace: "nowrap" }}>Maliyet <span className="mono" style={{ color: "var(--text-secondary)", fontWeight: 600 }}>{formatReportingCompact(finance.cost, reporting, true)}</span></span>
+                        <span style={{ whiteSpace: "nowrap" }}>Brüt Kâr <span className="mono" style={{ color: "var(--success-text)", fontWeight: 600 }}>{formatReportingCompact(finance.grossProfit, reporting, true)}</span></span>
                     </div>
                 </>
             ) : (

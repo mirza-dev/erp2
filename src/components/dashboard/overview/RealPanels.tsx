@@ -4,6 +4,7 @@ import Link from "next/link";
 import OverviewPanel, { Dot } from "./OverviewPanel";
 import Donut from "./charts/Donut";
 import { toneVar } from "./charts/chart-utils";
+import { formatReportingCompact } from "@/lib/dashboard-view-model";
 import type {
     CategorySegment, ReorderRow, AlertRow, RecentOrderRow, Tone,
 } from "@/lib/dashboard-view-model";
@@ -18,27 +19,30 @@ export function StockPanel({
     segments, currency, canView,
 }: { segments: CategorySegment[]; currency: string | null; canView: boolean }) {
     return (
-        <OverviewPanel title="Stok Dağılımı" sub={canView ? `Kategori bazında değer${currency ? ` (${currency})` : ""}` : "Değer görüntüleme yetkisi yok"}>
+        <OverviewPanel fill title="Stok Dağılımı" sub={canView ? `Kategori bazında değer${currency ? ` (${currency})` : ""}` : "Değer görüntüleme yetkisi yok"}>
             {!canView ? (
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "24px 0" }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-tertiary)", textAlign: "center" }}>
                     Stok değerini görüntüleme yetkiniz yok.
                 </div>
             ) : segments.length === 0 ? (
-                <div style={{ fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "24px 0" }}>
+                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-tertiary)", textAlign: "center" }}>
                     Stok verisi yok.
                 </div>
             ) : (
                 <>
-                    <div style={{ display: "flex", justifyContent: "center", marginBottom: 14 }}>
-                        <Donut data={segments} size={148} stroke={19} currency={currency} />
+                    {/* Donut kalan alanı dikey ortalar → eş-yükseklik kartta alttaki ölü alan dağılır */}
+                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "8px 0 16px" }}>
+                        <Donut data={segments} size={172} stroke={21} currency={currency} />
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                         {segments.map((c, i) => (
                             <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
                                 <Dot tone={c.color} />
                                 <span style={{ flex: 1, color: "var(--text-secondary)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                                 <span className="mono" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                                    {c.value >= 1e6 ? `${(c.value / 1e6).toFixed(2)}M` : c.value >= 1e3 ? `${Math.round(c.value / 1e3)}K` : Math.round(c.value)}
+                                    {currency
+                                        ? formatReportingCompact(c.value, currency, true)
+                                        : (c.value >= 1e6 ? `${(c.value / 1e6).toFixed(2)}M` : c.value >= 1e3 ? `${Math.round(c.value / 1e3)}K` : Math.round(c.value))}
                                 </span>
                             </div>
                         ))}
