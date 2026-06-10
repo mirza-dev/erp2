@@ -32,6 +32,11 @@ import {
 import type { ApplyResultSummary } from "@/lib/extraction-review-helpers";
 import { confidenceLabel } from "@/lib/technical-templates";
 import { coreFieldLabel } from "@/lib/import-center";
+import {
+    getActiveAiImportOperations,
+    getAiImportOperation,
+} from "@/lib/ai-import-operations";
+import { getTargetForOperation } from "@/lib/import-guide";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -99,6 +104,14 @@ export default function ExtractionReview({ document: doc, initialLines, productT
     const [overrideTypeId, setOverrideTypeId] = useState<string>(
         isCertFlow ? "" : (doc.classification?.suggested_product_type_id ?? ""),
     );
+    // Dosya-önce akış: işlem türü artık hub'da seçilmiyor — sınıflandırmadan
+    // türetilen damga başlangıç değeridir, kullanıcı burada override edebilir
+    // (extract body operation_type; route persist eder).
+    const [operationId, setOperationId] = useState<string>(
+        () => getAiImportOperation(doc.classification?.operation_type).id,
+    );
+    const effectiveOperation = getAiImportOperation(operationId);
+    const operationTarget = getTargetForOperation(effectiveOperation);
 
     // Faz 3c — Apply pipeline state
     const [applying, setApplying] = useState(false);
@@ -199,6 +212,10 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             // Cert-flow'da productTypeId body'ye eklenmez (route zaten ignore
             // ediyor ama defansif olarak burada da temiz tutulur).
             if (overrideTypeId && !isCertFlow) body.productTypeId = overrideTypeId;
+            // İşlem türü override'ı — sınıflandırma damgasından farklıysa gönder.
+            if (operationId && operationId !== doc.classification?.operation_type) {
+                body.operation_type = operationId;
+            }
             const res = await fetch(`/api/import/documents/${doc.id}/extract`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -562,8 +579,32 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                             <>{" · "}<span style={{ fontStyle: "italic" }}>{doc.classification.summary}</span></>
                         )}
                     </div>
+                    {/* Veri nereye gider — eski ImportGuide hedef haritasının ilgili-adım hali */}
+                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                        Hedef: <strong style={{ color: "var(--text-secondary)" }}>{operationTarget.module}</strong>
+                        {" — "}{operationTarget.action}
+                    </div>
                 </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                    {/* İşlem türü — sınıflandırmadan türetilen damga; override edilebilir
+                        (dosya-önce akış: hub'daki işlem ızgarası kaldırıldı). */}
+                    {!isCertFlow && (
+                        <select
+                            value={operationId}
+                            onChange={e => setOperationId(e.target.value)}
+                            aria-label="İşlem türü"
+                            title={effectiveOperation.safetyNote}
+                            style={{
+                                padding: "6px 10px", fontSize: "12px",
+                                background: "var(--bg-secondary)", color: "var(--text-primary)",
+                                border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
+                            }}
+                        >
+                            {getActiveAiImportOperations().map(op => (
+                                <option key={op.id} value={op.id}>{op.title}</option>
+                            ))}
+                        </select>
+                    )}
                     {/* Multi-type filter — default "AI otomatik": tüm tipler context'e
                         geçirilir, AI her satırın tipini kendi seçer (PMT multi-type).
                         "Sadece X" seçilirse availableProductTypes tek tipe filtre olur.

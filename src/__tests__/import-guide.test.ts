@@ -1,9 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
-    IMPORT_STEPS,
     IMPORT_DATA_TARGETS,
     IMPORT_TRUST_NOTES,
-    buildOperationTargets,
     getActiveTemplateLinks,
     getTargetForOperation,
 } from "@/lib/import-guide";
@@ -14,20 +12,10 @@ import {
 } from "@/lib/ai-import-operations";
 import { EXCEL_IMPORT_TEMPLATES } from "@/lib/import-center";
 
-describe("import-guide — IMPORT_STEPS", () => {
-    it("tam 3 adım, sıralı numara + başlık + açıklama", () => {
-        expect(IMPORT_STEPS).toHaveLength(3);
-        expect(IMPORT_STEPS.map(s => s.n)).toEqual([1, 2, 3]);
-        for (const s of IMPORT_STEPS) {
-            expect(s.title.length).toBeGreaterThan(0);
-            expect(s.desc.length).toBeGreaterThan(0);
-        }
-    });
-
-    it("3. adım onay vurgusu içerir (onaysız kayıt yazılmaz)", () => {
-        expect(IMPORT_STEPS[2].desc.toLowerCase()).toContain("onay");
-    });
-});
+// 2026-06-10 sadeleştirme: IMPORT_STEPS + buildOperationTargets, tüketicileri
+// ImportGuide.tsx ile birlikte kaldırıldı (dosya-önce hub). Kalan exportlar
+// hub şablon satırı + güven satırı + ExtractionReview hedef özeti tarafından
+// tüketilmeye devam eder ve burada kilitlenir.
 
 describe("import-guide — IMPORT_DATA_TARGETS", () => {
     it("ai-import-operations'taki HER scope kapsanır (eksik hedef yok)", () => {
@@ -51,31 +39,19 @@ describe("import-guide — IMPORT_DATA_TARGETS", () => {
     });
 });
 
-describe("import-guide — buildOperationTargets", () => {
-    it("her aktif işlem bir satır olur; safetyNote/evidenceHint/hedef taşınır", () => {
-        const rows = buildOperationTargets();
-        const active = getActiveAiImportOperations();
-        expect(rows).toHaveLength(active.length);
-        for (const row of rows) {
-            const op = active.find(o => o.id === row.id)!;
-            expect(op).toBeDefined();
-            expect(row.safetyNote).toBe(op.safetyNote);
-            expect(row.evidenceHint).toBe(op.evidenceHint);
-            expect(row.target).toBe(IMPORT_DATA_TARGETS[op.scope]);
-        }
-    });
-
-    it("bilinmeyen scope yok — hiçbir satırın hedefi undefined olamaz", () => {
-        for (const row of buildOperationTargets()) {
-            expect(row.target).toBeDefined();
-        }
-    });
-});
-
 describe("import-guide — getTargetForOperation", () => {
     it("işlemin scope'una karşılık gelen hedefi döndürür", () => {
         const op = getAiImportOperation("product_documents");
         expect(getTargetForOperation(op)).toBe(IMPORT_DATA_TARGETS.product_document);
+    });
+
+    it("her aktif işlem için hedef tanımlı (ExtractionReview özeti undefined göremez)", () => {
+        for (const op of getActiveAiImportOperations()) {
+            const target = getTargetForOperation(op);
+            expect(target).toBeDefined();
+            expect(target.module.length).toBeGreaterThan(0);
+            expect(target.action.length).toBeGreaterThan(0);
+        }
     });
 });
 

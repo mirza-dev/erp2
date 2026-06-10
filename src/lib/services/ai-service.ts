@@ -10,7 +10,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { logAiRun, hashInput } from "@/lib/supabase/ai-runs";
 import {
     sanitizeAiInput,
-    sanitizeAiInputRecord,
     clampConfidence,
     sanitizeAiOutput,
     capAiStringArray,

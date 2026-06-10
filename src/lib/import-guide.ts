@@ -1,43 +1,21 @@
-import {
-    getActiveAiImportOperations,
-    type AiImportOperationDefinition,
-    type AiImportOperationScope,
+import type {
+    AiImportOperationDefinition,
+    AiImportOperationScope,
 } from "@/lib/ai-import-operations";
 import { EXCEL_IMPORT_TEMPLATES, type ExcelImportTemplateKind } from "@/lib/import-center";
 
 /**
- * Veri Aktarım Merkezi rehber/şeffaflık katmanı için TEK KAYNAK saf veri.
+ * Veri Aktarım Merkezi şeffaflık içeriği için TEK KAYNAK saf veri.
  *
- * "Ne yükle → nereye kaydedilir → ne olur → ne korunur" haritası ve adımlar
- * burada tanımlanır; sayfa/komponent bunları tüketir (sayfa-içi hardcode değil).
- * İçerik mevcut `ai-import-operations` (safetyNote/evidenceHint) ve
- * `import-center` (Excel şablonları) katmanlarından türetilir.
+ * "Nereye kaydedilir → ne olur → ne korunur" haritası burada tanımlanır;
+ * tüketiciler: hub şablon satırı + güven satırı (page.tsx) ve İncele ekranı
+ * (ExtractionReview "veri nereye gider" özeti).
+ *
+ * 2026-06-10 sadeleştirme: IMPORT_STEPS (3-adım şeridi) ve
+ * buildOperationTargets (işlem ızgarası haritası) kaldırıldı — tüketicileri
+ * ImportGuide.tsx ile birlikte silindi; "veri nereye gider" bilgisi artık
+ * ilgili akış adımının içinde gösteriliyor.
  */
-
-export interface ImportStep {
-    n: number;
-    title: string;
-    desc: string;
-}
-
-/** Aktarımın üç temel adımı (her zaman görünür şerit). */
-export const IMPORT_STEPS: readonly ImportStep[] = [
-    {
-        n: 1,
-        title: "İşlemi seç",
-        desc: "Ne yapmak istediğini seç (yeni ürün, güncelleme, stok, sertifika…) veya Excel şablonu indirip doldur.",
-    },
-    {
-        n: 2,
-        title: "Dosyayı yükle",
-        desc: "PDF, görsel, Excel veya CSV'yi sürükle bırak. AI dosyayı seçtiğin amaca göre okur ve eşleştirir.",
-    },
-    {
-        n: 3,
-        title: "İncele ve onayla",
-        desc: "Bulunan eşleşmeleri ve alanları gözden geçir, onayla. Onayın olmadan hiçbir kayıt yazılmaz.",
-    },
-] as const;
 
 export interface ImportDataTarget {
     /** Verinin kaydedildiği modül (kullanıcıya görünen ad). */
@@ -84,33 +62,6 @@ export const IMPORT_DATA_TARGETS: Record<AiImportOperationScope, ImportDataTarge
         action: "Tedarikçiyi e-posta/kod öncelikli eşleştirir; yoksa yeni kayıt açar.",
     },
 };
-
-export interface OperationTargetRow {
-    id: string;
-    title: string;
-    /** Ne yükle / ne için. */
-    description: string;
-    /** Eşleşme/çıkarım için ne aranır. */
-    evidenceHint: string;
-    /** Ne korunur / ne uygulanmaz. */
-    safetyNote: string;
-    target: ImportDataTarget;
-}
-
-/**
- * Aktif AI işlemlerini hedef haritasıyla birleştirir.
- * Her işlem bir satır olur: işlem → modül → ne olur → ne aranır → ne korunur.
- */
-export function buildOperationTargets(): OperationTargetRow[] {
-    return getActiveAiImportOperations().map((op: AiImportOperationDefinition) => ({
-        id: op.id,
-        title: op.title,
-        description: op.description,
-        evidenceHint: op.evidenceHint,
-        safetyNote: op.safetyNote,
-        target: IMPORT_DATA_TARGETS[op.scope],
-    }));
-}
 
 /** Tek bir işlem için hedef bilgisini döndürür (seçili-işlem özeti için). */
 export function getTargetForOperation(op: AiImportOperationDefinition): ImportDataTarget {

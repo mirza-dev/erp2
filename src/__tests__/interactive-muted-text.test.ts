@@ -9,7 +9,8 @@ const UNDERLINED_TABS = read("src/components/ui/UnderlinedFilterTabs.tsx");
 const QUOTES_PAGE = read("src/app/dashboard/quotes/page.tsx");
 const ORDERS_PAGE = read("src/app/dashboard/orders/page.tsx");
 const PRODUCTS_PAGE = read("src/app/dashboard/products/page.tsx");
-const IMPORT_PAGE = read("src/app/dashboard/import/page.tsx");
+// 2026-06-10 sadeleştirme: tabBtnStyle + kolon algılama metni Excel sihirbazında
+const IMPORT_PAGE = read("src/app/dashboard/import/excel/page.tsx");
 
 describe("interactive muted text readability", () => {
     it("defines a dedicated readable muted token for dark and light themes", () => {

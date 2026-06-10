@@ -1,25 +1,16 @@
 /**
- * Import Wizard E2E Tests — klasik 7-adım wizard akışı.
+ * Import Wizard E2E Tests — Excel/CSV 7-adım sihirbaz akışı.
  *
- * Faz 3d (2026-05-23): "AI ile Aktar" / eski Excel modu tab toggle kaldırıldı;
- * klasik wizard sayfanın altında <details> accordion'a alındı (default kapalı).
- * AI default akışında DropZone'un kendi <input type="file"> var → eski genel
- * `page.locator(CLASSIC_FILE_INPUT)` locator'ı Playwright strict mode'da
- * iki element bulup hata veriyordu.
- *
- * Adaptasyon:
- *   - beforeEach: klasik accordion programmatic açılır
- *     (`<details>` el.open = true).
- *   - Tüm file input locator'ları `data-testid="classic-import-file"`
- *     ile scope'lanır → AI DropZone input'u ile karışmaz.
+ * 2026-06-10 sadeleştirme: sihirbaz /dashboard/import içindeki <details>
+ * accordion'dan kendi sayfasına (/dashboard/import/excel) taşındı. Accordion
+ * açma beforeEach adımı kalktı; testler doğrudan sihirbaz sayfasına gider.
+ * File input `data-testid="classic-import-file"` locator'ı aynen korunur.
  */
 import { test, expect } from "@playwright/test";
 import path from "path";
 
 const XLSX_PATH = path.join(__dirname, "fixtures/test-import.xlsx");
 const TXT_PATH  = path.join(__dirname, "fixtures/invalid.txt");
-// Faz 3d: page.tsx classic wizard input'una testid eklendi (AI dropzone input'u
-// ile karışmasın diye). Tüm aşağıdaki test'ler bu testid'i kullanır.
 const CLASSIC_FILE_INPUT = "[data-testid='classic-import-file']";
 const COLUMN_MAPPING_BUTTON = /kolon eşleştirmeye geç/i;
 
@@ -30,26 +21,15 @@ if (!fs.existsSync(path.join(__dirname, "fixtures/invalid.txt"))) {
 }
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/import");
+    await page.goto("/dashboard/import/excel");
     await page.waitForLoadState("networkidle");
     const demoLink = page.getByRole("link", { name: /demo ile gezin/i });
     if (await demoLink.isVisible().catch(() => false)) {
         await demoLink.click();
         await page.waitForURL(/\/dashboard(?:\/.*)?$/, { timeout: 15_000 });
-        await page.goto("/dashboard/import");
+        await page.goto("/dashboard/import/excel");
         await page.waitForLoadState("networkidle");
     }
-    // Faz 3d: klasik wizard accordion'ı testler için programmatic aç. <summary>
-    // tıklama animasyonla async olabildiği için doğrudan DOM mutasyonu daha
-    // güvenilir. classicDetailsRef React state'ine onToggle ile senkron olur.
-    // Faz 3d Review 2 (2026-05-23): data-testid scope — sayfaya başka <details>
-    // eklense bile bu locator klasik mod accordion'una sabit kalır.
-    await page.evaluate(() => {
-        const d = document.querySelector<HTMLDetailsElement>(
-            "[data-testid='classic-mode-accordion']"
-        );
-        if (d && !d.open) d.open = true;
-    });
 });
 
 // ── Idle state ────────────────────────────────────────────────────────────────

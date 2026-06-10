@@ -5,7 +5,7 @@
  * sourceChipLabel pure helper'ı doğrudan test edilir.
  */
 import { describe, it, expect } from "vitest";
-import { sourceChipLabel } from "@/app/dashboard/import/page";
+import { sourceChipLabel } from "@/app/dashboard/import/excel/page";
 
 describe("sourceChipLabel — source chip etiket mantığı", () => {
     it("memory source → 'Hafıza'", () => {

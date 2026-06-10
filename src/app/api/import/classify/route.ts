@@ -24,6 +24,7 @@ import { handleApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
 import {
     DEFAULT_AI_IMPORT_OPERATION,
+    defaultOperationForDocumentType,
     getAiImportOperation,
     isAiImportOperationType,
 } from "@/lib/ai-import-operations";
@@ -88,16 +89,21 @@ export async function POST(req: NextRequest) {
         }
 
         const batchId = typeof batchIdRaw === "string" && batchIdRaw.length > 0 ? batchIdRaw : null;
-        const operationType = typeof operationTypeRaw === "string" && operationTypeRaw.length > 0
+        // Dosya-önce akış: operation_type artık opsiyonel. Gönderilmediyse
+        // sınıflandırma sonucunun document_type'ından türetilir (aşağıda);
+        // AI prompt bağlamı için nötr varsayılan kullanılır.
+        const explicitOperation = typeof operationTypeRaw === "string" && operationTypeRaw.length > 0
             ? operationTypeRaw
-            : DEFAULT_AI_IMPORT_OPERATION;
-        if (!isAiImportOperationType(operationType)) {
-            return NextResponse.json({ error: "Geçersiz AI Import işlem türü." }, { status: 400 });
+            : null;
+        if (explicitOperation !== null) {
+            if (!isAiImportOperationType(explicitOperation)) {
+                return NextResponse.json({ error: "Geçersiz AI Import işlem türü." }, { status: 400 });
+            }
+            if (getAiImportOperation(explicitOperation).status !== "active") {
+                return NextResponse.json({ error: "Bu AI Import işlem türü henüz aktif değil." }, { status: 400 });
+            }
         }
-        const operation = getAiImportOperation(operationType);
-        if (operation.status !== "active") {
-            return NextResponse.json({ error: "Bu AI Import işlem türü henüz aktif değil." }, { status: 400 });
-        }
+        const operationType = explicitOperation ?? DEFAULT_AI_IMPORT_OPERATION;
 
         const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -157,13 +163,18 @@ export async function POST(req: NextRequest) {
             return new NextResponse(null, { status: 499 });
         }
 
+        // Explicit verilmediyse belge tipinden türet — extract route bunu okur;
+        // kullanıcı İncele ekranında override edebilir.
+        const stampedOperation = explicitOperation
+            ?? defaultOperationForDocumentType(classification.document_type);
+
         const row = await dbCreateImportDocument({
             batchId,
             file: buffer,
             fileName: file.name,
             fileSize: file.size,
             mimeType: file.type,
-            classification: { ...classification, operation_type: operationType },
+            classification: { ...classification, operation_type: stampedOperation },
             status: "classified",
             createdBy: user?.id ?? null,
         });

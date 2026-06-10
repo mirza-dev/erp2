@@ -56,7 +56,7 @@ export default function DropZone({ onFiles, disabled, disabledTooltip }: DropZon
         >
             <div style={{ fontSize: "28px", marginBottom: "8px" }}>📥</div>
             <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                {dragOver ? "Dosyayı bırak" : "Dosyaları sürükle bırak"}
+                {dragOver ? "Dosyayı bırak" : "Dosyanı bırak — PDF · Excel · görsel"}
             </div>
             <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "4px" }}>
                 veya tıklayarak seç · PDF / PNG / JPEG / WebP / Excel / CSV · max 10 MB

@@ -41,7 +41,7 @@ function makeFile(name: string, type = "application/pdf", size = 100): File {
 
 const PT = { id: "00000000-0000-4000-8000-000000000001", name: "Vana" };
 
-function okResponse(documentId = "doc-1", confidence = 0.92) {
+function okResponse(documentId = "doc-1", confidence = 0.92, operationType = "product_create") {
     return new Response(JSON.stringify({
         ok: true,
         document: {
@@ -52,6 +52,8 @@ function okResponse(documentId = "doc-1", confidence = 0.92) {
                 language: "tr",
                 summary: "Test özet",
                 suggested_product_type_id: PT.id,
+                // Dosya-önce akış: sunucu document_type'tan türetip damgalar
+                operation_type: operationType,
             },
         },
     }), { status: 201, headers: { "Content-Type": "application/json" } });
@@ -85,24 +87,24 @@ describe("ClassifierQueue — happy path (P2 + mountedRef fix)", () => {
         const [url, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
         expect(url).toBe("/api/import/classify");
         expect(init.method).toBe("POST");
-        expect((init.body as FormData).get("operation_type")).toBe("product_update");
+        // Dosya-önce akış: operation_type artık GÖNDERİLMEZ — sunucu türetir.
+        expect((init.body as FormData).get("operation_type")).toBeNull();
     });
 
-    it("sends selected operation_type and renders operation chip after classification", async () => {
-        const fetchSpy = vi.fn(async () => okResponse("doc-op"));
+    it("operation chip sunucunun damgaladığı classification.operation_type'tan render edilir", async () => {
+        const fetchSpy = vi.fn(async () => okResponse("doc-op", 0.92, "product_documents"));
         vi.stubGlobal("fetch", fetchSpy);
 
         render(
             <ClassifierQueue
                 files={[makeFile("a.pdf")]}
-                operationType="product_documents"
                 suggestedProductTypes={[PT]}
             />,
         );
 
         await screen.findByText(/İşlem: Görsel\/doküman ekle/, {}, { timeout: 3000 });
         const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
-        expect((init.body as FormData).get("operation_type")).toBe("product_documents");
+        expect((init.body as FormData).get("operation_type")).toBeNull();
     });
 
     it("Strict Mode double-render: fetch STILL called only once (no duplicate POST)", async () => {
@@ -308,7 +310,7 @@ describe("ClassifierQueue — onRemove parent sync (Review 3 P2)", () => {
     });
 });
 
-// ── Faz 3d (2026-05-23) — onOpenClassicMode CTA (migration_excel) ──────────
+// ── onOpenExcelWizard CTA (migration_excel) — 2026-06-10 sadeleştirme ───────
 
 function migrationExcelResponse() {
     return new Response(JSON.stringify({
@@ -321,43 +323,45 @@ function migrationExcelResponse() {
                 language: "tr",
                 summary: "Eski sistem Excel'i",
                 suggested_product_type_id: null,
+                operation_type: "product_update",
             },
         },
     }), { status: 201, headers: { "Content-Type": "application/json" } });
 }
 
-describe("ClassifierQueue — Faz 3d onOpenClassicMode callback", () => {
-    it("migration_excel + onOpenClassicMode → 'Klasik Mod'a geç ↓' button render; tıklama callback'i tetikler", async () => {
+describe("ClassifierQueue — onOpenExcelWizard callback (migration_excel)", () => {
+    it("migration_excel + onOpenExcelWizard → 'Excel sihirbazında aç' button; tıklama dosyayı callback'e verir", async () => {
         vi.stubGlobal("fetch", vi.fn(async () => migrationExcelResponse()));
-        const onOpenClassicMode = vi.fn();
+        const onOpenExcelWizard = vi.fn();
+        const file = makeFile("eski-katalog.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         render(<ClassifierQueue
-            files={[makeFile("eski-katalog.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]}
+            files={[file]}
             suggestedProductTypes={[PT]}
-            onOpenClassicMode={onOpenClassicMode}
+            onOpenExcelWizard={onOpenExcelWizard}
         />);
 
         // classified state bekle
-        const btn = await screen.findByRole("button", { name: /Klasik Mod accordion'unu aç/ }, { timeout: 3000 });
-        expect(btn.textContent).toMatch(/Klasik Mod'a geç/);
+        const btn = await screen.findByRole("button", { name: /Dosyayı Excel sihirbazında aç/ }, { timeout: 3000 });
+        expect(btn.textContent).toMatch(/Excel sihirbazında aç/);
 
         await act(async () => {
             fireEvent.click(btn);
         });
 
-        expect(onOpenClassicMode).toHaveBeenCalledTimes(1);
+        expect(onOpenExcelWizard).toHaveBeenCalledTimes(1);
+        expect(onOpenExcelWizard).toHaveBeenCalledWith(file);
     });
 
-    it("migration_excel + onOpenClassicMode YOK → eski disabled span davranışı (backward compat)", async () => {
+    it("migration_excel + onOpenExcelWizard YOK → bilgilendirici span davranışı (backward compat)", async () => {
         vi.stubGlobal("fetch", vi.fn(async () => migrationExcelResponse()));
-        // onOpenClassicMode geçilmedi
+        // onOpenExcelWizard geçilmedi
         render(<ClassifierQueue
             files={[makeFile("eski-katalog.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]}
             suggestedProductTypes={[PT]}
         />);
 
         // Span: aria-label yok, button rolünde değil
-        await screen.findByText(/Klasik Mod'a geçin/, {}, { timeout: 3000 });
-        // Button rolünde "Klasik Mod accordion" aria-label'ı olmamalı
-        expect(screen.queryByRole("button", { name: /Klasik Mod accordion'unu aç/ })).toBeNull();
+        await screen.findByText(/Excel\/CSV toplu aktarım için sihirbazı kullanın/, {}, { timeout: 3000 });
+        expect(screen.queryByRole("button", { name: /Dosyayı Excel sihirbazında aç/ })).toBeNull();
     });
 });

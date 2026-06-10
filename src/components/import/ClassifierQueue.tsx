@@ -23,11 +23,7 @@ import {
     formatLanguage,
     classifierResultBadge,
 } from "@/lib/classifier-helpers";
-import {
-    DEFAULT_AI_IMPORT_OPERATION,
-    getAiImportOperation,
-    type AiImportOperationType,
-} from "@/lib/ai-import-operations";
+import { getAiImportOperation } from "@/lib/ai-import-operations";
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -42,7 +38,6 @@ interface QueuedFile {
     classification: DocumentClassification | null;
     documentId: string | null;
     errorMessage: string | null;
-    operationType: AiImportOperationType;
 }
 
 interface QueuedSuggestedType {
@@ -52,7 +47,6 @@ interface QueuedSuggestedType {
 
 export interface ClassifierQueueProps {
     files: File[];
-    operationType?: AiImportOperationType;
     suggestedProductTypes?: QueuedSuggestedType[];
     onClear?: () => void;
     /**
@@ -62,11 +56,13 @@ export interface ClassifierQueueProps {
      */
     onRemove?: (file: File) => void;
     /**
-     * Faz 3d: migration_excel doc tespit edilirse parent'ın klasik mod
-     * accordion'unu açmasına izin verir. Callback verilirse "Klasik Mod'a geçin"
-     * CTA tıklanabilir button olur; verilmezse eski disabled span davranışı.
+     * migration_excel doc tespit edilirse dosyayı Excel sihirbazına
+     * (/dashboard/import/excel) taşımaya izin verir. Callback verilirse
+     * "Excel sihirbazında aç" CTA tıklanabilir button olur; verilmezse
+     * bilgilendirici span davranışı (2026-06-10 sadeleştirme: accordion yerine
+     * ayrı sayfa).
      */
-    onOpenClassicMode?: () => void;
+    onOpenExcelWizard?: (file: File) => void;
 }
 
 const CONCURRENCY = 3;
@@ -77,12 +73,12 @@ function newId(): string {
 
 async function uploadAndClassify(
     file: File,
-    operationType: AiImportOperationType,
     signal?: AbortSignal,
 ): Promise<{ ok: true; document: ImportDocumentRow } | { ok: false; error: string; aborted?: boolean }> {
+    // Dosya-önce akış: operation_type GÖNDERİLMEZ — sunucu sınıflandırma
+    // sonucunun document_type'ından türetir (defaultOperationForDocumentType).
     const fd = new FormData();
     fd.append("file", file);
-    fd.append("operation_type", operationType);
     try {
         const res = await fetch("/api/import/classify", { method: "POST", body: fd, signal });
         if (!res.ok) {
@@ -101,11 +97,10 @@ async function uploadAndClassify(
 
 export default function ClassifierQueue({
     files,
-    operationType = DEFAULT_AI_IMPORT_OPERATION,
     suggestedProductTypes = [],
     onClear,
     onRemove,
-    onOpenClassicMode,
+    onOpenExcelWizard,
 }: ClassifierQueueProps) {
     const isDemo = useIsDemo();
 
@@ -158,19 +153,17 @@ export default function ClassifierQueue({
                         id: newId(), file: f, status: "error", started: true,
                         classification: null, documentId: null,
                         errorMessage: v.reason ?? "Dosya reddedildi.",
-                        operationType,
                     });
                     continue;
                 }
                 additions.push({
                     id: newId(), file: f, status: "uploading", started: false,
                     classification: null, documentId: null, errorMessage: null,
-                    operationType,
                 });
             }
             return additions.length > 0 ? [...prev, ...additions] : prev;
         });
-    }, [files, operationType]);
+    }, [files]);
 
     // Concurrency driver — fetch tetiklemesi yalnız useEffect içinde olmalı
     // (Strict Mode double-render güvenliği + render-phase side-effect yasağı).
@@ -194,7 +187,7 @@ export default function ClassifierQueue({
         for (const c of candidates) {
             const ctl = new AbortController();
             abortControllersRef.current.set(c.id, ctl);
-            uploadAndClassify(c.file, c.operationType, ctl.signal).then(result => {
+            uploadAndClassify(c.file, ctl.signal).then(result => {
                 abortControllersRef.current.delete(c.id);
                 // Abort edildiyse (remove/clear/unmount): UI'a yansıma yok
                 if (result.ok === false && result.aborted) return;
@@ -291,7 +284,9 @@ export default function ClassifierQueue({
                     const c = q.classification;
                     const badge = c ? classifierResultBadge(c) : null;
                     const suggestedName = suggestedTypeName(c?.suggested_product_type_id ?? null);
-                    const operation = getAiImportOperation(q.operationType);
+                    // Dosya-önce akış: işlem türü sınıflandırma sonucundan gelir
+                    // (sunucu document_type'tan türetip damgalar).
+                    const operation = c?.operation_type ? getAiImportOperation(c.operation_type) : null;
                     return (
                         <div
                             key={q.id}
@@ -323,10 +318,12 @@ export default function ClassifierQueue({
                                 </div>
                                 {c && (
                                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "6px", alignItems: "center" }}>
-                                        <span style={{
-                                            fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
-                                            background: "var(--bg-tertiary)", color: "var(--text-secondary)",
-                                        }}>İşlem: {operation.shortTitle}</span>
+                                        {operation && (
+                                            <span style={{
+                                                fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
+                                                background: "var(--bg-tertiary)", color: "var(--text-secondary)",
+                                            }}>İşlem: {operation.shortTitle}</span>
+                                        )}
                                         {badge && (
                                             <span style={{
                                                 fontSize: "11px", padding: "2px 8px", borderRadius: "10px",
@@ -371,11 +368,11 @@ export default function ClassifierQueue({
                                     </Link>
                                 )}
                                 {q.status === "classified" && c && isMigrationExcelType(c.document_type) && (
-                                    onOpenClassicMode ? (
+                                    onOpenExcelWizard ? (
                                         <button
                                             type="button"
-                                            onClick={() => onOpenClassicMode()}
-                                            aria-label="Klasik Mod accordion'unu aç"
+                                            onClick={() => onOpenExcelWizard(q.file)}
+                                            aria-label="Dosyayı Excel sihirbazında aç"
                                             style={{
                                                 fontSize: "11px", padding: "4px 10px",
                                                 background: "var(--warning-bg)", color: "var(--warning-text)",
@@ -383,7 +380,7 @@ export default function ClassifierQueue({
                                                 cursor: "pointer", fontWeight: 500,
                                             }}
                                         >
-                                            Klasik Mod&apos;a geç ↓
+                                            Excel sihirbazında aç →
                                         </button>
                                     ) : (
                                         <span style={{
@@ -391,7 +388,7 @@ export default function ClassifierQueue({
                                             background: "var(--warning-bg)", color: "var(--warning-text)",
                                             border: "0.5px solid var(--warning-border)", borderRadius: "5px",
                                         }}>
-                                            Klasik Mod&apos;a geçin
+                                            Excel/CSV toplu aktarım için sihirbazı kullanın
                                         </span>
                                     )
                                 )}

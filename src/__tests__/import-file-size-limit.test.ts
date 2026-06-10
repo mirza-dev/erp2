@@ -5,7 +5,7 @@
  * validateFileSize helper'ı doğrudan test edilir.
  */
 import { describe, it, expect } from "vitest";
-import { validateFileSize } from "@/app/dashboard/import/page";
+import { validateFileSize } from "@/app/dashboard/import/excel/page";
 
 const MB = 1024 * 1024;
 

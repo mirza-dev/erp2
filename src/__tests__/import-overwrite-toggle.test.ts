@@ -21,7 +21,8 @@ describe("Faz C overwrite toggle — wiring", () => {
     });
 
     it("import sayfası overwrite checkbox + confirm çağrısı body'sine geçirir", () => {
-        const src = read("src/app/dashboard/import/page.tsx");
+        // 2026-06-10 sadeleştirme: Excel sihirbazı kendi sayfasına taşındı.
+        const src = read("src/app/dashboard/import/excel/page.tsx");
         expect(src).toContain("overwriteExisting");
         expect(src).toContain("JSON.stringify({ overwrite: overwriteExisting })");
         expect(src).toContain("Mevcut dolu alanların üzerine yaz");

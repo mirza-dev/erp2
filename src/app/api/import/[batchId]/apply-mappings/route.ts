@@ -99,6 +99,9 @@ export async function POST(
                 mappings: Array<{ source_column: string; target_field: string }>;
                 rows: Array<Record<string, string>>;
                 remember: boolean;
+                // Excel sihirbazı stok sheet'leri için sayım/hareket seçimini
+                // explicit gönderir (sheet adından çıkarım her zaman mümkün değil).
+                operation_type?: unknown;
             }>;
             operation_type?: unknown;
         };
@@ -143,7 +146,14 @@ export async function POST(
 
         for (const sheet of body.sheets) {
             const { entity_type, mappings, rows, remember } = sheet;
-            const sheetOperationType = inferOperationForSheet({
+            // Explicit per-sheet seçim isim-çıkarımını yener (kullanıcı radio ile
+            // override edebilmeli); yalnız stok operasyonları kabul edilir.
+            const explicitStockOp =
+                entity_type === "stock" &&
+                (sheet.operation_type === "stock_count" || sheet.operation_type === "stock_movement")
+                    ? sheet.operation_type
+                    : null;
+            const sheetOperationType = explicitStockOp ?? inferOperationForSheet({
                 sheetName: sheet.sheet_name,
                 entityType: entity_type,
                 fallback: operationType,

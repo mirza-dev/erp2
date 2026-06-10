@@ -19,7 +19,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { createServiceClient } from "@/lib/supabase/service";
-import { dbGetImportDocument } from "@/lib/supabase/import-documents";
+import { dbGetImportDocument, dbUpdateImportDocumentClassification } from "@/lib/supabase/import-documents";
 import {
     dbReplaceLinesForDocument,
     type CreateExtractedLineInput,
@@ -42,6 +42,7 @@ import { handleApiError } from "@/lib/api-error";
 import { createClient } from "@/lib/supabase/server";
 import {
     DEFAULT_AI_IMPORT_OPERATION,
+    getAiImportOperation,
     isAiImportOperationType,
     type AiImportOperationType,
 } from "@/lib/ai-import-operations";
@@ -109,9 +110,31 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         }
 
         const docType: DocumentType = doc.classification?.document_type ?? "unknown";
-        const operationType: AiImportOperationType = isAiImportOperationType(doc.classification?.operation_type)
-            ? doc.classification.operation_type
-            : DEFAULT_AI_IMPORT_OPERATION;
+
+        // Body — opsiyonel productTypeId override (datasheet için) + opsiyonel
+        // operation_type override (dosya-önce akış: sınıflandırmadan türetilen
+        // işlemi kullanıcı İncele ekranında değiştirebilir). Flow türetiminden
+        // ÖNCE okunur — operation_type product_documents flow seçimini etkiler.
+        let bodyProductTypeId: string | null = null;
+        let bodyOperationType: AiImportOperationType | null = null;
+        try {
+            const body = await req.json().catch(() => ({}));
+            if (typeof body?.productTypeId === "string" && body.productTypeId.length > 0) {
+                bodyProductTypeId = body.productTypeId;
+            }
+            if (body?.operation_type !== undefined && body?.operation_type !== null && body?.operation_type !== "") {
+                if (!isAiImportOperationType(body.operation_type)
+                    || getAiImportOperation(body.operation_type).status !== "active") {
+                    return NextResponse.json({ error: "Geçersiz AI Import işlem türü." }, { status: 400 });
+                }
+                bodyOperationType = body.operation_type;
+            }
+        } catch { /* boş body OK */ }
+
+        const operationType: AiImportOperationType = bodyOperationType
+            ?? (isAiImportOperationType(doc.classification?.operation_type)
+                ? doc.classification.operation_type
+                : DEFAULT_AI_IMPORT_OPERATION);
 
         if (docType === "migration_excel") {
             return NextResponse.json({ error: "Migration Excel için Excel/CSV ile Toplu Aktarım bölümünü kullanın." }, { status: 400 });
@@ -131,14 +154,20 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
             return NextResponse.json({ error: "Bu belge tipi için ekstraksiyon desteklenmiyor." }, { status: 400 });
         }
 
-        // Body — opsiyonel productTypeId override (datasheet için kullanıcı seçebilir)
-        let bodyProductTypeId: string | null = null;
-        try {
-            const body = await req.json().catch(() => ({}));
-            if (typeof body?.productTypeId === "string" && body.productTypeId.length > 0) {
-                bodyProductTypeId = body.productTypeId;
+        // Override kalıcılaştırma — sonraki extract/görüntülemeler tutarlı kalsın.
+        // Best-effort: persist hatası ekstraksiyonu bloklamaz (bu istek zaten
+        // override değeriyle çalışır).
+        if (bodyOperationType && doc.classification
+            && doc.classification.operation_type !== bodyOperationType) {
+            try {
+                await dbUpdateImportDocumentClassification(id, {
+                    ...doc.classification,
+                    operation_type: bodyOperationType,
+                });
+            } catch (persistErr) {
+                console.warn("[extract] operation_type override persist edilemedi:", persistErr);
             }
-        } catch { /* boş body OK */ }
+        }
 
         // Review 3b 4.tur P3: Body productTypeId early validation — kullanıcının
         // bilinçli girdisi storage download + matcher cache yüklemeden ÖNCE

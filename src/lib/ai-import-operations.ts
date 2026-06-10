@@ -173,3 +173,28 @@ export function getActiveAiImportOperations(): AiImportOperation[] {
 export function getPlannedAiImportOperations(): AiImportOperation[] {
     return AI_IMPORT_OPERATIONS.filter(op => op.status === "planned");
 }
+
+/**
+ * Dosya-önce akış (2026-06-10 sadeleştirme): kullanıcı artık işlem türü
+ * SEÇMEZ; AI'ın sınıflandırdığı belge tipinden makul varsayılan türetilir.
+ * Kullanıcı İncele ekranında (extract öncesi) override edebilir.
+ */
+export function defaultOperationForDocumentType(documentType: unknown): AiImportOperationType {
+    switch (documentType) {
+        case "material_certificate":
+        case "compliance_doc":
+        case "test_report":
+        case "msds":
+        case "product_photo":
+            return "product_documents";
+        case "product_catalog":
+            return "product_create";
+        case "product_datasheet":
+            return "product_technical_update";
+        case "vendor_profile":
+            return "vendor_upsert";
+        default:
+            // migration_excel / unknown / beklenmeyen → güvenli varsayılan
+            return DEFAULT_AI_IMPORT_OPERATION;
+    }
+}
