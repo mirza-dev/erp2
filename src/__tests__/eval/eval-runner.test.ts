@@ -36,7 +36,6 @@ vi.mock("@/lib/supabase/service", () => ({
 }));
 
 import {
-    aiBatchParse,
     aiScoreOrder,
     aiGenerateOpsSummary,
     aiEnrichPurchaseSuggestions,
@@ -46,7 +45,6 @@ import type { StockRiskItem } from "@/lib/services/ai-service";
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
-import { ALL_IMPORT_SCENARIOS } from "../fixtures/import-fixtures";
 import { ALL_ORDER_RISK_SCENARIOS } from "../fixtures/order-risk-fixtures";
 import { ALL_OPS_SCENARIOS } from "../fixtures/ops-summary-fixtures";
 import { ALL_PURCHASE_SCENARIOS } from "../fixtures/purchase-fixtures";
@@ -87,87 +85,9 @@ afterEach(() => {
     }
 });
 
-// ─── Eval: Import Batch Parse ─────────────────────────────────────────────────
-
-describe("Eval: Import Batch Parse", () => {
-    for (const scenario of ALL_IMPORT_SCENARIOS) {
-        describe(`scenario: ${scenario.label}`, () => {
-            beforeEach(() => {
-                mockCreate.mockResolvedValue(makeTextResponse(scenario.goldenResponse));
-            });
-
-            it("returns items array with correct length", async () => {
-                const result = await aiBatchParse({
-                    entity_type: scenario.entity_type,
-                    rows: scenario.rows,
-                });
-                expect(result.items).toHaveLength(scenario.rows.length);
-            });
-
-            it("each item has required structural keys", async () => {
-                const result = await aiBatchParse({
-                    entity_type: scenario.entity_type,
-                    rows: scenario.rows,
-                });
-                for (const item of result.items) {
-                    const check = checkRequiredKeys(
-                        item as unknown as Record<string, unknown>,
-                        ["parsed_data", "confidence", "ai_reason", "unmatched_fields"],
-                        {
-                            parsed_data: "object" as const,
-                            confidence: "number" as const,
-                            ai_reason: "string" as const,
-                            unmatched_fields: "array" as const,
-                        },
-                    );
-                    expect(check.pass, check.message).toBe(true);
-                }
-            });
-
-            it("confidence meets minimum threshold", async () => {
-                const result = await aiBatchParse({
-                    entity_type: scenario.entity_type,
-                    rows: scenario.rows,
-                });
-                for (const item of result.items) {
-                    const check = checkConfidenceRange(item.confidence, {
-                        min: scenario.expected.minConfidence,
-                        max: 1,
-                    });
-                    expect(check.pass, check.message).toBe(true);
-                }
-            });
-
-            it("required parsed keys are present in parsed_data", async () => {
-                if (scenario.expected.requiredParsedKeys.length === 0) return;
-                const result = await aiBatchParse({
-                    entity_type: scenario.entity_type,
-                    rows: scenario.rows,
-                });
-                for (const item of result.items) {
-                    const check = checkRequiredKeys(
-                        item.parsed_data as Record<string, unknown>,
-                        scenario.expected.requiredParsedKeys,
-                    );
-                    expect(check.pass, check.message).toBe(true);
-                }
-            });
-
-            it("unmatched_fields count within expected maximum", async () => {
-                const result = await aiBatchParse({
-                    entity_type: scenario.entity_type,
-                    rows: scenario.rows,
-                });
-                for (const item of result.items) {
-                    const check = checkArrayBounds(item.unmatched_fields, {
-                        max: scenario.expected.maxUnmatchedCount,
-                    });
-                    expect(check.pass, check.message).toBe(true);
-                }
-            });
-        });
-    }
-});
+// (Eval: Import Batch Parse bölümü kaldırıldı — 2026-06-10 sadeleştirme:
+// aiBatchParse ve onu kullanan /api/import/[batchId]/parse route'u silindi;
+// canlı Excel hattı detect-columns → apply-mappings.)
 
 // ─── Eval: Order Risk ─────────────────────────────────────────────────────────
 
@@ -389,7 +309,6 @@ describe("Eval: Stock Risk Assessment", () => {
 // ─── Eval: Universal Degradation ─────────────────────────────────────────────
 
 describe("Eval: Universal Degradation", () => {
-    const CUSTOMER_ROW = [{ firma_adi: "Test" }];
     const STOCK_RISK_ITEMS: StockRiskItem[] = [
         {
             productId: "p-deg-001",
@@ -431,22 +350,6 @@ describe("Eval: Universal Degradation", () => {
                     notes: null,
                     lines: [{ product_name: "Test Product", quantity: 1, unit_price: 1000, discount_pct: 0 }],
                 });
-            });
-
-            it("aiBatchParse does not throw", async () => {
-                await expect(
-                    aiBatchParse({ entity_type: "customer", rows: CUSTOMER_ROW }),
-                ).resolves.toBeDefined();
-            });
-
-            it("aiBatchParse returns valid items shape", async () => {
-                const result = await aiBatchParse({ entity_type: "customer", rows: CUSTOMER_ROW });
-                expect(Array.isArray(result.items)).toBe(true);
-                expect(result.items).toHaveLength(1);
-                const item = result.items[0];
-                expect(typeof item.confidence).toBe("number");
-                expect(typeof item.ai_reason).toBe("string");
-                expect(Array.isArray(item.unmatched_fields)).toBe(true);
             });
 
             it("aiGenerateOpsSummary does not throw", async () => {

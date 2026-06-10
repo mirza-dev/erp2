@@ -38,22 +38,8 @@ async function runDegradationChecks(): Promise<CheckResult[]> {
 
     const results: CheckResult[] = [];
 
-    try {
-        const { aiBatchParse } = await import("../src/lib/services/ai-service.js");
-        try {
-            const r = await aiBatchParse({ entity_type: "customer", rows: [{ firma_adi: "Test" }] });
-            const ok = Array.isArray(r.items);
-            results.push({
-                label: "aiBatchParse",
-                status: ok ? "PASS" : "FAIL",
-                detail: ok ? `items:${r.items.length},conf:${r.items[0]?.confidence ?? "n/a"}` : "invalid shape",
-            });
-        } catch (e) {
-            results.push({ label: "aiBatchParse", status: "FAIL", detail: String(e) });
-        }
-    } catch {
-        results.push({ label: "aiBatchParse", status: "SKIP", detail: "import failed" });
-    }
+    // aiBatchParse kontrolü kaldırıldı (2026-06-10 sadeleştirme):
+    // fonksiyon UI'sız /api/import/[batchId]/parse route'uyla birlikte silindi.
 
     try {
         const { aiGenerateOpsSummary } = await import("../src/lib/services/ai-service.js");

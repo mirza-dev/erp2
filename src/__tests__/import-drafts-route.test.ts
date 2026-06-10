@@ -1,6 +1,7 @@
 /**
- * Tests for GET / POST /api/import/[batchId]/drafts
- * DB and service functions are mocked — no real Supabase calls.
+ * Tests for GET /api/import/[batchId]/drafts
+ * (POST handler 2026-06-10 sadeleştirmesinde kaldırıldı — UI tüketicisi yoktu.)
+ * DB functions are mocked — no real Supabase calls.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -17,18 +18,13 @@ import { NextRequest } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
-const mockDbListDrafts          = vi.fn();
-const mockServiceAddDraftsToBatch = vi.fn();
+const mockDbListDrafts = vi.fn();
 
 vi.mock("@/lib/supabase/import", () => ({
     dbListDrafts: (...args: unknown[]) => mockDbListDrafts(...args),
 }));
 
-vi.mock("@/lib/services/import-service", () => ({
-    serviceAddDraftsToBatch: (...args: unknown[]) => mockServiceAddDraftsToBatch(...args),
-}));
-
-import { GET, POST } from "@/app/api/import/[batchId]/drafts/route";
+import { GET } from "@/app/api/import/[batchId]/drafts/route";
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -36,14 +32,6 @@ const BATCH_ID = "batch-drafts-1";
 
 function makeGetReq(): NextRequest {
     return new NextRequest(`http://localhost/api/import/${BATCH_ID}/drafts`, { method: "GET" });
-}
-
-function makePostReq(body: object | object[]): NextRequest {
-    return new NextRequest(`http://localhost/api/import/${BATCH_ID}/drafts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-    });
 }
 
 function makeCtx(batchId = BATCH_ID) {
@@ -92,43 +80,9 @@ describe("GET /api/import/[batchId]/drafts", () => {
     });
 });
 
-describe("POST /api/import/[batchId]/drafts", () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        mockServiceAddDraftsToBatch.mockResolvedValue([makeDraft("d-new")]);
-    });
-
-    it("creates a single draft from object body and returns 201", async () => {
-        const draft = { entity_type: "product", parsed_data: { sku: "P001" } };
-        const res = await POST(makePostReq(draft), makeCtx());
-        expect(res.status).toBe(201);
-        const body = await res.json();
-        expect(body).toHaveLength(1);
-    });
-
-    it("creates multiple drafts from array body and returns 201", async () => {
-        const drafts = [
-            { entity_type: "product", parsed_data: { sku: "P001" } },
-            { entity_type: "product", parsed_data: { sku: "P002" } },
-        ];
-        mockServiceAddDraftsToBatch.mockResolvedValue([makeDraft("d1"), makeDraft("d2")]);
-        const res = await POST(makePostReq(drafts), makeCtx());
-        expect(res.status).toBe(201);
-        const body = await res.json();
-        expect(body).toHaveLength(2);
-    });
-
-    it("calls serviceAddDraftsToBatch with correct batchId and normalized array", async () => {
-        const draft = { entity_type: "customer", parsed_data: { name: "ACME" } };
-        await POST(makePostReq(draft), makeCtx());
-        expect(mockServiceAddDraftsToBatch).toHaveBeenCalledWith(
-            BATCH_ID,
-            [draft]
-        );
-    });
-
-    it("returns 400 when empty array is posted", async () => {
-        const res = await POST(makePostReq([]), makeCtx());
-        expect(res.status).toBe(400);
+describe("drafts route POST kaldırıldı (regression-lock)", () => {
+    it("route artık POST export etmez", async () => {
+        const mod = await import("@/app/api/import/[batchId]/drafts/route");
+        expect("POST" in mod).toBe(false);
     });
 });

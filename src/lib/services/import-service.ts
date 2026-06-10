@@ -7,7 +7,6 @@
 import {
     dbGetBatch, dbUpdateBatchStatus, dbListDrafts, dbUpdateDraft,
     dbClaimBatchForConfirm,
-    type CreateDraftInput, dbCreateDrafts,
 } from "@/lib/supabase/import";
 import type { VendorRow } from "@/lib/database.types";
 import { dbIncrementMappingSuccess } from "@/lib/supabase/column-mappings";
@@ -42,26 +41,8 @@ import {
 import { dbListProductTypes, dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
 import type { ProductTypeWithFieldsRow } from "@/lib/supabase/product-types";
 
-// ── Batch ────────────────────────────────────────────────────
-
-/** Batch'e draft ekle ve status → review yap */
-export async function serviceAddDraftsToBatch(
-    batchId: string,
-    drafts: Omit<CreateDraftInput, "batch_id">[]
-) {
-    const batch = await dbGetBatch(batchId);
-    if (!batch) throw new Error("Batch bulunamadı.");
-    if (batch.status === "confirmed") throw new Error("Onaylanmış batch'e draft eklenemez.");
-
-    const created = await dbCreateDrafts(drafts.map(d => ({ ...d, batch_id: batchId })));
-
-    // pending → review
-    if (batch.status === "pending" || batch.status === "processing") {
-        await dbUpdateBatchStatus(batchId, "review");
-    }
-
-    return created;
-}
+// serviceAddDraftsToBatch kaldırıldı (2026-06-10 sadeleştirme):
+// tek çağıranı drafts POST route'uydu; draft yaratma yalnız apply-mappings hattında.
 
 // ── Confirm ──────────────────────────────────────────────────
 

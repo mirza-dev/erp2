@@ -110,7 +110,7 @@ Bu script iki kategori kontrol çalıştırır:
 
 **1. Graceful Degradation (CI'da çalışabilir — DB gerektirmez):**
 - `ANTHROPIC_API_KEY` geçici kaldırılarak her AI yüzeyi çağrılır
-- `aiBatchParse`, `aiGenerateOpsSummary`, `aiAssessStockRisk`, `aiEnrichPurchaseSuggestions`
+- `aiGenerateOpsSummary`, `aiAssessStockRisk`, `aiEnrichPurchaseSuggestions` (`aiBatchParse` 2026-06-10 sadeleştirmesinde UI'sız /parse route'uyla birlikte kaldırıldı)
 - Her biri exception fırlatmadan valid shape döndürüyor mu?
 
 **2. DB Coverage (opsiyonel — Supabase bağlantısı gerekir):**

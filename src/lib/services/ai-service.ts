@@ -143,94 +143,10 @@ export async function aiParseEntity(input: ParseEntityInput): Promise<ParseEntit
 }
 
 // ── Batch Parse ─────────────────────────────────────────────
-
-export interface BatchParseInput {
-    entity_type: "customer" | "product" | "vendor" | "stock" | "order";
-    rows: Array<Record<string, string>>;
-}
-
-export interface BatchParseResult {
-    items: Array<{
-        parsed_data: Record<string, unknown>;
-        confidence: number;
-        ai_reason: string;
-        unmatched_fields: string[];
-    }>;
-}
-
-const BATCH_PARSE_SYSTEM: Record<string, string> = {
-    customer: `You are a data extraction assistant for a B2B ERP system.
-You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
-For each row, extract customer fields and return a JSON array with objects containing these keys (omit missing fields):
-{ "name": string, "email": string, "phone": string, "country": string (ISO 2-letter or full name), "currency": string (ISO 3-letter), "tax_number": string, "tax_office": string, "address": string, "notes": string }
-
-Return ONLY a JSON object in this exact format:
-{
-  "items": [
-    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
-    ...
-  ]
-}
-Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
-
-    vendor: `You are a data extraction assistant for a B2B ERP system.
-You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
-For each row, extract vendor fields and return a JSON array with objects containing these keys (omit missing fields):
-{ "name": string, "contact_email": string, "contact_phone": string, "contact_person": string, "tax_number": string, "address": string, "currency": string (ISO 3-letter), "payment_terms_days": number, "lead_time_days": number, "notes": string }
-Do not extract price, cost, unit cost, sales price, purchase price or valuation fields.
-
-Return ONLY a JSON object in this exact format:
-{
-  "items": [
-    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
-    ...
-  ]
-}
-Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
-
-    stock: `You are a data extraction assistant for a B2B ERP system.
-You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
-For each row, extract stock operation fields and return a JSON array with objects containing these keys (omit missing fields):
-{ "sku": string, "on_hand": number }
-Do not extract cost, valuation, sales price, purchase price or accounting fields.
-
-Return ONLY a JSON object in this exact format:
-{
-  "items": [
-    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
-    ...
-  ]
-}
-Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
-
-    product: `You are a data extraction assistant for a B2B ERP system.
-You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
-For each row, extract product fields and return a JSON array with objects containing these keys (omit missing fields):
-{ "name": string, "sku": string, "category": string, "unit": string, "price": number, "currency": string (ISO 3-letter), "min_stock_level": number, "material_quality": string, "production_site": string, "use_cases": string, "industries": string, "standards": string, "certifications": string, "product_notes": string }
-
-Return ONLY a JSON object in this exact format:
-{
-  "items": [
-    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
-    ...
-  ]
-}
-Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
-
-    order: `You are a data extraction assistant for a B2B ERP system.
-You will receive a JSON array of rows from an Excel file. Each row is an object with column headers as keys.
-For each row, extract order fields and return a JSON array with objects containing these keys (omit missing fields):
-{ "customer_name": string, "currency": string (ISO 3-letter), "grand_total": number, "notes": string }
-
-Return ONLY a JSON object in this exact format:
-{
-  "items": [
-    { "parsed_data": {...}, "confidence": 0.85, "ai_reason": "...", "unmatched_fields": ["field1"] },
-    ...
-  ]
-}
-Each item corresponds to one input row in order. Confidence is 0-1. ai_reason is a short explanation in Turkish. unmatched_fields lists column names that could not be mapped.`,
-};
+// aiBatchParse + BATCH_PARSE_SYSTEM kaldırıldı (2026-06-10 sadeleştirme):
+// tek prod çağıranı /api/import/[batchId]/parse route'uydu (UI'sız eski yol);
+// canlı Excel hattı detect-columns → apply-mappings deterministik akışıdır.
+// FALLBACK_FIELD_MAP ve fallbackParseRow CANLI — detect-columns kullanıyor.
 
 /**
  * Simple column-name → field-name fallback when AI is unavailable.
@@ -378,121 +294,6 @@ export function fallbackParseRow(
     return { parsed_data, unmatched_fields };
 }
 
-const CHUNK_SIZE = 20;
-
-async function parseChunk(
-    chunk: Array<Record<string, string>>,
-    systemPrompt: string,
-    entity_type: string,
-): Promise<BatchParseResult["items"]> {
-    try {
-        const message = await client.messages.create({
-            model: MODEL,
-            max_tokens: 4096,
-            system: systemPrompt,
-            messages: [{ role: "user", content: JSON.stringify(chunk) }],
-        });
-
-        const text = message.content
-            .filter(c => c.type === "text")
-            .map(c => (c as { type: "text"; text: string }).text)
-            .join("\n");
-
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (Array.isArray(parsed.items)) {
-                return parsed.items.map((item: Record<string, unknown>) => ({
-                    parsed_data: (item.parsed_data ?? {}) as Record<string, unknown>,
-                    confidence: clampConfidence(item.confidence),
-                    ai_reason: sanitizeAiOutput(typeof item.ai_reason === "string" ? item.ai_reason : "", 300),
-                    unmatched_fields: Array.isArray(item.unmatched_fields)
-                        ? (item.unmatched_fields as unknown[]).slice(0, 50)
-                        : [],
-                }));
-            }
-        }
-        // JSON parse başarısız — chunk fallback
-        return chunk.map(row => {
-            const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
-            return { parsed_data, confidence: 0.5, ai_reason: "AI yanıtı ayrıştırılamadı — fallback eşleştirme", unmatched_fields };
-        });
-    } catch {
-        return chunk.map(row => {
-            const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
-            return { parsed_data, confidence: 0.5, ai_reason: "AI servisi yanıt veremedi — fallback eşleştirme", unmatched_fields };
-        });
-    }
-}
-
-/**
- * Advisory-only — domain-rules §11.1.
- * Writes: parsed_data, confidence, ai_reason, unmatched_fields per row (non-authoritative).
- * Approval gate: user confirms/rejects each ImportDraft before entity creation.
- */
-export async function aiBatchParse(input: BatchParseInput): Promise<BatchParseResult> {
-    const { entity_type, rows } = input;
-
-    // Fallback when AI is not available
-    if (!isAIAvailable()) {
-        return {
-            items: rows.map(row => {
-                const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
-                return {
-                    parsed_data,
-                    confidence: 0.5,
-                    ai_reason: "AI devre dışı — doğrudan kolon eşleştirmesi",
-                    unmatched_fields,
-                };
-            }),
-        };
-    }
-
-    const systemPrompt = BATCH_PARSE_SYSTEM[entity_type];
-    if (!systemPrompt) {
-        return {
-            items: rows.map(row => {
-                const { parsed_data, unmatched_fields } = fallbackParseRow(row, entity_type);
-                return {
-                    parsed_data,
-                    confidence: 0.5,
-                    ai_reason: `Desteklenmeyen entity tipi: ${entity_type}`,
-                    unmatched_fields,
-                };
-            }),
-        };
-    }
-
-    // G1 — Sanitize all string fields before they reach the AI prompt (§12 guardrail)
-    const sanitizedRows = rows.map(row => sanitizeAiInputRecord(row));
-
-    const t0 = Date.now();
-    const chunks: Array<Array<Record<string, string>>> = [];
-    for (let i = 0; i < sanitizedRows.length; i += CHUNK_SIZE) {
-        chunks.push(sanitizedRows.slice(i, i + CHUNK_SIZE));
-    }
-
-    const allItems: BatchParseResult["items"] = [];
-    for (const chunk of chunks) {
-        const items = await parseChunk(chunk, systemPrompt, entity_type);
-        allItems.push(...items);
-    }
-
-    const avgConfidence = allItems.length > 0
-        ? allItems.reduce((sum, item) => sum + item.confidence, 0) / allItems.length
-        : null;
-    void logAiRun({
-        feature: "import_parse",
-        entity_id: null,
-        input_hash: hashInput(JSON.stringify(sanitizedRows)),
-        confidence: avgConfidence,
-        latency_ms: Date.now() - t0,
-        model: MODEL,
-    });
-
-    return { items: allItems };
-}
-
 // ── Column Detection ─────────────────────────────────────────
 
 export interface ColumnDetectionInput {
@@ -514,7 +315,7 @@ export interface ColumnDetectionResult {
 /**
  * Advisory-only — domain-rules §11.1.
  * Detects which ERP field each Excel column maps to.
- * One AI call per sheet (not per row). Much cheaper than aiBatchParse.
+ * One AI call per sheet (not per row).
  */
 export async function aiDetectColumns(input: ColumnDetectionInput): Promise<ColumnDetectionResult> {
     const { headers, sampleRows, entityType, pastMappings = [] } = input;

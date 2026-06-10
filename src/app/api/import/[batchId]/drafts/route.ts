@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListDrafts } from "@/lib/supabase/import";
-import { serviceAddDraftsToBatch } from "@/lib/services/import-service";
-import { safeParseJson } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/import/[batchId]/drafts
+// (POST handler kaldırıldı — 2026-06-10 sadeleştirme: hiçbir UI tüketicisi yoktu,
+// draft yaratma yalnız apply-mappings hattında.)
 export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ batchId: string }> }
@@ -16,34 +15,5 @@ export async function GET(
     } catch (err) {
         console.error("[GET /api/import/[batchId]/drafts]", err);
         return NextResponse.json({ error: "Draftlar alınamadı." }, { status: 500 });
-    }
-}
-
-// POST /api/import/[batchId]/drafts
-// Body: array of { entity_type, parsed_data, raw_data?, confidence?, ai_reason? }
-export async function POST(
-    req: NextRequest,
-    { params }: { params: Promise<{ batchId: string }> }
-) {
-    try {
-        const guard = await requirePermission(req, "manage_import");
-        if (guard) return guard;
-
-        const { batchId } = await params;
-        const safeParsed = await safeParseJson(req);
-        if (!safeParsed.ok) return safeParsed.response;
-        const body = safeParsed.data;
-        const drafts = Array.isArray(body) ? body : [body];
-
-        if (drafts.length === 0) {
-            return NextResponse.json({ error: "En az bir draft gerekli." }, { status: 400 });
-        }
-
-        const created = await serviceAddDraftsToBatch(batchId, drafts);
-        return NextResponse.json(created, { status: 201 });
-    } catch (err) {
-        console.error("[POST /api/import/[batchId]/drafts]", err);
-        const msg = err instanceof Error ? err.message : "Draftlar eklenemedi.";
-        return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
