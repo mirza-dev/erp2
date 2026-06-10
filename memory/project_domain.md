@@ -67,20 +67,24 @@ grandTotal = subtotal + vatTotal
 
 ## Alert Tipleri
 
-| Tip | Tetikleyici |
+| Tip | Tetikleyici (2026-06-11 turu sonrası) |
 |-----|-------------|
-| `stock_critical` | available_now ≤ 0 |
-| `stock_risk` | available_now ≤ min_stock_level |
-| `purchase_recommended` | reorder önerisi |
-| `order_shortage` | onaylı sipariş için stok yetersiz |
-| `order_deadline` | stok tükenme tarihi yakın |
-| `quote_expired` | pending_approval + quote_valid_until geçmiş |
+| `stock_critical` | available_now ≤ min_stock_level (fiziksel eksen) |
+| `stock_risk` | kural: available_now ≤ ceil(min×1.5); AYRICA AI bulguları source=ai + entity'li bu tiple yazılır |
+| `purchase_recommended` | **ÜRETİLMİYOR** — Satın Alma'ya devredildi (ai_recommendations/copilot); tarihi kayıtlar source=ai, AI sekmesinde görünür |
+| `order_shortage` | shortages tablosunda açık eksik |
+| `order_deadline` | promisable bazlı sipariş-son-tarihi ≤7 gün; aynı-severity tazeleme YERİNDE (`dbUpdateActiveAlertContent`, churn yok) |
+| `quote_expired` | iki eksen: sales_order (pending_approval+quote_valid_until) VE V7 quote (sent+valid_until; entity_type=quote; revizyon `quote_revised` resolve) |
 | `overdue_shipment` | approved + sevk edilmemiş, planned_shipment_date geçmiş veya 7+ gün |
+| `po_overdue` | açık PO (sent/confirmed/partially_received) + expected_date geçmiş (mig.089; alerts/scan içinde non-fatal) |
 | `sync_issue` | Paraşüt sync hatası |
-| `import_review_required` | import batch review gerekiyor |
+
+(`import_review_required` mig.044'te kaldırıldı — domain-rules §12.1 not düşüldü.)
 
 **Dedup kuralı:** Tüm alert tipleri için `dbListActiveAlerts()` → type + entity_id filtresi ile aktif alert varsa yeni yaratılmaz.
 **Kapanma:** `dbBatchResolveAlerts([{ type, entityId, reason }])` — ID değil type+entity ile resolve edilir.
+**Takvim fetch:** `dbListAlertsForCalendar` — tüm aktifler + son 6 ay kapanmış (limitsiz select 1000-satır tavanında kesiliyordu).
+**Sekmeler:** `matchesAlertClass` tek matcher; AI sekmesi source=ai, tip sekmeleri AI'ı dışlar; "Vadeler" = overdue_shipment+quote_expired+po_overdue.
 
 ---
 
