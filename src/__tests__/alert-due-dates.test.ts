@@ -115,4 +115,72 @@ describe("enrichAlertsWithDueMeta", () => {
         expect(out).toHaveLength(1);
         expect(out[0].due_date).toBeNull();
     });
+
+    // ── Yeni eksenler: V7 teklif (quote entity) + PO teslim gecikmesi ────────
+
+    it("quote_expired + entity_type=quote → quotes.valid_until + quote_number", async () => {
+        mockFrom.mockImplementation((table: string) => ({
+            select: () => ({
+                in: () => Promise.resolve(
+                    table === "quotes"
+                        ? { data: [{ id: "vq1", quote_number: "TKL-2026-0042", valid_until: "2026-06-05" }], error: null }
+                        : { data: [], error: null },
+                ),
+            }),
+        }));
+        const out = await enrichAlertsWithDueMeta([
+            alert("quote_expired", { entity_type: "quote", entity_id: "vq1" }),
+        ]);
+        expect(out[0].due_date).toBe("2026-06-05");
+        expect(out[0].due_label).toBe("Teklif Geçerlilik");
+        expect(out[0].order_code).toBe("TKL-2026-0042");
+        expect(mockFrom).toHaveBeenCalledWith("quotes");
+        // sales_orders sorgusu ATILMAZ (quote ekseni ayrı tablo)
+        expect(mockFrom).not.toHaveBeenCalledWith("sales_orders");
+    });
+
+    it("po_overdue → purchase_orders.expected_date + po_number", async () => {
+        mockFrom.mockImplementation((table: string) => ({
+            select: () => ({
+                in: () => Promise.resolve(
+                    table === "purchase_orders"
+                        ? { data: [{ id: "po1", po_number: "PO-2026-0007", expected_date: "2026-06-08" }], error: null }
+                        : { data: [], error: null },
+                ),
+            }),
+        }));
+        const out = await enrichAlertsWithDueMeta([
+            alert("po_overdue", { entity_type: "purchase_order", entity_id: "po1" }),
+        ]);
+        expect(out[0].due_date).toBe("2026-06-08");
+        expect(out[0].due_label).toBe("Beklenen Teslim");
+        expect(out[0].order_code).toBe("PO-2026-0007");
+    });
+
+    it("üç eksen karışık: her tablo kendi batch'ini alır, eksen karışmaz", async () => {
+        const calls: string[] = [];
+        mockFrom.mockImplementation((table: string) => {
+            calls.push(table);
+            return {
+                select: () => ({
+                    in: () => Promise.resolve({
+                        data: table === "sales_orders"
+                            ? [{ id: "o1", order_number: "SIP-1", planned_shipment_date: "2026-06-01", quote_valid_until: null }]
+                            : table === "quotes"
+                                ? [{ id: "vq1", quote_number: "TKL-1", valid_until: "2026-06-02" }]
+                                : [{ id: "po1", po_number: "PO-1", expected_date: "2026-06-03" }],
+                        error: null,
+                    }),
+                }),
+            };
+        });
+        const out = await enrichAlertsWithDueMeta([
+            alert("overdue_shipment", { entity_type: "sales_order", entity_id: "o1" }),
+            alert("quote_expired", { entity_type: "quote", entity_id: "vq1" }),
+            alert("po_overdue", { entity_type: "purchase_order", entity_id: "po1" }),
+        ]);
+        expect(calls.sort()).toEqual(["purchase_orders", "quotes", "sales_orders"]);
+        expect(out.map((a) => a.due_date)).toEqual(["2026-06-01", "2026-06-02", "2026-06-03"]);
+        expect(out.map((a) => a.order_code)).toEqual(["SIP-1", "TKL-1", "PO-1"]);
+    });
 });

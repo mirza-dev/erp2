@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ALERT_CLASSES, type CalendarAlert } from "@/lib/alert-calendar";
+import { ALERT_CLASSES, matchesAlertClass, type CalendarAlert } from "@/lib/alert-calendar";
 
 interface Props {
     activeClass: string;
@@ -23,9 +23,7 @@ export function ClassificationTabs({ activeClass, onSelect, visibleAlerts }: Pro
             }}
         >
             {ALERT_CLASSES.map((cat) => {
-                const count = cat.types
-                    ? visibleAlerts.filter((a) => cat.types!.includes(a.type)).length
-                    : visibleAlerts.length;
+                const count = visibleAlerts.filter((a) => matchesAlertClass(a, cat)).length;
                 return (
                     <ClassTab
                         key={cat.id}

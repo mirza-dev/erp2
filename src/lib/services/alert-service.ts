@@ -3,23 +3,24 @@
  * Follows domain-rules.md §6 (critical/warning rules) + §12 (alert lifecycle).
  */
 
-import { dbListAllActiveProducts, dbListProducts, dbGetOpenShortagesByProduct, dbGetQuotedQuantities } from "@/lib/supabase/products";
+import { dbListAllActiveProducts, dbGetOpenShortagesByProduct, dbGetQuotedQuantities } from "@/lib/supabase/products";
 import { dbListOrders, dbListOverdueShipments } from "@/lib/supabase/orders";
+import { dbGetIncomingPOQuantities, dbListOverduePurchaseOrders } from "@/lib/supabase/purchase-orders";
 import {
     dbListAlerts,
     dbGetAlertById,
     dbCreateAlert,
     dbUpdateAlertStatus,
-    dbDismissAlertsBySource,
     dbListActiveAlerts,
     dbListRecentlyDismissed,
     dbBatchResolveAlerts,
+    dbUpdateActiveAlertContent,
     type ListAlertsFilter,
     type BatchResolveEntry,
 } from "@/lib/supabase/alerts";
-import type { AlertStatus } from "@/lib/database.types";
+import type { AlertStatus, AlertType } from "@/lib/database.types";
 import { computeCoverageDays, computeOrderDeadline, dateDaysFromToday, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
-import { isAIAvailable, aiGenerateOpsSummary, type OpsSummaryInput } from "@/lib/services/ai-service";
+import { isAIAvailable, aiGenerateAlertFindings } from "@/lib/services/ai-service";
 import { notifyUsersByEmail } from "@/lib/services/email-service";
 
 // ── Lifecycle transitions (domain-rules §12.3) ───────────────
@@ -216,12 +217,17 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                     }
                 } else if (existingSeverity !== newSeverity) {
                     // Severity değişti (warning → critical veya tersi) — eski resolve et, yeni oluştur
+                    // (escalation geçmişi kayıtta kalsın diye bilinçli resolve+create)
                     toResolve.push({ type: "order_deadline", entityId, reason: "deadline_severity_changed" });
                     toCreate.push(alertInput);
                 } else {
-                    // Aynı severity, fakat metin dinamik (gün sayısı değişir) → her scan'de tazele
-                    toResolve.push({ type: "order_deadline", entityId, reason: "deadline_text_refresh" });
-                    toCreate.push(alertInput);
+                    // Aynı severity — metin dinamik (gün sayısı), satırı YERİNDE tazele.
+                    // Eski davranış (resolve+create) her 6 saatlik taramada günde 4 "çözüldü"
+                    // kopyası üretip takvimi ve tabloyu şişiriyordu.
+                    await dbUpdateActiveAlertContent("order_deadline", entityId, {
+                        title: deadlineTitle,
+                        description: deadlineDesc,
+                    });
                 }
             } else {
                 toResolve.push({ type: "order_deadline", entityId, reason: "deadline_not_imminent" });
@@ -281,23 +287,67 @@ export interface UpdateAlertStatusResult {
 
 export interface AiAlertGenerationResult {
     aiAvailable: boolean;
+    /** Kapanan AI uyarısı sayısı (bulgusu geçen + entity'siz eski nesil). */
     dismissed: number;
     created: number;
+    /** İçeriği yerinde tazelenen mevcut AI uyarısı sayısı (churn yok). */
+    updated: number;
     summary: string;
 }
 
+/**
+ * AI bulgu üretimi — entity-bağlı, dedup'lu, churn'süz.
+ *
+ * Eski davranış: her çağrıda TÜM source=ai uyarıları dismiss edilip serbest
+ * metin insight/anomali'ler entity'siz yeniden yaratılıyordu (6 saatlik cron'da
+ * günde 4 batch takvim gürültüsü). Yeni davranış:
+ *  - AI'a riskli ürün alt kümesi (≤30) zengin satırlarla verilir, çıktı
+ *    product_id'ye bağlı yapılandırılmış bulgudur (ai-service tool şeması).
+ *  - Aynı ürün için aktif AI uyarısı varsa İÇERİĞİ tazelenir (update-in-place).
+ *  - Bulgusu geçen ürünlerin AI uyarıları resolve edilir.
+ *  - Kural-bazlı stok uyarısı zaten açık olan ürüne AI bulgusu eklenmez,
+ *    24 saat içinde yoksayılmış stok uyarısı olan ürün de atlanır.
+ */
 export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult> {
     if (!isAIAvailable()) {
-        return { aiAvailable: false, dismissed: 0, created: 0, summary: "" };
+        return { aiAvailable: false, dismissed: 0, created: 0, updated: 0, summary: "" };
     }
 
-    // Gather metrics (same logic as ops-summary route)
-    const [products, alerts, pendingOrders, approvedOrders] = await Promise.all([
-        dbListProducts({ is_active: true, pageSize: 500 }),
-        dbListAlerts({ status: "open" }),
+    const [products, shortageMap, quotedMap, incomingMap, activeAlerts, recentlyDismissed, pendingOrders, approvedOrders] = await Promise.all([
+        dbListAllActiveProducts(),
+        dbGetOpenShortagesByProduct(),
+        dbGetQuotedQuantities(),
+        dbGetIncomingPOQuantities(),
+        dbListActiveAlerts(),
+        dbListRecentlyDismissed(24),
         dbListOrders({ commercial_status: "pending_approval", pageSize: 200 }),
         dbListOrders({ commercial_status: "approved", pageSize: 200 }),
     ]);
+
+    // Riskli ürün alt kümesi: eşiğe yaklaşanlar + eksiği olanlar + kapsama/lead gerilimi.
+    const candidates = products.map(p => {
+        const quoted = quotedMap.get(p.id) ?? 0;
+        return {
+            id: p.id,
+            sku: p.sku,
+            name: p.name,
+            unit: p.unit,
+            available: p.available_now,
+            promisable: p.available_now - quoted,
+            min: p.min_stock_level,
+            dailyUsage: p.daily_usage ?? null,
+            coverageDays: computeCoverageDays(p.available_now, p.daily_usage ?? null),
+            leadTimeDays: p.lead_time_days ?? null,
+            openShortageQty: shortageMap.get(p.id) ?? 0,
+            incomingPoQty: incomingMap.get(p.id) ?? 0,
+        };
+    }).filter(c =>
+        c.promisable <= c.min * 2 ||
+        c.openShortageQty > 0 ||
+        (c.coverageDays !== null && c.leadTimeDays !== null && c.coverageDays < c.leadTimeDays * 1.5)
+    );
+    candidates.sort((a, b) => (a.coverageDays ?? 9999) - (b.coverageDays ?? 9999));
+    const subset = candidates.slice(0, 30);
 
     const critical = products.filter(p => p.available_now <= p.min_stock_level);
     const warning = products.filter(p =>
@@ -305,69 +355,85 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
         p.available_now <= Math.ceil(p.min_stock_level * 1.5)
     );
 
-    const topCritical = critical
-        .map(p => ({
-            name: p.name,
-            available: p.available_now,
-            min: p.min_stock_level,
-            coverageDays: computeCoverageDays(p.available_now, p.daily_usage),
-        }))
-        .sort((a, b) => (a.coverageDays ?? 999) - (b.coverageDays ?? 999))
-        .slice(0, 5);
+    const result = await aiGenerateAlertFindings({
+        aggregates: {
+            criticalStockCount: critical.length,
+            warningStockCount: warning.length,
+            pendingOrderCount: pendingOrders.length,
+            approvedOrderCount: approvedOrders.length,
+            openAlertCount: activeAlerts.length,
+        },
+        products: subset,
+    });
 
-    const highRiskOrderCount = [...pendingOrders, ...approvedOrders]
-        .filter(o => o.ai_risk_level === "high")
-        .length;
-
-    const metrics: OpsSummaryInput = {
-        criticalStockCount: critical.length,
-        warningStockCount: warning.length,
-        atRiskCount: warning.length,
-        topCriticalItems: topCritical,
-        pendingOrderCount: pendingOrders.length,
-        approvedOrderCount: approvedOrders.length,
-        highRiskOrderCount,
-        openAlertCount: alerts.length,
-    };
-
-    // Call AI
-    const result = await aiGenerateOpsSummary(metrics);
-
-    // Dismiss old AI alerts
-    const dismissed = await dbDismissAlertsBySource("ai");
-
-    // Create new alerts from insights
-    let created = 0;
-
-    for (const insight of result.insights) {
-        const alert = await dbCreateAlert({
-            type: "purchase_recommended",
-            severity: "info",
-            title: insight,
-            description: result.summary,
-            source: "ai",
-            ai_confidence: result.confidence,
-            ai_reason: insight,
-            ai_model_version: "claude-haiku-4-5-20251001",
-        });
-        if (alert) created++;
+    // Aktif AI uyarıları (entity'li) + kural-bazlı stok uyarısı olan ürünler.
+    const activeAiByEntity = new Map<string, { type: AlertType }>();
+    const ruleStockEntities = new Set<string>();
+    const legacyNoEntityAi: string[] = [];
+    for (const a of activeAlerts) {
+        if (a.source === "ai") {
+            if (a.entity_id) activeAiByEntity.set(a.entity_id, { type: a.type });
+            else legacyNoEntityAi.push(a.id);
+        } else if ((a.type === "stock_critical" || a.type === "stock_risk") && a.entity_id) {
+            ruleStockEntities.add(a.entity_id);
+        }
     }
+    // 24h içinde yoksayılmış stok uyarısı olan ürünler — kullanıcı kararına saygı.
+    const dismissedStockEntities = new Set(
+        recentlyDismissed
+            .filter(a => (a.type === "stock_risk" || a.type === "stock_critical") && a.entity_id)
+            .map(a => a.entity_id as string),
+    );
 
-    for (const anomaly of result.anomalies) {
+    let created = 0;
+    let updated = 0;
+    const keepEntities = new Set<string>();
+
+    for (const f of result.findings) {
+        const existing = activeAiByEntity.get(f.productId);
+        const title = f.title;
+        const description = `${f.detail}\nÖnerilen aksiyon: ${f.action}`;
+
+        if (existing) {
+            keepEntities.add(f.productId);
+            await dbUpdateActiveAlertContent(existing.type, f.productId, { title, description });
+            updated++;
+            continue;
+        }
+        if (ruleStockEntities.has(f.productId) || dismissedStockEntities.has(f.productId)) continue;
+
         const alert = await dbCreateAlert({
             type: "stock_risk",
-            severity: "warning",
-            title: anomaly,
-            description: result.summary,
+            severity: f.severity === "warning" ? "warning" : "info",
+            title,
+            description,
+            entity_type: "product",
+            entity_id: f.productId,
             source: "ai",
-            ai_confidence: result.confidence,
-            ai_reason: anomaly,
-            ai_model_version: "claude-haiku-4-5-20251001",
+            ai_confidence: f.confidence,
+            ai_reason: f.detail,
+            ai_model_version: result.modelVersion,
         });
-        if (alert) created++;
+        if (alert) {
+            created++;
+            keepEntities.add(f.productId);
+        }
     }
 
-    return { aiAvailable: true, dismissed, created, summary: result.summary };
+    // Bulgusu geçen ürünlerin AI uyarıları → resolve (yerine yenisi YARATILMAZ).
+    const stale: BatchResolveEntry[] = [];
+    for (const [entityId, a] of activeAiByEntity) {
+        if (!keepEntities.has(entityId)) stale.push({ type: a.type, entityId, reason: "ai_finding_cleared" });
+    }
+    let dismissed = stale.length > 0 ? await dbBatchResolveAlerts(stale) : 0;
+
+    // Tek seferlik geçiş temizliği: entity'siz eski nesil AI uyarıları artık üretilmiyor.
+    for (const id of legacyNoEntityAi) {
+        await dbUpdateAlertStatus(id, "dismissed", "legacy_entityless_ai_alert");
+        dismissed++;
+    }
+
+    return { aiAvailable: true, dismissed, created, updated, summary: result.summary };
 }
 
 export async function serviceUpdateAlertStatus(
@@ -384,6 +450,46 @@ export async function serviceUpdateAlertStatus(
 
     await dbUpdateAlertStatus(id, newStatus, reason);
     return { success: true };
+}
+
+// ── Overdue Purchase Order Scan ──────────────────────────────
+
+/**
+ * Beklenen teslim tarihi geçen açık (sent/confirmed/partially_received) PO'lar
+ * için po_overdue uyarısı üretir; artık gecikmede olmayan (teslim alınan,
+ * iptal edilen ya da tarihi ileri alınan) PO'ların uyarılarını resolve eder.
+ * /api/alerts/scan route'undan stok taramasıyla birlikte çağrılır (aynı lock).
+ */
+export async function serviceCheckOverduePurchaseOrders(): Promise<{ alerted: number; resolved: number }> {
+    const [overduePos, activeAlerts] = await Promise.all([
+        dbListOverduePurchaseOrders(),
+        dbListActiveAlerts(),
+    ]);
+
+    const poAlerts = activeAlerts.filter(a => a.type === "po_overdue");
+    const overdueIds = new Set(overduePos.map(po => po.id));
+
+    const toResolve: BatchResolveEntry[] = poAlerts
+        .filter(a => a.entity_id !== null && !overdueIds.has(a.entity_id))
+        .map(a => ({ type: "po_overdue", entityId: a.entity_id as string, reason: "po_no_longer_overdue" }));
+    const resolved = toResolve.length > 0 ? await dbBatchResolveAlerts(toResolve) : 0;
+
+    const activeSet = new Set(poAlerts.map(a => a.entity_id));
+    let alerted = 0;
+    for (const po of overduePos) {
+        if (activeSet.has(po.id)) continue;
+        const daysLate = Math.max(1, dateDaysFromToday(po.expected_date as string) * -1);
+        const alert = await dbCreateAlert({
+            type: "po_overdue",
+            severity: "warning",
+            title: `Geciken Tedarik: ${po.po_number}`,
+            description: `Beklenen teslim tarihi ${po.expected_date} — ${daysLate} gün gecikti. Tedarikçiyle teyitleşin ya da teslim tarihini güncelleyin.`,
+            entity_type: "purchase_order",
+            entity_id: po.id,
+        });
+        if (alert) alerted++;
+    }
+    return { alerted, resolved };
 }
 
 // ── Overdue Shipment Scan ────────────────────────────────────

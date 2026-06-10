@@ -84,21 +84,27 @@ describe("toCalendarAlert", () => {
     });
 });
 
-describe("applyClassFilter", () => {
-    const mk = (type: CalendarAlert["type"]): CalendarAlert =>
-        ({ id: type, type } as CalendarAlert);
-    const list = [mk("stock_critical"), mk("order_shortage"), mk("sync_issue"), mk("purchase_recommended")];
+describe("applyClassFilter — source bazlı AI sekmesi", () => {
+    const mk = (type: CalendarAlert["type"], source: string | null = null): CalendarAlert =>
+        ({ id: `${type}:${source ?? "sys"}`, type, source } as CalendarAlert);
+    const list = [
+        mk("stock_critical"),
+        mk("order_shortage"),
+        mk("sync_issue"),
+        mk("purchase_recommended", "ai"), // tarihi AI kaydı
+        mk("stock_risk", "ai"),           // yeni nesil AI bulgusu
+    ];
 
     it("all → hepsi", () => {
-        expect(applyClassFilter(list, "all")).toHaveLength(4);
+        expect(applyClassFilter(list, "all")).toHaveLength(5);
     });
-    it("stock → yalnız stok tipleri", () => {
+    it("stock → yalnız KURAL-bazlı stok tipleri (AI stock_risk hariç)", () => {
         expect(applyClassFilter(list, "stock").map((a) => a.type)).toEqual(["stock_critical"]);
     });
     it("system → sync_issue", () => {
         expect(applyClassFilter(list, "system").map((a) => a.type)).toEqual(["sync_issue"]);
     });
-    it("ai → purchase_recommended", () => {
-        expect(applyClassFilter(list, "ai").map((a) => a.type)).toEqual(["purchase_recommended"]);
+    it("ai → source=ai olan TÜM tipler (purchase_recommended + stock_risk)", () => {
+        expect(applyClassFilter(list, "ai").map((a) => a.type).sort()).toEqual(["purchase_recommended", "stock_risk"]);
     });
 });

@@ -9,14 +9,11 @@
  *     - 10k+ notes → 400, serviceCreatePOFromRecommendations ÇAĞRILMAZ
  *     - nested lines[].notes 10k+ → 400 (validateStringLengths recursive)
  *     - normal kısa body → 201
- *   GET /api/purchase/suggestions:
- *     - requirePermission guard döndürürse o response döner, servis çağrılmaz
- *     - guard null (yetkili) → 200 + servis çağrılır
  *
  * validateStringLengths GERÇEK çalışır (mock'lanmaz — standalone modül).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
@@ -44,11 +41,6 @@ vi.mock("@/lib/services/purchase-order-service", async () => {
     return { ...actual, serviceCreatePOFromRecommendations: (...a: unknown[]) => mockServiceCreatePO(...a) };
 });
 
-const mockServiceListSuggestions = vi.fn();
-vi.mock("@/lib/services/purchase-service", () => ({
-    serviceListPurchaseSuggestions: (...a: unknown[]) => mockServiceListSuggestions(...a),
-}));
-
 vi.mock("next/cache", () => ({
     revalidateTag: vi.fn(),
     unstable_cache: (_fn: () => unknown) => _fn,
@@ -61,7 +53,6 @@ vi.mock("next/headers", () => ({
 
 import { PATCH as recPatch } from "@/app/api/recommendations/[id]/route";
 import { POST as poFromRecsPost } from "@/app/api/purchase-orders/from-recommendations/route";
-import { GET as suggestionsGet } from "@/app/api/purchase/suggestions/route";
 
 const REC_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const VID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
@@ -91,7 +82,6 @@ beforeEach(() => {
     mockRequireRole.mockResolvedValue(null);       // yetkili
     mockDbUpdateRecStatus.mockResolvedValue({ id: REC_ID, status: "accepted" });
     mockServiceCreatePO.mockResolvedValue({ id: "po-1", po_number: "PO-2026-0001" });
-    mockServiceListSuggestions.mockResolvedValue([{ id: "alert-1" }]);
 });
 
 // ── PATCH /api/recommendations/[id] ───────────────────────────
@@ -144,22 +134,3 @@ describe("POST /api/purchase-orders/from-recommendations — notes validation pa
     });
 });
 
-// ── GET /api/purchase/suggestions — RBAC guard ────────────────
-
-describe("GET /api/purchase/suggestions — RBAC guard parity", () => {
-    it("requirePermission guard döndürürse o response döner, servis çağrılmaz", async () => {
-        mockRequirePermission.mockResolvedValue(
-            NextResponse.json({ error: "forbidden" }, { status: 403 }),
-        );
-        const res = await suggestionsGet(new NextRequest("http://localhost/api/purchase/suggestions"));
-        expect(res.status).toBe(403);
-        expect(mockServiceListSuggestions).not.toHaveBeenCalled();
-        expect(mockRequirePermission).toHaveBeenCalledWith(expect.anything(), "view_purchase_suggestions");
-    });
-
-    it("yetkili (guard null) → 200 + servis çağrılır", async () => {
-        const res = await suggestionsGet(new NextRequest("http://localhost/api/purchase/suggestions"));
-        expect(res.status).toBe(200);
-        expect(mockServiceListSuggestions).toHaveBeenCalledTimes(1);
-    });
-});

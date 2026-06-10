@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { serviceScanStockAlerts } from "@/lib/services/alert-service";
+import { serviceScanStockAlerts, serviceCheckOverduePurchaseOrders } from "@/lib/services/alert-service";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,7 +43,15 @@ export async function POST(request: Request) {
 
     try {
         const result = await serviceScanStockAlerts();
-        return NextResponse.json(result);
+        // PO teslim gecikmesi taraması — aynı lock altında, stok taramasıyla birlikte.
+        // Non-fatal: PO taraması patlarsa stok sonuçları yine döner.
+        let poOverdue: { alerted: number; resolved: number } = { alerted: 0, resolved: 0 };
+        try {
+            poOverdue = await serviceCheckOverduePurchaseOrders();
+        } catch (poErr) {
+            console.error("[POST /api/alerts/scan] po_overdue scan", poErr);
+        }
+        return NextResponse.json({ ...result, poOverdue });
     } catch (err) {
         console.error("[POST /api/alerts/scan]", err);
         return NextResponse.json({ error: "Tarama başarısız." }, { status: 500 });

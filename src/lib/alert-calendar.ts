@@ -47,16 +47,31 @@ export interface AlertClass {
     id: string;
     label: string;
     types: AlertType[] | null; // null = tüm tipler
+    /** "ai" → tip yerine source=ai filtrelenir (AI bulguları tipi ne olursa olsun burada). */
+    source?: "ai";
     icon: string;
 }
 export const ALERT_CLASSES: AlertClass[] = [
-    { id: "all",      label: "Tümü",              types: null,                                     icon: "⊞" },
-    { id: "stock",    label: "Stok",              types: ["stock_critical", "stock_risk"],          icon: "◉" },
-    { id: "order",    label: "Sipariş",           types: ["order_shortage", "order_deadline"],      icon: "◈" },
-    { id: "shipment", label: "Sevkiyat & Teklif", types: ["overdue_shipment", "quote_expired"],     icon: "◇" },
-    { id: "system",   label: "Sistem",            types: ["sync_issue"],                            icon: "⚙" },
-    { id: "ai",       label: "AI Öneriler",       types: ["purchase_recommended"],                  icon: "✦" },
+    { id: "all",      label: "Tümü",       types: null,                                              icon: "⊞" },
+    { id: "stock",    label: "Stok",       types: ["stock_critical", "stock_risk"],                  icon: "◉" },
+    { id: "order",    label: "Sipariş",    types: ["order_shortage", "order_deadline"],              icon: "◈" },
+    { id: "shipment", label: "Vadeler",    types: ["overdue_shipment", "quote_expired", "po_overdue"], icon: "◇" },
+    { id: "system",   label: "Sistem",     types: ["sync_issue"],                                    icon: "⚙" },
+    { id: "ai",       label: "AI Bulgular", types: null, source: "ai",                               icon: "✦" },
 ];
+
+/**
+ * Bir uyarının sekmeye girip girmediğine TEK yerden karar verir (sekme sayacı +
+ * sayfa filtresi aynı mantığı kullanır, sayılar tutarlı kalır).
+ *  - "ai" sekmesi source=ai uyarıları gösterir (tipi ne olursa olsun);
+ *  - tip-bazlı sekmeler AI kaynaklıları DIŞLAR (çifte sayım olmaz);
+ *  - "Tümü" hepsini gösterir.
+ */
+export function matchesAlertClass(a: { type: AlertType; source: string | null }, cls: AlertClass): boolean {
+    if (cls.source === "ai") return a.source === "ai";
+    if (!cls.types) return true;
+    return a.source !== "ai" && cls.types.includes(a.type);
+}
 
 // ── Görünüm modeli ───────────────────────────────────────────────────────────
 export interface CalendarProduct {

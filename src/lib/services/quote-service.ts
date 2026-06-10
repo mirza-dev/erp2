@@ -18,6 +18,7 @@ import { validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-v
 import { sendDirectEmail } from "@/lib/services/email-service";
 import { renderQuoteToCustomer } from "@/lib/email/templates";
 import { dbCreateEmailLog, dbUpdateEmailLogStatus } from "@/lib/supabase/email-logs";
+import { dbCreateAlert, dbResolveAlertsForEntity } from "@/lib/supabase/alerts";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -452,6 +453,12 @@ export async function serviceCreateQuoteRevision(sourceId: string): Promise<Quot
     } catch (err) {
         console.error(`[quote-reserve] revize'de kaynak siparişi iptali başarısız (quote ${sourceId}):`, err);
     }
+    // Revizyon, süresi dolan teklifin aksiyonudur → açık quote_expired uyarısını kapat.
+    try {
+        await dbResolveAlertsForEntity("quote_expired", sourceId, "quote_revised");
+    } catch (err) {
+        console.error(`[quote-expire-alert] revize'de uyarı kapatılamadı (quote ${sourceId}):`, err);
+    }
     const created = await dbGetQuote(newId);
     return { success: true, newQuoteId: newId, newQuoteNumber: created?.quote_number };
 }
@@ -461,12 +468,15 @@ export async function serviceCreateQuoteRevision(sourceId: string): Promise<Quot
 /**
  * Süresi dolmuş teklifleri tarar:
  *   - draft/sent + valid_until < today → status = expired
+ *   - sent olanlar için quote_expired uyarısı üretir (müşteriye sunulmuş teklif
+ *     sessizce ölmesin — Uyarılar sayfasında takip edilir). draft sessiz kalır.
  *
  * Endpoint: POST /api/quotes/expire (CRON_SECRET ile çağrılır)
  */
-export async function serviceExpireQuotes(): Promise<{ expired: number; expiredIds: string[] }> {
+export async function serviceExpireQuotes(): Promise<{ expired: number; expiredIds: string[]; alerted: number }> {
     const expiredQuotes = await dbListExpiredQuotes();
     const expiredIds: string[] = [];
+    let alerted = 0;
     for (const q of expiredQuotes) {
         const updated = await dbUpdateQuoteStatus(q.id, "expired", q.status as QuoteStatus);
         if (updated) {
@@ -478,10 +488,27 @@ export async function serviceExpireQuotes(): Promise<{ expired: number; expiredI
             } catch (err) {
                 console.error(`[quote-reserve] expire'da bağlı sipariş iptali başarısız (quote ${q.id}):`, err);
             }
+            // Dedup'u idx_alerts_active_dedup üstlenir (dbCreateAlert 23505 → null).
+            if (q.status === "sent") {
+                try {
+                    const alert = await dbCreateAlert({
+                        type: "quote_expired",
+                        severity: "warning",
+                        title: `Teklif Süresi Doldu: ${q.quote_number}`,
+                        description: `${q.customer_name} — ${q.quote_number} teklifinin geçerliliği ${q.valid_until} tarihinde doldu. Revize edin ya da müşteriyle teyitleşin.`,
+                        entity_type: "quote",
+                        entity_id: q.id,
+                    });
+                    if (alert) alerted++;
+                } catch (err) {
+                    // Uyarı best-effort: alert yazılamasa da expiry işlemi geçerli.
+                    console.error(`[quote-expire-alert] uyarı oluşturulamadı (quote ${q.id}):`, err);
+                }
+            }
         }
         // else: status already changed by concurrent action, skip
     }
-    return { expired: expiredIds.length, expiredIds };
+    return { expired: expiredIds.length, expiredIds, alerted };
 }
 
 // ── Quote → Order Conversion ────────────────────────────────

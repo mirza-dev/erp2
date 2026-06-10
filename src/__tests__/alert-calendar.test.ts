@@ -233,11 +233,14 @@ describe("eventLabel", () => {
 });
 
 describe("constants", () => {
-    it("ALERT_CLASSES tüm tipleri kapsar", () => {
+    it("ALERT_CLASSES tüm tipleri kapsar (purchase_recommended hariç — AI sekmesi source bazlı)", () => {
         const covered = ALERT_CLASSES.flatMap((c) => c.types ?? []);
-        ["stock_critical", "stock_risk", "order_shortage", "order_deadline", "overdue_shipment", "quote_expired", "sync_issue", "purchase_recommended"].forEach((t) => {
+        ["stock_critical", "stock_risk", "order_shortage", "order_deadline", "overdue_shipment", "quote_expired", "sync_issue", "po_overdue"].forEach((t) => {
             expect(covered).toContain(t);
         });
+        // purchase_recommended üretimi Satın Alma modülüne devredildi; tarihi
+        // kayıtlar source=ai olduğundan AI sekmesinde görünür, tip listesi gerekmez.
+        expect(covered).not.toContain("purchase_recommended");
     });
     it("SEVERITY_CONFIG 3 seviye + CSS var", () => {
         expect(SEVERITY_CONFIG.critical.color).toBe("var(--danger)");

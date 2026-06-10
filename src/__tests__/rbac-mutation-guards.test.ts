@@ -57,7 +57,6 @@ import { GET as pcGet, POST as pcPost } from "@/app/api/purchase-commitments/rou
 import { PATCH as pcPatch } from "@/app/api/purchase-commitments/[id]/route";
 import { GET as recGet } from "@/app/api/recommendations/route";
 import { PATCH as recPatch } from "@/app/api/recommendations/[id]/route";
-import { POST as scanPost } from "@/app/api/purchase/scan/route";
 import { POST as productionPost } from "@/app/api/production/route";
 import { DELETE as productionDelete } from "@/app/api/production/[id]/route";
 import { PATCH as alertPatch } from "@/app/api/alerts/[id]/route";
@@ -192,9 +191,6 @@ describe("R1/R2 guards — viewer → 403 (Batch B2: PO/commitments/öneri/üret
     });
     it("recommendations [id] PATCH → 403 (manage_purchase_suggestions)", async () => {
         expect((await recPatch(patchReq({ status: "accepted" }), params())).status).toBe(403);
-    });
-    it("purchase/scan POST → 403 (manage_purchase_suggestions)", async () => {
-        expect((await scanPost(postReq())).status).toBe(403);
     });
     it("production POST → 403 (manage_production)", async () => {
         expect((await productionPost(postReq())).status).toBe(403);

@@ -8,16 +8,23 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockIsAIAvailable = vi.fn();
 
-const mockAiGenerateOpsSummary = vi.fn();
+const mockAiGenerateAlertFindings = vi.fn();
 
 vi.mock("@/lib/services/ai-service", () => ({
     isAIAvailable: () => mockIsAIAvailable(),
-    aiGenerateOpsSummary: (...a: unknown[]) => mockAiGenerateOpsSummary(...a),
+    aiGenerateAlertFindings: (...a: unknown[]) => mockAiGenerateAlertFindings(...a),
 }));
 
 vi.mock("@/lib/supabase/products", () => ({
     dbListProducts: vi.fn().mockResolvedValue([]),
     dbListAllActiveProducts: vi.fn().mockResolvedValue([]),
+    dbGetOpenShortagesByProduct: vi.fn().mockResolvedValue(new Map()),
+    dbGetQuotedQuantities: vi.fn().mockResolvedValue(new Map()),
+}));
+
+vi.mock("@/lib/supabase/purchase-orders", () => ({
+    dbGetIncomingPOQuantities: vi.fn().mockResolvedValue(new Map()),
+    dbListOverduePurchaseOrders: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/lib/supabase/alerts", () => ({
@@ -26,6 +33,9 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbCreateAlert: vi.fn().mockResolvedValue({ id: "alert-1" }),
     dbBatchResolveAlerts: vi.fn().mockResolvedValue(0),
     dbDismissAlertsBySource: vi.fn().mockResolvedValue(0),
+    dbListRecentlyDismissed: vi.fn().mockResolvedValue([]),
+    dbUpdateAlertStatus: vi.fn().mockResolvedValue({}),
+    dbUpdateActiveAlertContent: vi.fn().mockResolvedValue(1),
 }));
 
 vi.mock("@/lib/supabase/orders", () => ({
@@ -36,12 +46,10 @@ import { serviceGenerateAiAlerts } from "@/lib/services/alert-service";
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockAiGenerateOpsSummary.mockResolvedValue({
-        insights: [],
-        anomalies: [],
+    mockAiGenerateAlertFindings.mockResolvedValue({
+        findings: [],
         summary: "Özet",
-        confidence: 0.9,
-        ai_inputs_summary: {},
+        modelVersion: "test-model",
     });
 });
 

@@ -12,7 +12,7 @@ import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 import {
-    ALERT_CLASSES, expandAlertOccurrences, getOccurrencesForDate, getCalendarStats,
+    ALERT_CLASSES, matchesAlertClass, expandAlertOccurrences, getOccurrencesForDate, getCalendarStats,
     timeFromISO, type CalendarAlert, type Occurrence,
 } from "@/lib/alert-calendar";
 import { CalendarHeader } from "@/components/alerts/CalendarHeader";
@@ -96,11 +96,11 @@ export function toCalendarAlert(row: AlertWithDueMeta, productMap: Map<string, P
     };
 }
 
-/** Sınıflandırma sekmesine göre filtre. */
+/** Sınıflandırma sekmesine göre filtre (sekme sayaçlarıyla aynı matcher). */
 export function applyClassFilter(alerts: CalendarAlert[], classId: string): CalendarAlert[] {
     const cat = ALERT_CLASSES.find((c) => c.id === classId);
-    if (!cat || !cat.types) return alerts;
-    return alerts.filter((a) => cat.types!.includes(a.type));
+    if (!cat) return alerts;
+    return alerts.filter((a) => matchesAlertClass(a, cat));
 }
 
 export default function AlertsPage() {
@@ -301,7 +301,9 @@ export default function AlertsPage() {
                 body: JSON.stringify({ status: "dismissed" }),
             });
             if (!res.ok) throw new Error(String(res.status));
-            setRawAlerts((prev) => prev.filter((a) => a.id !== alertId));
+            // Satırı silme — dismissed olarak işaretle. Silinirse bir sonraki
+            // refetch'te "Çözülenler" açıkken geri görünüp tutarsızlık yaratıyordu.
+            patchStatus(alertId, "dismissed");
             toast({ type: "info", message: "Uyarı yoksayıldı. 24 saat içinde durum kötüleşmezse yeniden açılmaz." });
         } catch { toast({ type: "error", message: "İşlem başarısız" }); }
     };
@@ -324,7 +326,7 @@ export default function AlertsPage() {
         const failedCount = results.filter((r) => r.status === "rejected").length;
         if (succeeded.length > 0) {
             const ok = new Set(succeeded);
-            setRawAlerts((prev) => prev.filter((a) => !ok.has(a.id)));
+            setRawAlerts((prev) => prev.map((a) => (ok.has(a.id) ? { ...a, status: "dismissed" as const } : a)));
         }
         if (failedCount > 0 && succeeded.length > 0) {
             toast({ type: "warning", message: `${succeeded.length} uyarı yoksayıldı. ${failedCount} işlem başarısız.` });

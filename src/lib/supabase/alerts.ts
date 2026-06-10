@@ -43,6 +43,43 @@ export async function dbListAlerts(filter: ListAlertsFilter = {}): Promise<Alert
     return data ?? [];
 }
 
+/**
+ * Takvim görünümü için sınırları açık liste:
+ *  - TÜM aktif (open|acknowledged) uyarılar — yaşına bakılmaz, asla kesilmez
+ *  - kapanmış (resolved|dismissed) uyarılardan son `monthsBack` aydakiler
+ *
+ * Gerekçe: limitsiz `select *` Supabase'in varsayılan 1000 satır tavanında
+ * SESSİZCE kesiliyordu; eski geçmiş ve (en kötüsü) tavana takılan aktif
+ * uyarılar görünmez olabiliyordu. Pencereli iki sorgu + yüksek explicit limit
+ * ile kesilme görünür/kontrollü hale gelir.
+ */
+export async function dbListAlertsForCalendar(monthsBack = 6): Promise<AlertRow[]> {
+    const supabase = createServiceClient();
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - monthsBack);
+
+    const [active, closed] = await Promise.all([
+        supabase
+            .from("alerts")
+            .select("*")
+            .in("status", ["open", "acknowledged"])
+            .order("created_at", { ascending: false })
+            .limit(5000),
+        supabase
+            .from("alerts")
+            .select("*")
+            .in("status", ["resolved", "dismissed"])
+            .gte("created_at", cutoff.toISOString())
+            .order("created_at", { ascending: false })
+            .limit(5000),
+    ]);
+    if (active.error) throw new Error(active.error.message);
+    if (closed.error) throw new Error(closed.error.message);
+
+    return [...(active.data ?? []), ...(closed.data ?? [])]
+        .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+}
+
 export async function dbGetAlertById(id: string): Promise<AlertRow | null> {
     const supabase = createServiceClient();
     const { data, error } = await supabase
@@ -157,6 +194,29 @@ export async function dbResolveAlertsForEntity(
     const { data, error } = await supabase
         .from("alerts")
         .update({ status: "resolved", resolved_at: now, resolution_reason: reason })
+        .eq("type", type)
+        .eq("entity_id", entityId)
+        .in("status", ["open", "acknowledged"])
+        .select("id");
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+}
+
+/**
+ * Aktif (open|acknowledged) bir alert'in içeriğini yerinde günceller.
+ * order_deadline gibi metni dinamik (gün sayısı) alertlerde resolve+create
+ * churn'ü yerine kullanılır: created_at/status değişmez, takvimde yeni
+ * "çözüldü" kopyaları birikmez. Güncellenen satır sayısını döner (0 = aktif yok).
+ */
+export async function dbUpdateActiveAlertContent(
+    type: AlertType,
+    entityId: string,
+    content: { title: string; description: string },
+): Promise<number> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("alerts")
+        .update({ title: content.title, description: content.description })
         .eq("type", type)
         .eq("entity_id", entityId)
         .in("status", ["open", "acknowledged"])

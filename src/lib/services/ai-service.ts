@@ -516,6 +516,171 @@ export async function aiGenerateOpsSummary(input: OpsSummaryInput): Promise<OpsS
     }
 }
 
+// ── Alert Findings (Uyarılar sayfası AI bulguları) ───────────
+
+export interface AlertFindingsProductInput {
+    id: string;
+    sku: string;
+    name: string;
+    unit: string;
+    available: number;
+    promisable: number;
+    min: number;
+    dailyUsage: number | null;
+    coverageDays: number | null;
+    leadTimeDays: number | null;
+    openShortageQty: number;
+    incomingPoQty: number;
+}
+
+export interface AlertFindingsInput {
+    aggregates: {
+        criticalStockCount: number;
+        warningStockCount: number;
+        pendingOrderCount: number;
+        approvedOrderCount: number;
+        openAlertCount: number;
+    };
+    products: AlertFindingsProductInput[];
+}
+
+export interface AiAlertFinding {
+    productId: string;
+    title: string;
+    detail: string;
+    action: string;
+    severity: "info" | "warning";
+    confidence: number;
+}
+
+export interface AlertFindingsResult {
+    findings: AiAlertFinding[];
+    summary: string;
+    modelVersion: string;
+}
+
+const ALERT_FINDINGS_SYSTEM = `Sen endüstriyel ERP stok/tedarik analistisin. B2B vana satan bir firmanın riskli ürün alt kümesini inceliyorsun.
+
+ÖNEMLİ BAĞLAM — kural tabanlı uyarılar ZATEN üretiliyor, TEKRARLAMA:
+- Kritik stok: available <= min (zaten uyarı var)
+- Stok riski: available <= min*1.5 (zaten uyarı var)
+- Sipariş eksiği: openShortageQty > 0 (zaten uyarı var)
+- Sipariş son tarihi: kapsama/lead-time hesabı (zaten uyarı var)
+
+SENİN görevin kuralların GÖREMEDİĞİ kalıpları bulmak. Örnekler:
+- Kapsama günü tedarik süresine tehlikeli yakın ama eşikler henüz tetiklenmedi
+- Eksik (shortage) var ama yoldaki PO miktarı kapatmaya yetmiyor
+- promisable hızla eriyor (teklife bağlanan miktar yüksek) — fiziksel stok yanıltıcı
+- dailyUsage'a göre min_stock bariz yanlış ayarlanmış (çok düşük kalmış)
+- Birden çok zayıf sinyalin aynı üründe birleşmesi
+
+Kurallar:
+- Her bulgu MUTLAKA verilen listedeki bir product_id'ye bağlı olmalı.
+  Ürüne bağlayamadığın gözlemi findings'e KOYMA; summary'de tek cümleyle belirt.
+- En fazla 6 bulgu; en önemliden başla. Bulgu yoksa boş dizi döndür.
+- Türkçe, kısa, jargonsuz; action emir kipinde somut adım olsun.
+- severity: operasyonel aksiyon gerektiriyorsa "warning", bilgilendirme ise "info".
+- confidence: 0-1 arası, kalıbın ne kadar kesin olduğu.`;
+
+const ALERT_FINDINGS_TOOL = {
+    name: "uyari_bulgulari",
+    description: "Ürün-bazlı risk bulgularını yapılandırılmış olarak raporla.",
+    input_schema: {
+        type: "object" as const,
+        properties: {
+            summary: { type: "string", description: "1-2 cümlelik genel değerlendirme" },
+            findings: {
+                type: "array",
+                items: {
+                    type: "object",
+                    properties: {
+                        product_id: { type: "string", description: "Verilen listedeki ürün id'si" },
+                        title: { type: "string", description: "Kısa bulgu başlığı (ürün adı dahil)" },
+                        detail: { type: "string", description: "Bulgunun veriye dayalı açıklaması" },
+                        action: { type: "string", description: "Önerilen somut aksiyon (emir kipi)" },
+                        severity: { type: "string", enum: ["info", "warning"] },
+                        confidence: { type: "number", description: "0-1 arası" },
+                    },
+                    required: ["product_id", "title", "detail", "action", "severity", "confidence"],
+                },
+            },
+        },
+        required: ["summary", "findings"],
+    },
+};
+
+/**
+ * Uyarılar sayfası için ürün-bağlı AI bulguları üretir (domain-rules §6.3:
+ * AI sarı risk üretir, kırmızı kritik üretmez — severity info|warning ile sınırlı).
+ * Çıktı tool-use şemasıyla zorlanır (regex JSON yakalama yok); product_id'ler
+ * girdi listesine karşı doğrulanır, listede olmayanlar atılır.
+ */
+export async function aiGenerateAlertFindings(input: AlertFindingsInput): Promise<AlertFindingsResult> {
+    if (!isAIAvailable() || input.products.length === 0) {
+        return { findings: [], summary: "", modelVersion: MODEL };
+    }
+
+    const t0 = Date.now();
+    try {
+        const sanitized = {
+            ...input,
+            products: input.products.map(p => ({ ...p, name: sanitizeAiInput(p.name, 200), sku: sanitizeAiInput(p.sku, 64) })),
+        };
+        const message = await client.messages.create({
+            model: MODEL,
+            max_tokens: 2048,
+            system: ALERT_FINDINGS_SYSTEM,
+            tools: [ALERT_FINDINGS_TOOL],
+            tool_choice: { type: "tool", name: ALERT_FINDINGS_TOOL.name },
+            messages: [{ role: "user", content: JSON.stringify(sanitized) }],
+        });
+
+        const toolBlock = message.content.find(c => c.type === "tool_use");
+        const raw = (toolBlock && toolBlock.type === "tool_use" ? toolBlock.input : null) as
+            | { summary?: unknown; findings?: unknown }
+            | null;
+
+        const validIds = new Set(input.products.map(p => p.id));
+        const findings: AiAlertFinding[] = [];
+        if (raw && Array.isArray(raw.findings)) {
+            for (const f of raw.findings as Record<string, unknown>[]) {
+                if (findings.length >= 6) break;
+                const productId = typeof f.product_id === "string" ? f.product_id : "";
+                if (!validIds.has(productId)) continue; // halüsinasyon koruması
+                const severity = f.severity === "warning" ? "warning" as const : "info" as const;
+                findings.push({
+                    productId,
+                    title: sanitizeAiOutput(String(f.title ?? ""), 200),
+                    detail: sanitizeAiOutput(String(f.detail ?? ""), 600),
+                    action: sanitizeAiOutput(String(f.action ?? ""), 300),
+                    severity,
+                    confidence: clampConfidence(typeof f.confidence === "number" ? f.confidence : 0.5),
+                });
+            }
+        }
+
+        void logAiRun({
+            feature: "alert_findings",
+            entity_id: null,
+            input_hash: hashInput(JSON.stringify(input)),
+            confidence: findings.length > 0
+                ? findings.reduce((s, f) => s + f.confidence, 0) / findings.length
+                : 0,
+            latency_ms: Date.now() - t0,
+            model: MODEL,
+        });
+
+        return {
+            findings,
+            summary: sanitizeAiOutput(String(raw?.summary ?? ""), 800),
+            modelVersion: MODEL,
+        };
+    } catch (err) {
+        console.error("[AI AlertFindings] graceful degradation:", err);
+        return { findings: [], summary: "", modelVersion: MODEL };
+    }
+}
+
 // ── Stock Risk ────────────────────────────────────────────────
 
 export interface StockRiskItem {

@@ -316,3 +316,43 @@ export async function dbPatchPurchaseOrder(
     if (!data) throw new Error("PO bulunamadı.");
     return data;
 }
+
+/**
+ * Yoldaki (henüz teslim alınmamış) PO miktarları: ürün → kalan adet.
+ * sent/confirmed/partially_received statüsündeki PO satırlarından
+ * (quantity - received_qty) toplanır. AI bulgu girdisi için kullanılır
+ * ("eksik var ama yoldaki PO kapatıyor mu?" sorusunun verisi).
+ */
+export async function dbGetIncomingPOQuantities(): Promise<Map<string, number>> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("purchase_order_lines")
+        .select("product_id, quantity, received_qty, purchase_orders!inner(status)")
+        .in("purchase_orders.status", ["sent", "confirmed", "partially_received"]);
+    if (error) throw new Error(error.message);
+
+    const map = new Map<string, number>();
+    for (const row of data ?? []) {
+        const pid = row.product_id as string;
+        const remaining = (row.quantity as number) - ((row.received_qty as number) ?? 0);
+        if (remaining > 0) map.set(pid, (map.get(pid) ?? 0) + remaining);
+    }
+    return map;
+}
+
+/**
+ * Beklenen teslim tarihi geçmiş, hâlâ açık (sent/confirmed/partially_received)
+ * satınalma siparişleri — po_overdue uyarı taraması için.
+ */
+export async function dbListOverduePurchaseOrders(): Promise<PurchaseOrderRow[]> {
+    const supabase = createServiceClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+        .from("purchase_orders")
+        .select("*")
+        .in("status", ["sent", "confirmed", "partially_received"])
+        .not("expected_date", "is", null)
+        .lt("expected_date", today);
+    if (error) throw new Error(error.message);
+    return data ?? [];
+}

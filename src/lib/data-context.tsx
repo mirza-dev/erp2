@@ -179,8 +179,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
       if (alertsRes.ok) {
         const data = await alertsRes.json();
+        // Aktif = open + acknowledged — Uyarılar sayfası istatistiğiyle aynı
+        // tanım (ack'lenen uyarı görülmüştür ama koşul sürer; sayaçtan düşmez).
         const open = (Array.isArray(data) ? data : []).filter(
-          (a: { status: string }) => a.status === "open"
+          (a: { status: string }) => a.status === "open" || a.status === "acknowledged"
         ) as OpenAlert[];
         setOpenAlerts(open);
       }

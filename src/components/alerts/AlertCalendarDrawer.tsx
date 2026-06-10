@@ -41,6 +41,9 @@ const DRAWER_LINKS: Partial<Record<AlertType, DrawerLink[]>> = {
     sync_issue: [
         { label: "Paraşüt Ayarları", href: "/dashboard/parasut", variant: "secondary" },
     ],
+    po_overdue: [
+        { label: "Satınalma Siparişleri", href: "/dashboard/purchase/orders", variant: "secondary" },
+    ],
 };
 
 interface Props {
@@ -83,9 +86,13 @@ export function AlertCalendarDrawer({
     const entityId = alert.entityId;
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    const isQuoteExpired    = alert.type === "quote_expired" && !!entityId && !isResolved;
+    // Süre-uzat formu sales_order eksenine özel (PATCH /api/orders/[id]);
+    // V7 teklif-entity uyarısında form gösterilmez, teklif sayfasına link verilir.
+    const isQuoteExpired    = alert.type === "quote_expired" && alert.entityType !== "quote" && !!entityId && !isResolved;
+    const isV7QuoteExpired  = alert.type === "quote_expired" && alert.entityType === "quote" && !!entityId && !isResolved;
     const isOverdueShipment = alert.type === "overdue_shipment" && !!entityId && !isResolved;
     const isOrderShortage   = alert.type === "order_shortage" && !!entityId;
+    const isPoOverdue       = alert.type === "po_overdue" && !!entityId && !isResolved;
 
     // ── quote_expired: süre uzatma formu ──
     const [newDate, setNewDate] = useState(() => {
@@ -318,6 +325,30 @@ export function AlertCalendarDrawer({
                                     {extending ? "Uzatılıyor..." : "Süreyi Uzat"}
                                 </Button>
                             </div>
+                        </Section>
+                    )}
+
+                    {/* quote_expired (V7 teklif modülü) → teklif detayına derin link */}
+                    {isV7QuoteExpired && (
+                        <Section label="Teklifi Yönet">
+                            <p style={{ ...textBlock, color: "var(--text-secondary)", marginTop: 0, marginBottom: "10px" }}>
+                                Teklifin süresi doldu. Revize ederek yeni geçerlilik tarihiyle müşteriye yeniden sunabilirsiniz.
+                            </p>
+                            <ButtonLink href={`/dashboard/quotes/${entityId}`} variant="primary" size="md" fullWidth>
+                                Teklifi Aç →
+                            </ButtonLink>
+                        </Section>
+                    )}
+
+                    {/* po_overdue → satınalma siparişi detayına derin link */}
+                    {isPoOverdue && (
+                        <Section label="Satınalma Siparişini Yönet">
+                            <p style={{ ...textBlock, color: "var(--text-secondary)", marginTop: 0, marginBottom: "10px" }}>
+                                Beklenen teslim tarihi geçti. Tedarikçiyle teyitleşin; teslim tarihi değiştiyse PO üzerinde güncelleyin.
+                            </p>
+                            <ButtonLink href={`/dashboard/purchase/orders/${entityId}`} variant="primary" size="md" fullWidth>
+                                Siparişi Aç →
+                            </ButtonLink>
                         </Section>
                     )}
 

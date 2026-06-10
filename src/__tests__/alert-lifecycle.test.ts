@@ -5,7 +5,8 @@
  *   - acknowledged = active (user has seen it, condition still live)
  *   - Dedupe (activeSet) must block new alerts when acknowledged exists
  *   - Auto-resolve (dbBatchResolveAlerts) must close acknowledged alerts too
- *   - AI dismiss (dbDismissAlertsBySource) must clear acknowledged AI alerts too
+ *   - AI regenerasyonu: bulgusu geçen entity'li AI alert'leri resolve eder,
+ *     entity'siz eski nesil AI alert'leri (acknowledged dahil) dismiss eder
  *
  * Lifecycle transitions:
  *   open         → acknowledged | resolved | dismissed
@@ -41,6 +42,7 @@ const mockDbUpdateAlertStatus      = vi.fn();
 const mockDbDismissAlertsBySource  = vi.fn();
 const mockDbListActiveAlerts       = vi.fn();
 const mockDbBatchResolveAlerts     = vi.fn();
+const mockDbUpdateActiveAlertContent = vi.fn();
 
 vi.mock("@/lib/supabase/alerts", () => ({
     dbListAlerts:             (...args: unknown[]) => mockDbListAlerts(...args),
@@ -51,14 +53,21 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbListActiveAlerts:       (...args: unknown[]) => mockDbListActiveAlerts(...args),
     dbListRecentlyDismissed: vi.fn().mockResolvedValue([]),
     dbBatchResolveAlerts:     (...args: unknown[]) => mockDbBatchResolveAlerts(...args),
+    dbUpdateActiveAlertContent: (...args: unknown[]) => mockDbUpdateActiveAlertContent(...args),
 }));
 
-const mockIsAIAvailable        = vi.fn();
-const mockAiGenerateOpsSummary = vi.fn();
+const mockDbGetIncomingPOQuantities = vi.fn();
+vi.mock("@/lib/supabase/purchase-orders", () => ({
+    dbGetIncomingPOQuantities: (...args: unknown[]) => mockDbGetIncomingPOQuantities(...args),
+    dbListOverduePurchaseOrders: vi.fn().mockResolvedValue([]),
+}));
+
+const mockIsAIAvailable           = vi.fn();
+const mockAiGenerateAlertFindings = vi.fn();
 
 vi.mock("@/lib/services/ai-service", () => ({
-    isAIAvailable:        () => mockIsAIAvailable(),
-    aiGenerateOpsSummary: (...args: unknown[]) => mockAiGenerateOpsSummary(...args),
+    isAIAvailable:           () => mockIsAIAvailable(),
+    aiGenerateAlertFindings: (...args: unknown[]) => mockAiGenerateAlertFindings(...args),
 }));
 
 import {
@@ -217,31 +226,91 @@ describe("Auto-resolve — koşul düzelince acknowledged alert kapanır", () =>
 
 // ── Block 3: AI dismiss — acknowledged AI alerts temizlenir ───────────────────
 
-describe("AI dismiss — AI regenerasyon acknowledged alert'leri de temizler", () => {
+describe("AI regenerasyon — entity-bağlı dedup, churn yok", () => {
     beforeEach(() => {
         mockIsAIAvailable.mockReturnValue(true);
         mockDbListAllActiveProducts.mockResolvedValue([]);
-        mockDbListProducts.mockResolvedValue([]);
+        mockDbGetOpenShortagesByProduct.mockResolvedValue(new Map());
+        mockDbGetQuotedQuantities.mockResolvedValue(new Map());
+        mockDbGetIncomingPOQuantities.mockResolvedValue(new Map());
         mockDbListOrders.mockResolvedValue([]);
-        mockDbListAlerts.mockResolvedValue([]);
-        mockDbDismissAlertsBySource.mockResolvedValue(3); // 2 open + 1 acknowledged dismissed
-        mockAiGenerateOpsSummary.mockResolvedValue({
-            summary: "Özet",
-            insights: [],
-            anomalies: [],
-            confidence: 0.9,
+        mockDbListActiveAlerts.mockResolvedValue([]);
+        mockDbBatchResolveAlerts.mockResolvedValue(0);
+        mockDbUpdateAlertStatus.mockResolvedValue({ id: "x", status: "dismissed" });
+        mockAiGenerateAlertFindings.mockResolvedValue({
+            findings: [],
+            summary: "",
+            modelVersion: "test-model",
         });
     });
 
-    it("AI alert üretiminde dbDismissAlertsBySource 'ai' kaynağı için çağrılır", async () => {
-        await serviceGenerateAiAlerts();
-        expect(mockDbDismissAlertsBySource).toHaveBeenCalledWith("ai");
+    it("bulgusu geçen entity'li AI alert (acknowledged dahil) ai_finding_cleared ile resolve edilir", async () => {
+        mockDbListActiveAlerts.mockResolvedValue([
+            { id: "ai-1", type: "stock_risk", entity_id: "prod-1", source: "ai", status: "acknowledged", severity: "warning" },
+        ]);
+        mockDbBatchResolveAlerts.mockResolvedValue(1);
+
+        const result = await serviceGenerateAiAlerts();
+
+        expect(mockDbBatchResolveAlerts).toHaveBeenCalledWith([
+            { type: "stock_risk", entityId: "prod-1", reason: "ai_finding_cleared" },
+        ]);
+        expect(result.dismissed).toBe(1);
+        // ESKİ davranış geri gelmesin: toptan source-dismiss çağrılmaz
+        expect(mockDbDismissAlertsBySource).not.toHaveBeenCalled();
     });
 
-    it("dbDismissAlertsBySource dönüş değeri (acknowledged dahil) result.dismissed'e yansır", async () => {
-        mockDbDismissAlertsBySource.mockResolvedValue(3);
+    it("entity'siz eski nesil AI alert'ler dismiss edilir (tek seferlik geçiş temizliği)", async () => {
+        mockDbListActiveAlerts.mockResolvedValue([
+            { id: "legacy-1", type: "purchase_recommended", entity_id: null, source: "ai", status: "open", severity: "info" },
+        ]);
+
         const result = await serviceGenerateAiAlerts();
-        expect(result.dismissed).toBe(3);
+
+        expect(mockDbUpdateAlertStatus).toHaveBeenCalledWith("legacy-1", "dismissed", "legacy_entityless_ai_alert");
+        expect(result.dismissed).toBe(1);
+    });
+
+    it("aynı ürün için aktif AI alert varken bulgu gelirse YERİNDE güncellenir (resolve+create yok)", async () => {
+        mockDbListAllActiveProducts.mockResolvedValue([{
+            ...PRODUCT_CRITICAL, id: "prod-1",
+        }]);
+        mockDbListActiveAlerts.mockResolvedValue([
+            { id: "ai-1", type: "stock_risk", entity_id: "prod-1", source: "ai", status: "open", severity: "warning" },
+        ]);
+        mockAiGenerateAlertFindings.mockResolvedValue({
+            findings: [{ productId: "prod-1", title: "Bulgu", detail: "Detay", action: "Aksiyon", severity: "warning", confidence: 0.8 }],
+            summary: "özet",
+            modelVersion: "test-model",
+        });
+
+        const result = await serviceGenerateAiAlerts();
+
+        expect(mockDbUpdateActiveAlertContent).toHaveBeenCalledWith(
+            "stock_risk", "prod-1", expect.objectContaining({ title: "Bulgu" }),
+        );
+        expect(result.updated).toBe(1);
+        expect(result.created).toBe(0);
+        expect(mockDbBatchResolveAlerts).not.toHaveBeenCalled();
+    });
+
+    it("kural-bazlı stok alert'i açık olan ürüne AI bulgusu EKLENMEZ", async () => {
+        mockDbListAllActiveProducts.mockResolvedValue([{
+            ...PRODUCT_CRITICAL, id: "prod-1",
+        }]);
+        mockDbListActiveAlerts.mockResolvedValue([
+            { id: "rule-1", type: "stock_critical", entity_id: "prod-1", source: "system", status: "open", severity: "critical" },
+        ]);
+        mockAiGenerateAlertFindings.mockResolvedValue({
+            findings: [{ productId: "prod-1", title: "Bulgu", detail: "Detay", action: "Aksiyon", severity: "warning", confidence: 0.8 }],
+            summary: "özet",
+            modelVersion: "test-model",
+        });
+
+        const result = await serviceGenerateAiAlerts();
+
+        expect(mockDbCreateAlert).not.toHaveBeenCalled();
+        expect(result.created).toBe(0);
     });
 });
 

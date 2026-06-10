@@ -18,6 +18,14 @@ vi.mock("@/lib/supabase/quotes", () => ({
     dbUpdateQuote:       vi.fn(),
     dbDeleteQuote:       vi.fn(),
     dbFindQuoteByNumber: vi.fn(),
+    dbCancelQuoteLinkedOrder: vi.fn().mockResolvedValue(undefined),
+}));
+
+// quote_expired uyarı üretimi (sent expiry) — alerts katmanı mock
+const mockDbCreateAlert = vi.fn();
+vi.mock("@/lib/supabase/alerts", () => ({
+    dbCreateAlert: (...args: unknown[]) => mockDbCreateAlert(...args),
+    dbResolveAlertsForEntity: vi.fn().mockResolvedValue(0),
 }));
 
 import {
@@ -221,43 +229,67 @@ describe("serviceTransitionQuote — Faz 2 send-time validasyon", () => {
 // ─── serviceExpireQuotes ─────────────────────────────────────────────────────
 
 describe("serviceExpireQuotes", () => {
-    it("boş liste → { expired: 0, expiredIds: [] }", async () => {
+    it("boş liste → { expired: 0, expiredIds: [], alerted: 0 }", async () => {
         mockDbListExpiredQuotes.mockResolvedValue([]);
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 0, expiredIds: [] });
+        expect(result).toEqual({ expired: 0, expiredIds: [], alerted: 0 });
         expect(mockDbUpdateQuoteStatus).not.toHaveBeenCalled();
     });
 
-    it("1 draft expired → { expired: 1, expiredIds: ['q1'] }", async () => {
+    it("1 draft expired → uyarı ÜRETMEZ (müşteriye sunulmamış)", async () => {
         mockDbListExpiredQuotes.mockResolvedValue([{ id: "q1", status: "draft" }]);
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 1, expiredIds: ["q1"] });
+        expect(result).toEqual({ expired: 1, expiredIds: ["q1"], alerted: 0 });
         expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith("q1", "expired", "draft");
+        expect(mockDbCreateAlert).not.toHaveBeenCalled();
     });
 
-    it("1 sent expired → { expired: 1, expiredIds: ['q2'] }", async () => {
-        mockDbListExpiredQuotes.mockResolvedValue([{ id: "q2", status: "sent" }]);
+    it("1 sent expired → quote_expired uyarısı üretir (entity_type=quote)", async () => {
+        mockDbListExpiredQuotes.mockResolvedValue([{
+            id: "q2", status: "sent", quote_number: "TKL-2026-0001",
+            customer_name: "PMT", valid_until: "2026-06-01",
+        }]);
+        mockDbCreateAlert.mockResolvedValue({ id: "alert-1" });
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 1, expiredIds: ["q2"] });
+        expect(result).toEqual({ expired: 1, expiredIds: ["q2"], alerted: 1 });
         expect(mockDbUpdateQuoteStatus).toHaveBeenCalledWith("q2", "expired", "sent");
+        expect(mockDbCreateAlert).toHaveBeenCalledWith(expect.objectContaining({
+            type: "quote_expired",
+            severity: "warning",
+            entity_type: "quote",
+            entity_id: "q2",
+            title: expect.stringContaining("TKL-2026-0001"),
+        }));
     });
 
-    it("mix: 2 draft + 1 sent → { expired: 3, expiredIds: ['q1','q2','q3'] }", async () => {
+    it("mix: 2 draft + 1 sent → 3 expired, yalnız sent için uyarı", async () => {
         mockDbListExpiredQuotes.mockResolvedValue([
             { id: "q1", status: "draft" },
             { id: "q2", status: "draft" },
-            { id: "q3", status: "sent" },
+            { id: "q3", status: "sent", quote_number: "TKL-3", customer_name: "X", valid_until: "2026-06-01" },
         ]);
+        mockDbCreateAlert.mockResolvedValue({ id: "alert-1" });
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 3, expiredIds: ["q1", "q2", "q3"] });
+        expect(result).toEqual({ expired: 3, expiredIds: ["q1", "q2", "q3"], alerted: 1 });
         expect(mockDbUpdateQuoteStatus).toHaveBeenCalledTimes(3);
+        expect(mockDbCreateAlert).toHaveBeenCalledTimes(1);
     });
 
-    it("optimistic lock başarısız → expiredIds'e eklenmez", async () => {
+    it("dedup: dbCreateAlert null dönerse (aktif uyarı zaten var) alerted artmaz", async () => {
+        mockDbListExpiredQuotes.mockResolvedValue([{
+            id: "q2", status: "sent", quote_number: "TKL-2", customer_name: "X", valid_until: "2026-06-01",
+        }]);
+        mockDbCreateAlert.mockResolvedValue(null); // idx_alerts_active_dedup 23505
+        const result = await serviceExpireQuotes();
+        expect(result.alerted).toBe(0);
+    });
+
+    it("optimistic lock başarısız → expiredIds'e eklenmez, uyarı üretilmez", async () => {
         mockDbListExpiredQuotes.mockResolvedValue([{ id: "q1", status: "sent" }]);
         mockDbUpdateQuoteStatus.mockResolvedValue(false);
         const result = await serviceExpireQuotes();
-        expect(result).toEqual({ expired: 0, expiredIds: [] });
+        expect(result).toEqual({ expired: 0, expiredIds: [], alerted: 0 });
+        expect(mockDbCreateAlert).not.toHaveBeenCalled();
     });
 
     it("DB hatası → hata fırlatır", async () => {

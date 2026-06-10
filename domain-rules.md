@@ -236,9 +236,15 @@ Bu sıra sistem ayarı ile ileride değiştirilebilir.
 
 #### critical
 `available_now <= min_stock`
+(fiziksel stok ekseni — rezerve/teklif düşülmez)
 
 #### warning
-Lead time penceresi içinde `projected_available < 0`
+`available_now <= ceil(min_stock * 1.5)` (critical değilken)
+
+Not — eksen farkı bilinçlidir:
+- `stock_critical` / `stock_risk` fiziksel stoğa (`available_now`) bakar.
+- `order_deadline` ve satın alma önerisi promisable'a (`available_now - quoted`) bakar;
+  teklife bağlanmış miktar söz verilebilir stoktan düşülür.
 
 ### 6.2 Ek Göstergeler
 Her kritik kayıt mümkünse şu verileri taşır:
@@ -509,7 +515,12 @@ Kod seviyesinde uygulanmış AI koruma kuralları (`ai-layer-ops-strategy.md §3
 - `purchase_recommended`
 - `order_shortage`
 - `sync_issue`
-- `import_review_required`
+- `order_deadline`
+- `quote_expired`
+- `overdue_shipment`
+- `po_overdue`
+
+(`import_review_required` Sprint A'da bilinçli kaldırıldı — migration 044.)
 
 ### 12.2 Alert Kuralı
 Alert yalnızca dekoratif değildir.

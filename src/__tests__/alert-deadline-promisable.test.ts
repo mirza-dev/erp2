@@ -30,6 +30,7 @@ const mockDbUpdateAlertStatus  = vi.fn();
 const mockDbDismissAlertsBySource = vi.fn();
 const mockDbListActiveAlerts   = vi.fn();
 const mockDbBatchResolveAlerts = vi.fn();
+const mockDbUpdateActiveAlertContent = vi.fn();
 
 vi.mock("@/lib/supabase/alerts", () => ({
     dbListAlerts:            (...args: unknown[]) => mockDbListAlerts(...args),
@@ -40,6 +41,7 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbListActiveAlerts:      (...args: unknown[]) => mockDbListActiveAlerts(...args),
     dbListRecentlyDismissed: vi.fn().mockResolvedValue([]),
     dbBatchResolveAlerts:    (...args: unknown[]) => mockDbBatchResolveAlerts(...args),
+    dbUpdateActiveAlertContent: (...args: unknown[]) => mockDbUpdateActiveAlertContent(...args),
 }));
 
 vi.mock("@/lib/services/ai-service", () => ({
@@ -165,10 +167,11 @@ describe("alert-service — order_deadline uses promisable (not available_now)",
         expect(deadlineAlerts[0][0].severity).toBe("critical");
     });
 
-    it("mevcut warning alert varken re-scan → resolve + yeni alert (metin tazeleme)", async () => {
+    it("mevcut warning alert varken re-scan → YERİNDE metin tazeleme (resolve+create churn yok)", async () => {
         // Senaryo: önceki scan'de 5 gün kaldı (warning) → alert açıldı.
         // Bugün re-scan: 4 gün kaldı — hâlâ warning, fakat metin bayat.
-        // Beklenti: eski alert resolve edilir, yeni metin (4 gün) ile alert açılır.
+        // Beklenti: dbUpdateActiveAlertContent ile yerinde güncellenir; eski
+        // davranıştaki resolve+create (günde 4 "çözüldü" kopyası) OLMAZ.
         //
         // Ürün: promisable=120, daily_usage=10, lead_time_days=1
         //   stockout_days = floor(120/10) = 12
@@ -194,24 +197,20 @@ describe("alert-service — order_deadline uses promisable (not available_now)",
 
         await serviceScanStockAlerts();
 
-        // dbBatchResolveAlerts deadline_text_refresh reason ile çağrılmış olmalı
-        expect(mockDbBatchResolveAlerts).toHaveBeenCalledWith(
-            expect.arrayContaining([
-                expect.objectContaining({
-                    type: "order_deadline",
-                    entityId: "prod-1",
-                    reason: "deadline_text_refresh",
-                }),
-            ])
+        // Yerinde güncelleme: taze metin (4 gün) update ile yazılır
+        expect(mockDbUpdateActiveAlertContent).toHaveBeenCalledWith(
+            "order_deadline",
+            "prod-1",
+            expect.objectContaining({ title: expect.stringContaining("4 gün kaldı") }),
         );
 
-        // Taze alert oluşturulmuş olmalı
+        // resolve+create churn YOK: ne text_refresh resolve'u ne yeni alert
+        const resolveEntries = mockDbBatchResolveAlerts.mock.calls.flatMap(([entries]) => entries as { reason: string }[]);
+        expect(resolveEntries.some((e) => e.reason === "deadline_text_refresh")).toBe(false);
         const deadlineAlerts = mockDbCreateAlert.mock.calls.filter(
             ([input]) => input.type === "order_deadline"
         );
-        expect(deadlineAlerts).toHaveLength(1);
-        expect(deadlineAlerts[0][0].severity).toBe("warning");
-        expect(deadlineAlerts[0][0].title).toContain("4 gün kaldı");
+        expect(deadlineAlerts).toHaveLength(0);
     });
 
     it("small quoted with comfortable deadline → no deadline alert", async () => {

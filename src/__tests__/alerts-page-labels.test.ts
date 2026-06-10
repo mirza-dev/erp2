@@ -17,6 +17,7 @@ const ALL_ALERT_TYPES: AlertType[] = [
     "overdue_shipment",
     "order_deadline",
     "sync_issue",
+    "po_overdue",
 ];
 
 describe("ALERT_TYPE_LABEL — tüm tipler için Türkçe etiket tanımlı", () => {
