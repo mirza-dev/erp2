@@ -14,40 +14,96 @@ const TONE_BADGE: Record<Tone, string> = {
     success: "badge-success", accent: "badge-accent",
 };
 
-// ── Stok Dağılımı (Donut) ──────────────────────────────────────
+// ── Stok Dağılımı (tam genişlik: donut + paylı legend + özet istatistik) ──────
+export interface StockPanelStats {
+    /** Aktif ürün sayısı. */
+    productCount: number;
+    /** available_now ≤ min (kritik eşik altı) aktif ürün sayısı. */
+    criticalCount: number;
+    /** min < available_now ≤ ceil(min×1.5) (risk bandı) aktif ürün sayısı. */
+    riskCount: number;
+}
+
 export function StockPanel({
-    segments, currency, canView,
-}: { segments: CategorySegment[]; currency: string | null; canView: boolean }) {
+    segments, currency, canView, stats,
+}: { segments: CategorySegment[]; currency: string | null; canView: boolean; stats?: StockPanelStats }) {
+    const totalValue = segments.reduce((sum, s) => sum + s.value, 0);
+    const fmtValue = (v: number) =>
+        currency
+            ? formatReportingCompact(v, currency, true)
+            : (v >= 1e6 ? `${(v / 1e6).toFixed(2)}M` : v >= 1e3 ? `${Math.round(v / 1e3)}K` : String(Math.round(v)));
+
     return (
-        <OverviewPanel fill title="Stok Dağılımı" sub={canView ? `Kategori bazında değer${currency ? ` (${currency})` : ""}` : "Değer görüntüleme yetkisi yok"}>
+        <OverviewPanel
+            title="Stok Dağılımı"
+            sub={canView
+                ? `Kategori bazında değer${currency ? ` (${currency})` : ""} · ${segments.length} kategori`
+                : "Değer görüntüleme yetkisi yok"}
+        >
             {!canView ? (
-                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-tertiary)", textAlign: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "32px 0" }}>
                     Stok değerini görüntüleme yetkiniz yok.
                 </div>
             ) : segments.length === 0 ? (
-                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-tertiary)", textAlign: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "var(--text-tertiary)", textAlign: "center", padding: "32px 0" }}>
                     Stok verisi yok.
                 </div>
             ) : (
-                <>
-                    {/* Donut kalan alanı dikey ortalar → eş-yükseklik kartta alttaki ölü alan dağılır */}
-                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, padding: "8px 0 16px" }}>
-                        <Donut data={segments} size={172} stroke={21} currency={currency} />
+                <div style={{ display: "flex", gap: 28, flexWrap: "wrap", alignItems: "stretch" }}>
+                    {/* Donut */}
+                    <div style={{ flex: "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center", padding: "4px 0" }}>
+                        <Donut data={segments} size={188} stroke={23} currency={currency} />
                     </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                        {segments.map((c, i) => (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                                <Dot tone={c.color} />
-                                <span style={{ flex: 1, color: "var(--text-secondary)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
-                                <span className="mono" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                                    {currency
-                                        ? formatReportingCompact(c.value, currency, true)
-                                        : (c.value >= 1e6 ? `${(c.value / 1e6).toFixed(2)}M` : c.value >= 1e3 ? `${Math.round(c.value / 1e3)}K` : Math.round(c.value))}
-                                </span>
+
+                    {/* Legend — pay çubuklu */}
+                    <div style={{ flex: "1 1 280px", minWidth: 0, display: "flex", flexDirection: "column", gap: 12, justifyContent: "center" }}>
+                        {segments.map((c, i) => {
+                            const pct = totalValue > 0 ? (c.value / totalValue) * 100 : 0;
+                            return (
+                                <div key={i}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 4 }}>
+                                        <Dot tone={c.color} />
+                                        <span style={{ flex: 1, color: "var(--text-secondary)", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                                        <span className="mono" style={{ fontSize: 10.5, color: "var(--text-tertiary)" }}>%{pct.toFixed(1)}</span>
+                                        <span className="mono" style={{ color: "var(--text-primary)", fontWeight: 600 }}>{fmtValue(c.value)}</span>
+                                    </div>
+                                    <div aria-hidden style={{ height: 4, borderRadius: 2, background: "var(--bg-tertiary)", overflow: "hidden" }}>
+                                        <div style={{ width: `${pct}%`, height: "100%", background: c.color, borderRadius: 2, transition: "width .5s cubic-bezier(.4,0,.2,1)" }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Özet istatistik kolonu — eski Finansal Özet alanını karşılar */}
+                    <div style={{
+                        flex: "0 0 200px", display: "flex", flexDirection: "column", gap: 14, justifyContent: "center",
+                        borderLeft: "1px solid var(--border-tertiary)", paddingLeft: 24,
+                    }}>
+                        <div>
+                            <div style={{ fontSize: 11, color: "var(--text-tertiary)", marginBottom: 2 }}>Toplam Stok Değeri</div>
+                            <div className="mono" style={{ fontSize: 26, fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.1 }}>
+                                {fmtValue(totalValue)}
                             </div>
-                        ))}
+                        </div>
+                        {stats && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 7, fontSize: 12 }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                    <span style={{ color: "var(--text-tertiary)" }}>Aktif ürün</span>
+                                    <span className="mono" style={{ color: "var(--text-primary)", fontWeight: 600 }}>{stats.productCount}</span>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                    <span style={{ color: "var(--text-tertiary)" }}>Kritik stok</span>
+                                    <span className="mono" style={{ color: stats.criticalCount > 0 ? "var(--danger-text)" : "var(--text-primary)", fontWeight: 600 }}>{stats.criticalCount}</span>
+                                </div>
+                                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                                    <span style={{ color: "var(--text-tertiary)" }}>Risk bandında</span>
+                                    <span className="mono" style={{ color: stats.riskCount > 0 ? "var(--warning-text)" : "var(--text-primary)", fontWeight: 600 }}>{stats.riskCount}</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                </>
+                </div>
             )}
         </OverviewPanel>
     );

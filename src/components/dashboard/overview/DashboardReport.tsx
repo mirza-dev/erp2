@@ -8,9 +8,10 @@
  * çıktılarıyla beslenir → sayılar ekranla birebir + RBAC maskeli. Saf sunum.
  */
 import RovenLogo from "@/components/layout/RovenLogo";
+import type { StockPanelStats } from "@/components/dashboard/overview/RealPanels";
 import {
     formatReportingCompact, currencySymbol,
-    type DashboardKpi, type FinanceSummary, type CategorySegment,
+    type DashboardKpi, type CategorySegment,
     type ReceivablesView, type RecentOrderRow, type AlertRow, type RangeKey,
 } from "@/lib/dashboard-view-model";
 
@@ -27,10 +28,9 @@ interface DashboardReportProps {
     cost: number[] | null;
     counts: number[];
     trendEmpty: boolean;
-    finance: FinanceSummary | null;
-    /** finance null iken kısa açıklama (yetki yok / dönem granülerliği). */
-    financeNote?: string;
     stockSegments: CategorySegment[];
+    /** Stok özet istatistikleri (aktif/kritik/risk) — ekran paneliyle aynı kaynak. */
+    stockStats?: StockPanelStats;
     receivables: ReceivablesView | null;
     orderRows: RecentOrderRow[];
     alertRows: AlertRow[];
@@ -54,7 +54,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function DashboardReport({
     range, dateStr, reporting, preparedBy, kpis, trendSub, labels, revenue, cost, counts, trendEmpty,
-    finance, financeNote, stockSegments, receivables, orderRows, alertRows, canViewPrices, canViewFinance,
+    stockSegments, stockStats, receivables, orderRows, alertRows, canViewPrices, canViewFinance,
 }: DashboardReportProps) {
     const fmt = (v: number, can = canViewPrices) => formatReportingCompact(v, reporting, can);
     const sym = currencySymbol(reporting);
@@ -91,24 +91,6 @@ export default function DashboardReport({
                 </table>
             </Section>
 
-            {/* Finansal özet */}
-            <Section title="Finansal Özet">
-                {finance ? (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <tbody>
-                            <tr><td style={td}>Net Ciro (KDV hariç)</td><td style={tdR}>{fmt(finance.revenue)}</td></tr>
-                            <tr><td style={td}>Maliyet (COGS)</td><td style={tdR}>{fmt(finance.cost)}</td></tr>
-                            <tr><td style={{ ...td, fontWeight: 700 }}>Brüt Kâr</td><td style={{ ...tdR, fontWeight: 700 }}>{fmt(finance.grossProfit)}</td></tr>
-                            <tr><td style={td}>Kâr Marjı</td><td style={tdR}>%{finance.marginPct.toFixed(0)}</td></tr>
-                        </tbody>
-                    </table>
-                ) : (
-                    <div style={{ fontSize: 11, color: "#444" }}>
-                        {financeNote ?? (canViewPrices ? "Maliyet verisi henüz hazır değil." : "Finansal özet görüntüleme yetkiniz yok.")}
-                    </div>
-                )}
-            </Section>
-
             {/* Ciro & Maliyet trendi */}
             <Section title={`Ciro & Maliyet · ${trendSub}`}>
                 {trendEmpty || !revenue ? (
@@ -135,23 +117,46 @@ export default function DashboardReport({
                 )}
             </Section>
 
-            {/* Stok dağılımı */}
+            {/* Stok dağılımı — pay yüzdesi + özet istatistik (eski Finansal Özet'in yerini alan ana bölüm) */}
             <Section title="Stok Dağılımı (kategori)">
                 {stockSegments.length === 0 ? (
                     <div style={{ fontSize: 11, color: "#444" }}>Kayıt yok.</div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead><tr><th style={th}>Kategori</th><th style={{ ...th, textAlign: "right" }}>Değer</th></tr></thead>
-                        <tbody>
-                            {stockSegments.map((s) => (
-                                <tr key={s.name}><td style={td}>{s.name}</td><td style={tdR}>{fmt(s.value)}</td></tr>
-                            ))}
-                            <tr>
-                                <td style={{ ...td, fontWeight: 700 }}>Toplam</td>
-                                <td style={{ ...tdR, fontWeight: 700 }}>{fmt(stockSegments.reduce((sum, s) => sum + s.value, 0))}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead><tr>
+                                <th style={th}>Kategori</th>
+                                <th style={{ ...th, textAlign: "right" }}>Pay</th>
+                                <th style={{ ...th, textAlign: "right" }}>Değer</th>
+                            </tr></thead>
+                            <tbody>
+                                {(() => {
+                                    const total = stockSegments.reduce((sum, s) => sum + s.value, 0);
+                                    return (
+                                        <>
+                                            {stockSegments.map((s) => (
+                                                <tr key={s.name}>
+                                                    <td style={td}>{s.name}</td>
+                                                    <td style={tdR}>%{total > 0 ? ((s.value / total) * 100).toFixed(1) : "0.0"}</td>
+                                                    <td style={tdR}>{fmt(s.value)}</td>
+                                                </tr>
+                                            ))}
+                                            <tr>
+                                                <td style={{ ...td, fontWeight: 700 }}>Toplam</td>
+                                                <td style={{ ...tdR, fontWeight: 700 }}>%100</td>
+                                                <td style={{ ...tdR, fontWeight: 700 }}>{fmt(total)}</td>
+                                            </tr>
+                                        </>
+                                    );
+                                })()}
+                            </tbody>
+                        </table>
+                        {stockStats && (
+                            <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>
+                                Aktif ürün: <b>{stockStats.productCount}</b> · Kritik stok: <b>{stockStats.criticalCount}</b> · Risk bandında: <b>{stockStats.riskCount}</b>
+                            </div>
+                        )}
+                    </>
                 )}
             </Section>
 

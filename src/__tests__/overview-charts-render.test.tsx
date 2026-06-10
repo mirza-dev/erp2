@@ -11,7 +11,6 @@ import Sparkline from "@/components/dashboard/overview/charts/Sparkline";
 import TrendChart from "@/components/dashboard/overview/charts/TrendChart";
 import Donut from "@/components/dashboard/overview/charts/Donut";
 import BarChart from "@/components/dashboard/overview/charts/BarChart";
-import AgingBars from "@/components/dashboard/overview/charts/AgingBars";
 import Heatmap from "@/components/dashboard/overview/charts/Heatmap";
 import MarginGauge from "@/components/dashboard/overview/charts/MarginGauge";
 
@@ -27,9 +26,6 @@ describe("charts — boş veriyle crash etmez", () => {
     });
     it("BarChart boş", () => {
         expect(() => renderToStaticMarkup(<BarChart days={[]} good={[]} scrap={[]} />)).not.toThrow();
-    });
-    it("AgingBars boş", () => {
-        expect(() => renderToStaticMarkup(<AgingBars data={[]} />)).not.toThrow();
     });
     it("Heatmap boş", () => {
         expect(() => renderToStaticMarkup(<Heatmap rows={[]} data={[]} />)).not.toThrow();
@@ -62,12 +58,6 @@ describe("charts — dolu veriyle render + tema tokenları", () => {
         expect(html).toContain("var(--chart-grid)");
         expect(html).toContain("var(--danger)");
         expect(html).toContain("var(--accent)");
-    });
-    it("AgingBars track token", () => {
-        const html = renderToStaticMarkup(
-            <AgingBars data={[{ label: "0–30", value: 1000, tone: "info" }]} currency="TRY" />,
-        );
-        expect(html).toContain("var(--chart-track)");
     });
     it("Heatmap track token (0 hücre) + tint (dolu)", () => {
         const html = renderToStaticMarkup(<Heatmap rows={["Döküm"]} data={[[0, 3]]} />);

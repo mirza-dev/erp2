@@ -43,9 +43,10 @@ describe("page.tsx — işlevsel dönem segmenti", () => {
         expect(PAGE).toMatch(/Bu dönemde sipariş yok/);
     });
 
-    it("Hafta/Bugün maliyet granülerlik notu FinancePanel'e geçer", () => {
-        expect(PAGE).toMatch(/costGranularityNote/);
+    it("Hafta/Bugün maliyet granülerlik notu trend panelinde gösterilir (Finansal Özet kaldırıldı)", () => {
+        expect(PAGE).toMatch(/costGranularityNote &&/);
         expect(PAGE).toMatch(/Maliyet aylık\/çeyreklik bazda gösterilir/);
+        expect(PAGE).not.toMatch(/<FinancePanel/);
     });
 });
 

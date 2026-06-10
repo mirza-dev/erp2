@@ -10,7 +10,7 @@ import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import DashboardReport from "@/components/dashboard/overview/DashboardReport";
 import type {
-    DashboardKpi, FinanceSummary, CategorySegment, ReceivablesView, RecentOrderRow, AlertRow,
+    DashboardKpi, CategorySegment, ReceivablesView, RecentOrderRow, AlertRow,
 } from "@/lib/dashboard-view-model";
 
 const KPIS: DashboardKpi[] = [
@@ -24,7 +24,7 @@ const RECV: ReceivablesView = {
 };
 const ORDERS: RecentOrderRow[] = [{ id: "o1", no: "SO-1", customer: "Müşteri", amount: "$10K", status: "Rezerveli", tone: "info" }];
 const ALERTS: AlertRow[] = [{ id: "al1", title: "Kritik stok", desc: "Vana DN50", tone: "danger", time: "2 sa önce" }];
-const FIN: FinanceSummary = { revenue: 1000, cost: 600, grossProfit: 400, marginPct: 40, costPct: 60 };
+const STATS = { productCount: 42, criticalCount: 3, riskCount: 5 };
 
 function render(extra: Partial<React.ComponentProps<typeof DashboardReport>> = {}) {
     return renderToStaticMarkup(
@@ -40,8 +40,8 @@ function render(extra: Partial<React.ComponentProps<typeof DashboardReport>> = {
             cost={[0, 0, 50, 80]}
             counts={[0, 0, 1, 2]}
             trendEmpty={false}
-            finance={FIN}
             stockSegments={SEGMENTS}
+            stockStats={STATS}
             receivables={RECV}
             orderRows={ORDERS}
             alertRows={ALERTS}
@@ -63,13 +63,15 @@ describe("DashboardReport", () => {
         expect(html).toContain("Çeyrek");
         expect(html).toContain("Hazırlayan:");
         expect(html).toContain("Mehmet Test");
-        // Bölümler (Detaylı kapsam, sıralı).
+        // Bölümler (Detaylı kapsam, sıralı) — Finansal Özet bölümü kaldırıldı,
+        // Stok Dağılımı pay yüzdesi + özet istatistiklerle ana bölüm oldu.
         expect(html).toContain("Özet Göstergeler");
-        expect(html).toContain("Finansal Özet");
-        expect(html).toContain("Net Ciro");
-        expect(html).toContain("Brüt Kâr");
+        expect(html).not.toContain("Finansal Özet");
         expect(html).toContain("Ciro &amp; Maliyet · Son 4 çeyrek");
         expect(html).toContain("Stok Dağılımı");
+        expect(html).toContain("Pay");
+        expect(html).toContain("%100");
+        expect(html).toContain("Aktif ürün");
         expect(html).toContain("Toplam");
         expect(html).toContain("Alacak Yaşlandırma");
         expect(html).toContain("Son Siparişler");
@@ -80,15 +82,15 @@ describe("DashboardReport", () => {
         expect(render({ preparedBy: null })).not.toContain("Hazırlayan:");
     });
 
-    it("finance null + financeNote → granülerlik notu (veri-bug değil)", () => {
-        const html = render({ finance: null, financeNote: "Maliyet aylık/çeyreklik bazda gösterilir" });
-        expect(html).toContain("Finansal Özet");
-        expect(html).toContain("Maliyet aylık/çeyreklik bazda gösterilir");
+    it("stockStats verilmezse istatistik satırı yok; tablo yine tam", () => {
+        const html = render({ stockStats: undefined });
+        expect(html).not.toContain("Aktif ürün");
+        expect(html).toContain("Stok Dağılımı");
     });
 
     it("boş veriyle crash etmez (boş-durum metinleri)", () => {
         const html = render({
-            revenue: null, cost: null, counts: [], trendEmpty: true, finance: null,
+            revenue: null, cost: null, counts: [], trendEmpty: true,
             stockSegments: [], receivables: null, orderRows: [], alertRows: [],
         });
         expect(html).toContain("Genel Bakış Raporu");

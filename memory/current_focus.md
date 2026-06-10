@@ -7,7 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-11 (**Uyarılar sistemi tutarlılık + kapsam turu — churn fix, AI revamp, quote/PO vade uyarıları — GREEN, `f9e88ed`**)
+## Son Tamamlanan İş — 2026-06-11 (**Genel Bakış: Finansal Özet kaldırıldı, Stok Dağılımı tam-genişlik revize — GREEN, push edildi**)
+
+**İstek:** "Finansal özet kısmını kaldırıyoruz; stok dağılımını finansal özetin yerini karşılayacak şekilde revize edelim, ardından her şeyi push."
+
+- **Silinen:** `FinancePanel.tsx` (Finansal Özet paneli — brüt kâr hero + money-flow + aging) ve tek tüketicisi olduğu `charts/AgingBars.tsx`; view-model'den `financeSummary`/`grossToNetRevenue`/`REPORTING_VAT_RATE`/`FinanceSummary` (tek tüketici paneldi). Maliyet granülerlik notu ("Maliyet aylık/çeyreklik bazda gösterilir") trend paneline taşındı.
+- **StockPanel revize (tam genişlik, Satır 1 tek panel):** donut 188px + paylı legend (kategori başına %pay etiketi + 4px renkli pay çubuğu) + sağda dikey-ayraçlı özet kolonu: **Toplam Stok Değeri** hero (mono 26px) + Aktif ürün / **Kritik stok** (≤min, danger-tint) / **Risk bandında** (≤ceil(min×1.5), warning-tint). `stockStats` page.tsx'te products'tan memo ile türetilir, `StockPanelStats` tipi RealPanels'tan export.
+- **Rapor (`DashboardReport`):** "Finansal Özet" bölümü kaldırıldı; Stok Dağılımı tablosu Pay sütunu kazandı (%xx.x satırlar + %100 toplam) + altında "Aktif ürün · Kritik stok · Risk bandında" özet satırı; `finance`/`financeNote` propları kalktı → `stockStats?` geldi. **Alacak Yaşlandırma rapor bölümü KORUNDU** (`receivables` artık yalnız raporun tükettiği veri; ekran paneliyle birlikte gitmedi — RBAC `canViewFinance` maskesi aynen).
+- **Test:** overview-panels-render: FinancePanel describe → StockPanel revize describe (pay/%toplam/stats/RBAC/hex-yok, 5 test); overview-charts-render: AgingBars blokları çıktı; dashboard-view-model: financeSummary/KDV-tuzağı blokları çıktı (helper'lar silindi); dashboard-overview-preservation: yeni diziliş kilidi (tek `overview-grid-1-1` + `<FinancePanel` ve `financeSummary(` geri gelmez + not trend'de); dashboard-report-render: `not.toContain("Finansal Özet")` + Pay/%100/Aktif-ürün; dashboard-segment-report hizalandı.
+- **Doğrulama:** tsc 0 · lint 0 · **4959 test / 355 dosya** · build 0.
+
+## Önceki — 2026-06-11 (**Uyarılar sistemi tutarlılık + kapsam turu — churn fix, AI revamp, quote/PO vade uyarıları — GREEN, `f9e88ed`**)
 
 **İstek:** "Uyarılar sayfası genel ERP'nin uyarı merkezi olsun — verdiği uyarılar tutarlı mı, atladığı/yanlış gösterdiği var mı, backend kapsamlı mı; önerini sun (şunlar gereksiz vs.)." Analiz: backend çekirdeği sağlam (8 tip, lifecycle matrisi, dedup unique-idx, 24h dismiss+severity bypass, orphan temizliği, advisory lock, 6h GH-Actions cron) ama 3 ciddi tutarlılık sorunu + boşluklar. **Kararlar (AskUserQuestion):** fix paketi 4/4 · purchase_recommended→Satın Alma'ya devret · AI source=ai sekme+sınırlı üretim · kapsam: V7 teklif+PO gecikme (import_review_required + order_shortage e-postası SEÇİLMEDİ) · **model: Haiku kalır** (maliyet ~$1/ay vs Sonnet ~$3/ay ama kalite girdiden gelir; `MODEL` tek sabit→gerekirse tek satırla Sonnet).
 

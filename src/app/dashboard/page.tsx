@@ -6,14 +6,13 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import KpiCard from "@/components/dashboard/overview/KpiCard";
 import OverviewPanel, { Dot } from "@/components/dashboard/overview/OverviewPanel";
 import TrendChart from "@/components/dashboard/overview/charts/TrendChart";
-import FinancePanel from "@/components/dashboard/overview/FinancePanel";
 import ProductionPanel from "@/components/dashboard/overview/ProductionPanel";
 import AiPanel from "@/components/dashboard/overview/AiPanel";
-import { StockPanel, ReorderPanel, AlertsPanel, OrdersPanel } from "@/components/dashboard/overview/RealPanels";
+import { StockPanel, ReorderPanel, AlertsPanel, OrdersPanel, type StockPanelStats } from "@/components/dashboard/overview/RealPanels";
 import DashboardReport from "@/components/dashboard/overview/DashboardReport";
 import {
     buildKpis, periodModel, revenueByPeriod, orderCountsByPeriod, cogsByPeriod,
-    stockValueByCategoryReporting, receivablesAging, financeSummary, grossToNetRevenue, productionDailySeries,
+    stockValueByCategoryReporting, receivablesAging, productionDailySeries,
     reorderView, alertsView, recentOrdersView,
     type ExchangeRates, type CogsRow, type RangeKey,
 } from "@/lib/dashboard-view-model";
@@ -104,18 +103,25 @@ export default function DashboardPage() {
         [canViewSalesPrices, canViewPurchaseCosts, finance.cogs, period],
     );
 
-    // ── Stok donut ──
+    // ── Stok donut + özet istatistikler (eski Finansal Özet alanını karşılar) ──
     const stock = useMemo(
         () => stockValueByCategoryReporting(products, reporting, rates),
         [products, reporting, rates],
     );
+    const stockStats = useMemo<StockPanelStats>(() => {
+        const active = products.filter((p) => p.isActive);
+        let criticalCount = 0;
+        let riskCount = 0;
+        for (const p of active) {
+            const a = p.available_now ?? 0;
+            const m = p.minStockLevel ?? 0;
+            if (a <= m) criticalCount++;
+            else if (a <= Math.ceil(m * 1.5)) riskCount++;
+        }
+        return { productCount: active.length, criticalCount, riskCount };
+    }, [products]);
 
-    // ── Finansal özet + alacak ──
-    const financePanel = useMemo(() => {
-        if (!(canViewSalesPrices && canViewPurchaseCosts) || !revenueSeries || !costSeries) return null;
-        // Ciro grandTotal (KDV dahil), COGS vergisiz → kâr/marj NET ciro tabanında hesaplanır.
-        return financeSummary(grossToNetRevenue(revenueSeries[period.currentIndex] ?? 0), costSeries[period.currentIndex] ?? 0);
-    }, [canViewSalesPrices, canViewPurchaseCosts, revenueSeries, costSeries, period]);
+    // ── Alacak (yalnız rapor tüketir; ekran paneli kaldırıldı) ──
     const receivables = useMemo(
         () => (canViewFinancialSummary ? receivablesAging(orders, reporting, rates, now) : null),
         [orders, reporting, rates, canViewFinancialSummary, now],
@@ -198,21 +204,26 @@ export default function DashboardPage() {
                         Bu dönemde sipariş yok.
                     </div>
                 ) : (
-                    <TrendChart
-                        months={period.labels}
-                        revenue={revenueSeries}
-                        cost={costSeries ?? []}
-                        orders={orderCounts}
-                        currency={reporting}
-                        showCost={!!costSeries}
-                    />
+                    <>
+                        <TrendChart
+                            months={period.labels}
+                            revenue={revenueSeries}
+                            cost={costSeries ?? []}
+                            orders={orderCounts}
+                            currency={reporting}
+                            showCost={!!costSeries}
+                        />
+                        {/* Maliyet granülerlik notu (eskiden Finansal Özet panelindeydi) */}
+                        {costGranularityNote && (
+                            <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", marginTop: 8 }}>{costGranularityNote}</div>
+                        )}
+                    </>
                 )}
             </OverviewPanel>
 
-            {/* Satır 1: Stok Dağılımı + Finansal Özet */}
-            <div className="overview-grid-1-1" style={{ marginBottom: gap }}>
-                <StockPanel segments={stock.segments} currency={reporting} canView={canViewSalesPrices} />
-                <FinancePanel reporting={reporting} monthLabel={period.currentLabel} finance={financePanel} canViewCosts={canViewSalesPrices && canViewPurchaseCosts} receivables={receivables} costGranularityNote={costGranularityNote} />
+            {/* Satır 1: Stok Dağılımı — tam genişlik (Finansal Özet paneli kaldırıldı) */}
+            <div style={{ marginBottom: gap }}>
+                <StockPanel segments={stock.segments} currency={reporting} canView={canViewSalesPrices} stats={stockStats} />
             </div>
 
             {/* Satır 2: Üretim + Son Siparişler */}
@@ -242,9 +253,8 @@ export default function DashboardPage() {
             cost={costSeries ?? null}
             counts={orderCounts}
             trendEmpty={trendEmpty}
-            finance={financePanel}
-            financeNote={costGranularityNote}
             stockSegments={stock.segments}
+            stockStats={stockStats}
             receivables={receivables}
             orderRows={reportOrderRows}
             alertRows={reportAlertRows}

@@ -43,7 +43,7 @@ describe("view-model normalizasyon fonksiyonları import edilir", () => {
     it("buildKpis + revenue/cost + stock + receivables + production + reorder/alerts/orders", () => {
         for (const fn of [
             "buildKpis", "revenueByPeriod", "cogsByPeriod",
-            "stockValueByCategoryReporting", "receivablesAging", "financeSummary",
+            "stockValueByCategoryReporting", "receivablesAging",
             "productionDailySeries", "reorderView", "alertsView", "recentOrdersView",
         ]) {
             expect(PAGE).toMatch(new RegExp(fn));
@@ -55,7 +55,6 @@ describe("tasarım panelleri render edilir (DashDetailed)", () => {
     it("kpi-strip + trend + 6 panel + AI", () => {
         expect(PAGE).toMatch(/className="kpi-strip"/);
         expect(PAGE).toMatch(/<TrendChart/);
-        expect(PAGE).toMatch(/<FinancePanel/);
         expect(PAGE).toMatch(/<ProductionPanel/);
         expect(PAGE).toMatch(/<OrdersPanel/);
         expect(PAGE).toMatch(/<StockPanel/);
@@ -71,13 +70,14 @@ describe("tasarım panelleri render edilir (DashDetailed)", () => {
     });
 });
 
-describe("panel yerleşimi — yeni diziliş (Stok|Finans / Üretim|Sipariş / alt alta)", () => {
-    it("iki adet overview-grid-1-1 satırı (Satır 1 + Satır 2)", () => {
+describe("panel yerleşimi — yeni diziliş (Stok tam-genişlik / Üretim|Sipariş / alt alta)", () => {
+    it("tek overview-grid-1-1 satırı kaldı (Üretim|Sipariş); Stok tam genişlik", () => {
         const matches = PAGE.match(/className="overview-grid-1-1"/g) ?? [];
-        expect(matches.length).toBe(2);
+        expect(matches.length).toBe(1);
     });
-    it("Satır 1: StockPanel, FinancePanel'den önce", () => {
-        expect(PAGE.indexOf("<StockPanel")).toBeLessThan(PAGE.indexOf("<FinancePanel"));
+    it("Finansal Özet paneli kaldırıldı; StockPanel stats alır (özet kolonu)", () => {
+        expect(PAGE).not.toMatch(/<FinancePanel/);
+        expect(PAGE).toMatch(/<StockPanel[\s\S]{0,200}stats=\{stockStats\}/);
     });
     it("Satır 2: ProductionPanel, OrdersPanel'den önce", () => {
         expect(PAGE.indexOf("<ProductionPanel")).toBeLessThan(PAGE.indexOf("<OrdersPanel"));
@@ -98,8 +98,12 @@ describe("RBAC finansal gating", () => {
     });
 });
 
-describe("KDV doğruluğu (advisor) — brüt kâr NET ciro tabanında", () => {
-    it("financeSummary'ye grossToNetRevenue ile net ciro geçer (KDV-dahil grandTotal değil)", () => {
-        expect(PAGE).toMatch(/financeSummary\(grossToNetRevenue\(/);
+describe("Finansal Özet kaldırma kilidi", () => {
+    it("financeSummary/grossToNetRevenue çağrısı geri gelmez (panel silindi)", () => {
+        expect(PAGE).not.toMatch(/financeSummary\(/);
+        expect(PAGE).not.toMatch(/grossToNetRevenue\(/);
+    });
+    it("maliyet granülerlik notu trend paneline taşındı", () => {
+        expect(PAGE).toMatch(/costGranularityNote &&/);
     });
 });

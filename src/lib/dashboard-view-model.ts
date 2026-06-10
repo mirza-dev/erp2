@@ -474,42 +474,6 @@ export function receivablesAging(
 }
 
 // ════════════════════════════════════════════════════════════════
-//  Finansal özet (brüt kâr / marj / money-flow)
-// ════════════════════════════════════════════════════════════════
-
-/** Projede KDV sabit %20 (domain: grandTotal = subtotal + subtotal×0.20). */
-export const REPORTING_VAT_RATE = 0.20;
-
-/** KDV-dahil tutarı KDV-hariç (net) tutara çevirir. Brüt kâr tabanı için. */
-export function grossToNetRevenue(gross: number, vatRate = REPORTING_VAT_RATE): number {
-    return gross / (1 + vatRate);
-}
-
-export interface FinanceSummary {
-    revenue: number;   // NET ciro (KDV hariç) — kâr/marj tabanı
-    cost: number;      // COGS (vergisiz)
-    grossProfit: number;
-    marginPct: number;
-    costPct: number;
-}
-
-/**
- * Brüt kâr / marj / maliyet yüzdesi.
- * ⚠️ `netRevenueLast` KDV-HARİÇ olmalı (COGS vergisiz) — aksi halde marj KDV oranı kadar şişer.
- * KPI "Aylık Ciro" + trend brüt (grandTotal) kalır; YALNIZ bu hesap net bazlıdır.
- */
-export function financeSummary(netRevenueLast: number, costLast: number): FinanceSummary {
-    const grossProfit = netRevenueLast - costLast;
-    return {
-        revenue: netRevenueLast,
-        cost: costLast,
-        grossProfit,
-        marginPct: netRevenueLast > 0 ? (grossProfit / netRevenueLast) * 100 : 0,
-        costPct: netRevenueLast > 0 ? (costLast / netRevenueLast) * 100 : 0,
-    };
-}
-
-// ════════════════════════════════════════════════════════════════
 //  Üretim
 // ════════════════════════════════════════════════════════════════
 

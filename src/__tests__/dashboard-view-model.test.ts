@@ -5,7 +5,7 @@
  *  - Stok: stockValueByCategoryReporting (raporlama para birimi)
  *  - Alacak: receivablesAging (siparişten türev, dürüst)
  *  - Üretim: todayProduction / productionDailySeries (gerçek scrap)
- *  - Finans: financeSummary · recentOrdersView (normalize+RBAC) · buildKpis (6 KPI + RBAC) · aiPoints
+ *  - Finans: recentOrdersView (normalize+RBAC) · buildKpis (6 KPI + RBAC) · aiPoints
  */
 import { describe, it, expect } from "vitest";
 import type { Product, Order, UretimKaydi } from "@/lib/mock-data";
@@ -15,7 +15,7 @@ import {
     last12MonthKeys, monthLabels,
     toReporting, formatReportingM, formatReportingCompact, currencySymbol,
     monthlyRevenueReporting, monthlyOrderCounts, cogsToReporting,
-    stockValueByCategoryReporting, receivablesAging, financeSummary, grossToNetRevenue, REPORTING_VAT_RATE, productionDailySeries,
+    stockValueByCategoryReporting, receivablesAging, productionDailySeries,
     todayProduction, lastNProductionTotals,
     reorderView, alertsView, relativeTime, recentOrdersView,
     aiPointsFromOpsSummary, buildKpis,
@@ -177,32 +177,8 @@ describe("receivablesAging (dürüst, siparişten türev)", () => {
     });
 });
 
-// ── Finans özet ──────────────────────────────────────────────
-describe("financeSummary", () => {
-    it("brüt kâr / marj / maliyet yüzdesi (NET ciro tabanı)", () => {
-        const f = financeSummary(1000, 710);
-        expect(f.grossProfit).toBe(290);
-        expect(f.marginPct).toBeCloseTo(29, 5);
-        expect(f.costPct).toBeCloseTo(71, 5);
-    });
-    it("ciro 0 → sıfır bölme yok", () => {
-        expect(financeSummary(0, 0).marginPct).toBe(0);
-    });
-    it("KDV %20 sabit + grossToNetRevenue brüt→net", () => {
-        expect(REPORTING_VAT_RATE).toBe(0.20);
-        expect(grossToNetRevenue(1200)).toBeCloseTo(1000, 5); // 1200 KDV dahil → 1000 net
-    });
-    it("KDV TUZAĞI: KDV-dahil ciro net'e çevrilmeden geçerse marj şişer (advisor)", () => {
-        // Gerçek: net ciro 1000, COGS 710 → marj %29.
-        // KDV-dahil grandTotal 1200 ile YANLIŞ hesap: (1200-710)/1200 = %40.8 (şişmiş).
-        const wrong = financeSummary(1200, 710);
-        expect(wrong.marginPct).toBeGreaterThan(40); // şişmiş — bu YOL KULLANILMAMALI
-        // DOĞRU: önce grossToNetRevenue ile net'e indir.
-        const right = financeSummary(grossToNetRevenue(1200), 710);
-        expect(right.marginPct).toBeCloseTo(29, 5);
-        expect(right.costPct).toBeCloseTo(71, 5);
-    });
-});
+// financeSummary/grossToNetRevenue testleri kaldırıldı — Finansal Özet paneli
+// silinince helper'lar da view-model'den çıkarıldı (tek tüketicileri paneldi).
 
 // ── Üretim ───────────────────────────────────────────────────
 describe("production", () => {

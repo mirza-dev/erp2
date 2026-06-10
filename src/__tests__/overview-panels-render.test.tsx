@@ -1,55 +1,52 @@
 // @vitest-environment node
 /**
  * Genel Bakış panelleri — renderToStaticMarkup smoke (jsdom-free).
- *  - FinancePanel: dolu (brüt kâr + money-flow + aging) ve RBAC-kilitli (null) durumlar.
+ *  - StockPanel: tam-genişlik revize (donut + paylı legend + özet istatistik kolonu)
+ *    — Finansal Özet paneli kaldırıldı, bu panel o alanı karşılar.
  *  - ProductionPanel: dolu (good/scrap) ve boş durum.
  *  - AiPanel: idle render (fetch yalnız açılınca; render'da çağrı yok).
  *  - Sabit hex yok (yalnız onaylı CSS var) — finansal tint kontrolü.
  */
 import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import FinancePanel from "@/components/dashboard/overview/FinancePanel";
 import ProductionPanel from "@/components/dashboard/overview/ProductionPanel";
 import AiPanel from "@/components/dashboard/overview/AiPanel";
 import { StockPanel } from "@/components/dashboard/overview/RealPanels";
-import type { FinanceSummary, ReceivablesView, CategorySegment } from "@/lib/dashboard-view-model";
+import type { CategorySegment } from "@/lib/dashboard-view-model";
 
-const FIN: FinanceSummary = { revenue: 1_000_000, cost: 710_000, grossProfit: 290_000, marginPct: 29, costPct: 71 };
-const RECV: ReceivablesView = {
-    buckets: [
-        { label: "Vadesi gelmemiş", value: 100_000, tone: "success" },
-        { label: "0–30 gün", value: 50_000, tone: "info" },
-        { label: "31–60 gün", value: 20_000, tone: "warning" },
-        { label: "60+ gün", value: 10_000, tone: "danger" },
-    ],
-    total: 180_000, overdue60: 10_000, overduePct: 44,
-};
+describe("StockPanel — tam genişlik revize (Finansal Özet'in yerini karşılar)", () => {
+    const SEGS: CategorySegment[] = [
+        { name: "Vana", value: 600_000, color: "var(--accent)" },
+        { name: "Aktüatör", value: 400_000, color: "var(--success)" },
+    ];
+    const STATS = { productCount: 42, criticalCount: 3, riskCount: 5 };
 
-describe("FinancePanel", () => {
-    it("dolu: brüt kâr + marj + money-flow + alacak yaşlandırma", () => {
-        const html = renderToStaticMarkup(<FinancePanel reporting="USD" monthLabel="Haziran 2026" finance={FIN} canViewCosts receivables={RECV} />);
-        expect(html).toContain("Brüt Kâr");
-        expect(html).toContain("29 marj");
-        expect(html).toContain("Maliyet 71%");
-        expect(html).toContain("Alacak Yaşlandırma");
-        expect(html).toContain("ödeme entegrasyonu beklemede");
+    it("dolu: pay yüzdesi + Toplam Stok Değeri + özet istatistikler", () => {
+        const html = renderToStaticMarkup(<StockPanel segments={SEGS} currency="USD" canView stats={STATS} />);
+        expect(html).toContain("Toplam Stok Değeri");
+        expect(html).toContain("%60.0");
+        expect(html).toContain("%40.0");
+        expect(html).toContain("Aktif ürün");
+        expect(html).toContain("Kritik stok");
+        expect(html).toContain("Risk bandında");
+        expect(html).toContain("2 kategori");
     });
-    it("yetki yok (canViewCosts=false) → 'yetki yok' mesajı", () => {
-        const html = renderToStaticMarkup(<FinancePanel reporting="USD" monthLabel="Haziran 2026" finance={null} canViewCosts={false} receivables={RECV} />);
-        expect(html).toContain("Maliyet/kâr görüntüleme yetkiniz yok");
-        expect(html).toContain("Alacak Yaşlandırma");
+    it("stats verilmezse istatistik kolonu satırları yok ama toplam var", () => {
+        const html = renderToStaticMarkup(<StockPanel segments={SEGS} currency="USD" canView />);
+        expect(html).toContain("Toplam Stok Değeri");
+        expect(html).not.toContain("Aktif ürün");
     });
-    it("yetki var ama veri yok (cold start) → 'veri henüz hazır değil' (dürüst, yetki demez)", () => {
-        const html = renderToStaticMarkup(<FinancePanel reporting="USD" monthLabel="Haziran 2026" finance={null} canViewCosts receivables={RECV} />);
-        expect(html).toContain("Maliyet verisi henüz hazır değil");
-        expect(html).not.toContain("yetkiniz yok");
+    it("RBAC: canView=false → değer kilitli mesajı", () => {
+        const html = renderToStaticMarkup(<StockPanel segments={SEGS} currency="USD" canView={false} />);
+        expect(html).toContain("Stok değerini görüntüleme yetkiniz yok");
+        expect(html).not.toContain("Toplam Stok Değeri");
     });
-    it("RBAC: receivables null → alacak kilitli mesajı", () => {
-        const html = renderToStaticMarkup(<FinancePanel reporting="USD" monthLabel="Haziran 2026" finance={FIN} canViewCosts receivables={null} />);
-        expect(html).toContain("Alacak özeti görüntüleme yetkiniz yok");
+    it("boş segments → boş durum mesajı", () => {
+        const html = renderToStaticMarkup(<StockPanel segments={[]} currency="USD" canView stats={STATS} />);
+        expect(html).toContain("Stok verisi yok");
     });
     it("sabit hex yok (yalnız var/color-mix)", () => {
-        const html = renderToStaticMarkup(<FinancePanel reporting="USD" monthLabel="Haziran 2026" finance={FIN} canViewCosts receivables={RECV} />);
+        const html = renderToStaticMarkup(<StockPanel segments={SEGS} currency="USD" canView stats={STATS} />);
         expect(html).not.toMatch(/#[0-9a-fA-F]{6}/);
     });
 });
