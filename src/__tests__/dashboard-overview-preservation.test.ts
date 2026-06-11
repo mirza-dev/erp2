@@ -12,6 +12,8 @@ import { join } from "node:path";
 const root = process.cwd();
 const PAGE = readFileSync(join(root, "src/app/dashboard/page.tsx"), "utf8");
 const SIDEBAR = readFileSync(join(root, "src/components/layout/Sidebar.tsx"), "utf8");
+const GLOBALS = readFileSync(join(root, "src/app/globals.css"), "utf8");
+const KPI_CARD = readFileSync(join(root, "src/components/dashboard/overview/KpiCard.tsx"), "utf8");
 
 describe("işlev kaybı yok — link kartları Sidebar'da korunur", () => {
     it("Sidebar Stok & Ürünler → /dashboard/products", () => {
@@ -58,6 +60,7 @@ describe("view-model normalizasyon fonksiyonları import edilir", () => {
 describe("tasarım panelleri render edilir (DashDetailed)", () => {
     it("kpi-strip + trend + 6 panel + AI", () => {
         expect(PAGE).toMatch(/className="kpi-strip"/);
+        expect(PAGE).toMatch(/aria-label="Temel performans göstergeleri"/);
         expect(PAGE).toMatch(/<TrendChart/);
         expect(PAGE).toMatch(/<ProductionPanel/);
         expect(PAGE).toMatch(/<OrdersPanel/);
@@ -71,6 +74,23 @@ describe("tasarım panelleri render edilir (DashDetailed)", () => {
         expect(PAGE).toMatch(/className="seg"/);
         expect(PAGE).toMatch(/Rapor indir/);
         expect(PAGE).toMatch(/window\.print\(\)/);
+    });
+});
+
+describe("executive KPI şeridi yerleşim kilidi", () => {
+    it("yedi kolon tek satırdır; dar görünümde wrap yerine yatay scroll + snap kullanır", () => {
+        expect(GLOBALS).toMatch(/\.kpi-strip\s*\{[\s\S]*grid-template-columns:\s*repeat\(7,\s*minmax\(182px,\s*1fr\)\)/);
+        expect(GLOBALS).toMatch(/\.kpi-strip\s*\{[\s\S]*overflow-x:\s*auto/);
+        expect(GLOBALS).toMatch(/\.kpi-strip\s*\{[\s\S]*scroll-snap-type:\s*x proximity/);
+        expect(GLOBALS).not.toMatch(/\.kpi-strip\s*\{[\s\S]{0,250}auto-fit/);
+    });
+
+    it("kart yüksekliği ve minimum genişliği kararlı; hover React state kullanmaz", () => {
+        expect(GLOBALS).toMatch(/\.kpi-card\s*\{[\s\S]*height:\s*138px/);
+        expect(GLOBALS).toMatch(/\.kpi-card\s*\{[\s\S]*min-width:\s*182px/);
+        expect(KPI_CARD).not.toMatch(/useState|onMouseEnter|onMouseLeave/);
+        expect(KPI_CARD).toMatch(/scrollIntoView\(\{ block: "nearest", inline: "nearest" \}\)/);
+        expect(KPI_CARD).not.toMatch(/KPI_ICONS|data-kpi-icon|CircleDollarSign|TriangleAlert/);
     });
 });
 

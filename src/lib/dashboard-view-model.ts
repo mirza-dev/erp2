@@ -738,7 +738,7 @@ export function aiPointsFromOpsSummary(
 }
 
 // ════════════════════════════════════════════════════════════════
-//  KPI şeridi (6 KPI — tasarımla birebir)
+//  KPI şeridi (executive iş akışı sırası)
 // ════════════════════════════════════════════════════════════════
 
 export interface DashboardKpi {
@@ -776,7 +776,8 @@ export interface KpiPerms {
 }
 
 /**
- * 5 KPI: Dönem Ciro · Açık Siparişler · Stok Değeri · Dönem Üretim · Açık Uyarılar.
+ * Ana sıra: Ciro · Teklif Hattı · Açık Siparişler · Yoldaki Mal · Stok Değeri · Üretim · Uyarılar.
+ * Opsiyonel veri gelmezse Teklif/Yoldaki kartları boşluk bırakmadan atlanır.
  * Finansal değerler raporlama para birimine normalize + RBAC ile maskeli.
  * (Açık Alacak kartı kaldırıldı — yukarıdaki receivablesAging notu.)
  */
@@ -825,30 +826,17 @@ export function buildKpis(
     // başarısız) kart hiç üretilmez; şerit fail-soft daralır. ──
     const kpis: DashboardKpi[] = [];
 
-    kpis.push(
-        {
-            id: "ciro",
-            label: `${period.kpiLabel} Ciro`,
-            value: ciroEmpty ? "—" : formatReportingCompact(thisRev, reporting, canPrices),
-            tone: "accent",
-            sub: ciroEmpty ? "Bu dönemde sipariş yok" : period.currentLabel,
-            delta: revDelta,
-            up: revUp,
-            spark: canPrices && !ciroEmpty ? revenue.slice(-6) : undefined,
-            href: "/dashboard/orders",
-        },
-        {
-            id: "siparis",
-            label: "Açık Siparişler",
-            value: formatNumber(open.length),
-            tone: "accent",
-            sub: `${formatReportingCompact(openVal, reporting, canPrices)} değerinde · anlık`,
-            delta: pending > 0 ? `${pending} onay bekliyor` : undefined,
-            up: true,
-            spark: counts.slice(-6),
-            href: "/dashboard/orders",
-        },
-    );
+    kpis.push({
+        id: "ciro",
+        label: `${period.kpiLabel} Ciro`,
+        value: ciroEmpty ? "—" : formatReportingCompact(thisRev, reporting, canPrices),
+        tone: "accent",
+        sub: ciroEmpty ? "Bu dönemde sipariş yok" : period.currentLabel,
+        delta: revDelta,
+        up: revUp,
+        spark: canPrices && !ciroEmpty ? revenue.slice(-6) : undefined,
+        href: "/dashboard/orders",
+    });
 
     if (input.quotes != null) {
         const pipe = quotePipelineView(input.quotes, reporting, rates, todayStr);
@@ -873,14 +861,15 @@ export function buildKpis(
     }
 
     kpis.push({
-        id: "stok",
-        label: "Stok Değeri",
-        value: formatReportingCompact(stockVal, reporting, canPrices),
-        tone: "success",
-        sub: canPrices ? `Satılabilir ${formatReportingCompact(availVal, reporting, true)} · anlık` : `${formatNumber(activeCount)} aktif ürün · anlık`,
-        delta: `${formatNumber(activeCount)} aktif ürün`,
+        id: "siparis",
+        label: "Açık Siparişler",
+        value: formatNumber(open.length),
+        tone: "accent",
+        sub: `${formatReportingCompact(openVal, reporting, canPrices)} değerinde · anlık`,
+        delta: pending > 0 ? `${pending} onay bekliyor` : undefined,
         up: true,
-        href: "/dashboard/products",
+        spark: counts.slice(-6),
+        href: "/dashboard/orders",
     });
 
     if (input.purchaseOrders != null) {
@@ -903,6 +892,17 @@ export function buildKpis(
             href: "/dashboard/purchase/orders",
         });
     }
+
+    kpis.push({
+        id: "stok",
+        label: "Stok Değeri",
+        value: formatReportingCompact(stockVal, reporting, canPrices),
+        tone: "success",
+        sub: canPrices ? `Satılabilir ${formatReportingCompact(availVal, reporting, true)} · anlık` : `${formatNumber(activeCount)} aktif ürün · anlık`,
+        delta: `${formatNumber(activeCount)} aktif ürün`,
+        up: true,
+        href: "/dashboard/products",
+    });
 
     kpis.push(
         {

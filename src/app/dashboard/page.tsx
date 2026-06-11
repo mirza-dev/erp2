@@ -216,7 +216,12 @@ export default function DashboardPage() {
             </div>
 
             {/* KPI şeridi */}
-            <div className="kpi-strip" style={{ marginBottom: unconvertible.length > 0 ? 8 : gap }}>
+            <div
+                className="kpi-strip"
+                role="region"
+                aria-label="Temel performans göstergeleri"
+                style={{ marginBottom: unconvertible.length > 0 ? 8 : gap }}
+            >
                 {kpis.map((k) => <KpiCard key={k.id} kpi={k} />)}
             </div>
             {unconvertible.length > 0 && (

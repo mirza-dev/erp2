@@ -336,7 +336,7 @@ describe("aiPointsFromOpsSummary", () => {
     });
 });
 
-// ── buildKpis (6 KPI + RBAC) ─────────────────────────────────
+// ── buildKpis (executive sıra + RBAC) ─────────────────────────
 describe("buildKpis", () => {
     const input = {
         products: [mkProduct({ on_hand: 100, price: 32_000, currency: "TRY" })], // 3.2M TRY → 100K USD
@@ -360,7 +360,21 @@ describe("buildKpis", () => {
             quotes: [{ status: "sent", currency: "USD", grandTotal: 5000, validUntil: "2026-06-17" }],
             purchaseOrders: [{ status: "confirmed", currency: "USD", grand_total: 2000, expected_date: "2026-06-10" }],
         }, allPerms, NOW);
-        expect(k.map((x) => x.id)).toEqual(["ciro", "siparis", "teklif", "stok", "yoldaki", "uretim", "uyari"]);
+        expect(k.map((x) => x.id)).toEqual(["ciro", "teklif", "siparis", "yoldaki", "stok", "uretim", "uyari"]);
+    });
+
+    it("opsiyonel kartlar eksikken kalan KPI'lar executive sırasını korur", () => {
+        const quoteOnly = buildKpis({
+            ...input,
+            quotes: [{ status: "sent", currency: "USD", grandTotal: 5000, validUntil: null }],
+        }, allPerms, NOW);
+        expect(quoteOnly.map((x) => x.id)).toEqual(["ciro", "teklif", "siparis", "stok", "uretim", "uyari"]);
+
+        const purchaseOnly = buildKpis({
+            ...input,
+            purchaseOrders: [{ status: "confirmed", currency: "USD", grand_total: 2000, expected_date: null }],
+        }, allPerms, NOW);
+        expect(purchaseOnly.map((x) => x.id)).toEqual(["ciro", "siparis", "yoldaki", "stok", "uretim", "uyari"]);
     });
 
     it("Teklif Hattı: değer+adet+expiring warning subTone+href", () => {
