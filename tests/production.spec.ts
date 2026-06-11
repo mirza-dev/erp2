@@ -66,11 +66,13 @@ test("üretim kaydı silinebiliyor", async ({ page }) => {
     await expect(page.locator("main")).toBeVisible();
 });
 
-test("tarih filtresi çalışıyor", async ({ page }) => {
+test("seçilen tarih günlük kayıt bağlamını değiştiriyor", async ({ page }) => {
     const dateInput = page.locator("input[type='date']").first();
     if (await dateInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await dateInput.fill("2025-01-01");
-        await page.waitForTimeout(500);
-        await expect(page.locator("main")).toBeVisible();
+        await expect(page.getByText(/1 Ocak 2025 Üretim Kayıtları/i)).toBeVisible();
+        await expect(page.getByRole("button", { name: /Bugüne Dön/i })).toBeVisible();
+        await expect(page.getByText(/Geçmiş tarih seçili/i)).toBeVisible();
+        await expect(dateInput).toHaveAttribute("max", /^\d{4}-\d{2}-\d{2}$/);
     }
 });

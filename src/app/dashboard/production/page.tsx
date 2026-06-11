@@ -10,7 +10,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { useVoiceRecorder, type VoiceRecorderResult } from "@/hooks/useVoiceRecorder";
 import type { VoiceProductionEntry } from "@/lib/services/voice-service";
 import { mergeFireIntoNote } from "@/lib/voice-note-helpers";
-import { Trash2 } from "lucide-react";
+import { CalendarDays, Mic, RotateCcw, Square, Trash2, X } from "lucide-react";
 
 interface FormLine {
     id: string;
@@ -53,6 +53,28 @@ const today = () => {
     return `${y}-${m}-${day}`;
 };
 
+const productionDateFormatter = new Intl.DateTimeFormat("tr-TR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+});
+
+export function formatProductionDateLabel(value: string): string {
+    const parts = value.split("-").map(Number);
+    if (parts.length !== 3 || parts.some(part => !Number.isInteger(part))) return value;
+    const [year, month, day] = parts;
+    const date = new Date(year, month - 1, day);
+    if (
+        Number.isNaN(date.getTime())
+        || date.getFullYear() !== year
+        || date.getMonth() !== month - 1
+        || date.getDate() !== day
+    ) {
+        return value;
+    }
+    return productionDateFormatter.format(date);
+}
+
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
     padding: "6px 10px",
@@ -89,14 +111,18 @@ function ProductionPageInner() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const searchParams = useSearchParams();
-    const [tarih, setTarih] = useState(today());
+    const [tarih, setTarih] = useState(() => today());
     const [lines, setLines] = useState<FormLine[]>([newLine()]);
     const [isSaving, setIsSaving] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     const todayStr = today();
-    const todayLogs = uretimKayitlari.filter(k => k.tarih === todayStr);
+    const selectedDateLogs = uretimKayitlari.filter(k => k.tarih === tarih);
+    const otherDateLogs = uretimKayitlari.filter(k => k.tarih !== tarih);
+    const isTodaySelected = tarih === todayStr;
+    const isPastDateSelected = tarih < todayStr;
+    const selectedDateLabel = formatProductionDateLabel(tarih);
     const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
     const transcriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -324,7 +350,7 @@ function ProductionPageInner() {
                 </div>
             )}
             {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
                 <div>
                     <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                         Üretim Girişi
@@ -333,14 +359,61 @@ function ProductionPageInner() {
                         Günlük üretim miktarlarını girerek stoğu güncelle
                     </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <input
-                        type="date"
-                        value={tarih}
-                        onChange={e => setTarih(e.target.value)}
-                        aria-label="Üretim tarihi"
-                        style={{ ...inputStyle, width: "140px" }}
-                    />
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "7px", maxWidth: "100%" }}>
+                    <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end", flexWrap: "wrap", gap: "8px" }}>
+                        <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <span style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "5px",
+                                fontSize: "10.5px",
+                                fontWeight: 650,
+                                color: "var(--text-secondary)",
+                                textTransform: "uppercase",
+                                letterSpacing: "0.04em",
+                            }}>
+                                <CalendarDays size={12} aria-hidden="true" />
+                                Kayıt Tarihi
+                            </span>
+                            <input
+                                type="date"
+                                value={tarih}
+                                max={todayStr}
+                                onChange={e => setTarih(!e.target.value || e.target.value > todayStr ? todayStr : e.target.value)}
+                                aria-label="Kayıt tarihi"
+                                style={{ ...inputStyle, width: "150px", minHeight: "36px" }}
+                            />
+                        </label>
+                        {!isTodaySelected && (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                leftIcon={<RotateCcw size={13} />}
+                                onClick={() => setTarih(todayStr)}
+                            >
+                                Bugüne Dön
+                            </Button>
+                        )}
+                    </div>
+                    {isPastDateSelected && (
+                        <output
+                            style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "5px 8px",
+                                border: "var(--line-width) solid var(--warning-border)",
+                                borderRadius: "6px",
+                                background: "var(--warning-bg)",
+                                color: "var(--warning-text)",
+                                fontSize: "11px",
+                                lineHeight: 1.35,
+                            }}
+                        >
+                            <CalendarDays size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
+                            Geçmiş tarih seçili. Kaydedilen üretim stoğu şimdi günceller.
+                        </output>
+                    )}
                 </div>
             </div>
 
@@ -362,10 +435,21 @@ function ProductionPageInner() {
                         Üretim Kalemleri
                     </div>
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        {/* Kayıt aktif: animasyonlu barlar + süre + durdur + iptal */}
+                        {/* Kayıt aktif: seviye göstergesi + süre + kontrollü aksiyonlar */}
                         {isRecording && (
-                            <>
-                                <span style={{ display: "flex", gap: "2px", alignItems: "flex-end", height: "18px" }}>
+                            <div
+                                aria-live="polite"
+                                style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    padding: "4px 5px 4px 10px",
+                                    border: "var(--line-width) solid var(--danger-border)",
+                                    borderRadius: "8px",
+                                    background: "var(--danger-bg)",
+                                }}
+                            >
+                                <span aria-hidden="true" style={{ display: "flex", gap: "2px", alignItems: "flex-end", height: "17px" }}>
                                     {[0.5, 0.75, 1, 0.75, 0.5].map((scale, i) => {
                                         const h = Math.max(3, Math.round((volume / 220) * 18 * scale));
                                         return (
@@ -376,60 +460,46 @@ function ProductionPageInner() {
                                         );
                                     })}
                                 </span>
-                                <span style={{ fontSize: "12px", color: "var(--danger-text)" }}>
+                                <span className="mono" style={{ minWidth: "34px", fontSize: "11.5px", fontWeight: 650, color: "var(--danger-text)" }}>
                                     {String(Math.floor(duration / 60)).padStart(2, "0")}:{String(duration % 60).padStart(2, "0")}
                                 </span>
-                                <button
+                                <Button
+                                    variant="dangerSoft"
+                                    size="xs"
+                                    leftIcon={<Square size={11} fill="currentColor" />}
                                     onClick={stopRecording}
-                                    style={{
-                                        fontSize: "13px", padding: "5px 12px",
-                                        border: "0.5px solid var(--danger-border)",
-                                        borderRadius: "6px", background: "var(--danger-bg)",
-                                        color: "var(--danger-text)", cursor: "pointer",
-                                        display: "flex", alignItems: "center", gap: "5px",
-                                    }}
                                 >
-                                    ■ Durdur
-                                </button>
-                                <button
+                                    Kaydı Bitir
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    iconOnly
+                                    leftIcon={<X size={13} />}
                                     onClick={cancelRecording}
-                                    style={{
-                                        fontSize: "12px", padding: "5px 8px",
-                                        border: "0.5px solid var(--border-secondary)",
-                                        borderRadius: "6px", background: "transparent",
-                                        color: "var(--text-tertiary)", cursor: "pointer",
-                                    }}
+                                    aria-label="Ses kaydını iptal et"
                                     title="İptal et"
-                                >
-                                    İptal
-                                </button>
-                            </>
+                                />
+                            </div>
                         )}
                         {/* İşleniyor */}
                         {isProcessing && !isRecording && (
-                            <span style={{ fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "5px" }}>
-                                <span style={{ display: "inline-block", width: "10px", height: "10px", border: "1.5px solid var(--border-secondary)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                                Ses işleniyor...
-                            </span>
+                            <Button variant="secondary" size="sm" loading disabled>
+                                Ses İşleniyor
+                            </Button>
                         )}
                         {/* Hazır: sesli giriş butonu */}
                         {!isRecording && !isProcessing && (
-                            <button
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                leftIcon={<Mic size={14} />}
                                 onClick={isDemo ? () => toast({ type: "info", message: DEMO_BLOCK_TOAST }) : startRecording}
                                 disabled={isDemo}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sesli üretim girişi (90sn max) — Klavyeden Ctrl+M ile de başlatabilirsiniz"}
-                                style={{
-                                    fontSize: "13px", padding: "5px 12px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "6px", background: "transparent",
-                                    color: isDemo ? "var(--text-tertiary)" : "var(--text-secondary)",
-                                    cursor: isDemo ? "not-allowed" : "pointer",
-                                    display: "flex", alignItems: "center", gap: "5px",
-                                    opacity: isDemo ? 0.5 : 1,
-                                }}
                             >
-                                🎤 Sesli Giriş
-                            </button>
+                                Sesli Giriş
+                            </Button>
                         )}
                     </div>
                 </div>
@@ -444,7 +514,7 @@ function ProductionPageInner() {
                         background: "var(--bg-secondary)",
                         display: "flex", alignItems: "center", gap: "6px",
                     }}>
-                        <span style={{ opacity: 0.6 }}>🎤</span>
+                        <Mic size={13} strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0, color: "var(--accent-text)" }} />
                         <span>&ldquo;{voiceTranscript}&rdquo;</span>
                     </div>
                 )}
@@ -457,7 +527,7 @@ function ProductionPageInner() {
                             <th style={thStyle}>Ürün</th>
                             <th style={{ ...thStyle, width: "90px", textAlign: "right" as const }}>Adet</th>
                             <th style={thStyle}>Not</th>
-                            <th style={{ ...thStyle, width: "34px" }}></th>
+                            <th style={{ ...thStyle, width: "34px" }} aria-label="Satır işlemleri"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -472,6 +542,7 @@ function ProductionPageInner() {
                                         <select
                                             value={line.productId}
                                             onChange={e => setLineField(line.id, "productId", e.target.value)}
+                                            aria-label={`${idx + 1}. satır ürün`}
                                             style={{ ...inputStyle }}
                                         >
                                             <option value="" disabled>Ürün seç...</option>
@@ -504,6 +575,7 @@ function ProductionPageInner() {
                                             value={line.adet}
                                             onChange={e => setLineField(line.id, "adet", e.target.value)}
                                             placeholder="0"
+                                            aria-label={`${idx + 1}. satır adet`}
                                             style={{ ...inputStyle, textAlign: "right", width: "80px" }}
                                         />
                                     </td>
@@ -513,11 +585,13 @@ function ProductionPageInner() {
                                             value={line.notlar}
                                             onChange={e => setLineField(line.id, "notlar", e.target.value)}
                                             placeholder="Not (opsiyonel)"
+                                            aria-label={`${idx + 1}. satır not`}
                                             style={inputStyle}
                                         />
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
+                                            type="button"
                                             onClick={() => removeLine(line.id)}
                                             aria-label={`${idx + 1}. satırı kaldır`}
                                             style={{
@@ -542,6 +616,7 @@ function ProductionPageInner() {
 
                 <div style={{ padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>
                     <button
+                        type="button"
                         onClick={() => setLines(prev => [...prev, newLine()])}
                         style={{
                             fontSize: "12px",
@@ -564,7 +639,7 @@ function ProductionPageInner() {
                 </div>
             </div>
 
-            {/* Today's log */}
+            {/* Selected date log */}
             <div style={{
                 background: "var(--bg-primary)",
                 border: "0.5px solid var(--border-tertiary)",
@@ -577,20 +652,22 @@ function ProductionPageInner() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
+                    gap: "8px",
+                    flexWrap: "wrap",
                 }}>
                     <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
-                        Bugünkü Üretim Kayıtları
+                        {isTodaySelected ? "Bugünkü Üretim Kayıtları" : `${selectedDateLabel} Üretim Kayıtları`}
                     </div>
-                    {todayLogs.length > 0 && (
+                    {selectedDateLogs.length > 0 && (
                         <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                            Toplam: {todayLogs.reduce((s, k) => s + k.adet, 0).toLocaleString("tr-TR")} adet · {todayLogs.length} kalem
+                            Toplam: {selectedDateLogs.reduce((s, k) => s + k.adet, 0).toLocaleString("tr-TR")} adet · {selectedDateLogs.length} kalem
                         </div>
                     )}
                 </div>
 
-                {todayLogs.length === 0 ? (
+                {selectedDateLogs.length === 0 ? (
                     <div style={{ padding: "24px 16px", textAlign: "center", fontSize: "13px", color: "var(--text-tertiary)" }}>
-                        Bugün henüz üretim kaydı girilmedi
+                        {isTodaySelected ? "Bugün henüz üretim kaydı girilmedi" : "Seçili tarihte üretim kaydı bulunmuyor"}
                     </div>
                 ) : (
                     <div style={{ overflowX: "auto" }}>
@@ -601,11 +678,11 @@ function ProductionPageInner() {
                                 <th style={thStyle}>Ürün</th>
                                 <th style={{ ...thStyle, textAlign: "right" as const }}>Üretilen Adet</th>
                                 <th style={thStyle}>Not</th>
-                                <th style={{ ...thStyle, width: "34px" }}></th>
+                                <th style={{ ...thStyle, width: "34px" }} aria-label="Kayıt işlemleri"></th>
                             </tr>
                         </thead>
                         <tbody>
-                            {todayLogs.map(kaydi => (
+                            {selectedDateLogs.map(kaydi => (
                                 <tr key={kaydi.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>
                                     <td style={{ ...tdStyle, fontWeight: 500 }}>{kaydi.productName}</td>
@@ -637,8 +714,8 @@ function ProductionPageInner() {
                 )}
             </div>
 
-            {/* Historical log (all days) */}
-            {uretimKayitlari.filter(k => k.tarih !== todayStr).length > 0 && (
+            {/* Other date logs */}
+            {otherDateLogs.length > 0 && (
                 <div style={{
                     background: "var(--bg-primary)",
                     border: "0.5px solid var(--border-tertiary)",
@@ -647,7 +724,7 @@ function ProductionPageInner() {
                 }}>
                     <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                         <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
-                            Geçmiş Kayıtlar
+                            Diğer Günlerin Kayıtları
                         </div>
                     </div>
                     <div style={{ overflowX: "auto" }}>
@@ -661,7 +738,7 @@ function ProductionPageInner() {
                             </tr>
                         </thead>
                         <tbody>
-                            {uretimKayitlari.filter(k => k.tarih !== todayStr).map(kaydi => (
+                            {otherDateLogs.map(kaydi => (
                                 <tr key={kaydi.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.tarih}</td>
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>
@@ -678,7 +755,7 @@ function ProductionPageInner() {
             {/* Silme onay modalı — stok ters hareketi geri-dönüşü zor olduğundan
                 tek tıkla silmeyi engeller (role=dialog + aria-modal, PO precedent) */}
             {confirmDeleteId && (() => {
-                const target = todayLogs.find(k => k.id === confirmDeleteId);
+                const target = selectedDateLogs.find(k => k.id === confirmDeleteId);
                 if (!target) return null;
                 const busy = deletingId === confirmDeleteId;
                 return (

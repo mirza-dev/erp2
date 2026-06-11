@@ -7,6 +7,7 @@
  *   2. [silme onayı] kayıt silme tek-tıktan onay modalına (role=dialog/aria-modal/
  *      aria-labelledby + başlık id); × yalnız modalı açar.
  *   3. [a11y] tarih input + satır-kaldır × + silme × aria-label taşır.
+ *   4. [tarih bağlamı] seçilen gün kayıt listesi, başlık ve silme hedefini birlikte yönetir.
  *
  * Kaynak okuma yöntemi (vendors-ui / voice-production-page aynası): JSX davranışı
  * jsdom render etmeden source-regex ile kilitlenir.
@@ -69,14 +70,55 @@ describe("Üretim — kayıt silme onay modalı", () => {
 
 describe("Üretim — a11y aria-label'lar", () => {
     it("tarih input aria-label taşır", () => {
-        expect(PAGE_SRC).toMatch(/aria-label="Üretim tarihi"/);
+        expect(PAGE_SRC).toMatch(/aria-label="Kayıt tarihi"/);
     });
 
     it("satır-kaldır × butonu aria-label taşır", () => {
         expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{idx \+ 1\}\. satırı kaldır`\}/);
     });
 
+    it("satır alanları erişilebilir ad, native aksiyon butonları açık type taşır", () => {
+        expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{idx \+ 1\}\. satır ürün`\}/);
+        expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{idx \+ 1\}\. satır adet`\}/);
+        expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{idx \+ 1\}\. satır not`\}/);
+        expect(PAGE_SRC.match(/type="button"/g)).toHaveLength(2);
+    });
+
     it("silme × butonu aria-label taşır", () => {
         expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{kaydi\.productName\} üretim kaydını sil`\}/);
+    });
+
+    it("ses kaydı iptal kontrolü erişilebilir ada sahiptir", () => {
+        expect(PAGE_SRC).toMatch(/aria-label="Ses kaydını iptal et"/);
+    });
+});
+
+describe("Üretim — seçili tarih aktif çalışma bağlamıdır", () => {
+    it("seçilen tarih hem kaydetme payload'ına hem günlük kayıt listesine gider", () => {
+        expect(PAGE_SRC).toMatch(/tarih,\s*\n\s*girenKullanici/);
+        expect(PAGE_SRC).toMatch(/const selectedDateLogs = uretimKayitlari\.filter\(k => k\.tarih === tarih\)/);
+        expect(PAGE_SRC).not.toMatch(/const todayLogs =/);
+    });
+
+    it("seçili gün dışındaki kayıtlar ayrı listelenir ve silme hedefi seçili günden bulunur", () => {
+        expect(PAGE_SRC).toMatch(/const otherDateLogs = uretimKayitlari\.filter\(k => k\.tarih !== tarih\)/);
+        expect(PAGE_SRC).toContain("Diğer Günlerin Kayıtları");
+        expect(PAGE_SRC).toMatch(/const target = selectedDateLogs\.find\(k => k\.id === confirmDeleteId\)/);
+    });
+
+    it("gelecek tarih ve boş tarih arayüzde bugüne sabitlenir", () => {
+        expect(PAGE_SRC).toMatch(/max=\{todayStr\}/);
+        expect(PAGE_SRC).toMatch(/!e\.target\.value \|\| e\.target\.value > todayStr \? todayStr : e\.target\.value/);
+    });
+
+    it("geçmiş tarih uyarısı ve Bugüne Dön aksiyonu görünür", () => {
+        expect(PAGE_SRC).toContain("Geçmiş tarih seçili. Kaydedilen üretim stoğu şimdi günceller.");
+        expect(PAGE_SRC).toContain("Bugüne Dön");
+        expect(PAGE_SRC).toMatch(/onClick=\{\(\) => setTarih\(todayStr\)\}/);
+    });
+
+    it("seçili tarih için dinamik başlık ve boş durum metni kullanılır", () => {
+        expect(PAGE_SRC).toContain('`${selectedDateLabel} Üretim Kayıtları`');
+        expect(PAGE_SRC).toContain("Seçili tarihte üretim kaydı bulunmuyor");
     });
 });

@@ -76,6 +76,19 @@ describe("Faz 10 — prefillLineFromQuery (pure helper)", () => {
     });
 });
 
+describe("Üretim tarihi — formatProductionDateLabel", () => {
+    it("ISO tarihi Türkçe okunabilir başlığa çevirir", async () => {
+        const { formatProductionDateLabel } = await import("@/app/dashboard/production/page");
+        expect(formatProductionDateLabel("2026-06-10")).toMatch(/10.*Haziran.*2026/i);
+    });
+
+    it("geçersiz tarihi değiştirmeden döndürür", async () => {
+        const { formatProductionDateLabel } = await import("@/app/dashboard/production/page");
+        expect(formatProductionDateLabel("2026-02-31")).toBe("2026-02-31");
+        expect(formatProductionDateLabel("geçersiz")).toBe("geçersiz");
+    });
+});
+
 describe("Faz 10 — production page source-regex", () => {
     let src = "";
 

@@ -87,4 +87,12 @@ describe("V3 — mikrofon button a11y hint", () => {
     it("button title attribute'unda 'Ctrl+M' geçiyor", () => {
         expect(SOURCE).toMatch(/title=\{[^}]*Ctrl\+M/);
     });
+
+    it("hazır/kayıt durumları ortak Button + Lucide ikonlarla render edilir; mikrofon emojisi yok", () => {
+        expect(SOURCE).toMatch(/leftIcon=\{<Mic size=\{14\} \/>}/);
+        expect(SOURCE).toMatch(/leftIcon=\{<Square size=\{11\} fill="currentColor" \/>}/);
+        expect(SOURCE).toMatch(/aria-label="Ses kaydını iptal et"/);
+        expect(SOURCE).not.toContain("🎤");
+        expect(SOURCE).not.toContain("■ Durdur");
+    });
 });
