@@ -13,7 +13,7 @@ import DashboardReport from "@/components/dashboard/overview/DashboardReport";
 import {
     buildKpis, periodModel, revenueByPeriod, orderCountsByPeriod, cogsByPeriod,
     stockValueByCategoryReporting, productionDailySeries,
-    reorderView, alertsView, recentOrdersView,
+    reorderView, alertsView, recentOrdersView, listUnconvertibleCurrencies,
     type ExchangeRates, type CogsRow, type RangeKey,
 } from "@/lib/dashboard-view-model";
 
@@ -37,11 +37,14 @@ const TrendLegend = (
 
 export default function DashboardPage() {
     const { products, orders, uretimKayitlari, openAlerts, reorderSuggestions } = useData();
-    const { canViewSalesPrices, canViewPurchaseCosts, canViewFinancialSummary } = usePermissions();
+    const { canViewSalesPrices, canViewPurchaseCosts } = usePermissions();
 
     const [range, setRange] = useState<RangeKey>("Ay");
     const [finance, setFinance] = useState<FinanceData>({ reportingCurrency: "USD", canViewCosts: false, cogs: null });
     const [rates, setRates] = useState<ExchangeRates | null>(null);
+    // Kur fetch'i sonuçlandı mı? Uyarı satırı yükleme yarışında FLASH etmesin
+    // diye yalnız fetch settle olduktan sonra değerlendirilir.
+    const [ratesResolved, setRatesResolved] = useState(false);
     const [preparedBy, setPreparedBy] = useState<string | null>(null);
 
     // Maliyet + raporlama para birimi + döviz kurları (mount'ta bir kez)
@@ -57,7 +60,8 @@ export default function DashboardPage() {
             try {
                 const r = await fetch("/api/exchange-rates");
                 if (r.ok && alive) setRates(await r.json());
-            } catch { /* defansif: TRY=1, diğerleri dönüştürülmez */ }
+            } catch { /* defansif: kur yok → dönüştürülemeyen tutarlar hariç + uyarı */ }
+            finally { if (alive) setRatesResolved(true); }
         })();
         (async () => {
             try {
@@ -78,12 +82,21 @@ export default function DashboardPage() {
     const kpis = useMemo(
         () => buildKpis(
             { products, orders, uretimKayitlari, openAlerts, reporting, rates },
-            { canViewSalesPrices, canViewFinancialSummary },
+            { canViewSalesPrices },
             now,
             period,
         ),
-        [products, orders, uretimKayitlari, openAlerts, reporting, rates, canViewSalesPrices, canViewFinancialSummary, now, period],
+        [products, orders, uretimKayitlari, openAlerts, reporting, rates, canViewSalesPrices, now, period],
     );
+
+    // Kur çözülemeyen para birimleri → toplamların dışında kaldılar; görünür uyarı.
+    const unconvertible = useMemo(() => {
+        if (!ratesResolved) return [];
+        const curs = new Set<string>();
+        for (const o of orders) curs.add(o.currency);
+        for (const p of products) if (p.isActive) curs.add(p.currency);
+        return listUnconvertibleCurrencies(curs, reporting, rates);
+    }, [ratesResolved, orders, products, reporting, rates]);
 
     // ── Trend (ciro + maliyet + sipariş) — seçili döneme göre ──
     const revenueSeries = useMemo(
@@ -178,9 +191,15 @@ export default function DashboardPage() {
             </div>
 
             {/* KPI şeridi */}
-            <div className="kpi-strip" style={{ marginBottom: gap }}>
+            <div className="kpi-strip" style={{ marginBottom: unconvertible.length > 0 ? 8 : gap }}>
                 {kpis.map((k) => <KpiCard key={k.id} kpi={k} />)}
             </div>
+            {unconvertible.length > 0 && (
+                <div role="status" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--warning-text)", marginBottom: gap }}>
+                    <span aria-hidden="true">⚠</span>
+                    Kur verisi alınamadı — {unconvertible.join(", ")} tutarları toplamlara dahil edilemedi.
+                </div>
+            )}
 
             {/* Ciro & Maliyet Trendi */}
             <OverviewPanel

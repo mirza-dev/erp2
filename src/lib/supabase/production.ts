@@ -53,7 +53,9 @@ export async function dbCreateProductionEntry(
     return data;
 }
 
-export async function dbListProductionEntries(productId?: string, limit = 50): Promise<ProductionEntryRow[]> {
+export async function dbListProductionEntries(
+    productId?: string, limit = 50, since?: string,
+): Promise<ProductionEntryRow[]> {
     const supabase = createServiceClient();
     let query = supabase
         .from("production_entries")
@@ -61,6 +63,9 @@ export async function dbListProductionEntries(productId?: string, limit = 50): P
         .order("production_date", { ascending: false })
         .limit(limit);
     if (productId) query = query.eq("product_id", productId);
+    // Tarih penceresi: dashboard dönem KPI'ları için (takvim 5000-fix paterni —
+    // pencere + yüksek explicit limit; düşük satır-limiti dönem toplamını sessizce keser).
+    if (since) query = query.gte("production_date", since);
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data ?? [];

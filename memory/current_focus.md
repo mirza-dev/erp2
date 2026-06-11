@@ -7,7 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-11 (**Ayarlar → "Dosyalar" sekmesi: şirket dosya arşivi (handoff, mig.091) — GREEN**)
+## Son Tamamlanan İş — 2026-06-12 (**Dashboard doğruluk turu — 4 bulgu fix + Açık Alacak kaldırıldı — GREEN**)
+
+**İstek:** "dashboard %100 doğru mu, veriler güvenilir mi, açık alacak semantiği ne" denetimi → "bulguları eksiksiz düzelt + Açık Alacak kartını kaldır." **Kararlar (AskUserQuestion):** ciro=yalnız approved · FX çözülemeyince hariç tut + uyarı.
+
+- **Üretim limit-50 bug'ı:** data-context parametresiz `/api/production` → default 50 kayıt; dönem KPI'ları + 14g seri sessizce eksikti. Fix: `productionFetchUrl()` (`?since=now-120g&limit=5000`, export — testte kilitli), route `since` regex + tavan 5000, db helper `gte(production_date)`. Yan etki: Üretim sayfası geçmişi ~120 gün gösterir.
+- **Ciro yalnız approved:** `isRevenueOrder` pending'i sayıyordu — mig.088'den beri her gönderilen teklif pending sipariş yaratır → kabul edilmemiş teklif ciroyu şişiriyordu. Trend/rapor/boş-dönem aynı fonksiyondan otomatik tutarlı.
+- **FX sessiz karışım:** `toReporting` kur yoksa tutarı ham geçiriyordu (TRY→USD 40 kat). Artık 0 (toplam dışı); `canConvert`+`listUnconvertibleCurrencies` yeni saf helper'lar; page'de `ratesResolved` guard'lı uyarı satırı (flash yok).
+- **Etiket:** "Kritik Uyarılar"→"Açık Uyarılar" (KPI + rapor bölümü; değer tüm open+ack idi, etiket değerle hizalandı).
+- **Açık Alacak KALDIRILDI:** `receivablesAging`/`AgingBucket`/`ReceivablesView` silindi (proxy: createdAt+30g sabit vade, 90g pencere, ödeme düşülmez — `customers.payment_terms_days` bile kullanılmıyordu); 5 KPI kaldı (`kpi-strip` auto-fit uyum sağlar); `KpiPerms.canViewFinancialSummary` kalktı (kart tek tüketici; müşteri sayfaları context'ten kullanmaya devam). Gerçek alacak istenirse `invoices`/`payments` tablolarından (mevcut, hiçbir UI okumuyor).
+- **Test:** yeni `dashboard-data-accuracy.test.ts` (6 source-lock) + view-model/report/preservation yeni sözleşme + geri-gelmez kilitleri; tsc 0 · lint 0 · **5049 test / 365 dosya** · build 0.
+- **Kalan:** görsel smoke — 5 kart, pending teklif gönder→ciro değişmez→onayla→artar, TCMB kapalıyken uyarı satırı.
+
+## Önceki — 2026-06-11 (**Ayarlar → "Dosyalar" sekmesi: şirket dosya arşivi (handoff, mig.091) — GREEN**)
 
 **İstek:** `design_handoff_settings_files_tab/` paketini "detaylı ve eksiksiz implement et, backendi sağlam olsun." **Kararlar (AskUserQuestion):** (1) handoff "api/yapay-zeka sekmelerini tamamen kaldır" diyordu → SİLİNMEDİ, dünkü Bakım/internal-operator işi korunur (müşteri admini zaten görmüyor — handoff'un amacı fiilen sağlanmış); (2) yalnız tablo görünümü (kart/grid prototipte tweak-panel'den geliyordu, toggle speclenmemiş).
 

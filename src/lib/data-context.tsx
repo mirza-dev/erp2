@@ -111,6 +111,18 @@ interface DataContextValue {
 
 // ── Context ─────────────────────────────────────────────────
 
+/**
+ * Üretim fetch URL'i: son 120 günü pencereli + yüksek explicit limitle çeker.
+ * Eski parametresiz çağrı default limit 50'ye düşüyordu → dashboard'ın
+ * "Bu Ay/Çeyrek Üretim" KPI'ı ve 14 günlük seri yoğun dönemlerde sessizce
+ * eksik sayıyordu. 120 gün = güncel çeyrek (≤92g) + 14g seri + 6g spark.
+ */
+export function productionFetchUrl(now: Date = new Date()): string {
+  const since = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 120);
+  const iso = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, "0")}-${String(since.getDate()).padStart(2, "0")}`;
+  return `/api/production?since=${iso}&limit=5000`;
+}
+
 const DataContext = createContext<DataContextValue | null>(null);
 
 // ── Provider ────────────────────────────────────────────────
@@ -148,7 +160,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           // cirosu (CustomerDetailPanel) 50-sipariş cap'i nedeniyle eksik
           // hesaplanıyordu; products ile aynı patern.
           fetch("/api/orders?all=1"),
-          fetch("/api/production"),
+          fetch(productionFetchUrl()),
           fetch("/api/alerts"),
         ]);
 
@@ -355,7 +367,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Audit 5. tur Fix 4: ?all=1 — global state ilk 100'e düşmesin
       let refetchFailed = false;
       const [prodRes, prodDataRes] = await Promise.all([
-        fetch("/api/production"),
+        fetch(productionFetchUrl()),
         fetch("/api/products?all=1"),
       ]);
       if (prodRes.ok) {
@@ -395,7 +407,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       let refetchFailed = false;
       const [productsRes, prodRes] = await Promise.all([
         fetch("/api/products?all=1"),
-        fetch("/api/production"),
+        fetch(productionFetchUrl()),
       ]);
       if (productsRes.ok) {
         const data = await productsRes.json();

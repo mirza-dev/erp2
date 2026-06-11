@@ -70,7 +70,9 @@ describe("DashboardReport", () => {
         // Alacak Yaşlandırma bölümü kaldırıldı (kullanıcı kararı 2026-06-11)
         expect(html).not.toContain("Alacak Yaşlandırma");
         expect(html).toContain("Son Siparişler");
-        expect(html).toContain("Kritik Uyarılar");
+        // Etiket dürüstlüğü: bölüm TÜM open+ack uyarıları listeler → "Açık Uyarılar"
+        expect(html).toContain("Açık Uyarılar");
+        expect(html).not.toContain("Kritik Uyarılar");
     });
 
     it("preparedBy yoksa Hazırlayan satırı render edilmez", () => {
@@ -90,7 +92,7 @@ describe("DashboardReport", () => {
         });
         expect(html).toContain("Genel Bakış Raporu");
         expect(html).toContain("Sipariş yok.");
-        expect(html).toContain("Acil uyarı yok.");
+        expect(html).toContain("Açık uyarı yok.");
     });
 
     it("trendEmpty=true → 'Bu dönemde sipariş yok'", () => {

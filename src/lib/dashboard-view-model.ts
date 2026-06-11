@@ -97,7 +97,10 @@ function midRate(rates: ExchangeRates | null, cur: string): number | null {
 
 /**
  * Tutarı `fromCur`'dan raporlama para birimine çevirir (orta kur).
- * Kur eksikse/dönüştürülemiyorsa tutar değişmeden döner (defansif — çöp NaN üretmez).
+ * Kur çözülemiyorsa 0 döner = tutar toplamların DIŞINDA kalır. Eski davranış
+ * tutarı "değişmeden geçirmek"ti — TRY'yi USD toplamına ham eklemek 40 kat
+ * hata üretiyordu; eksik-ama-dürüst rakam tercih edildi. Hariç kalan para
+ * birimleri `listUnconvertibleCurrencies` ile tespit edilip UI'da uyarılır.
  */
 export function toReporting(
     amount: number, fromCur: string, reporting: string, rates: ExchangeRates | null,
@@ -106,8 +109,28 @@ export function toReporting(
     if (fromCur === reporting) return amount;
     const from = midRate(rates, fromCur);
     const to = midRate(rates, reporting);
-    if (from === null || to === null) return amount;
+    if (from === null || to === null) return 0;
     return (amount * from) / to;
+}
+
+/** `cur` cinsinden tutar raporlama para birimine çevrilebiliyor mu? */
+export function canConvert(cur: string, reporting: string, rates: ExchangeRates | null): boolean {
+    if (cur === reporting) return true;
+    return midRate(rates, cur) !== null && midRate(rates, reporting) !== null;
+}
+
+/**
+ * Toplamlardan hariç kalan (kur çözülemeyen) para birimleri — KPI şeridi
+ * altındaki uyarı satırı için. Sıralı + tekrarsız.
+ */
+export function listUnconvertibleCurrencies(
+    currencies: Iterable<string>, reporting: string, rates: ExchangeRates | null,
+): string[] {
+    const out = new Set<string>();
+    for (const c of currencies) {
+        if (c && !canConvert(c, reporting, rates)) out.add(c);
+    }
+    return [...out].sort();
 }
 
 /** Tek-para kompakt biçim ($1.50M / $42K / $120). Yetki yoksa "—". */
@@ -130,9 +153,14 @@ export function formatReportingM(amount: number, reporting: string, canView = tr
 //  Sipariş / ciro hesapları
 // ════════════════════════════════════════════════════════════════
 
-/** Ciroya sayılan sipariş mi? (iptal/taslak hariç) */
+/**
+ * Ciroya sayılan sipariş mi? YALNIZ onaylı (approved).
+ * pending_approval bilinçli HARİÇ: mig.088'den beri gönderilen her teklif
+ * pending sipariş yaratır — kabul edilmemiş teklif ciroya sayılmamalı.
+ * Onaylanınca (teklif kabulü dahil) ciroya girer.
+ */
 function isRevenueOrder(o: Order): boolean {
-    return o.commercial_status !== "cancelled" && o.commercial_status !== "draft";
+    return o.commercial_status === "approved";
 }
 
 /** Açık sipariş mi? (onaylı/onay-bekleyen & sevk edilmemiş) */
@@ -421,57 +449,11 @@ export function stockValueByCategoryReporting(
     return { segments, total: segments.reduce((s, x) => s + x.value, 0) };
 }
 
-// ════════════════════════════════════════════════════════════════
-//  Alacak yaşlandırma (siparişlerden türev — dürüst; fatura/ödeme tablosu yok)
-// ════════════════════════════════════════════════════════════════
-
-export interface AgingBucket { label: string; value: number; tone: Tone }
-export interface ReceivablesView {
-    buckets: AgingBucket[];
-    total: number;
-    overdue60: number;
-    overduePct: number;
-}
-
-/**
- * Alacak yaşlandırma — faturalanmış (approved & shipped|allocated) siparişlerden türetilir.
- * vade = createdAt + 30g; son 90 günle sınırlı (eskiler tahsil varsayılır — dürüst sınır).
- * Tutar = siparişin tam grandTotal'ı (ödeme verisi yok → sahte kısmi tahsilat YOK).
- */
-export function receivablesAging(
-    orders: Order[], reporting: string, rates: ExchangeRates | null, now: Date = new Date(),
-): ReceivablesView {
-    const b = { notdue: 0, b0: 0, b30: 0, b60: 0 };
-    const t = now.getTime();
-    for (const o of orders) {
-        const invoiced = o.commercial_status === "approved" &&
-            (o.fulfillment_status === "shipped" || o.fulfillment_status === "allocated");
-        if (!invoiced) continue;
-        const created = new Date(o.createdAt).getTime();
-        const ageDays = Math.floor((t - created) / 86_400_000);
-        if (ageDays > 90) continue;
-        const overdue = Math.floor((t - (created + 30 * 86_400_000)) / 86_400_000);
-        const amt = toReporting(o.grandTotal, o.currency, reporting, rates);
-        if (overdue < 0) b.notdue += amt;
-        else if (overdue <= 30) b.b0 += amt;
-        else if (overdue <= 60) b.b30 += amt;
-        else b.b60 += amt;
-    }
-    const buckets: AgingBucket[] = [
-        { label: "Vadesi gelmemiş", value: Math.round(b.notdue), tone: "success" },
-        { label: "0–30 gün", value: Math.round(b.b0), tone: "info" },
-        { label: "31–60 gün", value: Math.round(b.b30), tone: "warning" },
-        { label: "60+ gün", value: Math.round(b.b60), tone: "danger" },
-    ];
-    const total = buckets.reduce((s, a) => s + a.value, 0);
-    const overdue = b.b0 + b.b30 + b.b60;
-    return {
-        buckets,
-        total,
-        overdue60: Math.round(b.b60),
-        overduePct: total > 0 ? Math.round((overdue / total) * 100) : 0,
-    };
-}
+// NOT: receivablesAging (Açık Alacak) kullanıcı kararıyla KALDIRILDI.
+// Siparişten türev proxy idi (createdAt+30g sabit vade, 90g pencere, ödeme
+// düşülmez) — güvenilir değildi. Gerçek alacak istenirse `invoices`/`payments`
+// tablolarından (lib/supabase/invoices.ts, payments.ts — mevcut, UI okumuyor)
+// yeniden yazılmalı.
 
 // ════════════════════════════════════════════════════════════════
 //  Üretim
@@ -703,19 +685,18 @@ export interface KpiInput {
 
 export interface KpiPerms {
     canViewSalesPrices: boolean;
-    canViewFinancialSummary: boolean;
 }
 
 /**
- * 6 KPI: Aylık Ciro · Açık Siparişler · Stok Değeri · Bugünkü Üretim · Açık Alacak · Kritik Uyarılar.
+ * 5 KPI: Dönem Ciro · Açık Siparişler · Stok Değeri · Dönem Üretim · Açık Uyarılar.
  * Finansal değerler raporlama para birimine normalize + RBAC ile maskeli.
+ * (Açık Alacak kartı kaldırıldı — yukarıdaki receivablesAging notu.)
  */
 export function buildKpis(
     input: KpiInput, perms: KpiPerms, now: Date = new Date(), period: PeriodModel = periodModel("Ay", now),
 ): DashboardKpi[] {
     const { products, orders, uretimKayitlari, openAlerts, reporting, rates } = input;
     const canPrices = perms.canViewSalesPrices;
-    const canFin = perms.canViewFinancialSummary;
 
     // ── Dönem Ciro (Aylık/Çeyreklik/Haftalık/Günlük) ──
     const revenue = revenueByPeriod(orders, reporting, rates, period);
@@ -745,10 +726,7 @@ export function buildKpis(
     const prod = productionInPeriod(uretimKayitlari, period);
     const prodSpark = lastNProductionTotals(uretimKayitlari, 6);
 
-    // ── Açık Alacak ──
-    const recv = receivablesAging(orders, reporting, rates, now);
-
-    // ── Kritik Uyarılar ──
+    // ── Açık Uyarılar ──
     const critical = openAlerts.length;
     const urgent = openAlerts.filter((a) => a.severity === "critical").length;
     const stockAlerts = openAlerts.filter((a) => a.type === "stock_risk" || a.type === "stock_critical").length;
@@ -793,19 +771,10 @@ export function buildKpis(
             spark: prodSpark.length > 0 ? prodSpark : undefined,
         },
         {
-            id: "tahsilat",
-            label: "Açık Alacak",
-            value: formatReportingCompact(recv.total, reporting, canFin),
-            tone: recv.total > 0 ? "warning" : "success",
-            sub: canFin
-                ? (recv.overdue60 > 0 ? `${formatReportingCompact(recv.overdue60, reporting, true)} (60+ gün) · anlık` : "Vadeler temiz · anlık")
-                : "Görüntüleme yetkisi yok",
-            delta: canFin && recv.total > 0 ? `%${recv.overduePct} vadesi geçmiş` : undefined,
-            up: recv.overduePct < 20,
-        },
-        {
             id: "uyari",
-            label: "Kritik Uyarılar",
+            // Değer TÜM açık+ack uyarılar (info dahil) — etiket değerle tutarlı
+            // ("Kritik" yalnız delta'daki acil sayısıdır).
+            label: "Açık Uyarılar",
             value: String(critical),
             tone: critical > 0 ? "danger" : "success",
             sub: critical > 0 ? `${stockAlerts} stok · ${critical - stockAlerts} diğer · anlık` : "Acil uyarı yok · anlık",

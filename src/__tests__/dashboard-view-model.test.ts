@@ -3,7 +3,7 @@
  *  - Para: addMoney/dominantCurrency/formatMoneyByCurrency (korunan) + toReporting normalizasyon
  *  - Ciro/maliyet: monthlyRevenueReporting / monthlyOrderCounts / cogsToReporting
  *  - Stok: stockValueByCategoryReporting (raporlama para birimi)
- *  - Alacak: receivablesAging (siparişten türev, dürüst)
+ *  - Alacak KARTI KALDIRILDI: receivablesAging proxy hesabı silindi (geri-gelmez kilidi aşağıda)
  *  - Üretim: todayProduction / productionDailySeries (gerçek scrap)
  *  - Finans: recentOrdersView (normalize+RBAC) · buildKpis (6 KPI + RBAC) · aiPoints
  */
@@ -15,7 +15,7 @@ import {
     last12MonthKeys, monthLabels,
     toReporting, formatReportingM, formatReportingCompact, currencySymbol,
     monthlyRevenueReporting, monthlyOrderCounts, cogsToReporting,
-    stockValueByCategoryReporting, receivablesAging, productionDailySeries,
+    stockValueByCategoryReporting, productionDailySeries, listUnconvertibleCurrencies, canConvert,
     todayProduction, lastNProductionTotals,
     reorderView, alertsView, relativeTime, recentOrdersView,
     aiPointsFromOpsSummary, buildKpis,
@@ -75,13 +75,20 @@ describe("toReporting normalizasyon", () => {
     it("EUR → USD (35/32)", () => {
         expect(toReporting(320, "EUR", "USD", RATES)).toBeCloseTo(350, 5);
     });
-    it("bilinmeyen kur → defansif (değişmez)", () => {
-        expect(toReporting(50, "GBP", "USD", RATES)).toBe(50);
-        expect(toReporting(50, "USD", "USD", null)).toBe(50);
-        expect(toReporting(50, "TRY", "USD", null)).toBe(50); // USD kuru yok → değişmez
+    it("kur çözülemiyor → 0 (toplam dışı; eski 'değişmeden geçir' 40 kat hata üretiyordu)", () => {
+        expect(toReporting(50, "GBP", "USD", RATES)).toBe(0);
+        expect(toReporting(50, "USD", "USD", null)).toBe(50); // aynı para — kur gerekmez
+        expect(toReporting(50, "TRY", "USD", null)).toBe(0);  // USD kuru yok → hariç
     });
     it("NaN → 0", () => {
         expect(toReporting(NaN, "USD", "USD", RATES)).toBe(0);
+    });
+    it("canConvert + listUnconvertibleCurrencies: hariç kalanlar uyarı için listelenir", () => {
+        expect(canConvert("TRY", "USD", RATES)).toBe(true);
+        expect(canConvert("GBP", "USD", RATES)).toBe(false);
+        expect(canConvert("USD", "USD", null)).toBe(true);
+        expect(listUnconvertibleCurrencies(["TRY", "GBP", "USD", "GBP"], "USD", RATES)).toEqual(["GBP"]);
+        expect(listUnconvertibleCurrencies(["TRY", "EUR"], "USD", null)).toEqual(["EUR", "TRY"]);
     });
 });
 
@@ -107,20 +114,23 @@ describe("revenue/cost series", () => {
         expect(keys[11]).toBe("2026-06");
         expect(monthLabels(NOW)[11]).toBe("Haz");
     });
-    it("monthlyRevenueReporting: cancelled/draft hariç, raporlamaya normalize", () => {
+    it("monthlyRevenueReporting: YALNIZ approved sayılır (pending teklif şişirmesi mig.088)", () => {
         const orders = [
             mkOrder({ createdAt: "2026-06-01", grandTotal: 3200, currency: "TRY" }), // → 100 USD
             mkOrder({ createdAt: "2026-06-20", grandTotal: 100, currency: "USD" }),  // → 100 USD
             mkOrder({ createdAt: "2026-06-05", grandTotal: 9999, commercial_status: "cancelled" }),
             mkOrder({ createdAt: "2026-06-05", grandTotal: 8888, commercial_status: "draft" }),
+            // Gönderilmiş-ama-kabul-edilmemiş teklifin pending siparişi → ciroya GİRMEZ
+            mkOrder({ createdAt: "2026-06-07", grandTotal: 7777, currency: "USD", commercial_status: "pending_approval" }),
         ];
         const series = monthlyRevenueReporting(orders, "USD", RATES, NOW);
         expect(series[11]).toBeCloseTo(200, 5);
     });
-    it("monthlyOrderCounts: ciro siparişlerini sayar", () => {
+    it("monthlyOrderCounts: yalnız approved sayar (draft/pending hariç)", () => {
         const orders = [
             mkOrder({ createdAt: "2026-06-01" }), mkOrder({ createdAt: "2026-06-02" }),
             mkOrder({ createdAt: "2026-06-03", commercial_status: "draft" }),
+            mkOrder({ createdAt: "2026-06-04", commercial_status: "pending_approval" }),
         ];
         expect(monthlyOrderCounts(orders, NOW)[11]).toBe(2);
     });
@@ -151,29 +161,14 @@ describe("stockValueByCategoryReporting", () => {
     });
 });
 
-// ── Alacak yaşlandırma ───────────────────────────────────────
-describe("receivablesAging (dürüst, siparişten türev)", () => {
-    it("faturalanan siparişleri bucket'lar; 90 gün üstü hariç", () => {
-        const orders = [
-            // 5 gün önce, vade gelmemiş
-            mkOrder({ createdAt: "2026-06-10", commercial_status: "approved", fulfillment_status: "allocated", grandTotal: 3200, currency: "TRY" }),
-            // 75 gün önce → due 05-01, overdue ~45 → 31-60
-            mkOrder({ createdAt: "2026-04-01", commercial_status: "approved", fulfillment_status: "shipped", grandTotal: 6400, currency: "TRY" }),
-            // 200 gün önce → hariç
-            mkOrder({ createdAt: "2025-11-01", commercial_status: "approved", fulfillment_status: "shipped", grandTotal: 99999, currency: "TRY" }),
-            // taslak → faturalanmamış
-            mkOrder({ createdAt: "2026-06-10", commercial_status: "draft", grandTotal: 5000 }),
-        ];
-        const r = receivablesAging(orders, "USD", RATES, NOW);
-        expect(r.buckets[0].value).toBe(100);   // vadesi gelmemiş (3200/32)
-        expect(r.buckets[2].value).toBe(200);   // 31-60 (6400/32)
-        expect(r.total).toBe(300);
-        expect(r.overduePct).toBe(67);          // 200/300
-    });
-    it("faturalanmış sipariş yok → sıfır + boş", () => {
-        const r = receivablesAging([mkOrder({ commercial_status: "draft" })], "USD", RATES, NOW);
-        expect(r.total).toBe(0);
-        expect(r.overduePct).toBe(0);
+// ── Açık Alacak KALDIRILDI — geri-gelmez kilidi ──────────────
+// receivablesAging siparişten türev bir PROXY idi (createdAt+30g sabit vade,
+// 90g pencere, ödeme düşülmez) — kullanıcı kararıyla silindi. Gerçek alacak
+// istenirse invoices/payments tablolarından yazılmalı.
+describe("Açık Alacak geri-gelmez kilidi", () => {
+    it("view-model receivablesAging/AgingBucket export etmez", async () => {
+        const mod = await import("@/lib/dashboard-view-model");
+        expect("receivablesAging" in mod).toBe(false);
     });
 });
 
@@ -282,39 +277,39 @@ describe("buildKpis", () => {
         reporting: "USD",
         rates: RATES,
     };
-    const allPerms = { canViewSalesPrices: true, canViewFinancialSummary: true };
+    const allPerms = { canViewSalesPrices: true };
 
-    it("6 KPI üretir (Açık Alacak dahil)", () => {
+    it("5 KPI üretir — tahsilat (Açık Alacak) kartı YOK", () => {
         const k = buildKpis(input, allPerms, NOW);
-        expect(k.map((x) => x.id)).toEqual(["ciro", "siparis", "stok", "uretim", "tahsilat", "uyari"]);
+        expect(k.map((x) => x.id)).toEqual(["ciro", "siparis", "stok", "uretim", "uyari"]);
+        expect(k.some((x) => x.label.includes("Alacak"))).toBe(false);
+    });
+
+    it("uyarı KPI etiketi 'Açık Uyarılar' (değer tüm open+ack — info dahil)", () => {
+        const k = buildKpis(input, allPerms, NOW);
+        const uyari = k.find((x) => x.id === "uyari")!;
+        expect(uyari.label).toBe("Açık Uyarılar");
+        expect(uyari.value).toBe("1");
     });
 
     it("admin → finansal değerler görünür (raporlama para birimi)", () => {
         const k = buildKpis(input, allPerms, NOW);
         expect(k.find((x) => x.id === "ciro")!.value).toBe("$1.00M");   // 32M TRY → 1M USD
         expect(k.find((x) => x.id === "stok")!.value).not.toBe("—");
-        expect(k.find((x) => x.id === "tahsilat")!.value).not.toBe("—");
     });
 
-    it("viewer (no sales/fin) → ciro/stok/tahsilat '—', sayımlar görünür", () => {
-        const k = buildKpis(input, { canViewSalesPrices: false, canViewFinancialSummary: false }, NOW);
+    it("viewer (no sales) → ciro/stok '—', sayımlar görünür", () => {
+        const k = buildKpis(input, { canViewSalesPrices: false }, NOW);
         expect(k.find((x) => x.id === "ciro")!.value).toBe("—");
         expect(k.find((x) => x.id === "stok")!.value).toBe("—");
-        expect(k.find((x) => x.id === "tahsilat")!.value).toBe("—");
         expect(k.find((x) => x.id === "siparis")!.value).toBe("1");
         expect(k.find((x) => x.id === "uretim")!.value).toBe("50 adet");
         expect(k.find((x) => x.id === "uyari")!.value).toBe("1");
     });
 
     it("viewer → ciro sparkline gizli (finansal seri sızmaz)", () => {
-        const k = buildKpis(input, { canViewSalesPrices: false, canViewFinancialSummary: false }, NOW);
+        const k = buildKpis(input, { canViewSalesPrices: false }, NOW);
         expect(k.find((x) => x.id === "ciro")!.spark).toBeUndefined();
-    });
-
-    it("financial_summary yetkisi → tahsilat görünür ama sales yoksa ciro gizli", () => {
-        const k = buildKpis(input, { canViewSalesPrices: false, canViewFinancialSummary: true }, NOW);
-        expect(k.find((x) => x.id === "ciro")!.value).toBe("—");
-        expect(k.find((x) => x.id === "tahsilat")!.value).not.toBe("—");
     });
 });
 
@@ -418,7 +413,7 @@ describe("productionInPeriod + buildKpis dönem entegrasyonu", () => {
             products: [mkProduct({})], orders: [mkOrder({ createdAt: "2026-06-15T09:00:00Z", grandTotal: 1000, currency: "TRY", commercial_status: "approved" })],
             uretimKayitlari: [], openAlerts: [], reporting: "TRY", rates: null,
         };
-        const k = buildKpis(input, { canViewSalesPrices: true, canViewFinancialSummary: true }, NOW, periodModel("Çeyrek", NOW));
+        const k = buildKpis(input, { canViewSalesPrices: true }, NOW, periodModel("Çeyrek", NOW));
         expect(k.find((x) => x.id === "ciro")!.label).toBe("Çeyreklik Ciro");
     });
 
@@ -426,7 +421,7 @@ describe("productionInPeriod + buildKpis dönem entegrasyonu", () => {
         const input = {
             products: [mkProduct({})], orders: [], uretimKayitlari: [], openAlerts: [], reporting: "TRY", rates: null,
         };
-        const k = buildKpis(input, { canViewSalesPrices: true, canViewFinancialSummary: true }, NOW, periodModel("Bugün", NOW));
+        const k = buildKpis(input, { canViewSalesPrices: true }, NOW, periodModel("Bugün", NOW));
         const ciro = k.find((x) => x.id === "ciro")!;
         expect(ciro.value).toBe("—");
         expect(ciro.sub).toBe("Bu dönemde sipariş yok");
@@ -437,7 +432,7 @@ describe("productionInPeriod + buildKpis dönem entegrasyonu", () => {
             products: [mkProduct({})], orders: [mkOrder({ commercial_status: "approved", fulfillment_status: "allocated" })],
             uretimKayitlari: [], openAlerts: [mkAlert({ severity: "critical", type: "stock_risk" })], reporting: "TRY", rates: null,
         };
-        const k = buildKpis(input, { canViewSalesPrices: true, canViewFinancialSummary: true }, NOW);
+        const k = buildKpis(input, { canViewSalesPrices: true }, NOW);
         expect(k.find((x) => x.id === "siparis")!.sub).toMatch(/anlık/);
         expect(k.find((x) => x.id === "stok")!.sub).toMatch(/anlık/);
         expect(k.find((x) => x.id === "uyari")!.sub).toMatch(/anlık/);

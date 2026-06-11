@@ -180,10 +180,10 @@ export default function DashboardReport({
                 )}
             </Section>
 
-            {/* Kritik uyarılar */}
-            <Section title="Kritik Uyarılar">
+            {/* Açık uyarılar (tüm open+ack — info dahil; KPI etiketiyle tutarlı) */}
+            <Section title="Açık Uyarılar">
                 {alertRows.length === 0 ? (
-                    <div style={{ fontSize: 11, color: "#444" }}>Acil uyarı yok.</div>
+                    <div style={{ fontSize: 11, color: "#444" }}>Açık uyarı yok.</div>
                 ) : (
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead><tr><th style={th}>Uyarı</th><th style={th}>Açıklama</th><th style={th}>Zaman</th></tr></thead>

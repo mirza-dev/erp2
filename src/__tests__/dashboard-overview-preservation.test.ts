@@ -94,10 +94,18 @@ describe("panel yerleşimi — yeni diziliş (Stok tam-genişlik / Üretim|Sipar
 });
 
 describe("RBAC finansal gating", () => {
-    it("sales/cost/financial_summary yetkileri kullanılır", () => {
+    it("sales/cost yetkileri kullanılır; financial_summary KALKTI (tek tüketicisi Açık Alacak kartıydı)", () => {
         expect(PAGE).toMatch(/canViewSalesPrices/);
         expect(PAGE).toMatch(/canViewPurchaseCosts/);
-        expect(PAGE).toMatch(/canViewFinancialSummary/);
+        expect(PAGE).not.toMatch(/canViewFinancialSummary/);
+    });
+});
+
+describe("Açık Alacak kaldırma kilidi", () => {
+    it("page/report 'Açık Alacak' içermez; kur-uyarı satırı mevcut", () => {
+        expect(PAGE).not.toContain("Açık Alacak");
+        expect(PAGE).toMatch(/listUnconvertibleCurrencies/);
+        expect(PAGE).toContain("Kur verisi alınamadı");
     });
 });
 

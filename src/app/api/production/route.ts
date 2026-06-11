@@ -6,13 +6,17 @@ import { revalidateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requirePermission } from "@/lib/auth/role-guard";
 
-// GET /api/production?product_id=xxx&limit=50
+// GET /api/production?product_id=xxx&limit=50&since=YYYY-MM-DD
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = req.nextUrl;
         const productId = searchParams.get("product_id") ?? undefined;
-        const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 500);
-        const entries = await dbListProductionEntries(productId, limit);
+        // Tavan 5000: dashboard dönem KPI'ları pencereli+yüksek limitli çeker
+        // (eski 500 tavanı yoğun dönemlerde toplamı sessizce kesebilirdi).
+        const limit = Math.min(parseInt(searchParams.get("limit") ?? "50", 10) || 50, 5000);
+        const sinceRaw = searchParams.get("since");
+        const since = sinceRaw && /^\d{4}-\d{2}-\d{2}$/.test(sinceRaw) ? sinceRaw : undefined;
+        const entries = await dbListProductionEntries(productId, limit, since);
         return NextResponse.json(entries);
     } catch (err) {
         return handleApiError(err, "GET /api/production");
