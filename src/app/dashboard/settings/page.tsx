@@ -7,6 +7,7 @@ import {
     BrainCircuit,
     Building2,
     CheckCircle2,
+    FolderOpen,
     ImageIcon,
     KeyRound,
     RefreshCw,
@@ -17,6 +18,7 @@ import {
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
+import DosyalarTab from "@/components/settings/DosyalarTab";
 import { isDemoMode, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import ResetDemoSection from "@/components/settings/ResetDemoSection";
 import { isValidEmail, isValidTaxNumber, isValidUrl } from "@/lib/validation";
@@ -36,6 +38,7 @@ import {
 
 const settingsTabIcons: Record<SettingsTab, LucideIcon> = {
     firma: Building2,
+    dosyalar: FolderOpen,
     api: KeyRound,
     "yapay-zeka": BrainCircuit,
     kullanici: UserRound,
@@ -1405,6 +1408,7 @@ function SettingsPageInner() {
                             {tabs.map(({ key }) => mountedTabs.has(key) ? (
                                 <section key={key} className="settings-panel" hidden={activeTab !== key}>
                                     {key === "firma" && <FirmaTab onDirtyChange={(d) => handleDirtyChange("firma", d)} />}
+                                    {key === "dosyalar" && <DosyalarTab />}
                                     {key === "kullanici" && <KullaniciTab onDirtyChange={(d) => handleDirtyChange("kullanici", d)} />}
                                     {key === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
                                     {key === "api" && <ApiTab />}

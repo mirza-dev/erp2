@@ -69,6 +69,7 @@ describe("SettingsPage tab access", () => {
         expect(screen.getByRole("button", { name: "Kullanıcı Profili" })).toBeTruthy();
         expect(screen.getByRole("button", { name: "Bildirimler" })).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Firma Profili" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Dosyalar" })).toBeNull();
         expect(screen.queryByRole("button", { name: "API Anahtarları" })).toBeNull();
         expect(screen.queryByTestId("reset-demo-section")).toBeNull();
         await waitFor(() => expect(screen.getByText("Profil Bilgileri")).toBeTruthy());
@@ -82,6 +83,7 @@ describe("SettingsPage tab access", () => {
         const settingsNav = screen.getByRole("navigation", { name: "Ayarlar sekmeleri" });
         expect(within(settingsNav).getAllByRole("button").map(button => button.textContent)).toEqual([
             "Firma Profili",
+            "Dosyalar",
             "Kullanıcı Profili",
             "Bildirimler",
         ]);
@@ -98,6 +100,7 @@ describe("SettingsPage tab access", () => {
         const settingsNav = screen.getByRole("navigation", { name: "Ayarlar sekmeleri" });
         expect(within(settingsNav).getAllByRole("button").map(button => button.textContent)).toEqual([
             "Firma Profili",
+            "Dosyalar",
             "API Anahtarları",
             "Yapay Zeka",
             "Kullanıcı Profili",

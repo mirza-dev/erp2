@@ -210,6 +210,26 @@ export interface ProductAttachmentRow {
     uploaded_by: string | null
 }
 
+/** Ayarlar → Dosyalar: şirket dosya arşivi kategorileri (mig. 091). */
+export type CompanyFileCategory = "sozlesme" | "belge" | "teklif-eki" | "kurumsal" | "diger"
+
+export interface CompanyFileRow {
+    id: string
+    /** Arşivde görünen ad, uzantı dahil ("Bayilik Sözleşmesi.pdf"). */
+    display_name: string
+    description: string | null
+    category: CompanyFileCategory
+    /** Büyük harf uzantı etiketi: "PDF", "XLSX"… */
+    ext: string
+    file_path: string
+    file_size: number
+    mime_type: string
+    uploaded_at: string
+    /** Kullanıcı görünen adı snapshot (full_name || email) — alerts.created_by paterni. */
+    uploaded_by: string | null
+    deleted_at: string | null
+}
+
 export interface ProductVendorLinkRow {
     id: string
     product_id: string

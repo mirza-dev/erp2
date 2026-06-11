@@ -1,6 +1,6 @@
 import type { Permission } from "@/lib/auth/permissions";
 
-export type SettingsTab = "firma" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
+export type SettingsTab = "firma" | "dosyalar" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
 export type SettingsTabScope = "personal" | "system" | "maintenance";
 
 export interface SettingsTabDefinition {
@@ -16,6 +16,12 @@ export const SETTINGS_TABS: SettingsTabDefinition[] = [
         label: "Firma Profili",
         scope: "system",
         description: "Firma kimliği, logo ve belge varsayılanları.",
+    },
+    {
+        key: "dosyalar",
+        label: "Dosyalar",
+        scope: "system",
+        description: "Sözleşme, sertifika ve teklif eklerinin saklandığı şirket dosya arşivi.",
     },
     {
         key: "api",

@@ -1205,6 +1205,397 @@ body {
 }
 
 /* ============================================
+   Ayarlar → Dosyalar (şirket dosya arşivi)
+   Handoff: design_handoff_settings_files_tab
+   ============================================ */
+
+.files-tab-root {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.files-toolbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.files-search {
+  position: relative;
+  flex: 1 1 200px;
+  min-width: 170px;
+  max-width: 340px;
+}
+.files-search .files-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
+  display: grid;
+}
+
+/* Kategori açılır menüsü — kompakt filtre */
+.cat-dropdown {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.cat-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: var(--line-width) solid var(--border-secondary);
+  border-radius: 7px;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: var(--font-ui-weight);
+  cursor: pointer;
+  transition: border-color 0.14s ease, color 0.14s ease, background 0.14s ease;
+  white-space: nowrap;
+}
+.cat-trigger:hover {
+  color: var(--text-primary);
+  border-color: var(--border-primary);
+}
+.cat-trigger.is-filtered {
+  border-color: var(--nav-active-border);
+  background: var(--nav-active-bg);
+  color: var(--accent-text);
+  font-weight: var(--font-heading-weight);
+}
+.cat-trigger .chev {
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.cat-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 240px;
+  background: var(--surface);
+  border: var(--line-width) solid var(--surface-border);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  padding: 5px;
+  z-index: 60;
+  animation: fade-in 0.12s ease;
+}
+
+.cat-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: var(--font-ui-weight);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.cat-menu-item:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text-primary);
+}
+.cat-menu-item.is-active {
+  background: var(--nav-active-bg);
+  color: var(--accent-text);
+  font-weight: var(--font-heading-weight);
+}
+.cat-menu-item .count {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+.cat-menu-item.is-active .count {
+  color: var(--accent-text);
+  opacity: 0.75;
+}
+
+/* Kalıcı sürükle-bırak belirteci */
+.files-dnd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1.5px dashed var(--border-secondary);
+  border-radius: 7px;
+  background: var(--surface-subtle);
+  color: var(--text-tertiary);
+  font-size: 11.5px;
+  font-weight: var(--font-ui-weight);
+  white-space: nowrap;
+  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+}
+.files-dnd-badge .dnd-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-bg);
+  flex: 0 0 auto;
+}
+.files-tab-root.is-dragging .files-dnd-badge {
+  border-color: var(--accent-border);
+  border-style: solid;
+  background: var(--accent-bg);
+  color: var(--accent-text);
+}
+@media (max-width: 1100px) {
+  .files-dnd-badge .dnd-label {
+    display: none;
+  }
+  .files-dnd-badge {
+    padding: 0 9px;
+  }
+}
+
+.files-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: var(--line-width) solid var(--border-tertiary);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  position: relative;
+}
+
+.files-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.files-table th {
+  text-align: left;
+  font-size: 10.5px;
+  font-weight: var(--font-heading-weight);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  background: var(--table-header-bg);
+  padding: 8px 12px;
+  border-bottom: var(--line-width) solid var(--border-tertiary);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.files-table th.no-sort {
+  cursor: default;
+}
+.files-table th .sort-arrow {
+  font-size: 9px;
+  margin-left: 4px;
+  color: var(--accent-text);
+}
+.files-table td {
+  padding: 9px 12px;
+  border-bottom: var(--line-width) solid var(--border-tertiary);
+  font-size: 13px;
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+.files-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.files-table tbody tr {
+  transition: background 0.1s ease;
+}
+.files-table tbody tr:hover {
+  background: var(--table-row-hover);
+}
+
+.file-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.file-name-cell .fname {
+  color: var(--text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.file-name-cell .fdesc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Kurumsal belge ikonu — sade dosya hattı + küçük uzantı etiketi */
+.file-doc-icon {
+  position: relative;
+  width: 26px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  color: var(--text-tertiary);
+}
+.file-doc-icon .ext-tag {
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  transform: translateX(-50%);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: var(--surface);
+  border: var(--line-width) solid var(--border-secondary);
+  white-space: nowrap;
+}
+
+.file-cat-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: var(--font-ui-weight);
+  border: var(--line-width) solid var(--border-tertiary);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.file-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.files-table tbody tr:hover .file-row-actions,
+.files-table tbody tr:focus-within .file-row-actions {
+  opacity: 1;
+}
+
+.file-action-btn {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: var(--line-width) solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.file-action-btn:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text-primary);
+  border-color: var(--border-tertiary);
+}
+.file-action-btn.is-danger:hover {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+
+.files-empty {
+  padding: 42px 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.files-footer {
+  flex: 0 0 auto;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.files-storage {
+  flex: 1 1 260px;
+  max-width: 360px;
+}
+.files-storage-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 5px;
+}
+.files-storage-label b {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.files-storage-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  border: var(--line-width) solid var(--border-tertiary);
+  overflow: hidden;
+}
+.files-storage-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--button-primary-bg);
+  transition: width 0.4s ease;
+}
+
+/* Sürükleme sırasında tam ekran bırakma katmanı */
+.files-drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  border: 3px dashed var(--accent-border);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  backdrop-filter: blur(1px);
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: fade-in 0.12s ease;
+}
+.files-drop-overlay-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 26px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: var(--line-width) solid var(--accent-border);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  color: var(--accent-text);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+/* ============================================
    Focus visibility — WCAG 2.4.11
    Visible focus for keyboard navigation.
    !important overrides inline outline:none

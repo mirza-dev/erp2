@@ -7,7 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-11 (**İç kullanıcıya özel bakım alanları — GREEN**)
+## Son Tamamlanan İş — 2026-06-11 (**Ayarlar → "Dosyalar" sekmesi: şirket dosya arşivi (handoff, mig.091) — GREEN**)
+
+**İstek:** `design_handoff_settings_files_tab/` paketini "detaylı ve eksiksiz implement et, backendi sağlam olsun." **Kararlar (AskUserQuestion):** (1) handoff "api/yapay-zeka sekmelerini tamamen kaldır" diyordu → SİLİNMEDİ, dünkü Bakım/internal-operator işi korunur (müşteri admini zaten görmüyor — handoff'un amacı fiilen sağlanmış); (2) yalnız tablo görünümü (kart/grid prototipte tweak-panel'den geliyordu, toggle speclenmemiş).
+
+- **mig.091 (APPLY BEKLİYOR ⚠️):** `company_files` tablosu (display_name/description/category CHECK 5'li [sozlesme/belge/teklif-eki/kurumsal/diger]/ext/file_path/file_size/mime_type/uploaded_at/`uploaded_by` text görünen-ad snapshot [alerts.created_by paterni]/`deleted_at` soft-delete) + partial index + RLS service_role + **private bucket `company-files`** (25MB, MIME allowlist) — 058 kalıbı.
+- **Saf modül `lib/company-files.ts`:** kategoriler+label, splitName, formatFileSize (TR virgül), EXT metin renkleri, **uzantı→MIME haritası** (contentType uzantıdan türer — tarayıcı `file.type` boş bırakabilir, bucket reddi yenmez), 25MB + 5GB sabitleri.
+- **DB helper `lib/supabase/company-files.ts`:** product-attachments birebir kalıbı — insert(file_path "")→upload `company/{id}.{ext}`→path patch; upload başarısız→satır silinir, patch başarısız→storage+satır geri alınır (orphan cleanup); **soft-delete storage'a DOKUNMAZ** (30 gün sözleşmesi, purge cron'u kapsam dışı); signed URL `{download}` opsiyonlu.
+- **Uçlar:** `GET /api/settings/files` (view_settings; `{files, usedBytes, limitBytes}` server toplar) · `POST` (manage_settings; multipart file+display_name+category; ad≤200/kategori/uzantı-allowlist/25MB; tek dosya/istek — client sıralı atar) · `DELETE /[id]` (soft, yoksa 404) · `GET /[id]/download` (imzalı 1saat; `?download=1` attachment; **SVG her zaman attachment** — 046 stored-XSS precedent). **README'den sapma: PATCH yok** (UI tüketicisi yok → ölü uç politikası; `dbUpdateCompanyFileMeta` helper hazır bekler).
+- **UI:** `settings-tabs.ts` += `dosyalar` (system, firma'dan sonra; eski `?tab=api` davranışı değişmedi); page.tsx 4 satır (FolderOpen + panel); yeni **`DosyalarTab.tsx`** (~560): pencere-geneli DnD (dragDepth sayacı, **tüm dragover/drop preventDefault** — tarayıcı dosyayı açmasın [README kritik notu], `section[hidden]` guard'ı — sekme arkadayken tepkisiz), isimlendirme+kategori onay modalı (taban ad düzenlenir + uzantı sabit + boyut; boş ad Yükle'yi kilitler; Escape+focus-dönüş NoteFormModal paterni; varsayılan kategori=aktif filtre), tr-TR arama (ad+açıklama+yükleyen), sayılı kategori dropdown (dışarı-tık kapatma), 3-eksen sıralama, sticky-thead tablo + DocIcon (belge silüeti+uzantı etiketi, renk yalnız metinde) + hover aksiyonları: Önizle (**senkron `window.open` sonra URL** — arşiv popup-blocker dersi; SVG'de gizli) / İndir (`location.assign`, attachment) / iki-aşamalı "Sil?" (mouseleave geri), depolama çubuğu + "30 gün çöp kutusu" özeti, demo guard'lar; globals.css `.files-*` portu (yalnız tablo yolu; kart/chip/dropzone sınıfları bilinçli portlanmadı).
+- **Test:** +41 — `company-files-routes`(14: RBAC çifti/validasyon matrisi/snapshot fallback/SVG-attachment/404-502), `company-files-db`(10: saf yardımcılar + orphan/soft-delete/bucket/mig eşleşme source-lock), `dosyalar-tab`(12 RTL: tr-TR arama "İmzalı"→"imza", kategori sayı+filtre+boş durum, sıralama yönü, modal staging/kilit, exe reddi, POST FormData içeriği, demo, iki-aşamalı silme, DnD+popup-blocker+hex-yok kilitleri), settings-tabs/page-tabs güncellendi.
+- tsc 0 · lint 0 · **5032 test / 361 dosya** · build 0 (3 yeni route manifest'te).
+- **Kalan:** mig.091 APPLY + manuel smoke (Dosya Yükle→modal→listede; boş alana sürükle-bırak→overlay+modal, tarayıcı açmaz; arama/filtre/sıralama; önizle yeni sekme + indir; Sil?→listeden düşer, storage durur; kota çubuğu; `?tab=dosyalar`; viewer/demo görmez; açık/koyu tema).
+
+## Önceki — 2026-06-11 (**İç kullanıcıya özel bakım alanları — GREEN**)
 
 **İstek:** Müşteriler `API Anahtarları` ve ayarlardaki `Yapay Zeka` gözlem ekranını görmesin; bakım/test gerektiğinde yalnız iç kullanıcı erişebilsin.
 
@@ -23,7 +36,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 **İstek:** "Uyarılar sayfasında kullanıcı kendi uyarısını/notunu oluşturabilsin." **Kararlar (AskUserQuestion, 4/4 önerilen):** serbest not + opsiyonel hatırlatma tarihi · herkese ortak (kişiye özel değil) · vade geçince severity info→warning · view_alerts olan herkes oluşturur (kapatma mevcut manage_alerts).
 
-- **mig.090 (APPLY BEKLİYOR ⚠️):** `alerts_type_check` += `user_note`; `due_date date` + `created_by text` kolonları.
+- **mig.090 (APPLY EDİLDİ ✅):** `alerts_type_check` += `user_note`; `due_date date` + `created_by text` kolonları. Canlı smoke: [SMOKE] seed (dün vadeli info + ileri tarihli) → scan `noteEscalated:1` yalnız vadesi geçen warning oldu → temizlendi.
 - **POST /api/alerts:** yalnız type=user_note yazılabilir (body'den type/severity/source ENJEKTE EDİLEMEZ — testli); başlık zorunlu ≤200, açıklama ≤2000, due_date YYYY-MM-DD + bugünden ileri; created_by = session full_name || email snapshot; RBAC requirePermission("view_alerts").
 - **Escalation:** `dbEscalateOverdueUserNotes` (due_date < bugün + aktif + info → warning) — scan route'unda po_overdue yanına non-fatal, yanıt `noteEscalated`.
 - **Takvim entegrasyonu:** enrichment user_note'ta due_date'i satırın KENDİ kolonundan okur (entity join yok, "Hatırlatma" etiketi) → mevcut occurrence mekaniğiyle not yazıldığı gün + hedef günde görünür, dueCountdownLabel bedava. Yeni "Notlar" sekmesi (✎, types=[user_note]); AI sekmesine sızmaz (source=ui).
