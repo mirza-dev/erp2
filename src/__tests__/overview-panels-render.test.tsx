@@ -3,7 +3,7 @@
  * Genel Bakış panelleri — renderToStaticMarkup smoke (jsdom-free).
  *  - StockPanel: tam-genişlik revize (donut + paylı legend + özet istatistik kolonu)
  *    — Finansal Özet paneli kaldırıldı, bu panel o alanı karşılar.
- *  - ProductionPanel: dolu (good/scrap) ve boş durum.
+ *  - ProductionPanel: tek seri günlük üretim ve boş durum.
  *  - AiPanel: idle render (fetch yalnız açılınca; render'da çağrı yok).
  *  - Sabit hex yok (yalnız onaylı CSS var) — finansal tint kontrolü.
  */
@@ -52,15 +52,16 @@ describe("StockPanel — tam genişlik revize (Finansal Özet'in yerini karşıl
 });
 
 describe("ProductionPanel", () => {
-    it("dolu: BarChart + Sağlam/Fire legend", () => {
-        const html = renderToStaticMarkup(<ProductionPanel days={["1", "2", "3"]} good={[100, 80, 120]} scrap={[3, 0, 5]} />);
+    it("dolu: tek seri günlük üretim grafiği; fire sunum davranışı yok", () => {
+        const html = renderToStaticMarkup(<ProductionPanel days={["1", "2", "3"]} values={[100, 80, 120]} />);
         expect(html).toContain("Üretim (Son 14 gün)");
-        expect(html).toContain("Sağlam");
-        expect(html).toContain("Fire");
+        expect(html).toContain("Günlük üretim");
+        expect(html).not.toContain("Sağlam");
+        expect(html).not.toContain("Fire");
         expect(html).toContain("<svg");
     });
     it("boş: kayıt yok mesajı", () => {
-        const html = renderToStaticMarkup(<ProductionPanel days={["1", "2"]} good={[0, 0]} scrap={[0, 0]} />);
+        const html = renderToStaticMarkup(<ProductionPanel days={["1", "2"]} values={[0, 0]} />);
         expect(html).toContain("Son 14 günde üretim kaydı yok");
     });
 });

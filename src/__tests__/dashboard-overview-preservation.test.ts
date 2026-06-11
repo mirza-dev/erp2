@@ -106,6 +106,10 @@ describe("panel yerleşimi — yeni diziliş (Stok tam-genişlik / Üretim|Sipar
     it("Satır 2: ProductionPanel, OrdersPanel'den önce", () => {
         expect(PAGE.indexOf("<ProductionPanel")).toBeLessThan(PAGE.indexOf("<OrdersPanel"));
     });
+    it("ProductionPanel fire serisini tüketmez; gerçek scrap view-model'de korunur", () => {
+        expect(PAGE).toMatch(/<ProductionPanel days=\{production\.days\} values=\{production\.good\} \/>/);
+        expect(PAGE).not.toMatch(/<ProductionPanel[^>]*scrap=/);
+    });
     it("AiPanel alt alta blokta — Reorder/Alerts ile birlikte ve hepsinden sonra", () => {
         expect(PAGE.indexOf("<ReorderPanel")).toBeLessThan(PAGE.indexOf("<AlertsPanel"));
         expect(PAGE.indexOf("<AlertsPanel")).toBeLessThan(PAGE.indexOf("<AiPanel"));

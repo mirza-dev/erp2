@@ -25,7 +25,7 @@ describe("charts — boş veriyle crash etmez", () => {
         expect(() => renderToStaticMarkup(<Donut data={[]} />)).not.toThrow();
     });
     it("BarChart boş", () => {
-        expect(() => renderToStaticMarkup(<BarChart days={[]} good={[]} scrap={[]} />)).not.toThrow();
+        expect(() => renderToStaticMarkup(<BarChart days={[]} values={[]} />)).not.toThrow();
     });
     it("Heatmap boş", () => {
         expect(() => renderToStaticMarkup(<Heatmap rows={[]} data={[]} />)).not.toThrow();
@@ -51,13 +51,14 @@ describe("charts — dolu veriyle render + tema tokenları", () => {
         expect(html).toContain("var(--chart-track)");
         expect(html).toContain("toplam");
     });
-    it("BarChart sağlam/fire çubukları", () => {
+    it("BarChart tek seri üretim çubukları", () => {
         const html = renderToStaticMarkup(
-            <BarChart days={["1", "2"]} good={[50, 30]} scrap={[2, 1]} />,
+            <BarChart days={["1", "2"]} values={[50, 30]} />,
         );
         expect(html).toContain("var(--chart-grid)");
-        expect(html).toContain("var(--danger)");
         expect(html).toContain("var(--accent)");
+        expect(html).not.toContain("var(--danger)");
+        expect(html).not.toContain("Fire");
     });
     it("Heatmap track token (0 hücre) + tint (dolu)", () => {
         const html = renderToStaticMarkup(<Heatmap rows={["Döküm"]} data={[[0, 3]]} />);

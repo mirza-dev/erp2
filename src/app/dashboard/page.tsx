@@ -159,7 +159,8 @@ export default function DashboardPage() {
         return { productCount: active.length, criticalCount, riskCount };
     }, [products]);
 
-    // ── Üretim good/scrap ──
+    // ── Üretim: dashboard grafiği yalnız günlük toplam adedi gösterir.
+    // Scrap verisi view-model'de korunur; bu panelin sunumuna dahil edilmez. ──
     const production = useMemo(() => productionDailySeries(uretimKayitlari, now, 14), [uretimKayitlari, now]);
 
     // ── Sağ kolon ──
@@ -271,7 +272,7 @@ export default function DashboardPage() {
 
             {/* Satır 2: Üretim + Son Siparişler */}
             <div className="overview-grid-1-1" style={{ marginBottom: gap }}>
-                <ProductionPanel days={production.days} good={production.good} scrap={production.scrap} />
+                <ProductionPanel days={production.days} values={production.good} />
                 <OrdersPanel rows={orderRows} />
             </div>
 

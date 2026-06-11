@@ -5,18 +5,16 @@ import { useMeasure } from "./chart-utils";
 
 interface BarChartProps {
     days: string[];
-    good: number[];
-    scrap: number[];
+    values: number[];
     rounded?: boolean;
 }
 
-/** Dikey yığılmış çubuk — sağlam (accent) + fire (danger). */
-export default function BarChart({ days, good, scrap, rounded = true }: BarChartProps) {
+/** Günlük toplam üretimi gösteren tek serili dikey çubuk grafik. */
+export default function BarChart({ days, values, rounded = true }: BarChartProps) {
     const [ref, W] = useMeasure();
     const H = 200, padL = 34, padR = 8, padT = 12, padB = 22;
     const iw = Math.max(W - padL - padR, 10), ih = H - padT - padB;
-    const totals = good.map((g, i) => g + (scrap[i] ?? 0));
-    const maxV = Math.max(...totals, 1) * 1.1;
+    const maxV = Math.max(...values, 1) * 1.1;
     const n = Math.max(days.length, 1);
     const gap = 6;
     const bw = (iw - gap * (n - 1)) / n;
@@ -39,31 +37,26 @@ export default function BarChart({ days, good, scrap, rounded = true }: BarChart
                 })}
                 {days.map((d, i) => {
                     const gx = padL + i * (bw + gap);
-                    const gTop = y(good[i]);
-                    const sTop = y(good[i] + (scrap[i] ?? 0));
-                    const goodH = padT + ih - gTop;
-                    const scrapH = gTop - sTop;
-                    const isOff = good[i] + (scrap[i] ?? 0) === 0;
+                    const value = values[i] ?? 0;
+                    const top = y(value);
+                    const barH = padT + ih - top;
+                    const isOff = value === 0;
                     return (
                         <g key={i} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)} style={{ cursor: "pointer" }}>
                             <rect x={gx} y={padT} width={bw} height={ih} fill="transparent" />
                             {isOff ? (
                                 <line x1={gx} y1={padT + ih} x2={gx + bw} y2={padT + ih} stroke="var(--border-secondary)" strokeWidth="2" />
                             ) : (
-                                <>
-                                    {(scrap[i] ?? 0) > 0 && <rect x={gx} y={sTop} width={bw} height={Math.max(scrapH, 1)} rx={rad}
-                                        fill="var(--danger)" opacity={hover == null || hover === i ? 0.9 : 0.4} />}
-                                    <rect x={gx} y={gTop} width={bw} height={Math.max(goodH, 1)} rx={rad}
-                                        fill="var(--accent)" opacity={hover == null || hover === i ? 1 : 0.45}
-                                        style={{ transition: "opacity .12s" }} />
-                                </>
+                                <rect x={gx} y={top} width={bw} height={Math.max(barH, 1)} rx={rad}
+                                    fill="var(--accent)" opacity={hover == null || hover === i ? 1 : 0.45}
+                                    style={{ transition: "opacity .12s" }} />
                             )}
                             <text x={gx + bw / 2} y={H - 7} textAnchor="middle" fontSize="9.5" fill="var(--text-tertiary)">{d}</text>
                         </g>
                     );
                 })}
             </svg>
-            {hover != null && good[hover] + (scrap[hover] ?? 0) > 0 && (
+            {hover != null && (values[hover] ?? 0) > 0 && (
                 <div style={{
                     position: "absolute", left: Math.min(Math.max(padL + hover * (bw + gap) - 50, 4), W - 124), top: 4,
                     width: 120, pointerEvents: "none",
@@ -72,12 +65,8 @@ export default function BarChart({ days, good, scrap, rounded = true }: BarChart
                 }}>
                     <div style={{ fontSize: 10.5, color: "var(--text-tertiary)", marginBottom: 4 }}>{days[hover]}</div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, lineHeight: 1.7 }}>
-                        <span style={{ color: "var(--text-tertiary)" }}>Sağlam</span>
-                        <span className="mono" style={{ color: "var(--accent-text)", fontWeight: 600 }}>{good[hover]}</span>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, lineHeight: 1.7 }}>
-                        <span style={{ color: "var(--text-tertiary)" }}>Fire</span>
-                        <span className="mono" style={{ color: "var(--danger-text)", fontWeight: 600 }}>{scrap[hover] ?? 0}</span>
+                        <span style={{ color: "var(--text-tertiary)" }}>Üretim</span>
+                        <span className="mono" style={{ color: "var(--accent-text)", fontWeight: 600 }}>{values[hover]}</span>
                     </div>
                 </div>
             )}
