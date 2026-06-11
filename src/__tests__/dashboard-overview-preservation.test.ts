@@ -45,6 +45,7 @@ describe("view-model normalizasyon fonksiyonları import edilir", () => {
             "buildKpis", "revenueByPeriod", "cogsByPeriod",
             "stockValueByCategoryReporting",
             "productionDailySeries", "reorderView", "alertsView", "recentOrdersView",
+            "QuotePipelineInput", "IncomingPoInput",
         ]) {
             expect(PAGE).toMatch(new RegExp(fn));
         }

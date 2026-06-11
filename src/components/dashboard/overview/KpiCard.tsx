@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { DashboardKpi } from "@/lib/dashboard-view-model";
 import Sparkline from "./charts/Sparkline";
 
@@ -24,23 +25,27 @@ function TrendingIcon({ up }: { up: boolean }) {
     );
 }
 
-/** KPI kartı — tasarıma sadık: ok ikonu + değer + trend delta + sub + opsiyonel sparkline. */
+/**
+ * KPI kartı — tasarıma sadık: ok ikonu + değer + trend delta + sub + opsiyonel sparkline.
+ * `kpi.href` varsa kart gerçek bir Link'tir (ok ikonu + pointer artık yanıltıcı değil);
+ * `kpi.subTone` alt satıra aciliyet rengi verir (sakin şeritte tek vurgu noktası).
+ */
 export default function KpiCard({ kpi }: { kpi: DashboardKpi }) {
     const [hov, setHov] = useState(false);
     const danger = kpi.tone === "danger";
     const sparkTone = kpi.tone === "danger" ? "danger" : kpi.tone === "warning" ? "warning" : kpi.tone === "success" ? "success" : "accent";
-    return (
-        <div
-            className="r-card"
-            onMouseEnter={() => setHov(true)}
-            onMouseLeave={() => setHov(false)}
-            style={{
-                padding: "13px 14px", position: "relative", cursor: "pointer",
-                borderColor: hov ? "var(--accent-border)" : "var(--surface-border)",
-                background: hov ? "var(--surface-subtle)" : "var(--surface-raised)",
-                transition: "border-color .14s, background .14s",
-            }}
-        >
+    const subColor = kpi.subTone === "warning"
+        ? "var(--warning-text)"
+        : kpi.subTone === "danger" ? "var(--danger-text)" : "var(--text-tertiary)";
+    const cardStyle: React.CSSProperties = {
+        padding: "13px 14px", position: "relative", cursor: "pointer",
+        borderColor: hov ? "var(--accent-border)" : "var(--surface-border)",
+        background: hov ? "var(--surface-subtle)" : "var(--surface-raised)",
+        transition: "border-color .14s, background .14s",
+        display: "block", color: "inherit", textDecoration: "none",
+    };
+    const body = (
+        <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                 <span style={{ fontSize: 11.5, color: "var(--text-secondary)" }}>{kpi.label}</span>
                 <ArrowIcon active={hov} />
@@ -64,7 +69,8 @@ export default function KpiCard({ kpi }: { kpi: DashboardKpi }) {
                     )}
                     {kpi.sub && (
                         <div style={{
-                            fontSize: 10.5, color: "var(--text-tertiary)", marginTop: 2,
+                            fontSize: 10.5, color: subColor, marginTop: 2,
+                            fontWeight: kpi.subTone ? 600 : undefined,
                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                         }}>
                             {kpi.sub}
@@ -75,6 +81,31 @@ export default function KpiCard({ kpi }: { kpi: DashboardKpi }) {
                     <Sparkline data={kpi.spark} tone={sparkTone} w={72} h={30} />
                 )}
             </div>
+        </>
+    );
+
+    if (kpi.href) {
+        return (
+            <Link
+                href={kpi.href}
+                aria-label={`${kpi.label}: ${kpi.value}`}
+                className="r-card"
+                onMouseEnter={() => setHov(true)}
+                onMouseLeave={() => setHov(false)}
+                style={cardStyle}
+            >
+                {body}
+            </Link>
+        );
+    }
+    return (
+        <div
+            className="r-card"
+            onMouseEnter={() => setHov(true)}
+            onMouseLeave={() => setHov(false)}
+            style={cardStyle}
+        >
+            {body}
         </div>
     );
 }

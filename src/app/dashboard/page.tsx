@@ -15,6 +15,7 @@ import {
     stockValueByCategoryReporting, productionDailySeries,
     reorderView, alertsView, recentOrdersView, listUnconvertibleCurrencies,
     type ExchangeRates, type CogsRow, type RangeKey,
+    type QuotePipelineInput, type IncomingPoInput,
 } from "@/lib/dashboard-view-model";
 
 interface FinanceData {
@@ -46,6 +47,9 @@ export default function DashboardPage() {
     // diye yalnız fetch settle olduktan sonra değerlendirilir.
     const [ratesResolved, setRatesResolved] = useState(false);
     const [preparedBy, setPreparedBy] = useState<string | null>(null);
+    // null = yüklenmedi/başarısız/yetkisiz → ilgili KPI kartı hiç üretilmez (fail-soft).
+    const [quotes, setQuotes] = useState<QuotePipelineInput[] | null>(null);
+    const [purchaseOrders, setPurchaseOrders] = useState<IncomingPoInput[] | null>(null);
 
     // Maliyet + raporlama para birimi + döviz kurları (mount'ta bir kez)
     useEffect(() => {
@@ -65,6 +69,25 @@ export default function DashboardPage() {
         })();
         (async () => {
             try {
+                const r = await fetch("/api/quotes");
+                if (r.ok && alive) {
+                    const d = await r.json();
+                    if (Array.isArray(d)) setQuotes(d as QuotePipelineInput[]);
+                }
+            } catch { /* defansif: Teklif Hattı kartı üretilmez */ }
+        })();
+        (async () => {
+            try {
+                // view_purchase_orders olmayan rolde 403 → kart hiç görünmez (RBAC fail-soft).
+                const r = await fetch("/api/purchase-orders");
+                if (r.ok && alive) {
+                    const d = await r.json();
+                    if (Array.isArray(d)) setPurchaseOrders(d as IncomingPoInput[]);
+                }
+            } catch { /* defansif: Yoldaki Mal kartı üretilmez */ }
+        })();
+        (async () => {
+            try {
                 const r = await fetch("/api/settings/user/profile");
                 if (r.ok && alive) {
                     const d = await r.json() as { fullName?: string | null; email?: string | null };
@@ -81,12 +104,12 @@ export default function DashboardPage() {
 
     const kpis = useMemo(
         () => buildKpis(
-            { products, orders, uretimKayitlari, openAlerts, reporting, rates },
+            { products, orders, uretimKayitlari, openAlerts, reporting, rates, quotes, purchaseOrders },
             { canViewSalesPrices },
             now,
             period,
         ),
-        [products, orders, uretimKayitlari, openAlerts, reporting, rates, canViewSalesPrices, now, period],
+        [products, orders, uretimKayitlari, openAlerts, reporting, rates, quotes, purchaseOrders, canViewSalesPrices, now, period],
     );
 
     // Kur çözülemeyen para birimleri → toplamların dışında kaldılar; görünür uyarı.
@@ -95,8 +118,10 @@ export default function DashboardPage() {
         const curs = new Set<string>();
         for (const o of orders) curs.add(o.currency);
         for (const p of products) if (p.isActive) curs.add(p.currency);
+        for (const q of quotes ?? []) curs.add(q.currency);
+        for (const po of purchaseOrders ?? []) curs.add(po.currency);
         return listUnconvertibleCurrencies(curs, reporting, rates);
-    }, [ratesResolved, orders, products, reporting, rates]);
+    }, [ratesResolved, orders, products, quotes, purchaseOrders, reporting, rates]);
 
     // ── Trend (ciro + maliyet + sipariş) — seçili döneme göre ──
     const revenueSeries = useMemo(

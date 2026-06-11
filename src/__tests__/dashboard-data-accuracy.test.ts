@@ -50,3 +50,21 @@ describe("kur uyarısı + Açık Alacak kaldırma (page kilitleri)", () => {
         expect(page).toMatch(/\{ canViewSalesPrices \}/);
     });
 });
+
+describe("Teklif Hattı + Yoldaki Mal kartları (page kilitleri)", () => {
+    const page = readFileSync(join(process.cwd(), "src/app/dashboard/page.tsx"), "utf8");
+
+    it("quotes + purchase-orders fetch edilir; !ok (403 dahil) null bırakır → kart üretilmez", () => {
+        expect(page).toMatch(/fetch\("\/api\/quotes"\)/);
+        expect(page).toMatch(/fetch\("\/api\/purchase-orders"\)/);
+        // fail-soft: yalnız r.ok'ta set edilir — setQuotes/setPurchaseOrders ok-guard'sız çağrılmaz
+        expect(page).toMatch(/if \(r\.ok && alive\) \{\s*const d = await r\.json\(\);\s*if \(Array\.isArray\(d\)\) setQuotes/);
+        expect(page).toMatch(/if \(Array\.isArray\(d\)\) setPurchaseOrders/);
+    });
+
+    it("buildKpis input'una quotes/purchaseOrders geçilir; kur uyarısı bu para birimlerini de tarar", () => {
+        expect(page).toMatch(/reporting, rates, quotes, purchaseOrders/);
+        expect(page).toMatch(/for \(const q of quotes \?\? \[\]\) curs\.add\(q\.currency\)/);
+        expect(page).toMatch(/for \(const po of purchaseOrders \?\? \[\]\) curs\.add\(po\.currency\)/);
+    });
+});

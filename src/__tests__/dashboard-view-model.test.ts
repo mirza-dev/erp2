@@ -18,7 +18,7 @@ import {
     stockValueByCategoryReporting, productionDailySeries, listUnconvertibleCurrencies, canConvert,
     todayProduction, lastNProductionTotals,
     reorderView, alertsView, relativeTime, recentOrdersView,
-    aiPointsFromOpsSummary, buildKpis,
+    aiPointsFromOpsSummary, buildKpis, quotePipelineView, incomingPoView,
     periodModel, revenueByPeriod, orderCountsByPeriod, cogsByPeriod, productionInPeriod,
     type ExchangeRates, type CogsRow,
 } from "@/lib/dashboard-view-model";
@@ -161,6 +161,75 @@ describe("stockValueByCategoryReporting", () => {
     });
 });
 
+// ── Teklif Hattı / Yoldaki Mal ───────────────────────────────
+describe("quotePipelineView", () => {
+    const TODAY = "2026-06-15";
+    const mkQ = (q: Partial<Parameters<typeof quotePipelineView>[0][number]>) => ({
+        status: "sent", currency: "TRY", grandTotal: 3200, validUntil: null, ...q,
+    });
+    it("yalnız sent sayılır; toplam raporlamaya normalize", () => {
+        const v = quotePipelineView([
+            mkQ({}),                                          // 3200 TRY → 100 USD
+            mkQ({ grandTotal: 100, currency: "USD" }),        // 100 USD
+            mkQ({ status: "draft", grandTotal: 9999 }),
+            mkQ({ status: "accepted", grandTotal: 9999 }),
+            mkQ({ status: "expired", grandTotal: 9999 }),
+        ], "USD", RATES, TODAY);
+        expect(v.count).toBe(2);
+        expect(v.totalReporting).toBeCloseTo(200, 5);
+        expect(v.redacted).toBe(false);
+    });
+    it("expiring7d sınırları: bugün=dahil, 7.gün=dahil, 8.gün=hariç, null=expire olmaz, geçmiş=sayılmaz", () => {
+        const v = quotePipelineView([
+            mkQ({ validUntil: "2026-06-15" }), // bugün → dahil
+            mkQ({ validUntil: "2026-06-22" }), // +7 → dahil
+            mkQ({ validUntil: "2026-06-23" }), // +8 → hariç
+            mkQ({ validUntil: null }),
+            mkQ({ validUntil: "2026-06-14" }), // geçmiş → sayılmaz
+        ], "USD", RATES, TODAY);
+        expect(v.expiring7d).toBe(2);
+        expect(v.count).toBe(5);
+    });
+    it("RBAC: herhangi bir satırda grandTotal null → redacted (adet yine doğru)", () => {
+        const v = quotePipelineView([mkQ({}), mkQ({ grandTotal: null })], "USD", RATES, TODAY);
+        expect(v.redacted).toBe(true);
+        expect(v.count).toBe(2);
+    });
+});
+
+describe("incomingPoView", () => {
+    const TODAY = "2026-06-15";
+    const mkPo = (p: Partial<Parameters<typeof incomingPoView>[0][number]>) => ({
+        status: "sent", currency: "TRY", grand_total: 3200, expected_date: null, ...p,
+    });
+    it("açık set sent/confirmed/partially_received; received/cancelled/draft hariç", () => {
+        const v = incomingPoView([
+            mkPo({}),
+            mkPo({ status: "confirmed", grand_total: 100, currency: "USD" }),
+            mkPo({ status: "partially_received", grand_total: 100, currency: "USD" }),
+            mkPo({ status: "received", grand_total: 9999 }),
+            mkPo({ status: "cancelled", grand_total: 9999 }),
+            mkPo({ status: "draft", grand_total: 9999 }),
+        ], "USD", RATES, TODAY);
+        expect(v.count).toBe(3);
+        expect(v.totalReporting).toBeCloseTo(300, 5);
+    });
+    it("overdue: expected_date < bugün (string karşılaştırma); null/bugün/gelecek sayılmaz", () => {
+        const v = incomingPoView([
+            mkPo({ expected_date: "2026-06-14" }), // geçmiş → gecikmede
+            mkPo({ expected_date: "2026-06-15" }), // bugün → değil
+            mkPo({ expected_date: "2026-07-01" }),
+            mkPo({ expected_date: null }),
+        ], "USD", RATES, TODAY);
+        expect(v.overdueCount).toBe(1);
+    });
+    it("RBAC: grand_total null → redacted", () => {
+        const v = incomingPoView([mkPo({ grand_total: null })], "USD", RATES, TODAY);
+        expect(v.redacted).toBe(true);
+        expect(v.count).toBe(1);
+    });
+});
+
 // ── Açık Alacak KALDIRILDI — geri-gelmez kilidi ──────────────
 // receivablesAging siparişten türev bir PROXY idi (createdAt+30g sabit vade,
 // 90g pencere, ödeme düşülmez) — kullanıcı kararıyla silindi. Gerçek alacak
@@ -283,6 +352,66 @@ describe("buildKpis", () => {
         const k = buildKpis(input, allPerms, NOW);
         expect(k.map((x) => x.id)).toEqual(["ciro", "siparis", "stok", "uretim", "uyari"]);
         expect(k.some((x) => x.label.includes("Alacak"))).toBe(false);
+    });
+
+    it("quotes+purchaseOrders verilince 7 KPI — satış→tedarik anlatı sırası", () => {
+        const k = buildKpis({
+            ...input,
+            quotes: [{ status: "sent", currency: "USD", grandTotal: 5000, validUntil: "2026-06-17" }],
+            purchaseOrders: [{ status: "confirmed", currency: "USD", grand_total: 2000, expected_date: "2026-06-10" }],
+        }, allPerms, NOW);
+        expect(k.map((x) => x.id)).toEqual(["ciro", "siparis", "teklif", "stok", "yoldaki", "uretim", "uyari"]);
+    });
+
+    it("Teklif Hattı: değer+adet+expiring warning subTone+href", () => {
+        const k = buildKpis({
+            ...input,
+            quotes: [
+                { status: "sent", currency: "USD", grandTotal: 5000, validUntil: "2026-06-17" },
+                { status: "sent", currency: "USD", grandTotal: 3000, validUntil: null },
+                { status: "draft", currency: "USD", grandTotal: 999, validUntil: null },
+            ],
+        }, allPerms, NOW);
+        const t = k.find((x) => x.id === "teklif")!;
+        expect(t.label).toBe("Teklif Hattı");
+        expect(t.value).toBe("$8K");
+        expect(t.delta).toBe("2 teklif");
+        expect(t.sub).toBe("1 tanesi 7 gün içinde doluyor");
+        expect(t.subTone).toBe("warning");
+        expect(t.href).toBe("/dashboard/quotes");
+    });
+
+    it("Yoldaki Mal: gecikme danger subTone; gecikme yoksa nötr sub", () => {
+        const mk = (expected: string | null) => buildKpis({
+            ...input,
+            purchaseOrders: [{ status: "sent", currency: "USD", grand_total: 2000, expected_date: expected }],
+        }, allPerms, NOW).find((x) => x.id === "yoldaki")!;
+        const overdue = mk("2026-06-10");
+        expect(overdue.value).toBe("$2K");
+        expect(overdue.delta).toBe("1 açık PO");
+        expect(overdue.sub).toBe("1 tanesi gecikmede");
+        expect(overdue.subTone).toBe("danger");
+        expect(overdue.href).toBe("/dashboard/purchase/orders");
+        const onTime = mk("2026-07-01");
+        expect(onTime.sub).toBe("Beklenen mal değeri · anlık");
+        expect(onTime.subTone).toBeUndefined();
+    });
+
+    it("redaction: null tutarlı teklif/PO → değer '—', adet delta'da kalır", () => {
+        const k = buildKpis({
+            ...input,
+            quotes: [{ status: "sent", currency: "USD", grandTotal: null, validUntil: null }],
+            purchaseOrders: [{ status: "sent", currency: "USD", grand_total: null, expected_date: null }],
+        }, allPerms, NOW);
+        expect(k.find((x) => x.id === "teklif")!.value).toBe("—");
+        expect(k.find((x) => x.id === "teklif")!.delta).toBe("1 teklif");
+        expect(k.find((x) => x.id === "yoldaki")!.value).toBe("—");
+    });
+
+    it("tüm kartlar href taşır (ok ikonu artık gerçek navigasyon)", () => {
+        const k = buildKpis(input, allPerms, NOW);
+        expect(k.every((x) => typeof x.href === "string" && x.href.startsWith("/dashboard"))).toBe(true);
+        expect(k.find((x) => x.id === "uyari")!.href).toBe("/dashboard/alerts");
     });
 
     it("uyarı KPI etiketi 'Açık Uyarılar' (değer tüm open+ack — info dahil)", () => {

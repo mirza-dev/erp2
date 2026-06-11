@@ -449,6 +449,86 @@ export function stockValueByCategoryReporting(
     return { segments, total: segments.reduce((s, x) => s + x.value, 0) };
 }
 
+// ════════════════════════════════════════════════════════════════
+//  Teklif Hattı + Yoldaki Mal (KPI kartları — birinci elden veri, proxy yok)
+// ════════════════════════════════════════════════════════════════
+
+/** /api/quotes özetinden kartın ihtiyaç duyduğu alt küme (RBAC: grandTotal null olabilir). */
+export interface QuotePipelineInput {
+    status: string;
+    currency: string;
+    grandTotal: number | null;
+    validUntil: string | null;
+}
+
+export interface QuotePipelineView {
+    count: number;
+    totalReporting: number;
+    /** RBAC redaction: en az bir satırda tutar null → toplam gösterilmez. */
+    redacted: boolean;
+    /** Geçerliliği bugünden itibaren 7 gün içinde dolan sent teklif sayısı. */
+    expiring7d: number;
+}
+
+/** `iso` (YYYY-MM-DD) + n gün → YYYY-MM-DD (yerel, string-karşılaştırma disipliniyle uyumlu). */
+function addDaysStr(iso: string, n: number): string {
+    const d = new Date(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)) + n);
+    return localDateKey(d);
+}
+
+/**
+ * Bekleyen teklif hattı: yalnız `sent` teklifler. Ciro yalnız-approved olduğundan
+ * bu kart pipeline değerini DÜRÜST etiketle ayrı gösterir (ciroya karışmaz).
+ * Tarihler domain kuralıyla string karşılaştırılır (saat kayması yok).
+ */
+export function quotePipelineView(
+    quotes: QuotePipelineInput[], reporting: string, rates: ExchangeRates | null, todayStr: string,
+): QuotePipelineView {
+    const horizon = addDaysStr(todayStr, 7);
+    let count = 0, total = 0, expiring = 0;
+    let redacted = false;
+    for (const q of quotes) {
+        if (q.status !== "sent") continue;
+        count++;
+        if (q.grandTotal === null) redacted = true;
+        else total += toReporting(q.grandTotal, q.currency, reporting, rates);
+        if (q.validUntil && q.validUntil >= todayStr && q.validUntil <= horizon) expiring++;
+    }
+    return { count, totalReporting: total, redacted, expiring7d: expiring };
+}
+
+/** /api/purchase-orders satırından kartın alt kümesi (RBAC: grand_total null olabilir). */
+export interface IncomingPoInput {
+    status: string;
+    currency: string;
+    grand_total: number | null;
+    expected_date: string | null;
+}
+
+export interface IncomingPoView {
+    count: number;
+    totalReporting: number;
+    redacted: boolean;
+    /** Beklenen teslim tarihi geçmiş açık PO sayısı. */
+    overdueCount: number;
+}
+
+/** Yoldaki mal: açık PO'lar (sent/confirmed/partially_received) — beklenen mal değeri. */
+export function incomingPoView(
+    pos: IncomingPoInput[], reporting: string, rates: ExchangeRates | null, todayStr: string,
+): IncomingPoView {
+    let count = 0, total = 0, overdue = 0;
+    let redacted = false;
+    for (const po of pos) {
+        if (po.status !== "sent" && po.status !== "confirmed" && po.status !== "partially_received") continue;
+        count++;
+        if (po.grand_total === null) redacted = true;
+        else total += toReporting(po.grand_total, po.currency, reporting, rates);
+        if (po.expected_date && po.expected_date < todayStr) overdue++;
+    }
+    return { count, totalReporting: total, redacted, overdueCount: overdue };
+}
+
 // NOT: receivablesAging (Açık Alacak) kullanıcı kararıyla KALDIRILDI.
 // Siparişten türev proxy idi (createdAt+30g sabit vade, 90g pencere, ödeme
 // düşülmez) — güvenilir değildi. Gerçek alacak istenirse `invoices`/`payments`
@@ -667,9 +747,13 @@ export interface DashboardKpi {
     value: string;
     tone: Tone;
     sub?: string;
+    /** Alt satır vurgu rengi (warning/danger) — sakin şeritte tek aciliyet sinyali. */
+    subTone?: Tone;
     delta?: string;
     up?: boolean;
     spark?: number[];
+    /** Kart tıklanınca gidilecek sayfa (KpiCard Link'e çevirir). */
+    href?: string;
 }
 
 export interface KpiInput {
@@ -679,8 +763,12 @@ export interface KpiInput {
     openAlerts: OpenAlert[];
     /** Raporlama para birimi (company_settings.currency, default USD). */
     reporting: string;
-    /** Döviz kurları (/api/exchange-rates); null → TRY=1, diğerleri dönüştürülmez. */
+    /** Döviz kurları (/api/exchange-rates); null → yalnız raporlama parası toplanır. */
     rates: ExchangeRates | null;
+    /** Bekleyen teklifler (/api/quotes). null/undefined = kart üretilmez (fetch yok/başarısız). */
+    quotes?: QuotePipelineInput[] | null;
+    /** Açık satın alma siparişleri (/api/purchase-orders). null/undefined = kart üretilmez (403 dahil). */
+    purchaseOrders?: IncomingPoInput[] | null;
 }
 
 export interface KpiPerms {
@@ -731,7 +819,13 @@ export function buildKpis(
     const urgent = openAlerts.filter((a) => a.severity === "critical").length;
     const stockAlerts = openAlerts.filter((a) => a.type === "stock_risk" || a.type === "stock_critical").length;
 
-    return [
+    const todayStr = localDateKey(now);
+
+    // ── Teklif Hattı / Yoldaki Mal — veri verilmemişse (yetki yok / fetch
+    // başarısız) kart hiç üretilmez; şerit fail-soft daralır. ──
+    const kpis: DashboardKpi[] = [];
+
+    kpis.push(
         {
             id: "ciro",
             label: `${period.kpiLabel} Ciro`,
@@ -741,6 +835,7 @@ export function buildKpis(
             delta: revDelta,
             up: revUp,
             spark: canPrices && !ciroEmpty ? revenue.slice(-6) : undefined,
+            href: "/dashboard/orders",
         },
         {
             id: "siparis",
@@ -751,16 +846,65 @@ export function buildKpis(
             delta: pending > 0 ? `${pending} onay bekliyor` : undefined,
             up: true,
             spark: counts.slice(-6),
+            href: "/dashboard/orders",
         },
-        {
-            id: "stok",
-            label: "Stok Değeri",
-            value: formatReportingCompact(stockVal, reporting, canPrices),
-            tone: "success",
-            sub: canPrices ? `Satılabilir ${formatReportingCompact(availVal, reporting, true)} · anlık` : `${formatNumber(activeCount)} aktif ürün · anlık`,
-            delta: `${formatNumber(activeCount)} aktif ürün`,
+    );
+
+    if (input.quotes != null) {
+        const pipe = quotePipelineView(input.quotes, reporting, rates, todayStr);
+        kpis.push({
+            id: "teklif",
+            label: "Teklif Hattı",
+            // Ciro yalnız-approved → pipeline değeri burada dürüst etiketle ayrı.
+            value: pipe.count === 0
+                ? "—"
+                : formatReportingCompact(pipe.totalReporting, reporting, canPrices && !pipe.redacted),
+            tone: "accent",
+            sub: pipe.count === 0
+                ? "Yanıt bekleyen teklif yok · anlık"
+                : pipe.expiring7d > 0
+                    ? `${pipe.expiring7d} tanesi 7 gün içinde doluyor`
+                    : "Yanıt bekleyen teklifler · anlık",
+            subTone: pipe.expiring7d > 0 ? "warning" : undefined,
+            delta: pipe.count > 0 ? `${pipe.count} teklif` : undefined,
             up: true,
-        },
+            href: "/dashboard/quotes",
+        });
+    }
+
+    kpis.push({
+        id: "stok",
+        label: "Stok Değeri",
+        value: formatReportingCompact(stockVal, reporting, canPrices),
+        tone: "success",
+        sub: canPrices ? `Satılabilir ${formatReportingCompact(availVal, reporting, true)} · anlık` : `${formatNumber(activeCount)} aktif ürün · anlık`,
+        delta: `${formatNumber(activeCount)} aktif ürün`,
+        up: true,
+        href: "/dashboard/products",
+    });
+
+    if (input.purchaseOrders != null) {
+        const incoming = incomingPoView(input.purchaseOrders, reporting, rates, todayStr);
+        kpis.push({
+            id: "yoldaki",
+            label: "Yoldaki Mal",
+            value: incoming.count === 0
+                ? "—"
+                : formatReportingCompact(incoming.totalReporting, reporting, canPrices && !incoming.redacted),
+            tone: "accent",
+            sub: incoming.count === 0
+                ? "Açık satın alma yok · anlık"
+                : incoming.overdueCount > 0
+                    ? `${incoming.overdueCount} tanesi gecikmede`
+                    : "Beklenen mal değeri · anlık",
+            subTone: incoming.overdueCount > 0 ? "danger" : undefined,
+            delta: incoming.count > 0 ? `${incoming.count} açık PO` : undefined,
+            up: incoming.overdueCount === 0,
+            href: "/dashboard/purchase/orders",
+        });
+    }
+
+    kpis.push(
         {
             id: "uretim",
             label: period.prodLabel,
@@ -769,6 +913,7 @@ export function buildKpis(
             sub: prod.types > 0 ? `${prod.types} ürün türü` : "Henüz giriş yok",
             up: prod.qty > 0,
             spark: prodSpark.length > 0 ? prodSpark : undefined,
+            href: "/dashboard/production",
         },
         {
             id: "uyari",
@@ -780,6 +925,9 @@ export function buildKpis(
             sub: critical > 0 ? `${stockAlerts} stok · ${critical - stockAlerts} diğer · anlık` : "Acil uyarı yok · anlık",
             delta: urgent > 0 ? `${urgent} acil` : undefined,
             up: false,
+            href: "/dashboard/alerts",
         },
-    ];
+    );
+
+    return kpis;
 }

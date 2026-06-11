@@ -7,7 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-12 (**Dashboard doğruluk turu — 4 bulgu fix + Açık Alacak kaldırıldı — GREEN**)
+## Son Tamamlanan İş — 2026-06-12 (**Dashboard: Teklif Hattı + Yoldaki Mal kartları — GREEN**)
+
+**İstek:** doğruluk turu sonrası önerilen 2 kartın ikisi de ("/frontend-design ile detaylı plan"). **Şerit 7 kart, satış→tedarik sırası:** Ciro · Açık Siparişler · **Teklif Hattı** · Stok Değeri · **Yoldaki Mal** · Üretim · Açık Uyarılar.
+
+- **`quotePipelineView`:** yalnız `sent`; `expiring7d` validUntil ∈ [bugün, +7g] (string karşılaştırma, `addDaysStr`); RBAC `grandTotal:null` → `redacted` → değer "—", adet delta'da kalır. Ciro yalnız-approved olduğundan pipeline değeri burada dürüst etiketle.
+- **`incomingPoView`:** açık set sent/confirmed/partially_received; `overdueCount` = expected_date < bugün.
+- **Fail-soft:** `KpiInput.quotes?/purchaseOrders?` null/undefined → kart üretilmez; page'de PO fetch 403 (sales/viewer) dahil !ok → null. `/api/quotes` guard'sız+redact'li, `/api/purchase-orders` view_purchase_orders guard'lı.
+- **KpiCard:** `DashboardKpi.href` → gerçek `next/link` (tüm 7 kart href aldı; ok ikonu artık gerçek navigasyon); `subTone` warning/danger alt satır rengi (Teklif "7 gün içinde doluyor" warning · PO "gecikmede" danger — sakin şeritte tek vurgu); href'siz div fallback.
+- Kur uyarısı memo'su quote/PO para birimlerini de tarar; rapor kpis'i generic map'lediğinden 7 satır otomatik.
+- **Test:** +17 (`kpi-card-render` RTL + view-model sınır testleri + buildKpis 7-sıra/redaction/href + page source-lock); tsc 0 · lint 0 · **5066 test / 366 dosya** · build 0.
+- **Kalan:** görsel smoke — admin 7 kart, sales'te Yoldaki Mal yok, kart tıkla→sayfa, expiring/gecikme renkleri, viewer "—".
+
+## Önceki — 2026-06-12 (**Dashboard doğruluk turu — 4 bulgu fix + Açık Alacak kaldırıldı — GREEN**)
 
 **İstek:** "dashboard %100 doğru mu, veriler güvenilir mi, açık alacak semantiği ne" denetimi → "bulguları eksiksiz düzelt + Açık Alacak kartını kaldır." **Kararlar (AskUserQuestion):** ciro=yalnız approved · FX çözülemeyince hariç tut + uyarı.
 
