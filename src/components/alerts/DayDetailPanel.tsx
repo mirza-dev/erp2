@@ -8,16 +8,32 @@ import {
     type Occurrence,
 } from "@/lib/alert-calendar";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
+import type { CalendarNote } from "@/lib/calendar-notes";
+import { CalendarNotesSection } from "@/components/alerts/CalendarNotesSection";
 
 interface Props {
     selectedDate: Date | null;
     occurrences: Occurrence[];
     onDetail: (occ: Occurrence) => void;
     onDismiss: (id: string) => void;
+    notes?: CalendarNote[];
+    onAddNote?: () => void;
+    onNoteDetail?: (note: CalendarNote) => void;
 }
 
-/** Sağ kolon: seçili günün kronolojik zaman çizelgesi. */
-export function DayDetailPanel({ selectedDate, occurrences, onDetail, onDismiss }: Props) {
+/**
+ * Sağ kolon: notlar ayrı bölümde, mevcut uyarı zaman çizelgesi ayrı bölümde.
+ * Notlar hiçbir zaman `sortOccurrences` hattına girmez.
+ */
+export function DayDetailPanel({
+    selectedDate,
+    occurrences,
+    onDetail,
+    onDismiss,
+    notes = [],
+    onAddNote = () => {},
+    onNoteDetail = () => {},
+}: Props) {
     if (!selectedDate) {
         return (
             <div style={emptyWrap}>
@@ -42,40 +58,47 @@ export function DayDetailPanel({ selectedDate, occurrences, onDetail, onDismiss 
                     {today && <Pill text="BUGÜN" accent />}
                     {!today && isPast && <Pill text="GEÇMİŞ" />}
                 </div>
-                <span style={{
-                    fontSize: "12px", fontWeight: 700, padding: "2px 10px", borderRadius: "10px",
-                    background: sorted.length > 0 ? "var(--danger-bg)" : "var(--bg-tertiary)",
-                    color: sorted.length > 0 ? "var(--danger-text)" : "var(--text-tertiary)",
-                    border: `0.5px solid ${sorted.length > 0 ? "var(--danger-border)" : "var(--border-secondary)"}`,
-                }}>
-                    {sorted.length} olay
-                </span>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 650 }}>
+                    <span style={{ color: sorted.length > 0 ? "var(--danger-text)" : "var(--text-tertiary)" }}>{sorted.length} uyarı</span>
+                    <span style={{ color: "var(--border-primary)" }}>·</span>
+                    <span style={{ color: "var(--text-secondary)" }}>{notes.length} not</span>
+                </div>
             </div>
 
-            {sorted.length === 0 ? (
+            {sorted.length === 0 && notes.length === 0 ? (
                 <div style={emptyWrap}>
                     <span style={{ fontSize: "12px" }}>Bu gün için kayıt yok</span>
+                    <Button variant="secondary" size="xs" onClick={onAddNote}>Not Ekle</Button>
                 </div>
             ) : (
                 <div
                     key={selectedDate.toISOString().slice(0, 10)}
-                    style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "10px" }}
+                    style={{ flex: 1, overflowY: "auto", minHeight: 0 }}
                 >
-                    {sorted.map((occ, idx) => (
-                        <div
-                            key={occ.id + occ.occKind}
-                            style={{
-                                display: "flex", gap: "12px", alignItems: "stretch",
-                                animation: "cal-fade-up 0.34s cubic-bezier(0.16,1,0.3,1) both",
-                                animationDelay: `${idx * 55}ms`,
-                            }}
-                        >
-                            <TimeRail occ={occ} isLast={idx === sorted.length - 1} />
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                                <AlertCard occ={occ} onDetail={onDetail} onDismiss={onDismiss} />
-                            </div>
+                    <CalendarNotesSection notes={notes} onAdd={onAddNote} onDetail={onNoteDetail} />
+                    <section data-testid="hourly-alert-timeline" aria-label="Saat bazlı uyarılar" style={{ padding: "14px 20px 18px" }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: sorted.length ? "12px" : 0 }}>
+                            Saat Bazlı Uyarılar
                         </div>
-                    ))}
+                        {sorted.length === 0 ? (
+                            <div style={{ padding: "16px 0 4px", fontSize: "11.5px", color: "var(--text-tertiary)" }}>Bu gün için uyarı yok</div>
+                        ) : sorted.map((occ, idx) => (
+                            <div
+                                key={occ.id + occ.occKind}
+                                style={{
+                                    display: "flex", gap: "12px", alignItems: "stretch",
+                                    marginTop: idx === 0 ? 0 : "10px",
+                                    animation: "cal-fade-up 0.34s cubic-bezier(0.16,1,0.3,1) both",
+                                    animationDelay: `${idx * 55}ms`,
+                                }}
+                            >
+                                <TimeRail occ={occ} isLast={idx === sorted.length - 1} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <AlertCard occ={occ} onDetail={onDetail} onDismiss={onDismiss} />
+                                </div>
+                            </div>
+                        ))}
+                    </section>
                 </div>
             )}
         </div>

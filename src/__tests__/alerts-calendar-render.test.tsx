@@ -8,6 +8,7 @@ import { CalendarGrid } from "@/components/alerts/CalendarGrid";
 import { DayDetailPanel } from "@/components/alerts/DayDetailPanel";
 import { AlertCalendarDrawer } from "@/components/alerts/AlertCalendarDrawer";
 import { expandAlertOccurrences, type CalendarAlert } from "@/lib/alert-calendar";
+import type { CalendarNote } from "@/lib/calendar-notes";
 
 const noop = () => {};
 function renderDrawer(over: Partial<CalendarAlert>) {
@@ -34,6 +35,15 @@ function ca(over: Partial<CalendarAlert>): CalendarAlert {
     };
 }
 
+function note(over: Partial<CalendarNote> = {}): CalendarNote {
+    return {
+        id: "n1", title: "Yönetim toplantısı", description: "Bütçe gözden geçirilecek",
+        noteDate: "2026-06-07", noteTime: null, visibility: "company",
+        ownerLabel: "Ayşe Yılmaz", createdAt: "2026-06-01T08:00:00Z",
+        updatedAt: "2026-06-01T08:00:00Z", canManage: true, ...over,
+    };
+}
+
 describe("CalendarGrid render", () => {
     it("hafta başlıkları + gün numaraları + olay çubuğu", () => {
         const occ = expandAlertOccurrences([ca({})]);
@@ -56,6 +66,16 @@ describe("CalendarGrid render", () => {
         );
         expect(html).toContain("dashed"); // due çubuk kesik çizgi
         expect(html).toContain("◷");
+    });
+
+    it("notları nötr önizleme olarak gösterir; uyarı occurrence listesine karıştırmaz", () => {
+        const occ = expandAlertOccurrences([ca({})]);
+        const html = renderToStaticMarkup(
+            <CalendarGrid year={2026} month={5} occurrences={occ} notes={[note()]} selectedDate={null} onSelectDate={() => {}} />,
+        );
+        expect(occ).toHaveLength(1);
+        expect(html).toContain("Yönetim toplantısı");
+        expect(html).toContain("1 uyarı, 1 not");
     });
 });
 
@@ -82,7 +102,7 @@ describe("DayDetailPanel render", () => {
         expect(html).toContain("15:25"); // saat rayı
         expect(html).toContain("Vana DN50");
         expect(html).toContain("Detay");
-        expect(html).toContain("1 olay");
+        expect(html).toContain("1 uyarı");
     });
 
     it("bugün rozeti", () => {
@@ -91,6 +111,25 @@ describe("DayDetailPanel render", () => {
             <DayDetailPanel selectedDate={today} occurrences={[]} onDetail={() => {}} onDismiss={() => {}} />,
         );
         expect(html).toContain("BUGÜN");
+    });
+
+    it("not bölümü uyarı çizelgesinin üstündedir ve uyarı saat/sırası değişmez", () => {
+        const occurrences = expandAlertOccurrences([
+            ca({ id: "later", severity: "warning", time: "16:00", date: new Date(2026, 5, 7, 16).toISOString(), title: "Geç uyarı" }),
+            ca({ id: "early", severity: "critical", time: "08:15", date: new Date(2026, 5, 7, 8, 15).toISOString(), title: "Erken uyarı" }),
+        ]);
+        const html = renderToStaticMarkup(
+            <DayDetailPanel
+                selectedDate={new Date(2026, 5, 7)}
+                occurrences={occurrences}
+                notes={[note({ noteTime: "09:00" }), note({ id: "all-day", title: "Tüm gün notu" })]}
+                onDetail={() => {}} onDismiss={() => {}} onAddNote={() => {}} onNoteDetail={() => {}}
+            />,
+        );
+        expect(html.indexOf("Notlar")).toBeLessThan(html.indexOf("Saat Bazlı Uyarılar"));
+        expect(html.indexOf("08:15")).toBeLessThan(html.indexOf("16:00"));
+        expect(html).toContain('data-testid="hourly-alert-timeline"');
+        expect(html).toContain("TÜM GÜN");
     });
 });
 

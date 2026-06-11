@@ -2,6 +2,7 @@
 
 import Button from "@/components/ui/Button";
 import { MONTH_NAMES_TR, type CalendarStats } from "@/lib/alert-calendar";
+import { NotebookPen } from "lucide-react";
 
 interface Props {
     year: number;
@@ -14,7 +15,7 @@ interface Props {
     refreshing: boolean;
     onAiSuggest: () => void;
     aiGenerating: boolean;
-    /** 090 — kullanıcı notu formunu açar. */
+    /** Uyarılardan bağımsız takvim notu formunu açar. */
     onAddNote: () => void;
 }
 
@@ -59,8 +60,8 @@ export function CalendarHeader({
                     <StatNum value={stats.resolved} color="var(--success)"      label="çözülen" />
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <Button variant="secondary" size="md" onClick={onAddNote} title="Not / hatırlatma ekle">
-                        ✎ Not
+                    <Button variant="secondary" size="md" onClick={onAddNote} title="Takvime not ekle" leftIcon={<NotebookPen size={14} />}>
+                        Not Ekle
                     </Button>
                     <Button
                         variant="secondary" size="md" onClick={onAiSuggest} disabled={aiGenerating}

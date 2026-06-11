@@ -231,27 +231,6 @@ export async function dbUpdateActiveAlertContent(
     return data?.length ?? 0;
 }
 
-/**
- * 090 — hatırlatma tarihi geçmiş aktif kullanıcı notlarını info→warning yükseltir.
- * Günlük scan'le birlikte çağrılır; "unutma" işlevini sayaca/güne taşır.
- * Yükseltilen satır sayısını döner.
- */
-export async function dbEscalateOverdueUserNotes(): Promise<number> {
-    const supabase = createServiceClient();
-    const today = new Date().toISOString().slice(0, 10);
-    const { data, error } = await supabase
-        .from("alerts")
-        .update({ severity: "warning" })
-        .eq("type", "user_note")
-        .eq("severity", "info")
-        .in("status", ["open", "acknowledged"])
-        .not("due_date", "is", null)
-        .lt("due_date", today)
-        .select("id");
-    if (error) throw new Error(error.message);
-    return data?.length ?? 0;
-}
-
 // ── Batch operations (N+1 optimization) ─────────────────────────
 
 /**

@@ -8,10 +8,18 @@ interface Props {
     onSelect: (id: string) => void;
     /** Görünür uyarılar (çözülenler ayarına göre filtrelenmiş) — sayı rozetleri için. */
     visibleAlerts: CalendarAlert[];
+    visibleNotesCount?: number;
 }
 
 /** Yatay sınıflandırma (filtre) sekmeleri — her kategori sayı rozetiyle. */
-export function ClassificationTabs({ activeClass, onSelect, visibleAlerts }: Props) {
+export function ClassificationTabs({ activeClass, onSelect, visibleAlerts, visibleNotesCount = 0 }: Props) {
+    const items = [
+        ...ALERT_CLASSES.map((cat) => ({
+            ...cat,
+            count: visibleAlerts.filter((alert) => matchesAlertClass(alert, cat)).length + (cat.id === "all" ? visibleNotesCount : 0),
+        })),
+        { id: "note", label: "Notlar", icon: "✎", count: visibleNotesCount },
+    ];
     return (
         <div
             role="tablist"
@@ -22,19 +30,16 @@ export function ClassificationTabs({ activeClass, onSelect, visibleAlerts }: Pro
                 scrollbarWidth: "none",
             }}
         >
-            {ALERT_CLASSES.map((cat) => {
-                const count = visibleAlerts.filter((a) => matchesAlertClass(a, cat)).length;
-                return (
-                    <ClassTab
-                        key={cat.id}
-                        label={cat.label}
-                        icon={cat.icon}
-                        count={count}
-                        active={activeClass === cat.id}
-                        onClick={() => onSelect(cat.id)}
-                    />
-                );
-            })}
+            {items.map((cat) => (
+                <ClassTab
+                    key={cat.id}
+                    label={cat.label}
+                    icon={cat.icon}
+                    count={cat.count}
+                    active={activeClass === cat.id}
+                    onClick={() => onSelect(cat.id)}
+                />
+            ))}
         </div>
     );
 }

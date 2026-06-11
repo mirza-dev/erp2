@@ -284,13 +284,6 @@ export function AlertCalendarDrawer({
                         </Section>
                     )}
 
-                    {/* user_note → oluşturan kullanıcı */}
-                    {alert.type === "user_note" && alert.createdBy && (
-                        <Section label="Oluşturan">
-                            <p style={textBlock}>{alert.createdBy}</p>
-                        </Section>
-                    )}
-
                     {alert.source === "ai" && (alert.aiReason || alert.aiConfidence != null) && (
                         <Section label="AI Değerlendirmesi">
                             {alert.aiReason && <p style={textBlock}>{alert.aiReason}</p>}

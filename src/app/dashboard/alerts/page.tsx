@@ -13,14 +13,16 @@ import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 import {
     ALERT_CLASSES, matchesAlertClass, expandAlertOccurrences, getOccurrencesForDate, getCalendarStats,
-    timeFromISO, type CalendarAlert, type Occurrence,
+    getMonthDays, timeFromISO, type CalendarAlert, type Occurrence,
 } from "@/lib/alert-calendar";
+import { getCalendarNotesForDate, type CalendarNote } from "@/lib/calendar-notes";
 import { CalendarHeader } from "@/components/alerts/CalendarHeader";
 import { ClassificationTabs } from "@/components/alerts/ClassificationTabs";
 import { CalendarGrid } from "@/components/alerts/CalendarGrid";
 import { DayDetailPanel } from "@/components/alerts/DayDetailPanel";
 import { AlertCalendarDrawer } from "@/components/alerts/AlertCalendarDrawer";
-import { NoteFormModal } from "@/components/alerts/NoteFormModal";
+import { formatInputDate, NoteFormModal } from "@/components/alerts/NoteFormModal";
+import { CalendarNoteDetailModal } from "@/components/alerts/CalendarNoteDetailModal";
 
 // ── AlertRow (+ due meta) → takvim görünüm modeli ─────────────────────────────
 /**
@@ -91,7 +93,6 @@ export function toCalendarAlert(row: AlertWithDueMeta, productMap: Map<string, P
         entityType: row.entity_type ?? null,
         product: cp,
         source: row.source ?? null,
-        createdBy: row.created_by ?? null,
         aiConfidence: row.ai_confidence ?? null,
         aiReason: row.ai_reason ?? null,
         aiModelVersion: row.ai_model_version ?? null,
@@ -100,6 +101,7 @@ export function toCalendarAlert(row: AlertWithDueMeta, productMap: Map<string, P
 
 /** Sınıflandırma sekmesine göre filtre (sekme sayaçlarıyla aynı matcher). */
 export function applyClassFilter(alerts: CalendarAlert[], classId: string): CalendarAlert[] {
+    if (classId === "note") return [];
     const cat = ALERT_CLASSES.find((c) => c.id === classId);
     if (!cat) return alerts;
     return alerts.filter((a) => matchesAlertClass(a, cat));
@@ -110,6 +112,7 @@ export default function AlertsPage() {
     const isDemo = useIsDemo();
 
     const [rawAlerts, setRawAlerts] = useState<AlertWithDueMeta[]>([]);
+    const [calendarNotes, setCalendarNotes] = useState<CalendarNote[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -127,7 +130,8 @@ export default function AlertsPage() {
     const [showResolved, setShowResolved] = useState(true);
     const [search, setSearch] = useState("");
     const [drawerAlertId, setDrawerAlertId] = useState<string | null>(null);
-    const [noteFormOpen, setNoteFormOpen] = useState(false);
+    const [noteFormState, setNoteFormState] = useState<{ initialDate?: string; note?: CalendarNote } | null>(null);
+    const [detailNote, setDetailNote] = useState<CalendarNote | null>(null);
 
     // ── Responsive (OrderForm precedent) — <768 tek kolon + doküman scroll ──
     const [windowWidth, setWindowWidth] = useState<number>(
@@ -160,6 +164,25 @@ export default function AlertsPage() {
         refetch().catch(console.error).finally(() => setLoading(false));
     }, [refetch]);
 
+    const noteRange = useMemo(() => {
+        const days = getMonthDays(viewYear, viewMonth);
+        return { from: formatInputDate(days[0].date), to: formatInputDate(days[days.length - 1].date) };
+    }, [viewYear, viewMonth]);
+
+    const refetchNotes = useCallback(async () => {
+        const res = await fetch(`/api/calendar-notes?from=${noteRange.from}&to=${noteRange.to}`);
+        if (!res.ok) {
+            setCalendarNotes([]);
+            return;
+        }
+        const data = await res.json();
+        setCalendarNotes(Array.isArray(data) ? data as CalendarNote[] : []);
+    }, [noteRange]);
+
+    useEffect(() => {
+        refetchNotes().catch(console.error);
+    }, [refetchNotes]);
+
     // ── Türetilen veriler ──
     const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
@@ -189,11 +212,26 @@ export default function AlertsPage() {
         return list;
     }, [visibleAlerts, activeClass, search]);
 
+    const filteredNotes = useMemo(() => {
+        if (activeClass !== "all" && activeClass !== "note") return [];
+        const q = search.trim().toLowerCase();
+        if (!q) return calendarNotes;
+        return calendarNotes.filter((note) =>
+            note.title.toLowerCase().includes(q) ||
+            note.description?.toLowerCase().includes(q) ||
+            note.ownerLabel?.toLowerCase().includes(q),
+        );
+    }, [activeClass, calendarNotes, search]);
+
     const occurrences = useMemo(() => expandAlertOccurrences(filteredAlerts), [filteredAlerts]);
     const stats = useMemo(() => getCalendarStats(calendarAlerts), [calendarAlerts]);
     const dayOccurrences = useMemo(
         () => (selectedDate ? getOccurrencesForDate(occurrences, selectedDate) : []),
         [occurrences, selectedDate],
+    );
+    const dayNotes = useMemo(
+        () => (selectedDate ? getCalendarNotesForDate(filteredNotes, selectedDate) : []),
+        [filteredNotes, selectedDate],
     );
 
     // Drawer canlı: rawAlerts mutasyonu otomatik yansır; silinince undefined → kapanır
@@ -420,12 +458,12 @@ export default function AlertsPage() {
                         aiGenerating={aiGenerating}
                         onAddNote={() => {
                             if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
-                            setNoteFormOpen(true);
+                            setNoteFormState({});
                         }}
                     />
 
                     <div style={controlsRowStyle}>
-                        <ClassificationTabs activeClass={activeClass} onSelect={setActiveClass} visibleAlerts={visibleAlerts} />
+                        <ClassificationTabs activeClass={activeClass} onSelect={setActiveClass} visibleAlerts={visibleAlerts} visibleNotesCount={calendarNotes.length} />
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0, paddingBottom: "14px" }}>
                             <input
                                 type="search"
@@ -449,6 +487,7 @@ export default function AlertsPage() {
                             year={viewYear}
                             month={viewMonth}
                             occurrences={occurrences}
+                            notes={filteredNotes}
                             selectedDate={selectedDate}
                             onSelectDate={handleSelectDate}
                         />
@@ -472,20 +511,47 @@ export default function AlertsPage() {
                     <DayDetailPanel
                         selectedDate={selectedDate}
                         occurrences={dayOccurrences}
+                        notes={dayNotes}
                         onDetail={openDrawer}
                         onDismiss={dismissAlert}
+                        onAddNote={() => {
+                            if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+                            setNoteFormState({ initialDate: selectedDate ? formatInputDate(selectedDate) : undefined });
+                        }}
+                        onNoteDetail={setDetailNote}
                     />
                 </div>
             </div>
 
-            {noteFormOpen && (
+            {noteFormState && (
                 <NoteFormModal
                     isDemo={isDemo}
-                    onClose={() => setNoteFormOpen(false)}
-                    onCreated={() => {
-                        setNoteFormOpen(false);
-                        void refetch();
-                        toast({ type: "success", message: "Not eklendi" });
+                    initialDate={noteFormState.initialDate}
+                    note={noteFormState.note}
+                    onClose={() => setNoteFormState(null)}
+                    onSaved={() => {
+                        const wasEditing = !!noteFormState.note;
+                        setNoteFormState(null);
+                        setDetailNote(null);
+                        void refetchNotes();
+                        toast({ type: "success", message: wasEditing ? "Takvim notu güncellendi" : "Takvim notu eklendi" });
+                    }}
+                />
+            )}
+
+            {detailNote && (
+                <CalendarNoteDetailModal
+                    note={detailNote}
+                    isDemo={isDemo}
+                    onClose={() => setDetailNote(null)}
+                    onEdit={() => {
+                        setNoteFormState({ note: detailNote });
+                        setDetailNote(null);
+                    }}
+                    onDeleted={() => {
+                        setDetailNote(null);
+                        void refetchNotes();
+                        toast({ type: "success", message: "Takvim notu silindi" });
                     }}
                 />
             )}

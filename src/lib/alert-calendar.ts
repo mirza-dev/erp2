@@ -57,7 +57,6 @@ export const ALERT_CLASSES: AlertClass[] = [
     { id: "order",    label: "Sipariş",    types: ["order_shortage", "order_deadline"],              icon: "◈" },
     { id: "shipment", label: "Vadeler",    types: ["overdue_shipment", "quote_expired", "po_overdue"], icon: "◇" },
     { id: "system",   label: "Sistem",     types: ["sync_issue"],                                    icon: "⚙" },
-    { id: "note",     label: "Notlar",     types: ["user_note"],                                     icon: "✎" },
     { id: "ai",       label: "AI Bulgular", types: null, source: "ai",                               icon: "✦" },
 ];
 
@@ -108,8 +107,6 @@ export interface CalendarAlert {
     entityType: string | null;
     product: CalendarProduct | null;
     source: string | null;
-    /** user_note: oluşturan kullanıcının görünen adı (090). */
-    createdBy: string | null;
     aiConfidence: number | null;
     aiReason: string | null;
     aiModelVersion: string | null;

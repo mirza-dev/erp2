@@ -2,23 +2,26 @@
 
 import { useMemo, useState, useRef, useEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { Building2, LockKeyhole, NotebookText } from "lucide-react";
 import {
     DAY_NAMES_TR, SEVERITY_CONFIG,
     getMonthDays, getOccurrencesForDate, sortOccurrences,
     isSameDate, isToday as calIsToday, formatDateShort, eventLabel,
     type Occurrence,
 } from "@/lib/alert-calendar";
+import { getCalendarNotesForDate, type CalendarNote } from "@/lib/calendar-notes";
 
 interface GridProps {
     year: number;
     month: number;
     occurrences: Occurrence[];
+    notes?: CalendarNote[];
     selectedDate: Date | null;
     onSelectDate: (d: Date) => void;
 }
 
 /** Aylık takvim ızgarası (Pzt-başı, 35/42 hücre). */
-export function CalendarGrid({ year, month, occurrences, selectedDate, onSelectDate }: GridProps) {
+export function CalendarGrid({ year, month, occurrences, notes = [], selectedDate, onSelectDate }: GridProps) {
     const days = useMemo(() => getMonthDays(year, month), [year, month]);
 
     return (
@@ -45,6 +48,7 @@ export function CalendarGrid({ year, month, occurrences, selectedDate, onSelectD
                     date={day.date}
                     current={day.current}
                     occurrences={getOccurrencesForDate(occurrences, day.date)}
+                    notes={getCalendarNotesForDate(notes, day.date)}
                     isSelected={!!selectedDate && isSameDate(day.date, selectedDate)}
                     isToday={calIsToday(day.date)}
                     onClick={() => onSelectDate(day.date)}
@@ -58,21 +62,23 @@ interface CellProps {
     date: Date;
     current: boolean;
     occurrences: Occurrence[];
+    notes: CalendarNote[];
     isSelected: boolean;
     isToday: boolean;
     onClick: () => void;
 }
 
-function DayCell({ date, current, occurrences, isSelected, isToday, onClick }: CellProps) {
+function DayCell({ date, current, occurrences, notes, isSelected, isToday, onClick }: CellProps) {
     const [hov, setHov] = useState(false);
     const [pop, setPop] = useState<{ x: number; y: number; above: boolean } | null>(null);
     const cellRef = useRef<HTMLButtonElement>(null);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const sorted = useMemo(() => sortOccurrences(occurrences), [occurrences]);
-    const has = sorted.length > 0;
+    const has = sorted.length > 0 || notes.length > 0;
     const preview = sorted.slice(0, 2);
-    const extra = sorted.length - preview.length;
+    const notePreview = notes.slice(0, Math.max(0, 2 - preview.length));
+    const extra = sorted.length + notes.length - preview.length - notePreview.length;
 
     const openPop = () => {
         if (!cellRef.current || !has) return;
@@ -108,7 +114,7 @@ function DayCell({ date, current, occurrences, isSelected, isToday, onClick }: C
         };
     };
 
-    const cellLabel = `${date.getDate()} — ${sorted.length} olay`;
+    const cellLabel = `${date.getDate()} — ${sorted.length} uyarı, ${notes.length} not`;
 
     return (
         <button
@@ -152,6 +158,22 @@ function DayCell({ date, current, occurrences, isSelected, isToday, onClick }: C
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{eventLabel(occ)}</span>
                         </span>
                     ))}
+                    {notePreview.map((note) => (
+                        <span
+                            key={note.id}
+                            title={note.title}
+                            style={{
+                                display: "flex", alignItems: "center", gap: "4px", minWidth: 0,
+                                padding: "2px 5px", borderRadius: "4px", lineHeight: 1.45,
+                                background: "var(--surface-raised)", border: "1px solid var(--border-tertiary)",
+                                borderLeft: "2px solid var(--text-tertiary)", color: "var(--text-secondary)",
+                                fontSize: "9.5px", fontWeight: 600,
+                            }}
+                        >
+                            <NotebookText size={9} style={{ flexShrink: 0 }} />
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{note.title}</span>
+                        </span>
+                    ))}
                     {extra > 0 && (
                         <span style={{ fontSize: "9.5px", fontWeight: 650, color: "var(--text-tertiary)", paddingLeft: "6px", marginTop: "1px" }}>
                             +{extra} daha
@@ -159,12 +181,12 @@ function DayCell({ date, current, occurrences, isSelected, isToday, onClick }: C
                     )}
                 </div>
             )}
-            {pop && <DayPopover x={pop.x} y={pop.y} above={pop.above} date={date} occurrences={sorted} />}
+            {pop && <DayPopover x={pop.x} y={pop.y} above={pop.above} date={date} occurrences={sorted} notes={notes} />}
         </button>
     );
 }
 
-function DayPopover({ x, y, above, date, occurrences }: { x: number; y: number; above: boolean; date: Date; occurrences: Occurrence[] }) {
+function DayPopover({ x, y, above, date, occurrences, notes }: { x: number; y: number; above: boolean; date: Date; occurrences: Occurrence[]; notes: CalendarNote[] }) {
     if (typeof document === "undefined") return null;
     return createPortal(
         <div
@@ -183,7 +205,7 @@ function DayPopover({ x, y, above, date, occurrences }: { x: number; y: number; 
         >
             <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                 <span>{formatDateShort(date)}</span>
-                <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)" }}>{occurrences.length} olay</span>
+                <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)" }}>{occurrences.length} uyarı · {notes.length} not</span>
             </div>
             <div style={{ display: "flex", flexDirection: "column" }}>
                 {occurrences.slice(0, 5).map((occ) => (
@@ -200,6 +222,16 @@ function DayPopover({ x, y, above, date, occurrences }: { x: number; y: number; 
                 {occurrences.length > 5 && (
                     <div style={{ fontSize: "10px", color: "var(--text-tertiary)", paddingTop: "4px", fontWeight: 600 }}>+{occurrences.length - 5} daha…</div>
                 )}
+                {notes.slice(0, Math.max(0, 5 - occurrences.length)).map((note) => (
+                    <div key={note.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "3px 0", minWidth: 0 }}>
+                        <span style={{ fontSize: "9px", color: "var(--text-tertiary)", width: "34px", flexShrink: 0 }}>{note.noteTime || "Tüm gün"}</span>
+                        <NotebookText size={10} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
+                        <span style={{ fontSize: "11px", color: "var(--text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{note.title}</span>
+                        <span aria-hidden style={{ display: "inline-flex", color: "var(--text-tertiary)" }}>
+                            {note.visibility === "personal" ? <LockKeyhole size={9} /> : <Building2 size={9} />}
+                        </span>
+                    </div>
+                ))}
             </div>
         </div>,
         document.body,
