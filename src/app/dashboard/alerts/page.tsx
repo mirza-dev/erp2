@@ -126,8 +126,8 @@ export default function AlertsPage() {
     const [viewMonth, setViewMonth] = useState(now.getMonth());
     const [selectedDate, setSelectedDate] = useState<Date | null>(now);
     const [activeClass, setActiveClass] = useState("all");
-    // Varsayılan: çözülenler de görünür (tasarım vaadi "hangi gün ne olmuş" — geçmişi gez).
-    const [showResolved, setShowResolved] = useState(true);
+    // Aktif işler önceliklidir; çözülen/yoksayılan geçmiş kullanıcı isteğiyle açılır.
+    const [showResolved, setShowResolved] = useState(false);
     const [search, setSearch] = useState("");
     const [drawerAlertId, setDrawerAlertId] = useState<string | null>(null);
     const [noteFormState, setNoteFormState] = useState<{ initialDate?: string; note?: CalendarNote } | null>(null);

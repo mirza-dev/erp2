@@ -12,7 +12,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, act, cleanup } from "@testing-library/react";
+import { render, screen, act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import AlertsPage from "@/app/dashboard/alerts/page";
 import { AlertCalendarDrawer } from "@/components/alerts/AlertCalendarDrawer";
 import type { CalendarAlert } from "@/lib/alert-calendar";
@@ -79,6 +79,53 @@ describe("Faz 3 — responsive layout", () => {
         expect(layout.style.gridTemplateColumns).toBe("1fr 380px");
         act(() => { setWidth(500); window.dispatchEvent(new Event("resize")); });
         expect(layout.style.gridTemplateColumns).toBe("1fr");
+    });
+});
+
+describe("Faz 3 — çözülen uyarılar görünürlüğü", () => {
+    it("ilk açılışta çözülenleri gizler; kullanıcı seçince gösterir", async () => {
+        const createdAt = new Date().toISOString();
+        const alert = (id: string, title: string, status: "open" | "resolved") => ({
+            id,
+            type: "sync_issue",
+            severity: "warning",
+            status,
+            title,
+            description: title,
+            entity_type: null,
+            entity_id: null,
+            resolution_reason: status === "resolved" ? "Tamamlandı" : null,
+            ai_confidence: null,
+            ai_reason: null,
+            ai_model_version: null,
+            created_at: createdAt,
+            source: "system",
+            due_date: null,
+            created_by: null,
+            due_label: null,
+            order_code: null,
+        });
+        global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            if (url === "/api/alerts/calendar") {
+                return { ok: true, json: async () => [
+                    alert("active", "Aktif senkron uyarısı", "open"),
+                    alert("resolved", "Çözülmüş senkron uyarısı", "resolved"),
+                ] } as Response;
+            }
+            return { ok: true, json: async () => [] } as Response;
+        }) as unknown as typeof fetch;
+
+        await renderPage();
+
+        const toggle = screen.getByRole("checkbox", { name: "Çözülenleri göster" }) as HTMLInputElement;
+        expect(toggle.checked).toBe(false);
+        expect(screen.getAllByText("Aktif senkron uyarısı").length).toBeGreaterThan(0);
+        expect(screen.queryByText("Çözülmüş senkron uyarısı")).toBeNull();
+
+        fireEvent.click(toggle);
+        await waitFor(() => expect(screen.getAllByText("Çözülmüş senkron uyarısı").length).toBeGreaterThan(0));
+        expect(toggle.checked).toBe(true);
     });
 });
 
