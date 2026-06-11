@@ -114,6 +114,22 @@ describe("Button premium system", () => {
         expect(iconWrapper?.getAttribute("aria-hidden")).toBe("true");
     });
 
+    it("fullWidth buton flex satırında shrink edebilir (yan yana 2×%100 taşması — Dosyalar/Not modal regression)", () => {
+        render(
+            <>
+                <Button fullWidth>İptal</Button>
+                <Button>Normal</Button>
+            </>,
+        );
+
+        const full = screen.getByRole("button", { name: "İptal" });
+        expect(full.style.width).toBe("100%");
+        expect(full.style.flexShrink).toBe("1");
+        expect(full.style.minWidth).toBe("0px");
+        // fullWidth olmayan buton toolbar sıkışmasına karşı shrink ETMEZ
+        expect(screen.getByRole("button", { name: "Normal" }).style.flexShrink).toBe("0");
+    });
+
     it("ButtonLink disabled ise odak dışı kalır ve navigasyonu engeller", () => {
         const onClick = vi.fn();
         render(

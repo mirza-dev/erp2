@@ -160,7 +160,8 @@ function getButtonStyle({
     return {
         minHeight: `${s.height}px`,
         height: `${s.height}px`,
-        minWidth: iconOnly ? `${s.height}px` : s.minWidth ? `${s.minWidth}px` : undefined,
+        // fullWidth flex satırında shrink edebilsin diye min-content tabanı da sıfırlanır
+        minWidth: iconOnly ? `${s.height}px` : fullWidth ? 0 : s.minWidth ? `${s.minWidth}px` : undefined,
         width: fullWidth ? "100%" : iconOnly ? `${s.height}px` : undefined,
         padding: iconOnly ? 0 : s.padding,
         border: `var(--line-width) solid ${v.border}`,
@@ -180,7 +181,11 @@ function getButtonStyle({
         whiteSpace: "nowrap",
         textDecoration: "none",
         userSelect: "none",
-        flexShrink: 0,
+        // fullWidth (width:100%) bir flex SATIRINDA yan yana kullanılınca
+        // shrink edebilmeli — aksi halde 2×%100 taşar (Dosyalar/Not modal
+        // İptal|Yükle satırı). Diğer butonlarda toolbar sıkışmasını önlemek
+        // için 0 kalır.
+        flexShrink: fullWidth ? 1 : 0,
         boxShadow: disabled ? "none" : v.shadow,
         transition: "background 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease, opacity 0.14s ease",
         ...style,
