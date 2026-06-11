@@ -5,6 +5,10 @@ import type { ExchangeCurrencyCode, ExchangeRatesResponse, ExchangeRatesSource }
 
 const REFRESH_MS = 20 * 60 * 1000;
 const CURRENCIES: ExchangeCurrencyCode[] = ["USD", "EUR"];
+const CURRENCY_META: Record<ExchangeCurrencyCode, { symbol: string; label: string }> = {
+    USD: { symbol: "$", label: "Amerikan Doları" },
+    EUR: { symbol: "€", label: "Euro" },
+};
 const SOURCE_META: Record<ExchangeRatesSource, { badge: string; label: string }> = {
     LIVE_RATES: { badge: "LIVE", label: "Live-Rates" },
     TCMB: { badge: "TCMB", label: "TCMB" },
@@ -74,6 +78,18 @@ const sepStyle: React.CSSProperties = {
     background: "var(--border-tertiary)",
 };
 
+const codeGroupStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "baseline",
+    gap: "3px",
+};
+
+const symbolStyle: React.CSSProperties = {
+    color: "var(--text-tertiary)",
+    fontWeight: 650,
+    fontSize: "11px",
+};
+
 const codeStyle: React.CSSProperties = {
     color: "var(--text-primary)",
     fontWeight: 700,
@@ -132,10 +148,14 @@ const ExchangeRatesTicker = memo(function ExchangeRatesTicker() {
         >
             {CURRENCIES.map((code, index) => {
                 const rate = rates.rates[code];
+                const currency = CURRENCY_META[code];
                 return (
                     <span key={code} style={rateStyle}>
                         {index > 0 && <span aria-hidden="true" style={sepStyle} />}
-                        <span style={codeStyle}>{code}</span>
+                        <span aria-label={`${currency.label} (${currency.symbol} ${code})`} style={codeGroupStyle}>
+                            <span aria-hidden="true" style={symbolStyle}>{currency.symbol}</span>
+                            <span aria-hidden="true" style={codeStyle}>{code}</span>
+                        </span>
                         <span style={colStyle}>
                             <span style={lineStyle}>
                                 <span style={labelStyle}>Alış</span> <b style={buyValStyle}>{formatRate(rate.buying)}</b>

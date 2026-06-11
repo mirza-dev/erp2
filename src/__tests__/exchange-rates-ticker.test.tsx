@@ -69,13 +69,17 @@ describe("ExchangeRatesTicker", () => {
 
         render(<ExchangeRatesTicker />);
 
-        await waitFor(() => expect(screen.getByText("USD")).toBeTruthy());
+        await waitFor(() => expect(screen.getByLabelText("Amerikan Doları ($ USD)")).toBeTruthy());
+        expect(screen.getByLabelText("Euro (€ EUR)")).toBeTruthy();
+        expect(screen.getByText("$")).toBeTruthy();
+        expect(screen.getByText("USD")).toBeTruthy();
+        expect(screen.getByText("€")).toBeTruthy();
+        expect(screen.getByText("EUR")).toBeTruthy();
         // Tasarım RateChip: Alış/Satış iki satır, 2 ondalık (satış yeşil).
         expect(screen.getAllByText("Alış")).toHaveLength(2);
         expect(screen.getAllByText("Satış")).toHaveLength(2);
         expect(screen.getByText("40,12")).toBeTruthy();
         expect(screen.getByText("40,29")).toBeTruthy();
-        expect(screen.getByText("EUR")).toBeTruthy();
         expect(screen.getByText("46,20")).toBeTruthy();
         expect(screen.getByText("46,41")).toBeTruthy();
         // Sakin düz: görünür LIVE/TCMB çip rozeti kaldırıldı; kaynak aria-label + tooltip'te.
