@@ -16,6 +16,11 @@ const FILE_ID = "00000000-0000-4000-8000-000000000011";
 const mockRequirePermission = vi.fn();
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: (...a: unknown[]) => mockRequirePermission(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermission(...a),
+    resolveAuthContext: async () => {
+        const { data: { user } } = await mockGetUser();
+        return { user: user ?? null, userId: user?.id ?? null, roles: ["admin"], perms: new Set() };
+    },
 }));
 
 const mockList = vi.fn();
@@ -55,7 +60,7 @@ function makeFile(name: string, opts?: { size?: number; type?: string }): File {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockRequirePermission.mockResolvedValue(null); // yetkili
+    mockRequirePermission.mockReturnValue(null); // yetkili
     mockGetUser.mockResolvedValue({ data: { user: { email: "ali@pmt.com", user_metadata: { full_name: "Ali Veli" } } } });
     mockCreate.mockResolvedValue({ id: FILE_ID, display_name: "Sözleşme.pdf" });
     mockSoftDelete.mockResolvedValue(true);
@@ -77,7 +82,7 @@ describe("GET /api/settings/files", () => {
     });
 
     it("guard response dönerse o döner, DB'ye gidilmez", async () => {
-        mockRequirePermission.mockResolvedValue(NextResponse.json({ error: "forbidden" }, { status: 403 }));
+        mockRequirePermission.mockReturnValue(NextResponse.json({ error: "forbidden" }, { status: 403 }));
         const res = await listGET(new NextRequest("http://localhost/api/settings/files"));
         expect(res.status).toBe(403);
         expect(mockList).not.toHaveBeenCalled();
@@ -154,7 +159,7 @@ describe("POST /api/settings/files", () => {
     });
 
     it("RBAC guard response dönerse servis çağrılmaz", async () => {
-        mockRequirePermission.mockResolvedValue(NextResponse.json({ error: "forbidden" }, { status: 403 }));
+        mockRequirePermission.mockReturnValue(NextResponse.json({ error: "forbidden" }, { status: 403 }));
         const fd = new FormData();
         fd.append("file", makeFile("x.pdf"));
         fd.append("display_name", "Not");

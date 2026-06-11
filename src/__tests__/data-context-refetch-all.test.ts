@@ -39,13 +39,14 @@ describe("data-context.tsx — tüm /api/products fetch çağrıları ?all=1 kul
         expect(offending).toEqual([]);
     });
 
-    it("İlk yükleme (refetchAll) ?all=1 kullanır", () => {
-        expect(dataContextSource).toContain('fetch("/api/products?all=1")');
-    });
-
-    it("uretimEkle, uretimSil, updateOrderStatus path'leri tutarlı", () => {
-        // En az 3 farklı yerde ?all=1 olmalı (ilk yükleme + 3 mutasyon path'i)
-        const allMatches = dataContextSource.match(/\/api\/products\?all=1/g) ?? [];
-        expect(allMatches.length).toBeGreaterThanOrEqual(3);
+    it("PRODUCTS_KEY tek kaynak: ?all=1 sabit, useSWR + mutasyonlar bu key'i kullanır", () => {
+        // SWR turu: fetch literal'leri yerine tek key sabiti. İlk yükleme
+        // useSWR(PRODUCTS_KEY), mutasyon tazelemeleri mutate(PRODUCTS_KEY) —
+        // 100-ürün cap regresyonu yapısal olarak imkânsız (tek tanım noktası).
+        expect(dataContextSource).toContain('export const PRODUCTS_KEY = "/api/products?all=1"');
+        expect(dataContextSource).toMatch(/useSWR<Product\[\]>\(PRODUCTS_KEY, productsFetcher/);
+        const mutateMatches = dataContextSource.match(/mutate\(PRODUCTS_KEY/g) ?? [];
+        // updateOrderStatus + production revalidation + addProduct/deleteProduct cache patch'leri
+        expect(mutateMatches.length).toBeGreaterThanOrEqual(3);
     });
 });

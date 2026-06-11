@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import UserAvatarLink from "@/components/layout/UserAvatarLink";
+import { SwrTestWrapper } from "./helpers/swr-test-wrapper";
 
 vi.mock("next/link", () => ({
     default: ({ href, children, ...props }: { href: string; children: ReactNode; [key: string]: unknown }) => (
@@ -25,7 +26,7 @@ describe("UserAvatarLink", () => {
             json: async () => ({ fullName: "Mirza Sarıbıyık", email: "mirza@example.com", avatarUrl: null }),
         }) as unknown as typeof fetch;
 
-        render(<UserAvatarLink />);
+        render(<UserAvatarLink />, { wrapper: SwrTestWrapper });
 
         await waitFor(() => expect(screen.getByText("MS")).toBeTruthy());
         expect(screen.getByRole("link", { name: "Profil ve ayarlar" }).getAttribute("href")).toBe("/dashboard/settings?tab=kullanici");
@@ -37,7 +38,7 @@ describe("UserAvatarLink", () => {
             json: async () => ({ fullName: "", email: "cenk.sari@example.com", avatarUrl: null }),
         }) as unknown as typeof fetch;
 
-        render(<UserAvatarLink />);
+        render(<UserAvatarLink />, { wrapper: SwrTestWrapper });
 
         await waitFor(() => expect(screen.getByText("CS")).toBeTruthy());
     });
@@ -45,7 +46,7 @@ describe("UserAvatarLink", () => {
     it("profil API hata verirse topbar kırılmaz ve fallback avatar gösterir", async () => {
         global.fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }) as unknown as typeof fetch;
 
-        render(<UserAvatarLink />);
+        render(<UserAvatarLink />, { wrapper: SwrTestWrapper });
 
         await waitFor(() => expect(global.fetch).toHaveBeenCalledWith("/api/settings/user/profile"));
         expect(screen.getByText("?")).toBeTruthy();

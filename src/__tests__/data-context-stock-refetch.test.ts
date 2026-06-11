@@ -10,14 +10,10 @@
  */
 import { describe, it, expect } from "vitest";
 
-// ─── Pure helper (mirrors data-context.tsx logic) ─────────────────────────────
-// Extract the condition so it can be tested without a React environment.
+// SWR turu: predicate artık data-context'ten GERÇEK export — mirror drift kapandı.
+import { shouldRefetchProducts } from "@/lib/data-context";
 
 type OrderTransition = "draft" | "pending_approval" | "approved" | "cancelled" | "shipped";
-
-function shouldRefetchProducts(transition: OrderTransition): boolean {
-    return transition === "approved" || transition === "cancelled" || transition === "shipped";
-}
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 

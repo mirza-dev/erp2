@@ -22,7 +22,7 @@ import {
     Users,
     type LucideIcon,
 } from "lucide-react";
-import { useData } from "@/lib/data-context";
+import { useDashboardCounters } from "@/lib/data-context";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
 import { requiredPermissionForPath } from "@/lib/auth/page-access";
 import { usePermissions } from "@/lib/auth/use-permissions";
@@ -49,7 +49,10 @@ interface SidebarProps {
 const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
     const pathname = usePathname();
     const router = useRouter();
-    const { reorderSuggestions, orders, activeAlertCount } = useData();
+    // Perf Faz 2: rozetler için tam listeler İNDİRİLMEZ — counters endpoint'i
+    // yalnız 3 sayı döner; veri gelene dek rozet render edilmez (eski
+    // `count || undefined` davranışıyla aynı).
+    const { counters } = useDashboardCounters();
 
     const [isDemo] = useState(() => isDemoMode());
 
@@ -63,11 +66,9 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
         router.push("/login");
     };
 
-    const reorderCount = useMemo(() => reorderSuggestions.length, [reorderSuggestions]);
-    const pendingOrderCount = useMemo(
-        () => orders.filter(o => o.commercial_status === "pending_approval").length,
-        [orders]
-    );
+    const reorderCount = counters?.reorderCount ?? 0;
+    const pendingOrderCount = counters?.pendingOrders ?? 0;
+    const activeAlertCount = counters?.activeAlerts ?? 0;
 
     const navGroups: NavGroup[] = useMemo(() => [
         {

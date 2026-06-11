@@ -8,9 +8,8 @@ import {
     splitName,
     ALLOWED_COMPANY_FILE_EXT_LABEL,
 } from "@/lib/company-files";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { requirePermission, resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
-import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +36,9 @@ export async function GET(req: NextRequest) {
 // Tek dosya/istek: çoklu seçimde client sıralı POST atar (dosya başına hata raporu).
 export async function POST(req: NextRequest) {
     try {
-        const guard = await requirePermission(req, "manage_settings");
+        // Tek getUser: guard + uploaded_by snapshot aynı auth context'ten (perf Faz 1).
+        const ctx = await resolveAuthContext();
+        const guard = requirePermissionFor(ctx, "manage_settings");
         if (guard) return guard;
 
         const formData = await req.formData();
@@ -80,16 +81,12 @@ export async function POST(req: NextRequest) {
 
         // Yükleyen: session kullanıcısının görünen adı (full_name || email snapshot).
         let uploadedBy: string | null = null;
-        try {
-            const supabase = await createClient();
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                const meta = (user.user_metadata ?? {}) as Record<string, unknown>;
-                uploadedBy = (typeof meta.full_name === "string" && meta.full_name.trim())
-                    ? meta.full_name.trim()
-                    : (user.email ?? null);
-            }
-        } catch { /* snapshot best-effort — dosya yine yüklenir */ }
+        if (ctx.user) {
+            const meta = (ctx.user.user_metadata ?? {}) as Record<string, unknown>;
+            uploadedBy = (typeof meta.full_name === "string" && meta.full_name.trim())
+                ? meta.full_name.trim()
+                : (ctx.user.email ?? null);
+        }
 
         const buffer = Buffer.from(await file.arrayBuffer());
 

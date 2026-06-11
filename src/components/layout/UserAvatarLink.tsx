@@ -1,32 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getUserInitials } from "@/lib/user-display";
-
-interface UserProfileSummary {
-    fullName?: string | null;
-    email?: string | null;
-    avatarUrl?: string | null;
-}
+import { useUserProfile } from "@/lib/shared-hooks";
 
 export default function UserAvatarLink() {
-    const [profile, setProfile] = useState<UserProfileSummary | null>(null);
-
-    useEffect(() => {
-        let cancelled = false;
-        void (async () => {
-            try {
-                const res = await fetch("/api/settings/user/profile");
-                if (!res.ok) return;
-                const data = await res.json() as UserProfileSummary;
-                if (!cancelled) setProfile(data);
-            } catch {
-                // Topbar profil fetch'i başarısızsa avatar fallback ile kalır.
-            }
-        })();
-        return () => { cancelled = true; };
-    }, []);
+    // Perf Faz 4: paylaşılan SWR hook'u — dashboard/settings ile aynı key.
+    // Fetch hatasında profile undefined kalır → avatar fallback (eski davranış).
+    const { profile } = useUserProfile();
 
     const initials = getUserInitials(profile?.fullName, profile?.email);
     const label = profile?.fullName || profile?.email || "Profil ve ayarlar";

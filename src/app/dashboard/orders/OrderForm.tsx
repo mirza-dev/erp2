@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { formatCurrency, safeRandomUUID } from "@/lib/utils";
 import { type Customer, type Product, type OrderLineItem } from "@/lib/mock-data";
-import { useData } from "@/lib/data-context";
+import { useCustomers, useProducts, useOrderMutations } from "@/lib/data-context";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -85,7 +85,9 @@ const inputStyle: React.CSSProperties = {
 };
 
 export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
-    const { customers, products, addOrder } = useData();
+    const { customers } = useCustomers();
+    const { products } = useProducts();
+    const { addOrder } = useOrderMutations();
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const searchParams = useSearchParams();

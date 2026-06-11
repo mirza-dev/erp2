@@ -10,6 +10,11 @@ const mockRevalidate = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    requireRoleFor: (...a: unknown[]) => mockRequireRole(...a),
+    resolveAuthContext: async () => {
+        const { data: { user } } = await mockGetUser();
+        return { user: user ?? null, userId: user?.id ?? null, roles: ["admin"], perms: new Set() };
+    },
 }));
 
 vi.mock("@/lib/services/import-apply-service", () => ({
@@ -60,14 +65,14 @@ const RESULT = {
 
 describe("POST /api/import/documents/[id]/apply", () => {
     it("viewer → 403 (requireRole)", async () => {
-        mockRequireRole.mockResolvedValueOnce(new Response(null, { status: 403 }));
+        mockRequireRole.mockReturnValueOnce(new Response(null, { status: 403 }));
         const res = await callPOST("doc-1");
         expect(res.status).toBe(403);
         expect(mockApplyService).not.toHaveBeenCalled();
     });
 
     it("happy: service başarılı → 200 + result + revalidateTag('products','max')", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockApplyService.mockResolvedValueOnce(RESULT);
         const res = await callPOST("doc-1");
         expect(res.status).toBe(200);
@@ -78,35 +83,35 @@ describe("POST /api/import/documents/[id]/apply", () => {
     });
 
     it("service throw 'bulunamadı' → 400 (pre-check)", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockApplyService.mockRejectedValueOnce(new Error("Belge bulunamadı"));
         const res = await callPOST("doc-x");
         expect(res.status).toBe(400);
     });
 
     it("service throw 'uygulanmaya hazır değil' → 400 (idempotency)", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockApplyService.mockRejectedValueOnce(new Error("Belge uygulanmaya hazır değil (durum: applied)"));
         const res = await callPOST("doc-1");
         expect(res.status).toBe(400);
     });
 
     it("service throw generic → 500", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockApplyService.mockRejectedValueOnce(new Error("DB exploded"));
         const res = await callPOST("doc-1");
         expect(res.status).toBe(500);
     });
 
     it("actor user.id apply service'e forward edilir", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockApplyService.mockResolvedValueOnce(RESULT);
         await callPOST("doc-1");
         expect(mockApplyService).toHaveBeenCalledWith("doc-1", "user-1", { fieldApprovals: undefined });
     });
 
     it("fieldApprovals body normalize edilir ve apply service'e forward edilir", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockApplyService.mockResolvedValueOnce(RESULT);
         await callPOST("doc-1", {
             fieldApprovals: {
@@ -131,7 +136,7 @@ describe("POST /api/import/documents/[id]/apply", () => {
     // ── Faz 3c Review 4.tur (P3) — 409 mapping for 'applying' state ──────
 
     it("service throw 'hazır değil (durum: applying)' → 409 Conflict + net mesaj", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockApplyService.mockRejectedValueOnce(
             new Error("Belge uygulanmaya hazır değil (durum: applying)"),
         );
@@ -143,7 +148,7 @@ describe("POST /api/import/documents/[id]/apply", () => {
 
     it("service throw 'hazır değil (durum: applied)' → 400 korunur (applying değil)", async () => {
         // Sadece 'applying' 409'a maplenir; diğer terminal/transient state'ler 400.
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockApplyService.mockRejectedValueOnce(
             new Error("Belge uygulanmaya hazır değil (durum: applied)"),
         );

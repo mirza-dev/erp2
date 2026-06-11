@@ -20,7 +20,11 @@ describe("üretim fetch penceresi", () => {
     it("data-context üretimi parametresiz ÇEKMEZ (limit-50 regresyonu)", () => {
         const src = readFileSync(join(process.cwd(), "src/lib/data-context.tsx"), "utf8");
         expect(src).not.toContain('fetch("/api/production")');
-        expect(src.match(/fetch\(productionFetchUrl\(\)\)/g)?.length).toBe(3);
+        // SWR turu: tek key kaynağı productionFetchUrl() — useSWR aboneliği +
+        // mutasyon revalidation'ları aynı pencereli key üzerinden döner.
+        expect(src).toMatch(/useSWR<UretimKaydi\[\]>\(productionKey, productionFetcher/);
+        expect(src).toMatch(/const productionKey = productionFetchUrl\(\)/);
+        expect(src).toMatch(/mutate\(productionKey\)/);
     });
 
     it("production route ?since regex-valide eder, tavan 5000", () => {
@@ -41,7 +45,10 @@ describe("kur uyarısı + Açık Alacak kaldırma (page kilitleri)", () => {
     it("kur uyarısı yalnız fetch settle olduktan sonra (ratesResolved guard — flash yok)", () => {
         expect(page).toMatch(/if \(!ratesResolved\) return \[\]/);
         expect(page).toContain("Kur verisi alınamadı");
-        expect(page).toMatch(/setRatesResolved\(true\)/);
+        // Perf Faz 4: ratesResolved artık paylaşılan useExchangeRates hook'undan
+        // (Topbar ile tek istek); sayfada ayrı kur fetch'i kalmadı.
+        expect(page).toMatch(/\{ ratesData, ratesResolved \} = useExchangeRates\(\)/);
+        expect(page).not.toMatch(/fetch\("\/api\/exchange-rates"\)/);
     });
 
     it("Açık Alacak page'de geri gelmez; KpiPerms yalnız canViewSalesPrices", () => {

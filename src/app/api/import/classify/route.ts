@@ -19,9 +19,8 @@ import {
 } from "@/lib/supabase/import-documents";
 import { aiClassifyDocument } from "@/lib/services/ai-service";
 import { dbListProductTypes } from "@/lib/supabase/product-types";
-import { requireRole } from "@/lib/auth/role-guard";
+import { resolveAuthContext, requireRoleFor } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
-import { createClient } from "@/lib/supabase/server";
 import {
     DEFAULT_AI_IMPORT_OPERATION,
     defaultOperationForDocumentType,
@@ -58,7 +57,9 @@ export function extractExcelTextSample(buffer: Buffer, maxChars = 4000): string 
 
 export async function POST(req: NextRequest) {
     try {
-        const guard = await requireRole(req, ["admin", "purchaser"]);
+        // Tek getUser: guard + uploader aynı auth context'ten (perf Faz 1).
+        const auth = await resolveAuthContext();
+        const guard = requireRoleFor(auth, ["admin", "purchaser"]);
         if (guard) return guard;
 
         let formData: FormData;
@@ -147,8 +148,7 @@ export async function POST(req: NextRequest) {
         }
 
         // Resolve uploader (auth user — may be null in edge cases)
-        const sb = await createClient();
-        const { data: { user } } = await sb.auth.getUser();
+        const user = auth.user;
 
         // P3 (Review 3.d) — Pre-write guard: auth.getUser() async; bu pencerede
         // abort olursa DB+storage write hâlâ olabilir. Final kontrol.

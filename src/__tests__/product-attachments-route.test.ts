@@ -35,6 +35,8 @@ vi.mock("@/lib/supabase/product-attachments", async () => {
 const mockRequireRole = vi.fn();
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    requireRoleFor: (...a: unknown[]) => mockRequireRole(...a),
+    resolveAuthContext: async () => ({ user: { id: "test-user" }, userId: "test-user", roles: ["admin"], perms: new Set() }),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -81,7 +83,7 @@ function makeJsonRequest(url: string, body: unknown, method = "PATCH"): NextRequ
 
 describe("POST /api/products/[id]/attachments", () => {
     it("viewer → 403", async () => {
-        mockRequireRole.mockResolvedValueOnce(NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }));
+        mockRequireRole.mockReturnValueOnce(NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }));
         const fd = new FormData();
         fd.append("file", new File([new Uint8Array([1, 2, 3])], "x.png", { type: "image/png" }));
         fd.append("kind", "image");
@@ -94,7 +96,7 @@ describe("POST /api/products/[id]/attachments", () => {
     });
 
     it("geçersiz MIME → 400", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         const fd = new FormData();
         fd.append("file", new File(["<svg/>"], "x.svg", { type: "image/svg+xml" }));
         fd.append("kind", "image");
@@ -109,7 +111,7 @@ describe("POST /api/products/[id]/attachments", () => {
     });
 
     it("10MB+ → 400", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         const big = new Uint8Array(10 * 1024 * 1024 + 1);
         const fd = new FormData();
         fd.append("file", new File([big], "big.pdf", { type: "application/pdf" }));
@@ -125,7 +127,7 @@ describe("POST /api/products/[id]/attachments", () => {
     });
 
     it("geçersiz kind → 400", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         const fd = new FormData();
         fd.append("file", new File([new Uint8Array([1, 2, 3])], "x.png", { type: "image/png" }));
         fd.append("kind", "photo");
@@ -138,7 +140,7 @@ describe("POST /api/products/[id]/attachments", () => {
     });
 
     it("happy path → 201 + revalidateTag", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockDbCreate.mockResolvedValueOnce({
             id: ATTACH_ID,
             product_id: PRODUCT_ID,
@@ -169,7 +171,7 @@ describe("POST /api/products/[id]/attachments", () => {
 
 describe("PATCH /api/products/[id]/attachments/[attachmentId]", () => {
     it("is_primary_image:true + image kind → ok", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockDbGet.mockResolvedValueOnce({ id: ATTACH_ID, product_id: PRODUCT_ID, kind: "image" });
         mockDbSetPrimary.mockResolvedValueOnce(undefined);
 
@@ -183,7 +185,7 @@ describe("PATCH /api/products/[id]/attachments/[attachmentId]", () => {
     });
 
     it("is_primary_image:true + non-image kind → 400", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockDbGet.mockResolvedValueOnce({ id: ATTACH_ID, product_id: PRODUCT_ID, kind: "datasheet" });
 
         const { PATCH } = await import("@/app/api/products/[id]/attachments/[attachmentId]/route");
@@ -197,7 +199,7 @@ describe("PATCH /api/products/[id]/attachments/[attachmentId]", () => {
 
 describe("DELETE /api/products/[id]/attachments/[attachmentId]", () => {
     it("happy path → 204", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockDbGet.mockResolvedValueOnce({ id: ATTACH_ID, product_id: PRODUCT_ID, kind: "image" });
         mockDbDelete.mockResolvedValueOnce(undefined);
 

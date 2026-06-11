@@ -28,6 +28,9 @@ const PRODUCT: Product = {
 
 vi.mock("@/lib/data-context", () => ({
     useData: () => ({ customers: [CUSTOMER], products: [PRODUCT], addOrder: mockAddOrder }),
+    useCustomers: () => ({ customers: [CUSTOMER] }),
+    useProducts: () => ({ products: [PRODUCT] }),
+    useOrderMutations: () => ({ addOrder: mockAddOrder }),
 }));
 vi.mock("@/components/ui/Toast", () => ({ useToast: () => ({ toast: mockToast }) }));
 vi.mock("@/lib/demo-utils", () => ({

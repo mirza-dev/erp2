@@ -448,7 +448,7 @@ describe("serviceListAlerts — passthrough to dbListAlerts", () => {
 
         const result = await serviceListAlerts({ status: "open" });
 
-        expect(mockDbListAlerts).toHaveBeenCalledWith({ status: "open" });
+        expect(mockDbListAlerts).toHaveBeenCalledWith({ status: "open" }, undefined);
         expect(result).toEqual([fakeAlert]);
     });
 });

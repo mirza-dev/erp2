@@ -2,6 +2,7 @@
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SystemHealthIndicator from "@/components/layout/SystemHealthIndicator";
+import { SwrTestWrapper } from "./helpers/swr-test-wrapper";
 
 const originalFetch = global.fetch;
 
@@ -19,7 +20,7 @@ describe("SystemHealthIndicator", () => {
             json: async () => ({ status: "ok" }),
         }) as unknown as typeof fetch;
 
-        render(<SystemHealthIndicator />);
+        render(<SystemHealthIndicator />, { wrapper: SwrTestWrapper });
 
         await waitFor(() => expect(screen.getByText("Bağlı")).toBeTruthy());
         expect(screen.getByLabelText("Sistem durumu: Bağlı")).toBeTruthy();
@@ -32,17 +33,17 @@ describe("SystemHealthIndicator", () => {
             json: async () => ({ status: "degraded" }),
         }) as unknown as typeof fetch;
 
-        render(<SystemHealthIndicator />);
+        render(<SystemHealthIndicator />, { wrapper: SwrTestWrapper });
         await waitFor(() => expect(screen.getByText("Sorun var")).toBeTruthy());
 
         cleanup();
         global.fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) }) as unknown as typeof fetch;
-        render(<SystemHealthIndicator />);
+        render(<SystemHealthIndicator />, { wrapper: SwrTestWrapper });
         await waitFor(() => expect(screen.getByText("Sorun var")).toBeTruthy());
 
         cleanup();
         global.fetch = vi.fn().mockRejectedValue(new Error("network")) as unknown as typeof fetch;
-        render(<SystemHealthIndicator />);
+        render(<SystemHealthIndicator />, { wrapper: SwrTestWrapper });
         await waitFor(() => expect(screen.getByText("Sorun var")).toBeTruthy());
     });
 
@@ -54,7 +55,7 @@ describe("SystemHealthIndicator", () => {
         });
         global.fetch = fetchMock as unknown as typeof fetch;
 
-        render(<SystemHealthIndicator />);
+        render(<SystemHealthIndicator />, { wrapper: SwrTestWrapper });
 
         await act(async () => {
             await Promise.resolve();

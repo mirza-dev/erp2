@@ -20,6 +20,11 @@ const mockResendSend = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    requireRoleFor: (...a: unknown[]) => mockRequireRole(...a),
+    resolveAuthContext: async () => {
+        const { data: { user } } = await mockGetUser();
+        return { user: user ?? null, userId: user?.id ?? null, roles: ["admin"], perms: new Set() };
+    },
 }));
 vi.mock("@/lib/supabase/server", () => ({
     createClient: async () => ({
@@ -47,7 +52,7 @@ function makeReq(body: unknown): NextRequest {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireRole.mockResolvedValue(null);                        // default: admin OK
+    mockRequireRole.mockReturnValue(null);                        // default: admin OK
     mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
     mockCreateLog.mockResolvedValue("log-1");
     mockUpdateLogStatus.mockResolvedValue(undefined);
@@ -58,7 +63,7 @@ beforeEach(() => {
 describe("POST /api/email/test — auth + validation", () => {
     it("admin değil → requireRole 403 dalını döndürür", async () => {
         const { NextResponse } = await import("next/server");
-        mockRequireRole.mockResolvedValueOnce(NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }));
+        mockRequireRole.mockReturnValueOnce(NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }));
         const res = await POST(makeReq({ to: "a@b.com", type: "stock_critical" }));
         expect(res.status).toBe(403);
         expect(mockResendSend).not.toHaveBeenCalled();

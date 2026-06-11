@@ -14,8 +14,7 @@ import {
     serviceApplyImportDocument,
     type ApplyOptions,
 } from "@/lib/services/import-apply-service";
-import { requireRole } from "@/lib/auth/role-guard";
-import { createClient } from "@/lib/supabase/server";
+import { resolveAuthContext, requireRoleFor } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
 
 export const dynamic = "force-dynamic";
@@ -47,22 +46,20 @@ function normalizeFieldApprovals(raw: unknown): ApplyOptions["fieldApprovals"] |
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
     try {
-        const guard = await requireRole(req, ["admin", "purchaser"]);
+        // Tek getUser: guard + actor aynı auth context'ten (perf Faz 1).
+        const auth = await resolveAuthContext();
+        const guard = requireRoleFor(auth, ["admin", "purchaser"]);
         if (guard) return guard;
 
         const { id } = await ctx.params;
         if (!id) return NextResponse.json({ error: "Belge ID zorunludur." }, { status: 400 });
-
-        // Actor (audit + uploadedBy için)
-        const sb = await createClient();
-        const { data: { user } } = await sb.auth.getUser();
 
         const body = await req.json().catch(() => ({}));
         const options: ApplyOptions = {
             fieldApprovals: normalizeFieldApprovals((body as { fieldApprovals?: unknown })?.fieldApprovals),
         };
 
-        const result = await serviceApplyImportDocument(id, user?.id ?? null, options);
+        const result = await serviceApplyImportDocument(id, auth.userId, options);
 
         revalidateTag("products", "max");
         return NextResponse.json({ ok: true, result }, { status: 200 });

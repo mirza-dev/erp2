@@ -7,7 +7,7 @@ import { Pencil, Plus, Save, X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { maskCurrency, formatDate } from "@/lib/utils";
 import type { Customer } from "@/lib/mock-data";
-import { useData } from "@/lib/data-context";
+import { useOrders, useCustomers } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -54,7 +54,8 @@ export default function CustomerDetailPanel({
     onClose,
 }: CustomerDetailPanelProps) {
     const router = useRouter();
-    const { orders, updateCustomer } = useData();
+    const { orders } = useOrders();
+    const { updateCustomer } = useCustomers();
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { canViewSalesPrices, canViewFinancialSummary, has } = usePermissions();

@@ -270,8 +270,11 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
 
 // ── Alert CRUD ───────────────────────────────────────────────
 
-export async function serviceListAlerts(filter: ListAlertsFilter = {}) {
-    return dbListAlerts(filter);
+export async function serviceListAlerts(
+    filter: ListAlertsFilter = {},
+    opts?: import("@/lib/supabase/alerts").ListAlertsOptions,
+) {
+    return dbListAlerts(filter, opts);
 }
 
 export async function serviceGetAlert(id: string) {

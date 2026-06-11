@@ -29,11 +29,26 @@ export interface ListAlertsFilter {
 
 // ── Queries ──────────────────────────────────────────────────
 
-export async function dbListAlerts(filter: ListAlertsFilter = {}): Promise<AlertRow[]> {
+/**
+ * Liste sorgusu daraltma seçenekleri (perf Faz 5). DEFAULT DAVRANIŞ DEĞİŞMEZ:
+ * opts verilmezse select("*") + limitsiz kalır — alert-service scan/dedup ve
+ * ops-summary tam satır okur, kırılmasın. Yalnız GET /api/alerts route'u
+ * (tek tüketicisi UI liste görünümü) kolon+limit geçer: ai_inputs_summary /
+ * ai_reason gibi büyük alanlar listede okunmuyor; ~479KB → ~80KB.
+ */
+export interface ListAlertsOptions {
+    limit?: number;
+    columns?: string;
+}
+
+export async function dbListAlerts(
+    filter: ListAlertsFilter = {},
+    opts: ListAlertsOptions = {},
+): Promise<AlertRow[]> {
     const supabase = createServiceClient();
     let query = supabase
         .from("alerts")
-        .select("*")
+        .select(opts.columns ?? "*")
         .order("created_at", { ascending: false });
 
     if (filter.status)      query = query.eq("status", filter.status);
@@ -41,10 +56,26 @@ export async function dbListAlerts(filter: ListAlertsFilter = {}): Promise<Alert
     if (filter.type)        query = query.eq("type", filter.type);
     if (filter.entity_type) query = query.eq("entity_type", filter.entity_type);
     if (filter.entity_id)   query = query.eq("entity_id", filter.entity_id);
+    if (opts.limit)         query = query.limit(opts.limit);
 
     const { data, error } = await query;
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return (data ?? []) as unknown as AlertRow[];
+}
+
+/**
+ * Aktif (open + acknowledged) uyarı ADEDİ (head+count — satır taşımaz).
+ * Tanım data-context/Uyarılar sayfası istatistiğiyle birebir: ack'lenen uyarı
+ * görülmüştür ama koşul sürer; sayaçtan düşmez. /api/dashboard/counters için.
+ */
+export async function dbCountActiveAlerts(): Promise<number> {
+    const supabase = createServiceClient();
+    const { count, error } = await supabase
+        .from("alerts")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["open", "acknowledged"]);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
 }
 
 /**

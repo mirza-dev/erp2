@@ -7,7 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-12 (**Dashboard: Teklif Hattı + Yoldaki Mal kartları — GREEN**)
+## Son Tamamlanan İş — 2026-06-13 (**Kalıcı performans — çekirdek paket — GREEN**)
+
+**İstek:** "sistemde çok büyük render yavaşlığı var, kalıcı çözmemiz lazım" + kullanıcının trace'li raporu (dashboard 31 istek / paralel toplam 27.6s / alerts 479KB / finance 1.7s / profile 1.0s). 3 paralel keşif doğruladı: ana neden global DataProvider'ın her mount'ta 5 dev endpoint'i çekmesi (~10MB) + her route'ta tekrar `getUser()` + client-side agregasyon. **Kararlar (AskUserQuestion):** çekirdek paket (RSC/loading.tsx + tam server-side pagination SONRAKİ tur) · **SWR eklendi** (`swr@2.4.1`, kullanıcı seçimi) · Sidebar sayaçları migration'sız route.
+
+- **Faz 0:** `swr-config.ts` (`jsonFetcher`/`FetchError`/`SWR_DEFAULTS` — focus-refetch KAPALI kilitli) + `server-timing.ts` → yalnız 3 yavaş route'ta `Server-Timing` header (products/orders all=1, finance).
+- **Faz 1 auth dedup:** `resolveAuthContext()` (TEK getUser → user+roles+perms) + `requirePermissionFor`/`requireRoleFor`; **11 route** "guard + ikinci getUser" deseninden kurtuldu → istek başına auth 2-3→1 round-trip. React.cache route handler'da çalışmaz (render scope yok) — açık context kalıbı seçildi. 11 test mock factory güncellendi; source-lock: bu dosyalarda `auth.getUser()` geri gelmez.
+- **Faz 2 counters:** YENİ `GET /api/dashboard/counters` → `{pendingOrders, reorderCount, activeAlerts}` (~100B; head+count; open+ack tanımı birebir; reorderCount = YENİ saf `isReorderCandidateRow` — copilot'un inline filtresiyle TEK kaynak + products-tag 60s cache). Sidebar artık `useData` çekmez → `useDashboardCounters()` 60s poll.
+- **Faz 3 (kalp):** `data-context.tsx` SWR domain hook'larına yeniden yazıldı (dosya yerinde): `useProducts/useCustomers/useOrders/useProduction/useAlerts/useReorderSuggestions` + mutation-only `useOrderMutations`; **DataProvider veri ÇEKMEZ** (yalnız SWRConfig); `useData()` geriye-uyumlu kompozisyon; mutasyon köprüleri sözleşme-birebir (`{revalidate:false}` cache patch, `shouldRefetchProducts`+`buildLoadError` saf export — mirror testler gerçek implementasyona bağlandı, `invalidateAllData()`=refetchAll, `{refetchFailed}` korunur); **10 tüketici** dar hook'lara geçti (dashboard'da customers fetch'i İLK KEZ elendi).
+- **Faz 4 duplicate fetch:** `shared-hooks.ts` — `useExchangeRates` (20dk; Ticker+dashboard tek istek; `ratesResolved` flash-guard), `useUserProfile` (+settings PATCH → `updateUserProfileCache` → Topbar avatarı anında tazelenir), `useSystemHealth` (5dk). RTL için `helpers/swr-test-wrapper.tsx` (`provider: () => new Map()`).
+- **Faz 5 server:** `/api/alerts` GET dar kolon+limit 500 (default davranış AYNEN — scan/dedup tam satır; ai_inputs_summary/ai_reason taşınmaz; 479KB→~80KB); finance COGS RPC `unstable_cache` tags ["products","finance-cogs"] rev.300 (RBAC cache dışı, imza kilidi) → 1.7s→~ms; profile route'a dokunulmadı (SWR dedup yeter).
+- **Test:** +6 yeni dosya, ~20 güncellendi; tsc 0 · lint 0 · **5104 test / 371 dosya** · build 0.
+- **Kalan:** tarayıcı smoke — dashboard panelleri dolu · sipariş onayla→Sidebar rozeti düşer · üretim→stok düşer · import→tazelenir · demo guard · viewer redaction · Network istek/byte önce-sonra. Sonraki tur adayları: RSC/loading.tsx dönüşümü, gerçek server-side pagination, kalan 109 `select("*")`, `getClaims()` JWT-local doğrulama.
+
+## Önceki — 2026-06-12 (**Dashboard: Teklif Hattı + Yoldaki Mal kartları — GREEN**)
 
 **İstek:** doğruluk turu sonrası önerilen 2 kartın ikisi de ("/frontend-design ile detaylı plan"). **Şerit 7 kart, satış→tedarik sırası:** Ciro · Açık Siparişler · **Teklif Hattı** · Stok Değeri · **Yoldaki Mal** · Üretim · Açık Uyarılar.
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo } from "react";
+import { useSystemHealth } from "@/lib/shared-hooks";
 
-const REFRESH_MS = 5 * 60 * 1000;
 
 type HealthState = "checking" | "ok" | "degraded";
 
@@ -35,32 +35,14 @@ function metaForState(state: HealthState) {
 }
 
 const SystemHealthIndicator = memo(function SystemHealthIndicator() {
-    const [state, setState] = useState<HealthState>("checking");
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadHealth() {
-            try {
-                const response = await fetch("/api/health");
-                if (!response.ok) {
-                    if (!cancelled) setState("degraded");
-                    return;
-                }
-                const payload: unknown = await response.json();
-                if (!cancelled) setState(isHealthPayload(payload) && payload.status === "ok" ? "ok" : "degraded");
-            } catch {
-                if (!cancelled) setState("degraded");
-            }
-        }
-
-        void loadHealth();
-        const timer = window.setInterval(() => { void loadHealth(); }, REFRESH_MS);
-        return () => {
-            cancelled = true;
-            window.clearInterval(timer);
-        };
-    }, []);
+    // Perf Faz 4: paylaşılan SWR hook'u — 5dk refreshInterval eski setInterval
+    // davranışıyla birebir; her mount'ta sıfırdan fetch yerine dedup+cache.
+    const { healthData, healthError } = useSystemHealth();
+    const state: HealthState = healthError
+        ? "degraded"
+        : healthData === undefined
+            ? "checking"
+            : (isHealthPayload(healthData) && healthData.status === "ok" ? "ok" : "degraded");
 
     const meta = metaForState(state);
 

@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { maskCurrency } from "@/lib/utils";
 import { type Customer } from "@/lib/mock-data";
-import { useData } from "@/lib/data-context";
+import { useCustomers, buildLoadError } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import CustomerDetailPanel from "@/components/customers/CustomerDetailPanel";
 import Button from "@/components/ui/Button";
@@ -56,7 +56,8 @@ const modalLabelStyle: React.CSSProperties = {
 };
 
 export default function CustomersPage() {
-    const { customers: mockCustomers, addCustomer, deleteCustomer, loadError } = useData();
+    const { customers: mockCustomers, addCustomer, deleteCustomer, customersError } = useCustomers();
+    const loadError = buildLoadError([customersError], undefined);
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has, canViewFinancialSummary } = usePermissions();

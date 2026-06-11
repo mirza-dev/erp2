@@ -24,8 +24,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { createClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/auth/role-guard";
+import { resolveAuthContext, requireRoleFor } from "@/lib/auth/role-guard";
 import { renderEmail, type RenderContext } from "@/lib/email/templates";
 import { NOTIFICATION_TYPE_KEYS, type NotificationTypeKey } from "@/lib/notification-types";
 import { dbCreateEmailLog, dbUpdateEmailLogStatus } from "@/lib/supabase/email-logs";
@@ -51,7 +50,9 @@ function buildSampleContext(type: NotificationTypeKey): RenderContext {
 export async function POST(request: NextRequest) {
     try {
         // 1. Admin guard
-        const roleGuard = await requireRole(request, ["admin"]);
+        // Tek getUser: guard + audit user aynı auth context'ten (perf Faz 1).
+        const auth = await resolveAuthContext();
+        const roleGuard = requireRoleFor(auth, ["admin"]);
         if (roleGuard) return roleGuard;
 
         // 2. Body validation
@@ -86,9 +87,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 4. Mevcut user id'sini al (audit/log için)
-        const sb = await createClient();
-        const { data: { user } } = await sb.auth.getUser();
+        // 4. Mevcut user id (audit/log için) — auth context'ten.
+        const user = auth.user;
         if (!user) return NextResponse.json({ error: "Oturum bulunamadı." }, { status: 401 });
 
         // 5. Render

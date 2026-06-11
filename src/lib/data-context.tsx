@@ -1,14 +1,22 @@
 "use client";
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useMemo,
-  useEffect,
-  useCallback,
-  ReactNode,
-} from "react";
+/**
+ * Veri katmanı — SWR domain hook'ları (kalıcı performans turu Faz 3).
+ *
+ * ESKİ: DataProvider mount'ta 5 endpoint'i (products?all=1 ~5MB, orders?all=1
+ * ~3.5MB, customers, production, alerts) Promise.all ile çekip context state'te
+ * tutuyordu — her dashboard sayfası açılışında TÜM veri indiriliyordu.
+ *
+ * YENİ: veri YALNIZ tüketen komponent mount edince çekilir (useSWR per-domain);
+ * SWR cache navigasyonlar arası paylaşılır + dedupingInterval eşzamanlı
+ * istekleri tekiller. `useData()` geriye-uyumlu kompozisyon hook'u olarak
+ * yaşar (dönüş şekli alan-alan aynı) — dar ihtiyaçlı sayfalar domain
+ * hook'larını doğrudan kullanır.
+ */
+
+import { useCallback, useMemo, ReactNode } from "react";
+import useSWR, { SWRConfig, useSWRConfig, mutate as globalMutate } from "swr";
+import { jsonFetcher, FetchError, SWR_DEFAULTS } from "./swr-config";
 
 import type {
   Customer,
@@ -109,7 +117,16 @@ interface DataContextValue {
   refetchAll: () => Promise<void>;
 }
 
-// ── Context ─────────────────────────────────────────────────
+// ── SWR keys ────────────────────────────────────────────────
+
+// Audit 4. tur Bulgu 3: ?all=1 → pagination'sız tüm aktif ürünler/siparişler.
+// Önceden default page=1 (100 ürün / 50 sipariş) sessiz cap üretiyordu; tab
+// sayaçları + müşteri cirosu (CustomerDetailPanel) eksik hesaplanıyordu.
+export const PRODUCTS_KEY = "/api/products?all=1";
+export const CUSTOMERS_KEY = "/api/customers";
+export const ORDERS_KEY = "/api/orders?all=1";
+export const ALERTS_KEY = "/api/alerts";
+export const COUNTERS_KEY = "/api/dashboard/counters";
 
 /**
  * Üretim fetch URL'i: son 120 günü pencereli + yüksek explicit limitle çeker.
@@ -123,99 +140,92 @@ export function productionFetchUrl(now: Date = new Date()): string {
   return `/api/production?since=${iso}&limit=5000`;
 }
 
-const DataContext = createContext<DataContextValue | null>(null);
+// ── Saf yardımcılar (test edilebilir export'lar) ───────────
 
-// ── Provider ────────────────────────────────────────────────
-
-export function DataProvider({ children }: { children: ReactNode }) {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [uretimKayitlari, setUretimKayitlari] = useState<UretimKaydi[]>([]);
-  const [openAlerts, setOpenAlerts] = useState<OpenAlert[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  // ── Demo guard — blocks mutation if in demo mode ─────────
-  // Does NOT clear the cookie or redirect; page-level handlers surface the
-  // toast feedback. Server middleware is the real security gate (403).
-  const demoGuard = useCallback((): boolean => {
-    return checkDemoMode();
-  }, []);
-
-  // ── Fetch all lists from API ─────────────────────────────
-
-  const refetchAll = useCallback(async () => {
-    setLoadError(null);
-    try {
-      const [productsRes, customersRes, ordersRes, productionRes, alertsRes] =
-        await Promise.all([
-          // Audit 4. tur Bulgu 3: ?all=1 → pagination'sız tüm aktif ürünler.
-          // Önceden default page=1 (100 ürün); 100+ ürün setlerinde UI'da
-          // gösterilmeyen ürünler için cron rec üretirken purchase/suggested
-          // sayfası onları listelemiyordu.
-          fetch("/api/products?all=1"),
-          fetch("/api/customers"),
-          // ?all=1 — pagination'sız tüm siparişler. Tab sayaçları + müşteri
-          // cirosu (CustomerDetailPanel) 50-sipariş cap'i nedeniyle eksik
-          // hesaplanıyordu; products ile aynı patern.
-          fetch("/api/orders?all=1"),
-          fetch(productionFetchUrl()),
-          fetch("/api/alerts"),
-        ]);
-
-      const coreFailure = [productsRes, customersRes, ordersRes, productionRes].find(r => !r.ok);
-      if (coreFailure) {
-        setLoadError(`Veriler yüklenemedi (HTTP ${coreFailure.status}). Backend bağlantısını kontrol edin.`);
-      } else if (!alertsRes.ok) {
-        setLoadError(`Uyarı servisi yanıt vermedi (HTTP ${alertsRes.status}). Stok uyarıları güncel olmayabilir.`);
-      }
-
-      if (productsRes.ok) {
-        const data = await productsRes.json();
-        setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
-      }
-      if (customersRes.ok) {
-        const data = await customersRes.json();
-        setCustomers(Array.isArray(data) ? data.map(mapCustomer) : []);
-      }
-      if (ordersRes.ok) {
-        const data = await ordersRes.json();
-        setOrders(Array.isArray(data) ? data.map(mapOrderSummary) : []);
-      }
-      if (productionRes.ok) {
-        const data = await productionRes.json();
-        setUretimKayitlari(
-          Array.isArray(data) ? data.map(mapProductionEntry) : []
-        );
-      }
-      if (alertsRes.ok) {
-        const data = await alertsRes.json();
-        // Aktif = open + acknowledged — Uyarılar sayfası istatistiğiyle aynı
-        // tanım (ack'lenen uyarı görülmüştür ama koşul sürer; sayaçtan düşmez).
-        const open = (Array.isArray(data) ? data : []).filter(
-          (a: { status: string }) => a.status === "open" || a.status === "acknowledged"
-        ) as OpenAlert[];
-        setOpenAlerts(open);
-      }
-    } catch (err) {
-      setLoadError("Sunucuya bağlanamadı. Ağ bağlantınızı ve backend durumunu kontrol edin.");
-      console.error("Failed to fetch initial data:", err);
-    } finally {
-      setLoading(false);
+/**
+ * Yük hata mesajı önceliği — eski refetchAll davranışıyla birebir:
+ * core (products/customers/orders/production) hatası > alerts hatası;
+ * HTTP hatası status'lu mesaj, ağ hatası bağlantı mesajı üretir.
+ */
+export function buildLoadError(coreErrors: unknown[], alertsError: unknown): string | null {
+  const coreErr = coreErrors.find(e => e !== undefined && e !== null);
+  if (coreErr !== undefined) {
+    if (coreErr instanceof FetchError) {
+      return `Veriler yüklenemedi (HTTP ${coreErr.status}). Backend bağlantısını kontrol edin.`;
     }
-  }, []);
+    return "Sunucuya bağlanamadı. Ağ bağlantınızı ve backend durumunu kontrol edin.";
+  }
+  if (alertsError !== undefined && alertsError !== null) {
+    if (alertsError instanceof FetchError) {
+      return `Uyarı servisi yanıt vermedi (HTTP ${alertsError.status}). Stok uyarıları güncel olmayabilir.`;
+    }
+    return "Sunucuya bağlanamadı. Ağ bağlantınızı ve backend durumunu kontrol edin.";
+  }
+  return null;
+}
 
-  // ── Mount ──────────────────────────────────────────────
-  useEffect(() => { refetchAll(); }, [refetchAll]);
+/**
+ * Stok etkisi olan sipariş geçişleri — bu geçişlerden sonra products tazelenir
+ * (approved: reserved artar, cancelled: reserved düşer, shipped: on_hand düşer).
+ */
+export function shouldRefetchProducts(transition: OrderTransition): boolean {
+  return transition === "approved" || transition === "cancelled" || transition === "shipped";
+}
 
-  // ── Customers ────────────────────────────────────────────
+// Demo guard — blocks mutation if in demo mode. Does NOT clear the cookie or
+// redirect; page-level handlers surface the toast feedback. Server middleware
+// is the real security gate (403).
+function demoGuard(): boolean {
+  return checkDemoMode();
+}
 
-  const addCustomer = async (
-    fields: Omit<
-      Customer,
-      "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive"
-    >
+// ── Mapped fetcher'lar (cache'te map'lenmiş veri tutulur) ──
+
+async function listFetcher<T>(url: string, map: (raw: never) => T): Promise<T[]> {
+  const data = await jsonFetcher<unknown>(url);
+  return Array.isArray(data) ? (data as never[]).map(map) : [];
+}
+
+const productsFetcher = (url: string) => listFetcher(url, mapProduct);
+const customersFetcher = (url: string) => listFetcher(url, mapCustomer);
+const ordersFetcher = (url: string) => listFetcher(url, mapOrderSummary);
+const productionFetcher = (url: string) => listFetcher(url, mapProductionEntry);
+
+async function alertsFetcher(url: string): Promise<OpenAlert[]> {
+  const data = await jsonFetcher<unknown>(url);
+  // Aktif = open + acknowledged — Uyarılar sayfası istatistiğiyle aynı
+  // tanım (ack'lenen uyarı görülmüştür ama koşul sürer; sayaçtan düşmez).
+  return (Array.isArray(data) ? data : []).filter(
+    (a: { status: string }) => a.status === "open" || a.status === "acknowledged"
+  ) as OpenAlert[];
+}
+
+// ── Sidebar sayaçları (perf Faz 2) ──────────────────────────
+// Sidebar 3 rozet için tam listeleri İNDİRMEZ — /api/dashboard/counters yalnız
+// 3 sayı döner. SWR 60sn poll + mutasyon köprüleri mutate(COUNTERS_KEY) ile tazeler.
+
+export interface DashboardCounters {
+  pendingOrders: number;
+  reorderCount: number;
+  activeAlerts: number;
+}
+
+export function useDashboardCounters(): { counters: DashboardCounters | undefined } {
+  const { data } = useSWR<DashboardCounters>(COUNTERS_KEY, jsonFetcher, {
+    ...SWR_DEFAULTS,
+    refreshInterval: 60_000,
+  });
+  return { counters: data };
+}
+
+// ── Domain hook'ları ────────────────────────────────────────
+
+export function useCustomers() {
+  const { data, isLoading, error } = useSWR<Customer[]>(CUSTOMERS_KEY, customersFetcher, SWR_DEFAULTS);
+  const { mutate } = useSWRConfig();
+
+  const addCustomer = useCallback(async (
+    fields: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">
   ) => {
     if (demoGuard()) return;
     try {
@@ -237,7 +247,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setCustomers((prev) => [mapCustomer(data), ...prev]);
+        await mutate(CUSTOMERS_KEY,
+          (prev: Customer[] | undefined) => [mapCustomer(data), ...(prev ?? [])],
+          { revalidate: false });
       } else {
         // route { error } JSON döndürür — kullanıcıya ham {"error":...} stringi
         // değil mesajı göster (updateCustomer/deleteCustomer paterni).
@@ -248,9 +260,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error("addCustomer failed:", err);
       throw err;
     }
-  };
+  }, [mutate]);
 
-  const updateCustomer = async (id: string, updates: Partial<Customer>): Promise<void> => {
+  const updateCustomer = useCallback(async (id: string, updates: Partial<Customer>): Promise<void> => {
     if (demoGuard()) return;
     const body = buildCustomerPatch(updates);
     const res = await fetch(`/api/customers/${id}`, {
@@ -263,22 +275,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
       throw new Error(errBody?.error ?? "Müşteri güncellenemedi.");
     }
     const data = await res.json();
-    setCustomers((prev) => prev.map((c) => (c.id === id ? mapCustomer(data) : c)));
-  };
+    await mutate(CUSTOMERS_KEY,
+      (prev: Customer[] | undefined) => (prev ?? []).map(c => (c.id === id ? mapCustomer(data) : c)),
+      { revalidate: false });
+  }, [mutate]);
 
-  const deleteCustomer = async (id: string) => {
+  const deleteCustomer = useCallback(async (id: string) => {
     if (demoGuard()) return;
     const res = await fetch(`/api/customers/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const errBody = await res.json().catch(() => null);
       throw new Error(errBody?.error ?? "Müşteri silinemedi.");
     }
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    await mutate(CUSTOMERS_KEY,
+      (prev: Customer[] | undefined) => (prev ?? []).filter(c => c.id !== id),
+      { revalidate: false });
+  }, [mutate]);
+
+  return {
+    customers: data ?? [],
+    customersLoading: isLoading,
+    customersError: error as unknown,
+    addCustomer,
+    updateCustomer,
+    deleteCustomer,
   };
+}
 
-  // ── Products ─────────────────────────────────────────────
+export function useProducts() {
+  const { data, isLoading, error } = useSWR<Product[]>(PRODUCTS_KEY, productsFetcher, SWR_DEFAULTS);
+  const { mutate } = useSWRConfig();
 
-  const addProduct = async (
+  const addProduct = useCallback(async (
     fields: Omit<Product, "id" | "reserved" | "available_now" | "isActive" | "quoted" | "promisable" | "incoming" | "forecasted">
   ) => {
     if (demoGuard()) return;
@@ -318,7 +346,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setProducts((prev) => [mapProduct(data), ...prev]);
+        await mutate(PRODUCTS_KEY,
+          (prev: Product[] | undefined) => [mapProduct(data), ...(prev ?? [])],
+          { revalidate: false });
       } else {
         throw new Error(await res.text());
       }
@@ -326,115 +356,39 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error("addProduct failed:", err);
       throw err;
     }
-  };
+  }, [mutate]);
 
-  const deleteProduct = async (id: string) => {
+  const deleteProduct = useCallback(async (id: string) => {
     if (demoGuard()) return;
     const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const errBody = await res.json().catch(() => null);
       throw new Error(errBody?.error ?? "Ürün silinemedi.");
     }
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+    await mutate(PRODUCTS_KEY,
+      (prev: Product[] | undefined) => (prev ?? []).filter(p => p.id !== id),
+      { revalidate: false });
+  }, [mutate]);
+
+  return {
+    products: data ?? [],
+    productsLoading: isLoading,
+    productsError: error as unknown,
+    addProduct,
+    deleteProduct,
   };
+}
 
-  // ── Production (Uretim) ──────────────────────────────────
+/**
+ * Sipariş mutasyonları — SWR liste aboneliği BAŞLATMAZ (perf): detay sayfası /
+ * OrderForm gibi yalnız yazma ihtiyacı olan tüketiciler tam listeyi indirmesin.
+ * Cache'te liste varsa optimistik günceller; yoksa mutate no-op kalır ve liste
+ * sayfası mount olduğunda taze çekilir.
+ */
+export function useOrderMutations() {
+  const { mutate } = useSWRConfig();
 
-  const addUretimKaydi = async (k: Omit<UretimKaydi, "id">): Promise<{ refetchFailed?: boolean }> => {
-    if (demoGuard()) return {};
-    try {
-      const body = {
-        product_id: k.productId,
-        produced_qty: k.adet,
-        production_date: k.tarih,
-        notes: k.notlar,
-      };
-      const res = await fetch("/api/production", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => null);
-        // 409 BOM eksik-bileşen payload'ı (errBody.shortages) varsa hangi
-        // bileşenin ne kadar gerekli/mevcut olduğunu mesaja taşı — yoksa
-        // jenerik "Yetersiz bileşen stoğu." kullanıcıya hangi hammaddeyi
-        // tedarik edeceğini söylemiyordu.
-        const fallback = errBody?.error ?? "Üretim kaydedilemedi.";
-        throw new Error(buildShortageMessage(errBody?.shortages, fallback));
-      }
-      // POST succeeded — refetch production and products (stock has changed)
-      // Audit 5. tur Fix 4: ?all=1 — global state ilk 100'e düşmesin
-      let refetchFailed = false;
-      const [prodRes, prodDataRes] = await Promise.all([
-        fetch(productionFetchUrl()),
-        fetch("/api/products?all=1"),
-      ]);
-      if (prodRes.ok) {
-        const data = await prodRes.json();
-        setUretimKayitlari(
-          Array.isArray(data) ? data.map(mapProductionEntry) : []
-        );
-      } else {
-        refetchFailed = true;
-        console.error("addUretimKaydi: production refetch failed", prodRes.status);
-      }
-      if (prodDataRes.ok) {
-        const data = await prodDataRes.json();
-        setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
-      } else {
-        refetchFailed = true;
-        console.error("addUretimKaydi: products refetch failed", prodDataRes.status);
-      }
-      return { refetchFailed };
-    } catch (err) {
-      console.error("addUretimKaydi failed:", err);
-      throw err;
-    }
-  };
-
-  const deleteUretimKaydi = async (id: string): Promise<{ refetchFailed?: boolean }> => {
-    if (demoGuard()) return {};
-    try {
-      const res = await fetch(`/api/production/${id}`, { method: "DELETE" });
-      if (!res.ok) {
-        const errBody = await res.json().catch(() => null);
-        throw new Error(errBody?.error ?? "Üretim kaydı silinemedi.");
-      }
-      setUretimKayitlari((prev) => prev.filter((k) => k.id !== id));
-      // Refetch products and production (stock has changed)
-      // Audit 5. tur Fix 4: ?all=1 — global state ilk 100'e düşmesin
-      let refetchFailed = false;
-      const [productsRes, prodRes] = await Promise.all([
-        fetch("/api/products?all=1"),
-        fetch(productionFetchUrl()),
-      ]);
-      if (productsRes.ok) {
-        const data = await productsRes.json();
-        setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
-      } else {
-        refetchFailed = true;
-        console.error("deleteUretimKaydi: products refetch failed", productsRes.status);
-      }
-      if (prodRes.ok) {
-        const data = await prodRes.json();
-        setUretimKayitlari(
-          Array.isArray(data) ? data.map(mapProductionEntry) : []
-        );
-      } else {
-        refetchFailed = true;
-        console.error("deleteUretimKaydi: production refetch failed", prodRes.status);
-      }
-      return { refetchFailed };
-    } catch (err) {
-      console.error("deleteUretimKaydi failed:", err);
-      throw err;
-    }
-  };
-
-  // ── Orders ───────────────────────────────────────────────
-
-  const addOrder = async (
+  const addOrder = useCallback(async (
     detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">
   ): Promise<{ id: string; submitError?: string }> => {
     if (demoGuard()) return { id: "" };
@@ -472,7 +426,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       });
       if (res.ok) {
         const data: SalesOrderRow & { submitError?: string } = await res.json();
-        setOrders((prev) => [mapOrderSummary(data), ...prev]);
+        await mutate(ORDERS_KEY,
+          (prev: Order[] | undefined) => [mapOrderSummary(data), ...(prev ?? [])],
+          { revalidate: false });
+        void mutate(COUNTERS_KEY);
         // create-and-send: pending istendi ama allocation başarısızsa (stok yok)
         // sipariş DRAFT kaldı → submitError ile dürüst bildirim (route 201 döner).
         return { id: data.id, submitError: data.submitError };
@@ -487,9 +444,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error("addOrder failed:", err);
       throw err;
     }
-  };
+  }, [mutate]);
 
-  const updateOrderStatus = async (
+  const updateOrderStatus = useCallback(async (
     orderId: string,
     transition: OrderTransition
   ): Promise<UpdateStatusResult> => {
@@ -508,19 +465,17 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
       const updated = await res.json();
       const mapped = mapOrderSummary(updated);
-      setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? mapped : o))
-      );
+      await mutate(ORDERS_KEY,
+        (prev: Order[] | undefined) => (prev ?? []).map(o => (o.id === orderId ? mapped : o)),
+        { revalidate: false });
+      void mutate(COUNTERS_KEY);
 
-      // Refetch products for any transition that affects stock (reserved/on_hand)
-      // Audit 5. tur Fix 4: ?all=1 — global state ilk 100'e düşmesin
-      if (transition === "approved" || transition === "cancelled" || transition === "shipped") {
-        const productsRes = await fetch("/api/products?all=1");
-        if (productsRes.ok) {
-          const data = await productsRes.json();
-          setProducts(Array.isArray(data) ? data.map(mapProduct) : []);
-        } else {
-          console.error("updateOrderStatus: products refetch failed", productsRes.status);
+      // Stok etkisi olan geçişlerde products tazelenir (reserved/on_hand değişti).
+      if (shouldRefetchProducts(transition)) {
+        try {
+          await mutate(PRODUCTS_KEY);
+        } catch (err) {
+          console.error("updateOrderStatus: products refetch failed", err);
         }
       }
 
@@ -533,11 +488,119 @@ export function DataProvider({ children }: { children: ReactNode }) {
       console.error("updateOrderStatus failed:", err);
       return { ok: false, error: err instanceof Error ? err.message : undefined };
     }
+  }, [mutate]);
+
+  return { addOrder, updateOrderStatus };
+}
+
+export function useOrders() {
+  const { data, isLoading, error } = useSWR<Order[]>(ORDERS_KEY, ordersFetcher, SWR_DEFAULTS);
+  const { addOrder, updateOrderStatus } = useOrderMutations();
+  return {
+    orders: data ?? [],
+    ordersLoading: isLoading,
+    ordersError: error as unknown,
+    addOrder,
+    updateOrderStatus,
   };
+}
 
-  // ── Derived values ───────────────────────────────────────
+export function useProduction() {
+  const productionKey = productionFetchUrl();
+  const { data, isLoading, error } = useSWR<UretimKaydi[]>(productionKey, productionFetcher, SWR_DEFAULTS);
+  const { mutate } = useSWRConfig();
 
-  const reorderSuggestions = useMemo(
+  // POST/DELETE sonrası üretim + ürün listeleri tazelenir (stok değişti).
+  // Revalidation hatası yutulmaz — { refetchFailed: true } sözleşmesi korunur
+  // (çağıran sayfa "liste güncel olmayabilir" uyarısı gösterir).
+  const revalidateAfterMutation = useCallback(async (): Promise<boolean> => {
+    let refetchFailed = false;
+    const results = await Promise.allSettled([
+      mutate(productionKey),
+      mutate(PRODUCTS_KEY),
+    ]);
+    for (const r of results) {
+      if (r.status === "rejected") {
+        refetchFailed = true;
+        console.error("production mutation refetch failed", r.reason);
+      }
+    }
+    return refetchFailed;
+  }, [mutate, productionKey]);
+
+  const addUretimKaydi = useCallback(async (k: Omit<UretimKaydi, "id">): Promise<{ refetchFailed?: boolean }> => {
+    if (demoGuard()) return {};
+    try {
+      const body = {
+        product_id: k.productId,
+        produced_qty: k.adet,
+        production_date: k.tarih,
+        notes: k.notlar,
+      };
+      const res = await fetch("/api/production", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        // 409 BOM eksik-bileşen payload'ı (errBody.shortages) varsa hangi
+        // bileşenin ne kadar gerekli/mevcut olduğunu mesaja taşı — yoksa
+        // jenerik "Yetersiz bileşen stoğu." kullanıcıya hangi hammaddeyi
+        // tedarik edeceğini söylemiyordu.
+        const fallback = errBody?.error ?? "Üretim kaydedilemedi.";
+        throw new Error(buildShortageMessage(errBody?.shortages, fallback));
+      }
+      const refetchFailed = await revalidateAfterMutation();
+      return { refetchFailed };
+    } catch (err) {
+      console.error("addUretimKaydi failed:", err);
+      throw err;
+    }
+  }, [revalidateAfterMutation]);
+
+  const deleteUretimKaydi = useCallback(async (id: string): Promise<{ refetchFailed?: boolean }> => {
+    if (demoGuard()) return {};
+    try {
+      const res = await fetch(`/api/production/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.error ?? "Üretim kaydı silinemedi.");
+      }
+      await mutate(productionKey,
+        (prev: UretimKaydi[] | undefined) => (prev ?? []).filter(x => x.id !== id),
+        { revalidate: false });
+      const refetchFailed = await revalidateAfterMutation();
+      return { refetchFailed };
+    } catch (err) {
+      console.error("deleteUretimKaydi failed:", err);
+      throw err;
+    }
+  }, [mutate, productionKey, revalidateAfterMutation]);
+
+  return {
+    uretimKayitlari: data ?? [],
+    productionLoading: isLoading,
+    productionError: error as unknown,
+    addUretimKaydi,
+    deleteUretimKaydi,
+  };
+}
+
+export function useAlerts() {
+  const { data, isLoading, error } = useSWR<OpenAlert[]>(ALERTS_KEY, alertsFetcher, SWR_DEFAULTS);
+  const openAlerts = data ?? [];
+  return {
+    openAlerts,
+    activeAlertCount: openAlerts.length,
+    alertsLoading: isLoading,
+    alertsError: error as unknown,
+  };
+}
+
+/** Satın alma önerisi adayları — backend (purchase-copilot) ile aynı semantik. */
+export function useReorderSuggestions(products: Product[]): Product[] {
+  return useMemo(
     () =>
       products.filter((p) =>
         // Audit 5. tur Fix 1: filter promisable üzerinden — backend
@@ -553,12 +616,62 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ),
     [products]
   );
+}
 
-  const activeAlertCount = useMemo(() => openAlerts.length, [openAlerts]);
+/**
+ * Tüm domain cache'lerini tazeler (import/excel sonrası global yenileme).
+ * Komponent dışından da çağrılabilir (global mutate).
+ */
+export async function invalidateAllData(): Promise<void> {
+  await globalMutate(
+    (key) => typeof key === "string" && (
+      key === CUSTOMERS_KEY ||
+      key === ORDERS_KEY ||
+      key === ALERTS_KEY ||
+      key === COUNTERS_KEY ||
+      key.startsWith("/api/products") ||
+      key.startsWith("/api/production")
+    ),
+    undefined,
+    { revalidate: true },
+  );
+}
 
-  // ── Stable context value ─────────────────────────────────
+// ── Provider (SWR cache sınırı) ─────────────────────────────
+// Artık veri ÇEKMEZ — yalnız SWRConfig sağlar (fetcher + ERP varsayılanları).
+// Dosya/komponent adları geriye-uyum için korunur (feedback_no_silent_deletes).
 
-  const value = useMemo(
+export function DataProvider({ children }: { children: ReactNode }) {
+  return (
+    <SWRConfig value={{ fetcher: jsonFetcher, ...SWR_DEFAULTS }}>
+      {children}
+    </SWRConfig>
+  );
+}
+
+// ── Geriye-uyumlu kompozisyon hook'u ────────────────────────
+// Dönüş şekli eski DataContextValue ile alan-alan aynı. Dar ihtiyaçlı sayfalar
+// domain hook'larını doğrudan kullanmalı — useData TÜM domain'leri çeker.
+
+export function useData(): DataContextValue {
+  const { customers, customersLoading, customersError, addCustomer, updateCustomer, deleteCustomer } = useCustomers();
+  const { products, productsLoading, productsError, addProduct, deleteProduct } = useProducts();
+  const { orders, ordersLoading, ordersError, addOrder, updateOrderStatus } = useOrders();
+  const { uretimKayitlari, productionLoading, productionError, addUretimKaydi, deleteUretimKaydi } = useProduction();
+  const { openAlerts, activeAlertCount, alertsLoading, alertsError } = useAlerts();
+  const reorderSuggestions = useReorderSuggestions(products);
+
+  const loading = customersLoading || productsLoading || ordersLoading || productionLoading || alertsLoading;
+  const loadError = useMemo(
+    () => buildLoadError([productsError, customersError, ordersError, productionError], alertsError),
+    [productsError, customersError, ordersError, productionError, alertsError]
+  );
+
+  const refetchAll = useCallback(async () => {
+    await invalidateAllData();
+  }, []);
+
+  return useMemo(
     () => ({
       customers,
       products,
@@ -580,27 +693,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       loadError,
       refetchAll,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [
       customers, products, orders, uretimKayitlari,
+      addCustomer, updateCustomer, deleteCustomer,
+      addProduct, deleteProduct,
+      addUretimKaydi, deleteUretimKaydi,
+      addOrder, updateOrderStatus,
       reorderSuggestions, activeAlertCount, openAlerts,
-      loading, loadError,
+      loading, loadError, refetchAll,
     ]
   );
-
-  // ── Render ───────────────────────────────────────────────
-
-  return (
-    <DataContext.Provider value={value}>
-      {children}
-    </DataContext.Provider>
-  );
-}
-
-// ── Hook ────────────────────────────────────────────────────
-
-export function useData(): DataContextValue {
-  const ctx = useContext(DataContext);
-  if (!ctx) throw new Error("useData must be used within DataProvider");
-  return ctx;
 }

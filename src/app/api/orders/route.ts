@@ -12,10 +12,10 @@ import { notifyUsersByEmail } from "@/lib/services/email-service";
 import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
+import { getCurrentUserPermissions, resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
+import { appendServerTiming, startSpan } from "@/lib/server-timing";
 
 // GET /api/orders?commercial_status=approved&customer_id=xxx&page=1
 // GET /api/orders?all=1[&commercial_status=...&customer_id=...]
@@ -30,16 +30,23 @@ export async function GET(req: NextRequest) {
         const all = searchParams.get("all") === "1";
         const page = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
 
+        const dbSpan = startSpan();
         const orders = await serviceListOrders({
             commercial_status: status ?? undefined,
             customer_id,
             page: all ? 1 : page,
             pageSize: all ? 10000 : undefined,
         });
+        const dbMs = dbSpan();
 
         // RBAC R3: redaction per-request (serviceListOrders cache'siz; yine de perms ayrı).
+        const authSpan = startSpan();
         const perms = await getCurrentUserPermissions(req);
-        return NextResponse.json(redactOrdersForPerms(orders, perms));
+        const authMs = authSpan();
+        return appendServerTiming(
+            NextResponse.json(redactOrdersForPerms(orders, perms)),
+            [{ name: "auth", ms: authMs }, { name: "db", ms: dbMs }],
+        );
     } catch (err) {
         return handleApiError(err, "GET /api/orders");
     }
@@ -48,7 +55,9 @@ export async function GET(req: NextRequest) {
 // POST /api/orders — creates a new order (draft or pending_approval)
 export async function POST(req: NextRequest) {
     try {
-        const guard = await requirePermission(req, "manage_sales_orders");
+        // Tek getUser: guard + created_by aynı auth context'ten (perf Faz 1).
+        const ctx = await resolveAuthContext();
+        const guard = requirePermissionFor(ctx, "manage_sales_orders");
         if (guard) return guard;
 
         const parsed = await safeParseJson(req);
@@ -56,9 +65,7 @@ export async function POST(req: NextRequest) {
         const body = parsed.data as CreateOrderInput;
 
         // Populate created_by from the current session user (session always wins)
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        body.created_by = user?.id ?? undefined;
+        body.created_by = ctx.userId ?? undefined;
 
         const lengthErr = validateStringLengths(body as unknown as Record<string, unknown>);
         if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });

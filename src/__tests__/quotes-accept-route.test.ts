@@ -20,6 +20,8 @@ vi.mock("@/lib/services/quote-service", () => ({
 const mockRequirePermission = vi.fn();
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: (...a: unknown[]) => mockRequirePermission(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermission(...a),
+    resolveAuthContext: async () => ({ user: { id: "test-user-id" }, userId: "test-user-id", roles: ["admin"], perms: new Set() }),
 }));
 
 vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
@@ -32,12 +34,12 @@ const idCtx = () => ({ params: Promise.resolve({ id: QID }) });
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockRequirePermission.mockResolvedValue(null);  // default: yetki var
+    mockRequirePermission.mockReturnValue(null);  // default: yetki var
 });
 
 describe("POST /api/quotes/[id]/accept", () => {
     it("RBAC: manage_quotes yoksa (viewer) → 403, servis çağrılmaz", async () => {
-        mockRequirePermission.mockResolvedValue(
+        mockRequirePermission.mockReturnValue(
             NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
         );
         const res = await POST(makeReq(), idCtx());

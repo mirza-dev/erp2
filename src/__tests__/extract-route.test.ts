@@ -18,6 +18,8 @@ const mockListProductTypes = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    requireRoleFor: (...a: unknown[]) => mockRequireRole(...a),
+    resolveAuthContext: async () => ({ user: { id: "user-1" }, userId: "user-1", roles: ["admin"], perms: new Set() }),
 }));
 
 vi.mock("@/lib/supabase/import-documents", () => ({
@@ -118,7 +120,7 @@ const PROD_DOC = {
 
 describe("POST /api/import/documents/[id]/extract — auth", () => {
     it("returns 403 from requireRole for viewer", async () => {
-        mockRequireRole.mockResolvedValueOnce(new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }));
+        mockRequireRole.mockReturnValueOnce(new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }));
         const res = await callPOST(makeReq("doc-1"), "doc-1");
         expect(res.status).toBe(403);
         expect(mockExtractProducts).not.toHaveBeenCalled();
@@ -126,7 +128,7 @@ describe("POST /api/import/documents/[id]/extract — auth", () => {
 });
 
 describe("POST /api/import/documents/[id]/extract — validation", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("returns 404 when document not found", async () => {
         mockGetDoc.mockResolvedValueOnce(null);
@@ -176,7 +178,7 @@ describe("POST /api/import/documents/[id]/extract — validation", () => {
 });
 
 describe("POST /api/import/documents/[id]/extract — happy product flow", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("product_catalog → extracts + matches + creates lines (201)", async () => {
         mockGetDoc.mockResolvedValueOnce({
@@ -247,7 +249,7 @@ describe("POST /api/import/documents/[id]/extract — happy product flow", () =>
 });
 
 describe("POST /api/import/documents/[id]/extract — certificate flow", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("material_certificate → single-row line with extraction_type=certificate_target", async () => {
         mockGetDoc.mockResolvedValueOnce({
@@ -332,7 +334,7 @@ describe("POST /api/import/documents/[id]/extract — certificate flow", () => {
 });
 
 describe("POST /api/import/documents/[id]/extract — error paths", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("storage download fails → 500", async () => {
         mockGetDoc.mockResolvedValueOnce(PROD_DOC);
@@ -361,7 +363,7 @@ describe("POST /api/import/documents/[id]/extract — error paths", () => {
 // ── Review 3b P2/P3 — empty re-extract guard + cache + product_type_id ──
 
 describe("POST extract — Review 3b P2-C (empty re-extract)", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("AI items=[] + existing lines>0 → 422, replace not called", async () => {
         mockGetDoc.mockResolvedValueOnce(PROD_DOC);
@@ -396,7 +398,7 @@ describe("POST extract — Review 3b P2-C (empty re-extract)", () => {
 });
 
 describe("POST extract — Review 3b P2/P3-D (productsCache)", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("loadActiveMatchables tek kez çağrılır + matcher cache ile çağrılır (N=3 satır → 1 fetch)", async () => {
         mockGetDoc.mockResolvedValueOnce(PROD_DOC);
@@ -420,7 +422,7 @@ describe("POST extract — Review 3b P2/P3-D (productsCache)", () => {
 });
 
 describe("POST extract — Review 3b P2-A (product_type_id persist)", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("body productTypeId restrict → availableProductTypes tek tip + AI o tipi seçer", async () => {
         // Multi-type mode'da body productTypeId = "sadece bu tip" filter semantiği.

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { serviceAcceptQuoteToOrder } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
 
@@ -19,13 +18,13 @@ export async function POST(
         // manage_quotes: teklifi kabul eden = teklif yönetim yetkisi (admin+sales).
         // (sales rolü manage_sales_orders'a da sahip; viewer/accounting/production
         // /purchasing → manage_quotes YOK → 403.)
-        const guard = await requirePermission(req, "manage_quotes");
+        // Tek getUser: guard + actor aynı auth context'ten (perf Faz 1).
+        const ctx = await resolveAuthContext();
+        const guard = requirePermissionFor(ctx, "manage_quotes");
         if (guard) return guard;
 
         const { id } = await params;
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        const result = await serviceAcceptQuoteToOrder(id, user?.id);
+        const result = await serviceAcceptQuoteToOrder(id, ctx.userId ?? undefined);
 
         if (!result.success) {
             const status = result.notFound ? 404

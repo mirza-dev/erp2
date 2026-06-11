@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
+import { SwrTestWrapper } from "./helpers/swr-test-wrapper";
 import Topbar from "@/components/layout/Topbar";
 
 vi.mock("next/link", () => ({
@@ -67,7 +68,7 @@ describe("ExchangeRatesTicker", () => {
         });
         global.fetch = fetchMock as unknown as typeof fetch;
 
-        render(<ExchangeRatesTicker />);
+        render(<ExchangeRatesTicker />, { wrapper: SwrTestWrapper });
 
         await waitFor(() => expect(screen.getByLabelText("Amerikan Doları ($ USD)")).toBeTruthy());
         expect(screen.getByLabelText("Euro (€ EUR)")).toBeTruthy();
@@ -94,7 +95,7 @@ describe("ExchangeRatesTicker", () => {
             json: async () => TCMB_RATE_PAYLOAD,
         }) as unknown as typeof fetch;
 
-        render(<ExchangeRatesTicker />);
+        render(<ExchangeRatesTicker />, { wrapper: SwrTestWrapper });
 
         await waitFor(() => expect(screen.getByLabelText("TCMB döviz kurları")).toBeTruthy());
         expect(screen.queryByText("TCMB")).toBeNull();
@@ -108,7 +109,7 @@ describe("ExchangeRatesTicker", () => {
         });
         global.fetch = fetchMock as unknown as typeof fetch;
 
-        render(<ExchangeRatesTicker />);
+        render(<ExchangeRatesTicker />, { wrapper: SwrTestWrapper });
 
         await act(async () => {
             await Promise.resolve();
@@ -132,7 +133,7 @@ describe("ExchangeRatesTicker", () => {
             json: async () => ({}),
         }) as unknown as typeof fetch;
 
-        const { container } = render(<ExchangeRatesTicker />);
+        const { container } = render(<ExchangeRatesTicker />, { wrapper: SwrTestWrapper });
 
         await waitFor(() => expect(global.fetch).toHaveBeenCalledWith("/api/exchange-rates"));
         expect(container.textContent).toBe("");
@@ -159,7 +160,7 @@ describe("ExchangeRatesTicker", () => {
             } as Response);
         }) as unknown as typeof fetch;
 
-        render(<Topbar />);
+        render(<Topbar />, { wrapper: SwrTestWrapper });
 
         await waitFor(() => expect(screen.getByText("Bağlı")).toBeTruthy());
         expect(screen.getByText("Dashboard")).toBeTruthy();

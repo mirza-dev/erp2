@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { maskCurrency, formatDate } from "@/lib/utils";
-import { useData, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
+import { useOrders, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapOrderSummary } from "@/lib/api-mappers";
 import type { Order } from "@/lib/mock-data";
@@ -85,7 +85,7 @@ function OrdersList() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has, canViewSalesPrices } = usePermissions();
-    const { orders: contextOrders } = useData();
+    const { orders: contextOrders } = useOrders();
     const [mockOrders, setMockOrders] = useState<Order[]>(contextOrders);
     const contextInitRef = useRef(contextOrders.length > 0);
     const [refreshing, setRefreshing] = useState(false);

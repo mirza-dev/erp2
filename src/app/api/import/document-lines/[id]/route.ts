@@ -18,8 +18,7 @@ import {
 import { dbGetImportDocument } from "@/lib/supabase/import-documents";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbGetProductType, dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
-import { requireRole } from "@/lib/auth/role-guard";
-import { createClient } from "@/lib/supabase/server";
+import { resolveAuthContext, requireRoleFor } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
 import { normalizeTechnicalEvidence } from "@/lib/technical-templates";
 import type { TechnicalExtractionEvidence } from "@/lib/database.types";
@@ -30,7 +29,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
     try {
-        const guard = await requireRole(req, ["admin", "purchaser"]);
+        // Tek getUser: guard + reviewer aynı auth context'ten (perf Faz 1).
+        const auth = await resolveAuthContext();
+        const guard = requireRoleFor(auth, ["admin", "purchaser"]);
         if (guard) return guard;
 
         const { id } = await ctx.params;
@@ -174,17 +175,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             }
         }
 
-        // Reviewer bilgisi
-        const sb = await createClient();
-        const { data: { user } } = await sb.auth.getUser();
-
         const confidence = typeof body.match_confidence === "number" ? body.match_confidence : null;
 
         const updated = await dbUpdateLineMatch(id, {
             matched_product_id: matchedId,
             match_action: body.match_action,
             match_confidence: confidence,
-            reviewed_by: user?.id ?? null,
+            reviewed_by: auth.userId,
             product_type_id: productTypeIdPatch,
             extracted_attributes: attributesPatch,
             extraction_evidence: evidencePatch,

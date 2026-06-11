@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { useData } from "@/lib/data-context";
+import { useProducts, useProduction, buildLoadError } from "@/lib/data-context";
 import { formatNumber, safeRandomUUID } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -83,7 +83,9 @@ const tdStyle: React.CSSProperties = {
 };
 
 function ProductionPageInner() {
-    const { products, uretimKayitlari, addUretimKaydi, deleteUretimKaydi, loadError } = useData();
+    const { products, productsError } = useProducts();
+    const { uretimKayitlari, addUretimKaydi, deleteUretimKaydi, productionError } = useProduction();
+    const loadError = buildLoadError([productsError, productionError], undefined);
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const searchParams = useSearchParams();

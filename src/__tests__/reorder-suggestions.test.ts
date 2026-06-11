@@ -129,3 +129,42 @@ describe("shouldSuggestReorder — timezone drift (TRT noon)", () => {
         // TZ=UTC: localToday="2024-05-31", sevenDaysLater="2024-06-07" → daysLeft=7 → true ✓
     });
 });
+
+// ── isReorderCandidateRow (perf Faz 2 — server-side tek kaynak) ──────────────
+// copilot route'unun eski inline filtresi; counters route'u da aynı helper'ı
+// kullanır → Sidebar rozeti ↔ copilot listesi sapamaz.
+
+import { isReorderCandidateRow } from "@/lib/stock-utils";
+
+const row = (over: Partial<Parameters<typeof isReorderCandidateRow>[0]> = {}) => ({
+    product_type: "commercial" as const,
+    available_now: 100,
+    min_stock_level: 10,
+    daily_usage: null,
+    lead_time_days: null,
+    ...over,
+});
+
+describe("isReorderCandidateRow", () => {
+    it("manufactured → her koşulda false (stok sıfır olsa bile)", () => {
+        expect(isReorderCandidateRow(row({ product_type: "manufactured", available_now: 0 }), 0)).toBe(false);
+    });
+
+    it("promisable = available - quoted eşiği: 50-45=5 ≤ min 10 → true", () => {
+        expect(isReorderCandidateRow(row({ available_now: 50 }), 45)).toBe(true);
+        expect(isReorderCandidateRow(row({ available_now: 50 }), 0)).toBe(false);
+    });
+
+    it("promisable > min ama orderDeadline ≤ 7g → true (proaktif)", () => {
+        // promisable=20, daily_usage=2 → 10 gün stok; lead_time 5 → deadline ~5 gün sonra
+        expect(isReorderCandidateRow(
+            row({ available_now: 20, min_stock_level: 5, daily_usage: 2, lead_time_days: 5 }), 0
+        )).toBe(true);
+    });
+
+    it("promisable > min ve deadline yok/uzak → false", () => {
+        expect(isReorderCandidateRow(
+            row({ available_now: 1000, min_stock_level: 5, daily_usage: 1, lead_time_days: 2 }), 0
+        )).toBe(false);
+    });
+});

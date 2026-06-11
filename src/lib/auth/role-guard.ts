@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import {
     type Role,
@@ -42,6 +43,66 @@ export async function getCurrentUserId(_req?: NextRequest): Promise<string | nul
     const sb = await createClient();
     const { data: { user } } = await sb.auth.getUser();
     return user?.id ?? null;
+}
+
+// ── Tek-getUser auth context (kalıcı performans turu Faz 1) ─────────────
+//
+// Sorun: guard (requirePermission → getUser) + aynı istekte created_by için
+// ikinci bir supabase.auth.getUser() = istek başına 2-3 Supabase Auth
+// round-trip'i. React.cache() route handler'larda memoize ETMEZ (React render
+// scope'u yok) → açık context kalıbı: route başında TEK resolveAuthContext(),
+// guard + actor bilgisi aynı sonuçtan okunur.
+
+export interface AuthContext {
+    user: User | null;
+    userId: string | null;
+    roles: Role[];
+    perms: Set<Permission>;
+}
+
+/** TEK createClient + TEK getUser ile {user, roles, perms} çözer. */
+export async function resolveAuthContext(): Promise<AuthContext> {
+    const sb = await createClient();
+    const { data: { user } } = await sb.auth.getUser();
+    const roles: Role[] = user
+        ? parseRoles(user.app_metadata, user.email, adminEmailsFromEnv())
+        : ["viewer"];
+    return {
+        user: user ?? null,
+        userId: user?.id ?? null,
+        roles,
+        perms: permissionsForRoles(roles),
+    };
+}
+
+/**
+ * resolveAuthContext sonucu üzerinden permission guard — requirePermission ile
+ * birebir aynı karar (EN AZ BİR permission) ve aynı 403 gövdesi; ek auth
+ * çağrısı YAPMAZ.
+ */
+export function requirePermissionFor(
+    ctx: AuthContext,
+    allowed: Permission | Permission[],
+): NextResponse | null {
+    const need = Array.isArray(allowed) ? allowed : [allowed];
+    if (need.some(p => ctx.perms.has(p))) return null;
+    return NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 });
+}
+
+/**
+ * resolveAuthContext sonucu üzerinden rol guard'ı — requireRole ile birebir
+ * aynı karar (çoklu-rol kesişimi + "purchaser" legacy normalize) ve aynı 403
+ * gövdesi; ek auth çağrısı YAPMAZ.
+ */
+export function requireRoleFor(
+    ctx: AuthContext,
+    allowed: (Role | "purchaser")[],
+): NextResponse | null {
+    const allowedNorm = allowed
+        .map(normalizeRole)
+        .filter((r): r is Role => r !== null);
+    if (ctx.roles.some(r => allowedNorm.includes(r))) return null;
+    return NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 });
 }
 
 /**

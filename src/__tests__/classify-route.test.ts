@@ -22,6 +22,11 @@ const mockListProductTypes = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    requireRoleFor: (...a: unknown[]) => mockRequireRole(...a),
+    resolveAuthContext: async () => {
+        const { data: { user } } = await mockGetUser();
+        return { user: user ?? null, userId: user?.id ?? null, roles: ["admin"], perms: new Set() };
+    },
 }));
 
 vi.mock("@/lib/supabase/import-documents", async () => {
@@ -80,7 +85,7 @@ function makeFile(name: string, mime: string, sizeBytes: number): File {
 
 describe("POST /api/import/classify — auth", () => {
     it("returns 403 from requireRole for viewer", async () => {
-        mockRequireRole.mockResolvedValueOnce(
+        mockRequireRole.mockReturnValueOnce(
             new Response(JSON.stringify({ error: "forbidden" }), { status: 403 }),
         );
         const fd = new FormData();
@@ -92,7 +97,7 @@ describe("POST /api/import/classify — auth", () => {
     });
 
     it("returns 201 for admin/purchaser (guard returns null)", async () => {
-        mockRequireRole.mockResolvedValueOnce(null);
+        mockRequireRole.mockReturnValueOnce(null);
         mockClassify.mockResolvedValueOnce({
             document_type: "product_catalog", confidence: 0.9, language: "tr",
             summary: "ok", suggested_product_type_id: null,
@@ -110,7 +115,7 @@ describe("POST /api/import/classify — auth", () => {
 });
 
 describe("POST /api/import/classify — validation", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("returns 400 when no file present", async () => {
         const { POST } = await import("@/app/api/import/classify/route");
@@ -167,7 +172,7 @@ describe("POST /api/import/classify — validation", () => {
 });
 
 describe("POST /api/import/classify — happy path + Excel + graceful AI", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("calls aiClassifyDocument with productTypes from dbListProductTypes", async () => {
         mockClassify.mockResolvedValueOnce({
@@ -259,7 +264,7 @@ describe("POST /api/import/classify — happy path + Excel + graceful AI", () =>
 // ── Faz 3a Review 3.c — Server-side hard cancel (P3) ─────────────────────────
 
 describe("POST /api/import/classify — abort signal (Review 3.c P3)", () => {
-    beforeEach(() => mockRequireRole.mockResolvedValue(null));
+    beforeEach(() => mockRequireRole.mockReturnValue(null));
 
     it("aborts BEFORE AI call → 499, AI not called, DB not written", async () => {
         const fd = new FormData();
@@ -317,14 +322,14 @@ describe("POST /api/import/classify — abort signal (Review 3.c P3)", () => {
         expect(mockCreateDoc).not.toHaveBeenCalled();
     });
 
-    it("aborts DURING auth.getUser (pre-write guard) → 499, DB not written (Review 3.d)", async () => {
-        mockClassify.mockResolvedValueOnce({
-            document_type: "product_catalog", confidence: 0.9, language: "tr",
-            summary: "x", suggested_product_type_id: null,
-        });
+    it("aborts DURING route-start auth (resolveAuthContext) → 499, AI ÇAĞRILMAZ, DB not written", async () => {
+        // Perf Faz 1: auth artık route BAŞINDA tek seferde çözülür (resolveAuthContext)
+        // — eski "AI bitti, post-AI getUser sırasında abort" penceresi yapısal olarak
+        // kalktı (AI sonrası async auth çağrısı yok). Abort auth sırasında gelirse
+        // pre-AI guard 499 döner: AI maliyeti de DB yazımı da olmaz.
         const ctl = new AbortController();
         mockGetUser.mockImplementationOnce(() => {
-            // Race: AI bitti, auth fetch'i sırasında client gitti
+            // Race: auth fetch'i sırasında client gitti
             ctl.abort();
             return Promise.resolve({ data: { user: { id: "user-1" } } });
         });
@@ -336,7 +341,7 @@ describe("POST /api/import/classify — abort signal (Review 3.c P3)", () => {
         const { POST } = await import("@/app/api/import/classify/route");
         const res = await POST(req);
         expect(res.status).toBe(499);
-        expect(mockClassify).toHaveBeenCalledTimes(1);
+        expect(mockClassify).not.toHaveBeenCalled();
         expect(mockGetUser).toHaveBeenCalledTimes(1);
         expect(mockCreateDoc).not.toHaveBeenCalled();
     });

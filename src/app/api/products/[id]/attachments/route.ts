@@ -8,9 +8,8 @@ import {
     isValidAttachmentKind,
     isAllowedMime,
 } from "@/lib/supabase/product-attachments";
-import { requireRole } from "@/lib/auth/role-guard";
+import { resolveAuthContext, requireRoleFor } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
-import { createClient } from "@/lib/supabase/server";
 import { mapProductAttachment } from "@/lib/api-mappers";
 import { revalidateTag } from "next/cache";
 import type { ProductAttachmentKind } from "@/lib/database.types";
@@ -70,7 +69,9 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
-        const guard = await requireRole(req, ["admin", "purchaser"]);
+        // Tek getUser: guard + uploaded_by aynı auth context'ten (perf Faz 1).
+        const ctx = await resolveAuthContext();
+        const guard = requireRoleFor(ctx, ["admin", "purchaser"]);
         if (guard) return guard;
 
         const { id } = await params;
@@ -115,9 +116,6 @@ export async function POST(
             }
         }
 
-        const sb = await createClient();
-        const { data: { user } } = await sb.auth.getUser();
-
         const buffer = Buffer.from(await file.arrayBuffer());
 
         const row = await dbCreateAttachment({
@@ -128,7 +126,7 @@ export async function POST(
             mimeType: file.type,
             kind: kindRaw,
             metadata,
-            uploadedBy: user?.id ?? null,
+            uploadedBy: ctx.userId,
         });
 
         revalidateTag("products", "max");

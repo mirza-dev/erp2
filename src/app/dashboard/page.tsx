@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { useData } from "@/lib/data-context";
+import { useProducts, useOrders, useProduction, useAlerts, useReorderSuggestions } from "@/lib/data-context";
+import { useExchangeRates, useUserProfile } from "@/lib/shared-hooks";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import KpiCard from "@/components/dashboard/overview/KpiCard";
 import OverviewPanel, { Dot } from "@/components/dashboard/overview/OverviewPanel";
@@ -37,16 +38,22 @@ const TrendLegend = (
 );
 
 export default function DashboardPage() {
-    const { products, orders, uretimKayitlari, openAlerts, reorderSuggestions } = useData();
+    // Perf Faz 3: yalnız bu sayfanın ihtiyaç duyduğu domain'ler (customers ELENDİ).
+    const { products } = useProducts();
+    const { orders } = useOrders();
+    const { uretimKayitlari } = useProduction();
+    const { openAlerts } = useAlerts();
+    const reorderSuggestions = useReorderSuggestions(products);
     const { canViewSalesPrices, canViewPurchaseCosts } = usePermissions();
 
     const [range, setRange] = useState<RangeKey>("Ay");
     const [finance, setFinance] = useState<FinanceData>({ reportingCurrency: "USD", canViewCosts: false, cogs: null });
-    const [rates, setRates] = useState<ExchangeRates | null>(null);
-    // Kur fetch'i sonuçlandı mı? Uyarı satırı yükleme yarışında FLASH etmesin
-    // diye yalnız fetch settle olduktan sonra değerlendirilir.
-    const [ratesResolved, setRatesResolved] = useState(false);
-    const [preparedBy, setPreparedBy] = useState<string | null>(null);
+    // Perf Faz 4: kur + profil paylaşılan SWR hook'larından (Topbar ile tek istek).
+    // ratesResolved: kur fetch'i settle olmadan uyarı satırı FLASH etmesin.
+    const { ratesData, ratesResolved } = useExchangeRates();
+    const rates = (ratesData as ExchangeRates | undefined) ?? null;
+    const { profile } = useUserProfile();
+    const preparedBy = profile?.fullName || profile?.email || null;
     // null = yüklenmedi/başarısız/yetkisiz → ilgili KPI kartı hiç üretilmez (fail-soft).
     const [quotes, setQuotes] = useState<QuotePipelineInput[] | null>(null);
     const [purchaseOrders, setPurchaseOrders] = useState<IncomingPoInput[] | null>(null);
@@ -59,13 +66,6 @@ export default function DashboardPage() {
                 const r = await fetch("/api/dashboard/finance");
                 if (r.ok && alive) setFinance(await r.json());
             } catch { /* defansif: USD + maliyet yok */ }
-        })();
-        (async () => {
-            try {
-                const r = await fetch("/api/exchange-rates");
-                if (r.ok && alive) setRates(await r.json());
-            } catch { /* defansif: kur yok → dönüştürülemeyen tutarlar hariç + uyarı */ }
-            finally { if (alive) setRatesResolved(true); }
         })();
         (async () => {
             try {
@@ -85,15 +85,6 @@ export default function DashboardPage() {
                     if (Array.isArray(d)) setPurchaseOrders(d as IncomingPoInput[]);
                 }
             } catch { /* defansif: Yoldaki Mal kartı üretilmez */ }
-        })();
-        (async () => {
-            try {
-                const r = await fetch("/api/settings/user/profile");
-                if (r.ok && alive) {
-                    const d = await r.json() as { fullName?: string | null; email?: string | null };
-                    setPreparedBy(d.fullName || d.email || null);
-                }
-            } catch { /* defansif: hazırlayan satırı gizlenir */ }
         })();
         return () => { alive = false; };
     }, []);

@@ -60,9 +60,12 @@ describe("page.tsx — yazdırılabilir rapor (ekran görüntüsü değil)", () 
         expect(PAGE).toMatch(/range=\{range\}/);
     });
 
-    it("zengin künye: hazırlayan kullanıcı /api/settings/user/profile'dan çekilir", () => {
-        expect(PAGE).toMatch(/fetch\("\/api\/settings\/user\/profile"\)/);
-        expect(PAGE).toMatch(/setPreparedBy\(/);
+    it("zengin künye: hazırlayan kullanıcı paylaşılan profil hook'undan gelir (perf Faz 4)", () => {
+        // Eski: sayfa kendi /api/settings/user/profile fetch'ini atıyordu (Topbar
+        // ile duplicate). Yeni: useUserProfile — Topbar avatarıyla TEK istek.
+        expect(PAGE).toMatch(/useUserProfile\(\)/);
+        expect(PAGE).not.toMatch(/fetch\("\/api\/settings\/user\/profile"\)/);
+        expect(PAGE).toMatch(/preparedBy = profile\?\.fullName \|\| profile\?\.email \|\| null/);
         expect(PAGE).toMatch(/preparedBy=\{preparedBy\}/);
     });
 

@@ -8,6 +8,7 @@ import { computeOrderDeadline } from "@/lib/stock-utils";
 import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
 import { redactProductsForPerms } from "@/lib/auth/redact";
 import { unstable_cache, revalidateTag } from "next/cache";
+import { appendServerTiming, startSpan } from "@/lib/server-timing";
 
 type EnrichedProduct = Awaited<ReturnType<typeof dbListProducts>>[number] & {
     quoted: number;
@@ -93,14 +94,26 @@ export async function GET(req: NextRequest) {
         const productType = searchParams.get("product_type") ?? "";
         const isActive = searchParams.get("is_active") !== "false";
         // RBAC R3: redaction cache SONRASI, per-request (perms cache key'ine girmez).
+        const authSpan = startSpan();
         const perms = await getCurrentUserPermissions(req);
+        const authMs = authSpan();
         if (searchParams.get("all") === "1") {
+            const dbSpan = startSpan();
             const enriched = await getCachedAllProducts(category, productType, isActive);
-            return NextResponse.json(redactProductsForPerms(enriched, perms));
+            const dbMs = dbSpan();
+            return appendServerTiming(
+                NextResponse.json(redactProductsForPerms(enriched, perms)),
+                [{ name: "auth", ms: authMs }, { name: "db", ms: dbMs }],
+            );
         }
         const page = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
+        const dbSpan = startSpan();
         const enriched = await getCachedProducts(category, productType, isActive, page);
-        return NextResponse.json(redactProductsForPerms(enriched, perms));
+        const dbMs = dbSpan();
+        return appendServerTiming(
+            NextResponse.json(redactProductsForPerms(enriched, perms)),
+            [{ name: "auth", ms: authMs }, { name: "db", ms: dbMs }],
+        );
     } catch (err) {
         return handleApiError(err, "GET /api/products");
     }

@@ -7,9 +7,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { handleApiError } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { dbListAllActiveProducts } from "@/lib/supabase/products";
 import {
     transcribeAudio,
@@ -24,14 +23,14 @@ const ALLOWED_AUDIO_TYPES = ["audio/webm", "audio/mp4", "audio/ogg", "audio/wav"
 export async function POST(req: NextRequest) {
     try {
         // 1. Session kontrolü (explicit — route testlerinde 401 doğrulanabilsin)
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        // Tek getUser: session + guard aynı auth context'ten (perf Faz 1).
+        const ctx = await resolveAuthContext();
+        if (!ctx.user) {
             return NextResponse.json({ error: "Oturum gerekli." }, { status: 401 });
         }
 
         // RBAC R1: üretim kaydı yetkisi (sesli giriş de üretim mutasyonu).
-        const guard = await requirePermission(req, "manage_production");
+        const guard = requirePermissionFor(ctx, "manage_production");
         if (guard) return guard;
 
         // 2. Servis kullanılabilirlik kontrolü

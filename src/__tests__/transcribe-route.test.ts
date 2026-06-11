@@ -7,8 +7,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // RBAC Faz 4: route'lara requirePermission guard eklendi → guard'ı allow'a mock'la.
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
+    requirePermissionFor: vi.fn().mockReturnValue(null),
     requireRole: vi.fn().mockResolvedValue(null),
+    requireRoleFor: vi.fn().mockReturnValue(null),
     requireAnyRole: vi.fn().mockResolvedValue(null),
+    resolveAuthContext: async () => {
+        const { data: { user } } = await mockGetUser();
+        return { user: user ?? null, userId: user?.id ?? null, roles: ["admin"], perms: new Set() };
+    },
     getCurrentUserPermissions: vi.fn().mockResolvedValue(
         new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),

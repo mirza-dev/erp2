@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useData } from "@/lib/data-context";
+import { useProducts, useReorderSuggestions, invalidateAllData } from "@/lib/data-context";
 import { computeCoverageDays, computeTargetStock, daysColor, daysBg, dateDaysFromToday } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
 import AIDetailDrawer from "@/components/ai/AIDetailDrawer";
@@ -684,7 +684,9 @@ function RecActionCell({
 }
 
 export default function PurchaseSuggestedPage() {
-    const { reorderSuggestions, products, refetchAll } = useData();
+    const { products } = useProducts();
+    const reorderSuggestions = useReorderSuggestions(products);
+    const refetchAll = invalidateAllData;
     const [filter, setFilter] = useState<FilterType>("all");
     const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>("all");
     const [search, setSearch] = useState("");

@@ -365,6 +365,33 @@ export function shouldSuggestReorder(args: {
     return false;
 }
 
+/**
+ * DB satırı (aktif ürün) + quoted miktarından satın alma adayı kararı —
+ * purchase-copilot route'unun eski inline filtresinin TEK kaynağa çıkarılmış
+ * hali. Hem copilot hem /api/dashboard/counters (Sidebar "Öneriler" rozeti)
+ * bunu çağırır; client tarafındaki shouldSuggestReorder ile aynı semantik
+ * (promisable eşiği + orderDeadline ≤ 7g penceresi).
+ *
+ * NOT: çağıran liste zaten yalnız AKTİF ürünleri içerir (dbListAllActiveProducts)
+ * — isActive kontrolü burada yok.
+ */
+export function isReorderCandidateRow(
+    p: {
+        product_type: "manufactured" | "commercial";
+        available_now: number;
+        min_stock_level: number;
+        daily_usage: number | null;
+        lead_time_days: number | null;
+    },
+    quoted: number,
+): boolean {
+    if (p.product_type === "manufactured") return false;
+    const promisable = p.available_now - quoted;
+    if (promisable <= p.min_stock_level) return true;
+    const { orderDeadline } = computeOrderDeadline(promisable, p.daily_usage, p.lead_time_days);
+    return !!(orderDeadline && dateDaysFromToday(orderDeadline) <= REORDER_DEADLINE_WINDOW_DAYS);
+}
+
 // ── Status Badge ──────────────────────────────────────────────
 
 export interface StatusBadge {

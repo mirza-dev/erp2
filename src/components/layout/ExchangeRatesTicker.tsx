@@ -1,9 +1,9 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo } from "react";
 import type { ExchangeCurrencyCode, ExchangeRatesResponse, ExchangeRatesSource } from "@/lib/exchange-rates";
+import { useExchangeRates } from "@/lib/shared-hooks";
 
-const REFRESH_MS = 20 * 60 * 1000;
 const CURRENCIES: ExchangeCurrencyCode[] = ["USD", "EUR"];
 const CURRENCY_META: Record<ExchangeCurrencyCode, { symbol: string; label: string }> = {
     USD: { symbol: "$", label: "Amerikan Doları" },
@@ -109,33 +109,10 @@ const buyValStyle: React.CSSProperties = { color: "var(--text-primary)", fontWei
 const sellValStyle: React.CSSProperties = { color: "var(--success-text)", fontWeight: 700 };
 
 const ExchangeRatesTicker = memo(function ExchangeRatesTicker() {
-    const [rates, setRates] = useState<ExchangeRatesResponse | null>(null);
-
-    useEffect(() => {
-        let cancelled = false;
-
-        async function loadRates() {
-            try {
-                const response = await fetch("/api/exchange-rates");
-                if (!response.ok) {
-                    if (!cancelled) setRates(null);
-                    return;
-                }
-
-                const payload: unknown = await response.json();
-                if (!cancelled) setRates(isRatePayload(payload) ? payload : null);
-            } catch {
-                if (!cancelled) setRates(null);
-            }
-        }
-
-        void loadRates();
-        const timer = window.setInterval(() => { void loadRates(); }, REFRESH_MS);
-        return () => {
-            cancelled = true;
-            window.clearInterval(timer);
-        };
-    }, []);
+    // Perf Faz 4: paylaşılan SWR hook'u — dashboard ile aynı key, tek istek;
+    // 20dk refreshInterval eski setInterval davranışıyla birebir.
+    const { ratesData } = useExchangeRates();
+    const rates = isRatePayload(ratesData) ? ratesData : null;
 
     if (!rates) return null;
     const meta = sourceMeta(rates.source);

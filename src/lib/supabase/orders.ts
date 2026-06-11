@@ -88,6 +88,21 @@ export async function dbGetOrderById(id: string): Promise<OrderWithLines | null>
     return { ...orderFields, lines: order_lines ?? [] };
 }
 
+/**
+ * Belirli ticari durumdaki sipariş ADEDİ (head+count — satır taşımaz).
+ * /api/dashboard/counters: Sidebar "Satış Siparişleri" rozeti, tam listeyi
+ * indirip client'ta filtrelemek yerine DB sayar (perf Faz 2).
+ */
+export async function dbCountOrdersByCommercialStatus(status: CommercialStatus): Promise<number> {
+    const supabase = createServiceClient();
+    const { count, error } = await supabase
+        .from("sales_orders")
+        .select("id", { count: "exact", head: true })
+        .eq("commercial_status", status);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+}
+
 export async function dbListOrders(filter: ListOrdersFilter = {}): Promise<SalesOrderRow[]> {
     const supabase = createServiceClient();
     const { page = 1, pageSize = 50, commercial_status, customer_id } = filter;

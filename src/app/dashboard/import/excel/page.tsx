@@ -15,7 +15,7 @@ import {
     Table2,
     Upload,
 } from "lucide-react";
-import { useData } from "@/lib/data-context";
+import { invalidateAllData } from "@/lib/data-context";
 import * as XLSX from "xlsx";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useToast } from "@/components/ui/Toast";
@@ -186,7 +186,7 @@ function normalizeDraftApprovals(draft: DraftRow): Record<string, ImportFieldApp
 
 export default function ImportExcelWizardPage() {
     const router = useRouter();
-    const { refetchAll } = useData();
+    const refetchAll = invalidateAllData;
     const { toast } = useToast();
     const isDemo = useIsDemo();
 

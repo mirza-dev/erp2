@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { updateUserProfileCache } from "@/lib/shared-hooks";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
     Bell,
@@ -499,6 +500,9 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
             }
             const updated: UserProfile = await res.json();
             setProfile(updated);
+            // Perf Faz 4: paylaşılan profil cache'i güncelle — Topbar avatarı/adı
+            // yeniden fetch olmadan anında tazelenir.
+            void updateUserProfileCache(updated);
             setFullName(updated.fullName);
             savedFullNameRef.current = updated.fullName;
             setIsDirty(false);

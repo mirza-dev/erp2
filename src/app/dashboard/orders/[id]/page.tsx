@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CircleOff, FileText, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { formatCurrency, maskCurrency, formatDate } from "@/lib/utils";
-import { useData, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
+import { useOrderMutations, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapOrderDetail } from "@/lib/api-mappers";
 import type { OrderDetail } from "@/lib/mock-data";
@@ -87,7 +87,7 @@ const tdStyle: React.CSSProperties = {
 export default function OrderDetailPage() {
     const params = useParams();
     const router = useRouter();
-    const { updateOrderStatus } = useData();
+    const { updateOrderStatus } = useOrderMutations();
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { canViewSalesPrices, has } = usePermissions();

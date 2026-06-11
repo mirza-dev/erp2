@@ -6,7 +6,7 @@ import { Eraser, FileText, Plus, RotateCcw, Save, Send, Trash2 } from "lucide-re
 import type { QuoteData } from "../components/quote-types";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
-import { useData } from "@/lib/data-context";
+import { useCustomers, useProducts } from "@/lib/data-context";
 import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import type { QuoteStatus } from "@/lib/database.types";
@@ -87,7 +87,8 @@ interface QuoteFormProps {
 
 export default function QuoteForm({ initialData, readOnly, status, enableInlineSend }: QuoteFormProps) {
     // ── Data context ──────────────────────────────────────────────────────────
-    const { customers, products } = useData();
+    const { customers } = useCustomers();
+    const { products } = useProducts();
     // Global toast (dashboard layout'ta ToastProvider) — gönderim akışı mesajları
     // client-side navigasyonda da hayatta kalır (yerel showToast yalnız "Kaydet").
     // `pushToast`: yerel `toast` state'i (alt taraftaki bildirim) ile ad çakışmasını önler.

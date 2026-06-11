@@ -37,9 +37,8 @@ import {
     type MatchableProduct,
 } from "@/lib/services/product-matcher";
 import { dbGetProductTypeWithFields, dbListProductTypes } from "@/lib/supabase/product-types";
-import { requireRole } from "@/lib/auth/role-guard";
+import { resolveAuthContext, requireRoleFor } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
-import { createClient } from "@/lib/supabase/server";
 import {
     DEFAULT_AI_IMPORT_OPERATION,
     getAiImportOperation,
@@ -96,7 +95,9 @@ function extractExcelTextSample(buffer: Buffer, maxChars = 4000): string {
 
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
     try {
-        const guard = await requireRole(req, ["admin", "purchaser"]);
+        // Tek getUser (perf Faz 1) — guard auth context'ten.
+        const auth = await resolveAuthContext();
+        const guard = requireRoleFor(auth, ["admin", "purchaser"]);
         if (guard) return guard;
 
         const { id } = await ctx.params;
@@ -362,12 +363,8 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         // Pre-write hard cancel
         if (req.signal.aborted) return new NextResponse(null, { status: 499 });
 
-        // Auth user (audit için)
-        const sbClient = await createClient();
-        const { data: { user } } = await sbClient.auth.getUser();
-        void user; // reviewed_by extract'ta set edilmez; PATCH'te set edilir
-
-        if (req.signal.aborted) return new NextResponse(null, { status: 499 });
+        // (perf Faz 1) buradaki ölü getUser kaldırıldı — reviewed_by extract'ta
+        // set edilmez, PATCH'te set edilir; guard zaten auth context çözdü.
 
         const lines = await dbReplaceLinesForDocument(id, linesToCreate);
 

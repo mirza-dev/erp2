@@ -5,8 +5,7 @@ import {
     computeCoverageDays,
     computeUrgencyPct,
     computeUrgencyLevel,
-    computeOrderDeadline,
-    dateDaysFromToday,
+    isReorderCandidateRow,
 } from "@/lib/stock-utils";
 import { aiEnrichPurchaseSuggestions, isAIAvailable, type PurchaseSuggestionItem } from "@/lib/services/ai-service";
 import { dbGetRecentRejectionsForProducts } from "@/lib/supabase/ai-feedback";
@@ -129,22 +128,18 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
         await dbExpireRecommendationsForMissingEntities("product", allActiveProductIds, "purchase_suggestion");
     } catch { /* non-fatal */ }
 
-    const REORDER_DEADLINE_WINDOW_DAYS = 7;
     // Audit 3-4. tur Fix 1: promisable = available_now - quoted (UI ile aynı).
     // Domain'in tek hesabı; alert/satınalma servisleriyle uyumlu.
     const promisableMap = new Map<string, number>();
     for (const p of products) {
         promisableMap.set(p.id, p.available_now - (quotedMap.get(p.id) ?? 0));
     }
-    const needsPurchase = products.filter(p => {
-        if (p.product_type === "manufactured") return false;
-        const promisable = promisableMap.get(p.id) ?? p.available_now;
-        // Audit 4. tur Bulgu 1: ilk eşik available_now değil promisable olmalı.
-        // available_now=50, quoted=40, min=20 → promisable=10 < min=20 → öneri.
-        if (promisable <= p.min_stock_level) return true;
-        const { orderDeadline } = computeOrderDeadline(promisable, p.daily_usage, p.lead_time_days);
-        return !!(orderDeadline && dateDaysFromToday(orderDeadline) <= REORDER_DEADLINE_WINDOW_DAYS);
-    });
+    // Perf Faz 2: inline filtre TEK kaynağa çıkarıldı — isReorderCandidateRow
+    // (promisable eşiği + orderDeadline ≤ 7g). /api/dashboard/counters da aynı
+    // helper'ı kullanır; Sidebar rozeti ↔ copilot listesi sapamaz.
+    const needsPurchase = products.filter(p =>
+        isReorderCandidateRow(p, quotedMap.get(p.id) ?? 0)
+    );
 
     const manufacturedCount = needsPurchase.filter(p => p.product_type === "manufactured").length;
     const commercialCount = needsPurchase.filter(p => p.product_type === "commercial").length;
