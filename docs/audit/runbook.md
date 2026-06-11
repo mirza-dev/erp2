@@ -193,3 +193,25 @@ npx tsx scripts/seed-large.ts --clean
 curl -X DELETE -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/seed
 curl -X POST  -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/seed
 ```
+
+## Faz 4 — Security & Correctness Gate (2026-06)
+
+Sürekli bekçiler (arka plan: `docs/audit/2026-06-guvenlik-dogruluk-bulgulari.md` §7):
+
+```bash
+# 1. Route-guard matrisi + SQL/migration lint — normal test suite'in parçası
+npx vitest run src/__tests__/gate/
+
+# 2. Bağımlılık gate'i (CI'da deps-gate job'u; lokal kontrol)
+npm audit --omit=dev --json | node scripts/check-deps.mjs
+
+# 3. Migration drift — DEPLOY ÖNCESİ zorunlu (read-only OpenAPI probe; canlı
+#    veriye dokunmaz). Eksik migration varsa exit 1 → deploy ertelenir.
+npx tsx scripts/check-migrations.ts
+```
+
+Kurallar:
+- Guard'sız yeni route → `route-guard-baseline.ts`'e sınıf+gerekçe (yoksa CI kırmızı).
+- Yeni SECURITY DEFINER fonksiyon → `SET search_path` + REVOKE/GRANT zorunlu (039/054/087 kalıbı).
+- Mevcut RPC'yi redefine eden migration → `sql-lint-baseline.ts` zincir güncellemesi + önceki davranışların korunduğu PR'da beyan.
+- Yeni migration → `scripts/check-migrations.ts` PROBES kaydı.

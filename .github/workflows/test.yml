@@ -23,3 +23,18 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage/lcov.info
           fail_ci_if_error: false
+  # Güvenlik gate'i: allowlist dışı high/critical npm açığı → kırmızı
+  # (allowlist + gerekçeler: scripts/check-deps.mjs)
+  deps-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: npm audit → allowlist karşılaştırması
+        run: npm audit --omit=dev --json | node scripts/check-deps.mjs
+        # npm audit nonzero dönebilir; karar check-deps.mjs'in — pipefail kapalı
+        shell: bash {0}
