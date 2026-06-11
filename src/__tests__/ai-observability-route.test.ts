@@ -7,6 +7,13 @@
  *   - DB errors in individual queries are non-fatal (try/catch in route)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextResponse } from "next/server";
+
+const mockRequireInternalOperator = vi.fn().mockResolvedValue(null);
+
+vi.mock("@/lib/auth/internal-access", () => ({
+    requireInternalOperator: (...args: unknown[]) => mockRequireInternalOperator(...args),
+}));
 
 // ─── Supabase mock ────────────────────────────────────────────────────────────
 
@@ -36,11 +43,25 @@ import { GET } from "@/app/api/ai/observability/route";
 beforeEach(() => {
     tableData = {};
     throwOnTable = null;
+    mockRequireInternalOperator.mockResolvedValue(null);
 });
 
 // ─── Shape guard ─────────────────────────────────────────────────────────────
 
 describe("GET /api/ai/observability — response shape", () => {
+    it("internal operator guard reddederse gözlem verisi dönmez", async () => {
+        mockRequireInternalOperator.mockResolvedValueOnce(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+
+        const res = await GET();
+        const body = await res.json();
+
+        expect(res.status).toBe(403);
+        expect(body).toEqual({ error: "Yetkiniz yok." });
+        expect(body).not.toHaveProperty("runs");
+    });
+
     it("returns 200 with all top-level keys", async () => {
         const res = await GET();
         expect(res.status).toBe(200);

@@ -7,6 +7,9 @@
  *   - GET /api/settings/company — must not leak parasut_oauth token fields
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextResponse } from "next/server";
+
+const mockRequireInternalOperator = vi.fn().mockResolvedValue(null);
 
 // Simulate authenticated request (no demo_mode cookie)
 vi.mock("next/headers", () => ({
@@ -16,6 +19,9 @@ vi.mock("next/headers", () => ({
 // parasut/config GET artık view_parasut guard'lı → authenticated kullanıcı allow.
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
+}));
+vi.mock("@/lib/auth/internal-access", () => ({
+    requireInternalOperator: (...args: unknown[]) => mockRequireInternalOperator(...args),
 }));
 
 import { GET as parasutConfigGET } from "@/app/api/parasut/config/route";
@@ -36,6 +42,10 @@ import { GET as companySettingsGET } from "@/app/api/settings/company/route";
 const COMPANY_ID = "pmt-endustriyel-9471";
 const CLIENT_ID = "cl_k9x2m4nw8qabcdef";
 const CLIENT_SECRET = "cs_xK9mW2pQrTv3nLhBfZeYuD";
+
+beforeEach(() => {
+    mockRequireInternalOperator.mockResolvedValue(null);
+});
 
 describe("GET /api/parasut/config — no secret leak", () => {
     const saved: Record<string, string | undefined> = {};
@@ -120,6 +130,20 @@ describe("GET /api/settings/api-keys-status — no secret leak", () => {
         expect(data.parasut).toBe(true);
         expect(data.claude).toBe(true);
         expect(data.vercel).toBe(false);
+    });
+
+    it("internal operator guard reddederse durum bilgisi dönmez", async () => {
+        mockRequireInternalOperator.mockResolvedValueOnce(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+
+        const res = await apiKeysStatusGET();
+        const data = await res.json();
+
+        expect(res.status).toBe(403);
+        expect(data).toEqual({ error: "Yetkiniz yok." });
+        expect(data).not.toHaveProperty("parasut");
+        expect(data).not.toHaveProperty("claude");
     });
 });
 

@@ -11,6 +11,7 @@ const router = {
 };
 let searchParams = new URLSearchParams();
 let mockedPerms: Set<Permission> | null = null;
+let mockedInternalOperator = false;
 
 vi.mock("next/navigation", () => ({
     useRouter: () => router,
@@ -21,6 +22,7 @@ vi.mock("@/lib/auth/use-permissions", () => ({
     usePermissions: () => ({
         perms: mockedPerms,
         loading: mockedPerms === null,
+        internalOperator: mockedInternalOperator,
         has: (perm: Permission) => mockedPerms === null || mockedPerms.has(perm),
         canViewSalesPrices: true,
         canViewPurchaseCosts: true,
@@ -47,6 +49,7 @@ beforeEach(() => {
     router.replace.mockClear();
     searchParams = new URLSearchParams();
     mockedPerms = new Set<Permission>(["view_dashboard"]);
+    mockedInternalOperator = false;
     global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({ fullName: "Can Sarı", email: "can.sari@example.com", avatarUrl: null }),
@@ -71,8 +74,24 @@ describe("SettingsPage tab access", () => {
         await waitFor(() => expect(screen.getByText("Profil Bilgileri")).toBeTruthy());
     });
 
-    it("admin/yetkili kullanıcı tüm mevcut tabları görür", () => {
+    it("müşteri admini firma ve kişisel tabları görür, bakım tablarını görmez", () => {
         mockedPerms = new Set<Permission>(["view_dashboard", "view_settings"]);
+
+        render(<SettingsPage />);
+
+        const settingsNav = screen.getByRole("navigation", { name: "Ayarlar sekmeleri" });
+        expect(within(settingsNav).getAllByRole("button").map(button => button.textContent)).toEqual([
+            "Firma Profili",
+            "Kullanıcı Profili",
+            "Bildirimler",
+        ]);
+        expect(screen.queryByText("Bakım")).toBeNull();
+        expect(screen.getByTestId("reset-demo-section")).toBeTruthy();
+    });
+
+    it("internal admin bakım grubunu ve tüm tabları görür", () => {
+        mockedPerms = new Set<Permission>(["view_dashboard", "view_settings"]);
+        mockedInternalOperator = true;
 
         render(<SettingsPage />);
 
@@ -84,7 +103,7 @@ describe("SettingsPage tab access", () => {
             "Kullanıcı Profili",
             "Bildirimler",
         ]);
-        expect(screen.getByTestId("reset-demo-section")).toBeTruthy();
+        expect(within(settingsNav).getByText("Bakım")).toBeTruthy();
     });
 
     it("yetkisiz ?tab=firma query'sini kişisel profile fallback eder", async () => {
@@ -104,6 +123,29 @@ describe("SettingsPage tab access", () => {
 
         await waitFor(() => expect(screen.getByText("Profil Bilgileri")).toBeTruthy());
         expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it("müşteri admininin bakım tabı query'sini Firma Profili'ne yönlendirir", async () => {
+        mockedPerms = new Set<Permission>(["view_dashboard", "view_settings"]);
+        searchParams = new URLSearchParams("tab=api");
+
+        render(<SettingsPage />);
+
+        await waitFor(() => expect(router.replace).toHaveBeenCalledWith("/dashboard/settings?tab=firma"));
+        expect(screen.queryByRole("button", { name: "API Anahtarları" })).toBeNull();
+        expect(screen.getByRole("button", { name: "Firma Profili" })).toBeTruthy();
+        expect(global.fetch).not.toHaveBeenCalledWith("/api/settings/api-keys-status");
+        expect(global.fetch).not.toHaveBeenCalledWith("/api/ai/observability", expect.anything());
+    });
+
+    it("permission yüklenirken bakım tablarını fail-closed gizler", () => {
+        mockedPerms = null;
+        mockedInternalOperator = false;
+
+        render(<SettingsPage />);
+
+        expect(screen.queryByRole("button", { name: "API Anahtarları" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Yapay Zeka" })).toBeNull();
     });
 
     it("sekme değiştirirken confirm göstermez ve kaydedilmemiş profil state'ini korur", async () => {

@@ -19,6 +19,8 @@ interface PermissionContextValue {
     /** null = henüz yüklenmedi */
     perms: Set<Permission> | null;
     loading: boolean;
+    /** Bakım alanları için fail-closed server-derived kimlik sinyali. */
+    internalOperator: boolean;
     /** Yüklenmeden önce (null) true döner — server gate korur. */
     has: (perm: Permission) => boolean;
     canViewSalesPrices: boolean;
@@ -30,6 +32,7 @@ const PermissionContext = createContext<PermissionContextValue | null>(null);
 
 export function PermissionProvider({ children }: { children: ReactNode }) {
     const [perms, setPerms] = useState<Set<Permission> | null>(null);
+    const [internalOperator, setInternalOperator] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
@@ -40,6 +43,7 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
                 const data = await res.json();
                 if (!cancelled && Array.isArray(data.permissions)) {
                     setPerms(new Set<Permission>(data.permissions));
+                    setInternalOperator(data.internalOperator === true);
                 }
             } catch {
                 // sessiz — perms null kalır, has() true döner (server gate korur)
@@ -53,19 +57,21 @@ export function PermissionProvider({ children }: { children: ReactNode }) {
         return {
             perms,
             loading: perms === null,
+            internalOperator,
             has,
             canViewSalesPrices: has("view_sales_prices"),
             canViewPurchaseCosts: has("view_purchase_costs"),
             canViewFinancialSummary: has("view_financial_summary"),
         };
-    }, [perms]);
+    }, [internalOperator, perms]);
 
     return <PermissionContext.Provider value={value}>{children}</PermissionContext.Provider>;
 }
 
 /**
- * Provider dışında çağrılırsa güvenli fallback döner (perms=null → her şey görünür,
- * server gate korur) — test/izole render component'leri crash etmesin.
+ * Provider dışında çağrılırsa güvenli fallback döner. Genel permission'lar eski
+ * davranışla görünür kalır; internalOperator ise bakım alanları için fail-closed
+ * false olur. Test/izole render component'leri crash etmez.
  */
 export function usePermissions(): PermissionContextValue {
     const ctx = useContext(PermissionContext);
@@ -73,6 +79,7 @@ export function usePermissions(): PermissionContextValue {
     return {
         perms: null,
         loading: true,
+        internalOperator: false,
         has: () => true,
         canViewSalesPrices: true,
         canViewPurchaseCosts: true,

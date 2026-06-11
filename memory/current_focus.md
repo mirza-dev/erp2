@@ -7,7 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-11 (**Uyarılar: kullanıcı notları / hatırlatmalar (user_note, mig.090) — GREEN**)
+## Son Tamamlanan İş — 2026-06-11 (**İç kullanıcıya özel bakım alanları — GREEN**)
+
+**İstek:** Müşteriler `API Anahtarları` ve ayarlardaki `Yapay Zeka` gözlem ekranını görmesin; bakım/test gerektiğinde yalnız iç kullanıcı erişebilsin.
+
+- **Tek güvenlik kaynağı:** yeni `internal-access.ts`; `INTERNAL_OPERATOR_EMAILS` allowlist'i + effective `view_settings` birlikte zorunlu. E-posta trim/lowercase/dedupe; env boşsa fail-closed.
+- **Server guard:** `/api/settings/api-keys-status` ve `/api/ai/observability` yalnız internal operator; anon 401, müşteri/admin-but-not-internal 403. Secret/env değerleri dönmez.
+- **Client sinyali:** `/api/auth/me` → `internalOperator: boolean`; `PermissionProvider` loading/fetch-error/provider-dışı durumda false (bakım sekmesi flash yok).
+- **Ayarlar UI:** Sistem (`Firma Profili`) / Bakım (`API Anahtarları`, `Yapay Zeka`) / Kişisel grupları. Müşteri admini Bakım grubunu görmez; doğrudan bakım query'si `firma`ya fallback ve iç endpoint fetch'i başlamaz.
+- **Korunan müşteri akışları:** Paraşüt Sync/OAuth/token yenileme ve müşteri-facing AI işlevleri değişmedi.
+- **Doğrulama:** tsc 0 · lint 0 · **4991 test / 358 dosya** · build 0. Migration yok.
+- **Deploy yükümlülüğü:** Coolify'da bakım hesabı için `INTERNAL_OPERATOR_EMAILS=<eposta>` set edilmeli; boşsa iç kullanıcı dahil hiç kimse bakım alanını göremez.
+
+## Önceki — 2026-06-11 (**Uyarılar: kullanıcı notları / hatırlatmalar (user_note, mig.090) — GREEN**)
 
 **İstek:** "Uyarılar sayfasında kullanıcı kendi uyarısını/notunu oluşturabilsin." **Kararlar (AskUserQuestion, 4/4 önerilen):** serbest not + opsiyonel hatırlatma tarihi · herkese ortak (kişiye özel değil) · vade geçince severity info→warning · view_alerts olan herkes oluşturur (kapatma mevcut manage_alerts).
 

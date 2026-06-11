@@ -14,10 +14,18 @@ import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import { PermissionProvider, usePermissions } from "@/lib/auth/use-permissions";
 
 function Probe() {
-    const { loading, has, canViewSalesPrices, canViewPurchaseCosts, canViewFinancialSummary } = usePermissions();
+    const {
+        loading,
+        internalOperator,
+        has,
+        canViewSalesPrices,
+        canViewPurchaseCosts,
+        canViewFinancialSummary,
+    } = usePermissions();
     return (
         <div>
             <span data-testid="loading">{String(loading)}</span>
+            <span data-testid="internal">{String(internalOperator)}</span>
             <span data-testid="sales">{String(canViewSalesPrices)}</span>
             <span data-testid="cost">{String(canViewPurchaseCosts)}</span>
             <span data-testid="fin">{String(canViewFinancialSummary)}</span>
@@ -38,7 +46,10 @@ describe("usePermissions / PermissionProvider", () => {
     it("sales rolü perm seti → sales true, cost/fin false", async () => {
         const fetchMock = vi.fn().mockResolvedValue({
             ok: true,
-            json: async () => ({ permissions: ["view_sales_prices", "manage_sales_orders"] }),
+            json: async () => ({
+                permissions: ["view_sales_prices", "manage_sales_orders"],
+                internalOperator: true,
+            }),
         });
         global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -46,6 +57,7 @@ describe("usePermissions / PermissionProvider", () => {
 
         await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
         expect(screen.getByTestId("sales").textContent).toBe("true");
+        expect(screen.getByTestId("internal").textContent).toBe("true");
         expect(screen.getByTestId("cost").textContent).toBe("false");
         expect(screen.getByTestId("fin").textContent).toBe("false");
         expect(screen.getByTestId("manage-orders").textContent).toBe("true");
@@ -75,6 +87,7 @@ describe("usePermissions / PermissionProvider", () => {
         // perms hiç set edilmez → loading true kalır, booleans true (fallback)
         await waitFor(() => {});
         expect(screen.getByTestId("loading").textContent).toBe("true");
+        expect(screen.getByTestId("internal").textContent).toBe("false");
         expect(screen.getByTestId("sales").textContent).toBe("true");
         expect(screen.getByTestId("manage-orders").textContent).toBe("true");
     });
@@ -82,8 +95,21 @@ describe("usePermissions / PermissionProvider", () => {
     it("Provider dışında usePermissions → güvenli fallback (her şey true)", () => {
         render(<Probe />);
         expect(screen.getByTestId("loading").textContent).toBe("true");
+        expect(screen.getByTestId("internal").textContent).toBe("false");
         expect(screen.getByTestId("sales").textContent).toBe("true");
         expect(screen.getByTestId("cost").textContent).toBe("true");
         expect(screen.getByTestId("fin").textContent).toBe("true");
+    });
+
+    it("response internalOperator içermiyorsa bakım erişimini fail-closed tutar", async () => {
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ permissions: ["view_settings"] }),
+        }) as unknown as typeof fetch;
+
+        render(<PermissionProvider><Probe /></PermissionProvider>);
+
+        await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+        expect(screen.getByTestId("internal").textContent).toBe("false");
     });
 });

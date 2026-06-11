@@ -44,6 +44,7 @@ const settingsTabIcons: Record<SettingsTab, LucideIcon> = {
 
 const settingsGroupLabels: Record<SettingsTabDefinition["scope"], string> = {
     system: "Sistem Yönetimi",
+    maintenance: "Bakım",
     personal: "Kişisel Ayarlar",
 };
 
@@ -1255,19 +1256,23 @@ function AiTab() {
 function SettingsPageInner() {
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { perms } = usePermissions();
+    const { perms, internalOperator } = usePermissions();
     const permissionsLoaded = perms !== null;
     const canViewSystem = canViewSystemSettings(perms);
+    const canViewMaintenance = canViewSystem && internalOperator;
     const searchKey = searchParams.toString();
     const requestedTab = parseSettingsTab(searchParams.get("tab"));
-    const resolvedTab = resolveSettingsTab(requestedTab, canViewSystem);
-    const tabs = useMemo(() => getVisibleSettingsTabs(canViewSystem), [canViewSystem]);
+    const resolvedTab = resolveSettingsTab(requestedTab, canViewSystem, canViewMaintenance);
+    const tabs = useMemo(
+        () => getVisibleSettingsTabs(canViewSystem, canViewMaintenance),
+        [canViewMaintenance, canViewSystem],
+    );
     const [activeTab, setActiveTab] = useState<SettingsTab>(resolvedTab);
     const [mountedTabs, setMountedTabs] = useState<Set<SettingsTab>>(() => new Set([resolvedTab]));
     const [dirtyTabs, setDirtyTabs] = useState<Set<SettingsTab>>(new Set());
     const activeTabButtonRef = useRef<HTMLButtonElement | null>(null);
     const tabGroups = useMemo(() => {
-        const scopes: SettingsTabDefinition["scope"][] = ["system", "personal"];
+        const scopes: SettingsTabDefinition["scope"][] = ["system", "maintenance", "personal"];
         return scopes
             .map(scope => ({
                 scope,
