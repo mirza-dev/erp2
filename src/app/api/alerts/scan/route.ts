@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { serviceScanStockAlerts, serviceCheckOverduePurchaseOrders } from "@/lib/services/alert-service";
+import { dbEscalateOverdueUserNotes } from "@/lib/supabase/alerts";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,7 +52,14 @@ export async function POST(request: Request) {
         } catch (poErr) {
             console.error("[POST /api/alerts/scan] po_overdue scan", poErr);
         }
-        return NextResponse.json({ ...result, poOverdue });
+        // Hatırlatma tarihi geçen kullanıcı notları info→warning (090). Non-fatal.
+        let noteEscalated = 0;
+        try {
+            noteEscalated = await dbEscalateOverdueUserNotes();
+        } catch (noteErr) {
+            console.error("[POST /api/alerts/scan] user_note escalation", noteErr);
+        }
+        return NextResponse.json({ ...result, poOverdue, noteEscalated });
     } catch (err) {
         console.error("[POST /api/alerts/scan]", err);
         return NextResponse.json({ error: "Tarama başarısız." }, { status: 500 });

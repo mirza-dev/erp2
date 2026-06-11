@@ -10,4 +10,5 @@ export const ALERT_TYPE_LABEL: Record<AlertType, string> = {
     order_deadline:       "Sipariş Teslim Riski",
     sync_issue:           "Paraşüt Senkron Hatası",
     po_overdue:           "Geciken Tedarik",
+    user_note:            "Not",
 };

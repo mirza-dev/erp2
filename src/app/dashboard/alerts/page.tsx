@@ -20,6 +20,7 @@ import { ClassificationTabs } from "@/components/alerts/ClassificationTabs";
 import { CalendarGrid } from "@/components/alerts/CalendarGrid";
 import { DayDetailPanel } from "@/components/alerts/DayDetailPanel";
 import { AlertCalendarDrawer } from "@/components/alerts/AlertCalendarDrawer";
+import { NoteFormModal } from "@/components/alerts/NoteFormModal";
 
 // ── AlertRow (+ due meta) → takvim görünüm modeli ─────────────────────────────
 /**
@@ -90,6 +91,7 @@ export function toCalendarAlert(row: AlertWithDueMeta, productMap: Map<string, P
         entityType: row.entity_type ?? null,
         product: cp,
         source: row.source ?? null,
+        createdBy: row.created_by ?? null,
         aiConfidence: row.ai_confidence ?? null,
         aiReason: row.ai_reason ?? null,
         aiModelVersion: row.ai_model_version ?? null,
@@ -125,6 +127,7 @@ export default function AlertsPage() {
     const [showResolved, setShowResolved] = useState(true);
     const [search, setSearch] = useState("");
     const [drawerAlertId, setDrawerAlertId] = useState<string | null>(null);
+    const [noteFormOpen, setNoteFormOpen] = useState(false);
 
     // ── Responsive (OrderForm precedent) — <768 tek kolon + doküman scroll ──
     const [windowWidth, setWindowWidth] = useState<number>(
@@ -415,6 +418,10 @@ export default function AlertsPage() {
                         refreshing={refreshing}
                         onAiSuggest={handleAiSuggest}
                         aiGenerating={aiGenerating}
+                        onAddNote={() => {
+                            if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+                            setNoteFormOpen(true);
+                        }}
                     />
 
                     <div style={controlsRowStyle}>
@@ -470,6 +477,18 @@ export default function AlertsPage() {
                     />
                 </div>
             </div>
+
+            {noteFormOpen && (
+                <NoteFormModal
+                    isDemo={isDemo}
+                    onClose={() => setNoteFormOpen(false)}
+                    onCreated={() => {
+                        setNoteFormOpen(false);
+                        void refetch();
+                        toast({ type: "success", message: "Not eklendi" });
+                    }}
+                />
+            )}
 
             {drawerAlert && (
                 <AlertCalendarDrawer

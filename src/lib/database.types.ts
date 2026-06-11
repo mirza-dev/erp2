@@ -16,7 +16,7 @@ export type ProductType = "manufactured" | "commercial"
 export type ReservationStatus = "open" | "shipped" | "released"
 export type ShortageStatus = "open" | "resolved" | "cancelled"
 export type MovementType = "production" | "shipment" | "receipt" | "adjustment" | "reservation_create" | "reservation_release"
-export type AlertType = "stock_critical" | "stock_risk" | "purchase_recommended" | "order_shortage" | "sync_issue" | "order_deadline" | "quote_expired" | "overdue_shipment" | "po_overdue"
+export type AlertType = "stock_critical" | "stock_risk" | "purchase_recommended" | "order_shortage" | "sync_issue" | "order_deadline" | "quote_expired" | "overdue_shipment" | "po_overdue" | "user_note"
 export type AlertSeverity = "critical" | "warning" | "info"
 export type AlertStatus = "open" | "acknowledged" | "resolved" | "dismissed"
 export type ImportBatchStatus = "pending" | "processing" | "review" | "confirming" | "confirmed" | "failed"
@@ -469,6 +469,9 @@ export interface AlertRow {
     ai_inputs_summary: Json | null
     created_at: string
     source: "system" | "ai" | "ui"
+    // 090 — kullanıcı notları: opsiyonel hatırlatma tarihi + oluşturan adı snapshot
+    due_date: string | null
+    created_by: string | null
 }
 
 export interface ImportBatchRow {

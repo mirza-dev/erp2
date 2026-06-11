@@ -7,7 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-11 (**Genel Bakış: Finansal Özet kaldırıldı, Stok Dağılımı tam-genişlik revize — GREEN, push edildi**)
+## Son Tamamlanan İş — 2026-06-11 (**Uyarılar: kullanıcı notları / hatırlatmalar (user_note, mig.090) — GREEN**)
+
+**İstek:** "Uyarılar sayfasında kullanıcı kendi uyarısını/notunu oluşturabilsin." **Kararlar (AskUserQuestion, 4/4 önerilen):** serbest not + opsiyonel hatırlatma tarihi · herkese ortak (kişiye özel değil) · vade geçince severity info→warning · view_alerts olan herkes oluşturur (kapatma mevcut manage_alerts).
+
+- **mig.090 (APPLY BEKLİYOR ⚠️):** `alerts_type_check` += `user_note`; `due_date date` + `created_by text` kolonları.
+- **POST /api/alerts:** yalnız type=user_note yazılabilir (body'den type/severity/source ENJEKTE EDİLEMEZ — testli); başlık zorunlu ≤200, açıklama ≤2000, due_date YYYY-MM-DD + bugünden ileri; created_by = session full_name || email snapshot; RBAC requirePermission("view_alerts").
+- **Escalation:** `dbEscalateOverdueUserNotes` (due_date < bugün + aktif + info → warning) — scan route'unda po_overdue yanına non-fatal, yanıt `noteEscalated`.
+- **Takvim entegrasyonu:** enrichment user_note'ta due_date'i satırın KENDİ kolonundan okur (entity join yok, "Hatırlatma" etiketi) → mevcut occurrence mekaniğiyle not yazıldığı gün + hedef günde görünür, dueCountdownLabel bedava. Yeni "Notlar" sekmesi (✎, types=[user_note]); AI sekmesine sızmaz (source=ui).
+- **UI:** CalendarHeader "✎ Not" butonu (demo guard) → `NoteFormModal.tsx` (başlık/açıklama/tarih; Escape + focus dönüşü; min=today) → 201 → refetch + toast. Drawer'da user_note için "Oluşturan" satırı (createdBy CalendarAlert'e eklendi).
+- **Güvenlik çiti:** scan'ler notlara dokunmaz — ORPHAN_TARGET_TYPES ve AI dedup user_note içermez (source-lock testli); user_note entity_id taşımaz → dedup index çakışmaz.
+- **Test:** +15 `user-note-alerts.test.ts`; tsc 0 · lint 0 · **4976 test / 356 dosya** · build 0.
+- **Kalan:** mig.090 apply + manuel smoke (not ekle → bugün görünür; tarihli not → hedef günde de; tarihi geçir + Tara → warning + sayaç; drawer Oluşturan; demo guard).
+
+## Önceki — 2026-06-11 (**Genel Bakış: Finansal Özet kaldırıldı, Stok Dağılımı tam-genişlik revize — GREEN, push edildi**)
 
 **İstek:** "Finansal özet kısmını kaldırıyoruz; stok dağılımını finansal özetin yerini karşılayacak şekilde revize edelim, ardından her şeyi push."
 

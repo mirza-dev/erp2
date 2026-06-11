@@ -13,6 +13,10 @@ export interface CreateAlertInput {
     ai_confidence?: number;
     ai_reason?: string;
     ai_model_version?: string;
+    /** 090 — kullanıcı notu hatırlatma tarihi ("YYYY-MM-DD"). */
+    due_date?: string | null;
+    /** 090 — oluşturan kullanıcının görünen adı (snapshot). */
+    created_by?: string | null;
 }
 
 export interface ListAlertsFilter {
@@ -125,6 +129,8 @@ export async function dbCreateAlert(input: CreateAlertInput): Promise<AlertRow |
             ai_confidence: input.ai_confidence ?? null,
             ai_reason: input.ai_reason ?? null,
             ai_model_version: input.ai_model_version ?? null,
+            due_date: input.due_date ?? null,
+            created_by: input.created_by ?? null,
         })
         .select("*")
         .single();
@@ -220,6 +226,27 @@ export async function dbUpdateActiveAlertContent(
         .eq("type", type)
         .eq("entity_id", entityId)
         .in("status", ["open", "acknowledged"])
+        .select("id");
+    if (error) throw new Error(error.message);
+    return data?.length ?? 0;
+}
+
+/**
+ * 090 — hatırlatma tarihi geçmiş aktif kullanıcı notlarını info→warning yükseltir.
+ * Günlük scan'le birlikte çağrılır; "unutma" işlevini sayaca/güne taşır.
+ * Yükseltilen satır sayısını döner.
+ */
+export async function dbEscalateOverdueUserNotes(): Promise<number> {
+    const supabase = createServiceClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await supabase
+        .from("alerts")
+        .update({ severity: "warning" })
+        .eq("type", "user_note")
+        .eq("severity", "info")
+        .in("status", ["open", "acknowledged"])
+        .not("due_date", "is", null)
+        .lt("due_date", today)
         .select("id");
     if (error) throw new Error(error.message);
     return data?.length ?? 0;

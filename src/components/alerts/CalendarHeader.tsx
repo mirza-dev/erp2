@@ -14,6 +14,8 @@ interface Props {
     refreshing: boolean;
     onAiSuggest: () => void;
     aiGenerating: boolean;
+    /** 090 — kullanıcı notu formunu açar. */
+    onAddNote: () => void;
 }
 
 function StatNum({ value, color, label }: { value: number; color: string; label: string }) {
@@ -27,7 +29,7 @@ function StatNum({ value, color, label }: { value: number; color: string; label:
 
 /** Takvim başlığı: ay gezinme + istatistikler + Tara (scan) + AI Analiz (ai-suggest). */
 export function CalendarHeader({
-    year, month, onPrev, onNext, onToday, stats, onRefresh, refreshing, onAiSuggest, aiGenerating,
+    year, month, onPrev, onNext, onToday, stats, onRefresh, refreshing, onAiSuggest, aiGenerating, onAddNote,
 }: Props) {
     return (
         <div
@@ -57,6 +59,9 @@ export function CalendarHeader({
                     <StatNum value={stats.resolved} color="var(--success)"      label="çözülen" />
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <Button variant="secondary" size="md" onClick={onAddNote} title="Not / hatırlatma ekle">
+                        ✎ Not
+                    </Button>
                     <Button
                         variant="secondary" size="md" onClick={onAiSuggest} disabled={aiGenerating}
                         title="AI ile risk analizi öner"

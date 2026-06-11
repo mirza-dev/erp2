@@ -107,6 +107,16 @@ export async function enrichAlertsWithDueMeta(alerts: AlertRow[]): Promise<Alert
 
     // 3) Her alert'i zenginleştir.
     return alerts.map((a) => {
+        // user_note (090): hedef tarih entity join'inden değil, satırın kendi
+        // due_date kolonundan gelir.
+        if (a.type === "user_note") {
+            return {
+                ...a,
+                due_date: a.due_date ?? null,
+                due_label: a.due_date ? "Hatırlatma" : null,
+                order_code: null,
+            };
+        }
         const src = dueSource(a);
         let meta: DueMeta = EMPTY;
         if (src === "sales_order") {
