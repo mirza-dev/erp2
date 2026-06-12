@@ -22,12 +22,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // mock'lar (gerçek guard logic role-guard.test.ts + page-access.test.ts'te test edilir).
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
+    requirePermissionFor: vi.fn().mockReturnValue(null),
     requireRole: vi.fn().mockResolvedValue(null),
     requireAnyRole: vi.fn().mockResolvedValue(null),
     getCurrentUserPermissions: vi.fn().mockResolvedValue(
         new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
     getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
+    resolveAuthContext: vi.fn().mockResolvedValue({ user: { id: "actor-1" }, userId: "actor-1", roles: ["admin"], perms: new Set(["ship_sales_orders", "view_sales_prices"]) }),
+    actorFromAuthContext: (ctx: { userId?: string | null }) => ({ userId: ctx.userId ?? null, label: null }),
 }));
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -205,6 +208,7 @@ describe("POST /api/orders/[id]/ship", () => {
                 trackingNumber: "1Z123456",
                 carrier:        "UPS",
             }),
+            { userId: "actor-1", label: null },
         );
 
         // Cache invalidation
@@ -224,6 +228,7 @@ describe("POST /api/orders/[id]/ship", () => {
                 trackingNumber: null,
                 carrier:        null,
             }),
+            { userId: "actor-1", label: null },
         );
     });
 

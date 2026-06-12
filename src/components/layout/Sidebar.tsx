@@ -10,6 +10,7 @@ import {
     Factory,
     FileText,
     LayoutDashboard,
+    MailCheck,
     NotebookText,
     RefreshCw,
     Settings,
@@ -59,7 +60,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
     // RBAC Faz 2 — permission'a göre menü filtresi (UX katmanı; gerçek koruma
     // proxy.ts page-gate'te). Faz 7: ad-hoc fetch yerine merkezi PermissionProvider.
     // perms === null = henüz yüklenmedi → tüm item'lar gösterilir (server gate korur).
-    const { perms } = usePermissions();
+    const { perms, internalOperator } = usePermissions();
 
     const handleLogout = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
@@ -126,9 +127,12 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                 { label: "Teknik Şablonlar", href: "/dashboard/settings/product-types", icon: SlidersHorizontal },
                 { label: "Not Şablonları", href: "/dashboard/settings/note-templates", icon: NotebookText },
                 { label: "Kullanıcılar", href: "/dashboard/settings/users", icon: Users },
+                ...(internalOperator
+                    ? [{ label: "E-posta Teslimatları", href: "/dashboard/settings/email-deliveries", icon: MailCheck }]
+                    : []),
             ],
         },
-    ], [reorderCount, pendingOrderCount, activeAlertCount]);
+    ], [reorderCount, pendingOrderCount, activeAlertCount, internalOperator]);
 
     // Permission filtresi — her item'ın gerekli permission'ı page-access matrisinden
     // türetilir (Sidebar'da ayrı liste YOK → gate ile garantili tutarlı). Filtrelenince

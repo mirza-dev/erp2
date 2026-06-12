@@ -7,10 +7,16 @@ import {
     type OrderTransition,
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
-import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { dbGetOrderById, dbHardDeleteOrder, type UpdateOrderInput } from "@/lib/supabase/orders";
-import { getCurrentUserPermissions, getCurrentUserId, requirePermission } from "@/lib/auth/role-guard";
+import {
+    actorFromAuthContext,
+    getCurrentUserPermissions,
+    getCurrentUserId,
+    requirePermission,
+    requirePermissionFor,
+    resolveAuthContext,
+} from "@/lib/auth/role-guard";
 import { redactOrderForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
@@ -63,14 +69,15 @@ export async function PATCH(
         // viewer 403 (eski authz-önce davranışı korunur), yetkili kullanıcı 400 alır.
         // production ship_sales_orders tutar → detay "Sevket" butonu çalışır.
         const neededPerm = transition === "shipped" ? "ship_sales_orders" : "manage_sales_orders";
-        const transitionGuard = await requirePermission(req, neededPerm);
+        const auth = await resolveAuthContext();
+        const transitionGuard = requirePermissionFor(auth, neededPerm);
         if (transitionGuard) return transitionGuard;
 
         if (!transition) {
             return NextResponse.json({ error: "'transition' alanı zorunludur." }, { status: 400 });
         }
 
-        const result = await serviceTransitionOrder(id, transition);
+        const result = await serviceTransitionOrder(id, transition, undefined, actorFromAuthContext(auth));
 
         if (!result.success) {
             return NextResponse.json({ error: result.error }, { status: 400 });
@@ -86,25 +93,10 @@ export async function PATCH(
         // Return updated order with shortage info if partial allocation occurred
         const updated = await serviceGetOrder(id);
 
-        // Fire-and-forget order_shipped e-posta bildirimi — updated kullanılarak
-        // ekstra DB call'a gerek kalmıyor; parasut sync'den sonraki güncel state
-        if (transition === "shipped" && result.success && updated) {
-            notifyUsersByEmail({
-                notificationType: "order_shipped",
-                entityType: "sales_order",
-                entityId: id,
-                render: { type: "order_shipped", ctx: {
-                    orderId: id,
-                    orderNumber: updated.order_number,
-                    customerName: updated.customer_name,
-                } },
-            }).catch(err => console.error("[email order_shipped]", err));
-        }
         revalidateTag("products", "max");
         // RBAC R3/F3b: production (ship_sales_orders var, view_sales_prices yok)
         // PATCH ship response'unda satış finansallarını GÖRMESİN (per-request).
-        const perms = await getCurrentUserPermissions(req);
-        const response: Record<string, unknown> = updated ? { ...redactOrderForPerms(updated, perms) } : {};
+        const response: Record<string, unknown> = updated ? { ...redactOrderForPerms(updated, auth.perms) } : {};
         if (result.shortages && result.shortages.length > 0) {
             response.shortages = result.shortages;
         }

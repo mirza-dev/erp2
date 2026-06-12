@@ -10,12 +10,14 @@ on:
     - cron: "7 0,6,12,18 * * *"
     # Saatte bir = günde 24 invocation (XX:07)
     - cron: "7 * * * *"
+    # Internal email outbox safety worker — en geç 5 dakikada teslimat denemesi
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       job:
         description: "Hangi cron job tetiklensin"
         type: choice
-        options: [all, six-hourly, hourly]
+        options: [all, six-hourly, hourly, email-outbox]
         default: all
 
 concurrency:
@@ -23,6 +25,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  email-outbox:
+    if: |
+      github.event.schedule == '*/5 * * * *' ||
+      (github.event_name == 'workflow_dispatch' && (inputs.job == 'all' || inputs.job == 'email-outbox'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      APP_URL: ${{ secrets.APP_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: Email — process internal outbox
+        run: |
+          curl --retry 3 --retry-delay 10 --max-time 60 -fsSL \
+            -X POST "$APP_URL/api/email/outbox/process" \
+            -H "Authorization: Bearer $CRON_SECRET"
+
   six-hourly:
     if: |
       github.event.schedule == '7 0,6,12,18 * * *' ||

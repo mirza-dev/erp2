@@ -45,7 +45,7 @@ export const SETTINGS_TABS: SettingsTabDefinition[] = [
         key: "bildirimler",
         label: "Bildirimler",
         scope: "personal",
-        description: "E-posta ve tarayıcı bildirim tercihleri.",
+        description: "Rolünüze uygun e-posta bildirim tercihleri.",
     },
 ];
 

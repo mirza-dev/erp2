@@ -1,10 +1,16 @@
 import { createServiceClient } from "./service";
 import { NOTIFICATION_TYPE_KEYS } from "@/lib/notification-types";
+import type { NotificationTypeKey } from "@/lib/notification-types";
+import { parseRoles, permissionsForRoles, type Role } from "@/lib/auth/permissions";
+import { hasInternalOperatorAccess } from "@/lib/auth/internal-access";
+import { isEligibleForNotification } from "@/lib/notification-policy";
 
 export interface UserWithPref {
     userId: string;
     email: string;
     fullName: string;
+    roles: Role[];
+    internalOperator: boolean;
 }
 
 /**
@@ -21,29 +27,38 @@ export interface UserWithPref {
  */
 export async function dbListUsersForEmailNotification(
     notificationType: string,
+    opts: { actorUserId?: string | null } = {},
 ): Promise<UserWithPref[]> {
     if (!NOTIFICATION_TYPE_KEYS.has(notificationType)) return [];
+    const type = notificationType as NotificationTypeKey;
 
     const supabase = createServiceClient();
 
-    // 1) Tüm kullanıcılar (service_role)
-    const { data: usersPage, error: usersErr } = await supabase.auth.admin.listUsers({
-        page: 1,
-        perPage: 200,    // tek sayfa yeterli; 200+ user senaryosu sonraki turda
-    });
-    if (usersErr) throw new Error(usersErr.message);
-    const users = usersPage?.users ?? [];
+    // 1) Tüm kullanıcılar (service_role) — 200+ kullanıcıda sessiz kesilmez.
+    const users = [];
+    const perPage = 200;
+    for (let page = 1; ; page++) {
+        const { data: usersPage, error: usersErr } = await supabase.auth.admin.listUsers({ page, perPage });
+        if (usersErr) throw new Error(usersErr.message);
+        const batch = usersPage?.users ?? [];
+        users.push(...batch);
+        if (batch.length < perPage) break;
+    }
 
     if (users.length === 0) return [];
 
     // 2) İlgili tipte tercih satırlarını çek
     const userIds = users.map(u => u.id);
-    const { data: prefRows, error: prefErr } = await supabase
-        .from("user_notification_preferences")
-        .select("user_id, email_enabled")
-        .eq("notification_type", notificationType)
-        .in("user_id", userIds);
-    if (prefErr) throw new Error(prefErr.message);
+    const prefRows: { user_id: string; email_enabled: boolean }[] = [];
+    for (let i = 0; i < userIds.length; i += 200) {
+        const { data, error: prefErr } = await supabase
+            .from("user_notification_preferences")
+            .select("user_id, email_enabled")
+            .eq("notification_type", notificationType)
+            .in("user_id", userIds.slice(i, i + 200));
+        if (prefErr) throw new Error(prefErr.message);
+        prefRows.push(...((data ?? []) as { user_id: string; email_enabled: boolean }[]));
+    }
 
     const prefMap = new Map<string, boolean>(
         (prefRows ?? []).map(r => [r.user_id as string, !!r.email_enabled]),
@@ -54,6 +69,14 @@ export async function dbListUsersForEmailNotification(
     for (const u of users) {
         if (!u.email) continue;                        // e-posta yok → atla
         if (u.banned_until) continue;                  // ban'lı → atla
+        if (u.id === opts.actorUserId) continue;       // kendi işlemini yapan kişiye mail yok
+        const roles = parseRoles(
+            u.app_metadata as Record<string, unknown>,
+            u.email,
+            [],
+        );
+        const internalOperator = hasInternalOperatorAccess(u.email, permissionsForRoles(roles));
+        if (!isEligibleForNotification(type, roles, internalOperator)) continue;
         const enabled = prefMap.get(u.id) ?? true;     // default true
         if (!enabled) continue;
         const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
@@ -61,6 +84,8 @@ export async function dbListUsersForEmailNotification(
             userId: u.id,
             email: u.email,
             fullName: typeof meta.full_name === "string" ? meta.full_name : "",
+            roles,
+            internalOperator,
         });
     }
     return result;

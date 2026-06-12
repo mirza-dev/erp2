@@ -11,7 +11,7 @@ import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/sync-log";
 import { dbCreateAlert } from "@/lib/supabase/alerts";
-import { notifyUsersByEmail } from "@/lib/services/email-service";
+import { enqueueInternalNotification } from "@/lib/services/notification-outbox-service";
 import { getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ParasutError } from "@/lib/parasut-adapter";
@@ -143,7 +143,7 @@ export async function checkAuthAlertThreshold(): Promise<void> {
 
     if ((count ?? 0) >= 3) {
         const description = `Son 1 saatte ${count ?? 0} auth hatası tespit edildi — OAuth yeniden doğrulama gerekebilir.`;
-        await dbCreateAlert({
+        const alert = await dbCreateAlert({
             type:        "sync_issue",
             severity:    "critical",
             title:       "Paraşüt auth hatası",
@@ -152,16 +152,22 @@ export async function checkAuthAlertThreshold(): Promise<void> {
             entity_id:   ALERT_ENTITY_PARASUT_AUTH,
             source:      "system",
         });
-        // Fire-and-forget e-posta bildirimi — dedup penceresi spam'i engelliyor
-        notifyUsersByEmail({
-            notificationType: "sync_error",
-            entityType: "parasut",
-            entityId: ALERT_ENTITY_PARASUT_AUTH,
-            render: { type: "sync_error", ctx: {
-                entityName: "Paraşüt OAuth",
-                errorMessage: description,
-            } },
-        }).catch(err => console.error("[email sync_error]", err));
+        if (alert) {
+            try {
+                await enqueueInternalNotification({
+                    eventKey: `alert:${alert.id}:sync_error`,
+                    notificationType: "sync_error",
+                    entityType: "parasut",
+                    entityId: ALERT_ENTITY_PARASUT_AUTH,
+                    render: { type: "sync_error", ctx: {
+                        entityName: "Paraşüt OAuth",
+                        errorMessage: description,
+                    } },
+                });
+            } catch (err) {
+                console.error("[notification-outbox sync_error]", err);
+            }
+        }
     }
 }
 

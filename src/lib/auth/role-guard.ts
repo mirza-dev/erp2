@@ -60,6 +60,16 @@ export interface AuthContext {
     perms: Set<Permission>;
 }
 
+export function actorFromAuthContext(ctx: AuthContext): { userId: string | null; label: string | null } {
+    if (!ctx.user) return { userId: null, label: null };
+    const meta = (ctx.user.user_metadata ?? {}) as Record<string, unknown>;
+    const fullName = typeof meta.full_name === "string" ? meta.full_name.trim() : "";
+    return {
+        userId: ctx.userId,
+        label: fullName || ctx.user.email?.trim() || null,
+    };
+}
+
 /** TEK createClient + TEK getUser ile {user, roles, perms} çözer. */
 export async function resolveAuthContext(): Promise<AuthContext> {
     const sb = await createClient();

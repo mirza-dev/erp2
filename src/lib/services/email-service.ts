@@ -57,6 +57,23 @@ function getEmailFrom(): string | null {
     return from && from.length > 0 ? from : null;
 }
 
+export function getEmailRuntimeStatus(): {
+    configured: boolean;
+    hasApiKey: boolean;
+    hasFrom: boolean;
+    hasWebhookSecret: boolean;
+} {
+    const hasApiKey = !!process.env.RESEND_API_KEY?.trim();
+    const hasFrom = !!process.env.EMAIL_FROM?.trim();
+    const hasWebhookSecret = !!process.env.RESEND_WEBHOOK_SECRET?.trim();
+    return {
+        configured: hasApiKey && hasFrom && hasWebhookSecret,
+        hasApiKey,
+        hasFrom,
+        hasWebhookSecret,
+    };
+}
+
 /**
  * Tip + context eşleşmesini sıkı tutmak için tek `RenderContext`'i alıyoruz.
  * Caller: `notifyUsersByEmail({ notificationType: "stock_critical", entityType, entityId, render: { type: "stock_critical", ctx: {...} } })`.
@@ -130,13 +147,16 @@ export async function notifyUsersByEmail(opts: NotifyOpts): Promise<NotifyResult
 
         // Resend send
         try {
-            const sendRes = await resend.emails.send({
-                from,
-                to: r.email,
-                subject: content.subject,
-                html: content.html,
-                text: content.text,
-            });
+            const sendRes = await resend.emails.send(
+                {
+                    from,
+                    to: r.email,
+                    subject: content.subject,
+                    html: content.html,
+                    text: content.text,
+                },
+                { idempotencyKey: `legacy-email-log-${logId}` },
+            );
             if (sendRes.error) {
                 await dbUpdateEmailLogStatus(logId, "failed", { error: sendRes.error.message });
                 result.failed++;
@@ -174,6 +194,7 @@ export interface SendDirectEmailOpts {
     text: string;
     attachments?: { filename: string; content: Buffer }[];
     replyTo?: string;
+    idempotencyKey?: string;
 }
 
 export async function sendDirectEmail(
@@ -184,17 +205,20 @@ export async function sendDirectEmail(
     if (!resend || !from) return { ok: false, error: "config_missing" };
 
     try {
-        const sendRes = await resend.emails.send({
-            from,
-            to: opts.to,
-            subject: opts.subject,
-            html: opts.html,
-            text: opts.text,
-            ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
-            ...(opts.attachments && opts.attachments.length > 0
-                ? { attachments: opts.attachments }
-                : {}),
-        });
+        const sendRes = await resend.emails.send(
+            {
+                from,
+                to: opts.to,
+                subject: opts.subject,
+                html: opts.html,
+                text: opts.text,
+                ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+                ...(opts.attachments && opts.attachments.length > 0
+                    ? { attachments: opts.attachments }
+                    : {}),
+            },
+            opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : undefined,
+        );
         if (sendRes.error) return { ok: false, error: sendRes.error.message };
         return { ok: true, messageId: sendRes.data?.id };
     } catch (err) {
@@ -231,13 +255,16 @@ export async function retryFailedEmails(): Promise<{ retried: number; succeeded:
             continue;
         }
         try {
-            const sendRes = await resend.emails.send({
-                from,
-                to: log.recipient_email,
-                subject: log.subject,
-                html: log.html_body,
-                text: log.text_body,
-            });
+            const sendRes = await resend.emails.send(
+                {
+                    from,
+                    to: log.recipient_email,
+                    subject: log.subject,
+                    html: log.html_body,
+                    text: log.text_body,
+                },
+                { idempotencyKey: `legacy-email-log-${log.id}` },
+            );
             if (sendRes.error) {
                 await dbUpdateEmailLogStatus(log.id, "failed", { error: sendRes.error.message });
                 if (log.attempt_count + 1 >= RETRY_MAX_ATTEMPTS) {

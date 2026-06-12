@@ -7,11 +7,12 @@ Kod **2026-05-06**'dan beri hazır (commit history'de "SMTP/Resend entegrasyonu"
 ## Mimari özet
 
 - **Sağlayıcı:** [Resend](https://resend.com) (free tier: 100 mail/gün, 3000/ay)
-- **Tetik noktası:** Fire-and-forget — request'i bozmaz (config eksik = sessiz return)
-- **5 bildirim türü:** `stock_critical`, `order_pending`, `order_new`, `sync_error`, `order_shipped`
-- **Dedup:** 6 saat penceresi (aynı user + entity + tip CRON spam'i engellenir)
-- **Retry:** GitHub Actions cron her saat `/api/email/retry-failed` → `status='failed'` + son 24 saat + max 3 deneme
-- **Audit:** Her gönderim `email_logs` tablosuna işlenir (status, attempt_count, resend_message_id, error)
+- **Tetik noktası:** Domain olayı kalıcı `notification_outbox` kaydına yazılır; kullanıcı işlemi Resend gecikmesine bağlanmaz.
+- **4 internal bildirim türü:** `stock_critical`, `order_pending`, `sync_error`, `order_shipped`
+- **Dedup:** Deterministik olay anahtarı; aynı gerçek olay yalnız bir kez kuyruğa girer.
+- **Retry:** Opportunistic dispatch + en geç 5 dakikalık `/api/email/outbox/process` worker; geçici hatalarda en fazla 3 deneme.
+- **Audit:** `email_logs` Resend kabul, teslim, bounce, complaint ve suppression durumlarını taşır.
+- **Webhook:** Resend imzası doğrulanmadan teslimat durumu güncellenmez.
 
 ---
 
@@ -33,14 +34,15 @@ Kod **2026-05-06**'dan beri hazır (commit history'de "SMTP/Resend entegrasyonu"
 
 ## Faz 2 — Coolify Environment Variables (kullanıcı tarafı, ~5 dk)
 
-Coolify dashboard → ERP project → Environment Variables → 4 değişken:
+Coolify dashboard → ERP project → Environment Variables → aşağıdaki değişkenler:
 
 | Key | Değer | Not |
 |---|---|---|
 | `RESEND_API_KEY` | `re_xxxxxxxxxxxxxx` | Faz 1.5'te kopyalanan |
 | `EMAIL_FROM` | `Roven <bildirim@bildirim.pmt.com.tr>` | Doğrulanmış domain'den; "Display Name <adres>" formatı önerilir |
+| `RESEND_WEBHOOK_SECRET` | `whsec_...` | Resend webhook signing secret; eksikse outbox fail-closed bekler |
 | `NEXT_PUBLIC_APP_URL` | `https://erp.getmedspace.com` | Zaten set ise dokunma — email template'lerinde CTA link |
-| `ADMIN_EMAILS` | `mrzsrbyk06@gmail.com` (opsiyonel) | virgülle ayrılmış admin liste; user_notification_preferences boşsa fallback |
+| `INTERNAL_OPERATOR_EMAILS` | `operator@example.com` | Bakım ekranı ve test endpoint’i için virgülle ayrılmış internal operator allowlist’i |
 
 **Dikkat:**
 - `NEXT_PUBLIC_*` prefix'i client bundle'a girer — sadece public URL koy, asla API key
@@ -48,7 +50,7 @@ Coolify dashboard → ERP project → Environment Variables → 4 değişken:
 
 ---
 
-## Faz 3 — Migration 047 uygulama (kullanıcı tarafı, ~3 dk)
+## Faz 3 — Migration 047, 096 ve 097 uygulama (kullanıcı tarafı)
 
 `supabase/migrations/047_email_logs.sql` production DB'ye uygulanmalı:
 
@@ -62,7 +64,7 @@ SELECT to_regclass('public.email_logs');
 -- veya: psql $DATABASE_URL -f supabase/migrations/047_email_logs.sql
 ```
 
-Migration idempotent (`CREATE TABLE IF NOT EXISTS`, RLS politikaları create-or-replace). Tekrar çalıştırmak güvenli.
+`097_internal_email_outbox.sql` outbox, suppression, webhook idempotency ve internal bakım kayıtlarını ekler.
 
 ---
 
@@ -76,10 +78,10 @@ Coolify panel → ERP project → Redeploy. ~3-5 dk sürer. Build sonrası env v
 
 ### Yöntem A — Test endpoint (önerilen)
 
-`POST /api/email/test` admin-only endpoint, recipient lookup + dedup bypass ile direkt mail atar.
+`POST /api/email/test` yalnız internal operator erişimli endpoint’tir; recipient lookup + dedup bypass ile direkt test maili atar.
 
 **Adımlar:**
-1. Browser'da `https://erp.getmedspace.com/login` → admin hesap ile giriş yap
+1. Browser'da `https://erp.getmedspace.com/login` → allowlist’teki internal operator hesap ile giriş yap
 2. DevTools → Network tab açık olsun (cookies yakalayacağız)
 3. Console'da:
    ```js
@@ -93,9 +95,9 @@ Coolify panel → ERP project → Redeploy. ~3-5 dk sürer. Build sonrası env v
 5. ~30 saniye içinde inbox'a **"Kritik stok: Test Ürün"** subject'li mail düşmeli
 6. Gmail kullanıyorsan promotions veya spam klasörünü de kontrol et (ilk seferki olduğu için)
 
-**Diğer 4 tip için tekrar:**
+**Diğer internal tipler için tekrar:**
 ```js
-for (const t of ["order_pending", "order_new", "sync_error", "order_shipped"]) {
+for (const t of ["order_pending", "sync_error", "order_shipped"]) {
   await fetch("/api/email/test", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -107,8 +109,8 @@ for (const t of ["order_pending", "order_new", "sync_error", "order_shipped"]) {
 ### Yöntem B — Gerçek tetikleyici
 - Bir test ürünün stoğunu 0'a indir (`/dashboard/products` → edit)
 - `POST /api/alerts/scan` çağır (veya cron'un tetiklemesini bekle — 6 saat)
-- Stok kritik alert oluşur → `alert-service.ts:148` `notifyUsersByEmail` çağrılır
-- Bildirim tercihlerinde `stock_critical` aktif olan admin'lere mail gider
+- Stok kritik alert oluşur → deterministik olay anahtarıyla outbox'a alınır
+- Rol matrisine uygun ve `stock_critical` tercihi açık kullanıcılara mail gider
 
 ---
 
@@ -116,11 +118,11 @@ for (const t of ["order_pending", "order_new", "sync_error", "order_shipped"]) {
 
 | Belirti | Sebep | Çözüm |
 |---|---|---|
-| `status: "config_missing"` (503) | RESEND_API_KEY veya EMAIL_FROM env eksik | Coolify env vars kontrol; redeploy |
+| Outbox `waiting_config` | RESEND_API_KEY, EMAIL_FROM veya RESEND_WEBHOOK_SECRET eksik | Coolify env vars ve internal bakım kaydını kontrol; redeploy |
 | `status: "failed"` + "Domain not verified" | DNS henüz propagate olmadı veya DKIM eksik | Resend dashboard "Domains" status kontrol; TTL 300 + 15 dk bekle |
 | 200 dönüyor ama inbox'a düşmüyor | Spam klasörü; SPF/DKIM hâlâ eksik; reverse DNS | Spam kontrol; Resend dashboard "Logs" → message status |
 | `email_logs.status = 'failed'` çok | Resend rate limit; geçici network | GitHub Actions cron her saat retry; 3 deneme sonrası bırakır |
-| Cron çalışmıyor | GitHub Actions secret `CRON_SECRET` set değil veya endpoint URL yanlış | Workflow logs kontrol (`.github/workflows/crons.yml` `email_retry` step) |
+| Cron çalışmıyor | GitHub Actions secret `CRON_SECRET` set değil veya endpoint URL yanlış | Workflow logs kontrol (`email-outbox` job) |
 
 **Resend dashboard Logs:**
 - https://resend.com/logs → her gönderim status, message-id, delivery time
@@ -141,7 +143,7 @@ FROM email_logs
 ORDER BY created_at DESC LIMIT 10;
 ```
 
-✅ GitHub Actions `Crons` workflow log → `email_retry` step son 24 saatte success.
+✅ GitHub Actions `Crons` workflow log → `email-outbox` job son 5-10 dakika içinde success.
 
 ---
 
@@ -149,9 +151,9 @@ ORDER BY created_at DESC LIMIT 10;
 
 - **Resend free tier yetebilir mi?** 100 mail/gün × 30 = 3000/ay. Stok kritik alert günde 5-10, sipariş bildirim 1-5 → çok rahat sınır altında.
 - **EMAIL_FROM formatı:** `"Display Name <email@domain>"` veya sadece `"email@domain"`. Display name spam skor'unu düşürür.
-- **Disable etmek:** RESEND_API_KEY'i Coolify'dan sil → sessiz fail-safe, kod hatasız çalışmaya devam eder.
+- **Disable etmek:** RESEND_API_KEY'i kaldırırsanız olaylar kaybolmaz; outbox `waiting_config` durumunda bekler ve internal bakım kaydı açar.
 - **NotificationPreferences:** Her kullanıcı `/dashboard/settings` → "Bildirimler" sekmesinden tip bazlı opt-out yapabilir.
-- **Test endpoint güvenliği:** `requireRole(["admin"])` guard'lı, demo modunda middleware tarafından zaten blok. Body'deki `to` admin yetkili olduğu için keyfi adrese gidebilir — production'da admin role'ü güvenle tutulmalı.
+- **Test endpoint güvenliği:** `INTERNAL_OPERATOR_EMAILS + view_settings` guard’ı fail-closed çalışır; müşteri adminleri endpoint’i doğrudan çağıramaz.
 
 ---
 
@@ -161,7 +163,7 @@ ORDER BY created_at DESC LIMIT 10;
 
 **Body:** `{ to: string (valid email), type: NotificationTypeKey }`
 
-**Geçerli `type` değerleri:** `stock_critical`, `order_pending`, `order_new`, `sync_error`, `order_shipped`
+**Geçerli `type` değerleri:** `stock_critical`, `order_pending`, `sync_error`, `order_shipped`, `quote_customer_send`
 
 **Response (sent):**
 ```json
@@ -177,5 +179,5 @@ ORDER BY created_at DESC LIMIT 10;
 
 **Response (config eksik):** 503 `{ status: "config_missing", has_api_key, has_email_from }`
 **Response (Resend hata):** 502 `{ status: "failed" | "error", error, log_id }`
-**Response (admin değil):** 403 `{ error: "Yetkiniz yok." }`
+**Response (internal operator değil):** 403 `{ error: "Yetkiniz yok." }`
 **Response (geçersiz body):** 400 `{ error }`

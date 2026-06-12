@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { resolveAuthContext } from "@/lib/auth/role-guard";
+import { hasInternalOperatorAccess } from "@/lib/auth/internal-access";
 import {
     dbListUserPrefs,
     dbUpsertUserPrefs,
@@ -8,13 +9,13 @@ import {
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 
 // GET /api/settings/user/preferences
-// Response: NotificationPref[] (5 satır, default true/true if no DB row)
+// Response: rol matrisine uygun NotificationPref[] (DB satırı yoksa default açık)
 export async function GET() {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Yetkisiz." }, { status: 401 });
-        const prefs = await dbListUserPrefs(user.id);
+        const auth = await resolveAuthContext();
+        if (!auth.user) return NextResponse.json({ error: "Yetkisiz." }, { status: 401 });
+        const internalOperator = hasInternalOperatorAccess(auth.user.email, auth.perms);
+        const prefs = await dbListUserPrefs(auth.user.id, auth.roles, internalOperator);
         return NextResponse.json(prefs);
     } catch (err) {
         return handleApiError(err, "GET /api/settings/user/preferences");
@@ -25,9 +26,9 @@ export async function GET() {
 // Body: { prefs: NotificationPref[] }
 export async function PATCH(req: NextRequest) {
     try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return NextResponse.json({ error: "Yetkisiz." }, { status: 401 });
+        const auth = await resolveAuthContext();
+        if (!auth.user) return NextResponse.json({ error: "Yetkisiz." }, { status: 401 });
+        const internalOperator = hasInternalOperatorAccess(auth.user.email, auth.perms);
 
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
@@ -60,8 +61,8 @@ export async function PATCH(req: NextRequest) {
             }))
             .filter(p => p.type.length > 0);
 
-        await dbUpsertUserPrefs(user.id, sanitized);
-        const fresh = await dbListUserPrefs(user.id);
+        await dbUpsertUserPrefs(auth.user.id, sanitized, auth.roles, internalOperator);
+        const fresh = await dbListUserPrefs(auth.user.id, auth.roles, internalOperator);
         return NextResponse.json(fresh);
     } catch (err) {
         return handleApiError(err, "PATCH /api/settings/user/preferences");

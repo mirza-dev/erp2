@@ -20,6 +20,7 @@ const ROUTE_TITLES: Record<string, string> = {
     "/dashboard/settings/product-types": "Teknik Şablonlar",
     "/dashboard/settings/note-templates": "Not Şablonları",
     "/dashboard/settings/users": "Kullanıcılar",
+    "/dashboard/settings/email-deliveries": "E-posta Teslimatları",
 };
 
 export function getTopbarTitle(pathname: string | null | undefined): string {

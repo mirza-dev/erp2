@@ -20,6 +20,7 @@ vi.mock("@/lib/auth/role-guard", () => ({
     requireAnyRole: vi.fn().mockResolvedValue(null),
     getCurrentUserId: vi.fn().mockResolvedValue(null),
     resolveAuthContext: vi.fn().mockResolvedValue({ user: { id: "u-perf" }, userId: "u-perf", roles: ["admin"], perms: new Set() }),
+    actorFromAuthContext: (ctx: { userId?: string | null }) => ({ userId: ctx.userId ?? null, label: null }),
     getCurrentUserPermissions: vi.fn().mockResolvedValue(
         new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),

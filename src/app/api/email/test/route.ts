@@ -9,7 +9,7 @@
  * Demo guard: 403 — middleware zaten /api/** demo POST'u bloklar, ek savunma
  *
  * Davranış:
- *   - 5 iç bildirim + müşteri teklif e-postası için makul sample context render
+ *   - 4 iç bildirim + müşteri teklif e-postası için makul sample context render
  *   - dbCreateEmailLog → status='pending' (entity_type='test_email')
  *   - Resend direct send (notifyUsersByEmail içindeki dedup ve recipient lookup
  *     bypass edilir — admin'in test attığı kişiye her seferinde gitmeli)
@@ -45,13 +45,11 @@ function buildSampleContext(type: NotificationTypeKey): RenderContext {
         case "stock_critical":
             return { type, ctx: { productId: "00000000-0000-0000-0000-000000000001", productName: "Test Ürün", sku: "TST-001", available: 0, min: 10 } };
         case "order_pending":
-            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", total: 1500, currency: "TRY" } };
-        case "order_new":
-            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", total: 1500, currency: "TRY" } };
+            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", total: 1500, currency: "TRY", actorLabel: "Test Satış Kullanıcısı" } };
         case "sync_error":
             return { type, ctx: { entityName: "Test Müşteri (Paraşüt sync)", errorMessage: "Bu bir test hata mesajıdır — gerçek sync hatası değil." } };
         case "order_shipped":
-            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti." } };
+            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", actorLabel: "Test Üretim Kullanıcısı" } };
     }
 }
 

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
 import SystemHealthIndicator from "@/components/layout/SystemHealthIndicator";
+import MaintenanceIncidentIndicator from "@/components/layout/MaintenanceIncidentIndicator";
 import ThemeToggle from "@/components/layout/ThemeToggle";
 import UserAvatarLink from "@/components/layout/UserAvatarLink";
 import RovenLogo from "@/components/layout/RovenLogo";
@@ -67,6 +68,7 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                     <ExchangeRatesTicker />
                     <SystemHealthIndicator />
                 </div>
+                <MaintenanceIncidentIndicator />
                 <ThemeToggle />
                 <UserAvatarLink />
             </div>

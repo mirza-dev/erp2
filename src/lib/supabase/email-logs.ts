@@ -3,6 +3,7 @@ import type { EmailLogRow, EmailLogStatus, Json } from "@/lib/database.types";
 
 export interface CreateEmailLogInput {
     user_id: string;
+    outbox_id?: string | null;
     notification_type: string;
     entity_type?: string | null;
     entity_id?: string | null;
@@ -23,6 +24,7 @@ export async function dbCreateEmailLog(input: CreateEmailLogInput): Promise<stri
         .from("email_logs")
         .insert({
             user_id: input.user_id,
+            outbox_id: input.outbox_id ?? null,
             notification_type: input.notification_type,
             entity_type: input.entity_type ?? null,
             entity_id: input.entity_id ?? null,
@@ -32,6 +34,7 @@ export async function dbCreateEmailLog(input: CreateEmailLogInput): Promise<stri
             text_body: input.text_body ?? null,
             body_expires_at: input.body_expires_at ?? null,
             status: "pending",
+            delivery_status: "queued",
             attempt_count: 0,
         })
         .select("id")
@@ -73,6 +76,7 @@ export async function dbUpdateEmailLogStatus(
     };
     if (status === "sent") {
         update.sent_at = now;
+        update.resend_message_id = metadata.resend_message_id ?? null;
         update.error_message = null;
         update.html_body = null;
         update.text_body = null;
@@ -83,6 +87,88 @@ export async function dbUpdateEmailLogStatus(
 
     const { error } = await supabase.from("email_logs").update(update).eq("id", id);
     if (error) throw new Error(error.message);
+    if (status === "sent") {
+        // Webhook, Resend API yanıtından önce teslim edildi/bounced gibi daha ileri
+        // bir durumu yazmış olabilir. Atomik RPC accepted durumunu yalnız ilerletir;
+        // terminal/provider durumunu geriye düşürmez.
+        await dbUpdateEmailDeliveryFromProvider({
+            id,
+            deliveryStatus: "accepted",
+            providerEventAt: now,
+        });
+    }
+}
+
+export async function dbGetEmailLogForOutboxRecipient(
+    outboxId: string,
+    userId: string,
+): Promise<EmailLogRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("email_logs")
+        .select("*")
+        .eq("outbox_id", outboxId)
+        .eq("user_id", userId)
+        .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data as EmailLogRow | null;
+}
+
+export async function dbGetEmailLogById(id: string): Promise<EmailLogRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("email_logs")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data as EmailLogRow | null;
+}
+
+export async function dbMarkEmailLogSuppressed(input: CreateEmailLogInput): Promise<string> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("email_logs")
+        .insert({
+            ...input,
+            outbox_id: input.outbox_id ?? null,
+            entity_type: input.entity_type ?? null,
+            entity_id: input.entity_id ?? null,
+            status: "failed",
+            delivery_status: "suppressed",
+            error_message: "suppressed",
+            attempt_count: 0,
+        })
+        .select("id")
+        .single();
+    if (error || !data) throw new Error(error?.message ?? "suppressed email_log create failed");
+    return data.id as string;
+}
+
+export async function dbGetEmailLogByResendMessageId(messageId: string): Promise<EmailLogRow | null> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("email_logs")
+        .select("*")
+        .eq("resend_message_id", messageId)
+        .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data as EmailLogRow | null;
+}
+
+export async function dbUpdateEmailDeliveryFromProvider(input: {
+    id: string;
+    deliveryStatus: EmailLogRow["delivery_status"];
+    providerEventAt: string;
+}): Promise<boolean> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("update_email_delivery_from_provider", {
+        p_email_log_id: input.id,
+        p_delivery_status: input.deliveryStatus,
+        p_provider_event_at: input.providerEventAt,
+    });
+    if (error) throw new Error(error.message);
+    return data === true;
 }
 
 /**
@@ -143,6 +229,7 @@ export async function dbListFailedEmailsForRetry(
         .gte("body_expires_at", now)
         .not("html_body", "is", null)
         .not("text_body", "is", null)
+        .is("outbox_id", null)
         .or("entity_type.is.null,entity_type.neq.quote")
         .order("last_attempt_at", { ascending: true })
         .limit(50);
@@ -157,6 +244,15 @@ export async function dbClearEmailSnapshot(id: string): Promise<void> {
         .from("email_logs")
         .update({ html_body: null, text_body: null, body_expires_at: null })
         .eq("id", id);
+    if (error) throw new Error(error.message);
+}
+
+export async function dbClearEmailSnapshotsForOutbox(outboxId: string): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("email_logs")
+        .update({ html_body: null, text_body: null, body_expires_at: null })
+        .eq("outbox_id", outboxId);
     if (error) throw new Error(error.message);
 }
 

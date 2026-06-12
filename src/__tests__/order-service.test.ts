@@ -37,9 +37,9 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbUpdateOrderQuoteDeadline:   (...args: unknown[]) => mockDbUpdateOrderQuoteDeadline(...args),
 }));
 
-// Fire-and-forget e-posta bildirimleri — gerçek çağrı yapma
-vi.mock("@/lib/services/email-service", () => ({
-    notifyUsersByEmail: vi.fn().mockResolvedValue(undefined),
+const mockEnqueueInternalNotification = vi.fn().mockResolvedValue({ id: "outbox-1", created: true });
+vi.mock("@/lib/services/notification-outbox-service", () => ({
+    enqueueInternalNotification: (...args: unknown[]) => mockEnqueueInternalNotification(...args),
 }));
 
 const mockDbBatchResolveAlerts = vi.fn().mockResolvedValue(0);
@@ -110,6 +110,7 @@ beforeEach(() => {
     mockDbLogOrderAction.mockReset().mockResolvedValue(undefined);
     mockParasutUpdate.mockClear();
     mockParasutUpdateEq.mockClear();
+    mockEnqueueInternalNotification.mockClear();
 });
 
 // ── approve — 007 RPC response shapes ────────────────────────
@@ -184,6 +185,10 @@ describe("serviceTransitionOrder — pending_approval (onaya gönder = rezervasy
         expect(mockDbSubmitOrderForApproval).toHaveBeenCalledWith("order-1");
         expect(result.success).toBe(true);
         expect(result.fulfillment_status).toBe("allocated");
+        expect(mockEnqueueInternalNotification).toHaveBeenCalledWith(expect.objectContaining({
+            eventKey: "sales_order:order-1:pending_approval",
+            notificationType: "order_pending",
+        }));
     });
 
     it("kısmi stok: shortages servis sonucuna taşınır", async () => {
@@ -228,6 +233,10 @@ describe("serviceTransitionOrder — ship (007 fulfillment guard)", () => {
         const result = await serviceTransitionOrder("order-1", "shipped");
         expect(mockDbShipOrderFull).toHaveBeenCalledWith("order-1");
         expect(result.success).toBe(true);
+        expect(mockEnqueueInternalNotification).toHaveBeenCalledWith(expect.objectContaining({
+            eventKey: "sales_order:order-1:shipped",
+            notificationType: "order_shipped",
+        }));
     });
 
     it("RPC hata dönerse (kısmi stok, fully_allocated değil) → success:false, error iletilir", async () => {

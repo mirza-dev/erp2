@@ -34,6 +34,8 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     { path: "auth/demo", methods: ["GET"], cls: "public", reason: "Demo giriş ucu (cookie set)" },
     { path: "auth/logout", methods: ["POST"], cls: "public", reason: "Oturum kapatma — yan etkisi yalnız kendi session'ı" },
     { path: "exchange-rates", methods: ["GET"], cls: "public", reason: "TCMB kuru — kamusal veri" },
+    { path: "email/webhooks/resend", methods: ["POST"], cls: "public", reason: "Public provider callback; Resend Svix imzası route içinde fail-closed doğrulanır" },
+    { path: "email/outbox/process", methods: ["POST"], cls: "cron-proxy", reason: "Proxy CRON_PATHS + route-içi requireCronSecret çift guard" },
 
     // ── self-auth (route içinde getUser, yalnız kendi kaydı) ──────────
     { path: "settings/user/avatar", methods: ["POST"], cls: "self-auth", reason: "getUser() → kendi avatarı" },

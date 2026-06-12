@@ -4,7 +4,7 @@
  * Gerçek proxy() koşumu (getUser mock'lu). Güvenlik enforcement burada —
  * Sidebar filtre yalnız UX. Manuel URL girişi → /dashboard?forbidden redirect.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockGetUser = vi.fn();
@@ -21,7 +21,16 @@ function authWithRoles(roles: string[]) {
     return { data: { user: { id: "u1", email: "x@pmt.com", app_metadata: { roles }, user_metadata: {} } } };
 }
 
-beforeEach(() => vi.clearAllMocks());
+const originalInternalOperators = process.env.INTERNAL_OPERATOR_EMAILS;
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    delete process.env.INTERNAL_OPERATOR_EMAILS;
+});
+afterEach(() => {
+    if (originalInternalOperators === undefined) delete process.env.INTERNAL_OPERATOR_EMAILS;
+    else process.env.INTERNAL_OPERATOR_EMAILS = originalInternalOperators;
+});
 
 describe("page-gate — authenticated", () => {
     it("admin → korumalı sayfa (parasut) 200", async () => {
@@ -79,6 +88,19 @@ describe("page-gate — authenticated", () => {
         const blocked = await middleware(req("/dashboard/parasut"));
         expect(blocked.status).toBeGreaterThanOrEqual(300);
         expect(blocked.status).toBeLessThan(400);
+    });
+
+    it("e-posta teslimatları sayfası admin rolüyle değil yalnız internal allowlist ile açılır", async () => {
+        mockGetUser.mockResolvedValue(authWithRoles(["admin"]));
+        process.env.INTERNAL_OPERATOR_EMAILS = "operator@pmt.com";
+        const blocked = await middleware(req("/dashboard/settings/email-deliveries"));
+        expect(blocked.status).toBeGreaterThanOrEqual(300);
+        expect(blocked.status).toBeLessThan(400);
+        expect(decodeURIComponent(blocked.headers.get("location") ?? ""))
+            .toContain("/dashboard/settings/email-deliveries");
+
+        process.env.INTERNAL_OPERATOR_EMAILS = " X@PMT.COM ";
+        expect((await middleware(req("/dashboard/settings/email-deliveries"))).status).toBe(200);
     });
 });
 

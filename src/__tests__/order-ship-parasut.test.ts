@@ -8,14 +8,20 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+const mockCurrentPerms = vi.hoisted(() => vi.fn().mockResolvedValue(
+    new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"]),
+));
+
 // RBAC Faz 4: route'lara requirePermission guard eklendi → bu test guard'ı allow'a
 // mock'lar (gerçek guard logic role-guard.test.ts + page-access.test.ts'te test edilir).
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
+    requirePermissionFor: vi.fn().mockReturnValue(null),
     requireRole: vi.fn().mockResolvedValue(null),
     requireAnyRole: vi.fn().mockResolvedValue(null),
-    getCurrentUserPermissions: vi.fn().mockResolvedValue(
-        new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
+    getCurrentUserPermissions: mockCurrentPerms,
+    resolveAuthContext: async () => ({ user: { id: "actor-1" }, userId: "actor-1", roles: ["admin"], perms: await mockCurrentPerms() }),
+    actorFromAuthContext: (ctx: { userId?: string | null }) => ({ userId: ctx.userId ?? null, label: null }),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
     getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
 }));
@@ -88,6 +94,7 @@ const stubTransitionSuccess = {
 describe("PATCH /api/orders/[id] ship — successful sync", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockCurrentPerms.mockResolvedValue(new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"]));
         mockServiceTransitionOrder.mockResolvedValue(stubTransitionSuccess);
         mockServiceSyncOrderToParasut.mockResolvedValue({
             success: true,

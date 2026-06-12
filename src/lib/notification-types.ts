@@ -15,11 +15,6 @@ export const NOTIFICATION_TYPES = [
         desc: "Yeni siparişler onayınızı bekliyor",
     },
     {
-        key: "order_new",
-        label: "Yeni sipariş oluşturuldu",
-        desc: "Bir müşteri yeni sipariş açtı",
-    },
-    {
         key: "sync_error",
         label: "Paraşüt sync hataları",
         desc: "Fatura veya müşteri sync sırasında oluşan hatalar",

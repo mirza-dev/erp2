@@ -23,6 +23,7 @@ export interface PageAccessRule {
  * /dashboard exact ayrı ele alınır (aşağıda), çünkü her şey startsWith eder.
  */
 export const PAGE_ACCESS: PageAccessRule[] = [
+    { prefix: "/dashboard/settings/email-deliveries", permission: "view_settings" },
     { prefix: "/dashboard/settings/users", permission: "view_users" },
     { prefix: "/dashboard/settings/product-types", permission: "view_products" },
     { prefix: "/dashboard/settings/note-templates", permission: "view_settings" },

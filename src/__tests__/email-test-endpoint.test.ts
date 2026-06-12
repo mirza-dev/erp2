@@ -144,12 +144,17 @@ describe("POST /api/email/test — happy path", () => {
         expect(mockUpdateLogStatus).toHaveBeenCalledWith("log-1", "sent", { resend_message_id: "resend-123" });
     });
 
-    it("5 iç bildirim + müşteri teklif örneğini kabul ediyor", async () => {
+    it("4 iç bildirim + müşteri teklif örneğini kabul ediyor", async () => {
         mockResendSend.mockResolvedValue({ data: { id: "x" }, error: null });
-        for (const t of ["stock_critical", "order_pending", "order_new", "sync_error", "order_shipped", "quote_customer_send"]) {
+        for (const t of ["stock_critical", "order_pending", "sync_error", "order_shipped", "quote_customer_send"]) {
             const res = await POST(makeReq({ to: "a@b.com", type: t }));
             expect(res.status).toBe(200);
         }
+    });
+
+    it("order_new artık test gönderim türü değildir", async () => {
+        const res = await POST(makeReq({ to: "a@b.com", type: "order_new" }));
+        expect(res.status).toBe(400);
     });
 
     it("teklif testi dış firma markalı HTML gönderir", async () => {

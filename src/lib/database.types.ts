@@ -871,10 +871,12 @@ export interface ParasutOAuthTokensRow {
 }
 
 export type EmailLogStatus = "pending" | "sent" | "failed"
+export type EmailDeliveryStatus = "queued" | "accepted" | "delivered" | "failed" | "bounced" | "complained" | "suppressed"
 
 export interface EmailLogRow {
     id:                string
     user_id:           string
+    outbox_id:         string | null
     notification_type: string
     entity_type:       string | null
     entity_id:         string | null
@@ -884,10 +886,65 @@ export interface EmailLogRow {
     text_body:         string | null
     body_expires_at:   string | null
     status:            EmailLogStatus
+    resend_message_id: string | null
+    delivery_status:   EmailDeliveryStatus
+    provider_event_at: string | null
+    delivered_at:      string | null
+    bounced_at:        string | null
+    complained_at:     string | null
     error_message:     string | null
     attempt_count:     number
     last_attempt_at:   string | null
     sent_at:           string | null
     metadata:          Json | null
     created_at:        string
+}
+
+export type NotificationOutboxStatus = "queued" | "processing" | "waiting_config" | "failed" | "completed"
+
+export interface NotificationOutboxRow {
+    id:                string
+    event_key:         string
+    notification_type: string
+    entity_type:       string | null
+    entity_id:         string | null
+    render_payload:    Json
+    actor_user_id:     string | null
+    actor_label:       string | null
+    status:            NotificationOutboxStatus
+    attempt_count:     number
+    next_attempt_at:   string
+    locked_at:         string | null
+    locked_by:         string | null
+    last_error:        string | null
+    completed_at:      string | null
+    created_at:        string
+    updated_at:        string
+}
+
+export interface EmailSuppressionRow {
+    id:                  string
+    recipient_email:     string
+    scope_key:           string
+    reason:              "hard_bounce" | "complaint"
+    active:              boolean
+    source_email_log_id: string | null
+    created_at:          string
+    resolved_at:         string | null
+    resolved_by:         string | null
+}
+
+export interface MaintenanceIncidentRow {
+    id:           string
+    incident_key: string
+    kind:         "email_config" | "email_retry_exhausted"
+    severity:     "warning" | "critical"
+    status:       "open" | "resolved"
+    title:        string
+    description:  string | null
+    metadata:     Json | null
+    opened_at:    string
+    resolved_at:  string | null
+    resolved_by:  string | null
+    updated_at:   string
 }

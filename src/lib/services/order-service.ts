@@ -28,7 +28,7 @@ import { dbCreateAlert, dbListActiveAlerts, dbBatchResolveAlerts, type BatchReso
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { createServiceClient } from "@/lib/supabase/service";
-import { notifyUsersByEmail } from "@/lib/services/email-service";
+import { enqueueInternalNotification } from "@/lib/services/notification-outbox-service";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 
 // ── Types ────────────────────────────────────────────────────
@@ -39,6 +39,11 @@ export interface ShipMeta {
     shipDate?: string;           // ISO "YYYY-MM-DD"; verilmezse new Date()
     trackingNumber?: string | null;
     carrier?: string | null;
+}
+
+export interface TransitionActor {
+    userId: string | null;
+    label: string | null;
 }
 
 export interface ShortageInfo {
@@ -238,6 +243,7 @@ export async function serviceTransitionOrder(
     orderId: string,
     transition: OrderTransition,
     shipMeta?: ShipMeta,
+    actor?: TransitionActor,
 ): Promise<TransitionResult> {
 
     // ── draft → pending_approval: HARD rezervasyon BURADA (migration 082) ──
@@ -253,19 +259,22 @@ export async function serviceTransitionOrder(
         if (!result.success) {
             return { success: false, error: result.error };
         }
-        // Fire-and-forget e-posta bildirimi
-        notifyUsersByEmail({
+        await enqueueInternalNotification({
+            eventKey: `sales_order:${orderId}:pending_approval`,
             notificationType: "order_pending",
             entityType: "sales_order",
             entityId: orderId,
+            actorUserId: actor?.userId ?? null,
+            actorLabel: actor?.label ?? null,
             render: { type: "order_pending", ctx: {
                 orderId,
                 orderNumber: order.order_number,
                 customerName: order.customer_name,
                 total: order.grand_total,
                 currency: order.currency,
+                actorLabel: actor?.label ?? null,
             } },
-        }).catch(err => console.error("[email order_pending]", err));
+        }).catch(err => console.error("[outbox order_pending]", err));
         return {
             success: true,
             shortages: result.shortages,
@@ -339,11 +348,39 @@ export async function serviceTransitionOrder(
                 // caller'a "başarısız" demek yanıltıcıydı (UI retry'ı teşvik eder,
                 // durum tutarsız görünür). Dürüst sinyal: uyarılı başarı; Paraşüt
                 // başlangıç adımı için manuel kontrol mesajda.
+                await enqueueInternalNotification({
+                    eventKey: `sales_order:${orderId}:shipped`,
+                    notificationType: "order_shipped",
+                    entityType: "sales_order",
+                    entityId: orderId,
+                    actorUserId: actor?.userId ?? null,
+                    actorLabel: actor?.label ?? null,
+                    render: { type: "order_shipped", ctx: {
+                        orderId,
+                        orderNumber: order.order_number,
+                        customerName: order.customer_name,
+                        actorLabel: actor?.label ?? null,
+                    } },
+                }).catch(err => console.error("[outbox order_shipped]", err));
                 return {
                     success: true,
                     postShipWarning: `Sevk tamamlandı ancak sevk tarihi/Paraşüt adımı yazılamadı: ${updErr.message}. Kaydı manuel kontrol edin.`,
                 };
             }
+            await enqueueInternalNotification({
+                eventKey: `sales_order:${orderId}:shipped`,
+                notificationType: "order_shipped",
+                entityType: "sales_order",
+                entityId: orderId,
+                actorUserId: actor?.userId ?? null,
+                actorLabel: actor?.label ?? null,
+                render: { type: "order_shipped", ctx: {
+                    orderId,
+                    orderNumber: order.order_number,
+                    customerName: order.customer_name,
+                    actorLabel: actor?.label ?? null,
+                } },
+            }).catch(err => console.error("[outbox order_shipped]", err));
         }
         return { success: result.success, error: result.error };
     }

@@ -6,10 +6,9 @@ import {
     type ShipMeta,
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
-import { notifyUsersByEmail } from "@/lib/services/email-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
-import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
+import { actorFromAuthContext, requirePermissionFor, resolveAuthContext } from "@/lib/auth/role-guard";
 import { redactOrderForPerms } from "@/lib/auth/redact";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -23,7 +22,8 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> },
 ) {
     try {
-        const guard = await requirePermission(req, "ship_sales_orders");
+        const auth = await resolveAuthContext();
+        const guard = requirePermissionFor(auth, "ship_sales_orders");
         if (guard) return guard;
 
         const { id } = await params;
@@ -74,7 +74,7 @@ export async function POST(
             carrier:        typeof body.carrier === "string" ? body.carrier || null : null,
         };
 
-        const result = await serviceTransitionOrder(id, "shipped", shipMeta);
+        const result = await serviceTransitionOrder(id, "shipped", shipMeta, actorFromAuthContext(auth));
 
         if (!result.success) {
             const status = result.error?.includes("bulunamadı") ? 404 : 400;
@@ -93,25 +93,10 @@ export async function POST(
 
         const updated = await serviceGetOrder(id);
 
-        // Fire-and-forget email
-        if (updated) {
-            notifyUsersByEmail({
-                notificationType: "order_shipped",
-                entityType: "sales_order",
-                entityId: id,
-                render: { type: "order_shipped", ctx: {
-                    orderId: id,
-                    orderNumber: updated.order_number,
-                    customerName: updated.customer_name,
-                } },
-            }).catch(err => console.error("[email order_shipped ship]", err));
-        }
-
         revalidateTag("products", "max");
         // RBAC R3/F3a: ship_sales_orders tutan production view_sales_prices tutmaz
         // → ship response'undaki satış finansalları redakte edilir (per-request).
-        const perms = await getCurrentUserPermissions(req);
-        const responseBody = updated ? redactOrderForPerms(updated, perms) : { ok: true };
+        const responseBody = updated ? redactOrderForPerms(updated, auth.perms) : { ok: true };
         // O1: stok düştü ama shipped_at/parasut_step yazılamadıysa UI'ya uyarı taşı.
         return NextResponse.json(
             result.postShipWarning

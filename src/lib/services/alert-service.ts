@@ -21,7 +21,7 @@ import {
 import type { AlertStatus, AlertType } from "@/lib/database.types";
 import { computeCoverageDays, computeOrderDeadline, dateDaysFromToday, buildStockAlertDescription, type StockRiskInputs } from "@/lib/stock-utils";
 import { isAIAvailable, aiGenerateAlertFindings } from "@/lib/services/ai-service";
-import { notifyUsersByEmail } from "@/lib/services/email-service";
+import { enqueueInternalNotification } from "@/lib/services/notification-outbox-service";
 
 // ── Lifecycle transitions (domain-rules §12.3) ───────────────
 
@@ -42,8 +42,7 @@ export interface ScanResult {
     scanned: number;
     created: number;
     resolved: number;
-    /** Y8 (2026-06): kritik-stok e-postası gönderilemeyen alıcı sayısı — sessiz
-     *  kayıp görünür olur (log'a yazılan failed'ları retry cron'u yeniden dener). */
+    /** Kritik-stok bildirimi outbox'a alınamayan olay sayısı. */
     emailFailed: number;
 }
 
@@ -150,13 +149,11 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                 });
                 if (alert) {
                     created++;
-                    // Y8 (2026-06): kritik-stok e-postası artık AWAITED — cron
-                    // bağlamında gecikme kabul edilebilir; başarısızlık sayaçla
-                    // görünür (eski fire-and-forget + 24h alert-dedup birleşimi
-                    // bildirimi sessizce yutabiliyordu). Hata taramayı düşürmez;
-                    // email-log'a yazılmış failed kayıtları retry cron'u dener.
+                    // Alert kimliği olay anahtarıdır: aynı gerçek stok olayı yalnız
+                    // bir kez kuyruğa girer. Resend teslimatı worker tarafından yapılır.
                     try {
-                        const mail = await notifyUsersByEmail({
+                        await enqueueInternalNotification({
+                            eventKey: `alert:${alert.id}:stock_critical`,
                             notificationType: "stock_critical",
                             entityType: "product",
                             entityId,
@@ -168,10 +165,9 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                                 min,
                             } },
                         });
-                        emailFailed += mail.failed;
                     } catch (err) {
                         emailFailed++;
-                        console.error("[email stock_critical]", err);
+                        console.error("[notification-outbox stock_critical]", err);
                     }
                 }
             }

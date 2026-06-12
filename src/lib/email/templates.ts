@@ -256,6 +256,7 @@ export interface OrderPendingCtx {
     customerName: string;
     total: number;
     currency: string;
+    actorLabel?: string | null;
 }
 
 export function renderOrderPending(ctx: OrderPendingCtx): EmailContent {
@@ -270,12 +271,14 @@ export function renderOrderPending(ctx: OrderPendingCtx): EmailContent {
             ["Sipariş numarası", ctx.orderNumber],
             ["Müşteri", ctx.customerName],
             ["Sipariş tutarı", fmtCurrency(ctx.total, ctx.currency)],
+            ...(ctx.actorLabel ? [["İşlemi yapan", ctx.actorLabel] as DetailRow] : []),
         ],
         ctaLabel: "Sipariş detayını aç",
         ctaUrl: recordUrl("order", ctx.orderId),
     });
     const text = `${subject}\n\nSipariş onayınızı bekliyor.\nSipariş: ${ctx.orderNumber}\n` +
-        `Müşteri: ${ctx.customerName}\nTutar: ${fmtCurrency(ctx.total, ctx.currency)}\n\n` +
+        `Müşteri: ${ctx.customerName}\nTutar: ${fmtCurrency(ctx.total, ctx.currency)}\n` +
+        (ctx.actorLabel ? `İşlemi yapan: ${ctx.actorLabel}\n` : "") + "\n" +
         `Sipariş detayı: ${recordUrl("order", ctx.orderId)}`;
     return { subject, html, text };
 }
@@ -339,6 +342,7 @@ export interface OrderShippedCtx {
     orderId?: string;
     orderNumber: string;
     customerName: string;
+    actorLabel?: string | null;
 }
 
 export function renderOrderShipped(ctx: OrderShippedCtx): EmailContent {
@@ -352,12 +356,15 @@ export function renderOrderShipped(ctx: OrderShippedCtx): EmailContent {
         rows: [
             ["Sipariş numarası", ctx.orderNumber],
             ["Müşteri", ctx.customerName],
+            ...(ctx.actorLabel ? [["İşlemi yapan", ctx.actorLabel] as DetailRow] : []),
         ],
         ctaLabel: "Sipariş detayını aç",
         ctaUrl: recordUrl("order", ctx.orderId),
     });
     const text = `${subject}\n\nSipariş sevk edildi.\nSipariş: ${ctx.orderNumber}\n` +
-        `Müşteri: ${ctx.customerName}\n\nSipariş detayı: ${recordUrl("order", ctx.orderId)}`;
+        `Müşteri: ${ctx.customerName}\n` +
+        (ctx.actorLabel ? `İşlemi yapan: ${ctx.actorLabel}\n` : "") +
+        `\nSipariş detayı: ${recordUrl("order", ctx.orderId)}`;
     return { subject, html, text };
 }
 
@@ -449,7 +456,6 @@ export function renderQuoteToCustomer(ctx: QuoteToCustomerCtx): EmailContent {
 export type RenderContext =
     | { type: "stock_critical"; ctx: StockCriticalCtx }
     | { type: "order_pending"; ctx: OrderPendingCtx }
-    | { type: "order_new"; ctx: OrderNewCtx }
     | { type: "sync_error"; ctx: SyncErrorCtx }
     | { type: "order_shipped"; ctx: OrderShippedCtx };
 
@@ -457,7 +463,6 @@ export function renderEmail(input: RenderContext): EmailContent {
     switch (input.type) {
         case "stock_critical": return renderStockCritical(input.ctx);
         case "order_pending": return renderOrderPending(input.ctx);
-        case "order_new": return renderOrderNew(input.ctx);
         case "sync_error": return renderSyncError(input.ctx);
         case "order_shipped": return renderOrderShipped(input.ctx);
     }
@@ -466,7 +471,6 @@ export function renderEmail(input: RenderContext): EmailContent {
 export type ContextForType<K extends NotificationTypeKey> =
     K extends "stock_critical" ? StockCriticalCtx :
     K extends "order_pending" ? OrderPendingCtx :
-    K extends "order_new" ? OrderNewCtx :
     K extends "sync_error" ? SyncErrorCtx :
     K extends "order_shipped" ? OrderShippedCtx :
     never;

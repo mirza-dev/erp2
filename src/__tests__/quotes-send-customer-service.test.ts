@@ -40,6 +40,11 @@ vi.mock("@/lib/supabase/email-logs", () => ({
     dbUpdateEmailLogStatus: (...a: unknown[]) => mockUpdateLog(...a),
 }));
 
+const mockFindSuppression = vi.fn();
+vi.mock("@/lib/supabase/email-maintenance", () => ({
+    dbFindActiveSuppression: (...a: unknown[]) => mockFindSuppression(...a),
+}));
+
 import { serviceSendQuoteToCustomer } from "@/lib/services/quote-service";
 
 const DETAIL = {
@@ -65,6 +70,7 @@ beforeEach(() => {
     mockSendDirect.mockResolvedValue({ ok: true, messageId: "rs_1" });
     mockCreateLog.mockResolvedValue("log-1");
     mockUpdateLog.mockResolvedValue(undefined);
+    mockFindSuppression.mockResolvedValue(null);
 });
 
 describe("serviceSendQuoteToCustomer", () => {
@@ -88,6 +94,13 @@ describe("serviceSendQuoteToCustomer", () => {
         expect(r.reason).toBe("no_email");
     });
 
+    it("bounce/complaint suppression varsa teklif e-postası gönderilmez", async () => {
+        mockFindSuppression.mockResolvedValue({ id: "sup-1" });
+        const r = await serviceSendQuoteToCustomer("q-1", "actor-1");
+        expect(r).toEqual({ ok: false, reason: "suppressed" });
+        expect(mockSendDirect).not.toHaveBeenCalled();
+    });
+
     it("başarılı: arşiv HTML'i ek olarak gönderilir + email_logs sent", async () => {
         const r = await serviceSendQuoteToCustomer("q-1", "actor-1");
         expect(r).toEqual({ ok: true, messageId: "rs_1" });
@@ -99,6 +112,7 @@ describe("serviceSendQuoteToCustomer", () => {
         expect(Buffer.isBuffer(sendArg.attachments[0].content)).toBe(true);
         expect(sendArg.attachments[0].content.toString("utf-8")).toBe("<html>BELGE</html>");
         expect(sendArg.replyTo).toBe("teklif@pmt.example");
+        expect(sendArg.idempotencyKey).toBe("quote-email-log-log-1");
         expect(sendArg.html).toContain("PMT A.Ş.");
         expect(sendArg.html).not.toContain("Roven");
 

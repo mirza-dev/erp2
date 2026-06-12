@@ -57,7 +57,7 @@ describe("GET /api/settings/user/preferences", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body).toEqual(fakePrefs);
-        expect(mockDbListUserPrefs).toHaveBeenCalledWith("u-1");
+        expect(mockDbListUserPrefs).toHaveBeenCalledWith("u-1", ["viewer"], false);
     });
 });
 
@@ -76,14 +76,14 @@ describe("PATCH /api/settings/user/preferences", () => {
     it("happy path → upsert çağrılır + güncel liste döner", async () => {
         const inputPrefs = [
             { type: "stock_critical", emailEnabled: false, browserEnabled: true },
-            { type: "order_new", emailEnabled: true, browserEnabled: false },
+            { type: "order_shipped", emailEnabled: true, browserEnabled: false },
         ];
         mockDbUpsertUserPrefs.mockResolvedValue(undefined);
         mockDbListUserPrefs.mockResolvedValue(inputPrefs);
 
         const res = await PATCH(makePatchReq({ prefs: inputPrefs }));
         expect(res.status).toBe(200);
-        expect(mockDbUpsertUserPrefs).toHaveBeenCalledWith("u-1", inputPrefs);
+        expect(mockDbUpsertUserPrefs).toHaveBeenCalledWith("u-1", inputPrefs, ["viewer"], false);
         const body = await res.json();
         expect(body).toEqual(inputPrefs);
     });
@@ -91,7 +91,7 @@ describe("PATCH /api/settings/user/preferences", () => {
     it("emailEnabled boolean değil → 400", async () => {
         const res = await PATCH(makePatchReq({
             prefs: [
-                { type: "order_new", emailEnabled: "yes", browserEnabled: false },
+                { type: "order_shipped", emailEnabled: "yes", browserEnabled: false },
             ],
         }));
         expect(res.status).toBe(400);
@@ -102,7 +102,7 @@ describe("PATCH /api/settings/user/preferences", () => {
     it("browserEnabled number → 400 (strict boolean kontratı)", async () => {
         const res = await PATCH(makePatchReq({
             prefs: [
-                { type: "order_new", emailEnabled: true, browserEnabled: 1 },
+                { type: "order_shipped", emailEnabled: true, browserEnabled: 1 },
             ],
         }));
         expect(res.status).toBe(400);
@@ -123,6 +123,6 @@ describe("PATCH /api/settings/user/preferences", () => {
 
         expect(mockDbUpsertUserPrefs).toHaveBeenCalledWith("u-1", [
             { type: "stock_critical", emailEnabled: true, browserEnabled: true },
-        ]);
+        ], ["viewer"], false);
     });
 });

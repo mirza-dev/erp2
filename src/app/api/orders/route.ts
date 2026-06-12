@@ -8,11 +8,10 @@ import {
     type ShortageInfo,
 } from "@/lib/services/order-service";
 import { aiScoreOrder } from "@/lib/services/ai-service";
-import { notifyUsersByEmail } from "@/lib/services/email-service";
 import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { getCurrentUserPermissions, resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
+import { actorFromAuthContext, getCurrentUserPermissions, resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 import { appendServerTiming, startSpan } from "@/lib/server-timing";
@@ -89,7 +88,12 @@ export async function POST(req: NextRequest) {
         let createShortages: ShortageInfo[] | undefined;
         let submitError: string | undefined;
         if (requestedPending) {
-            const submit = await serviceTransitionOrder(result.id, "pending_approval");
+            const submit = await serviceTransitionOrder(
+                result.id,
+                "pending_approval",
+                undefined,
+                actorFromAuthContext(ctx),
+            );
             if (submit.success) {
                 createShortages = submit.shortages;
                 finalOrder = (await serviceGetOrder(result.id)) ?? result;
@@ -103,25 +107,6 @@ export async function POST(req: NextRequest) {
         aiScoreOrder(result.id).catch(err =>
             console.error("[AI Score] fire-and-forget:", err)
         );
-
-        // Fire-and-forget order_new e-postası — başarıyla onaya gönderildiyse
-        // ATLA (geçişin order_pending'i tek bildirim; çift e-posta yok). Taslak
-        // kaldıysa (draft create veya submit fail) order_new gönderilir.
-        const sentToPending = requestedPending && !submitError;
-        if (!sentToPending) {
-            notifyUsersByEmail({
-                notificationType: "order_new",
-                entityType: "sales_order",
-                entityId: result.id,
-                render: { type: "order_new", ctx: {
-                    orderId: result.id,
-                    orderNumber: result.order_number,
-                    customerName: result.customer_name,
-                    total: result.grand_total,
-                    currency: result.currency,
-                } },
-            }).catch(err => console.error("[email order_new]", err));
-        }
 
         revalidateTag("products", "max");
         return NextResponse.json(

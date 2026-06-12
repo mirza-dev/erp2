@@ -20,6 +20,7 @@ import { sendDirectEmail } from "@/lib/services/email-service";
 import { renderQuoteToCustomer } from "@/lib/email/templates";
 import { dbCreateEmailLog, dbUpdateEmailLogStatus } from "@/lib/supabase/email-logs";
 import { dbCreateAlert, dbResolveAlertsForEntity } from "@/lib/supabase/alerts";
+import { dbFindActiveSuppression } from "@/lib/supabase/email-maintenance";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -242,7 +243,7 @@ export interface SendQuoteToCustomerResult {
     ok: boolean;
     notFound?: boolean;
     /** Teklifte müşteri e-postası yok/geçersiz → route 400 (gönderim atılmaz). */
-    reason?: "no_email";
+    reason?: "no_email" | "suppressed";
     /** Resend/config hatası → route 502/503. */
     error?: string;
     messageId?: string;
@@ -273,6 +274,8 @@ export async function serviceSendQuoteToCustomer(
     const detail = mapQuoteDetail(quote);
     const to = detail.customerEmail?.trim() ?? "";
     if (!QUOTE_EMAIL_RE.test(to)) return { ok: false, reason: "no_email" };
+    const suppression = await dbFindActiveSuppression(to, "quote_customer_send");
+    if (suppression) return { ok: false, reason: "suppressed" };
 
     // Belge HTML'i — arşivle birebir
     const company = await dbGetCompanySettings().catch(() => null);
@@ -312,6 +315,7 @@ export async function serviceSendQuoteToCustomer(
         html: body.html,
         text: body.text,
         replyTo: QUOTE_EMAIL_RE.test(companyReplyTo) ? companyReplyTo : undefined,
+        ...(logId ? { idempotencyKey: `quote-email-log-${logId}` } : {}),
         attachments: [{
             filename: `Teklif-${detail.quoteNumber}.html`,
             content: Buffer.from(docHtml, "utf-8"),

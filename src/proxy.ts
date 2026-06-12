@@ -11,11 +11,12 @@ import {
 import { parseRoles, permissionsForRoles, isProvisionedUser } from "@/lib/auth/permissions";
 import { REMEMBER_COOKIE, shouldPersistSession, applySessionPersistence } from "@/lib/auth/remember";
 import { canAccessPath } from "@/lib/auth/page-access";
+import { hasInternalOperatorAccess } from "@/lib/auth/internal-access";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
 // /api/alerts/scan is listed here because it handles its own auth (CRON_SECRET OR session)
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/auth/callback"];
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback"];
 
 // Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
 // Not: /api/alerts/scan buraya dahil değil — kendi içinde session OR CRON_SECRET kontrolü yapar
@@ -27,6 +28,7 @@ const CRON_PATHS = [
     "/api/orders/check-shipments",
     "/api/quotes/expire",
     "/api/email/retry-failed",
+    "/api/email/outbox/process",
 ];
 
 /**
@@ -264,6 +266,15 @@ export async function proxy(request: NextRequest) {
     // /dashboard/** erişimi. user.app_metadata authoritative (user_metadata DEĞİL).
     const roles = parseRoles(user.app_metadata, user.email, adminEmailsFromEnv());
     const perms = permissionsForRoles(roles);
+    if (
+        pathname.startsWith("/dashboard/settings/email-deliveries")
+        && !hasInternalOperatorAccess(user.email, perms)
+    ) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        url.searchParams.set("forbidden", pathname);
+        return withRateHeaders(NextResponse.redirect(url), rate);
+    }
     const gated = pageGateRedirect(request, pathname, perms, rate, roles.includes("admin"));
     if (gated) return gated;
 

@@ -625,6 +625,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                         {profile?.fullName || profile?.email}
                     </div>
                     <button
+                        type="button"
                         onClick={() => avatarFileRef.current?.click()}
                         disabled={isMutating}
                         style={{
@@ -728,7 +729,7 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
         fetch("/api/settings/user/preferences", { signal: ctrl.signal })
             .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
             .then((data: NotificationPref[]) => {
-                if (Array.isArray(data) && data.length > 0) {
+                if (Array.isArray(data)) {
                     setPrefs(data);
                     savedRef.current = data;
                 }
@@ -742,8 +743,8 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
         return () => ctrl.abort();
     }, [isDemo, toast]);
 
-    const toggle = (type: NotificationTypeKey, channel: "emailEnabled" | "browserEnabled") => {
-        const next = prefs.map(p => p.type === type ? { ...p, [channel]: !p[channel] } : p);
+    const toggleEmail = (type: NotificationTypeKey) => {
+        const next = prefs.map(p => p.type === type ? { ...p, emailEnabled: !p.emailEnabled } : p);
         setPrefs(next);
         const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
         setIsDirty(dirty);
@@ -784,9 +785,13 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
         );
     }
 
+    const visibleTypes = isDemo
+        ? NOTIFICATION_TYPES
+        : NOTIFICATION_TYPES.filter(type => prefs.some(pref => pref.type === type.key));
+
     return (
         <div>
-            <div style={sectionTitle}>Bildirim Kanalları</div>
+            <div style={sectionTitle}>E-posta Bildirimleri</div>
             <div
                 style={{
                     background: "var(--surface-subtle)",
@@ -800,7 +805,7 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                 <div
                     style={{
                         display: "grid",
-                        gridTemplateColumns: "1fr 80px 80px",
+                        gridTemplateColumns: "1fr 90px",
                         padding: "8px 16px",
                         borderBottom: "var(--line-width) solid var(--border-tertiary)",
                         fontSize: "10px",
@@ -811,10 +816,14 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                 >
                     <span>Olay</span>
                     <span style={{ textAlign: "center" }}>E-posta</span>
-                    <span style={{ textAlign: "center" }}>Tarayıcı</span>
                 </div>
 
-                {NOTIFICATION_TYPES.map((typeDef, i) => {
+                {visibleTypes.length === 0 && (
+                    <div style={{ padding: "18px 16px", color: "var(--text-tertiary)", fontSize: "12px" }}>
+                        Rolünüze atanmış e-posta bildirimi bulunmuyor.
+                    </div>
+                )}
+                {visibleTypes.map((typeDef, i) => {
                     const pref = prefs.find(p => p.type === typeDef.key)
                         ?? { type: typeDef.key, emailEnabled: true, browserEnabled: true };
                     return (
@@ -822,9 +831,9 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                             key={typeDef.key}
                             style={{
                                 display: "grid",
-                                gridTemplateColumns: "1fr 80px 80px",
+                                gridTemplateColumns: "1fr 90px",
                                 padding: "12px 16px",
-                                borderBottom: i < NOTIFICATION_TYPES.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
+                                borderBottom: i < visibleTypes.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
                                 alignItems: "center",
                             }}
                         >
@@ -834,40 +843,41 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                                     {typeDef.desc}
                                 </div>
                             </div>
-                            {(["emailEnabled", "browserEnabled"] as const).map(channel => (
-                                <div key={channel} style={{ display: "flex", justifyContent: "center" }}>
-                                    <button
-                                        onClick={() => toggle(typeDef.key, channel)}
-                                        title={isDemo ? "Demo modunda devre dışı" : undefined}
-                                        disabled={isDemo}
+                            <div style={{ display: "flex", justifyContent: "center" }}>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleEmail(typeDef.key)}
+                                    aria-label={`${typeDef.label} e-posta bildirimini ${pref.emailEnabled ? "kapat" : "aç"}`}
+                                    aria-pressed={pref.emailEnabled}
+                                    title={isDemo ? "Demo modunda devre dışı" : undefined}
+                                    disabled={isDemo}
+                                    style={{
+                                        width: "36px",
+                                        height: "20px",
+                                        borderRadius: "10px",
+                                        border: "none",
+                                        background: pref.emailEnabled ? "var(--accent)" : "var(--bg-tertiary)",
+                                        cursor: isDemo ? "not-allowed" : "pointer",
+                                        position: "relative",
+                                        transition: "background 0.2s",
+                                        flexShrink: 0,
+                                        opacity: isDemo ? 0.5 : 1,
+                                    }}
+                                >
+                                    <span
                                         style={{
-                                            width: "36px",
-                                            height: "20px",
-                                            borderRadius: "10px",
-                                            border: "none",
-                                            background: pref[channel] ? "var(--accent)" : "var(--bg-tertiary)",
-                                            cursor: isDemo ? "not-allowed" : "pointer",
-                                            position: "relative",
-                                            transition: "background 0.2s",
-                                            flexShrink: 0,
-                                            opacity: isDemo ? 0.5 : 1,
+                                            position: "absolute",
+                                            top: "2px",
+                                            left: pref.emailEnabled ? "18px" : "2px",
+                                            width: "16px",
+                                            height: "16px",
+                                            borderRadius: "50%",
+                                            background: "white",
+                                            transition: "left 0.2s",
                                         }}
-                                    >
-                                        <span
-                                            style={{
-                                                position: "absolute",
-                                                top: "2px",
-                                                left: pref[channel] ? "18px" : "2px",
-                                                width: "16px",
-                                                height: "16px",
-                                                borderRadius: "50%",
-                                                background: "white",
-                                                transition: "left 0.2s",
-                                            }}
-                                        />
-                                    </button>
-                                </div>
-                            ))}
+                                    />
+                                </button>
+                            </div>
                         </div>
                     );
                 })}
@@ -1206,6 +1216,7 @@ function AiTab() {
                     {error ?? "Bilinmeyen hata"}
                 </div>
                 <button
+                    type="button"
                     onClick={() => { setLoading(true); setError(null); load(); }}
                     style={{
                         alignSelf: "flex-start",

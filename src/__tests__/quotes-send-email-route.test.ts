@@ -59,6 +59,12 @@ describe("POST /api/quotes/[id]/send-email", () => {
         expect(res.status).toBe(400);
     });
 
+    it("suppression ile bloke alıcı → 409", async () => {
+        mockSend.mockResolvedValue({ ok: false, reason: "suppressed" });
+        const res = await POST(makeReq(), idCtx());
+        expect(res.status).toBe(409);
+    });
+
     it("config_missing → 503", async () => {
         mockSend.mockResolvedValue({ ok: false, error: "config_missing" });
         const res = await POST(makeReq(), idCtx());

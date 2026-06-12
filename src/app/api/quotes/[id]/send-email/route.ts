@@ -37,6 +37,12 @@ export async function POST(
                 { status: 400 },
             );
         }
+        if (result.reason === "suppressed") {
+            return NextResponse.json(
+                { error: "Bu alıcı adresi önceki teslimat sorunu veya spam şikâyeti nedeniyle e-posta gönderimine kapalı." },
+                { status: 409 },
+            );
+        }
         if (result.error === "config_missing") {
             return NextResponse.json(
                 { error: "E-posta gönderimi yapılandırılmamış (sunucu)." },

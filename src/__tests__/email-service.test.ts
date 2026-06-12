@@ -92,7 +92,7 @@ describe("notifyUsersByEmail — recipient resolution", () => {
         expect(mockResendSend).toHaveBeenCalledWith(expect.objectContaining({
             to: "user@example.com",
             subject: expect.stringContaining("Kritik stok"),
-        }));
+        }), { idempotencyKey: "legacy-email-log-log-1" });
     });
 });
 
@@ -181,7 +181,7 @@ describe("retryFailedEmails", () => {
         expect(mockResendSend).toHaveBeenCalledWith(expect.objectContaining({
             html: "<html>özgün</html>",
             text: "özgün",
-        }));
+        }), { idempotencyKey: "legacy-email-log-log-1" });
         expect(mockUpdateLog).toHaveBeenCalledWith("log-1", "sent", { resend_message_id: "rs_msg_1" });
     });
 
@@ -244,9 +244,22 @@ describe("sendDirectEmail", () => {
             text: "t",
             replyTo: "teklif@firma.com",
         });
-        expect(mockResendSend).toHaveBeenCalledWith(expect.objectContaining({
+        expect(mockResendSend.mock.calls[0][0]).toEqual(expect.objectContaining({
             replyTo: "teklif@firma.com",
         }));
+    });
+
+    it("idempotency anahtarı Resend request seçeneğine iletilir", async () => {
+        await sendDirectEmail({
+            to: "a@b.com",
+            subject: "S",
+            html: "<p>h</p>",
+            text: "t",
+            idempotencyKey: "internal-email-log-log-1",
+        });
+        expect(mockResendSend.mock.calls[0][1]).toEqual({
+            idempotencyKey: "internal-email-log-log-1",
+        });
     });
 
     it("config eksik (EMAIL_FROM yok) → ok:false config_missing, Resend çağrılmaz", async () => {

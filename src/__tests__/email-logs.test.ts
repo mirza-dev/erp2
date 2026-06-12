@@ -9,6 +9,7 @@ const insertCalls: unknown[][] = [];
 const updateCalls: unknown[][] = [];
 const selectCalls: unknown[][] = [];
 const orCalls: string[] = [];
+const rpcCalls: unknown[][] = [];
 
 let insertResponse: { data: unknown; error: { message: string } | null } = { data: { id: "log-1" }, error: null };
 let getResponse: { data: { attempt_count: number; metadata: unknown } | null; error: { message: string } | null } = {
@@ -72,6 +73,10 @@ vi.mock("@/lib/supabase/service", () => ({
             });
             return currentBuilder;
         }),
+        rpc: vi.fn((name: string, args: unknown) => {
+            rpcCalls.push([name, args]);
+            return Promise.resolve({ data: true, error: null });
+        }),
     }),
 }));
 
@@ -89,6 +94,7 @@ beforeEach(() => {
     updateCalls.length = 0;
     selectCalls.length = 0;
     orCalls.length = 0;
+    rpcCalls.length = 0;
     insertResponse = { data: { id: "log-1" }, error: null };
     getResponse = { data: { attempt_count: 0, metadata: {} }, error: null };
     updateResponse = { data: null, error: null };
@@ -141,6 +147,14 @@ describe("dbUpdateEmailLogStatus", () => {
         expect(patch.html_body).toBeNull();
         expect(patch.text_body).toBeNull();
         expect(patch.body_expires_at).toBeNull();
+        expect(patch.delivery_status).toBeUndefined();
+        expect(rpcCalls).toEqual([[
+            "update_email_delivery_from_provider",
+            expect.objectContaining({
+                p_email_log_id: "log-1",
+                p_delivery_status: "accepted",
+            }),
+        ]]);
     });
 
     it("status='failed' → error_message kaydedilir", async () => {

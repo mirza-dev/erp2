@@ -18,6 +18,7 @@ vi.mock("@/lib/auth/role-guard", () => ({
         const { data: { user } } = await mockGetUser();
         return { user: user ?? null, userId: user?.id ?? null, roles: ["admin"], perms: new Set() };
     },
+    actorFromAuthContext: (ctx: { userId?: string | null }) => ({ userId: ctx.userId ?? null, label: null }),
     getCurrentUserPermissions: vi.fn().mockResolvedValue(
         new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
@@ -43,11 +44,6 @@ vi.mock("@/lib/services/order-service", () => ({
 
 vi.mock("@/lib/services/ai-service", () => ({
     aiScoreOrder: (...args: unknown[]) => mockAiScoreOrder(...args),
-}));
-
-const mockNotify = vi.fn();
-vi.mock("@/lib/services/email-service", () => ({
-    notifyUsersByEmail: (...args: unknown[]) => mockNotify(...args),
 }));
 
 const mockGetUser = vi.fn();
@@ -85,7 +81,6 @@ beforeEach(() => {
     mockServiceGetOrder.mockResolvedValue({ id: "order-new", commercial_status: "pending_approval", fulfillment_status: "allocated" });
     mockServiceTransitionOrder.mockResolvedValue({ success: true, fulfillment_status: "allocated", shortages: [] });
     mockAiScoreOrder.mockResolvedValue(undefined);
-    mockNotify.mockResolvedValue(undefined);
 });
 
 // ── Tests ─────────────────────────────────────────────────────
@@ -150,7 +145,12 @@ describe("POST /api/orders — create-and-send (pending_approval)", () => {
         const [input] = mockServiceCreateOrder.mock.calls[0];
         expect(input.commercial_status).toBe("draft");
         // Sonra onaya gönder (rezervasyon)
-        expect(mockServiceTransitionOrder).toHaveBeenCalledWith("order-new", "pending_approval");
+        expect(mockServiceTransitionOrder).toHaveBeenCalledWith(
+            "order-new",
+            "pending_approval",
+            undefined,
+            { userId: "u1", label: null },
+        );
     });
 
     it("kısmi stok: shortages create yanıtında döner", async () => {
@@ -183,23 +183,19 @@ describe("POST /api/orders — create-and-send (pending_approval)", () => {
         expect(mockServiceTransitionOrder).not.toHaveBeenCalled();
     });
 
-    // ── order_new e-posta dedup (tek bildirim) ──
-    const newEmailCount = () =>
-        mockNotify.mock.calls.filter(c => (c[0] as { notificationType?: string })?.notificationType === "order_new").length;
-
-    it("başarılı create-and-send → order_new ATLANIR (order_pending tek bildirim)", async () => {
+    it("başarılı create-and-send → onaya gönderme servisine devredilir", async () => {
         await POST(makeRequest({ ...VALID_BODY, commercial_status: "pending_approval" }));
-        expect(newEmailCount()).toBe(0);
+        expect(mockServiceTransitionOrder).toHaveBeenCalledTimes(1);
     });
 
-    it("allocation başarısız (draft kaldı) → order_new GÖNDERİLİR", async () => {
+    it("allocation başarısız (draft kaldı) → yeni sipariş e-postası için ek tetik çalışmaz", async () => {
         mockServiceTransitionOrder.mockResolvedValue({ success: false, error: "stok yok" });
         await POST(makeRequest({ ...VALID_BODY, commercial_status: "pending_approval" }));
-        expect(newEmailCount()).toBe(1);
+        expect(mockServiceTransitionOrder).toHaveBeenCalledTimes(1);
     });
 
-    it("draft create → order_new GÖNDERİLİR", async () => {
+    it("draft create → bildirim/transition tetiklemez", async () => {
         await POST(makeRequest({ ...VALID_BODY, commercial_status: "draft" }));
-        expect(newEmailCount()).toBe(1);
+        expect(mockServiceTransitionOrder).not.toHaveBeenCalled();
     });
 });
