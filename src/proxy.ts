@@ -9,6 +9,7 @@ import {
 } from "@/lib/rate-limit";
 // RBAC Faz 2 — pure helper'lar (next/supabase import etmez → middleware-safe).
 import { parseRoles, permissionsForRoles, isProvisionedUser } from "@/lib/auth/permissions";
+import { REMEMBER_COOKIE, shouldPersistSession, applySessionPersistence } from "@/lib/auth/remember";
 import { canAccessPath } from "@/lib/auth/page-access";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
@@ -153,8 +154,10 @@ export async function proxy(request: NextRequest) {
                             request.cookies.set(name, value)
                         );
                         supabaseResponse = NextResponse.next({ request });
+                        // "Beni hatırla" kapalıysa token-refresh yazımları da session cookie kalır.
+                        const persist = shouldPersistSession(request.cookies.get(REMEMBER_COOKIE)?.value);
                         cookiesToSet.forEach(({ name, value, options }) =>
-                            supabaseResponse.cookies.set(name, value, options)
+                            supabaseResponse.cookies.set(name, value, applySessionPersistence(options ?? {}, persist))
                         );
                     },
                 },

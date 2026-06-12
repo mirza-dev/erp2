@@ -229,4 +229,58 @@ describe("LoginPage (Monolith)", () => {
             value: { ...window.location, search: orig },
         });
     });
+
+    it("?error=unauthorized&attempted=<email> e-postalı 'ekli değil' mesajı gösterir", async () => {
+        const orig = window.location.search;
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: { ...window.location, search: "?error=unauthorized&attempted=yeni%40gmail.com" },
+        });
+        render(<LoginPage />);
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).toContain("yeni@gmail.com");
+        expect(alert.textContent).toMatch(/ekli değil/i);
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: { ...window.location, search: orig },
+        });
+    });
+
+    it("?error=oauth&reason=pkce yapılandırma mesajı gösterir", async () => {
+        const orig = window.location.search;
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: { ...window.location, search: "?error=oauth&reason=pkce" },
+        });
+        render(<LoginPage />);
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).toMatch(/dönüş adresi/i);
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: { ...window.location, search: orig },
+        });
+    });
+
+    it("beni-hatırla işaretsizken girişte roven_remember=0 yazılır (sign-in öncesi)", async () => {
+        mockSignInWithPassword.mockResolvedValue({ error: null });
+        render(<LoginPage />);
+
+        fireEvent.click(screen.getByRole("checkbox", { name: /beni hatırla/i }));
+        fireEvent.change(screen.getByLabelText("E-posta"), { target: { value: "a@b.com" } });
+        fireEvent.change(screen.getByLabelText("Şifre"), { target: { value: "secret" } });
+        fireEvent.click(screen.getByRole("button", { name: "Giriş Yap" }));
+
+        await waitFor(() => expect(mockSignInWithPassword).toHaveBeenCalled());
+        expect(document.cookie).toContain("roven_remember=0");
+    });
+
+    it("beni-hatırla işaretliyken (varsayılan) Google akışı roven_remember=1 yazar", async () => {
+        mockSignInWithOAuth.mockResolvedValue({ error: null });
+        render(<LoginPage />);
+
+        fireEvent.click(screen.getByRole("button", { name: "Google ile devam et" }));
+
+        await waitFor(() => expect(mockSignInWithOAuth).toHaveBeenCalled());
+        expect(document.cookie).toContain("roven_remember=1");
+    });
 });

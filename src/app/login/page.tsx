@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, Check, CheckCircle2, Eye, EyeOff, Lock, LogIn, Mail, Moon, Sun } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { clearDemoMode } from "@/lib/demo-utils";
+import { REMEMBER_COOKIE } from "@/lib/auth/remember";
 import { ThemeProvider, useTheme } from "@/lib/theme/use-theme";
 import RovenLogo from "@/components/layout/RovenLogo";
 import Button from "@/components/ui/Button";
@@ -32,7 +33,9 @@ const STR = {
         contact: "Yöneticinizle iletişime geçin",
         errAuth: "E-posta veya şifre hatalı.",
         errOAuth: "Google ile giriş tamamlanamadı.",
+        errOAuthConfig: "Google girişi yapılandırma nedeniyle tamamlanamadı — dönüş adresi Supabase'de kayıtlı olmayabilir. Yöneticinize bildirin.",
         errUnauthorized: "Hesabınız bu sisteme yetkili değil. Yöneticinizle iletişime geçin.",
+        errUnauthorizedEmail: "{email} hesabı bu sisteme ekli değil. Yöneticinizin sizi Ayarlar → Kullanıcılar'dan eklemesi gerekir.",
         errEmailEmpty: "E-posta adresi gerekli.",
         errEmailInvalid: "Geçerli bir e-posta girin.",
         errPwEmpty: "Şifre gerekli.",
@@ -58,7 +61,9 @@ const STR = {
         contact: "Contact your administrator",
         errAuth: "Email or password is incorrect.",
         errOAuth: "Google sign-in could not be completed.",
+        errOAuthConfig: "Google sign-in failed due to configuration — the return URL may not be registered in Supabase. Notify your administrator.",
         errUnauthorized: "Your account is not authorized for this system. Contact your administrator.",
+        errUnauthorizedEmail: "{email} is not registered in this system. Ask your administrator to add you via Settings → Users.",
         errEmailEmpty: "Email is required.",
         errEmailInvalid: "Enter a valid email.",
         errPwEmpty: "Password is required.",
@@ -70,6 +75,16 @@ const STR = {
 type Strings = (typeof STR)[Lang];
 
 const isEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
+/**
+ * "Beni hatırla" tercihini sign-in BAŞLAMADAN önce cookie'ye yazar — auth cookie
+ * yazan katmanlar (client/server/proxy) bu değere göre kalıcı/session karar verir.
+ * Tercih cookie'sinin kendisi hep kalıcı (1 yıl).
+ */
+function persistRememberChoice(remember: boolean) {
+    const secure = window.location.protocol === "https:" ? "; Secure" : "";
+    document.cookie = `${REMEMBER_COOKIE}=${remember ? "1" : "0"}; Path=/; Max-Age=31536000; SameSite=Lax${secure}`;
+}
 
 /* Google "G" — çok renkli marka SVG'si (Google brand renkleri TEMA-MUAF, logo precedent'i). */
 function GoogleIcon() {
@@ -112,8 +127,8 @@ function LoginForm({ t }: { t: Strings }) {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [showPw, setShowPw] = useState(false);
-    // Beni hatırla — şimdilik KOZMETİK (Supabase JS session'ı zaten persist eder;
-    // session/local ayrımı bağlanmadı). Varsayılan işaretli.
+    // Beni hatırla — roven_remember cookie'si üzerinden GERÇEK bağlı (2026-06):
+    // işaretli = kalıcı oturum (varsayılan), işaretsiz = tarayıcı kapanınca düşer.
     const [remember, setRemember] = useState(true);
     const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
     const [authError, setAuthError] = useState<string | null>(null);
@@ -123,11 +138,22 @@ function LoginForm({ t }: { t: Strings }) {
     const { push, refresh } = useRouter();
 
     // Redirect-time hatası (OAuth handler veya yetkisiz-erişim guard'ı) → mount'ta yüzeye çıkar.
+    // `reason` (callback'in teşhisi) ve `attempted` (reddedilen e-posta) ayrışmış mesaj verir.
     useEffect(() => {
         if (typeof window === "undefined") return;
-        const err = new URLSearchParams(window.location.search).get("error");
-        if (err === "oauth") setAuthError(t.errOAuth);
-        else if (err === "unauthorized") setAuthError(t.errUnauthorized);
+        const params = new URLSearchParams(window.location.search);
+        const err = params.get("error");
+        if (err === "oauth") {
+            const reason = params.get("reason");
+            setAuthError(reason === "provider" || reason === "pkce" ? t.errOAuthConfig : t.errOAuth);
+        } else if (err === "unauthorized") {
+            const attempted = params.get("attempted");
+            setAuthError(
+                attempted
+                    ? t.errUnauthorizedEmail.replace("{email}", attempted)
+                    : t.errUnauthorized,
+            );
+        }
         // yalnız ilk mount — dil değişiminde tekrar çalışmasın
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -153,6 +179,7 @@ function LoginForm({ t }: { t: Strings }) {
         if (Object.keys(e).length > 0) return;
 
         setLoading(true);
+        persistRememberChoice(remember);
         const supabase = createClient();
         const { error: authErr } = await supabase.auth.signInWithPassword({ email, password });
         if (authErr) {
@@ -169,6 +196,7 @@ function LoginForm({ t }: { t: Strings }) {
     async function handleGoogle() {
         clearMessages();
         setGoogleLoading(true);
+        persistRememberChoice(remember);
         const supabase = createClient();
         const { error: oauthErr } = await supabase.auth.signInWithOAuth({
             provider: "google",
