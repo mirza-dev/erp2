@@ -58,6 +58,9 @@ export interface QuoteToCustomerCtx {
     companyPhone?: string | null;
     companyEmail?: string | null;
     companyWebsite?: string | null;
+    /** Süreli public görüntüleme linki (/api/quotes/shared/<token>). Ek artık
+     *  GÖNDERİLMEZ (.html eki Gmail PC'de ham kod görünüyordu) — belge bu linkle açılır. */
+    viewUrl?: string | null;
 }
 
 function escapeHtml(value: string): string {
@@ -84,7 +87,7 @@ function safeHttpUrl(value: string | null | undefined): string | null {
     }
 }
 
-function appUrl(path: string): string {
+export function appUrl(path: string): string {
     try {
         return new URL(path, APP_URL).toString();
     } catch {
@@ -398,9 +401,23 @@ export function renderQuoteToCustomer(ctx: QuoteToCustomerCtx): EmailContent {
         : `<div style="color:${COLORS.text};font-size:19px;font-weight:800;line-height:26px">${escapeHtml(companyName || "Teklif")}</div>`;
     const quoteRows: DetailRow[] = [["Teklif numarası", ctx.quoteNumber]];
     if (ctx.validUntil) quoteRows.push(["Geçerlilik tarihi", fmtDateTr(ctx.validUntil)]);
+    const viewUrl = safeHttpUrl(ctx.viewUrl);
+
+    // Link varsa belge butonla açılır (ek YOK); link üretilemediyse (secret eksik /
+    // arşiv yok) müşteri yanıtlamaya yönlendirilir — ham .html eki dönemi kapandı.
+    const docBlock = viewUrl
+        ? `<tr>
+            <td style="padding:0 28px 8px">${ctaButton("Teklifi Görüntüle", viewUrl)}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 24px;color:${COLORS.muted};font-size:12px;line-height:18px">Bağlantı teklif belgesini tarayıcınızda açar; oradan yazdırabilir veya PDF olarak kaydedebilirsiniz.</td>
+          </tr>`
+        : `<tr>
+            <td style="padding:0 28px 24px;color:${COLORS.muted};font-size:13px;line-height:19px">Teklif belgesinin kopyası için bu e-postayı yanıtlamanız yeterlidir.</td>
+          </tr>`;
 
     const html = emailDocument(
-        `${ctx.quoteNumber} numaralı teklif belgesi ekte.`,
+        `${ctx.quoteNumber} numaralı teklifiniz hazır.`,
         `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLORS.surface}" style="width:100%;border-collapse:separate;background:${COLORS.surface};border:1px solid ${COLORS.borderStrong};border-radius:8px">
           <tr>
             <td style="padding:26px 28px 20px;border-bottom:1px solid ${COLORS.border}">${brand}</td>
@@ -412,24 +429,12 @@ export function renderQuoteToCustomer(ctx: QuoteToCustomerCtx): EmailContent {
             <td style="padding:13px 28px 0;color:${COLORS.muted};font-size:14px;line-height:23px">Sayın ${escapeHtml(ctx.customerName)},</td>
           </tr>
           <tr>
-            <td style="padding:8px 28px 22px;color:${COLORS.muted};font-size:14px;line-height:23px">${escapeHtml(ctx.quoteNumber)} numaralı teklif belgemizi incelemeniz için ekte iletiyoruz.</td>
+            <td style="padding:8px 28px 22px;color:${COLORS.muted};font-size:14px;line-height:23px">${escapeHtml(ctx.quoteNumber)} numaralı teklif belgemizi incelemeniz için iletiyoruz.</td>
           </tr>
           <tr>
             <td style="padding:0 28px 22px">${detailsTable(quoteRows)}</td>
           </tr>
-          <tr>
-            <td style="padding:0 28px 24px">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLORS.accentSoft}" style="width:100%;border-collapse:separate;background:${COLORS.accentSoft};border:1px solid #c9dcff;border-radius:6px">
-                <tr>
-                  <td width="38" valign="top" style="padding:14px 0 14px 14px;color:${COLORS.accent};font-size:17px;font-weight:800;line-height:22px">↗</td>
-                  <td style="padding:14px;color:${COLORS.text};font-size:13px;font-weight:700;line-height:19px">
-                    Teklif belgesi ektedir
-                    <div style="padding-top:3px;color:${COLORS.muted};font-size:12px;font-weight:400;line-height:18px">Belgeyi tarayıcınızda açabilir, yazdırabilir veya PDF olarak kaydedebilirsiniz.</div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
+          ${docBlock}
           <tr>
             <td style="padding:0 28px 28px;color:${COLORS.muted};font-size:14px;line-height:23px">Sorularınız ve görüşleriniz için bu e-postayı yanıtlayabilirsiniz.</td>
           </tr>
@@ -446,9 +451,11 @@ export function renderQuoteToCustomer(ctx: QuoteToCustomerCtx): EmailContent {
         ctx.companyEmail?.trim() ? `E-posta: ${ctx.companyEmail.trim()}` : "",
         ctx.companyWebsite?.trim() ? `Web: ${ctx.companyWebsite.trim()}` : "",
     ].filter(Boolean).join("\n");
-    const text = `Sayın ${ctx.customerName},\n\n${ctx.quoteNumber} numaralı teklif belgemizi ekte iletiyoruz.\n` +
+    const text = `Sayın ${ctx.customerName},\n\n${ctx.quoteNumber} numaralı teklifiniz hazır.\n` +
         (ctx.validUntil ? `Geçerlilik tarihi: ${fmtDateTr(ctx.validUntil)}\n` : "") +
-        `\nBelgeyi tarayıcınızda açabilir, yazdırabilir veya PDF olarak kaydedebilirsiniz.\n\n` +
+        (viewUrl
+            ? `\nTeklif belgesini görüntülemek için: ${viewUrl}\nBağlantı belgeyi tarayıcınızda açar; oradan yazdırabilir veya PDF olarak kaydedebilirsiniz.\n\n`
+            : `\nTeklif belgesinin kopyası için bu e-postayı yanıtlamanız yeterlidir.\n\n`) +
         [companyName, contacts].filter(Boolean).join("\n");
     return { subject, html, text };
 }

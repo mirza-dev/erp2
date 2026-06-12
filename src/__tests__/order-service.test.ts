@@ -67,6 +67,7 @@ vi.mock("@/lib/supabase/service", () => ({
 }));
 
 import { serviceTransitionOrder, validateOrderCreate, serviceListOrders, serviceGetOrder, serviceCreateOrder, serviceUpdateQuoteDeadline } from "@/lib/services/order-service";
+import { localISODate } from "@/lib/stock-utils";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 
 // ── Fixtures ──────────────────────────────────────────────────
@@ -407,7 +408,11 @@ describe("validateOrderCreate", () => {
     });
 
     it("quote_valid_until bugün veya gelecek → geçerli", () => {
-        const today = new Date().toISOString().slice(0, 10);
+        // "Bugün" üretim koduyla AYNI kaynaktan (localISODate, TR lokal) — UTC
+        // toISOString kullanılırsa TR 00:00–03:00 arasında "dün" üretip test
+        // gece yarısı penceresinde yanlış kırılıyordu (Y6 turunda kod düzeldi,
+        // test eski kalmıştı).
+        const today = localISODate(Date.now());
         const result = validateOrderCreate({ ...validInput, quote_valid_until: today });
         expect(result.valid).toBe(true);
     });

@@ -17,7 +17,8 @@ import { buildQuoteDataFromDetail, renderQuoteArchiveHtml } from "@/lib/quote-ar
 import { mapQuoteDetail } from "@/lib/api-mappers";
 import { validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
 import { sendDirectEmail } from "@/lib/services/email-service";
-import { renderQuoteToCustomer } from "@/lib/email/templates";
+import { renderQuoteToCustomer, appUrl } from "@/lib/email/templates";
+import { createQuoteShareToken, resolveQuoteShareSecret } from "@/lib/quote-share-token";
 import { dbCreateEmailLog, dbUpdateEmailLogStatus } from "@/lib/supabase/email-logs";
 import { dbCreateAlert, dbResolveAlertsForEntity } from "@/lib/supabase/alerts";
 import { dbFindActiveSuppression } from "@/lib/supabase/email-maintenance";
@@ -277,10 +278,30 @@ export async function serviceSendQuoteToCustomer(
     const suppression = await dbFindActiveSuppression(to, "quote_customer_send");
     if (suppression) return { ok: false, reason: "suppressed" };
 
-    // Belge HTML'i — arşivle birebir
     const company = await dbGetCompanySettings().catch(() => null);
-    const data = buildQuoteDataFromDetail(detail, company);
-    const docHtml = await renderQuoteArchiveHtml(data);
+
+    // Belge artık EK olarak gönderilmez (.html eki Gmail PC'de ham kod görünüyordu,
+    // mobil viewer'da logo yüklenmiyordu) — bunun yerine donmuş arşivin süreli public
+    // görüntüleme linki gövdeye konur (/api/quotes/shared/<token> kendi origin'imizden
+    // text/html servis eder). Arşiv send transition'ında üretildi; yoksa burada
+    // idempotent üretmeyi dener. Link üretilemezse e-posta yine gider (şablon fallback
+    // metni müşteriyi yanıtlamaya yönlendirir).
+    let viewUrl: string | null = null;
+    try {
+        const secret = resolveQuoteShareSecret();
+        if (secret) {
+            const archiveRes = await serviceArchiveQuotePdf(quoteId, actorUserId).catch(() => null);
+            if (archiveRes?.archived) {
+                const revisionNo = archiveRes.revisionNo ?? Number(quote.revision_no ?? 1);
+                const token = createQuoteShareToken({ quoteId, revisionNo }, secret);
+                viewUrl = appUrl(`/api/quotes/shared/${token}`);
+            }
+        } else {
+            console.warn("[quote-service] QUOTE_SHARE_SECRET/CRON_SECRET yok — teklif e-postası linksiz gidiyor.");
+        }
+    } catch (err) {
+        console.error("[quote-service] share link üretilemedi (non-fatal)", err);
+    }
 
     const body = renderQuoteToCustomer({
         quoteNumber: detail.quoteNumber,
@@ -291,6 +312,7 @@ export async function serviceSendQuoteToCustomer(
         companyPhone: company?.phone ?? null,
         companyEmail: company?.email ?? null,
         companyWebsite: company?.website ?? null,
+        viewUrl,
     });
     const companyReplyTo = company?.email?.trim() ?? "";
 
@@ -316,10 +338,6 @@ export async function serviceSendQuoteToCustomer(
         text: body.text,
         replyTo: QUOTE_EMAIL_RE.test(companyReplyTo) ? companyReplyTo : undefined,
         ...(logId ? { idempotencyKey: `quote-email-log-${logId}` } : {}),
-        attachments: [{
-            filename: `Teklif-${detail.quoteNumber}.html`,
-            content: Buffer.from(docHtml, "utf-8"),
-        }],
     });
 
     if (logId) {

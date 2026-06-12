@@ -97,6 +97,50 @@ export function buildQuoteDataFromDetail(detail: QuoteDetail, company?: CompanyS
     };
 }
 
+// ── Logo data-URI gömme (arşiv self-containment) ────────────────────────────
+// Arşiv HTML'i e-posta linkinden/mobil HTML viewer'dan açıldığında harici logo
+// URL'i yüklenmeyebiliyordu (kullanıcı bulgusu: "mobilde firma logosu boş") →
+// logo render anında sunucuda indirilip data-URI gömülür. SSRF guard: yalnız
+// kendi Supabase storage host'umuz fetch edilir; aksi/boyut aşımı/hata → null
+// (çağıran mevcut URL ile devam eder — davranış bugünkünden kötüleşmez).
+
+const LOGO_MAX_BYTES = 512 * 1024;
+const LOGO_MIME_RE = /^image\/(png|jpe?g|webp|gif|svg\+xml)$/;
+
+export async function inlineLogoAsDataUri(
+    logoUrl: string | null | undefined,
+    allowedHost?: string,
+): Promise<string | null> {
+    if (!logoUrl || !/^https?:\/\//i.test(logoUrl)) return null;
+    let host: string;
+    try {
+        host = new URL(logoUrl).host;
+    } catch {
+        return null;
+    }
+    const expected = allowedHost
+        ?? (() => {
+            try {
+                return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").host;
+            } catch {
+                return "";
+            }
+        })();
+    if (!expected || host !== expected) return null;
+
+    try {
+        const res = await fetch(logoUrl);
+        if (!res.ok) return null;
+        const mime = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+        if (!LOGO_MIME_RE.test(mime)) return null;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (buf.length === 0 || buf.length > LOGO_MAX_BYTES) return null;
+        return `data:${mime};base64,${buf.toString("base64")}`;
+    } catch {
+        return null;
+    }
+}
+
 function escapeHtml(s: string): string {
     return s
         .replace(/&/g, "&amp;")
@@ -120,7 +164,11 @@ export async function renderQuoteArchiveHtml(data: QuoteData): Promise<string> {
     // import'u Turbopack tarafından reddedilir (footgun guard). Dinamik import statik
     // analizi atlar, runtime'da server'da çalışır.
     const { renderToStaticMarkup } = await import("react-dom/server");
-    const body = renderToStaticMarkup(createElement(QuoteDocument, { data }));
+    // Logo'yu data-URI göm (başarısızsa mevcut URL kalır) — arşiv her ortamda
+    // (e-posta linki, mobil viewer, offline kayıt) logolu açılır.
+    const inlinedLogo = await inlineLogoAsDataUri(data.logoSrc);
+    const renderData = inlinedLogo ? { ...data, logoSrc: inlinedLogo } : data;
+    const body = renderToStaticMarkup(createElement(QuoteDocument, { data: renderData }));
     return `<!doctype html>
 <html lang="tr">
 <head>

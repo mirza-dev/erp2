@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import ExchangeRatesTicker from "@/components/layout/ExchangeRatesTicker";
@@ -42,7 +43,10 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                     <Menu size={19} strokeWidth={1.8} aria-hidden />
                 </button>
 
-                <div
+                {/* Marka → ana sayfa linki (UserAvatarLink kalıbı: Link + inherit renk) */}
+                <Link
+                    href="/dashboard"
+                    aria-label="Ana sayfa"
                     className="topbar-brand"
                     style={{
                         fontSize: "15.5px",
@@ -51,10 +55,11 @@ const Topbar = memo(function Topbar({ onToggleSidebar }: TopbarProps) {
                         display: "flex",
                         alignItems: "center",
                         letterSpacing: 0,
+                        textDecoration: "none",
                     }}
                 >
                     <RovenLogo size={22} wordmarkSize={19} />
-                </div>
+                </Link>
 
                 <span className="topbar-divider" aria-hidden="true" />
 

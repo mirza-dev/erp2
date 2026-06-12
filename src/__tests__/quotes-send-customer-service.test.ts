@@ -1,7 +1,9 @@
 /**
- * serviceSendQuoteToCustomer — teklif belgesini müşteriye HTML ek olarak gönderir.
+ * serviceSendQuoteToCustomer — teklif e-postası: EK YOK, gövdede süreli
+ * "Teklifi Görüntüle" linki (/api/quotes/shared/<token>). Eski .html eki
+ * Gmail PC'de ham kod görünüyordu — geri gelmemeli.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockDbGetQuote = vi.fn();
 vi.mock("@/lib/supabase/quotes", () => ({
@@ -45,6 +47,16 @@ vi.mock("@/lib/supabase/email-maintenance", () => ({
     dbFindActiveSuppression: (...a: unknown[]) => mockFindSuppression(...a),
 }));
 
+// serviceArchiveQuotePdf'in kullandığı arşiv DB katmanı (link üretimi arşive bağlı)
+const mockGetArchive = vi.fn();
+const mockArchiveStatus = vi.fn();
+vi.mock("@/lib/supabase/quote-pdf-archives", () => ({
+    dbGetQuoteArchive:    (...a: unknown[]) => mockGetArchive(...a),
+    dbArchiveObjectStatus: (...a: unknown[]) => mockArchiveStatus(...a),
+    dbCreateQuoteArchive: vi.fn(),
+    dbDeleteQuoteArchive: vi.fn(),
+}));
+
 import { serviceSendQuoteToCustomer } from "@/lib/services/quote-service";
 
 const DETAIL = {
@@ -57,8 +69,11 @@ const DETAIL = {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockDbGetQuote.mockResolvedValue({ id: "q-1", quote_number: "TKL-2026-001" });
+    process.env.QUOTE_SHARE_SECRET = "test-share-secret";
+    mockDbGetQuote.mockResolvedValue({ id: "q-1", quote_number: "TKL-2026-001", revision_no: 1 });
     mockMapDetail.mockReturnValue(DETAIL);
+    mockGetArchive.mockResolvedValue({ id: "arch-1", file_path: "quotes/q-1/r1.html" });
+    mockArchiveStatus.mockResolvedValue("present");
     mockGetCompany.mockResolvedValue({
         name: "PMT A.Ş.",
         logo_url: "https://example.com/logo.png",
@@ -71,6 +86,10 @@ beforeEach(() => {
     mockCreateLog.mockResolvedValue("log-1");
     mockUpdateLog.mockResolvedValue(undefined);
     mockFindSuppression.mockResolvedValue(null);
+});
+
+afterEach(() => {
+    delete process.env.QUOTE_SHARE_SECRET;
 });
 
 describe("serviceSendQuoteToCustomer", () => {
@@ -101,16 +120,18 @@ describe("serviceSendQuoteToCustomer", () => {
         expect(mockSendDirect).not.toHaveBeenCalled();
     });
 
-    it("başarılı: arşiv HTML'i ek olarak gönderilir + email_logs sent", async () => {
+    it("başarılı: EK YOK, gövdede /api/quotes/shared/ linki + email_logs sent", async () => {
         const r = await serviceSendQuoteToCustomer("q-1", "actor-1");
         expect(r).toEqual({ ok: true, messageId: "rs_1" });
 
-        // Belge HTML'i ek olarak iletildi
         const sendArg = mockSendDirect.mock.calls[0][0];
         expect(sendArg.to).toBe("satinalma@acme.com");
-        expect(sendArg.attachments[0].filename).toBe("Teklif-TKL-2026-001.html");
-        expect(Buffer.isBuffer(sendArg.attachments[0].content)).toBe(true);
-        expect(sendArg.attachments[0].content.toString("utf-8")).toBe("<html>BELGE</html>");
+        // .html eki dönemi kapandı (Gmail PC ham kod gösteriyordu) — geri gelmemeli
+        expect(sendArg.attachments).toBeUndefined();
+        // Belge süreli public linkle açılır (html + text her ikisinde)
+        expect(sendArg.html).toContain("/api/quotes/shared/");
+        expect(sendArg.html).toContain("Teklifi Görüntüle");
+        expect(sendArg.text).toContain("/api/quotes/shared/");
         expect(sendArg.replyTo).toBe("teklif@pmt.example");
         expect(sendArg.idempotencyKey).toBe("quote-email-log-log-1");
         expect(sendArg.html).toContain("PMT A.Ş.");
@@ -124,6 +145,28 @@ describe("serviceSendQuoteToCustomer", () => {
             recipient_email: "satinalma@acme.com",
         }));
         expect(mockUpdateLog).toHaveBeenCalledWith("log-1", "sent", { resend_message_id: "rs_1" });
+    });
+
+    it("secret yokken e-posta yine gider — linksiz, yanıtlamaya yönlendirir", async () => {
+        delete process.env.QUOTE_SHARE_SECRET;
+        delete process.env.CRON_SECRET;
+        const r = await serviceSendQuoteToCustomer("q-1", "actor-1");
+        expect(r.ok).toBe(true);
+        const sendArg = mockSendDirect.mock.calls[0][0];
+        expect(sendArg.attachments).toBeUndefined();
+        expect(sendArg.html).not.toContain("/api/quotes/shared/");
+        expect(sendArg.html).toContain("yanıtlamanız yeterlidir");
+    });
+
+    it("arşiv üretilemezse (storage hatası) e-posta linksiz ama yine gider (non-fatal)", async () => {
+        mockGetArchive.mockResolvedValue(null);          // arşiv yok
+        mockArchiveStatus.mockResolvedValue("unknown");  // (kullanılmaz; create yolunda throw yok ama
+        // dbCreateQuoteArchive vi.fn() → undefined döner; serviceArchiveQuotePdf render'a iner.
+        mockRenderArchive.mockRejectedValue(new Error("render fail"));
+        const r = await serviceSendQuoteToCustomer("q-1", "actor-1");
+        expect(r.ok).toBe(true);
+        const sendArg = mockSendDirect.mock.calls[0][0];
+        expect(sendArg.html).not.toContain("/api/quotes/shared/");
     });
 
     it("firma e-postası geçersizse replyTo gönderilmez", async () => {

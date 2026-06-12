@@ -82,11 +82,15 @@ interface QuoteFormProps {
     // Yeni-teklif sayfasında inline "Gönder" butonu + çift onay akışı (yalnız
     // /quotes/new'de true; detay sayfasının kendi header Gönder'i var → çift buton önlenir).
     enableInlineSend?: boolean;
+    // Başarılı kayıt sonrası sunucunun döndürdüğü TAZE QuoteDetail parent'a iletilir.
+    // Detay sayfası bununla kendi `quote` state'ini tazeler — aksi hâlde Gönder
+    // onayındaki müşteri e-postası sayfanın İLK fetch'inden kalır (stale).
+    onSaved?: (detail: QuoteDetail) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function QuoteForm({ initialData, readOnly, status, enableInlineSend }: QuoteFormProps) {
+export default function QuoteForm({ initialData, readOnly, status, enableInlineSend, onSaved }: QuoteFormProps) {
     // ── Data context ──────────────────────────────────────────────────────────
     const { customers } = useCustomers();
     const { products } = useProducts();
@@ -745,6 +749,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                 const data = await res.json() as QuoteDetail;
                 setQuoteId(data.id);
                 setQuoteNo(data.quoteNumber);
+                onSaved?.(data);
                 if (!opts?.skipUrlSync) {
                     window.history.replaceState(null, "", "/dashboard/quotes/" + data.id);
                 }
@@ -756,6 +761,8 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                 body: JSON.stringify(payload),
             });
             if (!res.ok) return null;
+            const updated = await res.json().catch(() => null) as QuoteDetail | null;
+            if (updated) onSaved?.(updated);
             return quoteId;
         } catch {
             return null;

@@ -125,6 +125,17 @@ describe("Topbar", () => {
         expect(screen.getByRole("link", { name: "Profil ve ayarlar" }).getAttribute("href")).toBe("/dashboard/settings?tab=kullanici");
         await waitFor(() => expect(screen.getByLabelText("Live-Rates döviz kurları")).toBeTruthy());
     });
+
+    it("Roven markası /dashboard'a link verir (kullanıcı bulgusu: logo tıklanabilir olmalı)", () => {
+        mockTopbarFetch();
+
+        render(<Topbar />);
+
+        const brand = screen.getByRole("link", { name: "Ana sayfa" });
+        expect(brand.getAttribute("href")).toBe("/dashboard");
+        expect(brand.className).toContain("topbar-brand");
+        expect(brand.textContent).toContain("Roven");
+    });
 });
 
 describe("Topbar — Sakin düz tasarım (kaynak regresyonu)", () => {

@@ -423,7 +423,14 @@ export default function QuoteDetailPage() {
             </div>
 
             {/* ── Quote Form ── */}
-            <QuoteForm initialData={quote} readOnly={!editable} status={status} />
+            {/* onSaved: form Kaydet'i sayfanın quote state'ini tazeler — Gönder onayındaki
+                müşteri e-postası ilk fetch'te takılı kalmasın (kaydet→gönder stale bug'ı). */}
+            <QuoteForm
+                initialData={quote}
+                readOnly={!editable}
+                status={status}
+                onSaved={(d) => setQuote(prev => (prev ? { ...prev, ...d } : (d as QuoteDetailWithConversion)))}
+            />
 
             {/* ── Confirm Dialog ── */}
             {confirmDialog && (
@@ -529,7 +536,7 @@ export default function QuoteDetailPage() {
                                         Müşteriye e-posta da gönder
                                         {hasCustomerEmail && (
                                             <span style={{ color: "var(--text-tertiary)", display: "block", fontSize: "12px", marginTop: "2px" }}>
-                                                {quote?.customerEmail} · teklif belgesi ek olarak iletilir
+                                                {quote?.customerEmail} · teklif belgesinin görüntüleme bağlantısı iletilir
                                             </span>
                                         )}
                                     </span>

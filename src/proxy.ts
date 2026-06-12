@@ -16,7 +16,8 @@ import { hasInternalOperatorAccess } from "@/lib/auth/internal-access";
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
 // /api/alerts/scan is listed here because it handles its own auth (CRON_SECRET OR session)
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback"];
+// /api/quotes/shared: müşteri teklif linki (login'siz) — kendi HMAC token doğrulaması var
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared"];
 
 // Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
 // Not: /api/alerts/scan buraya dahil değil — kendi içinde session OR CRON_SECRET kontrolü yapar
