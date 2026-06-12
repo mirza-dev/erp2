@@ -2,16 +2,22 @@
  * Faz 3b — GET /api/import/documents/[id]/lines
  *
  * Belgeden çıkarılan tüm satırları line_number sırasında listeler.
- * Auth: middleware zaten authenticated requirement (viewer dahil okuyabilir).
+ * Auth: view_import şartı (Denetim Y1 2026-06; önceki "middleware yeter"
+ * varsayımı her oturumu/demoyu okutuyordu — viewer'da view_import yok).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetImportDocument } from "@/lib/supabase/import-documents";
 import { dbListLinesByDocument } from "@/lib/supabase/import-document-lines";
 import { handleApiError } from "@/lib/api-error";
+import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+    const authCtx = await resolveAuthContext();
+    const permGuard = requirePermissionFor(authCtx, "view_import");
+    if (permGuard) return permGuard;
+
     try {
         const { id } = await ctx.params;
         if (!id) return NextResponse.json({ error: "Belge ID zorunludur." }, { status: 400 });

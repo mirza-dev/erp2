@@ -7,7 +7,11 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-12 (**E-posta retry snapshot turu commit+mirror — mig.096 APPLY BEKLİYOR ⚠️**)
+## Son Tamamlanan İş — 2026-06-12 (**Y1 turu — kalan 7 guard'sız GET kapandı; mig.096 APPLY ✅**)
+
+**Karar (AskUserQuestion): DEMO-DOSTU guard** — `requirePermissionFor` izin arar, `!user→401` dalı YOK (anonim→viewer fallback bilinçli → demo gezintisi yaşar; import uçları viewer'da view_import olmadığından fiilen kapalı). İzin haritası: alerts/calendar→view_alerts · import×3→view_import · parasut-status→view_sales_orders (view_parasut sales/viewer'ı kırardı) · open-count→OR[view_purchase_suggestions, view_sales_orders] (purchasing'de sales_orders yok) · shortages→view_products. Baseline ACIK-BULGU sınıfı BOŞALDI (gate + `y1-route-guards.test.ts` kilitler); 6 route testine mock+403 senaryosu. mig.096 kullanıcı APPLY etti, probe ✅. tsc 0 · lint 0 · **5199 test / 380 dosya** · build 0. **KALAN (kullanıcı):** smoke — demo modda takvim/eksik drawer/Paraşüt rozetleri/açık-sipariş kolonu ÇALIŞMALI, muhasebe rolünde takvim 403; önceki liste (sipariş toplamları · teklif gönder→iptal→tekrar gönder · Next sonrası login). Son tur adayı: Upstash (O5).
+
+## Önceki — 2026-06-12 (**E-posta retry snapshot turu commit+mirror — mig.096 APPLY ✅ [sonraki turda]**)
 
 **Durum:** proje-codex'te hazır ama commit'siz bulunan iş (kullanıcı "mirrorla" dedi) doğrulanıp gönderildi: tsc 0 · lint 0 · **5182 test / 379 dosya** → `3c8fb85`, iki branch aynalandı. İçerik: **mig.096** `email_logs` + html_body/text_body/body_expires_at (24h TTL; başarı/expiry/max-attempt'te snapshot temizlenir) + partial index · retry aynı gövdeyle yeniden gönderir · `sendDirectEmail` `replyTo` · `requireInternalOperatorFor(ctx)` auth-dedup · iç şablon testleri (+21 test). `check-migrations.ts` PROBES'a 096 eklendi. **093/094/095 doğrulama SQL'i 4×true ✅ (canlıda kesin).** **KALAN (kullanıcı):** **mig.096 Studio'da APPLY** + e-posta retry smoke; önceki smoke listesi de açık (sipariş toplamları · teklif gönder→iptal→tekrar gönder · Next sonrası login/dashboard).
 

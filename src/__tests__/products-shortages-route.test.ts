@@ -2,7 +2,7 @@
  * Faz 10 — GET /api/products/[id]/shortages route
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const mockDbGetOpenShortagesByProductId = vi.fn();
 
@@ -16,7 +16,20 @@ function makeParams(id: string) {
     return { params: Promise.resolve({ id }) };
 }
 
+// ── Denetim Y1 (2026-06): route artık view_products şartı arar (demo-dostu requirePermissionFor) ──
+const mockResolveAuthContext = vi.fn();
+const mockRequirePermissionFor = vi.fn();
+
+vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext: (...a: unknown[]) => mockResolveAuthContext(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermissionFor(...a),
+}));
+
 beforeEach(() => {
+    mockResolveAuthContext.mockResolvedValue({
+        user: { id: "u-1" }, userId: "u-1", roles: ["admin"], perms: new Set(["view_products"]),
+    });
+    mockRequirePermissionFor.mockReturnValue(null);
     mockDbGetOpenShortagesByProductId.mockReset();
 });
 
@@ -65,5 +78,16 @@ describe("GET /api/products/[id]/shortages", () => {
         const res = await GET(req, makeParams("p-1"));
         const body = await res.json();
         expect(body.totalShortage).toBe(50);
+    });
+});
+
+describe("Y1 RBAC guard", () => {
+    it("izin yoksa 403 döner ve DB'ye inmez", async () => {
+        mockRequirePermissionFor.mockReturnValue(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+        const res = await GET({} as never, { params: Promise.resolve({ id: "p-1" }) });
+        expect(res.status).toBe(403);
+        expect(mockDbGetOpenShortagesByProductId).not.toHaveBeenCalled();
     });
 });

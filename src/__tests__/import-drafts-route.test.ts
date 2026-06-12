@@ -6,6 +6,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // RBAC Faz 4: import route'larına requirePermission(manage_import) eklendi → allow.
+// Denetim Y1 (2026-06): GET artık resolveAuthContext + requirePermissionFor(view_import).
+const mockResolveAuthContext = vi.fn();
+const mockRequirePermissionFor = vi.fn();
+
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
     requireRole: vi.fn().mockResolvedValue(null),
@@ -13,8 +17,10 @@ vi.mock("@/lib/auth/role-guard", () => ({
     getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["manage_import"])),
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
     getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
+    resolveAuthContext: (...a: unknown[]) => mockResolveAuthContext(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermissionFor(...a),
 }));
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // ── Mocks ─────────────────────────────────────────────────────
 
@@ -55,6 +61,10 @@ function makeDraft(id: string) {
 describe("GET /api/import/[batchId]/drafts", () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockResolveAuthContext.mockResolvedValue({
+            user: { id: "u-1" }, userId: "u-1", roles: ["admin"], perms: new Set(["view_import"]),
+        });
+        mockRequirePermissionFor.mockReturnValue(null);
         mockDbListDrafts.mockResolvedValue([makeDraft("d1"), makeDraft("d2")]);
     });
 
@@ -84,5 +94,20 @@ describe("drafts route POST kaldırıldı (regression-lock)", () => {
     it("route artık POST export etmez", async () => {
         const mod = await import("@/app/api/import/[batchId]/drafts/route");
         expect("POST" in mod).toBe(false);
+    });
+});
+
+describe("Y1 RBAC guard", () => {
+    it("izin yoksa 403 döner ve DB'ye inmez", async () => {
+        vi.clearAllMocks(); // describe-dışı: önceki testlerin sayaçları taşınmasın
+        mockResolveAuthContext.mockResolvedValue({
+            user: { id: "u-1" }, userId: "u-1", roles: ["viewer"], perms: new Set(),
+        });
+        mockRequirePermissionFor.mockReturnValue(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+        const res = await GET(makeGetReq(), makeCtx());
+        expect(res.status).toBe(403);
+        expect(mockDbListDrafts).not.toHaveBeenCalled();
     });
 });

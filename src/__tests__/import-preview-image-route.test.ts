@@ -24,7 +24,7 @@ vi.mock("@/lib/services/pdf-render", async () => {
     return { ...actual, renderPdfPageToPng: (...a: unknown[]) => mockRenderPdf(...a) };
 });
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { GET } from "@/app/api/import/documents/[id]/lines/[lineId]/preview-image/route";
 
 const PDF_DOC = { id: "doc-1", mime_type: "application/pdf", file_path: "staging/doc-1.pdf" };
@@ -35,7 +35,20 @@ function call(id: string, lineId: string) {
     return GET(req, { params: Promise.resolve({ id, lineId }) });
 }
 
+// ── Denetim Y1 (2026-06): route artık view_import şartı arar (demo-dostu requirePermissionFor) ──
+const mockResolveAuthContext = vi.fn();
+const mockRequirePermissionFor = vi.fn();
+
+vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext: (...a: unknown[]) => mockResolveAuthContext(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermissionFor(...a),
+}));
+
 beforeEach(() => {
+    mockResolveAuthContext.mockResolvedValue({
+        user: { id: "u-1" }, userId: "u-1", roles: ["admin"], perms: new Set(["view_import"]),
+    });
+    mockRequirePermissionFor.mockReturnValue(null);
     mockGetLine.mockReset();
     mockGetDoc.mockReset();
     mockDownload.mockReset();
@@ -106,5 +119,16 @@ describe("preview-image route", () => {
         expect(res.status).toBe(200);
         expect(res.headers.get("X-Render-Mode")).toBe("cropped");
         expect(mockRenderPdf).toHaveBeenCalledWith(expect.anything(), 0, { clip: [0.1, 0.1, 0.7, 0.6] });
+    });
+});
+
+describe("Y1 RBAC guard", () => {
+    it("izin yoksa 403 döner ve DB'ye inmez", async () => {
+        mockRequirePermissionFor.mockReturnValue(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+        const res = await GET({} as never, { params: Promise.resolve({ id: "doc-1", lineId: "line-1" }) });
+        expect(res.status).toBe(403);
+        expect(mockGetLine).not.toHaveBeenCalled();
     });
 });

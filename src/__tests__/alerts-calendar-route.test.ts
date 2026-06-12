@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const mockListAlerts = vi.fn();
 const mockEnrich = vi.fn();
@@ -22,7 +22,20 @@ function req(qs = ""): NextRequest {
     return new NextRequest(`http://localhost/api/alerts/calendar${qs}`);
 }
 
+// ── Denetim Y1 (2026-06): route artık view_alerts şartı arar (demo-dostu requirePermissionFor) ──
+const mockResolveAuthContext = vi.fn();
+const mockRequirePermissionFor = vi.fn();
+
+vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext: (...a: unknown[]) => mockResolveAuthContext(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermissionFor(...a),
+}));
+
 beforeEach(() => {
+    mockResolveAuthContext.mockResolvedValue({
+        user: { id: "u-1" }, userId: "u-1", roles: ["admin"], perms: new Set(["view_alerts"]),
+    });
+    mockRequirePermissionFor.mockReturnValue(null);
     mockListAlerts.mockReset().mockResolvedValue([{ id: "a1", type: "stock_critical" }]);
     mockCalendarList.mockReset().mockResolvedValue([{ id: "a1", type: "stock_critical" }]);
     mockEnrich.mockReset().mockImplementation((alerts) =>
@@ -54,5 +67,16 @@ describe("GET /api/alerts/calendar", () => {
         mockCalendarList.mockRejectedValue(new Error("boom"));
         const res = await GET(req());
         expect(res.status).toBe(500);
+    });
+});
+
+describe("Y1 RBAC guard", () => {
+    it("izin yoksa 403 döner ve DB'ye inmez", async () => {
+        mockRequirePermissionFor.mockReturnValue(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+        const res = await GET(new NextRequest("http://test/api/alerts/calendar"));
+        expect(res.status).toBe(403);
+        expect(mockCalendarList).not.toHaveBeenCalled();
     });
 });

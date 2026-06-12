@@ -18,9 +18,22 @@ vi.mock("next/headers", () => ({
     cookies: () => Promise.resolve({ get: () => undefined, getAll: () => [] }),
 }));
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+// ── Denetim Y1 (2026-06): route artık view_import şartı arar (demo-dostu requirePermissionFor) ──
+const mockResolveAuthContext = vi.fn();
+const mockRequirePermissionFor = vi.fn();
+
+vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext: (...a: unknown[]) => mockResolveAuthContext(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermissionFor(...a),
+}));
 
 beforeEach(() => {
+    mockResolveAuthContext.mockResolvedValue({
+        user: { id: "u-1" }, userId: "u-1", roles: ["admin"], perms: new Set(["view_import"]),
+    });
+    mockRequirePermissionFor.mockReturnValue(null);
     mockGetDoc.mockReset();
     mockListLines.mockReset();
 });
@@ -62,5 +75,16 @@ describe("GET /api/import/documents/[id]/lines", () => {
         mockListLines.mockRejectedValueOnce(new Error("DB down"));
         const res = await callGET("doc-1");
         expect(res.status).toBe(500);
+    });
+});
+
+describe("Y1 RBAC guard", () => {
+    it("izin yoksa 403 döner ve DB'ye inmez", async () => {
+        mockRequirePermissionFor.mockReturnValue(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+        const res = await callGET("doc-1");
+        expect(res.status).toBe(403);
+        expect(mockGetDoc).not.toHaveBeenCalled();
     });
 });

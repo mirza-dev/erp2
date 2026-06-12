@@ -48,13 +48,8 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     // ── 410 tombstone (DB erişimi yok — denetim O9 incelemesi: bulgu DEĞİL) ──
     { path: "quotes/[id]/convert", methods: ["POST"], cls: "public", reason: "Saf 410 Gone tombstone (Faz 6 V4-A8); DB/servis çağrısı yok" },
 
-    // ── AÇIK BULGULAR (docs/audit/2026-06 raporu; guard eklenince sil) ─
-    { path: "alerts/calendar", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_alerts kontrolü yok" },
-    { path: "import/[batchId]/drafts", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_import kontrolü yok (batch GET'i var)" },
-    { path: "import/documents/[id]/lines", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_import kontrolü yok" },
-    { path: "import/documents/[id]/lines/[lineId]/preview-image", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_import kontrolü yok" },
-    { path: "orders/[id]/parasut-status", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_parasut/view_orders kontrolü yok" },
-    { path: "orders/open-count-by-product", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_orders kontrolü yok (yalnız adet — düşük)" },
-    { path: "products/[id]/shortages", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_products kontrolü yok" },
+    // ── AÇIK BULGULAR — Y1 turu (2026-06-12) ile KAPANDI: 7 uç requirePermissionFor
+    // aldı (demo-dostu varyant: anonim→viewer fallback bilinçli; import uçları
+    // viewer'da view_import olmadığından fiilen kapalı). Kayıtlar silindi.
     { path: "products/[id]/attachments/[attachmentId]/url", methods: ["GET"], cls: "public", reason: "O11 KAPANDI: proxy demo-anon'u DEFAULT bloklar (ATTACHMENTS_ALLOW_DEMO_ANON opt-out); oturumlu erişim serbest — route-içi perm guard'ı yok (Y1 genel kapsamında)" },
 ];

@@ -19,11 +19,19 @@ import { dbGetOrderById } from "@/lib/supabase/orders";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbCountRecentSyncLogsByStep } from "@/lib/supabase/sync-log";
+import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 
 export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
 ) {
+    // Denetim Y1 (2026-06): view_sales_orders şartı — tüketici sipariş detay
+    // sayfası (sales/viewer dahil); view_parasut şartı o rolleri kırardı.
+    // Demo-dostu: anonim→viewer fallback bilinçli (rozetler demoda çalışır).
+    const authCtx = await resolveAuthContext();
+    const permGuard = requirePermissionFor(authCtx, "view_sales_orders");
+    if (permGuard) return permGuard;
+
     try {
         const { id } = await params;
         const order = await dbGetOrderById(id);

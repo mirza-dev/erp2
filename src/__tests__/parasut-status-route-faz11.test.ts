@@ -5,7 +5,7 @@
  *   - eDoc status pass-through
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const mockDbGetOrderById    = vi.fn();
 const mockDbGetCustomerById = vi.fn();
@@ -53,8 +53,21 @@ function makeReq(): NextRequest {
 }
 const params = { params: Promise.resolve({ id: ORDER_ID }) };
 
+// ── Denetim Y1 (2026-06): route artık view_sales_orders şartı arar (demo-dostu requirePermissionFor) ──
+const mockResolveAuthContext = vi.fn();
+const mockRequirePermissionFor = vi.fn();
+
+vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext: (...a: unknown[]) => mockResolveAuthContext(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermissionFor(...a),
+}));
+
 beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveAuthContext.mockResolvedValue({
+        user: { id: "u-1" }, userId: "u-1", roles: ["admin"], perms: new Set(["view_sales_orders"]),
+    });
+    mockRequirePermissionFor.mockReturnValue(null);
     mockDbGetOrderById.mockResolvedValue(baseOrder);
     mockDbGetCustomerById.mockResolvedValue({ id: "cust-1", parasut_contact_id: null });
     mockDbGetProductById.mockResolvedValue({ id: "prod-1", parasut_product_id: null });
@@ -181,5 +194,16 @@ describe("GET /api/orders/[id]/parasut-status", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.attemptsLast24h).toEqual({});
+    });
+});
+
+describe("Y1 RBAC guard", () => {
+    it("izin yoksa 403 döner ve DB'ye inmez", async () => {
+        mockRequirePermissionFor.mockReturnValue(
+            NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }),
+        );
+        const res = await GET({} as never, { params: Promise.resolve({ id: "o-1" }) });
+        expect(res.status).toBe(403);
+        expect(mockDbGetOrderById).not.toHaveBeenCalled();
     });
 });

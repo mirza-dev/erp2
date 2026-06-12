@@ -190,7 +190,7 @@ Ek olarak bu denetimde dış raporun **görmediği** bulgular çıktı (K3 impor
 | K3 import KDV | ✅ kod | siparişin vat_rate+discount_amount'ı ile 081 formülü |
 | K4+Y3 rezervasyon | ✅ kod | `serviceReconcileQuoteReservations` alert-scan'de (iki yön + sync_issue) |
 | K5 drift | ✅ sistem | check-migrations.ts (probe) + PROBES/MANUAL kültürü |
-| Y1 guard'sız GET'ler | 🔶 kısmen | en riskli 2 uç kapandı (K1+Y2); kalan 8 ACIK-BULGU baseline'da işaretli, gate küçülmeye zorlar |
+| Y1 guard'sız GET'ler | ✅ kod (2026-06-12) | kalan 7 uç requirePermissionFor aldı — **demo-dostu varyant** (kullanıcı kararı): anonim→viewer fallback bilinçli, demo gezintisi yaşar; import uçları viewer'da izin olmadığından fiilen kapalı; baseline'da ACIK-BULGU sınıfı KALMADI (y1-route-guards testi kilitler) |
 | Y2 stock-risk | ✅ kod | oturum + view_products |
 | Y4 088 regresyonları | ✅ mig.094 apply edildi (2026-06-12) | description + qty<=0 + **cancelled-hariç unique index** (dış raporun haklı çıktığı bulgu); doğrulama SQL + smoke bekliyor |
 | Y5 xlsx | ✅ kod | CDN 0.20.3 pin; GHSA'lar kapandı, allowlist'ten silindi |

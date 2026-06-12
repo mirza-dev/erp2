@@ -5,7 +5,8 @@
  * döndürür (hibrit: güvenli bbox varsa kırpılmış, yoksa tam sayfa). Lazy:
  * storage'a YAZMAZ — kullanıcı ExtractionReview'da apply ÖNCESİ görseli görür.
  *
- * Auth: middleware authenticated requirement (lines GET ile aynı; viewer okur).
+ * Auth: view_import şartı (Denetim Y1 2026-06; lines GET ile aynı — viewer'da
+ * view_import yok, demo dahil fiilen kapalı).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -13,6 +14,7 @@ import { dbGetImportDocument } from "@/lib/supabase/import-documents";
 import { dbGetLine } from "@/lib/supabase/import-document-lines";
 import { renderPdfPageToPng, pickRenderClip } from "@/lib/services/pdf-render";
 import { handleApiError } from "@/lib/api-error";
+import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 
 const STORAGE_BUCKET = "product-files";
 
@@ -20,6 +22,10 @@ export async function GET(
     _req: NextRequest,
     ctx: { params: Promise<{ id: string; lineId: string }> },
 ) {
+    const authCtx = await resolveAuthContext();
+    const permGuard = requirePermissionFor(authCtx, "view_import");
+    if (permGuard) return permGuard;
+
     try {
         const { id, lineId } = await ctx.params;
         if (!id || !lineId) {
