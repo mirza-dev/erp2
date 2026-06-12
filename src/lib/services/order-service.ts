@@ -53,6 +53,9 @@ export interface TransitionResult {
     error?: string;
     shortages?: ShortageInfo[];
     fulfillment_status?: FulfillmentStatus;
+    /** O1 (2026-06): sevk RPC'si BAŞARILI (stok düştü) ama shipped_at/parasut_step
+     *  yazımı başarısız — durum "başarısız" DEĞİL, uyarılı başarı (UI toast warning). */
+    postShipWarning?: string;
 }
 
 export interface ValidationResult {
@@ -331,9 +334,13 @@ export async function serviceTransitionOrder(
                     orderId,
                     patch,
                 }));
+                // O1 (2026-06): stok GERÇEKTEN hareket etti (RPC commit edildi) —
+                // caller'a "başarısız" demek yanıltıcıydı (UI retry'ı teşvik eder,
+                // durum tutarsız görünür). Dürüst sinyal: uyarılı başarı; Paraşüt
+                // başlangıç adımı için manuel kontrol mesajda.
                 return {
-                    success: false,
-                    error: `Sevk başarılı ancak shipped_at/parasut_step yazılamadı: ${updErr.message}`,
+                    success: true,
+                    postShipWarning: `Sevk tamamlandı ancak sevk tarihi/Paraşüt adımı yazılamadı: ${updErr.message}. Kaydı manuel kontrol edin.`,
                 };
             }
         }

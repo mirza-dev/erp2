@@ -251,21 +251,21 @@ describe("Faz 11.1 — serviceTransitionOrder('shipped') sonrası DB yazımı", 
 
 // M1 (bulgu fix) — post-ship update hatası
 describe("M1 fix — post-ship shipped_at/parasut_step update hatası yutulmuyor", () => {
-    it("Paraşüt on + DB update fail → success:false + açıklayıcı error", async () => {
+    it("O1 (2026-06): Paraşüt on + DB update fail → uyarılı BAŞARI (stok düştü; retry yanıltmaz)", async () => {
         process.env.PARASUT_ENABLED = "true";
         pendingUpdateResults.push({ error: { message: "DB connection lost" } });
         const r = await serviceTransitionOrder(ORDER_ID, "shipped");
-        expect(r.success).toBe(false);
-        expect(r.error).toMatch(/shipped_at\/parasut_step yazılamadı/);
-        expect(r.error).toMatch(/DB connection lost/);
+        expect(r.success).toBe(true);
+        expect(r.postShipWarning).toMatch(/sevk tarihi\/Paraşüt adımı yazılamadı/);
+        expect(r.postShipWarning).toMatch(/DB connection lost/);
     });
 
-    it("Paraşüt off + DB update fail → success:false (shipped_at yazımı kanonik)", async () => {
+    it("O1: Paraşüt off + DB update fail → uyarılı başarı + mesaj manuel kontrolü söyler", async () => {
         process.env.PARASUT_ENABLED = "false";
         pendingUpdateResults.push({ error: { message: "fk violation" } });
         const r = await serviceTransitionOrder(ORDER_ID, "shipped");
-        expect(r.success).toBe(false);
-        expect(r.error).toMatch(/shipped_at/);
+        expect(r.success).toBe(true);
+        expect(r.postShipWarning).toMatch(/manuel kontrol/);
     });
 
     it("DB update başarılı → success:true (regresyon)", async () => {

@@ -632,7 +632,14 @@ export async function serviceApplyImportDocument(
             try {
                 await dbUpdateImportDocumentStatus(documentId, "applied");
                 successPath = true;
-            } catch (statusErr) {
+            } catch (firstErr) {
+                // O2 (2026-06): tek retry — geçici ağ/timeout hatasında doc
+                // 'applying'de kilitli kalıp admin SQL'i gerektirmesin.
+                console.warn("[import-apply] status update 1. deneme başarısız, yeniden deneniyor:", firstErr);
+                try {
+                    await dbUpdateImportDocumentStatus(documentId, "applied");
+                    successPath = true;
+                } catch (statusErr) {
                 postCommitStatusFailed = true;
                 // Faz 3c Review 5.tur: result'a da flag yaz → API response'ta
                 // UI'a taşınır, "Belge uygulandı" yerine "admin recovery gerek"
@@ -643,6 +650,7 @@ export async function serviceApplyImportDocument(
                     statusErr,
                 );
                 // throw YOK — outer catch'e düşmesin, audit yazılsın.
+                }
             }
         } else {
             // Faz 3c Review 3.tur: lock'u serbest bırak — 'applying' takılı kalmasın

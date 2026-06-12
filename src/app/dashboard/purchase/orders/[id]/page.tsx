@@ -165,6 +165,18 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     const handleReceive = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (!po) return;
+        // D5 (2026-06): negatif/geçersiz giriş sessizce filtrelenmesin — kullanıcı
+        // "kaydettim" sanıp satırın atlandığını fark etmiyordu.
+        const invalid = po.lines.filter(l => {
+            const raw = (receiveQtys[l.id] ?? "").trim();
+            if (raw === "") return false; // boş = bilinçli atlama
+            const n = Number(raw);
+            return !Number.isInteger(n) || n < 0;
+        });
+        if (invalid.length > 0) {
+            toast({ type: "error", message: "Geçersiz miktar girilen satır var — miktarlar 0 veya pozitif tam sayı olmalı." });
+            return;
+        }
         const lines = po.lines
             .map(l => ({ line_id: l.id, qty: parseInt(receiveQtys[l.id] ?? "0", 10) }))
             .filter(l => l.qty > 0);

@@ -425,14 +425,23 @@ export function useOrderMutations() {
         body: JSON.stringify(body),
       });
       if (res.ok) {
-        const data: SalesOrderRow & { submitError?: string } = await res.json();
-        await mutate(ORDERS_KEY,
-          (prev: Order[] | undefined) => [mapOrderSummary(data), ...(prev ?? [])],
-          { revalidate: false });
-        void mutate(COUNTERS_KEY);
-        // create-and-send: pending istendi ama allocation başarısızsa (stok yok)
-        // sipariş DRAFT kaldı → submitError ile dürüst bildirim (route 201 döner).
-        return { id: data.id, submitError: data.submitError };
+        // O10 (2026-06): başarı yolunda parse/map/mutate patlarsa cache DB'nin
+        // gerisinde kalır (sipariş var, listede yok). Bu durumda key'ler
+        // background refetch'e zorlanır — sayfa yenilemeden tutarlılık döner.
+        try {
+          const data: SalesOrderRow & { submitError?: string } = await res.json();
+          await mutate(ORDERS_KEY,
+            (prev: Order[] | undefined) => [mapOrderSummary(data), ...(prev ?? [])],
+            { revalidate: false });
+          void mutate(COUNTERS_KEY);
+          // create-and-send: pending istendi ama allocation başarısızsa (stok yok)
+          // sipariş DRAFT kaldı → submitError ile dürüst bildirim (route 201 döner).
+          return { id: data.id, submitError: data.submitError };
+        } catch (postErr) {
+          void mutate(ORDERS_KEY);
+          void mutate(COUNTERS_KEY);
+          throw postErr;
+        }
       }
       const errJson = await res.json().catch(() => null);
       const errMsg =

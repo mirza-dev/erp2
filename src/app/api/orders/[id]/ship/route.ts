@@ -110,7 +110,13 @@ export async function POST(
         // RBAC R3/F3a: ship_sales_orders tutan production view_sales_prices tutmaz
         // → ship response'undaki satış finansalları redakte edilir (per-request).
         const perms = await getCurrentUserPermissions(req);
-        return NextResponse.json(updated ? redactOrderForPerms(updated, perms) : { ok: true });
+        const responseBody = updated ? redactOrderForPerms(updated, perms) : { ok: true };
+        // O1: stok düştü ama shipped_at/parasut_step yazılamadıysa UI'ya uyarı taşı.
+        return NextResponse.json(
+            result.postShipWarning
+                ? { ...responseBody, postShipWarning: result.postShipWarning }
+                : responseBody,
+        );
     } catch (err) {
         return handleApiError(err, "POST /api/orders/[id]/ship");
     }

@@ -865,13 +865,31 @@ describe("serviceApplyImportDocument — Review (P3 aggregate audit)", () => {
 // ── Faz 3c Review 4.tur — Post-commit rollback fix (P2) ──────────────────────
 
 describe("serviceApplyImportDocument — Faz 3c Review 4.tur (P2 post-commit)", () => {
-    it("CRITICAL: post-commit status update fail → 'applying'de KAL (rollback YOK, duplicate engel)", async () => {
+    it("O2 (2026-06): TEK geçici hata → retry kurtarır; flag YOK, doc 'applied'", async () => {
+        mockClaim.mockResolvedValueOnce(DOC);
+        mockListLines.mockResolvedValueOnce([makeLine("1")]);
+        mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
+        // 1. deneme fail, 2. deneme (retry) default mock ile başarılı
+        mockUpdateDocStatus.mockRejectedValueOnce(new Error("transient timeout"));
+
+        const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
+        const r = await serviceApplyImportDocument("doc-1", null);
+
+        expect(r.products_created).toBe(1);
+        expect(r.status_update_failed).toBeFalsy();
+        const appliedCalls = mockUpdateDocStatus.mock.calls.filter(c => c[1] === "applied");
+        expect(appliedCalls).toHaveLength(2); // ilk deneme + retry
+    });
+
+    it("CRITICAL: post-commit status update İKİ KEZ fail → 'applying'de KAL (rollback YOK, duplicate engel)", async () => {
         // Setup: 1 ürün başarıyla yaratılır
         mockClaim.mockResolvedValueOnce(DOC);
         mockListLines.mockResolvedValueOnce([makeLine("1")]);
         mockCreateProduct.mockResolvedValueOnce({ id: "p-new" });
-        // İlk dbUpdateImportDocumentStatus("applied") çağrısı fail
-        mockUpdateDocStatus.mockRejectedValueOnce(new Error("DB write conflict"));
+        // O2 retry'ı da dahil İKİ deneme de fail
+        mockUpdateDocStatus
+            .mockRejectedValueOnce(new Error("DB write conflict"))
+            .mockRejectedValueOnce(new Error("DB write conflict"));
 
         const { serviceApplyImportDocument } = await import("@/lib/services/import-apply-service");
         // Service throw ETMEZ — audit yazılır, result döner

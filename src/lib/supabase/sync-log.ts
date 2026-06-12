@@ -1,6 +1,22 @@
 import { createServiceClient } from "./service";
 import type { IntegrationSyncLogRow } from "@/lib/database.types";
 
+/**
+ * Denetim O4 (2026-06): Paraşüt API hataları müşteri adı/VKN/e-posta içerebilir
+ * ve `/api/parasut/logs` üzerinden view_parasut rolüne görünür. Mesaj log'a
+ * yazılmadan PII maskelenir + 300 karaktere kırpılır (hata kodu/teşhis kalır).
+ * Saf ve export — testlenebilir.
+ */
+export function sanitizeSyncErrorMessage(msg: string | undefined | null): string | null {
+    if (!msg) return null;
+    return msg
+        // e-posta adresleri
+        .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, "[email]")
+        // VKN/TCKN sınıfı uzun rakam dizileri (10-11 hane)
+        .replace(/\b\d{10,11}\b/g, "[vkn]")
+        .slice(0, 300);
+}
+
 export interface CreateSyncLogInput {
     entity_type: string;
     entity_id?: string;
@@ -25,7 +41,7 @@ export async function dbCreateSyncLog(input: CreateSyncLogInput): Promise<Integr
             direction: input.direction,
             status: input.status,
             external_id: input.external_id ?? null,
-            error_message: input.error_message ?? null,
+            error_message: sanitizeSyncErrorMessage(input.error_message),
             retry_count: 0,
             source: input.source ?? "system",
             requested_at: now,

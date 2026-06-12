@@ -1034,16 +1034,18 @@ export function reconcileParasutDiscount(order: ReconcileOrder): {
         return { ok: false, expected: NaN, grandTotal, tolerance: 0, reason: "subtotal_zero" };
     }
     const headerPct = computeHeaderDiscountPct(discountAmount, subtotal);
-    let expected = 0;
+    // O3 (2026-06): kuruş-tamsayı akümülasyon — satır brüt değeri kuruşa
+    // yuvarlanıp int toplanır; float drift'i (0.1+0.2 sınıfı) birikemez.
+    let expectedCents = 0;
     for (const l of order.lines) {
         const qty   = Number(l.quantity);
         const price = Number(l.unit_price);
         const pct   = Number(l.discount_pct ?? 0) + headerPct;
         const vat   = Number(l.vat_rate ?? 20);
         const net   = qty * price * (1 - pct / 100);
-        expected += net * (1 + vat / 100);
+        expectedCents += Math.round(net * (1 + vat / 100) * 100);
     }
-    expected = Math.round(expected * 100) / 100;
+    const expected = expectedCents / 100;
     // Per-satır yuvarlama drift'i: satır başına ≤1 kuruş + 1 kuruş tampon.
     const tolerance = 0.01 * order.lines.length + 0.01;
     return { ok: Math.abs(expected - grandTotal) <= tolerance, expected, grandTotal, tolerance };
