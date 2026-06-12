@@ -54,6 +54,7 @@ const PROBES: Record<string, Probe> = {
     "091": { kind: "table", table: "company_files" },
     "092": { kind: "table", table: "calendar_notes" },
     "096": { kind: "column", table: "email_logs", column: "body_expires_at" },
+    "097": { kind: "table", table: "notification_outbox" },
 };
 
 /** OpenAPI'den görünmeyen migration'lar — elle SQL doğrulaması gerekir.

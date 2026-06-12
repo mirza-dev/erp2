@@ -52,6 +52,20 @@ export function buildMiniPdf(title: string, lines: string[] = []): Buffer {
     return Buffer.from(body + xref + trailer, "latin1");
 }
 
+// ── Mini HTML (teklif arşivi — quote-pdfs bucket'ı YALNIZ text/html kabul eder, 076) ──
+
+export function buildMiniHtml(title: string, lines: string[] = []): Buffer {
+    const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const html = `<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><title>${esc(title)}</title></head>
+<body style="font-family:sans-serif;max-width:720px;margin:40px auto;color:#1a2230">
+<h1 style="font-size:20px">${esc(title)}</h1>
+${lines.map(l => `<p style="font-size:13px;margin:6px 0">${esc(l)}</p>`).join("\n")}
+</body></html>
+`;
+    return Buffer.from(html, "utf-8");
+}
+
 // ── Placeholder PNG ──────────────────────────────────────────────────────────
 // 48×48 düz renkli geçerli PNG (CRC32 + zlib deflate ile elle kurulur).
 

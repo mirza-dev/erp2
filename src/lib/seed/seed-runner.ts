@@ -12,7 +12,7 @@
  */
 import { createHash } from "node:crypto";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildMiniPdf, buildPlaceholderPng } from "./seed-assets";
+import { buildMiniHtml, buildMiniPdf, buildPlaceholderPng } from "./seed-assets";
 import {
     SEED_COMPANY, SEED_FACTORY_ADDRESS, PRODUCT_TYPE_IDS,
     SEED_VENDORS, SEED_PRODUCTS, SEED_CUSTOMERS, SEED_QUOTES, SEED_ORDERS,
@@ -340,28 +340,29 @@ export async function runSeed(supabase: Service): Promise<Record<string, unknown
     await supabase.from("quote_yearly_counters")
         .upsert({ year, last_seq: SEED_QUOTES.length }, { onConflict: "year" });
 
-    // Arşiv PDF'leri (sentetik — quote-pdfs bucket, demo/ prefix)
+    // Teklif arşivleri — gerçek sistemle aynı format: HTML snapshot (quote-pdfs
+    // bucket'ı YALNIZ text/html kabul eder, mig.076; PDF yüklenirse reddedilir).
     const archiveIdByQuoteNumber = new Map<string, string>();
     let archiveCount = 0;
     for (const q of SEED_QUOTES) {
         if (!q.withPdfArchive) continue;
         const quoteId = quoteIdByNumber.get(q.quoteNumber);
         if (!quoteId) continue;
-        const pdf = buildMiniPdf(`Teklif ${q.quoteNumber} (rev ${q.revisionNo})`, [
+        const html = buildMiniHtml(`Teklif ${q.quoteNumber} (rev ${q.revisionNo})`, [
             SEED_COMPANY.name,
-            `Musteri: ${q.customerName}`,
-            `Para birimi: ${q.currency} — Toplam: ${quoteTotals(q).grandTotal}`,
-            "DEMO ARSIV — sentetik icerik",
+            `Müşteri: ${q.customerName}`,
+            `Para birimi: ${q.currency} — Genel toplam: ${quoteTotals(q).grandTotal}`,
+            "DEMO ARŞİV — sentetik içerik",
         ]);
         const path = await uploadDemoFile(
-            supabase, "quote-pdfs", `${q.quoteNumber}-rev${q.revisionNo}.pdf`,
-            pdf, "application/pdf", warnings,
+            supabase, "quote-pdfs", `${q.quoteNumber}-rev${q.revisionNo}.html`,
+            html, "text/html", warnings,
         );
         if (!path) continue;
         const { data: arch, error } = await supabase.from("quote_pdf_archives").insert({
             quote_id: quoteId, revision_no: q.revisionNo, file_path: path,
-            content_hash: createHash("sha256").update(pdf).digest("hex"),
-            byte_size: pdf.length,
+            content_hash: createHash("sha256").update(html).digest("hex"),
+            byte_size: html.length,
         }).select("id").single();
         if (error) { warnings.push(`quote_pdf_archives ${q.quoteNumber}: ${error.message}`); continue; }
         archiveIdByQuoteNumber.set(q.quoteNumber, arch.id);

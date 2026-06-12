@@ -4,7 +4,8 @@
  * imza + yapı kontrolleri; gerçek render testi tarayıcı smoke'unda.)
  */
 import { describe, it, expect } from "vitest";
-import { buildMiniPdf, buildPlaceholderPng } from "@/lib/seed/seed-assets";
+import { readFileSync } from "node:fs";
+import { buildMiniHtml, buildMiniPdf, buildPlaceholderPng } from "@/lib/seed/seed-assets";
 
 describe("buildMiniPdf", () => {
     it("geçerli PDF imzasıyla başlar ve EOF ile biter", () => {
@@ -24,6 +25,24 @@ describe("buildMiniPdf", () => {
     it("Türkçe karakterleri WinAnsi-güvenli sadeleştirir, parantezleri kaçışlar", () => {
         const s = buildMiniPdf("Çelik Şartname (İhracat)").toString("latin1");
         expect(s).toContain("Celik Sartname \\(Ihracat\\)");
+    });
+});
+
+describe("buildMiniHtml — teklif arşivi formatı", () => {
+    it("geçerli UTF-8 HTML üretir, içeriği escape'ler", () => {
+        const html = buildMiniHtml("Teklif <TKL-001> & Co", ["satır <1>"]).toString("utf-8");
+        expect(html).toContain("<!doctype html>");
+        expect(html).toContain('<meta charset="utf-8">');
+        expect(html).toContain("Teklif &lt;TKL-001&gt; &amp; Co");
+        expect(html).toContain("satır &lt;1&gt;");
+    });
+
+    it("runner teklif arşivini text/html olarak yükler — quote-pdfs bucket'ı (076) PDF KABUL ETMEZ", () => {
+        const runner = readFileSync("src/lib/seed/seed-runner.ts", "utf8");
+        const archiveBlock = runner.slice(runner.indexOf("Teklif arşivleri"), runner.indexOf("// ── 8."));
+        expect(archiveBlock).toContain('"text/html"');
+        expect(archiveBlock).toContain("buildMiniHtml");
+        expect(archiveBlock).not.toContain('"application/pdf"');
     });
 });
 
