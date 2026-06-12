@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { serviceScanStockAlerts, serviceCheckOverduePurchaseOrders } from "@/lib/services/alert-service";
+import { serviceReconcileQuoteReservations } from "@/lib/services/quote-service";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 
@@ -51,7 +52,17 @@ export async function POST(request: Request) {
         } catch (poErr) {
             console.error("[POST /api/alerts/scan] po_overdue scan", poErr);
         }
-        return NextResponse.json({ ...result, poOverdue });
+        // K4+Y3 reconciler (2026-06): send/reject best-effort artıkları — "sent ama
+        // sipariş yok" onarılır, "terminal ama pending order yaşıyor" bırakılır.
+        // Non-fatal: reconciler patlarsa stok sonuçları yine döner.
+        let quoteReconcile: { repaired: number; released: number; alerted: number } =
+            { repaired: 0, released: 0, alerted: 0 };
+        try {
+            quoteReconcile = await serviceReconcileQuoteReservations();
+        } catch (qrErr) {
+            console.error("[POST /api/alerts/scan] quote reconcile", qrErr);
+        }
+        return NextResponse.json({ ...result, poOverdue, quoteReconcile });
     } catch (err) {
         console.error("[POST /api/alerts/scan]", err);
         return NextResponse.json({ error: "Tarama başarısız." }, { status: 500 });

@@ -24,7 +24,7 @@ Kullanıcının paylaştığı dış denetim raporundaki her iddia kodda doğrul
 | Sipariş/teklif toplamları istemciden sahte oluşturulabilir | ✅ DOĞRU | K2 — `quantity=100, unit_price=100, line_total=1` kabul edilir |
 | Teklif önce sent, rezervasyon best-effort | ✅ DOĞRU | K4 |
 | Reject/expire release best-effort → phantom rezervasyon | ✅ DOĞRU | Y3 |
-| **İptal edilen quote-order yeniden oluşturulamaz** | ❌ YANLIŞ | 088 RPC idempotency'de `commercial_status <> 'cancelled'` filtreler (088:55-59) → iptal sonrası yeni order oluşur. Kalan gerçek risk: eşzamanlı çift send → 23505 yarışı (Düşük) |
+| **İptal edilen quote-order yeniden oluşturulamaz** | ✅ DOĞRU (düzeltme: ilk değerlendirmemiz yanlıştı) | 037 unique index cancelled satırları DA kapsıyordu; 088'in idempotency'si cancelled'ı dışladığından yeni INSERT aynı quote_id ile 23505'e çarpar → teklif bir daha gönderilemezdi. **mig.094 ile kapatıldı** (index cancelled'ı dışlar). Eşzamanlılık zaten quote FOR UPDATE ile serialize |
 | xlsx 0.18.5 savunmasız | ✅ DOĞRU | Y5 — `npm audit`: prototype pollution + ReDoS, fix yok |
 | 019 advisory-lock RPC'leri REVOKE/search_path'siz | ✅ DOĞRU | Y7 — 039/054/071/088 doğru kalıbı kullanıyor, 019+016 outlier |
 | 088, 080'in description + 078'in qty-guard'ını düşürüyor | ✅ DOĞRU | Y4 — send path'te ikisi de yok |
@@ -159,7 +159,7 @@ Ek olarak bu denetimde dış raporun **görmediği** bulgular çıktı (K3 impor
 | PO receive çift artırım "on_hand bozulur" | Aynı nedenle imkânsız (RAISE tüm fonksiyonu geri alır) |
 | QuoteForm Türkçe virgül `parseFloat("1.234,56")=1.234` | Fiyat/adet input'ları `type="number"` — tarayıcı virgüllü değeri value olarak vermez |
 | E-posta dedup hatasında "skipped sayılıp yine gönderiliyor" | Hata yolunda `skipped` artmaz; bilinçli gönderime-devam, yorumla belgeli |
-| İptal edilen quote-order yeniden oluşturulamaz | 088 idempotency `<> 'cancelled'` filtreli; yalnız eşzamanlılık yarışı kalır (D3) |
+| ~~İptal edilen quote-order yeniden oluşturulamaz~~ | **GERİ ALINDI — iddia DOĞRUYMUŞ:** ajan "idempotency INSERT'i önler" demişti ama kontrol cancelled'ı dışlıyor → INSERT 037 index'ine çarpar. mig.094 düzeltti. (D3 "eşzamanlılık yarışı" diye yazdığımız da yanlıştı: FOR UPDATE serialize ediyor) |
 | `accept_quote` 077↔088 uyumsuz | 088 tek migration içinde tutarlı; risk yalnız kısmi apply (K5 drift kontrolü kapsar) |
 
 ## 6. Önceliklendirilmiş yol haritası

@@ -309,3 +309,51 @@ export async function dbCancelQuoteLinkedOrder(quoteId: string): Promise<void> {
     const { error } = await sb.rpc("cancel_quote_linked_order", { p_quote_id: quoteId });
     if (error) throw error;
 }
+
+// ── Rezervasyon reconciler sorguları (denetim K4+Y3, 2026-06) ───────────────
+
+export interface QuoteReservationMismatches {
+    /** status=sent ama bağlı (cancelled olmayan) sipariş YOK → rezervasyon kaçmış. */
+    sentWithoutOrder: Array<{ id: string; quote_number: string }>;
+    /** status=rejected/expired ama bağlı pending_approval sipariş YAŞIYOR → phantom rezerv. */
+    terminalWithActiveOrder: Array<{ id: string; quote_number: string; status: string }>;
+}
+
+/**
+ * Send/reject yollarının best-effort yan etkileri başarısız kaldığında oluşan
+ * iki yönlü tutarsızlığı listeler (alert-scan reconciler'ı tüketir):
+ *  - sent + linked-order-yok  → dbSendQuoteCreatePendingOrder ile onarılır
+ *  - terminal + pending-order → dbCancelQuoteLinkedOrder ile bırakılır
+ */
+export async function dbListQuoteReservationMismatches(): Promise<QuoteReservationMismatches> {
+    const sb = createServiceClient();
+
+    const [{ data: sent, error: e1 }, { data: terminal, error: e2 }] = await Promise.all([
+        sb.from("quotes").select("id, quote_number").eq("status", "sent"),
+        sb.from("quotes").select("id, quote_number, status").in("status", ["rejected", "expired"]),
+    ]);
+    if (e1) throw new Error(e1.message);
+    if (e2) throw new Error(e2.message);
+
+    const allIds = [...(sent ?? []), ...(terminal ?? [])].map((q) => q.id);
+    if (allIds.length === 0) return { sentWithoutOrder: [], terminalWithActiveOrder: [] };
+
+    const { data: orders, error: e3 } = await sb
+        .from("sales_orders")
+        .select("quote_id, commercial_status")
+        .in("quote_id", allIds)
+        .neq("commercial_status", "cancelled");
+    if (e3) throw new Error(e3.message);
+
+    const hasOrder = new Set((orders ?? []).map((o) => o.quote_id));
+    const hasPending = new Set(
+        (orders ?? [])
+            .filter((o) => o.commercial_status === "pending_approval")
+            .map((o) => o.quote_id),
+    );
+
+    return {
+        sentWithoutOrder: (sent ?? []).filter((q) => !hasOrder.has(q.id)),
+        terminalWithActiveOrder: (terminal ?? []).filter((q) => hasPending.has(q.id)),
+    };
+}

@@ -45,4 +45,14 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     create_quote_with_lines: ["035", "036", "065", "069", "071", "093"],
     update_quote_with_lines: ["035", "036", "065", "069", "071", "093"],
     accept_quote_and_create_order: ["077", "078", "080", "088"],
+    // 094 (Y4): description kopyalama + qty<=0 pre-check geri geldi; index
+    // cancelled'ı dışlar (iptal sonrası yeniden gönderim) — 088 davranışının
+    // geri kalanı birebir korundu.
+    send_quote_and_create_pending_order: ["088", "094"],
+    // 095 (Y7): gövdeler birebir; yalnız SET search_path + REVOKE/GRANT eklendi.
+    try_acquire_scan_lock: ["019", "095"],
+    release_scan_lock: ["019", "095"],
+    try_acquire_ai_suggest_lock: ["019", "095"],
+    release_ai_suggest_lock: ["019", "095"],
+    check_migration_011_applied: ["016", "095"],
 };

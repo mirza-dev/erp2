@@ -55,9 +55,13 @@ const PROBES: Record<string, Probe> = {
     "092": { kind: "table", table: "calendar_notes" },
 };
 
-/** OpenAPI'den görünmeyen migration'lar — elle SQL doğrulaması gerekir. */
+/** OpenAPI'den görünmeyen migration'lar — elle SQL doğrulaması gerekir.
+ *  (Fonksiyon REDEFINE'ları OpenAPI'de görünmez — rpc path'i zaten vardı.) */
 const MANUAL: Record<string, string> = {
     "089": "alerts type CHECK 'po_overdue' içeriyor mu: SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'alerts'::regclass AND contype = 'c';",
+    "093": "order/quote RPC recompute: SELECT prosrc LIKE '%v_line_total%' FROM pg_proc WHERE proname='create_order_with_lines';",
+    "094": "send fix: SELECT prosrc LIKE '%qli.description%' FROM pg_proc WHERE proname='send_quote_and_create_pending_order'; + index: SELECT indexdef FROM pg_indexes WHERE indexname='uq_sales_orders_quote_id'; (cancelled hariç olmalı)",
+    "095": "lock hijyeni: SELECT proname, proconfig FROM pg_proc WHERE proname LIKE '%scan_lock%'; (search_path set olmalı)",
 };
 
 interface OpenApiSpec {

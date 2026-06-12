@@ -8,7 +8,7 @@
 
 import { createHash } from "crypto";
 import type { QuoteStatus } from "@/lib/database.types";
-import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision, dbAcceptQuoteAndCreateOrder, dbSendQuoteCreatePendingOrder, dbCancelQuoteLinkedOrder } from "@/lib/supabase/quotes";
+import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision, dbAcceptQuoteAndCreateOrder, dbSendQuoteCreatePendingOrder, dbCancelQuoteLinkedOrder, dbListQuoteReservationMismatches } from "@/lib/supabase/quotes";
 import type { SendQuoteOrderResult } from "@/lib/supabase/quotes";
 import { dbGetCompanySettings } from "@/lib/supabase/company-settings";
 import { dbGetQuoteArchive, dbCreateQuoteArchive, dbArchiveObjectStatus, dbDeleteQuoteArchive } from "@/lib/supabase/quote-pdf-archives";
@@ -522,4 +522,69 @@ export async function serviceExpireQuotes(): Promise<{ expired: number; expiredI
 
 export async function serviceGetQuote(id: string) {
     return dbGetQuote(id);
+}
+
+// ── Rezervasyon reconciler (denetim K4+Y3, 2026-06) ─────────────────────────
+
+export interface QuoteReconcileResult {
+    /** sent + sipariş-yok → pending order yeniden yaratıldı */
+    repaired: number;
+    /** rejected/expired + pending order → iptal edildi (rezerv bırakıldı) */
+    released: number;
+    /** onarılamayan tutarsızlık için açılan sync_issue alert sayısı */
+    alerted: number;
+}
+
+/**
+ * Send/reject best-effort yan etkilerinin iki yönlü artıklarını onarır.
+ * Alert-scan cron'undan (aynı advisory lock altında) çağrılır:
+ *  - "sent ama bağlı sipariş yok" → rezervasyon RPC'si yeniden denenir
+ *    (RPC idempotent: quote FOR UPDATE + cancelled-hariç kontrol).
+ *  - "rejected/expired ama pending order yaşıyor" → cancel RPC'si denenir.
+ * İkinci deneme de başarısızsa sync_issue alert açılır (entity-bağlı dedup
+ * idx_alerts_active_dedup ile — her taramada çoğalmaz).
+ */
+export async function serviceReconcileQuoteReservations(): Promise<QuoteReconcileResult> {
+    const mismatches = await dbListQuoteReservationMismatches();
+    const result: QuoteReconcileResult = { repaired: 0, released: 0, alerted: 0 };
+
+    for (const q of mismatches.sentWithoutOrder) {
+        try {
+            await dbSendQuoteCreatePendingOrder(q.id, null);
+            result.repaired++;
+            console.info(`[quote-reconcile] ${q.quote_number}: eksik rezervasyon onarıldı`);
+        } catch (err) {
+            const created = await dbCreateAlert({
+                type: "sync_issue",
+                severity: "warning",
+                title: `Teklif rezervasyonu onarılamadı: ${q.quote_number}`,
+                description: `Teklif 'sent' ama bağlı bekleyen sipariş yok; otomatik onarım başarısız: ${err instanceof Error ? err.message : String(err)}`,
+                entity_type: "quote",
+                entity_id: q.id,
+                source: "system",
+            }).catch(() => null);
+            if (created) result.alerted++;
+        }
+    }
+
+    for (const q of mismatches.terminalWithActiveOrder) {
+        try {
+            await dbCancelQuoteLinkedOrder(q.id);
+            result.released++;
+            console.info(`[quote-reconcile] ${q.quote_number}: phantom rezervasyon bırakıldı (${q.status})`);
+        } catch (err) {
+            const created = await dbCreateAlert({
+                type: "sync_issue",
+                severity: "warning",
+                title: `Phantom rezervasyon bırakılamadı: ${q.quote_number}`,
+                description: `Teklif '${q.status}' ama bağlı bekleyen sipariş hâlâ rezerv tutuyor; otomatik iptal başarısız: ${err instanceof Error ? err.message : String(err)}`,
+                entity_type: "quote",
+                entity_id: q.id,
+                source: "system",
+            }).catch(() => null);
+            if (created) result.alerted++;
+        }
+    }
+
+    return result;
 }
