@@ -192,17 +192,20 @@ Ek olarak bu denetimde dış raporun **görmediği** bulgular çıktı (K3 impor
 | K5 drift | ✅ sistem | check-migrations.ts (probe) + PROBES/MANUAL kültürü |
 | Y1 guard'sız GET'ler | 🔶 kısmen | en riskli 2 uç kapandı (K1+Y2); kalan 8 ACIK-BULGU baseline'da işaretli, gate küçülmeye zorlar |
 | Y2 stock-risk | ✅ kod | oturum + view_products |
-| Y4 088 regresyonları | ⏳ **mig.094 APPLY bekliyor** | description + qty<=0 + **cancelled-hariç unique index** (dış raporun haklı çıktığı bulgu) |
+| Y4 088 regresyonları | ✅ mig.094 apply edildi (2026-06-12) | description + qty<=0 + **cancelled-hariç unique index** (dış raporun haklı çıktığı bulgu); doğrulama SQL + smoke bekliyor |
 | Y5 xlsx | ✅ kod | CDN 0.20.3 pin; GHSA'lar kapandı, allowlist'ten silindi |
 | Y6 UTC tarih | ✅ kod | 10 nokta `localISODate`; computeDueDate bilinçli muaf |
-| Y7 lock hijyeni | ⏳ **mig.095 APPLY bekliyor** | search_path + REVOKE/GRANT (016+019) |
+| Y7 lock hijyeni | ✅ mig.095 apply edildi (2026-06-12) | search_path + REVOKE/GRANT (016+019); doğrulama SQL bekliyor |
 | Y8 e-posta sessiz kayıp | ✅ kod | awaited + `ScanResult.emailFailed` |
 | O1/O2/O3/O4/O6/O7/O8/O10/O11 | ✅ kod | Tur B/D/E commit'leri |
 | D1/D2/D4/D5 | ✅ kod | roundMoney / clamp uyarısı / requireCronSecret / receive toast |
 | D3 eşzamanlı send | ✅ kapalı sayıldı | FOR UPDATE zaten serialize ediyordu (ilk değerlendirme hatalıydı); 094 index'i kalan durumu çözer |
-| O5 rate-limit Redis · Next 16.x yükseltme | 📋 ertelendi (kullanıcı kararı) | ayrı turlar; deps-gate allowlist'inde gerekçeli |
+| Next 16.x yükseltme | ✅ kod (2026-06-12) | 16.1.7 → 16.2.9 + fast-uri 3.1.2; 14 next advisory + 2 fast-uri GHSA kapandı; **deps-gate allowlist BOŞ** — yeni advisory'ler yeniden yakalanır |
+| O5 rate-limit Redis | 📋 ertelendi (kullanıcı kararı) | ayrı tur |
 | O9 convert | ✅ bulgu değil | saf 410 tombstone — baseline'da `public` sınıfı |
 
-**Kullanıcı aksiyonu:** Studio'da sırayla 093 → 094 → 095 apply; ardından smoke
-(sipariş oluştur/düzenle [toplamlar sunucudan], teklif kaydet [override %5 içi],
-teklif gönder→iptal→tekrar gönder [094 index], teklif reddet [rezerv düşer]).
+**Kullanıcı aksiyonu:** ~~Studio'da sırayla 093 → 094 → 095 apply~~ ✅ apply edildi
+(2026-06-12). Kalan: birleşik doğrulama SQL'i (4 satır `true` — pg_proc/pg_indexes)
++ smoke (sipariş oluştur/düzenle [toplamlar sunucudan], teklif kaydet [override %5
+içi], teklif gönder→iptal→tekrar gönder [094 index], teklif reddet [rezerv düşer]).
+Next 16.2.9 sonrası ek smoke: login redirect + dashboard + bir API çağrısı.
