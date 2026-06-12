@@ -169,6 +169,26 @@ describe("DosyalarTab — yükleme modalı", () => {
         expect((within(dialog).getByRole("button", { name: /Yükle$/ }) as HTMLButtonElement).disabled).toBe(true);
     });
 
+    it("ad alanına yazarken focus+select TEKRARLANMAZ — yazı silinmez (mount-only effect)", async () => {
+        // Bug: effect [onCancel]'a bağlıydı; onCancel inline olduğundan her tuşta
+        // yeniden koşup select() yapıyordu → yazılan harf seçilip ezilirdi.
+        const selectSpy = vi.spyOn(HTMLInputElement.prototype, "select");
+        await renderTab();
+        pickFile("Sözleşme.pdf");
+        const dialog = await screen.findByRole("dialog");
+        const nameInput = within(dialog).getByLabelText("Dosya adı (1)") as HTMLInputElement;
+        const mountCalls = selectSpy.mock.calls.length;
+
+        // her change parent'ı re-render eder (pending state) — effect yeniden koşmamalı
+        fireEvent.change(nameInput, { target: { value: "T" } });
+        fireEvent.change(nameInput, { target: { value: "Te" } });
+        fireEvent.change(nameInput, { target: { value: "Tedarik Sözleşmesi" } });
+
+        expect(nameInput.value).toBe("Tedarik Sözleşmesi");
+        expect(selectSpy.mock.calls.length).toBe(mountCalls); // yeniden select YOK
+        selectSpy.mockRestore();
+    });
+
     it("desteklenmeyen uzantı modal açmaz, hata toast'ı verir", async () => {
         await renderTab();
         pickFile("zararli.exe", "application/octet-stream");

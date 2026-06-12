@@ -143,15 +143,20 @@ function UploadModal({ pending, onBaseChange, category, onCategoryChange, onCanc
     saving: boolean;
 }) {
     // Escape kapatır; açılışta ilk ad alanına odak; kapanışta tetikleyiciye dönüş.
+    // KRİTİK: effect MOUNT-ONLY olmalı. onCancel parent'ta inline tanımlı (her
+    // render'da yeni kimlik); dep olarak bağlanırsa her tuş vuruşunda focus+select
+    // tekrarlanır → yazılan harf seçilip bir sonrakiyle ezilir ("yazamıyorum" bug'ı).
     const firstInputRef = useRef<HTMLInputElement>(null);
+    const onCancelRef = useRef(onCancel);
+    onCancelRef.current = onCancel;
     useEffect(() => {
         const prevFocus = document.activeElement as HTMLElement | null;
         firstInputRef.current?.focus();
         firstInputRef.current?.select();
-        const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+        const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancelRef.current(); };
         window.addEventListener("keydown", handler);
         return () => { window.removeEventListener("keydown", handler); prevFocus?.focus?.(); };
-    }, [onCancel]);
+    }, []);
 
     const valid = pending.every(p => p.base.trim().length > 0);
 
