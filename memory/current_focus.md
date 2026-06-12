@@ -7,7 +7,47 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-13 (**Kalıcı performans — çekirdek paket — GREEN**)
+## Son Tamamlanan İş — 2026-06-12 (**E-posta retry snapshot turu commit+mirror — mig.096 APPLY BEKLİYOR ⚠️**)
+
+**Durum:** proje-codex'te hazır ama commit'siz bulunan iş (kullanıcı "mirrorla" dedi) doğrulanıp gönderildi: tsc 0 · lint 0 · **5182 test / 379 dosya** → `3c8fb85`, iki branch aynalandı. İçerik: **mig.096** `email_logs` + html_body/text_body/body_expires_at (24h TTL; başarı/expiry/max-attempt'te snapshot temizlenir) + partial index · retry aynı gövdeyle yeniden gönderir · `sendDirectEmail` `replyTo` · `requireInternalOperatorFor(ctx)` auth-dedup · iç şablon testleri (+21 test). `check-migrations.ts` PROBES'a 096 eklendi. **093/094/095 doğrulama SQL'i 4×true ✅ (canlıda kesin).** **KALAN (kullanıcı):** **mig.096 Studio'da APPLY** + e-posta retry smoke; önceki smoke listesi de açık (sipariş toplamları · teklif gönder→iptal→tekrar gönder · Next sonrası login/dashboard).
+
+## Önceki — 2026-06-12 (**Next 16.x güvenlik yükseltmesi — GREEN; mig.093/094/095 APPLY + doğrulama SQL 4×true ✅**)
+
+**İstek:** denetimde ertelenen Next turu ("Next 16.x güvenlik yükseltmesi"). Commit `64c2fd0` (package.json/lock + check-deps.mjs).
+
+- next/eslint-config-next **16.1.7 → 16.2.9** (caret'siz pin) — 14 advisory'nin TÜMÜ <16.2.6 aralığındaydı (4 high proxy/middleware bypass, DoS, SSRF, XSS, cache poisoning); minor bump, React 19.2.3 dokunulmadı.
+- `fast-uri` 3.1.0 → **3.1.2** (`npm update` yetti; @sentry/nextjs→webpack→ajv transitif zinciri, 2 GHSA kapandı).
+- **`check-deps.mjs` ALLOWLIST BOŞ** — bundan sonra her yeni high/critical advisory gate'i anında kırar (kuruluş amacı gerçekleşti). Gate koşusu: "OK — 0 istisna".
+- tsc 0 · lint 0 · **5161 test / 377 dosya** · build 0 (standalone'da next 16.2.9 + mupdf wasm trace + proxy derlemesi doğrulandı).
+- Ayrıca kullanıcı **mig.093/094/095'i Studio'da APPLY ETTİ** ✅ (rapor §8 güncellendi; OpenAPI probe RPC redefine'ları göremez → doğrulama yalnız SQL ile).
+- **KALAN (kullanıcı):** (1) birleşik doğrulama SQL'i — 4 satır `true` (093 `v_line_total` / 094 `qli.description` + index `cancelled` / 095 `search_path`); (2) smoke: sipariş oluştur/düzenle [toplamlar sunucudan] · teklif override %5 içi · teklif gönder→iptal→**tekrar gönder** [094] · reddet→rezerv düşer · import satırı KDV · **Next sonrası: login redirect + dashboard + bir API çağrısı + attachment demo-anon blok**. Sonraki tur adayları: Upstash rate-limit (O5) · Y1 kalan 8 ACIK-BULGU GET'i.
+
+## Önceki — 2026-06-13 (**Denetim düzeltmeleri Tur A–E — GREEN**)
+
+**İstek:** "bütün gerekli düzeltmeleri tek tek yapalım." Kararlar (AskUserQuestion): K2 = sipariş katı recompute + teklif override korunur+makul-sapma (%5/100); xlsx = CDN 0.20.3; Next yükseltme + Upstash AYRI tur. 5 tur, 5 commit (`1c1ef92` A · `dc0e2aa` B · `16bfdb3` C · `437a470` D · `fadf74b` E).
+
+- **A:** K1 audit-log guard (entity→perm map) · Y2 stock-risk oturum+view_products · K3 import KDV (order'ın vat_rate+discount'u) · O11 attachment demo-anon DEFAULT bloklu (`ATTACHMENTS_ALLOW_DEMO_ANON` opt-out) · D4 `requireCronSecret` 5 cron route'u · O9 convert bulgu-değil.
+- **B:** **mig.093** order RPC sunucu-recompute / quote `assert_quote_totals_sane` · O7 redaction simetri · D1 `roundMoney` · D2 clamp uyarısı · gate SQL lint **yorum-ayıklama** (kendi migration'ımı yanlış-pozitif yakaladı; DEFINER grandfather 016+019'a indi).
+- **C:** **mig.094** send RPC (description + qty<=0 + **index cancelled-hariç** — dış raporun HAKLI çıktığı "iptal sonrası gönderilemez" bulgusu; karne düzeltildi, FOR UPDATE zaten serialize) · `serviceReconcileQuoteReservations` (K4+Y3, scan cron'unda; sync_issue fallback) · **mig.095** 019+016 DEFINER hijyeni.
+- **D:** xlsx **CDN 0.20.3** (GHSA kapandı, deps-allowlist'ten silindi) · Y6 `localISODate` 10 nokta (TR gece gün-kayması; computeDueDate muaf) · O8 OAuth HMAC fail-closed · O6 Sentry beforeSend scrub (`sentry-scrub.ts`) · Y8 e-posta awaited+`emailFailed`.
+- **E:** O1 ship `postShipWarning` (uyarılı başarı) · O2 status tek-retry · O3 kuruş-tamsayı reconcile · O4 `sanitizeSyncErrorMessage` · O10 addOrder hata-yolu refetch · D5 receive toast.
+- Rapor §8 durum tablosu; tsc 0 · lint 0 · **5161 test / 377 dosya** · build 0.
+- ~~KALAN: 093/094/095 apply~~ → **apply edildi ✅ (2026-06-12)**; Next yükseltmesi de sonraki turda yapıldı. Açık yükümlülükler üstteki güncel bölümde.
+
+## Önceki — 2026-06-12 (**Güvenlik & Doğruluk Denetimi + Gate sistemi — GREEN, ürün kodu DEĞİŞMEDİ**)
+
+**İstek:** kullanıcı dışarıdan bir denetim raporu paylaştı → "hiçbir kodda değişiklik yapmadan repo genelinde güvenlik/doğruluk/semantik hataları DETAYLI EKSİKSİZ incele + gerekiyorsa sistem kur" (AskUserQuestion: **Denetim+Gate birlikte**; gate bileşen sorusuna "bilemedim" → 4 bileşen de dahil edildi).
+
+- **Denetim:** 6 paralel tarama (route/migration/servis/lib-semantik/frontend/cron-email-PDF) + Kritik-Yüksek'lerin elle doğrulanması → **`docs/audit/2026-06-guvenlik-dogruluk-bulgulari.md`**. Dış rapor karnesi: çoğu doğru, **2 iddia YANLIŞ** ("iptal edilen quote-order yeniden oluşturulamaz" — 088 cancelled'ı dışlıyor; "discount_amount redaction açığı" — orders'ta subtotal zaten null, asimetri var sızıntı düşük).
+- **5 Kritik:** K1 `/api/audit-log` guard'sız + silinen müşteri PII'si `before_state`'te · K2 finansal toplamlar istemciden (023 create hiç recompute etmez, 081 edit client line_total'larını toplar, 071 quote ikisine güvenir; `validateOrderCreate` yalnız sınır kontrolü) · K3 import sipariş KDV'si `subtotal*0.20` hardcode (iskonto + siparişin vat_rate'i yok sayılır; `import-service.ts:771-776`) · K4 teklif send status-önce/rezervasyon-best-effort + reconciler yok · K5 migration drift izlenemiyor.
+- **8 Yüksek:** Y1 25/64 GET guard'sız + viewer-fallback (proxy tek hat) · Y2 ai/stock-risk permission'sız DB mutasyonu · Y3 phantom rezervasyon (reject release best-effort) · Y4 088 regresyonları (078 qty-guard + 080 description send-yolunda yok) · Y5 xlsx 0.18.5 (2 GHSA, fix yok) · Y6 **UTC tarih dilimleme 13 nokta** — `toISOString().slice(0,10)` TR'de 00:00–03:00 gün kaydırır (vade/expiry; doğru kalıp `stock-utils localISODate` zaten var) · Y7 019 advisory-lock DEFINER hijyensiz (016/036/069/071/073/074 de) · Y8 kritik-stok e-postası fire-and-forget + 24h dedup = sessiz kayıp. +11 Orta +6 Düşük.
+- **Elenen yanlış-pozitifler** (rapor §5): PO receive güvenli (route guard + RPC 051:48 RAISE, plpgsql atomik) · QuoteForm TR-virgül sorunu yok (`type="number"`) · email dedup-hatasında gönderim bilinçli (yorumlu).
+- **Gate sistemi (baseline-allowlist: suite yeşil, YENİ ihlal kırmızı):** `src/__tests__/gate/route-guard-matrix.test.ts`+`route-guard-baseline.ts` (114 route enumerate; 28 guard'sız uç sınıf+gerekçeli [public/self-auth/redaction/cron-proxy/ACIK-BULGU]; stale kayıt da kırar) · `sql-migration-lint.test.ts`+`sql-lint-baseline.ts` (yeni DEFINER'da search_path+REVOKE/GRANT zorunlu; RPC redefinition zincirleri kayıtlı — 088-tipi sessiz regresyon görünür) · `scripts/check-deps.mjs` + test.yml `deps-gate` job (high+ allowlist; xlsx 2 GHSA + **next 16.1.7'nin 14 high advisory'si** + fast-uri 2 — Next yükseltmesinde kayıt silinir) · `scripts/check-migrations.ts` READ-ONLY OpenAPI-probe drift kontrolü.
+- **Drift script'inin ilk koşusu GERÇEK HABER verdi:** `schema_migrations` bu projede güvenilmez (Studio'dan elle apply → kayıt yok; CLI listesi 082+ boş). Nesne-probe sonucu: **088/090/091/092 CANLIDA UYGULANMIŞ** (önceki "088/091 APPLY BEKLİYOR" notları BAYATTI) — **tek belirsiz 089** (`po_overdue` CHECK; OpenAPI'den problanamaz, script manuel SQL hint'i basıyor).
+- Gate kendini kanıtladı (baseline'dan kayıt silinince kırmızı). Runbook'a Faz 4 bölümü. tsc 0 · lint 0 · **5123 test / 373 dosya** · build 0.
+- **Kalan:** 089 elle doğrulama · rapor yol haritası Tur A–E (Tur A hızlı paket: K1 audit-log guard + Y2 stock-risk guard + K3 import KDV + O9 convert mühür + O11 attachment default flip).
+
+## Önceki — 2026-06-13 (**Kalıcı performans — çekirdek paket — GREEN**)
 
 **İstek:** "sistemde çok büyük render yavaşlığı var, kalıcı çözmemiz lazım" + kullanıcının trace'li raporu (dashboard 31 istek / paralel toplam 27.6s / alerts 479KB / finance 1.7s / profile 1.0s). 3 paralel keşif doğruladı: ana neden global DataProvider'ın her mount'ta 5 dev endpoint'i çekmesi (~10MB) + her route'ta tekrar `getUser()` + client-side agregasyon. **Kararlar (AskUserQuestion):** çekirdek paket (RSC/loading.tsx + tam server-side pagination SONRAKİ tur) · **SWR eklendi** (`swr@2.4.1`, kullanıcı seçimi) · Sidebar sayaçları migration'sız route.
 
