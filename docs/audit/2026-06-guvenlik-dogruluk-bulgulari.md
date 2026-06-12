@@ -178,3 +178,31 @@ Ek olarak bu denetimde dış raporun **görmediği** bulgular çıktı (K3 impor
 | SQL/migration lint | `src/__tests__/gate/sql-migration-lint.test.ts` + `sql-lint-baseline.ts` | Yeni SECURITY DEFINER fonksiyonu `SET search_path` + REVOKE/GRANT'sız ise kırılır (019/016 grandfathered); mevcut fonksiyonun yeni migration'da redefine edilmesi baseline kaydı ister → 088-tipi sessiz regresyon görünür olur |
 | Bağımlılık gate'i | `scripts/check-deps.mjs` + `test.yml` job | `npm audit` high+ yeni açık → CI kırmızı; xlsx 2 GHSA gerekçeli allowlist'te |
 | Migration drift | `scripts/check-migrations.ts` | PostgREST OpenAPI spec'inden (read-only tek GET) migration nesnelerini (tablo/kolon/RPC) problar; eksikte exit 1. İlk koşu: 088/090/091/092 canlıda ✅, yalnız 089 elle doğrulama gerektiriyor (deploy-öncesi koşulur; kullanım: runbook) |
+
+---
+
+## 8. Düzeltme durumu (2026-06-13 — Tur A–E uygulandı)
+
+| Bulgu | Durum | Nerede |
+|---|---|---|
+| K1 audit-log | ✅ kod | oturum + entity-bazlı yetki (`audit-log/route.ts`) |
+| K2 finansal toplamlar | ⏳ **mig.093 APPLY bekliyor** | order RPC'leri sunucuda hesaplar; quote override + makul-sapma (%5/100) |
+| K3 import KDV | ✅ kod | siparişin vat_rate+discount_amount'ı ile 081 formülü |
+| K4+Y3 rezervasyon | ✅ kod | `serviceReconcileQuoteReservations` alert-scan'de (iki yön + sync_issue) |
+| K5 drift | ✅ sistem | check-migrations.ts (probe) + PROBES/MANUAL kültürü |
+| Y1 guard'sız GET'ler | 🔶 kısmen | en riskli 2 uç kapandı (K1+Y2); kalan 8 ACIK-BULGU baseline'da işaretli, gate küçülmeye zorlar |
+| Y2 stock-risk | ✅ kod | oturum + view_products |
+| Y4 088 regresyonları | ⏳ **mig.094 APPLY bekliyor** | description + qty<=0 + **cancelled-hariç unique index** (dış raporun haklı çıktığı bulgu) |
+| Y5 xlsx | ✅ kod | CDN 0.20.3 pin; GHSA'lar kapandı, allowlist'ten silindi |
+| Y6 UTC tarih | ✅ kod | 10 nokta `localISODate`; computeDueDate bilinçli muaf |
+| Y7 lock hijyeni | ⏳ **mig.095 APPLY bekliyor** | search_path + REVOKE/GRANT (016+019) |
+| Y8 e-posta sessiz kayıp | ✅ kod | awaited + `ScanResult.emailFailed` |
+| O1/O2/O3/O4/O6/O7/O8/O10/O11 | ✅ kod | Tur B/D/E commit'leri |
+| D1/D2/D4/D5 | ✅ kod | roundMoney / clamp uyarısı / requireCronSecret / receive toast |
+| D3 eşzamanlı send | ✅ kapalı sayıldı | FOR UPDATE zaten serialize ediyordu (ilk değerlendirme hatalıydı); 094 index'i kalan durumu çözer |
+| O5 rate-limit Redis · Next 16.x yükseltme | 📋 ertelendi (kullanıcı kararı) | ayrı turlar; deps-gate allowlist'inde gerekçeli |
+| O9 convert | ✅ bulgu değil | saf 410 tombstone — baseline'da `public` sınıfı |
+
+**Kullanıcı aksiyonu:** Studio'da sırayla 093 → 094 → 095 apply; ardından smoke
+(sipariş oluştur/düzenle [toplamlar sunucudan], teklif kaydet [override %5 içi],
+teklif gönder→iptal→tekrar gönder [094 index], teklif reddet [rezerv düşer]).
