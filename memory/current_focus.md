@@ -7,7 +7,11 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-12 (**Y1 turu — kalan 7 guard'sız GET kapandı; mig.096 APPLY ✅**)
+## Son Tamamlanan İş — 2026-06-12 (**Google auth kesin kapanış + Beni hatırla — `5b3f3f9`**)
+
+**Şikayet:** admin Gmail'le Google girişi "401" + beni-hatırla işlevsiz. **Karar: yalnız-ekli-kullanıcılar.** **Google:** callback hata körlüğü giderildi (provider/no_code/**pkce**/exchange reason'ları log+login'e; pkce="code verifier" → tipik kök Supabase Redirect URL allowlist); provizyon kontrolü callback'te — rolsüz OAuth user'da `reconcileOAuthUserRoles` (aynı-e-postalı ekli kullanıcıdan rol kopyala, YALNIZ doğrulanmış e-posta, fail-closed), olmazsa `signOut`+`unauthorized&attempted=` (yarım-oturum/401 gürültüsü bitti). **Beni hatırla:** `remember.ts` — login iki akışta sign-in öncesi `roven_remember` yazar; server/proxy/client (custom cookies) persist=0'da auth cookie'lerini session yapar; silme yazımları muaf. +28 test; **5227 test / 382 dosya**. **KALAN (kullanıcı):** Supabase Dashboard Redirect URLs (iki Coolify domain + localhost `/auth/callback`) + iki ortamda `ADMIN_EMAILS` kontrolü; deploy sonrası Google dene (mesaj artık nedeni söyler); beni-hatırla smoke (işaretsiz → tarayıcı kapat-aç → login). Sonraki adaylar: Upstash (O5).
+
+## Önceki — 2026-06-12 (**Y1 turu — kalan 7 guard'sız GET kapandı; mig.096 APPLY ✅**)
 
 **Karar (AskUserQuestion): DEMO-DOSTU guard** — `requirePermissionFor` izin arar, `!user→401` dalı YOK (anonim→viewer fallback bilinçli → demo gezintisi yaşar; import uçları viewer'da view_import olmadığından fiilen kapalı). İzin haritası: alerts/calendar→view_alerts · import×3→view_import · parasut-status→view_sales_orders (view_parasut sales/viewer'ı kırardı) · open-count→OR[view_purchase_suggestions, view_sales_orders] (purchasing'de sales_orders yok) · shortages→view_products. Baseline ACIK-BULGU sınıfı BOŞALDI (gate + `y1-route-guards.test.ts` kilitler); 6 route testine mock+403 senaryosu. mig.096 kullanıcı APPLY etti, probe ✅. tsc 0 · lint 0 · **5199 test / 380 dosya** · build 0. **KALAN (kullanıcı):** smoke — demo modda takvim/eksik drawer/Paraşüt rozetleri/açık-sipariş kolonu ÇALIŞMALI, muhasebe rolünde takvim 403; önceki liste (sipariş toplamları · teklif gönder→iptal→tekrar gönder · Next sonrası login). Son tur adayı: Upstash (O5).
 
