@@ -24,6 +24,18 @@ vi.mock("@/lib/services/ai-service", () => ({
     isAIAvailable: () => mockIsAIAvailable(),
 }));
 
+// ─── Role-guard mock (denetim Y2: stock-risk artık oturum + view_products ister) ──
+
+vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext: vi.fn(async () => ({
+        user: { id: "test-user-id" },
+        userId: "test-user-id",
+        roles: ["admin"],
+        perms: new Set(["view_products"]),
+    })),
+    requirePermissionFor: vi.fn(() => null),
+}));
+
 import { POST } from "@/app/api/ai/stock-risk/route";
 import { ConfigError } from "@/lib/supabase/service";
 import { isValidISO } from "./test-helpers";

@@ -34,12 +34,32 @@ vi.mock("@/lib/supabase/service", () => ({
     }),
 }));
 
+// ── Role-guard mock (denetim K1: route artık oturum + entity-bazlı yetki ister) ──
+
+const mockResolveAuthContext = vi.fn();
+const mockRequirePermissionFor = vi.fn();
+const mockRequireRoleFor = vi.fn();
+
+vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext: (...a: unknown[]) => mockResolveAuthContext(...a),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermissionFor(...a),
+    requireRoleFor: (...a: unknown[]) => mockRequireRoleFor(...a),
+}));
+
 import { dbListAuditLog } from "@/lib/supabase/audit-log";
 import { GET as auditGET } from "@/app/api/audit-log/route";
+import { NextResponse } from "next/server";
 
 beforeEach(() => {
     vi.clearAllMocks();
     setTerminal({ data: [], error: null });
+    // default: yetkili kullanıcı (guard'lar geçer)
+    mockResolveAuthContext.mockResolvedValue({
+        user: { id: "u-1" }, userId: "u-1", roles: ["admin"],
+        perms: new Set(["view_purchase_orders"]),
+    });
+    mockRequirePermissionFor.mockReturnValue(null);
+    mockRequireRoleFor.mockReturnValue(null);
 });
 
 // ── dbListAuditLog ────────────────────────────────────────────
@@ -90,5 +110,38 @@ describe("GET /api/audit-log", () => {
         const body = await res.json();
         expect(body).toHaveLength(2);
         expect(body[0].action).toBe("po_created");
+    });
+
+    // ── K1 RBAC guard'ları (2026-06 denetimi) ─────────────────
+
+    it("oturumsuz → 401 (before_state PII'si anonim okunamaz)", async () => {
+        mockResolveAuthContext.mockResolvedValue({
+            user: null, userId: null, roles: ["viewer"], perms: new Set(),
+        });
+        const req = new Request("http://localhost/api/audit-log?entity_type=purchase_order&entity_id=po-1");
+        const res = await auditGET(req as unknown as Parameters<typeof auditGET>[0]);
+        expect(res.status).toBe(401);
+    });
+
+    it("purchase_order → view_purchase_orders yetkisi sorulur; yoksa 403", async () => {
+        mockRequirePermissionFor.mockReturnValue(
+            NextResponse.json({ error: "yetki yok" }, { status: 403 }),
+        );
+        const req = new Request("http://localhost/api/audit-log?entity_type=purchase_order&entity_id=po-1");
+        const res = await auditGET(req as unknown as Parameters<typeof auditGET>[0]);
+        expect(res.status).toBe(403);
+        expect(mockRequirePermissionFor).toHaveBeenCalledWith(expect.anything(), "view_purchase_orders");
+        expect(mockRequireRoleFor).not.toHaveBeenCalled();
+    });
+
+    it("haritada olmayan entity_type → yalnız admin (fail-closed)", async () => {
+        mockRequireRoleFor.mockReturnValue(
+            NextResponse.json({ error: "yetki yok" }, { status: 403 }),
+        );
+        const req = new Request("http://localhost/api/audit-log?entity_type=customer&entity_id=c-1");
+        const res = await auditGET(req as unknown as Parameters<typeof auditGET>[0]);
+        expect(res.status).toBe(403);
+        expect(mockRequireRoleFor).toHaveBeenCalledWith(expect.anything(), ["admin"]);
+        expect(mockRequirePermissionFor).not.toHaveBeenCalled();
     });
 });

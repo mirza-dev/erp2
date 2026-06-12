@@ -33,8 +33,9 @@ const ENV_EXAMPLE = fs.readFileSync(
 // ── Source-regex regression locks ────────────────────────────────────────────
 
 describe("Faz 2d Review P3-005 — middleware demo guard (source)", () => {
-    it("middleware reads ATTACHMENTS_BLOCK_DEMO_ANON env flag", () => {
-        expect(MIDDLEWARE).toMatch(/process\.env\.ATTACHMENTS_BLOCK_DEMO_ANON === "true"/);
+    it("middleware: bloklama DEFAULT — yalnız ATTACHMENTS_ALLOW_DEMO_ANON='true' acar (O11 flip)", () => {
+        expect(MIDDLEWARE).toMatch(/process\.env\.ATTACHMENTS_ALLOW_DEMO_ANON !== "true"/);
+        expect(MIDDLEWARE).not.toContain("ATTACHMENTS_BLOCK_DEMO_ANON");
     });
 
     it("guard targets /api/products/:id/attachments path tree", () => {
@@ -48,17 +49,18 @@ describe("Faz 2d Review P3-005 — middleware demo guard (source)", () => {
     });
 
     it("guard sits INSIDE the demo-cookie branch (not unconditional)", () => {
-        const idx = MIDDLEWARE.indexOf("ATTACHMENTS_BLOCK_DEMO_ANON");
+        const idx = MIDDLEWARE.indexOf("ATTACHMENTS_ALLOW_DEMO_ANON");
         const before = MIDDLEWARE.slice(0, idx);
         expect(before).toMatch(/isDemoMode/);
     });
 
-    it("url route documents the env flag in its security note", () => {
-        expect(URL_ROUTE).toMatch(/ATTACHMENTS_BLOCK_DEMO_ANON=true/);
+    it("url route documents the opt-out flag in its security note", () => {
+        expect(URL_ROUTE).toMatch(/ATTACHMENTS_ALLOW_DEMO_ANON=true/);
     });
 
-    it(".env.example documents the opt-in flag", () => {
-        expect(ENV_EXAMPLE).toMatch(/ATTACHMENTS_BLOCK_DEMO_ANON/);
+    it(".env.example documents the opt-out flag", () => {
+        expect(ENV_EXAMPLE).toMatch(/ATTACHMENTS_ALLOW_DEMO_ANON/);
+        expect(ENV_EXAMPLE).not.toMatch(/ATTACHMENTS_BLOCK_DEMO_ANON/);
     });
 });
 
@@ -96,11 +98,11 @@ function makeReq(
     return req;
 }
 
-describe("Faz 2d Review P3-007 — middleware demo guard (behavior, env=true)", () => {
+describe("O11 flip — middleware demo guard (behavior, DEFAULT: env unset → bloklu)", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockGetUser.mockResolvedValue(ANON);
-        vi.stubEnv("ATTACHMENTS_BLOCK_DEMO_ANON", "true");
+        // env bilerek stub'lanmaz: bloklama VARSAYILAN davranış.
     });
     afterEach(() => {
         vi.unstubAllEnvs();
@@ -146,7 +148,7 @@ describe("Faz 2d Review P3-007 — middleware demo guard (behavior, env=true)", 
     });
 });
 
-describe("Faz 2d Review P3-007 — middleware demo guard (behavior, env=false / unset)", () => {
+describe("O11 flip — middleware demo guard (behavior, bilinçli opt-out: ALLOW=true)", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockGetUser.mockResolvedValue(ANON);
@@ -155,21 +157,21 @@ describe("Faz 2d Review P3-007 — middleware demo guard (behavior, env=false / 
         vi.unstubAllEnvs();
     });
 
-    it("env UNSET + demo cookie + GET attachments → 200 (default off, geriye uyum)", async () => {
-        vi.stubEnv("ATTACHMENTS_BLOCK_DEMO_ANON", "");
+    it("ALLOW='true' + demo cookie + GET attachments → 200 (izole demo dağıtımı bilinçli açar)", async () => {
+        vi.stubEnv("ATTACHMENTS_ALLOW_DEMO_ANON", "true");
         const res = await middleware(makeReq(`/api/products/${PROD}/attachments`, { cookies: DEMO_COOKIE }));
         expect(res.status).toBe(200);
     });
 
-    it("env='false' + demo cookie + GET attachments → 200 (string compare, sadece 'true' aktif)", async () => {
-        vi.stubEnv("ATTACHMENTS_BLOCK_DEMO_ANON", "false");
+    it("ALLOW='false' + demo cookie → 401 (yalnız literal 'true' açar)", async () => {
+        vi.stubEnv("ATTACHMENTS_ALLOW_DEMO_ANON", "false");
         const res = await middleware(makeReq(`/api/products/${PROD}/attachments`, { cookies: DEMO_COOKIE }));
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(401);
     });
 
-    it("env='1' + demo cookie + GET attachments → 200 (sadece literal 'true' tetiklemeli)", async () => {
-        vi.stubEnv("ATTACHMENTS_BLOCK_DEMO_ANON", "1");
+    it("ALLOW='1' + demo cookie → 401 (string compare; '1' yetmez)", async () => {
+        vi.stubEnv("ATTACHMENTS_ALLOW_DEMO_ANON", "1");
         const res = await middleware(makeReq(`/api/products/${PROD}/attachments`, { cookies: DEMO_COOKIE }));
-        expect(res.status).toBe(200);
+        expect(res.status).toBe(401);
     });
 });

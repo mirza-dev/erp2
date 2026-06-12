@@ -45,15 +45,10 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     { path: "products/aging", methods: ["GET"], cls: "redaction", reason: "boundCapital/costPrice perm'e göre maskelenir" },
     { path: "products/[id]/quotes", methods: ["GET"], cls: "redaction", reason: "unitPrice/lineTotal view_sales_prices'a göre maskelenir" },
 
-    // ── cron: yalnız proxy CRON_SECRET (bulgu D4 — route-içi kontrol eklenecek) ──
-    { path: "alerts/ai-suggest", methods: ["POST"], cls: "cron-proxy", reason: "advisory lock + proxy CRON; route-içi secret yok (D4)" },
-    { path: "orders/check-shipments", methods: ["POST"], cls: "cron-proxy", reason: "proxy CRON_PATHS; route-içi secret yok (D4)" },
-    { path: "parasut/poll-e-documents", methods: ["POST"], cls: "cron-proxy", reason: "proxy CRON_PATHS; route-içi secret yok (D4)" },
-    { path: "parasut/sync-all", methods: ["POST"], cls: "cron-proxy", reason: "proxy CRON_PATHS; route-içi secret yok (D4)" },
-    { path: "quotes/expire", methods: ["POST"], cls: "cron-proxy", reason: "proxy CRON_PATHS; route-içi secret yok (D4)" },
+    // ── 410 tombstone (DB erişimi yok — denetim O9 incelemesi: bulgu DEĞİL) ──
+    { path: "quotes/[id]/convert", methods: ["POST"], cls: "public", reason: "Saf 410 Gone tombstone (Faz 6 V4-A8); DB/servis çağrısı yok" },
 
     // ── AÇIK BULGULAR (docs/audit/2026-06 raporu; guard eklenince sil) ─
-    { path: "audit-log", methods: ["GET"], cls: "ACIK-BULGU", reason: "K1: before/after_state PII — guard + redaction eklenecek" },
     { path: "alerts/calendar", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_alerts kontrolü yok" },
     { path: "import/[batchId]/drafts", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_import kontrolü yok (batch GET'i var)" },
     { path: "import/documents/[id]/lines", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_import kontrolü yok" },
@@ -61,6 +56,5 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     { path: "orders/[id]/parasut-status", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_parasut/view_orders kontrolü yok" },
     { path: "orders/open-count-by-product", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_orders kontrolü yok (yalnız adet — düşük)" },
     { path: "products/[id]/shortages", methods: ["GET"], cls: "ACIK-BULGU", reason: "Y1: view_products kontrolü yok" },
-    { path: "products/[id]/attachments/[attachmentId]/url", methods: ["GET"], cls: "ACIK-BULGU", reason: "O11: signed URL — demo-anon koruması env opt-in" },
-    { path: "quotes/[id]/convert", methods: ["POST"], cls: "ACIK-BULGU", reason: "O9: 410 ölü uç — guard'la mühürle veya sil" },
+    { path: "products/[id]/attachments/[attachmentId]/url", methods: ["GET"], cls: "public", reason: "O11 KAPANDI: proxy demo-anon'u DEFAULT bloklar (ATTACHMENTS_ALLOW_DEMO_ANON opt-out); oturumlu erişim serbest — route-içi perm guard'ı yok (Y1 genel kapsamında)" },
 ];

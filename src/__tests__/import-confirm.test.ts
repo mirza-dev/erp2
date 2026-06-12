@@ -2087,8 +2087,13 @@ describe("serviceConfirmBatch — order_line entity", () => {
     function makeSupabaseMock(opts: {
         existingSortOrders?: Array<{ sort_order: number }>;
         allLines?: Array<{ line_total: number }>;
+        orderRow?: { vat_rate: number; discount_amount: number };
     } = {}) {
-        const { existingSortOrders = [], allLines = [{ line_total: 500 }] } = opts;
+        const {
+            existingSortOrders = [],
+            allLines = [{ line_total: 500 }],
+            orderRow = { vat_rate: 20, discount_amount: 0 },
+        } = opts;
         const mockInsert = vi.fn().mockResolvedValue({ data: null, error: null });
         const mockUpdateEq = vi.fn().mockResolvedValue({ data: null, error: null });
         const mockSalesOrdersUpdate = vi.fn().mockReturnValue({ eq: mockUpdateEq });
@@ -2113,7 +2118,15 @@ describe("serviceConfirmBatch — order_line entity", () => {
                 };
             }
             if (table === "sales_orders") {
-                return { update: mockSalesOrdersUpdate };
+                return {
+                    update: mockSalesOrdersUpdate,
+                    // K3: totals artık siparişin kendi vat_rate + discount_amount'ı ile
+                    select: vi.fn().mockReturnValue({
+                        eq: vi.fn().mockReturnValue({
+                            single: vi.fn().mockResolvedValue({ data: orderRow, error: null }),
+                        }),
+                    }),
+                };
             }
             return {};
         });
@@ -2187,6 +2200,30 @@ describe("serviceConfirmBatch — order_line entity", () => {
             expect.objectContaining({ subtotal: 500, vat_total: 100, grand_total: 600 })
         );
         expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, { status: "merged", matched_entity_id: "order-1" });
+    });
+
+    it("K3: totals siparişin KENDİ vat_rate + discount_amount'ı ile hesaplanır (%20 hardcode regresyonu)", async () => {
+        // %10 KDV'li, 50₺ header iskontolu sipariş: taxable=450, vat=45, grand=495.
+        // Eski bug: vat = 500*0.20 = 100, grand = 600 (iskonto + oran yok sayılırdı).
+        const draft = makeDraft({
+            entity_type: "order_line",
+            parsed_data: { order_number: "ORD-2026-0001", product_sku: "GV-050", quantity: 2, unit_price: 250, discount_pct: 0 },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        mockDbFindOrderByOriginalNumber.mockResolvedValue({ id: "order-1" });
+        mockDbFindProductBySku.mockResolvedValue({ id: "prod-1" });
+
+        const { mockFrom, mockSalesOrdersUpdate } = makeSupabaseMock({
+            allLines: [{ line_total: 500 }],
+            orderRow: { vat_rate: 10, discount_amount: 50 },
+        });
+        vi.mocked(createServiceClient).mockReturnValue({ from: mockFrom } as ReturnType<typeof createServiceClient>);
+
+        await serviceConfirmBatch("batch-1");
+
+        expect(mockSalesOrdersUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({ subtotal: 500, vat_total: 45, grand_total: 495 })
+        );
     });
 
     it("mevcut satır varsa sort_order bir artırılır", async () => {

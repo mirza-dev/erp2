@@ -10,13 +10,12 @@ export const dynamic = "force-dynamic";
 // GET /api/products/[id]/attachments/[attachmentId]/url
 // Response: { url, expires_in }
 //
-// SECURITY NOTE (Faz 2d Review P3-005 — ENV opt-in guard):
-// middleware.ts demo cookie + GET /api/* anonymous read'e izin verir → bu route da
-// authenticated user OLMADAN signed URL üretebilir. Demo bucket SADECE seed/fake
-// data içerdiğinde risksiz; prod bucket ile paylaşan dağıtımlarda env aç:
-//   ATTACHMENTS_BLOCK_DEMO_ANON=true
-// Bu env aktifken middleware demo cookie ile /api/products/[id]/attachments**
-// path'lerine 401 döner; bu route hiç çalışmaz. Default false (geriye uyumlu).
+// SECURITY NOTE (Denetim O11, 2026-06 — default FLIP):
+// proxy demo cookie'li anonim kullanıcıyı /api/products/[id]/attachments**
+// path'lerinde VARSAYILAN olarak 401'ler (bu route'a hiç ulaşmaz). Yalnız
+// bucket'ı seed/fake data içeren izole demo dağıtımı bilinçli açar:
+//   ATTACHMENTS_ALLOW_DEMO_ANON=true
+// Oturumlu kullanıcılar proxy auth'undan normal geçer (davranış değişmedi).
 export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string; attachmentId: string }> },

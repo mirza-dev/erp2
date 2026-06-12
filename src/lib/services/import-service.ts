@@ -14,6 +14,7 @@ import { dbCreateCustomer, dbFindCustomerByName, dbFindCustomerByCode, dbFindCus
 import { dbLookupEntityAlias, dbSaveEntityAlias } from "@/lib/supabase/entity-aliases";
 import { dbCreateProduct, dbFindProductBySku, dbRecordMovementAtomic, dbRecordStockTransfer, dbUpdateProduct } from "@/lib/supabase/products";
 import type { Permission } from "@/lib/auth/permissions";
+import { roundMoney } from "@/lib/money-utils";
 import { dbCreateVendor, dbListVendors, dbUpdateVendor } from "@/lib/supabase/vendors";
 import { dbUpsertProductVendorLink } from "@/lib/supabase/product-vendor-links";
 import { dbFindOrderByOriginalNumber, dbCreateOrder } from "@/lib/supabase/orders";
@@ -763,17 +764,30 @@ async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}
                     continue;
                 }
 
-                // Update order totals — best-effort, non-blocking
+                // Update order totals — best-effort, non-blocking.
+                // Denetim K3 (2026-06): eski hesap `subtotal * 0.20` idi — siparişin
+                // kendi vat_rate'i ve header iskontosu YOK SAYILIYORDU (yanlış KDV →
+                // Paraşüt reconcile reddi). Artık 081 RPC formülünün birebir aynısı:
+                // taxable = max(subtotal - discount, 0); vat = round2(taxable*rate/100).
                 const { data: allLines } = await supabase
                     .from("order_lines")
                     .select("line_total")
                     .eq("order_id", orderId);
-                const subtotal = (allLines ?? []).reduce((s: number, l: { line_total?: number | null }) => s + (l.line_total ?? 0), 0);
-                const vatTotal = subtotal * 0.20;
+                const { data: orderRow } = await supabase
+                    .from("sales_orders")
+                    .select("vat_rate, discount_amount")
+                    .eq("id", orderId)
+                    .single();
+                const vatRate = Number(orderRow?.vat_rate ?? 20);
+                const discount = Number(orderRow?.discount_amount ?? 0);
+                const subtotal = roundMoney((allLines ?? []).reduce(
+                    (s: number, l: { line_total?: number | null }) => s + (l.line_total ?? 0), 0));
+                const taxable = Math.max(subtotal - discount, 0);
+                const vatTotal = roundMoney(taxable * vatRate / 100);
                 const { error: updateErr } = await supabase.from("sales_orders").update({
                     subtotal,
                     vat_total: vatTotal,
-                    grand_total: subtotal + vatTotal,
+                    grand_total: roundMoney(taxable + vatTotal),
                     item_count: (allLines ?? []).length,
                 }).eq("id", orderId);
                 if (updateErr) console.warn("[import] order totals update failed:", updateErr.message);

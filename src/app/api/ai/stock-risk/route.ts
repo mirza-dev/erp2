@@ -11,6 +11,7 @@ import {
 import type { AiRecommendationRow } from "@/lib/database.types";
 import { handleApiError } from "@/lib/api-error";
 import { guardAiRoute } from "@/lib/ai-route-limit";
+import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 
 interface StockRiskResponseItem {
     productId: string;
@@ -33,6 +34,17 @@ export async function POST(request?: NextRequest) {
         const limited = guardAiRoute(request, "stock-risk", 5);
         if (limited) return limited;
     }
+
+    // Denetim Y2 (2026-06): bu uç öneri tablosuna YAZAR (upsert/expire) —
+    // rate-limit tek başına yetki değildir. Gerçek oturum + view_products şartı
+    // (tüketiciler: products + purchase/suggested sayfaları — tüm roller
+    // view_products'lı, UI davranışı değişmez; anonim/viewer-fallback kapanır).
+    const ctx = await resolveAuthContext();
+    if (!ctx.user) {
+        return NextResponse.json({ error: "Kimlik doğrulama gerekiyor." }, { status: 401 });
+    }
+    const permGuard = requirePermissionFor(ctx, "view_products");
+    if (permGuard) return permGuard;
 
     // Expire suggested recommendations not acted on after 48 hours.
     try { await dbExpireStaleRecommendations(48); } catch { /* non-fatal */ }
