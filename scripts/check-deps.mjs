@@ -12,29 +12,12 @@
  */
 
 const ALLOWLIST = [
-    // xlsx kayıtları KAPANDI (Tur D, 2026-06-12): CDN 0.20.3 pin
-    // (https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz) iki GHSA'yı da çözer.
-    {
-        // PAKET-SEVİYESİ istisna (zayıf — yalnız planlı yükseltmeye köprü):
-        // next 16.1.7'de 14 high advisory (proxy/middleware bypass dahil).
-        // Güvenlik yükseltmesi Tur D'de; yükseltme yapılınca BU KAYDI SİL →
-        // gate yeni next advisory'lerini yeniden yakalamaya başlar.
-        pkg: "next",
-        reason: "Next 16.1.7 bilinen advisory seti — yükseltme Tur D (2026-06 bulguları, dış rapor Kritik-1)",
-        added: "2026-06-12",
-    },
-    {
-        ghsa: "GHSA-q3j6-qgpj-74h6",
-        pkg: "fast-uri",
-        reason: "Transitif (ajv zinciri) — üst paket yükseltmesiyle çözülür, Tur D",
-        added: "2026-06-12",
-    },
-    {
-        ghsa: "GHSA-v39h-62p7-jpjc",
-        pkg: "fast-uri",
-        reason: "Transitif (ajv zinciri) — üst paket yükseltmesiyle çözülür, Tur D",
-        added: "2026-06-12",
-    },
+    // ŞU AN İSTİSNA YOK (2026-06-12, Next 16.2.9 yükseltmesi sonrası):
+    //  - xlsx 2 GHSA → CDN 0.20.3 pin ile kapandı (Tur D)
+    //  - next 16.1.7 paket-seviyesi 14 advisory → 16.2.9 yükseltmesiyle kapandı
+    //  - fast-uri 2 GHSA → 3.1.2'ye update ile kapandı
+    // Yeni kayıt formatı: { ghsa: "GHSA-...", pkg, reason, added } — paket-seviyesi
+    // istisna ({ pkg, reason, added }, ghsa'sız) yalnız planlı yükseltmeye köprü olarak.
 ];
 
 const FAIL_LEVELS = new Set(["high", "critical"]);
