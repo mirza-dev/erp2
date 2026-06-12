@@ -14,15 +14,14 @@
  *    bu sınıf hatanın emsali — bulgu Y4).
  */
 
-/** DEFINER hijyeni eksik mevcut migration dosyaları (yalnız küçülür). */
+/** DEFINER hijyeni eksik mevcut migration dosyaları (yalnız küçülür).
+ *  Not: 036/069/071/073/074 ilk listede vardı — yorum-ayıklama sonrası
+ *  DEFINER'larının yalnız AÇIKLAMA satırlarında geçtiği görüldü (gerçek
+ *  fonksiyonlar INVOKER). Gerçek DEFINER+hijyensiz yalnız 016 ve 019;
+ *  ikisi de 095_lock_hygiene ile kapanacak (Tur C). */
 export const DEFINER_GRANDFATHER: string[] = [
     "016_health_check_utils.sql",
     "019_concurrency_hardening.sql",
-    "036_fix_quote_rpc_security.sql",
-    "069_quotes_rpc_payload_ext.sql",
-    "071_quotes_rpc_discount.sql",
-    "073_quotes_numbering.sql",
-    "074_quotes_revision.sql",
 ];
 
 /** fonksiyon adı → tanımlandığı migration numaraları (sıralı, eksiksiz). */
@@ -36,10 +35,14 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     complete_production: ["004", "008"],
     try_resolve_shortages: ["004", "008"],
     reverse_production: ["004", "008"],
-    create_order_with_lines: ["018", "023"],
+    // 093 (K2): order RPC'leri toplamları SUNUCUDA hesaplar; quote RPC'leri
+    // override'ı koruyup makul-sapma kontrolü yapar — önceki davranışlar
+    // (071 NULLIF/COALESCE cast'leri, draft guard, 081 header recompute) KORUNDU.
+    create_order_with_lines: ["018", "023", "093"],
+    update_order_with_lines: ["081", "093"],
     receive_purchase_commitment: ["020", "021", "028"],
     next_quote_number: ["034", "073"],
-    create_quote_with_lines: ["035", "036", "065", "069", "071"],
-    update_quote_with_lines: ["035", "036", "065", "069", "071"],
+    create_quote_with_lines: ["035", "036", "065", "069", "071", "093"],
+    update_quote_with_lines: ["035", "036", "065", "069", "071", "093"],
     accept_quote_and_create_order: ["077", "078", "080", "088"],
 };

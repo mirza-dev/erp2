@@ -26,8 +26,14 @@ interface MigInfo {
     fns: string[];
 }
 
+/** SQL satır yorumlarını ayıkla — "-- SECURITY DEFINER YOK" gibi açıklamalar
+ *  yanlış-pozitif üretmesin (093'te gate'in kendisi yakaladı). */
+function stripSqlComments(src: string): string {
+    return src.replace(/--[^\n]*/g, "");
+}
+
 const inventory: MigInfo[] = files.map((file) => {
-    const src = readFileSync(join(MIG_DIR, file), "utf8");
+    const src = stripSqlComments(readFileSync(join(MIG_DIR, file), "utf8"));
     return {
         file,
         num: file.slice(0, 3),

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { formatCurrency, safeRandomUUID } from "@/lib/utils";
+import { roundMoney } from "@/lib/money-utils";
 import { type Customer, type Product, type OrderLineItem } from "@/lib/mock-data";
 import { useCustomers, useProducts, useOrderMutations } from "@/lib/data-context";
 import Button, { ButtonLink } from "@/components/ui/Button";
@@ -205,13 +206,15 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
         if (lines.length > 1) setLines(lines.filter(l => l.id !== lineId));
     };
 
-    // Calculations
+    // Calculations — satır toplamı yuvarlanır SONRA toplanır (denetim D1:
+    // yuvarlamasız float akümülasyonu 100+ satırda kuruş kaydırıyordu; 093
+    // RPC'si de aynı round(…,2) konvansiyonuyla hesaplar → UI=DB).
     const currency = selectedCustomer?.currency ?? "USD";
     const lineTotal = (l: OrderLine) =>
-        l.product ? l.quantity * l.unitPrice * (1 - l.discountPct / 100) : 0;
-    const subtotal = lines.reduce((acc, l) => acc + lineTotal(l), 0);
-    const vat = subtotal * 0.20;
-    const grandTotal = subtotal + vat;
+        l.product ? roundMoney(l.quantity * l.unitPrice * (1 - l.discountPct / 100)) : 0;
+    const subtotal = roundMoney(lines.reduce((acc, l) => acc + lineTotal(l), 0));
+    const vat = roundMoney(subtotal * 0.20);
+    const grandTotal = roundMoney(subtotal + vat);
 
     const filledLines = lines.filter(l => l.product !== null).length;
     const canSubmit = selectedCustomer !== null && filledLines > 0 && grandTotal > 0;

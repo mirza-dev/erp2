@@ -119,7 +119,8 @@ describe("redactOrderForPerms (detail, lines'lı)", () => {
         grand_total: 1200,
         subtotal: 1000,
         vat_total: 200,
-        lines: [{ id: "l1", unit_price: 500, line_total: 1000, quantity: 2 }],
+        discount_amount: 150,
+        lines: [{ id: "l1", unit_price: 500, line_total: 1000, quantity: 2, discount_pct: 5 }],
     };
 
     it("view_sales_prices VAR → no-op", () => {
@@ -132,6 +133,12 @@ describe("redactOrderForPerms (detail, lines'lı)", () => {
         expect((out.lines as Array<Record<string, unknown>>)[0].unit_price).toBeNull();
         expect((out.lines as Array<Record<string, unknown>>)[0].line_total).toBeNull();
         expect((out.lines as Array<Record<string, unknown>>)[0].quantity).toBe(2); // adet sızıntı değil
+    });
+
+    it("O7 simetri: discount_amount + satır discount_pct de null (quotes ile aynı sınıf)", () => {
+        const out = redactOrderForPerms(detail, P());
+        expect(out.discount_amount).toBeNull();
+        expect((out.lines as Array<Record<string, unknown>>)[0].discount_pct).toBeNull();
     });
 
     it("orijinal lines dizisini mutate ETMEZ", () => {

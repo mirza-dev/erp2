@@ -71,11 +71,15 @@ export function redactOrderForPerms<T extends object>(order: T, perms: Set<Permi
     nullField(r, "grand_total");
     nullField(r, "subtotal");
     nullField(r, "vat_total");
+    // Denetim O7 (2026-06): quotes ile simetri — iskonto da fiyat sınıfında
+    // (quotes discountAmount'ı zaten maskeliyordu, orders açık bırakıyordu).
+    nullField(r, "discount_amount");
     if (Array.isArray(r.lines)) {
         r.lines = (r.lines as Row[]).map((l) => {
             const lr: Row = { ...l };
             nullField(lr, "unit_price");
             nullField(lr, "line_total");
+            nullField(lr, "discount_pct");
             return lr;
         });
     }

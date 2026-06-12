@@ -12,6 +12,7 @@ import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import type { QuoteStatus } from "@/lib/database.types";
 import { buildQuoteLineDescription } from "@/lib/quote-description-builder";
 import { findMissingHsLines, validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
+import { roundMoney } from "@/lib/money-utils";
 import { applySendResultToast, sendQuoteEmail } from "../_utils/send-result";
 import { applyTemplateToField, templatesForField } from "@/lib/quote-note-templates";
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
@@ -204,8 +205,11 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     const custWrapperRef = useRef<HTMLDivElement>(null);
 
     // ── Computed ─────────────────────────────────────────────────────────────
+    // D1 (2026-06): satır toplamı yuvarlanır SONRA toplanır — 093 RPC'sinin
+    // makul-sapma kontrolü de aynı round(qty*price, 2) konvansiyonunu kullanır.
     const sym = SYM[currency];
-    const compSub = rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+    const compSub = roundMoney(rows.reduce(
+        (s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0));
     const compKg  = rows.reduce((s, r) => s + (parseFloat(r.kg) || 0), 0);
     // Faz 2 (V3-A1): GTİP soft warn — ürün/fiyatı olan ama HS boş satırlar (non-blocking).
     const missingHsLines = findMissingHsLines(rows.map(r => ({
@@ -218,8 +222,11 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     // Faz 3 (V7): iskonto KDV ÖNCESİ matrahtan düşülür (Türk fatura standardı).
     // 0 ≤ disc ≤ subtotal soft clamp (negatif/aşırı değer otomatik sınırlanır).
     const effDisc  = Math.min(Math.max(discount, 0), effSub);
-    const effVat   = ovVat   !== null ? ovVat   : (effSub - effDisc) * vatRate / 100;
-    const effGrand = ovGrand !== null ? ovGrand : (effSub - effDisc) + effVat;
+    // D2 (2026-06): clamp artık SESSİZ değil — girilen iskonto ara toplamı
+    // aşıyorsa kullanıcıya inline uyarı gösterilir (aşağıda, iskonto satırında).
+    const discountClamped = discount > effSub && effSub > 0;
+    const effVat   = ovVat   !== null ? ovVat   : roundMoney((effSub - effDisc) * vatRate / 100);
+    const effGrand = ovGrand !== null ? ovGrand : roundMoney((effSub - effDisc) + effVat);
 
     // ── Init ─────────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -524,19 +531,19 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                 custCompany, custContact, custPhone, custEmail, custAddress,
                 quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
                 currency, vatRate, rows,
-                subtotal: ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0),
+                subtotal: ovSub !== null ? ovSub : roundMoney(rows.reduce((s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0)),
                 // Faz 3 (V7): header iskonto (0 ≤ disc ≤ subtotal clamp); KDV öncesi matrahtan düşülür.
                 discountAmount: (() => {
-                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    const sub = ovSub !== null ? ovSub : roundMoney(rows.reduce((s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0));
                     return Math.min(Math.max(discount, 0), sub);
                 })(),
                 vatTotal: (() => {
-                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    const sub = ovSub !== null ? ovSub : roundMoney(rows.reduce((s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0));
                     const disc = Math.min(Math.max(discount, 0), sub);
                     return ovVat !== null ? ovVat : (sub - disc) * vatRate / 100;
                 })(),
                 grandTotal: (() => {
-                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    const sub = ovSub !== null ? ovSub : roundMoney(rows.reduce((s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0));
                     const disc = Math.min(Math.max(discount, 0), sub);
                     const vat = ovVat !== null ? ovVat : (sub - disc) * vatRate / 100;
                     return ovGrand !== null ? ovGrand : (sub - disc) + vat;
@@ -570,19 +577,19 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                 custCompany, custContact, custPhone, custEmail, custAddress,
                 quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
                 currency, vatRate, rows,
-                subtotal: ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0),
+                subtotal: ovSub !== null ? ovSub : roundMoney(rows.reduce((s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0)),
                 // Faz 3 (V7): header iskonto (0 ≤ disc ≤ subtotal clamp); KDV öncesi matrahtan düşülür.
                 discountAmount: (() => {
-                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    const sub = ovSub !== null ? ovSub : roundMoney(rows.reduce((s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0));
                     return Math.min(Math.max(discount, 0), sub);
                 })(),
                 vatTotal: (() => {
-                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    const sub = ovSub !== null ? ovSub : roundMoney(rows.reduce((s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0));
                     const disc = Math.min(Math.max(discount, 0), sub);
                     return ovVat !== null ? ovVat : (sub - disc) * vatRate / 100;
                 })(),
                 grandTotal: (() => {
-                    const sub = ovSub !== null ? ovSub : rows.reduce((s, r) => s + (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0), 0);
+                    const sub = ovSub !== null ? ovSub : roundMoney(rows.reduce((s, r) => s + roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)), 0));
                     const disc = Math.min(Math.max(discount, 0), sub);
                     const vat = ovVat !== null ? ovVat : (sub - disc) * vatRate / 100;
                     return ovGrand !== null ? ovGrand : (sub - disc) + vat;
@@ -661,7 +668,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         setTimeout(() => setToast(null), 2500);
     }
 
-    function lineTotal(r: QuoteRow) { return (parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0); }
+    function lineTotal(r: QuoteRow) { return roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)); }
 
     // ── DB Persistence ────────────────────────────────────────────────────────
     function buildQuotePayload(): CreateQuoteInput {
@@ -1432,6 +1439,11 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                             }}
                                             onBlur={() => setDiscFocused(false)}
                                         />
+                                        {discountClamped && (
+                                            <div className="q-no-print" style={{ fontSize: "10px", color: "var(--warning)", marginTop: "2px" }}>
+                                                İskonto ara toplamı aşıyor — {sym} {fmt(effDisc)} olarak uygulanacak
+                                            </div>
+                                        )}
                                     </td>
                                     <td colSpan={2}>&nbsp;</td>
                                     <td className="q-no-print" style={{ width: "28px", padding: "0 4px" }}>&nbsp;</td>
