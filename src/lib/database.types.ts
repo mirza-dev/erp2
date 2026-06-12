@@ -880,6 +880,9 @@ export interface EmailLogRow {
     entity_id:         string | null
     recipient_email:   string
     subject:           string
+    html_body:         string | null
+    text_body:         string | null
+    body_expires_at:   string | null
     status:            EmailLogStatus
     error_message:     string | null
     attempt_count:     number

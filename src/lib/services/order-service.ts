@@ -259,6 +259,7 @@ export async function serviceTransitionOrder(
             entityType: "sales_order",
             entityId: orderId,
             render: { type: "order_pending", ctx: {
+                orderId,
                 orderNumber: order.order_number,
                 customerName: order.customer_name,
                 total: order.grand_total,

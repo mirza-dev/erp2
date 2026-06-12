@@ -1,8 +1,8 @@
 /**
- * POST /api/email/test — Admin-only smoke test endpoint testleri.
+ * POST /api/email/test — internal operator smoke test endpoint testleri.
  *
  * Coverage:
- *   - requireRole(["admin"]) guard
+ *   - requireInternalOperator guard
  *   - Body validation (to/type)
  *   - Config check (RESEND_API_KEY + EMAIL_FROM yoksa 503)
  *   - Resend send → email_logs sent
@@ -12,19 +12,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const mockRequireRole = vi.fn();
+const mockInternalGuard = vi.fn();
 const mockGetUser = vi.fn();
 const mockCreateLog = vi.fn();
 const mockUpdateLogStatus = vi.fn();
 const mockResendSend = vi.fn();
 
 vi.mock("@/lib/auth/role-guard", () => ({
-    requireRole: (...a: unknown[]) => mockRequireRole(...a),
-    requireRoleFor: (...a: unknown[]) => mockRequireRole(...a),
     resolveAuthContext: async () => {
         const { data: { user } } = await mockGetUser();
         return { user: user ?? null, userId: user?.id ?? null, roles: ["admin"], perms: new Set() };
     },
+}));
+vi.mock("@/lib/auth/internal-access", () => ({
+    requireInternalOperatorFor: (...a: unknown[]) => mockInternalGuard(...a),
 }));
 vi.mock("@/lib/supabase/server", () => ({
     createClient: async () => ({
@@ -52,7 +53,7 @@ function makeReq(body: unknown): NextRequest {
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireRole.mockReturnValue(null);                        // default: admin OK
+    mockInternalGuard.mockReturnValue(null);
     mockGetUser.mockResolvedValue({ data: { user: { id: "u-1" } } });
     mockCreateLog.mockResolvedValue("log-1");
     mockUpdateLogStatus.mockResolvedValue(undefined);
@@ -61,12 +62,19 @@ beforeEach(() => {
 });
 
 describe("POST /api/email/test — auth + validation", () => {
-    it("admin değil → requireRole 403 dalını döndürür", async () => {
+    it("internal operator değil → 403 döndürür", async () => {
         const { NextResponse } = await import("next/server");
-        mockRequireRole.mockReturnValueOnce(NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }));
+        mockInternalGuard.mockReturnValueOnce(NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }));
         const res = await POST(makeReq({ to: "a@b.com", type: "stock_critical" }));
         expect(res.status).toBe(403);
         expect(mockResendSend).not.toHaveBeenCalled();
+    });
+
+    it("oturumsuz kullanıcı → internal guard 401 yanıtını döndürür", async () => {
+        const { NextResponse } = await import("next/server");
+        mockInternalGuard.mockReturnValueOnce(NextResponse.json({ error: "Yetkisiz." }, { status: 401 }));
+        const res = await POST(makeReq({ to: "a@b.com", type: "stock_critical" }));
+        expect(res.status).toBe(401);
     });
 
     it("geçersiz JSON body → 400", async () => {
@@ -94,7 +102,7 @@ describe("POST /api/email/test — config check", () => {
         expect(res.status).toBe(503);
         const body = await res.json();
         expect(body.status).toBe("config_missing");
-        expect(body.has_api_key).toBe(false);
+        expect(JSON.stringify(body)).not.toContain("RESEND_API_KEY");
         expect(mockResendSend).not.toHaveBeenCalled();
     });
 
@@ -103,7 +111,7 @@ describe("POST /api/email/test — config check", () => {
         const res = await POST(makeReq({ to: "a@b.com", type: "stock_critical" }));
         expect(res.status).toBe(503);
         const body = await res.json();
-        expect(body.has_email_from).toBe(false);
+        expect(JSON.stringify(body)).not.toContain("EMAIL_FROM");
     });
 });
 
@@ -136,12 +144,20 @@ describe("POST /api/email/test — happy path", () => {
         expect(mockUpdateLogStatus).toHaveBeenCalledWith("log-1", "sent", { resend_message_id: "resend-123" });
     });
 
-    it("5 NotificationType'in tümü için kabul ediyor", async () => {
+    it("5 iç bildirim + müşteri teklif örneğini kabul ediyor", async () => {
         mockResendSend.mockResolvedValue({ data: { id: "x" }, error: null });
-        for (const t of ["stock_critical", "order_pending", "order_new", "sync_error", "order_shipped"]) {
+        for (const t of ["stock_critical", "order_pending", "order_new", "sync_error", "order_shipped", "quote_customer_send"]) {
             const res = await POST(makeReq({ to: "a@b.com", type: t }));
             expect(res.status).toBe(200);
         }
+    });
+
+    it("teklif testi dış firma markalı HTML gönderir", async () => {
+        mockResendSend.mockResolvedValue({ data: { id: "x" }, error: null });
+        await POST(makeReq({ to: "a@b.com", type: "quote_customer_send" }));
+        const payload = mockResendSend.mock.calls[0][0];
+        expect(payload.subject).toContain("Örnek Endüstriyel A.Ş. | Teklif");
+        expect(payload.html).not.toContain("Roven");
     });
 });
 

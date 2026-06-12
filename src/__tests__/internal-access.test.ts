@@ -16,6 +16,7 @@ import {
     hasInternalOperatorAccess,
     parseInternalOperatorEmails,
     requireInternalOperator,
+    requireInternalOperatorFor,
 } from "@/lib/auth/internal-access";
 
 const originalInternalEmails = process.env.INTERNAL_OPERATOR_EMAILS;
@@ -116,5 +117,19 @@ describe("internal operator server context and guard", () => {
 
         expect(response?.status).toBe(401);
         expect(await response?.json()).toEqual({ error: "Yetkisiz." });
+    });
+
+    it("önceden çözülmüş auth context ile ikinci auth çağrısı yapmadan karar verir", () => {
+        const allowed = requireInternalOperatorFor({
+            user: { id: "u-1", email: "ops@example.com" } as never,
+            perms: new Set<Permission>(["view_settings"]),
+        });
+        const denied = requireInternalOperatorFor({
+            user: { id: "u-2", email: "customer@example.com" } as never,
+            perms: new Set<Permission>(["view_settings"]),
+        });
+
+        expect(allowed).toBeNull();
+        expect(denied?.status).toBe(403);
     });
 });

@@ -94,6 +94,7 @@ export async function PATCH(
                 entityType: "sales_order",
                 entityId: id,
                 render: { type: "order_shipped", ctx: {
+                    orderId: id,
                     orderNumber: updated.order_number,
                     customerName: updated.customer_name,
                 } },

@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
                 entityType: "sales_order",
                 entityId: result.id,
                 render: { type: "order_new", ctx: {
+                    orderId: result.id,
                     orderNumber: result.order_number,
                     customerName: result.customer_name,
                     total: result.grand_total,

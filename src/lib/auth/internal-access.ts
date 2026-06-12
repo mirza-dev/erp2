@@ -6,6 +6,7 @@ import {
     parseRoles,
     permissionsForRoles,
 } from "@/lib/auth/permissions";
+import type { AuthContext } from "@/lib/auth/role-guard";
 
 export interface InternalAccessContext {
     authenticated: boolean;
@@ -74,6 +75,22 @@ export async function requireInternalOperator(): Promise<NextResponse | null> {
         return NextResponse.json({ error: "Yetkisiz." }, { status: 401 });
     }
     if (!access.internalOperator) {
+        return NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 });
+    }
+    return null;
+}
+
+/**
+ * Önceden çözülmüş auth context üzerinden internal operator guard'ı.
+ * Route içinde audit actor da gerekiyorsa ikinci auth round-trip'ini önler.
+ */
+export function requireInternalOperatorFor(
+    auth: Pick<AuthContext, "user" | "perms">,
+): NextResponse | null {
+    if (!auth.user) {
+        return NextResponse.json({ error: "Yetkisiz." }, { status: 401 });
+    }
+    if (!hasInternalOperatorAccess(auth.user.email, auth.perms)) {
         return NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 });
     }
     return null;

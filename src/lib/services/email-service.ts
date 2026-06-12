@@ -24,12 +24,15 @@ import {
     dbUpdateEmailLogStatus,
     dbCheckRecentDuplicate,
     dbListFailedEmailsForRetry,
+    dbClearEmailSnapshot,
+    dbClearExpiredEmailSnapshots,
 } from "@/lib/supabase/email-logs";
 import type { NotificationTypeKey } from "@/lib/notification-types";
 
 const DEDUP_WINDOW_HOURS = 6;
 const RETRY_MAX_ATTEMPTS = 3;
 const RETRY_WINDOW_HOURS = 24;
+const RETRY_BODY_TTL_HOURS = 24;
 
 interface NotifyResult {
     sent: number;
@@ -85,6 +88,7 @@ export async function notifyUsersByEmail(opts: NotifyOpts): Promise<NotifyResult
     if (recipients.length === 0) return result;
 
     const content = renderEmail(opts.render);
+    const bodyExpiresAt = new Date(Date.now() + RETRY_BODY_TTL_HOURS * 60 * 60 * 1000).toISOString();
     const entityType = opts.entityType ?? null;
     const entityId = opts.entityId ?? null;
 
@@ -114,6 +118,9 @@ export async function notifyUsersByEmail(opts: NotifyOpts): Promise<NotifyResult
                 entity_id: entityId,
                 recipient_email: r.email,
                 subject: content.subject,
+                html_body: content.html,
+                text_body: content.text,
+                body_expires_at: bodyExpiresAt,
             });
         } catch (err) {
             console.error("[email-service] log create failed", err);
@@ -166,6 +173,7 @@ export interface SendDirectEmailOpts {
     html: string;
     text: string;
     attachments?: { filename: string; content: Buffer }[];
+    replyTo?: string;
 }
 
 export async function sendDirectEmail(
@@ -182,6 +190,7 @@ export async function sendDirectEmail(
             subject: opts.subject,
             html: opts.html,
             text: opts.text,
+            ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
             ...(opts.attachments && opts.attachments.length > 0
                 ? { attachments: opts.attachments }
                 : {}),
@@ -202,6 +211,12 @@ export async function sendDirectEmail(
 export async function retryFailedEmails(): Promise<{ retried: number; succeeded: number; failed: number }> {
     const stats = { retried: 0, succeeded: 0, failed: 0 };
 
+    try {
+        await dbClearExpiredEmailSnapshots();
+    } catch (err) {
+        console.error("[email-service] expired snapshot cleanup failed", err);
+    }
+
     const resend = getResend();
     const from = getEmailFrom();
     if (!resend || !from) return stats;
@@ -209,18 +224,25 @@ export async function retryFailedEmails(): Promise<{ retried: number; succeeded:
     const failed = await dbListFailedEmailsForRetry(RETRY_MAX_ATTEMPTS, RETRY_WINDOW_HOURS);
     for (const log of failed) {
         stats.retried++;
+        if (!log.html_body || !log.text_body) {
+            try { await dbClearEmailSnapshot(log.id); }
+            catch { /* best-effort */ }
+            stats.failed++;
+            continue;
+        }
         try {
-            // Subject ve recipient log'da var; html/text yeniden render gerekiyor.
-            // Ancak entity context yok — bu yüzden "Yeniden gönderim" basit bir notice metni olarak
-            // önceki subject ile gönderiyoruz (HTML body kayıp olduğu için fallback metin).
             const sendRes = await resend.emails.send({
                 from,
                 to: log.recipient_email,
                 subject: log.subject,
-                text: `${log.subject}\n\nBu bildirim daha önce iletilemedi, yeniden denendi. Detay: ${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard/settings`,
+                html: log.html_body,
+                text: log.text_body,
             });
             if (sendRes.error) {
                 await dbUpdateEmailLogStatus(log.id, "failed", { error: sendRes.error.message });
+                if (log.attempt_count + 1 >= RETRY_MAX_ATTEMPTS) {
+                    await dbClearEmailSnapshot(log.id);
+                }
                 stats.failed++;
                 continue;
             }
@@ -232,6 +254,10 @@ export async function retryFailedEmails(): Promise<{ retried: number; succeeded:
             const msg = err instanceof Error ? err.message : "Resend retry error";
             try { await dbUpdateEmailLogStatus(log.id, "failed", { error: msg }); }
             catch { /* best-effort */ }
+            if (log.attempt_count + 1 >= RETRY_MAX_ATTEMPTS) {
+                try { await dbClearEmailSnapshot(log.id); }
+                catch { /* best-effort */ }
+            }
             stats.failed++;
         }
     }

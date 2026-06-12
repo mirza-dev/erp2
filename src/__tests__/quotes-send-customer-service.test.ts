@@ -54,7 +54,13 @@ beforeEach(() => {
     vi.clearAllMocks();
     mockDbGetQuote.mockResolvedValue({ id: "q-1", quote_number: "TKL-2026-001" });
     mockMapDetail.mockReturnValue(DETAIL);
-    mockGetCompany.mockResolvedValue({ name: "PMT A.Ş." });
+    mockGetCompany.mockResolvedValue({
+        name: "PMT A.Ş.",
+        logo_url: "https://example.com/logo.png",
+        phone: "+90 212 555 01 23",
+        email: "teklif@pmt.example",
+        website: "https://pmt.example",
+    });
     mockRenderArchive.mockResolvedValue("<html>BELGE</html>");
     mockSendDirect.mockResolvedValue({ ok: true, messageId: "rs_1" });
     mockCreateLog.mockResolvedValue("log-1");
@@ -92,6 +98,9 @@ describe("serviceSendQuoteToCustomer", () => {
         expect(sendArg.attachments[0].filename).toBe("Teklif-TKL-2026-001.html");
         expect(Buffer.isBuffer(sendArg.attachments[0].content)).toBe(true);
         expect(sendArg.attachments[0].content.toString("utf-8")).toBe("<html>BELGE</html>");
+        expect(sendArg.replyTo).toBe("teklif@pmt.example");
+        expect(sendArg.html).toContain("PMT A.Ş.");
+        expect(sendArg.html).not.toContain("Roven");
 
         // Log pending → sent
         expect(mockCreateLog).toHaveBeenCalledWith(expect.objectContaining({
@@ -101,6 +110,12 @@ describe("serviceSendQuoteToCustomer", () => {
             recipient_email: "satinalma@acme.com",
         }));
         expect(mockUpdateLog).toHaveBeenCalledWith("log-1", "sent", { resend_message_id: "rs_1" });
+    });
+
+    it("firma e-postası geçersizse replyTo gönderilmez", async () => {
+        mockGetCompany.mockResolvedValue({ name: "PMT A.Ş.", email: "geçersiz" });
+        await serviceSendQuoteToCustomer("q-1", "actor-1");
+        expect(mockSendDirect.mock.calls[0][0].replyTo).toBeUndefined();
     });
 
     it("Resend fail → ok:false + email_logs failed", async () => {

@@ -29,13 +29,17 @@ function makeQueryBuilder() {
         }),
         update: vi.fn((patch: unknown) => {
             updateCalls.push([patch]);
-            return { eq: vi.fn(() => Promise.resolve(updateResponse)) };
+            return {
+                eq: vi.fn(() => Promise.resolve(updateResponse)),
+                lt: vi.fn(() => Promise.resolve(updateResponse)),
+            };
         }),
         eq: vi.fn(() => builder),
         is: vi.fn(() => builder),
         in: vi.fn(() => builder),
         gte: vi.fn(() => builder),
         lt: vi.fn(() => builder),
+        not: vi.fn(() => builder),
         or: vi.fn((expr: string) => { orCalls.push(expr); return builder; }),
         order: vi.fn(() => builder),
         limit: vi.fn(() => Promise.resolve(listResponse)),
@@ -76,6 +80,8 @@ import {
     dbUpdateEmailLogStatus,
     dbCheckRecentDuplicate,
     dbListFailedEmailsForRetry,
+    dbClearEmailSnapshot,
+    dbClearExpiredEmailSnapshots,
 } from "@/lib/supabase/email-logs";
 
 beforeEach(() => {
@@ -101,12 +107,17 @@ describe("dbCreateEmailLog", () => {
             entity_id: "p-1",
             recipient_email: "user@example.com",
             subject: "Test",
+            html_body: "<html>Test</html>",
+            text_body: "Test",
+            body_expires_at: "2026-06-13T00:00:00.000Z",
         });
         expect(id).toBe("log-1");
         const inserted = insertCalls[0][0] as Record<string, unknown>;
         expect(inserted.status).toBe("pending");
         expect(inserted.attempt_count).toBe(0);
         expect(inserted.user_id).toBe("u-1");
+        expect(inserted.html_body).toBe("<html>Test</html>");
+        expect(inserted.text_body).toBe("Test");
     });
 
     it("DB hatası → throw", async () => {
@@ -127,6 +138,9 @@ describe("dbUpdateEmailLogStatus", () => {
         expect(patch.attempt_count).toBe(1);
         expect(patch.sent_at).toBeDefined();
         expect((patch.metadata as Record<string, unknown>).resend_message_id).toBe("rs_123");
+        expect(patch.html_body).toBeNull();
+        expect(patch.text_body).toBeNull();
+        expect(patch.body_expires_at).toBeNull();
     });
 
     it("status='failed' → error_message kaydedilir", async () => {
@@ -177,6 +191,7 @@ describe("dbListFailedEmailsForRetry", () => {
                 { id: "log-1", status: "failed", attempt_count: 1, recipient_email: "u@x.com", subject: "T",
                   user_id: "u-1", notification_type: "stock_critical", entity_type: null, entity_id: null,
                   error_message: "x", last_attempt_at: "2026-01-01", sent_at: null, metadata: null,
+                  html_body: "<html>T</html>", text_body: "T", body_expires_at: "2026-01-02",
                   created_at: "2026-01-01" },
             ],
             error: null,
@@ -197,5 +212,19 @@ describe("dbListFailedEmailsForRetry", () => {
         // quote'u dışla AMA entity_type=NULL iç bildirimleri retry'da tut:
         // PostgREST düz .neq NULL satırlarını da yutardı → .or kullanılır.
         expect(orCalls).toContain("entity_type.is.null,entity_type.neq.quote");
+    });
+});
+
+describe("email snapshot cleanup", () => {
+    it("tek kaydın retry gövdesini temizler", async () => {
+        await dbClearEmailSnapshot("log-1");
+        const patch = updateCalls[0][0] as Record<string, unknown>;
+        expect(patch).toEqual({ html_body: null, text_body: null, body_expires_at: null });
+    });
+
+    it("süresi dolan retry gövdelerini topluca temizler", async () => {
+        await dbClearExpiredEmailSnapshots("2026-06-13T00:00:00.000Z");
+        const patch = updateCalls[0][0] as Record<string, unknown>;
+        expect(patch).toEqual({ html_body: null, text_body: null, body_expires_at: null });
     });
 });

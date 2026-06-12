@@ -284,7 +284,12 @@ export async function serviceSendQuoteToCustomer(
         customerName: detail.customerName,
         validUntil: detail.validUntil,
         companyName: company?.name ?? null,
+        companyLogoUrl: company?.logo_url ?? null,
+        companyPhone: company?.phone ?? null,
+        companyEmail: company?.email ?? null,
+        companyWebsite: company?.website ?? null,
     });
+    const companyReplyTo = company?.email?.trim() ?? "";
 
     // Log (pending) — fail olursa gönderimi yine de dene (best-effort audit)
     let logId: string | null = null;
@@ -306,6 +311,7 @@ export async function serviceSendQuoteToCustomer(
         subject: body.subject,
         html: body.html,
         text: body.text,
+        replyTo: QUOTE_EMAIL_RE.test(companyReplyTo) ? companyReplyTo : undefined,
         attachments: [{
             filename: `Teklif-${detail.quoteNumber}.html`,
             content: Buffer.from(docHtml, "utf-8"),

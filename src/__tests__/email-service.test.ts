@@ -14,11 +14,15 @@ const mockCreateLog = vi.fn();
 const mockUpdateLog = vi.fn();
 const mockCheckDup = vi.fn();
 const mockListFailed = vi.fn();
+const mockClearSnapshot = vi.fn();
+const mockClearExpiredSnapshots = vi.fn();
 vi.mock("@/lib/supabase/email-logs", () => ({
     dbCreateEmailLog: (...a: unknown[]) => mockCreateLog(...a),
     dbUpdateEmailLogStatus: (...a: unknown[]) => mockUpdateLog(...a),
     dbCheckRecentDuplicate: (...a: unknown[]) => mockCheckDup(...a),
     dbListFailedEmailsForRetry: (...a: unknown[]) => mockListFailed(...a),
+    dbClearEmailSnapshot: (...a: unknown[]) => mockClearSnapshot(...a),
+    dbClearExpiredEmailSnapshots: (...a: unknown[]) => mockClearExpiredSnapshots(...a),
 }));
 
 const mockResendSend = vi.fn();
@@ -39,6 +43,8 @@ beforeEach(() => {
     mockCreateLog.mockResolvedValue("log-1");
     mockUpdateLog.mockResolvedValue(undefined);
     mockListFailed.mockResolvedValue([]);
+    mockClearSnapshot.mockResolvedValue(undefined);
+    mockClearExpiredSnapshots.mockResolvedValue(undefined);
     mockListUsers.mockResolvedValue([]);
 });
 
@@ -47,7 +53,7 @@ const STOCK_OPTS = {
     entityType: "product",
     entityId: "p-1",
     render: { type: "stock_critical" as const, ctx: {
-        productName: "Vana", sku: "V-1", available: 2, min: 10,
+        productId: "p-1", productName: "Vana", sku: "V-1", available: 2, min: 10,
     } },
 };
 
@@ -114,6 +120,11 @@ describe("notifyUsersByEmail — Resend success/fail", () => {
         mockListUsers.mockResolvedValue([{ userId: "u-1", email: "user@x.com", fullName: "A" }]);
         await notifyUsersByEmail(STOCK_OPTS);
         expect(mockUpdateLog).toHaveBeenCalledWith("log-1", "sent", { resend_message_id: "rs_msg_1" });
+        expect(mockCreateLog).toHaveBeenCalledWith(expect.objectContaining({
+            html_body: expect.stringContaining("Roven"),
+            text_body: expect.stringContaining("Kritik stok"),
+            body_expires_at: expect.any(String),
+        }));
     });
 
     it("Resend error response → status='failed', error_message metadata", async () => {
@@ -150,6 +161,7 @@ describe("retryFailedEmails", () => {
         const r = await retryFailedEmails();
         expect(r).toEqual({ retried: 0, succeeded: 0, failed: 0 });
         expect(mockListFailed).not.toHaveBeenCalled();
+        expect(mockClearExpiredSnapshots).toHaveBeenCalledOnce();
     });
 
     it("failed liste boş → 0 retried", async () => {
@@ -161,22 +173,42 @@ describe("retryFailedEmails", () => {
     it("failed kayıtları yeniden dener, başarılı ise sayar", async () => {
         mockListFailed.mockResolvedValue([
             { id: "log-1", recipient_email: "u@x.com", subject: "T",
-              status: "failed", attempt_count: 1 },
+              status: "failed", attempt_count: 1, html_body: "<html>özgün</html>", text_body: "özgün" },
         ]);
         const r = await retryFailedEmails();
         expect(r.retried).toBe(1);
         expect(r.succeeded).toBe(1);
+        expect(mockResendSend).toHaveBeenCalledWith(expect.objectContaining({
+            html: "<html>özgün</html>",
+            text: "özgün",
+        }));
         expect(mockUpdateLog).toHaveBeenCalledWith("log-1", "sent", { resend_message_id: "rs_msg_1" });
     });
 
     it("retry'de Resend error → failed sayılır", async () => {
         mockListFailed.mockResolvedValue([
-            { id: "log-1", recipient_email: "u@x.com", subject: "T", status: "failed", attempt_count: 1 },
+            { id: "log-1", recipient_email: "u@x.com", subject: "T", status: "failed", attempt_count: 1,
+              html_body: "<html>özgün</html>", text_body: "özgün" },
         ]);
         mockResendSend.mockResolvedValue({ data: null, error: { message: "Bounce" } });
         const r = await retryFailedEmails();
         expect(r.failed).toBe(1);
         expect(mockUpdateLog).toHaveBeenCalledWith("log-1", "failed", { error: "Bounce" });
+    });
+
+    it("son retry başarısızsa gövde snapshot'ını temizler", async () => {
+        mockListFailed.mockResolvedValue([
+            { id: "log-1", recipient_email: "u@x.com", subject: "T", status: "failed", attempt_count: 2,
+              html_body: "<html>özgün</html>", text_body: "özgün" },
+        ]);
+        mockResendSend.mockResolvedValue({ data: null, error: { message: "Bounce" } });
+        await retryFailedEmails();
+        expect(mockClearSnapshot).toHaveBeenCalledWith("log-1");
+    });
+
+    it("her retry turunun başında süresi dolan snapshot'ları temizler", async () => {
+        await retryFailedEmails();
+        expect(mockClearExpiredSnapshots).toHaveBeenCalledOnce();
     });
 });
 
@@ -202,6 +234,19 @@ describe("sendDirectEmail", () => {
         await sendDirectEmail({ to: "a@b.com", subject: "S", html: "<p>h</p>", text: "t" });
         const arg = mockResendSend.mock.calls[0][0];
         expect("attachments" in arg).toBe(false);
+    });
+
+    it("replyTo verilirse Resend payload'ına iletilir", async () => {
+        await sendDirectEmail({
+            to: "a@b.com",
+            subject: "S",
+            html: "<p>h</p>",
+            text: "t",
+            replyTo: "teklif@firma.com",
+        });
+        expect(mockResendSend).toHaveBeenCalledWith(expect.objectContaining({
+            replyTo: "teklif@firma.com",
+        }));
     });
 
     it("config eksik (EMAIL_FROM yok) → ok:false config_missing, Resend çağrılmaz", async () => {

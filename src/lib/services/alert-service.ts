@@ -161,6 +161,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                             entityType: "product",
                             entityId,
                             render: { type: "stock_critical", ctx: {
+                                productId: entityId,
                                 productName: product.name,
                                 sku: product.sku,
                                 available,

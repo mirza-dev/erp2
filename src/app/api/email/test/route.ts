@@ -1,15 +1,15 @@
 /**
- * POST /api/email/test — Admin-only e-posta smoke test endpoint
+ * POST /api/email/test — internal operator e-posta smoke test endpoint
  *
  * Production deploy sonrası Resend + DNS + EMAIL_FROM doğrulamasını
  * recipient_lookup/dedup BYPASS ederek hızlı yapar.
  *
- * Body: { to: string (email), type: NotificationTypeKey }
- * Auth: requireRole(["admin"]) — middleware Supabase session zorunlu
+ * Body: { to: string (email), type: NotificationTypeKey | "quote_customer_send" }
+ * Auth: INTERNAL_OPERATOR_EMAILS allowlist + view_settings (fail-closed)
  * Demo guard: 403 — middleware zaten /api/** demo POST'u bloklar, ek savunma
  *
  * Davranış:
- *   - 5 NOTIFICATION_TYPE'ın her biri için makul sample context render
+ *   - 5 iç bildirim + müşteri teklif e-postası için makul sample context render
  *   - dbCreateEmailLog → status='pending' (entity_type='test_email')
  *   - Resend direct send (notifyUsersByEmail içindeki dedup ve recipient lookup
  *     bypass edilir — admin'in test attığı kişiye her seferinde gitmeli)
@@ -19,41 +19,63 @@
  * Smoke akışı (deploy sonrası):
  *   1. Coolify env'de RESEND_API_KEY + EMAIL_FROM set edilmiş
  *   2. Migration 047 production DB'de uygulanmış
- *   3. Admin login → POST /api/email/test {"to":"sen@example.com","type":"stock_critical"}
- *   4. Inbox'a "Kritik stok: Test Ürün" maili düşmeli
+ *   3. Internal operator login → POST /api/email/test {"to":"sen@example.com","type":"stock_critical"}
+ *   4. Inbox'a "[Roven] Kritik stok · Test Ürün" maili düşmeli
  */
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
-import { resolveAuthContext, requireRoleFor } from "@/lib/auth/role-guard";
-import { renderEmail, type RenderContext } from "@/lib/email/templates";
+import { resolveAuthContext } from "@/lib/auth/role-guard";
+import {
+    renderEmail,
+    renderQuoteToCustomer,
+    type EmailContent,
+    type RenderContext,
+} from "@/lib/email/templates";
+import { requireInternalOperatorFor } from "@/lib/auth/internal-access";
 import { NOTIFICATION_TYPE_KEYS, type NotificationTypeKey } from "@/lib/notification-types";
 import { dbCreateEmailLog, dbUpdateEmailLogStatus } from "@/lib/supabase/email-logs";
 import { handleApiError } from "@/lib/api-error";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const QUOTE_TEST_TYPE = "quote_customer_send";
+const EMAIL_TEST_TYPES = new Set<string>([...NOTIFICATION_TYPE_KEYS, QUOTE_TEST_TYPE]);
 
 function buildSampleContext(type: NotificationTypeKey): RenderContext {
     switch (type) {
         case "stock_critical":
-            return { type, ctx: { productName: "Test Ürün", sku: "TST-001", available: 0, min: 10 } };
+            return { type, ctx: { productId: "00000000-0000-0000-0000-000000000001", productName: "Test Ürün", sku: "TST-001", available: 0, min: 10 } };
         case "order_pending":
-            return { type, ctx: { orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", total: 1500, currency: "TRY" } };
+            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", total: 1500, currency: "TRY" } };
         case "order_new":
-            return { type, ctx: { orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", total: 1500, currency: "TRY" } };
+            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", total: 1500, currency: "TRY" } };
         case "sync_error":
             return { type, ctx: { entityName: "Test Müşteri (Paraşüt sync)", errorMessage: "Bu bir test hata mesajıdır — gerçek sync hatası değil." } };
         case "order_shipped":
-            return { type, ctx: { orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti." } };
+            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti." } };
     }
+}
+
+function buildSampleContent(type: string): EmailContent {
+    if (type === QUOTE_TEST_TYPE) {
+        return renderQuoteToCustomer({
+            quoteNumber: "TST-2026-001",
+            customerName: "Örnek Müşteri A.Ş.",
+            validUntil: "2026-06-30",
+            companyName: "Örnek Endüstriyel A.Ş.",
+            companyPhone: "+90 212 555 01 23",
+            companyEmail: "teklif@example.com",
+            companyWebsite: "https://example.com",
+        });
+    }
+    return renderEmail(buildSampleContext(type as NotificationTypeKey));
 }
 
 export async function POST(request: NextRequest) {
     try {
-        // 1. Admin guard
-        // Tek getUser: guard + audit user aynı auth context'ten (perf Faz 1).
+        // 1. Internal operator guard — müşteri adminleri gerçek test e-postası atamaz.
         const auth = await resolveAuthContext();
-        const roleGuard = requireRoleFor(auth, ["admin"]);
-        if (roleGuard) return roleGuard;
+        const internalGuard = requireInternalOperatorFor(auth);
+        if (internalGuard) return internalGuard;
 
         // 2. Body validation
         const body = await request.json().catch(() => null) as { to?: unknown; type?: unknown } | null;
@@ -65,9 +87,9 @@ export async function POST(request: NextRequest) {
         if (!EMAIL_RE.test(to)) {
             return NextResponse.json({ error: "Geçerli bir e-posta adresi gerekli (to)." }, { status: 400 });
         }
-        if (!NOTIFICATION_TYPE_KEYS.has(type)) {
+        if (!EMAIL_TEST_TYPES.has(type)) {
             return NextResponse.json(
-                { error: `Geçersiz bildirim tipi (type). Geçerli: ${[...NOTIFICATION_TYPE_KEYS].join(", ")}` },
+                { error: `Geçersiz bildirim tipi (type). Geçerli: ${[...EMAIL_TEST_TYPES].join(", ")}` },
                 { status: 400 },
             );
         }
@@ -79,9 +101,7 @@ export async function POST(request: NextRequest) {
             return NextResponse.json(
                 {
                     status: "config_missing",
-                    error: "Email config eksik (RESEND_API_KEY veya EMAIL_FROM tanımsız). Coolify env vars kontrol edin.",
-                    has_api_key: !!apiKey,
-                    has_email_from: !!from,
+                    error: "E-posta gönderim yapılandırması tamamlanmamış.",
                 },
                 { status: 503 },
             );
@@ -92,7 +112,7 @@ export async function POST(request: NextRequest) {
         if (!user) return NextResponse.json({ error: "Oturum bulunamadı." }, { status: 401 });
 
         // 5. Render
-        const content = renderEmail(buildSampleContext(type as NotificationTypeKey));
+        const content = buildSampleContent(type);
 
         // 6. Log (pending)
         let logId: string;
@@ -134,7 +154,6 @@ export async function POST(request: NextRequest) {
                 status: "sent",
                 resend_message_id: sendRes.data?.id,
                 log_id: logId,
-                from,
                 to,
                 subject: content.subject,
             });

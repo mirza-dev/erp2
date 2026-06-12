@@ -25,6 +25,7 @@ const GUARD_PATTERNS = [
     "requirePermissionFor(",
     "requireRoleFor(",
     "requireInternalOperator(",
+    "requireInternalOperatorFor(",
     "guardAiRoute(",   // IP rate-limit (AI maliyet kapısı — bilinçli sınıf)
     "requireAdmin(",   // admin/users lokal guard'ı
     "checkAuth(",      // seed route'unun CRON/admin kombinasyonu

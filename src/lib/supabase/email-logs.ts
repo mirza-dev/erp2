@@ -8,6 +8,9 @@ export interface CreateEmailLogInput {
     entity_id?: string | null;
     recipient_email: string;
     subject: string;
+    html_body?: string | null;
+    text_body?: string | null;
+    body_expires_at?: string | null;
 }
 
 /**
@@ -25,6 +28,9 @@ export async function dbCreateEmailLog(input: CreateEmailLogInput): Promise<stri
             entity_id: input.entity_id ?? null,
             recipient_email: input.recipient_email,
             subject: input.subject,
+            html_body: input.html_body ?? null,
+            text_body: input.text_body ?? null,
+            body_expires_at: input.body_expires_at ?? null,
             status: "pending",
             attempt_count: 0,
         })
@@ -68,6 +74,9 @@ export async function dbUpdateEmailLogStatus(
     if (status === "sent") {
         update.sent_at = now;
         update.error_message = null;
+        update.html_body = null;
+        update.text_body = null;
+        update.body_expires_at = null;
     } else if (metadata.error) {
         update.error_message = metadata.error.slice(0, 500);
     }
@@ -119,6 +128,7 @@ export async function dbListFailedEmailsForRetry(
 ): Promise<EmailLogRow[]> {
     const supabase = createServiceClient();
     const cutoff = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
     // entity_type='quote' (müşteriye giden teklif e-postası) generic retry'a GİRMEZ:
     // retryFailedEmails ekleri (HTML belge) yeniden ekleyemez → içeriksiz fallback
     // metin gönderirdi. Audit için email_logs kaydı 'failed' olarak kalır.
@@ -130,9 +140,32 @@ export async function dbListFailedEmailsForRetry(
         .eq("status", "failed")
         .lt("attempt_count", maxAttempts)
         .gte("last_attempt_at", cutoff)
+        .gte("body_expires_at", now)
+        .not("html_body", "is", null)
+        .not("text_body", "is", null)
         .or("entity_type.is.null,entity_type.neq.quote")
         .order("last_attempt_at", { ascending: true })
         .limit(50);
     if (error) throw new Error(error.message);
     return (data ?? []) as EmailLogRow[];
+}
+
+/** Başarılı/bitmiş bir kaydın hassas retry gövdesini temizler; audit satırı kalır. */
+export async function dbClearEmailSnapshot(id: string): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("email_logs")
+        .update({ html_body: null, text_body: null, body_expires_at: null })
+        .eq("id", id);
+    if (error) throw new Error(error.message);
+}
+
+/** Süresi dolmuş retry gövdelerini topluca temizler; metadata/audit bilgisi kalır. */
+export async function dbClearExpiredEmailSnapshots(now = new Date().toISOString()): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("email_logs")
+        .update({ html_body: null, text_body: null, body_expires_at: null })
+        .lt("body_expires_at", now);
+    if (error) throw new Error(error.message);
 }
