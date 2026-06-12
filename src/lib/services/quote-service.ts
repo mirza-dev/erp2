@@ -7,6 +7,7 @@
  */
 
 import { createHash } from "crypto";
+import { localISODate } from "@/lib/stock-utils";
 import type { QuoteStatus } from "@/lib/database.types";
 import { dbGetQuote, dbUpdateQuoteStatus, dbListExpiredQuotes, dbCreateQuoteRevision, dbAcceptQuoteAndCreateOrder, dbSendQuoteCreatePendingOrder, dbCancelQuoteLinkedOrder, dbListQuoteReservationMismatches } from "@/lib/supabase/quotes";
 import type { SendQuoteOrderResult } from "@/lib/supabase/quotes";
@@ -374,7 +375,7 @@ export async function serviceAcceptQuoteToOrder(
 
     // valid_until geçmiş → blokla (convert ile aynı; string karşılaştırma kuralı).
     if (quote.valid_until) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localISODate(Date.now());
         if (quote.valid_until < today) {
             return {
                 success: false,

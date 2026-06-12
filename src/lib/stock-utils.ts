@@ -286,7 +286,7 @@ export function buildPurchaseDescription(
  * Avoids the UTC-midnight drift that toISOString() causes for UTC+ zones
  * (e.g., at 00:30 Istanbul, toISOString() returns yesterday's UTC date).
  */
-function localISODate(ts: number): string {
+export function localISODate(ts: number): string {
     const d = new Date(ts);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

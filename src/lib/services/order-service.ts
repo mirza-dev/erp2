@@ -5,6 +5,7 @@
  * Used by API routes only (server-side).
  */
 
+import { localISODate } from "@/lib/stock-utils";
 import {
     dbGetOrderById,
     dbListOrders,
@@ -92,7 +93,7 @@ export function validateOrderCreate(input: CreateOrderInput): ValidationResult {
     if (input.grand_total <= 0) errors.push("Sipariş tutarı 0'dan büyük olmalıdır.");
 
     if (input.quote_valid_until) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localISODate(Date.now());
         if (input.quote_valid_until < today) {
             errors.push("Teklif geçerlilik tarihi bugün veya sonrası olmalıdır.");
         }
@@ -138,7 +139,7 @@ export function validateOrderUpdate(input: UpdateOrderInput): ValidationResult {
     if (!input.lines || input.lines.length === 0) errors.push("En az bir satır ürün girilmelidir.");
 
     if (input.quote_valid_until) {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = localISODate(Date.now());
         if (input.quote_valid_until < today) {
             errors.push("Teklif geçerlilik tarihi bugün veya sonrası olmalıdır.");
         }
@@ -360,7 +361,7 @@ export async function serviceUpdateQuoteDeadline(
     quoteValidUntil: string | null
 ): Promise<void> {
     await dbUpdateOrderQuoteDeadline(orderId, quoteValidUntil);
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localISODate(Date.now());
     if (quoteValidUntil && quoteValidUntil >= today) {
         await resolveQuoteExpiredAlerts(orderId);
     }

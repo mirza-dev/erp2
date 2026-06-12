@@ -6,6 +6,7 @@
  */
 
 import { dbGetOrderById } from "@/lib/supabase/orders";
+import { localISODate } from "@/lib/stock-utils";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById } from "@/lib/supabase/products";
 import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/sync-log";
@@ -543,7 +544,7 @@ async function upsertShipment(order: OrderWithLines): Promise<void> {
     }
 
     const shippedAt = (order.shipped_at ?? order.created_at).slice(0, 10);
-    const issueDate = new Date().toISOString().slice(0, 10);
+    const issueDate = localISODate(Date.now());
 
     // Durable attempted marker — tüm validasyonlar geçtikten sonra, create çağrısından hemen önce yazılır.
     // Crash-before-DB-write senaryosu: sonraki retry hasAttemptedBefore=true görür, recovery pagination çalışır.
@@ -700,7 +701,7 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
         });
     }
 
-    const issueDate = new Date().toISOString().slice(0, 10);
+    const issueDate = localISODate(Date.now());
     const dueDate   = computeDueDate(issueDate, customer.payment_terms_days ?? 30);
 
     // Durable attempted marker — create çağrısından hemen önce, validasyonlar geçtikten sonra
@@ -964,7 +965,7 @@ async function upsertEDocument(
         .eq("id", orderId);
     if (markerErr) throw new Error(`E-doc attempted marker yazılamadı: ${markerErr.message}`);
 
-    const issueDate = new Date().toISOString().slice(0, 10);
+    const issueDate = localISODate(Date.now());
 
     const job = type === "e_invoice"
         ? await parasutApiCall(

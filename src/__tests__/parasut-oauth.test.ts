@@ -124,7 +124,7 @@ function makeAdapter() {
 }
 
 /** Build a signed state cookie value matching the start route implementation. */
-function signState(state: string, secret = ""): string {
+function signState(state: string, secret = "test-cron-secret"): string {
     const sig = createHmac("sha256", secret).update(state).digest("hex");
     return `${state}.${sig}`;
 }
@@ -138,7 +138,7 @@ function buildMockRequest(url: string, cookies: Record<string, string> = {}): Ne
 }
 
 /** Build request with a correctly HMAC-signed state cookie. */
-function buildCallbackRequest(state: string, code: string, secret = ""): NextRequest {
+function buildCallbackRequest(state: string, code: string, secret = "test-cron-secret"): NextRequest {
     const cookieVal = signState(state, secret);
     return buildMockRequest(
         `http://localhost/api/parasut/oauth/callback?code=${code}&state=${state}`,
@@ -159,7 +159,8 @@ beforeEach(() => {
     savedEnv.PARASUT_REDIRECT_URI  = process.env.PARASUT_REDIRECT_URI;
     savedEnv.CRON_SECRET           = process.env.CRON_SECRET;
     process.env.PARASUT_USE_MOCK   = "true";
-    process.env.CRON_SECRET        = "";
+    // O8 (2026-06): secret unset/boş → fail-closed; testler gerçek secret kullanır.
+    process.env.CRON_SECRET        = "test-cron-secret";
 });
 
 afterEach(() => {

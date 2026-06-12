@@ -1,4 +1,5 @@
 import { createServiceClient } from "./service";
+import { localISODate } from "@/lib/stock-utils";
 import type { PurchaseOrderRow, PurchaseOrderLineRow, PurchaseOrderStatus } from "@/lib/database.types";
 
 export type { PurchaseOrderStatus };
@@ -346,7 +347,7 @@ export async function dbGetIncomingPOQuantities(): Promise<Map<string, number>> 
  */
 export async function dbListOverduePurchaseOrders(): Promise<PurchaseOrderRow[]> {
     const supabase = createServiceClient();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localISODate(Date.now());
     const { data, error } = await supabase
         .from("purchase_orders")
         .select("*")

@@ -1,4 +1,5 @@
 import { createServiceClient } from "./service";
+import { localISODate } from "@/lib/stock-utils";
 import type {
     SalesOrderRow,
     OrderLineRow,
@@ -328,7 +329,7 @@ export async function dbCancelOrder(orderId: string): Promise<{ success: boolean
  */
 export async function dbListExpiredQuotes(): Promise<SalesOrderRow[]> {
     const supabase = createServiceClient();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localISODate(Date.now());
     const { data, error } = await supabase
         .from("sales_orders")
         .select("*")
@@ -489,8 +490,8 @@ export async function dbUpdateOrderQuoteDeadline(
  *  or have no ship date but were created 7+ days ago. */
 export async function dbListOverdueShipments(): Promise<SalesOrderRow[]> {
     const supabase = createServiceClient();
-    const today = new Date().toISOString().slice(0, 10);
-    const threshold = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+    const today = localISODate(Date.now());
+    const threshold = localISODate(Date.now() - 7 * 86_400_000);
     const { data, error } = await supabase
         .from("sales_orders")
         .select("*")

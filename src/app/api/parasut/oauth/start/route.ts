@@ -16,7 +16,11 @@ async function requireAdmin(): Promise<{ error: NextResponse } | null> {
 }
 
 function signState(state: string): string {
-    const secret = process.env.CRON_SECRET ?? "";
+    // Denetim O8 (2026-06): secret unset iken boş-anahtar HMAC üretmek yerine
+    // FAIL-CLOSED — OAuth akışı hiç başlamaz (callback doğrulaması da secret
+    // yokken false döner; "her imza geçer" durumu yapısal olarak imkânsız).
+    const secret = process.env.CRON_SECRET;
+    if (!secret) throw new Error("CRON_SECRET tanımsız — OAuth state imzalanamaz.");
     const sig = createHmac("sha256", secret).update(state).digest("hex");
     return `${state}.${sig}`;
 }

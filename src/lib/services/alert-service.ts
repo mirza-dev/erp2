@@ -42,6 +42,9 @@ export interface ScanResult {
     scanned: number;
     created: number;
     resolved: number;
+    /** Y8 (2026-06): kritik-stok e-postası gönderilemeyen alıcı sayısı — sessiz
+     *  kayıp görünür olur (log'a yazılan failed'ları retry cron'u yeniden dener). */
+    emailFailed: number;
 }
 
 /**
@@ -96,6 +99,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
     }
 
     let created = 0;
+    let emailFailed = 0;
     const toResolve: BatchResolveEntry[] = [];
 
     // Orphan cleanup — aktif ürün setinde olmayan uyarıları resolve et.
@@ -146,18 +150,28 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                 });
                 if (alert) {
                     created++;
-                    // Fire-and-forget e-posta bildirimi (preferences/dedup email-service'te kontrol edilir)
-                    notifyUsersByEmail({
-                        notificationType: "stock_critical",
-                        entityType: "product",
-                        entityId,
-                        render: { type: "stock_critical", ctx: {
-                            productName: product.name,
-                            sku: product.sku,
-                            available,
-                            min,
-                        } },
-                    }).catch(err => console.error("[email stock_critical]", err));
+                    // Y8 (2026-06): kritik-stok e-postası artık AWAITED — cron
+                    // bağlamında gecikme kabul edilebilir; başarısızlık sayaçla
+                    // görünür (eski fire-and-forget + 24h alert-dedup birleşimi
+                    // bildirimi sessizce yutabiliyordu). Hata taramayı düşürmez;
+                    // email-log'a yazılmış failed kayıtları retry cron'u dener.
+                    try {
+                        const mail = await notifyUsersByEmail({
+                            notificationType: "stock_critical",
+                            entityType: "product",
+                            entityId,
+                            render: { type: "stock_critical", ctx: {
+                                productName: product.name,
+                                sku: product.sku,
+                                available,
+                                min,
+                            } },
+                        });
+                        emailFailed += mail.failed;
+                    } catch (err) {
+                        emailFailed++;
+                        console.error("[email stock_critical]", err);
+                    }
                 }
             }
         } else if (isWarning) {
@@ -265,7 +279,7 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
         if (alert) created++;
     }
 
-    return { scanned: products.length, created, resolved };
+    return { scanned: products.length, created, resolved, emailFailed };
 }
 
 // ── Alert CRUD ───────────────────────────────────────────────

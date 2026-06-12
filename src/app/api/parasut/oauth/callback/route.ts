@@ -18,7 +18,10 @@ interface TokenRow {
 }
 
 function verifyCookieState(cookieValue: string, stateParam: string): boolean {
-    const secret = process.env.CRON_SECRET ?? "";
+    // Denetim O8 (2026-06): secret unset → doğrulama FAIL-CLOSED (boş-anahtar
+    // HMAC ile "her state geçer" penceresi kapalı).
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return false;
     const sep = cookieValue.lastIndexOf(".");
     if (sep === -1) return false;
     const state = cookieValue.slice(0, sep);

@@ -12,18 +12,8 @@
  */
 
 const ALLOWLIST = [
-    {
-        ghsa: "GHSA-4r6h-8v6p-xvw6",
-        pkg: "xlsx",
-        reason: "Prototype pollution — npm'de fix yok; izole parser/exceljs geçişi Tur D (2026-06 bulguları Y5)",
-        added: "2026-06-12",
-    },
-    {
-        ghsa: "GHSA-5pgg-2g8v-p4x9",
-        pkg: "xlsx",
-        reason: "ReDoS — npm'de fix yok; dosya boyu limiti mevcut, kalıcı çözüm Tur D (Y5)",
-        added: "2026-06-12",
-    },
+    // xlsx kayıtları KAPANDI (Tur D, 2026-06-12): CDN 0.20.3 pin
+    // (https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz) iki GHSA'yı da çözer.
     {
         // PAKET-SEVİYESİ istisna (zayıf — yalnız planlı yükseltmeye köprü):
         // next 16.1.7'de 14 high advisory (proxy/middleware bypass dahil).
