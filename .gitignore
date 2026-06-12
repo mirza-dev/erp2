@@ -52,3 +52,6 @@ test-results/
 playwright-report/
 tests/fixtures/invalid.txt
 results/
+
+# Gerçek PMT katalog/sertifika dosyaları — public repo'ya GİRMEZ (seed bunlardan türetildi)
+pmt/
