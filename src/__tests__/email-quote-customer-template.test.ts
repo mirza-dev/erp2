@@ -77,6 +77,27 @@ describe("renderQuoteToCustomer", () => {
         expect(c.html).not.toContain("javascript:");
     });
 
+    it("PDF eki dönemi: gövde eki anlatır (dosya adıyla), link-buton YOK", () => {
+        const c = renderQuoteToCustomer({
+            quoteNumber: "TKL-2026-001",
+            customerName: "Acme",
+            attachmentFilename: "Teklif-TKL-2026-001.pdf",
+        });
+        expect(c.html).toContain("ekinde PDF olarak");
+        expect(c.html).toContain("Teklif-TKL-2026-001.pdf");
+        expect(c.text).toContain("ekinde PDF olarak");
+        expect(c.text).toContain("Teklif-TKL-2026-001.pdf");
+        expect(c.html).not.toContain("Teklifi Görüntüle");
+        expect(c.html).not.toContain("/api/quotes/shared");
+        expect(c.text).not.toContain("/api/quotes/shared");
+    });
+
+    it("attachmentFilename verilmese de ek metni görünür (dosya adsız)", () => {
+        const c = renderQuoteToCustomer({ quoteNumber: "T", customerName: "X" });
+        expect(c.html).toContain("ekinde PDF olarak");
+        expect(c.text).toContain("ekinde PDF olarak");
+    });
+
     it("finansal toplam ve kırılgan flex layout içermez", () => {
         const c = renderQuoteToCustomer({ quoteNumber: "T", customerName: "X", companyName: "PMT" });
         expect(c.html).not.toContain("Genel Toplam");

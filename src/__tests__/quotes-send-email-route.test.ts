@@ -65,6 +65,15 @@ describe("POST /api/quotes/[id]/send-email", () => {
         expect(res.status).toBe(409);
     });
 
+    it("PDF üretilemedi → 502 + dostça Türkçe mesaj (mail hiç atılmadı)", async () => {
+        mockSend.mockResolvedValue({ ok: false, reason: "pdf_failed" });
+        const res = await POST(makeReq(), idCtx());
+        expect(res.status).toBe(502);
+        const body = await res.json();
+        expect(body.error).toContain("PDF belgesi oluşturulamadı");
+        expect(body.error).toContain("gönderilmedi");
+    });
+
     it("config_missing → 503", async () => {
         mockSend.mockResolvedValue({ ok: false, error: "config_missing" });
         const res = await POST(makeReq(), idCtx());

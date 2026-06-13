@@ -58,9 +58,9 @@ export interface QuoteToCustomerCtx {
     companyPhone?: string | null;
     companyEmail?: string | null;
     companyWebsite?: string | null;
-    /** Süreli public görüntüleme linki (/api/quotes/shared/<token>). Ek artık
-     *  GÖNDERİLMEZ (.html eki Gmail PC'de ham kod görünüyordu) — belge bu linkle açılır. */
-    viewUrl?: string | null;
+    /** PDF eki dosya adı (Teklif-<no>.pdf) — gövde metninde anılır. viewUrl link
+     *  dönemi kullanıcı kararıyla kapandı (2026-06): belge artık gerçek PDF eki. */
+    attachmentFilename?: string | null;
 }
 
 function escapeHtml(value: string): string {
@@ -401,19 +401,12 @@ export function renderQuoteToCustomer(ctx: QuoteToCustomerCtx): EmailContent {
         : `<div style="color:${COLORS.text};font-size:19px;font-weight:800;line-height:26px">${escapeHtml(companyName || "Teklif")}</div>`;
     const quoteRows: DetailRow[] = [["Teklif numarası", ctx.quoteNumber]];
     if (ctx.validUntil) quoteRows.push(["Geçerlilik tarihi", fmtDateTr(ctx.validUntil)]);
-    const viewUrl = safeHttpUrl(ctx.viewUrl);
+    const attachmentName = ctx.attachmentFilename?.trim() || "";
 
-    // Link varsa belge butonla açılır (ek YOK); link üretilemediyse (secret eksik /
-    // arşiv yok) müşteri yanıtlamaya yönlendirilir — ham .html eki dönemi kapandı.
-    const docBlock = viewUrl
-        ? `<tr>
-            <td style="padding:0 28px 8px">${ctaButton("Teklifi Görüntüle", viewUrl)}</td>
-          </tr>
-          <tr>
-            <td style="padding:0 28px 24px;color:${COLORS.muted};font-size:12px;line-height:18px">Bağlantı teklif belgesini tarayıcınızda açar; oradan yazdırabilir veya PDF olarak kaydedebilirsiniz.</td>
-          </tr>`
-        : `<tr>
-            <td style="padding:0 28px 24px;color:${COLORS.muted};font-size:13px;line-height:19px">Teklif belgesinin kopyası için bu e-postayı yanıtlamanız yeterlidir.</td>
+    // PDF eki dönemi (2026-06, kullanıcı kararı): belge e-postanın ekinde gerçek
+    // PDF olarak gider — "Teklifi Görüntüle" linki ve ham .html eki dönemleri kapandı.
+    const docBlock = `<tr>
+            <td style="padding:0 28px 24px;color:${COLORS.muted};font-size:13px;line-height:19px">Teklif belgemiz${attachmentName ? ` <strong style="color:${COLORS.text}">${escapeHtml(attachmentName)}</strong> adıyla` : ""} bu e-postanın ekinde PDF olarak yer alıyor. Belgeyi açarak inceleyebilir veya yazdırabilirsiniz.</td>
           </tr>`;
 
     const html = emailDocument(
@@ -453,9 +446,7 @@ export function renderQuoteToCustomer(ctx: QuoteToCustomerCtx): EmailContent {
     ].filter(Boolean).join("\n");
     const text = `Sayın ${ctx.customerName},\n\n${ctx.quoteNumber} numaralı teklifiniz hazır.\n` +
         (ctx.validUntil ? `Geçerlilik tarihi: ${fmtDateTr(ctx.validUntil)}\n` : "") +
-        (viewUrl
-            ? `\nTeklif belgesini görüntülemek için: ${viewUrl}\nBağlantı belgeyi tarayıcınızda açar; oradan yazdırabilir veya PDF olarak kaydedebilirsiniz.\n\n`
-            : `\nTeklif belgesinin kopyası için bu e-postayı yanıtlamanız yeterlidir.\n\n`) +
+        `\nTeklif belgemiz bu e-postanın ekinde PDF olarak yer alıyor${attachmentName ? ` (${attachmentName})` : ""}.\n\n` +
         [companyName, contacts].filter(Boolean).join("\n");
     return { subject, html, text };
 }

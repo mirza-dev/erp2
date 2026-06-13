@@ -1,0 +1,16 @@
+Bu klasördeki fontlar SIL Open Font License 1.1 ile lisanslıdır:
+
+- Montserrat (SemiBold 600 / Bold 700 / ExtraBold 800)
+  Copyright 2011 The Montserrat Project Authors
+  https://github.com/JulietaUla/Montserrat
+
+- Inter (Regular 400 / Medium 500 / SemiBold 600)
+  Copyright 2016 The Inter Project Authors
+  https://github.com/rsms/inter
+
+Kaynak: Google Fonts (fonts.gstatic.com static TTF instansları).
+Tam lisans metni: https://openfontlicense.org/open-font-license-official-text/
+
+Kullanım amacı: teklif PDF belgesi üretimi (@react-pdf/renderer Font.register).
+Türkçe karakter desteği (latin-ext) için TTF gömme zorunludur — PDF standart
+14 fontu WinAnsi kodlamasıyla ğ/ş/İ gibi glifleri içermez.

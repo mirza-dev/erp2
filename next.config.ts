@@ -9,11 +9,17 @@ const nextConfig: NextConfig = {
     // bundle edilirse import.meta.url chunk konumunu gösterir ve wasm
     // (node_modules/mupdf/dist/) bulunamaz. External → node_modules'tan
     // require edilir, import.meta.url doğru konumu gösterir.
-    serverExternalPackages: ["mupdf"],
+    // @react-pdf/renderer da external: yoga/reconciler bundling sürprizleri yerine
+    // standalone node_modules'tan require edilir (teklif PDF eki — quote-pdf modülü).
+    serverExternalPackages: ["mupdf", "@react-pdf/renderer"],
     // WASM dosyası import.meta.url ile runtime'da yüklenir; nft bunu güvenilir
     // trace etmez → render eden route'lara açıkça dahil et, standalone'a kopyalansın.
     outputFileTracingIncludes: {
         "/api/import/documents/**": ["./node_modules/mupdf/dist/mupdf-wasm.wasm"],
+        // Teklif PDF fontları: Font.register fs path ile okur (path.join(process.cwd()));
+        // nft fs.readFileSync olmayan path'i trace etmez → quotes route'larına açıkça
+        // dahil et, .next/standalone/src/lib/quote-pdf/fonts/ altına kopyalansın.
+        "/api/quotes/**": ["./src/lib/quote-pdf/fonts/*.ttf"],
     },
     // Self-hosted'da Vercel Image Optimization CDN yok; next/image tek yerde
     // (QuoteDocument.tsx PDF render — intentional <img>), unoptimize güvenli.

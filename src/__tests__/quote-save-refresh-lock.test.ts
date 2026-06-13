@@ -25,8 +25,8 @@ describe("teklif kaydet→gönder tazeliği (kaynak kilitleri)", () => {
         expect(PAGE).toMatch(/onSaved=\{[\s\S]{0,160}setQuote/);
         // onay modalı canlı state'ten okur
         expect(PAGE).toContain("{quote?.customerEmail}");
-        // ek dönemi bitti — modal metni bağlantıdan bahseder
-        expect(PAGE).toContain("görüntüleme bağlantısı iletilir");
-        expect(PAGE).not.toContain("ek olarak iletilir");
+        // PDF eki dönemi (2026-06) — modal metni gerçek PDF ekinden bahseder
+        expect(PAGE).toContain("teklif belgesi PDF olarak eklenir");
+        expect(PAGE).not.toContain("görüntüleme bağlantısı");
     });
 });

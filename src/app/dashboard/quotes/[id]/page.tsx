@@ -536,7 +536,7 @@ export default function QuoteDetailPage() {
                                         Müşteriye e-posta da gönder
                                         {hasCustomerEmail && (
                                             <span style={{ color: "var(--text-tertiary)", display: "block", fontSize: "12px", marginTop: "2px" }}>
-                                                {quote?.customerEmail} · teklif belgesinin görüntüleme bağlantısı iletilir
+                                                {quote?.customerEmail} · teklif belgesi PDF olarak eklenir
                                             </span>
                                         )}
                                     </span>

@@ -148,11 +148,12 @@ describe("kaynak kilitleri", () => {
         expect(src).toMatch(/ALWAYS_PUBLIC = \[[^\]]*"\/api\/quotes\/shared"/);
     });
 
-    it("quote-service artık attachment GÖNDERMEZ + viewUrl şablona geçer", () => {
+    it("PDF eki dönemi (2026-06): e-posta yolu token kullanmaz ama altyapı DURUYOR", () => {
+        // Route + token lib silinmedi (manuel paylaşım / ileride yeniden kullanım);
+        // quote-service ise artık PDF eki gönderir, link üretmez.
         const src = readFileSync("src/lib/services/quote-service.ts", "utf8");
-        expect(src).not.toContain("attachments:");
-        expect(src).toContain("createQuoteShareToken");
-        expect(src).toContain("viewUrl");
+        expect(src).toContain("attachments:");
+        expect(src).not.toContain("createQuoteShareToken");
     });
 
     it("arşiv HTML render'ı logoyu data-URI gömmeyi dener (mobil boş-logo fix'i)", () => {

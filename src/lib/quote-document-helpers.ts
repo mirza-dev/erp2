@@ -11,6 +11,27 @@
  * kullanır → drift tek noktada yakalanır, source-of-truth.
  * Test edilebilirlik: `import { BILINGUAL_LABELS } from "@/lib/quote-document-helpers"`.
  */
+/**
+ * PDF eki turu (2026-06): para sembolü + sayı/tarih formatlayıcıları
+ * QuoteDocument.tsx'ten buraya taşındı (silinmedi) — HTML belge (QuoteDocument)
+ * ve PDF belge (QuotePdfDocument) aynı formatları tek kaynaktan kullanır.
+ */
+export const CURRENCY_SYMBOLS: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
+
+export function formatQuoteAmount(n: number): string {
+    return n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export function formatQuoteDate(s: string): string {
+    if (!s) return "—";
+    try {
+        const [y, m, d] = s.split("-");
+        return `${d}.${m}.${y}`;
+    } catch {
+        return s;
+    }
+}
+
 export const BILINGUAL_LABELS = {
     // Title band
     // Faz 4c Review (2026-05-25): plan §503 wording — "TEKLİF FORMU / COMMERCIAL OFFER"

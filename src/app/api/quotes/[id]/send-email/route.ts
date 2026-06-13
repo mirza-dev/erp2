@@ -6,11 +6,12 @@ import { handleApiError } from "@/lib/api-error";
 /**
  * POST /api/quotes/[id]/send-email
  *
- * Teklif belgesini (dondurulmuş HTML ek) teklifte yazan müşteri e-postasına gönderir.
+ * Teklif belgesini (Teklif-<no>.pdf eki) teklifte yazan müşteri e-postasına gönderir.
  * Status transition'dan bağımsız — frontend "Gönder" onayında checkbox işaretliyse,
  * başarılı transition SONRASI çağırır. RBAC = send transition ile aynı (manage_quotes).
  *
- * Map: notFound→404, no_email→400, config_missing→503, Resend fail→502, ok→200.
+ * Map: notFound→404, no_email→400, suppressed→409, pdf_failed→502,
+ * config_missing→503, Resend fail→502, ok→200.
  * Demo: middleware /api/** POST'u zaten 403'ler.
  */
 export async function POST(
@@ -41,6 +42,12 @@ export async function POST(
             return NextResponse.json(
                 { error: "Bu alıcı adresi önceki teslimat sorunu veya spam şikâyeti nedeniyle e-posta gönderimine kapalı." },
                 { status: 409 },
+            );
+        }
+        if (result.reason === "pdf_failed") {
+            return NextResponse.json(
+                { error: "Teklif PDF belgesi oluşturulamadı — e-posta gönderilmedi. Lütfen tekrar deneyin." },
+                { status: 502 },
             );
         }
         if (result.error === "config_missing") {

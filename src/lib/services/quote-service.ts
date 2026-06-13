@@ -17,8 +17,10 @@ import { buildQuoteDataFromDetail, renderQuoteArchiveHtml } from "@/lib/quote-ar
 import { mapQuoteDetail } from "@/lib/api-mappers";
 import { validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
 import { sendDirectEmail } from "@/lib/services/email-service";
-import { renderQuoteToCustomer, appUrl } from "@/lib/email/templates";
-import { createQuoteShareToken, resolveQuoteShareSecret } from "@/lib/quote-share-token";
+// PDF eki turu (2026-06): quote-share-token/appUrl import'ları kaldırıldı — e-posta
+// artık link değil PDF eki taşır. Token lib + /api/quotes/shared route'u SİLİNMEDİ
+// (manuel paylaşım / ileride yeniden kullanım altyapısı olarak duruyor).
+import { renderQuoteToCustomer } from "@/lib/email/templates";
 import { dbCreateEmailLog, dbUpdateEmailLogStatus } from "@/lib/supabase/email-logs";
 import { dbCreateAlert, dbResolveAlertsForEntity } from "@/lib/supabase/alerts";
 import { dbFindActiveSuppression } from "@/lib/supabase/email-maintenance";
@@ -243,27 +245,30 @@ const QUOTE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export interface SendQuoteToCustomerResult {
     ok: boolean;
     notFound?: boolean;
-    /** Teklifte müşteri e-postası yok/geçersiz → route 400 (gönderim atılmaz). */
-    reason?: "no_email" | "suppressed";
+    /** no_email → 400 · suppressed → 400 · pdf_failed → 502 (gönderim hiç atılmaz). */
+    reason?: "no_email" | "suppressed" | "pdf_failed";
     /** Resend/config hatası → route 502/503. */
     error?: string;
     messageId?: string;
 }
 
 /**
- * Teklif belgesini (arşivle birebir dondurulmuş HTML) teklifte yazan müşteri
- * e-postasına EK olarak gönderir. Status transition'dan bağımsız, reusable.
+ * Teklif belgesini `Teklif-<no>.pdf` GERÇEK PDF eki olarak teklifte yazan müşteri
+ * e-postasına gönderir (kullanıcı kararı 2026-06: link değil ek). Status
+ * transition'dan bağımsız, reusable.
  *
- * Belge HTML'i = serviceArchiveQuotePdf ile AYNI pipeline (deterministik):
- *   mapQuoteDetail → buildQuoteDataFromDetail → renderQuoteArchiveHtml.
+ * PDF aynı QuoteData pipeline'ından üretilir (deterministik):
+ *   mapQuoteDetail → buildQuoteDataFromDetail → renderQuotePdfBuffer (@react-pdf).
+ * PDF üretilemezse gönderim FAIL eder (reason:"pdf_failed") — müşteriye belgesiz
+ * "teklifiniz hazır" maili GİTMEZ; kullanıcı route 502 mesajıyla tekrar dener.
+ *
+ * HTML arşiv (serviceArchiveQuotePdf) audit/dondurulmuş kopya olarak send'de
+ * üretilmeye devam eder (non-fatal). Paylaşım-token altyapısı (quote-share-token +
+ * /api/quotes/shared) kodda durur ama e-posta yolu artık link üretmez —
+ * "Teklifi Görüntüle" linki dönemi kullanıcı kararıyla kapandı.
+ *
  * `email_logs` kaydı tutar (entity_type='quote'); generic retry'a girmez
  * (dbListFailedEmailsForRetry quote'u dışlar — ek yeniden eklenemez).
- *
- * NOT (gelecek "Tekrar Gönder"): burada arşiv BUCKET'ından değil, yeniden
- * render'dan ek üretiyoruz. Normal akışta (send → anında e-posta, aynı deploy)
- * byte-identical + archiveWarning durumunda da çalışır (daha sağlam). Ancak
- * post-redeploy template değişiminde dondurulmuş arşivden sapabilir. Resend
- * özelliği eklenirse `dbGetArchiveSignedUrl` ile FROZEN arşivi ek yapmayı tercih et.
  */
 export async function serviceSendQuoteToCustomer(
     quoteId: string,
@@ -280,27 +285,23 @@ export async function serviceSendQuoteToCustomer(
 
     const company = await dbGetCompanySettings().catch(() => null);
 
-    // Belge artık EK olarak gönderilmez (.html eki Gmail PC'de ham kod görünüyordu,
-    // mobil viewer'da logo yüklenmiyordu) — bunun yerine donmuş arşivin süreli public
-    // görüntüleme linki gövdeye konur (/api/quotes/shared/<token> kendi origin'imizden
-    // text/html servis eder). Arşiv send transition'ında üretildi; yoksa burada
-    // idempotent üretmeyi dener. Link üretilemezse e-posta yine gider (şablon fallback
-    // metni müşteriyi yanıtlamaya yönlendirir).
-    let viewUrl: string | null = null;
+    // Donmuş HTML arşivi audit kopyası olarak üretilmeye devam eder (idempotent,
+    // non-fatal) — e-posta artık bu arşivi KULLANMAZ (ek PDF olarak gider).
+    await serviceArchiveQuotePdf(quoteId, actorUserId).catch((err) => {
+        console.error("[quote-service] arşiv üretilemedi (non-fatal, gönderim sürer)", err);
+        return null;
+    });
+
+    // PDF eki — üretilemezse gönderim FAIL (belgesiz mail müşteriye gitmez).
+    let pdf: Buffer;
+    let pdfFilename: string;
     try {
-        const secret = resolveQuoteShareSecret();
-        if (secret) {
-            const archiveRes = await serviceArchiveQuotePdf(quoteId, actorUserId).catch(() => null);
-            if (archiveRes?.archived) {
-                const revisionNo = archiveRes.revisionNo ?? Number(quote.revision_no ?? 1);
-                const token = createQuoteShareToken({ quoteId, revisionNo }, secret);
-                viewUrl = appUrl(`/api/quotes/shared/${token}`);
-            }
-        } else {
-            console.warn("[quote-service] QUOTE_SHARE_SECRET/CRON_SECRET yok — teklif e-postası linksiz gidiyor.");
-        }
+        const { renderQuotePdfBuffer, quotePdfFilename } = await import("@/lib/quote-pdf");
+        pdf = await renderQuotePdfBuffer(buildQuoteDataFromDetail(detail, company));
+        pdfFilename = quotePdfFilename(detail.quoteNumber);
     } catch (err) {
-        console.error("[quote-service] share link üretilemedi (non-fatal)", err);
+        console.error("[quote-service] teklif PDF üretilemedi — e-posta GÖNDERİLMEDİ", err);
+        return { ok: false, reason: "pdf_failed" };
     }
 
     const body = renderQuoteToCustomer({
@@ -312,7 +313,7 @@ export async function serviceSendQuoteToCustomer(
         companyPhone: company?.phone ?? null,
         companyEmail: company?.email ?? null,
         companyWebsite: company?.website ?? null,
-        viewUrl,
+        attachmentFilename: pdfFilename,
     });
     const companyReplyTo = company?.email?.trim() ?? "";
 
@@ -336,6 +337,7 @@ export async function serviceSendQuoteToCustomer(
         subject: body.subject,
         html: body.html,
         text: body.text,
+        attachments: [{ filename: pdfFilename, content: pdf }],
         replyTo: QUOTE_EMAIL_RE.test(companyReplyTo) ? companyReplyTo : undefined,
         ...(logId ? { idempotencyKey: `quote-email-log-${logId}` } : {}),
     });

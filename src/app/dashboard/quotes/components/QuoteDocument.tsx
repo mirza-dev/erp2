@@ -33,25 +33,16 @@ const C = {
     white: "#ffffff",
 };
 
-const SYM: Record<string, string> = { TRY: "₺", USD: "$", EUR: "€" };
-
-import { BILINGUAL_LABELS } from "@/lib/quote-document-helpers";
+// PDF eki turu (2026-06): SYM/fmt/fmtDate quote-document-helpers'a taşındı —
+// HTML belge ve PDF belge (QuotePdfDocument) aynı formatları tek kaynaktan okur.
+import {
+    BILINGUAL_LABELS,
+    CURRENCY_SYMBOLS as SYM,
+    formatQuoteAmount as fmt,
+    formatQuoteDate as fmtDate,
+} from "@/lib/quote-document-helpers";
 
 const L = BILINGUAL_LABELS;
-
-function fmt(n: number) {
-    return n.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtDate(s: string) {
-    if (!s) return "—";
-    try {
-        const [y, m, d] = s.split("-");
-        return `${d}.${m}.${y}`;
-    } catch {
-        return s;
-    }
-}
 
 // ── @page rule (top-level, NOT inside @media print) ──────────────────────────
 // margin: 0 → browser has no space to show its default headers/footers (title, URL, date)
