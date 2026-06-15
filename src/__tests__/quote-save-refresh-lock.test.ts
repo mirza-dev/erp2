@@ -15,10 +15,20 @@ const PAGE = readFileSync("src/app/dashboard/quotes/[id]/page.tsx", "utf8");
 describe("teklif kaydet→gönder tazeliği (kaynak kilitleri)", () => {
     it("QuoteForm onSaved prop'u tanımlı ve PATCH yanıtıyla çağrılıyor", () => {
         expect(FORM).toContain("onSaved?: (detail: QuoteDetail) => void");
-        // PATCH dalı: yanıt parse edilip onSaved'e veriliyor
-        expect(FORM).toMatch(/const updated = await res\.json\(\)[\s\S]{0,120}onSaved\?\.\(updated\)/);
+        // Yanıt parse edilip onSaved'e veriliyor (POST+PATCH birleşik dal)
+        expect(FORM).toMatch(/const data = await res\.json\(\)[\s\S]{0,500}onSaved\?\.\(data\)/);
+        // PATCH (mevcut teklif) dalı da bildirir
+        expect(FORM).toContain("if (data) onSaved?.(data)");
         // POST (ilk kayıt) dalı da bildirir
         expect(FORM).toMatch(/setQuoteNo\(data\.quoteNumber\);\s*\n\s*onSaved\?\.\(data\);/);
+    });
+
+    it("kaydetme hatasında sunucunun gerçek nedeni toast'a taşınır (403/422 ayrımı)", () => {
+        // persistQuote artık jenerik 'return null' yerine readSaveError ile mesaj saklar
+        expect(FORM).toMatch(/lastSaveErrorRef\.current = await readSaveError\(res\)/);
+        expect(FORM).toMatch(/showToast\(lastSaveErrorRef\.current \|\| "Kaydetme hatası", "error"\)/);
+        // 403 → manage_quotes yetki mesajı
+        expect(FORM).toMatch(/res\.status === 403[\s\S]{0,120}manage_quotes/);
     });
 
     it("detay sayfası onSaved ile quote state'ini tazeler (modal yeni e-postayı görür)", () => {

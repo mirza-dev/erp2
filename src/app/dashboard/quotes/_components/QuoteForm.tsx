@@ -127,6 +127,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     // Gönderim sonrası draft localStorage temizliği ile unmount arasında autoSave'in
     // teklif_v3'ü geri yazmasını önler (clear→push penceresinde).
     const suppressAutoSaveRef = useRef(false);
+    // Kaydetme hatasında sunucunun gerçek nedenini toast'a taşımak için
+    // (persistQuote yutmasın → kullanıcı 403/422/500'ü körlemesine kalmasın).
+    const lastSaveErrorRef = useRef<string | null>(null);
 
     // Manual total overrides
     const [ovSub, setOvSub] = useState<number | null>(null);
@@ -755,15 +758,26 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     // router.push ile detaya gidilir; replaceState/push desync hazard'ını eler.
     async function persistQuote(opts?: { skipUrlSync?: boolean }): Promise<string | null> {
         const payload = buildQuotePayload();
+        lastSaveErrorRef.current = null;
         try {
-            if (quoteId === null) {
-                const res = await fetch("/api/quotes", {
+            const res = quoteId === null
+                ? await fetch("/api/quotes", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload),
+                })
+                : await fetch("/api/quotes/" + quoteId, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
                 });
-                if (!res.ok) return null;
-                const data = await res.json() as QuoteDetail;
+            if (!res.ok) {
+                lastSaveErrorRef.current = await readSaveError(res);
+                return null;
+            }
+            const data = await res.json().catch(() => null) as QuoteDetail | null;
+            if (quoteId === null) {
+                if (!data?.id) { lastSaveErrorRef.current = "Sunucu yanıtı beklenmedik (kimlik yok)."; return null; }
                 setQuoteId(data.id);
                 setQuoteNo(data.quoteNumber);
                 onSaved?.(data);
@@ -772,18 +786,23 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                 }
                 return data.id;
             }
-            const res = await fetch("/api/quotes/" + quoteId, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload),
-            });
-            if (!res.ok) return null;
-            const updated = await res.json().catch(() => null) as QuoteDetail | null;
-            if (updated) onSaved?.(updated);
+            if (data) onSaved?.(data);
             return quoteId;
         } catch {
+            lastSaveErrorRef.current = "Ağ hatası — sunucuya ulaşılamadı.";
             return null;
         }
+    }
+
+    // Sunucu hata yanıtını okunur Türkçe mesaja çevirir (403/422/500 ayrımı dahil).
+    async function readSaveError(res: Response): Promise<string> {
+        const body = await res.json().catch(() => null) as { error?: string } | null;
+        const detail = body?.error ? ` — ${body.error}` : "";
+        if (res.status === 401) return "Oturum gerekiyor — lütfen tekrar giriş yapın.";
+        if (res.status === 403) return "Yetkiniz yok: teklif kaydetmek için 'manage_quotes' (admin/sales) rolü gerekir.";
+        if (res.status === 422) return `Geçersiz alan${detail}`;
+        if (res.status === 400) return `Hatalı istek${detail}`;
+        return `Kaydetme hatası (${res.status})${detail}`;
     }
 
     async function handleSave() {
@@ -793,7 +812,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             autoSave();
             showToast("Kaydedildi", "success");
         } else {
-            showToast("Kaydetme hatası", "error");
+            showToast(lastSaveErrorRef.current || "Kaydetme hatası", "error");
         }
         setSaving(false);
     }
