@@ -285,6 +285,8 @@ function mapQuoteLineItem(line: QuoteLineItemRow): QuoteLineItem {
     // Faz 1a (V3-B5, V4-A7): birim ağırlık + KG manuel override.
     unitWeightKg: line.unit_weight_kg ?? null,
     kgManualOverride: line.kg_manual_override ?? false,
+    // 098: satır bazlı serbest "Not" (description'dan AYRI; null → "").
+    note: line.note ?? "",
   };
 }
 

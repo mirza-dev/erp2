@@ -591,6 +591,9 @@ export interface QuoteLineItemRow {
     // weight_kg (satır toplamı) korunur; unit_weight_kg per-unit (recompute).
     unit_weight_kg: number | null
     kg_manual_override: boolean
+    // 098: satır bazlı serbest "Not" alanı (description'dan AYRI; saf açıklayıcı,
+    // toplamları etkilemez, siparişe taşınmaz).
+    note: string | null
     created_at: string
 }
 

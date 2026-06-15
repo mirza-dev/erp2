@@ -7,7 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-13 (**Teklif e-postası: gerçek PDF eki — @react-pdf/renderer**)
+## Son Tamamlanan İş — 2026-06-15 (**Teklif satırı bazlı serbest "Not" alanı — mig.098, APPLY ✅**)
+
+**İstek:** "Teklif sayfasında genel notlar kısmını her ürün içinde ayrı not oluşturulabilsin şeklinde ürün satırında bulunsun" → plan + soru-cevap sonrası uygula. **Kararlar (AskUserQuestion):** (1) Genel Notlar KALIR + ayrıca satır bazlı not (iki seviye); (2) **açılır not satırı** (tablo 10 kolon dar → yeni kolon DEĞİL); (3) not müşteri belgesinde de görünür (HTML+PDF+e-posta eki, TR/EN bilingual); (4) siparişe TAŞINMAZ (order tarafına dokunulmaz).
+
+- **Mevcut `description` ("Ürün Tanımı") korundu** — o üründen otomatik kurulan teknik tanım (mig.080 ile siparişe taşınır); yeni `note` ondan AYRI serbest alan. `size_text` (065)/`unit_weight_kg` (068) "satıra alan ekle" emsali birebir.
+- **mig.098 (APPLY ✅):** `quote_line_items.note text` + `create/update_quote_with_lines` RPC'leri **093 gövdesiyle birebir** yeniden tanımlandı (yalnız INSERT'e `note` + `NULLIF(ln->>'note','')`; line_total formülü/assert_quote_totals_sane DOKUNULMADI → toplamı etkilemez). Gate: `sql-lint-baseline` RPC zincirine 098 + `check-migrations` PROBES'a 098 (column probe).
+- **Zincir:** `database.types` QuoteLineItemRow · `quotes.ts` CreateQuoteLineInput · `mock-data` QuoteLineItem · `api-mappers` (null→"") · `quote-types` döküman QuoteRow · `quote-document-helpers` `BILINGUAL_LABELS.lineNote = Not/Note`.
+- **Form (QuoteForm.tsx):** form-içi QuoteRow + emptyRow + hydration + payload (`note: r.note.trim()||undefined`; preview rows doğrudan akar) `note` taşır; **açılır not satırı** — her satırda StickyNote toggle butonu (not doluysa accent renkli `var(--accent-bg/text)`) → `expandedNoteRowIds` Set → satır altında tek `<td colSpan={11}>` tam-genişlik textarea (`.q-notes` stili); `readOnly`'da gizli (`!readOnly && noteOpen`); actions kolonu 28→56px (Not+Sil).
+- **Müşteri belgesi:** `QuoteDocument` (HTML) + `QuotePdfDocument` (PDF) ürün satırının ALTINA, not varsa, marka-mavisi "Not / Note:" ön-etiketli koşullu satır (HTML tek `<td colSpan={10}>` paddingLeft girinti + borderLeft brand — `colSpan={9}` üretmez [faz4a kilidi korunur]; PDF `S.noteRow`/`noteText`/`noteLabel` View wrap={false}); `quote-archive-html` rows'a `note` eşlemesi (arşiv + PDF eki tek kaynak).
+- **Test:** +2 dosya / +24 — `quote-line-note-migration` (098 SQL + gate kaydı) · `quote-line-note` (mapper null→""/değer · dbCreateQuote RPC p_lines.note · BILINGUAL_LABELS.lineNote · QuoteDocument HTML not bloğu var/yok · buildQuoteDataFromDetail eşleme · renderQuotePdfBuffer notlu gerçek render · QuoteForm 9 source-lock). tsc 0 · lint 0 · **5353 test / 395 dosya** · build 0 (`ƒ Proxy`).
+- UI `/frontend-design` yerine projenin inline-style+CSS-var+`erp2-dashboard-ui-builder` konvansiyonlarıyla (in-grid küçük ekleme → mevcut stile uyum doğru yol).
+- **KALAN (kullanıcı):** manuel smoke — yeni teklif → satıra Not → kaydet → yenile (korunur) → Önizle/PDF ürün altında görünür + notsuz satırda yok → Gönder → mail PDF + arşivde görünür → Genel Notlar ayrı çalışır → koyu/aydınlık tema; demo modda kaydet bloklu.
+
+## Önceki — 2026-06-13 (**Teklif e-postası: gerçek PDF eki — @react-pdf/renderer**)
 
 **Kullanıcı kararı değişti:** bir önceki turun "ek YOK + Teklifi Görüntüle linki" çözümü kaldırıldı — "maille iletilen teklifler pdf olsun" → ekte gerçek `Teklif-<no>.pdf`, gövdede link YOK. Kapsam yalnız e-posta eki; HTML arşiv + paylaşım-token altyapısı (`quote-share-token.ts`, `/api/quotes/shared/[token]`, quote-pdfs bucket) KODDA DURUYOR (no-silent-deletes; e-posta yolu artık kullanmıyor — kaynak kilidi testli).
 

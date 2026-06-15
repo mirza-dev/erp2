@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { Eraser, FileText, Plus, RotateCcw, Save, Send, Trash2 } from "lucide-react";
+import { Eraser, FileText, Plus, RotateCcw, Save, Send, StickyNote, Trash2 } from "lucide-react";
 import type { QuoteData } from "../components/quote-types";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -38,6 +38,9 @@ interface QuoteRow {
     // unitWeightKg dolu & !kgManualOverride iken KG = qty × unitWeightKg recompute.
     unitWeightKg: string;
     kgManualOverride: boolean;
+    // 098: satır bazlı serbest "Not" (Ürün Tanımı/desc'ten AYRI). Açılır not
+    // satırında düzenlenir; müşteri belgesinde satırın altında gösterilir.
+    note: string;
 }
 
 type Currency = "TRY" | "USD" | "EUR";
@@ -48,7 +51,7 @@ function fmt(n: number) {
 }
 
 function emptyRow(id: number): QuoteRow {
-    return { id, productId: "", code: "", lead: "", desc: "", qty: "", price: "", hs: "", kg: "", size: "", unitWeightKg: "", kgManualOverride: false };
+    return { id, productId: "", code: "", lead: "", desc: "", qty: "", price: "", hs: "", kg: "", size: "", unitWeightKg: "", kgManualOverride: false, note: "" };
 }
 
 // Faz 1b: numeric(10,3) hedefi için 3 ondalığa yuvarla (float kalıntısını temizler).
@@ -106,6 +109,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     // bir rowId varsa handleSelectProduct desc auto-fill'i atlar (kullanıcı
     // override etti, ürün değişimi override'ı silmesin).
     const [descDirtyRowIds, setDescDirtyRowIds] = useState<Set<number>>(new Set());
+    // 098: açık not satırı id'leri. Toggle butonu satırın altındaki tam-genişlik
+    // not textarea'sını açar/kapar (descDirtyRowIds Set paterni).
+    const [expandedNoteRowIds, setExpandedNoteRowIds] = useState<Set<number>>(new Set());
     const [currency, setCurrency] = useState<Currency>("TRY");
     const [vatRate, setVatRate] = useState(20);
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
@@ -285,6 +291,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     size: l.sizeText,
                     unitWeightKg: l.unitWeightKg !== null ? String(l.unitWeightKg) : "",
                     kgManualOverride: l.kgManualOverride,
+                    note: l.note ?? "",
                 }));
                 setRows(mapped);
                 setNextId(initialData.lines.length + 1);
@@ -632,6 +639,14 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     function patchRow(id: number, patch: Partial<QuoteRow>) {
         setRows(prev => prev.map(r => r.id === id ? { ...r, ...patch } : r));
     }
+    // 098: satır not alanını aç/kapa.
+    function toggleNoteRow(id: number) {
+        setExpandedNoteRowIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }
     // Faz 1b (V3-B5): qty değişince KG recompute (override yoksa & birim ağırlık varsa).
     function handleQtyChange(rowId: number, value: string) {
         setRows(prev => prev.map(r => {
@@ -729,6 +744,8 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     // Faz 1b (V3-B5/V4-A7): birim ağırlık + KG manuel override
                     unit_weight_kg: r.unitWeightKg ? parseFloat(r.unitWeightKg) : undefined,
                     kg_manual_override: r.kgManualOverride,
+                    // 098: satır bazlı serbest not (boşsa gönderme)
+                    note: r.note.trim() || undefined,
                 })),
         };
     }
@@ -1264,7 +1281,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                         <th className="q-th" style={{ ...th, width: "115px", textAlign: "right" }}>Total Price<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Toplam Fiyat</span></th>
                                         <th className="q-th" style={{ ...th, width: "90px" }}>HS Code<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>GTİP Kodu</span></th>
                                         <th className="q-th" style={{ ...th, width: "70px", textAlign: "right" }}>Kg<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ağırlık</span></th>
-                                        <th className="q-th q-no-print" style={{ ...th, width: "28px" }}>
+                                        <th className="q-th q-no-print" style={{ ...th, width: "56px" }}>
                                             <span className="q-sr-only">İşlemler</span>
                                         </th>
                                     </tr>
@@ -1272,8 +1289,11 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                 <tbody>
                                     {rows.map((row, idx) => {
                                         const lt = lineTotal(row);
+                                        const noteOpen = expandedNoteRowIds.has(row.id);
+                                        const hasNote = row.note.trim().length > 0;
                                         return (
-                                            <tr key={row.id}>
+                                            <Fragment key={row.id}>
+                                            <tr>
                                                 {/* # */}
                                                 <td style={{ ...tdBase, textAlign: "center", fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", color: "var(--text-tertiary)", width: "32px" }}>{idx + 1}</td>
                                                 {/* Code — autocomplete */}
@@ -1342,9 +1362,21 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                                 <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} GTİP kodu`} style={cellInput} placeholder="8481.80" value={row.hs} onChange={e => updateRow(row.id, "hs", e.target.value)} /></td>
                                                 {/* Kg */}
                                                 <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} ağırlık (kg)`} style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.kg} onChange={e => handleKgChange(row.id, e.target.value)} /></td>
-                                                {/* Delete */}
+                                                {/* Aksiyonlar: Not + Sil */}
                                                 {!readOnly && (
-                                                <td style={{ ...tdBase, width: "28px", textAlign: "center", padding: "0 4px" }} className="q-no-print">
+                                                <td style={{ ...tdBase, width: "56px", textAlign: "center", padding: "0 4px", whiteSpace: "nowrap" }} className="q-no-print">
+                                                    {/* 098: satır notu aç/kapa */}
+                                                    <Button
+                                                        iconOnly
+                                                        aria-label={`Satır ${idx + 1} not`}
+                                                        aria-expanded={noteOpen}
+                                                        variant="icon"
+                                                        size="xs"
+                                                        leftIcon={<StickyNote size={12} />}
+                                                        onClick={() => toggleNoteRow(row.id)}
+                                                        title={hasNote ? "Notu düzenle" : "Not ekle"}
+                                                        style={{ width: "22px", minWidth: "22px", height: "22px", minHeight: "22px", borderRadius: "3px", color: hasNote ? "var(--accent-text)" : "var(--text-tertiary)", background: hasNote ? "var(--accent-bg)" : "none", border: "none", marginRight: "2px" }}
+                                                    />
                                                     <Button
                                                         iconOnly
                                                         aria-label={`Satır ${idx + 1} sil`}
@@ -1359,6 +1391,35 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                                 </td>
                                                 )}
                                             </tr>
+                                            {/* 098: açılır not satırı (tam genişlik) */}
+                                            {!readOnly && noteOpen && (
+                                                <tr className="q-no-print">
+                                                    <td colSpan={11} style={{ ...tdBase, padding: "4px 8px 10px 8px", background: "var(--bg-tertiary)" }}>
+                                                        <label style={{ display: "block", fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px", letterSpacing: "0.04em" }}>
+                                                            Satır {idx + 1} notu · belgede ürünün altında görünür
+                                                        </label>
+                                                        <textarea
+                                                            aria-label={`Satır ${idx + 1} notu`}
+                                                            value={row.note}
+                                                            onChange={e => updateRow(row.id, "note", e.target.value)}
+                                                            placeholder="Bu ürüne özel not (teslimat, uygulama, uyarı vb.)"
+                                                            style={{
+                                                                width: "100%",
+                                                                background: "var(--bg-secondary)",
+                                                                border: "0.5px solid var(--border-secondary)",
+                                                                borderRadius: "4px",
+                                                                padding: "7px 9px",
+                                                                fontSize: "12px",
+                                                                color: "var(--text-primary)",
+                                                                resize: "vertical",
+                                                                minHeight: "56px",
+                                                                lineHeight: 1.5,
+                                                            }}
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            </Fragment>
                                         );
                                     })}
                                 </tbody>

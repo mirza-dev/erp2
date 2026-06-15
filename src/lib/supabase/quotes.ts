@@ -19,6 +19,8 @@ export interface CreateQuoteLineInput {
     // Faz 1a (V3-B5, V4-A7): birim ağırlık + KG manuel override flag.
     unit_weight_kg?: number;
     kg_manual_override?: boolean;
+    // 098: satır bazlı serbest "Not" (description'dan AYRI; saf açıklayıcı).
+    note?: string | null;
 }
 
 export interface CreateQuoteInput {

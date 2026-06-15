@@ -13,6 +13,7 @@
  * TEMA-MUAF: beyaz kağıt + PMT marka kimliği; sabit hex kasıtlı (QuoteDocument kuralı).
  * Ölçek: HTML şablon px değerleri × 0.75 = pt (96dpi→72dpi); 210mm ≈ 595pt korunur.
  */
+import { Fragment } from "react";
 import { Document, Page, View, Text, Image } from "@react-pdf/renderer";
 import type { Style } from "@react-pdf/stylesheet";
 import type { QuoteData, QuoteRow } from "@/app/dashboard/quotes/components/quote-types";
@@ -106,6 +107,10 @@ const S: Record<string, Style> = {
     row: { flexDirection: "row" },
     td: { padding: `${px(5)} ${px(8)}`, fontSize: px(10), borderWidth: 0.5, borderColor: C.border, justifyContent: "center" },
     tableBottom: { borderBottomWidth: 1, borderBottomColor: C.border },
+    // 098: satır bazlı not (ürün satırının altında tam genişlik)
+    noteRow: { borderWidth: 0.5, borderTopWidth: 0, borderColor: C.border, borderLeftWidth: 2, borderLeftColor: C.brand, paddingVertical: px(3), paddingHorizontal: px(10) },
+    noteText: { fontSize: px(9), color: C.muted, lineHeight: 1.4 },
+    noteLabel: { fontWeight: 700, color: C.brand },
     // ── Totals ──
     totalsSection: { flexDirection: "row", justifyContent: "flex-end", padding: `${px(12)} ${px(20)}`, borderBottomWidth: 1, borderBottomColor: C.border },
     totalsTable: { width: px(300), borderWidth: 1, borderColor: C.border },
@@ -174,7 +179,10 @@ function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string })
     // V3-B6 (QuoteDocument ile aynı kural): gerçek satırda 0 fiyat "0.00", boş filler "—".
     const isRealRow = !!(row.code || row.desc || row.qty || row.size || row.lead || row.hs || row.kg);
     const bg = idx % 2 === 1 ? C.zebraEven : C.white;
+    // 098: satır bazlı not (varsa) ürün satırının altında gösterilir.
+    const lineNote = (row.note || "").trim();
     return (
+        <Fragment>
         <View style={S.row} wrap={false}>
             <Td width={COL.rowNo} align="center" bg={bg} style={{ color: C.muted, fontSize: px(9) }}>{String(idx + 1)}</Td>
             {/* Uzun kodda font bir tık küçülür → tire-kırılması 3 yerine 2 satırda kalır */}
@@ -188,6 +196,15 @@ function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string })
             <Td width={COL.hs} bg={bg} style={{ fontSize: px(9.5) }}>{row.hs || "—"}</Td>
             <Td width={COL.kg} align="right" bg={bg}>{row.kg || "—"}</Td>
         </View>
+        {!!lineNote && (
+            <View style={{ ...S.noteRow, backgroundColor: bg }} wrap={false}>
+                <Text style={S.noteText}>
+                    <Text style={S.noteLabel}>{L.lineNote.tr} / {L.lineNote.en}: </Text>
+                    {lineNote}
+                </Text>
+            </View>
+        )}
+        </Fragment>
     );
 }
 

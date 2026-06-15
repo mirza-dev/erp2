@@ -77,6 +77,8 @@ export const BILINGUAL_LABELS = {
     payment:      { tr: "Ödeme Şekli",           en: "Payment Method" },
     // Notes
     notes:        { tr: "NOTLAR & KOŞULLAR",     en: "Notes & Terms" },
+    // 098: ürün satırı bazlı not (satır altında, belgede)
+    lineNote:     { tr: "Not",                   en: "Note" },
     // Signatures
     signatures:   { tr: "İmzalar",               en: "Signatures" },
     // Footer

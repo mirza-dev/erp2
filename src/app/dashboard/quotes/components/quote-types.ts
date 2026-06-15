@@ -10,6 +10,9 @@ export interface QuoteRow {
     // ve DB tarafında zaten taşınıyordu; preview/PDF kontratta yoktu.
     // Faz 4c bilingual PMT layout'unda görsel olarak da kullanılacak.
     size: string;
+    // 098: satır bazlı serbest "Not" — ürün satırının altında müşteri belgesinde
+    // (HTML + PDF) gösterilir. "" ise alt-satır render edilmez.
+    note: string;
 }
 
 export interface QuoteSignature {

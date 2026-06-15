@@ -5,6 +5,7 @@
 // onu client-reference proxy'ye çevirip render'ı boşaltırdı. Client preview sayfası (Mod A)
 // bu shared component'i sorunsuz import etmeye devam eder (tek template korunur).
 
+import { Fragment } from "react";
 import type { QuoteData } from "./quote-types";
 
 // TEMA-MUAF: bu belge beyaz kağıda baskı + PMT marka kimliği içindir; sabit hex
@@ -569,8 +570,11 @@ export default function QuoteDocument({ data }: Props) {
                                 const isRealRow = !!(row.code || row.desc || row.qty || row.size || row.lead || row.hs || row.kg);
                                 const isEven = idx % 2 === 1;
                                 const rowBg = isEven ? C.zebraEven : C.white;
+                                // 098: satır bazlı not (varsa) ürün satırının altında tam-genişlik gösterilir.
+                                const lineNote = (row.note || "").trim();
                                 return (
-                                    <tr key={idx} className={isEven ? "doc-zebra-even" : ""}>
+                                    <Fragment key={idx}>
+                                    <tr className={isEven ? "doc-zebra-even" : ""}>
                                         <td style={{ ...tdStyle, background: rowBg, textAlign: "center" as const, color: C.muted, fontFamily: FONT.mono, fontSize: "9px" }}>{idx + 1}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.code || "—"}</td>
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.lead || "—"}</td>
@@ -583,6 +587,15 @@ export default function QuoteDocument({ data }: Props) {
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.hs || "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{row.kg || "—"}</td>
                                     </tr>
+                                    {lineNote && (
+                                        <tr className="doc-no-break">
+                                            <td colSpan={10} style={{ ...tdStyle, background: rowBg, fontSize: "9px", color: C.muted, lineHeight: 1.5, whiteSpace: "pre-wrap" as const, paddingTop: "1px", paddingBottom: "4px", paddingLeft: "20px", borderLeft: `2px solid ${C.brand}` }}>
+                                                <span style={{ fontWeight: 700, color: C.brand }}>{L.lineNote.tr} / {L.lineNote.en}: </span>
+                                                {lineNote}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    </Fragment>
                                 );
                             })}
                             {data.rows.length === 0 && (

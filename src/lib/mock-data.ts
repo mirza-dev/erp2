@@ -240,6 +240,8 @@ export interface QuoteLineItem {
     // Faz 1a (V3-B5, V4-A7): birim ağırlık + KG manuel override flag.
     unitWeightKg: number | null;
     kgManualOverride: boolean;
+    // 098: satır bazlı serbest "Not" (description'dan AYRI; null → "").
+    note: string;
 }
 
 export interface QuoteSummary {

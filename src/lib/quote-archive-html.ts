@@ -43,6 +43,7 @@ export function buildQuoteDataFromDetail(detail: QuoteDetail, company?: CompanyS
         hs: l.hsCode ?? "",
         kg: l.weightKg != null ? String(l.weightKg) : "",
         size: l.sizeText ?? "",
+        note: l.note ?? "",
     }));
 
     const totalKg = detail.lines.reduce((s, l) => s + (l.weightKg ?? 0), 0);

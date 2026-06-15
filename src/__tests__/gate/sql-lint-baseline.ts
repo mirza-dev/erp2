@@ -42,8 +42,9 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     update_order_with_lines: ["081", "093"],
     receive_purchase_commitment: ["020", "021", "028"],
     next_quote_number: ["034", "073"],
-    create_quote_with_lines: ["035", "036", "065", "069", "071", "093"],
-    update_quote_with_lines: ["035", "036", "065", "069", "071", "093"],
+    // 098: satır note kolonu INSERT'e eklendi — gövdeler 093 ile birebir.
+    create_quote_with_lines: ["035", "036", "065", "069", "071", "093", "098"],
+    update_quote_with_lines: ["035", "036", "065", "069", "071", "093", "098"],
     accept_quote_and_create_order: ["077", "078", "080", "088"],
     // 094 (Y4): description kopyalama + qty<=0 pre-check geri geldi; index
     // cancelled'ı dışlar (iptal sonrası yeniden gönderim) — 088 davranışının
