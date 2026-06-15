@@ -796,13 +796,14 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
 
     // Sunucu hata yanıtını okunur Türkçe mesaja çevirir (403/422/500 ayrımı dahil).
     async function readSaveError(res: Response): Promise<string> {
-        const body = await res.json().catch(() => null) as { error?: string } | null;
+        const body = await res.json().catch(() => null) as { error?: string; code?: string } | null;
         const detail = body?.error ? ` — ${body.error}` : "";
+        const code = body?.code ? ` [${body.code}]` : "";
         if (res.status === 401) return "Oturum gerekiyor — lütfen tekrar giriş yapın.";
         if (res.status === 403) return "Yetkiniz yok: teklif kaydetmek için 'manage_quotes' (admin/sales) rolü gerekir.";
         if (res.status === 422) return `Geçersiz alan${detail}`;
         if (res.status === 400) return `Hatalı istek${detail}`;
-        return `Kaydetme hatası (${res.status})${detail}`;
+        return `Kaydetme hatası (${res.status})${code}${detail}`;
     }
 
     async function handleSave() {

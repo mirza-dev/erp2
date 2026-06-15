@@ -32,14 +32,38 @@ export function handleApiError(err: unknown, label: string): NextResponse {
         return NextResponse.json({ error: "Sayısal değer çok büyük." }, { status: 400 });
     }
 
-    const internalMsg = err instanceof Error ? err.message : String(err);
-    console.error(`[${label}]`, internalMsg);
+    // Supabase/Postgres hataları `Error` DEĞİL düz nesnedir ({message, details,
+    // hint, code}) → String(err) "[object Object]" verir ve gerçek neden kaybolur.
+    // Mesajı + SQLSTATE kodunu çıkar; kod (ör. 22P02/42883/P0001) hassas değildir,
+    // teşhis için prod yanıtına da konur (mesaj prod'da gizli kalır).
+    const { msg: internalMsg, code: pgCode } = describeError(err);
+    console.error(`[${label}]`, pgCode ? `[${pgCode}]` : "", internalMsg);
 
-    // Production: iç hata mesajı sızmasın
+    // Production: iç hata mesajı sızmasın (yalnız güvenli SQLSTATE kodu)
     const isProduction = process.env.NODE_ENV === "production";
     const clientMsg = isProduction ? "Beklenmeyen bir hata oluştu." : internalMsg;
 
-    return NextResponse.json({ error: clientMsg }, { status: 500 });
+    return NextResponse.json(
+        pgCode ? { error: clientMsg, code: pgCode } : { error: clientMsg },
+        { status: 500 },
+    );
+}
+
+/**
+ * Hata nesnesinden okunur mesaj + (varsa) SQLSTATE kodu çıkarır.
+ * Error → message; Supabase PostgrestError gibi düz nesne → message|details|hint
+ * birleşimi + code; aksi halde String(err).
+ */
+function describeError(err: unknown): { msg: string; code?: string } {
+    if (err instanceof Error) return { msg: err.message };
+    if (err && typeof err === "object") {
+        const e = err as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown };
+        const parts = [e.message, e.details, e.hint]
+            .filter((p): p is string => typeof p === "string" && p.length > 0);
+        const code = typeof e.code === "string" && e.code.length > 0 ? e.code : undefined;
+        return { msg: parts.length > 0 ? parts.join(" | ") : JSON.stringify(err), code };
+    }
+    return { msg: String(err) };
 }
 
 /**
