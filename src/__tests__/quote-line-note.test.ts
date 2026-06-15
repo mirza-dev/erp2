@@ -145,6 +145,28 @@ describe("QuoteDocument (HTML) — satır notu", () => {
         }));
         expect(html).not.toContain("Not / Note:");
     });
+
+    it("not satırı sayfa-kırpılmasına karşı doc-note-row sınıfı kullanır (doc-no-break DEĞİL)", () => {
+        const html = renderToStaticMarkup(createElement(QuoteDocument, {
+            data: makeDocData([docRow({ note: "uzun not" })]),
+        }));
+        expect(html).toContain('class="doc-note-row"');
+    });
+});
+
+// ── 4b. Uzun not sayfa-kırpılma fix'i (source-lock) ─────────────────────────
+
+describe("QuoteDocument — uzun not page-break override", () => {
+    const DOC_SOURCE = readFileSync(
+        join(process.cwd(), "src/app/dashboard/quotes/components/QuoteDocument.tsx"),
+        "utf8",
+    );
+    it("PAGE_CSS not satırı için break-inside:auto override içerir", () => {
+        expect(DOC_SOURCE).toMatch(/tr\.doc-note-row[\s\S]{0,120}break-inside:\s*auto\s*!important/);
+    });
+    it("not satırı doc-note-row sınıfı kullanır, blanket avoid'e takılmaz", () => {
+        expect(DOC_SOURCE).toMatch(/<tr className="doc-note-row">/);
+    });
 });
 
 // ── 5. buildQuoteDataFromDetail not eşlemesi ────────────────────────────────
@@ -193,6 +215,25 @@ describe("renderQuotePdfBuffer — notlu satır", () => {
         expect(buf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
         expect(buf.length).toBeGreaterThan(10 * 1024);
     }, 30000);
+
+    it("ÇOK UZUN not (çok-sayfalık) → kırpılmadan geçerli PDF üretir", async () => {
+        const huge = Array.from({ length: 200 }, (_, i) => `Not satırı ${i + 1} — uzun açıklama şğİ.`).join("\n");
+        const buf = await renderQuotePdfBuffer(makeDocData([docRow({ note: huge })]));
+        expect(buf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
+        expect(buf.length).toBeGreaterThan(10 * 1024);
+    }, 30000);
+});
+
+describe("QuotePdfDocument — not View'ı wrap=false DEĞİL (sayfalara akar)", () => {
+    const PDF_SOURCE = readFileSync(
+        join(process.cwd(), "src/lib/quote-pdf/QuotePdfDocument.tsx"),
+        "utf8",
+    );
+    it("not View'ında wrap={false} yok (ürün satırı S.row'da wrap={false} kalır)", () => {
+        // noteRow View'ı backgroundColor ile açılır ve wrap={false} İÇERMEZ
+        expect(PDF_SOURCE).toMatch(/\.\.\.S\.noteRow,\s*backgroundColor:\s*bg\s*\}\}>/);
+        expect(PDF_SOURCE).not.toMatch(/\.\.\.S\.noteRow[\s\S]{0,40}wrap=\{false\}/);
+    });
 });
 
 // ── 7. QuoteForm source-lock ────────────────────────────────────────────────

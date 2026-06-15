@@ -197,7 +197,9 @@ function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string })
             <Td width={COL.kg} align="right" bg={bg}>{row.kg || "—"}</Td>
         </View>
         {!!lineNote && (
-            <View style={{ ...S.noteRow, backgroundColor: bg }} wrap={false}>
+            // 098: wrap=false YOK → uzun not sayfalara akar (kırpılmaz). Ürün
+            // satırı (S.row) wrap={false} kalır = ürün satırı bütün durur.
+            <View style={{ ...S.noteRow, backgroundColor: bg }}>
                 <Text style={S.noteText}>
                     <Text style={S.noteLabel}>{L.lineNote.tr} / {L.lineNote.en}: </Text>
                     {lineNote}
