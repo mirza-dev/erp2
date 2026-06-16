@@ -146,26 +146,27 @@ describe("QuoteDocument (HTML) — satır notu", () => {
         expect(html).not.toContain("Not / Note:");
     });
 
-    it("not satırı sayfa-kırpılmasına karşı doc-note-row sınıfı kullanır (doc-no-break DEĞİL)", () => {
+    it("not satırı doc-no-break sınıfı kullanır (HTML print fallback'te push-whole, kırpmaz)", () => {
         const html = renderToStaticMarkup(createElement(QuoteDocument, {
             data: makeDocData([docRow({ note: "uzun not" })]),
         }));
-        expect(html).toContain('class="doc-note-row"');
+        expect(html).toContain('class="doc-no-break"');
     });
 });
 
-// ── 4b. Uzun not sayfa-kırpılma fix'i (source-lock) ─────────────────────────
+// ── 4b. HTML print fallback: not satırı doc-no-break (auto override KALDIRILDI) ──
 
-describe("QuoteDocument — uzun not page-break override", () => {
+describe("QuoteDocument — not satırı page-break (push-whole)", () => {
     const DOC_SOURCE = readFileSync(
         join(process.cwd(), "src/app/dashboard/quotes/components/QuoteDocument.tsx"),
         "utf8",
     );
-    it("PAGE_CSS not satırı için break-inside:auto override içerir", () => {
-        expect(DOC_SOURCE).toMatch(/tr\.doc-note-row[\s\S]{0,120}break-inside:\s*auto\s*!important/);
+    it("not satırı doc-no-break sınıfı kullanır", () => {
+        expect(DOC_SOURCE).toMatch(/{lineNote && \([\s\S]{0,400}<tr className="doc-no-break">/);
     });
-    it("not satırı doc-note-row sınıfı kullanır, blanket avoid'e takılmaz", () => {
-        expect(DOC_SOURCE).toMatch(/<tr className="doc-note-row">/);
+    it("doc-note-row break-inside:auto override KALDIRILDI (Chrome'da kırpıyordu)", () => {
+        expect(DOC_SOURCE).not.toMatch(/tr\.doc-note-row/);
+        expect(DOC_SOURCE).not.toMatch(/break-inside:\s*auto/);
     });
 });
 

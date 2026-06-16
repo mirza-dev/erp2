@@ -105,13 +105,6 @@ export const PRINT_CSS = `
         break-inside: avoid;
         page-break-inside: avoid;
     }
-    /* 098: satır-notu uzun olabilir → blanket tbody-tr avoid kuralını EZ; not
-       sayfa sonunda kesilmeyip sonraki sayfaya aksın (içerik kaybı olmasın). */
-    #quote-document table tbody tr.doc-note-row,
-    #quote-document table tbody tr.doc-note-row td {
-        break-inside: auto !important;
-        page-break-inside: auto !important;
-    }
     #quote-document .doc-watermark {
         color: rgba(0,114,188,0.05) !important;
         -webkit-print-color-adjust: exact !important;
@@ -596,7 +589,10 @@ export default function QuoteDocument({ data }: Props) {
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{row.kg || "—"}</td>
                                     </tr>
                                     {lineNote && (
-                                        <tr className="doc-note-row">
+                                        // doc-no-break: HTML doğrudan-print fallback'inde not
+                                        // bütünüyle sonraki sayfaya iter (kırpmaz; 800-cap'le tek
+                                        // sayfaya sığar). Birincil çıktı react-pdf (preview-pdf).
+                                        <tr className="doc-no-break">
                                             <td colSpan={10} style={{ ...tdStyle, background: rowBg, fontSize: "9px", color: C.muted, lineHeight: 1.5, whiteSpace: "pre-wrap" as const, paddingTop: "1px", paddingBottom: "4px", paddingLeft: "20px", borderLeft: `2px solid ${C.brand}` }}>
                                                 <span style={{ fontWeight: 700, color: C.brand }}>{L.lineNote.tr} / {L.lineNote.en}: </span>
                                                 {lineNote}

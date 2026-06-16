@@ -10,6 +10,7 @@ import type { QuoteData } from "../components/quote-types";
 
 export default function QuotePreviewPage() {
     const router = useRouter();
+    const [printing, setPrinting] = useState(false);
     const [data] = useState<QuoteData | null>(() => {
         if (typeof window === "undefined") return null;
         try {
@@ -20,6 +21,41 @@ export default function QuotePreviewPage() {
         }
     });
     const notFound = data === null;
+
+    // "Yazdır / PDF": e-postadaki ile BİREBİR aynı react-pdf belgesini üretir
+    // (not sayfalar arası gerçek bölünür). Popup-blocker'ı önlemek için pencere
+    // senkron açılır, sonra blob URL'i atanır. Demo (POST 403) / hata → HTML
+    // window.print() fallback (push-whole, kırpmaz).
+    async function handlePrintPdf() {
+        if (!data || printing) return;
+        setPrinting(true);
+        const win = window.open("", "_blank");
+        try {
+            const res = await fetch("/api/quotes/preview-pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            if (!res.ok) throw new Error(String(res.status));
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            if (win) {
+                win.location.href = url;
+            } else {
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${data.quoteNo || "Teklif"}.pdf`;
+                a.click();
+            }
+            setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        } catch {
+            if (win) win.close();
+            // Demo modunda POST engellenir (403) veya hata → HTML yazdırmaya düş.
+            window.print();
+        } finally {
+            setPrinting(false);
+        }
+    }
 
     const toolbarStyle: React.CSSProperties = {
         position: "fixed" as const,
@@ -94,13 +130,14 @@ export default function QuotePreviewPage() {
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Ctrl+P ile de yazdırabilirsiniz</span>
+                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>E-postadaki PDF ile aynı belge</span>
                         <Button
                             size="sm"
                             leftIcon={<Printer size={14} />}
-                            onClick={() => window.print()}
+                            onClick={handlePrintPdf}
+                            disabled={printing}
                         >
-                            Yazdır / PDF
+                            {printing ? "Hazırlanıyor…" : "Yazdır / PDF"}
                         </Button>
                     </div>
                 </div>
