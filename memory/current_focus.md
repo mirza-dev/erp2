@@ -7,7 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-15 (**Teklif satırı bazlı serbest "Not" alanı — mig.098, APPLY ✅**)
+## Son Tamamlanan İş — 2026-06-16 (**Teklif satırı bazlı ölçü birimi — mig.099, APPLY BEKLİYOR ⚠️**)
+
+**İstek:** "teklif formunda birim kısmı üzerinde detaylı çalışmamız lazım her ürünün birimi vs aynı olmuyor onu nasıl yaparız" — Miktar kolonu her satıra sabit "Adet" yazıyordu; PMT çok-tipli katalogda her ürünün birimi farklı (adet/metre/kg/m²…). **Kararlar (AskUserQuestion, 3/3 önerilen):** (1) belge gösterimi = Miktar hücresine **birleşik** ("70 adet"), yeni kolon DEĞİL; (2) form girişi = ürün seçilince **otomatik dolar** + serbest düzenlenebilir (datalist); (3) siparişe taşıma = **teklif birimi öncelikli** COALESCE.
+
+- `size_text`(065)/`note`(098) "satıra alan ekle" emsali birebir. `products.unit` zaten NOT NULL → form `handleSelectProduct`'ta `p.unit`'ten autofill.
+- **mig.099 (APPLY BEKLİYOR ⚠️):** `quote_line_items.unit text` (nullable) + **4 RPC redefine**: create/update_quote_with_lines (098 gövdesi + INSERT'e `unit` + `NULLIF(ln->>'unit','')`; toplamlara DOKUNULMADI), `send_quote_and_create_pending_order` (094 halefi) + `accept_quote_and_create_order` legacy draft yolu (088 halefi) → `order_lines.unit = COALESCE(NULLIF(qli.unit,''), p.unit)` (teklif birimi > ürün master). **DİKKAT:** send=094, accept=088 en güncel gövdeler — 078 DEĞİL.
+- **Zincir:** database.types(`unit:string|null`)/quotes.ts(CreateQuoteLineInput)/mock-data(QuoteLineItem)/api-mappers(null→"")/quote-types(döküman QuoteRow)/quote-archive-html. **Form:** QuoteRow+emptyRow+autofill+hydration+payload(`unit: r.unit.trim()||undefined`); Miktar hücresi miktar üstte + serbest birim input altta (`<datalist id="quote-units">` 12 öneri); Qty th "Miktar / Birim" + width 70→92. **Belge:** QuoteDocument(HTML) + QuotePdfDocument miktar+birim birleşik ("12 metre"; boşsa yalnız sayı); PDF qty kolonu 52→74; başlık zaten BILINGUAL "Miktar / Qty" (sabit "Adet" yalnız formdaydı→kalktı).
+- **Gate:** `sql-lint-baseline` 4 zincire 099 (create/update/send/accept) + `check-migrations` PROBES'a 099 (`quote_line_items.unit` column probe).
+- +1 test dosyası `quote-line-unit.test.ts` (+21: mig source-lock/mapper/RPC payload/HTML birleşik+başlık/arşiv/PDF render/form 7 source-lock/gate). tsc 0 · lint 0 · **5401 test / 399 dosya** · build 0. **PUSH EDİLDİ** `9f8fd17` (iki branch aynı SHA, diff boş). UI inline-style+CSS-var konvansiyonu (datalist + tema-uyumlu).
+- **Kalan (KULLANICI):** **mig.099 APPLY** (Studio → `npx tsx scripts/check-migrations.ts` doğrular) + smoke: ürün seç→birim otomatik dolar; elle "kg"→kaydet→yenile (korunur); Önizle/PDF "12 metre"; **Kabul et**→siparişte birimler teklifle aynı (COALESCE); koyu/aydınlık tema; demo bloklu.
+
+---
+
+## Önceki İş — 2026-06-15 (**Teklif satırı bazlı serbest "Not" alanı — mig.098, APPLY ✅**)
 
 **İstek:** "Teklif sayfasında genel notlar kısmını her ürün içinde ayrı not oluşturulabilsin şeklinde ürün satırında bulunsun" → plan + soru-cevap sonrası uygula. **Kararlar (AskUserQuestion):** (1) Genel Notlar KALIR + ayrıca satır bazlı not (iki seviye); (2) **açılır not satırı** (tablo 10 kolon dar → yeni kolon DEĞİL); (3) not müşteri belgesinde de görünür (HTML+PDF+e-posta eki, TR/EN bilingual); (4) siparişe TAŞINMAZ (order tarafına dokunulmaz).
 
