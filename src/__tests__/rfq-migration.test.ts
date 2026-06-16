@@ -44,3 +44,18 @@ describe("migration 100 — RFQ şeması", () => {
         expect(SQL).toMatch(/status[\s\S]{0,80}'draft','sent','awarded','cancelled'/i);
     });
 });
+
+describe("migration 102 — create_rfq_with_lines ambiguity (42702) fix", () => {
+    const FIX = readFileSync(join(process.cwd(), "supabase/migrations/102_rfq_create_ambiguous_fix.sql"), "utf8");
+    // Yorum satırları (açıklamada eski ON CONFLICT alıntılanıyor) hariç, yalnız kod.
+    const CODE = FIX.split("\n").filter(l => !l.trim().startsWith("--")).join("\n");
+    it("create_rfq_with_lines yeniden tanımlanır", () => {
+        expect(FIX).toMatch(/create or replace function create_rfq_with_lines/i);
+    });
+    it("ambiguity kaynağı ON CONFLICT (rfq_id ...) KOD'dan KALDIRILDI", () => {
+        expect(CODE).not.toMatch(/on conflict/i);
+    });
+    it("yinelenen vendor_id için DISTINCT kullanılır", () => {
+        expect(FIX).toMatch(/select distinct \(jsonb_array_elements_text\(p_vendor_ids\)\)/i);
+    });
+});

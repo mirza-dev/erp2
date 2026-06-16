@@ -68,6 +68,7 @@ const MANUAL: Record<string, string> = {
     "094": "send fix: SELECT prosrc LIKE '%qli.description%' FROM pg_proc WHERE proname='send_quote_and_create_pending_order'; + index: SELECT indexdef FROM pg_indexes WHERE indexname='uq_sales_orders_quote_id'; (cancelled hariç olmalı)",
     "095": "lock hijyeni: SELECT proname, proconfig FROM pg_proc WHERE proname LIKE '%scan_lock%'; (search_path set olmalı)",
     "101": "alerts type CHECK 'rfq_response_due' içeriyor mu: SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = 'alerts'::regclass AND contype = 'c';",
+    "102": "create_rfq_with_lines ambiguity fix: SELECT prosrc NOT LIKE '%ON CONFLICT (rfq_id%' FROM pg_proc WHERE proname='create_rfq_with_lines'; (DISTINCT'li, ON CONFLICT'siz sürüm)",
 };
 
 interface OpenApiSpec {

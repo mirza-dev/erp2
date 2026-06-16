@@ -42,6 +42,9 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     update_order_with_lines: ["081", "093"],
     receive_purchase_commitment: ["020", "021", "028"],
     next_quote_number: ["034", "073"],
+    // 102: ON CONFLICT (rfq_id,...) kolon-çıkarımı OUT param rfq_id ile çakışıyordu
+    // (42702) → DISTINCT + ON CONFLICT'siz INSERT; gövdenin geri kalanı 100 ile birebir.
+    create_rfq_with_lines: ["100", "102"],
     // 098: satır note kolonu INSERT'e eklendi — gövdeler 093 ile birebir.
     // 099: satır unit kolonu INSERT'e eklendi — gövdeler 098 ile birebir.
     create_quote_with_lines: ["035", "036", "065", "069", "071", "093", "098", "099"],
