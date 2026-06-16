@@ -45,6 +45,9 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     // 102: ON CONFLICT (rfq_id,...) kolon-çıkarımı OUT param rfq_id ile çakışıyordu
     // (42702) → DISTINCT + ON CONFLICT'siz INSERT; gövdenin geri kalanı 100 ile birebir.
     create_rfq_with_lines: ["100", "102"],
+    // 103: award bütünlüğü (O2 sunucu-otoriter fiyat/qty + D2 mükerrer satır guard);
+    // gövdenin geri kalanı 100 ile birebir.
+    award_rfq_create_pos: ["100", "103"],
     // 098: satır note kolonu INSERT'e eklendi — gövdeler 093 ile birebir.
     // 099: satır unit kolonu INSERT'e eklendi — gövdeler 098 ile birebir.
     create_quote_with_lines: ["035", "036", "065", "069", "071", "093", "098", "099"],

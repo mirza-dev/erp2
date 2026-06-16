@@ -39,4 +39,12 @@ describe("POST /api/email/retry-failed", () => {
         const res = await POST();
         expect(res.status).toBe(500);
     });
+
+    it("D1: req verilip Bearer yoksa route-içi CRON guard 401 (derinlemesine savunma)", async () => {
+        const { NextRequest } = await import("next/server");
+        const req = new NextRequest("http://localhost/api/email/retry-failed", { method: "POST" });
+        const res = await POST(req);
+        expect(res.status).toBe(401);
+        expect(mockRetry).not.toHaveBeenCalled();
+    });
 });

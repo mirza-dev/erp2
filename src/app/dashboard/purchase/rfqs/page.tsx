@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { RfqListRow } from "@/lib/supabase/supplier-rfqs";
 import type { SupplierRfqStatus } from "@/lib/database.types";
+import { localISODate } from "@/lib/stock-utils";
 
 const STATUS_LABEL: Record<SupplierRfqStatus, string> = {
     draft: "Taslak",
@@ -64,7 +65,7 @@ export default function RfqListPage() {
     }, [load]);
 
     const isOverdue = (r: RfqListRow) =>
-        r.status === "sent" && r.due_date != null && r.due_date < new Date().toISOString().slice(0, 10);
+        r.status === "sent" && r.due_date != null && r.due_date < localISODate(Date.now());
 
     return (
         <div>

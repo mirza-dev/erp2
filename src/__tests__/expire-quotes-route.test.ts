@@ -42,4 +42,12 @@ describe("POST /api/orders/expire-quotes", () => {
 
         expect(res.status).toBe(500);
     });
+
+    it("3. D1: req verilip Bearer yoksa route-içi CRON guard 401 (derinlemesine savunma)", async () => {
+        const { NextRequest } = await import("next/server");
+        const req = new NextRequest("http://localhost/api/orders/expire-quotes", { method: "POST" });
+        const res = await POST(req);
+        expect(res.status).toBe(401);
+        expect(mockServiceExpireQuotes).not.toHaveBeenCalled();
+    });
 });

@@ -1,4 +1,5 @@
 import { createServiceClient } from "./service";
+import { localISODate } from "@/lib/stock-utils";
 import type {
     SupplierRfqRow,
     SupplierRfqLineRow,
@@ -317,7 +318,8 @@ export async function dbListVendorPriceHistory(vendorId: string, limit = 50): Pr
  * — rfq_response_due uyarı taraması için (Özellik 4). */
 export async function dbListRfqsAwaitingResponse(): Promise<SupplierRfqRow[]> {
     const supabase = createServiceClient();
-    const today = new Date().toISOString().slice(0, 10);
+    // O1 (Y6 sınıfı): UTC slice yerel TZ'de gün kaydırır → localISODate (yerel gün).
+    const today = localISODate(Date.now());
     const { data: rfqs, error } = await supabase
         .from("supplier_rfqs")
         .select("*")
