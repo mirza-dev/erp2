@@ -280,6 +280,21 @@ npm run doctor        # react-doctor tarama
 - ⚛️ **`"use client"`:** Tüm interaktif component'larda zorunlu.
 - 🚫 **Framer Motion:** Kurulu değil/yasak. CSS animasyon yalnız gerekli yerde.
 
+## 🔍 Kod İnceleme & Güvenlik Denetimi
+
+Projeye özel **`erp2-reviewer`** Claude Code subagent'ı (`.claude/agents/erp2-reviewer.md`) bug,
+semantik hata ve güvenlik açığı tarar; bulguları `docs/audit/` altında **Bulgular (K/Y/O/D)**
+formatında üretir. Mekanik katman için iki yerel araç gerekir:
+
+```bash
+brew install semgrep gitleaks      # SAST + secret taraması
+```
+
+Çalıştırma (Claude Code içinde): **`/erp-review`** (tam denetim) · **`/erp-review diff`** (yalnız PR
+değişikliği). Subagent `.semgrep/erp-rules.yml` (projeye özel kurallar: NEXT_PUBLIC secret, UTC tarih
+kayması, Tailwind, framer-motion, hardcoded renk…) + `p/typescript p/react p/nextjs p/owasp-top-ten`
+ruleset'lerini çalıştırıp sonuçları yorumlar. Yalnız **rapor** üretir; düzeltmeleri uygulamaz.
+
 <div align="center">
 
 ---

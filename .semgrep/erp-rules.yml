@@ -1,0 +1,85 @@
+# Roven ERP — projeye özel Semgrep kuralları.
+# erp2-reviewer subagent'ı p/typescript + p/react + p/nextjs + p/owasp-top-ten
+# yanında bu dosyayı da çalıştırır. Kurallar REVIEW.md "Always flag" + denetim
+# boşluk listesinin MEKANİK yarısını kapsar (semantik yarı LLM checklist'inde).
+# Doğrula: semgrep --validate --config .semgrep/erp-rules.yml
+rules:
+  # ── Güvenlik: client bundle'a sızan secret ────────────────────
+  - id: roven-next-public-secret
+    languages: [generic]
+    severity: ERROR
+    message: >
+      NEXT_PUBLIC_ önekli secret client JS bundle'ına gömülür (tarayıcıda görünür).
+      Secret/token/service-role/parola sunucu-yalnız olmalı (NEXT_PUBLIC_ önekisiz).
+      NOT: NEXT_PUBLIC_SUPABASE_ANON_KEY ve _URL bilinçli olarak public'tir — güvenli, hariç tutulur.
+    paths:
+      include: ["*.ts", "*.tsx", "*.js", "*.mjs", "*.env*"]
+    patterns:
+      - pattern-regex: 'NEXT_PUBLIC_\w*(KEY|SECRET|TOKEN|PASSWORD|SERVICE_ROLE)'
+      # Supabase anon key + url bilinçli public → yanlış-pozitif eleme
+      - pattern-not-regex: 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+      - pattern-not-regex: 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY'
+
+  # ── Güvenlik: ham HTML enjeksiyonu (XSS) ──────────────────────
+  - id: roven-dangerously-set-inner-html
+    languages: [typescript]
+    severity: WARNING
+    message: >
+      dangerouslySetInnerHTML XSS riskidir. İçeriğin sabit/temizlenmiş olduğunu file:line ile
+      doğrula; kullanıcı girdisi ham basılıyorsa Important bulgu.
+    patterns:
+      - pattern: <$EL dangerouslySetInnerHTML={...} />
+
+  # ── Semantik: UTC tarih kayması (denetim Y6) ──────────────────
+  - id: roven-utc-date-slice
+    languages: [typescript]
+    severity: WARNING
+    message: >
+      `.toISOString().slice(0,10)` UTC-gece yarısına göre keser → yerel TZ'de gün kayar
+      (denetim Y6). Tarih karşılaştırma/üretiminde `localISODate()` kullan.
+    patterns:
+      - pattern-regex: '\.toISOString\(\)\.slice\(\s*0\s*,\s*10\s*\)'
+
+  # ── Semantik: tutarsız para yuvarlaması (denetim D1) ──────────
+  - id: roven-inline-money-rounding
+    languages: [typescript]
+    severity: INFO
+    message: >
+      Satıriçi `Math.round(x*100)/100` para yuvarlaması 13+ yerde tekrar ediyor (denetim D1);
+      ortak helper yerine kuruş hassasiyeti sapabilir. Tutarlılığı kontrol et.
+    patterns:
+      - pattern-regex: 'Math\.round\([^)]*\*\s*100\s*\)\s*/\s*100'
+
+  # ── Proje kuralı: Tailwind className (inline-style-only proje) ─
+  - id: roven-tailwind-classname
+    languages: [generic]
+    severity: WARNING
+    message: >
+      Proje inline style + CSS değişkeni kullanır; Tailwind utility class YASAK (REVIEW.md).
+      `style={{ ... var(--...) }}` kullan.
+    paths:
+      include: ["*.tsx"]
+    patterns:
+      - pattern-regex: 'className=["''][^"'']*\b(flex|grid|hidden|p[trblxy]?-\d|m[trblxy]?-\d|text-(white|black|gray|red|blue|green)|bg-\w+-\d|rounded(-\w+)?|gap-\d|w-\d|h-\d)\b'
+
+  # ── Proje kuralı: framer-motion yasak ─────────────────────────
+  - id: roven-framer-motion-import
+    languages: [generic]
+    severity: WARNING
+    message: "framer-motion bu projede yasak (REVIEW.md). CSS animasyon/transition kullan."
+    paths:
+      include: ["*.ts", "*.tsx"]
+    patterns:
+      - pattern-regex: 'from\s+["'']framer-motion["'']'
+
+  # ── Proje kuralı: hardcoded hex/rgb renk (style prop) ─────────
+  - id: roven-hardcoded-color
+    languages: [generic]
+    severity: INFO
+    message: >
+      Style prop'unda sabit hex/rgb renk yerine CSS değişkeni (var(--accent) vb.) kullan.
+      Belge/PDF/logo/lightbox yüzeyleri TEMA-MUAF (yanlış-pozitif olabilir, file:line doğrula).
+    paths:
+      include: ["*.tsx"]
+    patterns:
+      - pattern-regex: '(color|background|backgroundColor|borderColor|fill|stroke)\s*:\s*["'']#[0-9a-fA-F]{3,8}["'']'
