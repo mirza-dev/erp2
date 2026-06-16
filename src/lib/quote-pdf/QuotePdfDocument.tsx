@@ -101,7 +101,9 @@ const S: Record<string, Style> = {
     metaValue: { flex: 1, fontSize: px(10), fontWeight: 500, color: C.text },
     // ── Items table ──
     tableLabel: { padding: `${px(8)} ${px(20)} ${px(6)}`, fontFamily: FONT.heading, fontSize: px(8), fontWeight: 700, color: C.brand, letterSpacing: 0.8, backgroundColor: C.zebraEven, borderBottomWidth: 1, borderBottomColor: C.border },
-    th: { padding: `${px(7)} ${px(8)}`, fontSize: px(8.5), fontFamily: FONT.heading, fontWeight: 700, color: C.white, letterSpacing: 0.4, borderWidth: 0.5, borderColor: "rgba(255,255,255,0.2)", justifyContent: "flex-end" },
+    // Kenarlık YOK: ince beyaz kenarlık mavi band üzerinde react-pdf'te yeşil/cyan
+    // antialiasing saçağı veriyordu. Header düz mavi band + ortalı başlık.
+    th: { padding: `${px(7)} ${px(6)}`, fontSize: px(8.5), fontFamily: FONT.heading, fontWeight: 700, color: C.white, letterSpacing: 0.4, justifyContent: "center" },
     thEn: { fontSize: px(7.5), opacity: 0.65, fontStyle: "italic", fontWeight: 400, marginTop: 1, textTransform: "none" },
     headRow: { flexDirection: "row", backgroundColor: C.brand },
     row: { flexDirection: "row" },
@@ -151,12 +153,13 @@ function MetaRow({ label, value }: { label: { tr: string; en: string }; value: s
     );
 }
 
-function Th({ label, width, align, grow }: { label: { tr: string; en: string }; width?: number; align?: "center" | "right"; grow?: boolean }) {
-    const alignItems = align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start";
+function Th({ label, width, grow }: { label: { tr: string; en: string }; width?: number; grow?: boolean }) {
+    // Tüm başlıklar ORTALI (kullanıcı isteği). textAlign hem yatay merkez hem
+    // çok-satıra sarılan uzun başlıkları (TESLİM SÜRESİ) düzgün hizalar.
     return (
-        <View style={{ ...S.th, ...(grow ? { flex: 1 } : { width }), alignItems }}>
-            <Text>{trUpper(label.tr)}</Text>
-            <Text style={S.thEn}>{label.en}</Text>
+        <View style={{ ...S.th, ...(grow ? { flex: 1 } : { width }), alignItems: "center" }}>
+            <Text style={{ textAlign: "center" }}>{trUpper(label.tr)}</Text>
+            <Text style={{ ...S.thEn, textAlign: "center" }}>{label.en}</Text>
         </View>
     );
 }
@@ -306,16 +309,16 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
                 <Text style={S.tableLabel}>{trUpper(L.lineItems.tr)} <Text style={S.sectionHeadEn}>/ {L.lineItems.en}</Text></Text>
                 <View style={S.tableBottom}>
                     <View style={S.headRow} wrap={false}>
-                        <Th label={L.rowNo} width={COL.rowNo} align="center" />
+                        <Th label={L.rowNo} width={COL.rowNo} />
                         <Th label={L.productCode} width={COL.code} />
                         <Th label={L.leadTime} width={COL.lead} />
                         <Th label={L.size} width={COL.size} />
                         <Th label={L.description} grow />
-                        <Th label={L.qty} width={COL.qty} align="center" />
-                        <Th label={L.unitPrice} width={COL.unit} align="right" />
-                        <Th label={L.totalPrice} width={COL.total} align="right" />
+                        <Th label={L.qty} width={COL.qty} />
+                        <Th label={L.unitPrice} width={COL.unit} />
+                        <Th label={L.totalPrice} width={COL.total} />
                         <Th label={L.hsCode} width={COL.hs} />
-                        <Th label={L.weight} width={COL.kg} align="right" />
+                        <Th label={L.weight} width={COL.kg} />
                     </View>
                     {data.rows.map((row, idx) => <ItemRow key={idx} row={row} idx={idx} sym={sym} />)}
                     {data.rows.length === 0 && (

@@ -273,9 +273,10 @@ export default function QuoteDocument({ data }: Props) {
         textTransform: "uppercase" as const,
         letterSpacing: "0.05em",
         border: `0.5px solid rgba(255,255,255,0.2)`,
-        whiteSpace: "nowrap" as const,
-        textAlign: "left" as const,
-        verticalAlign: "bottom" as const,
+        // Tüm başlıklar ORTALI; uzun başlıklar sarılsın (taşma yok) → nowrap kaldırıldı.
+        whiteSpace: "normal" as const,
+        textAlign: "center" as const,
+        verticalAlign: "middle" as const,
     };
 
     const tdStyle: React.CSSProperties = {
@@ -524,7 +525,7 @@ export default function QuoteDocument({ data }: Props) {
                     <table style={{ width: "100%", borderCollapse: "collapse" as const }}>
                         <thead>
                             <tr>
-                                <th className="doc-brand-bg" style={{ ...thStyle, width: "28px", textAlign: "center" as const }}>
+                                <th className="doc-brand-bg" style={{ ...thStyle, width: "28px" }}>
                                     {L.rowNo.tr}
                                     <span style={enSubLabelStyle}>{L.rowNo.en}</span>
                                 </th>
@@ -545,15 +546,15 @@ export default function QuoteDocument({ data }: Props) {
                                     {L.description.tr}
                                     <span style={enSubLabelStyle}>{L.description.en}</span>
                                 </th>
-                                <th className="doc-brand-bg" style={{ ...thStyle, width: "52px", textAlign: "center" as const }}>
+                                <th className="doc-brand-bg" style={{ ...thStyle, width: "52px" }}>
                                     {L.qty.tr}
                                     <span style={enSubLabelStyle}>{L.qty.en}</span>
                                 </th>
-                                <th className="doc-brand-bg" style={{ ...thStyle, width: "100px", textAlign: "right" as const }}>
+                                <th className="doc-brand-bg" style={{ ...thStyle, width: "100px" }}>
                                     {L.unitPrice.tr}
                                     <span style={enSubLabelStyle}>{L.unitPrice.en}</span>
                                 </th>
-                                <th className="doc-brand-bg" style={{ ...thStyle, width: "110px", textAlign: "right" as const }}>
+                                <th className="doc-brand-bg" style={{ ...thStyle, width: "110px" }}>
                                     {L.totalPrice.tr}
                                     <span style={enSubLabelStyle}>{L.totalPrice.en}</span>
                                 </th>
@@ -561,7 +562,7 @@ export default function QuoteDocument({ data }: Props) {
                                     {L.hsCode.tr}
                                     <span style={enSubLabelStyle}>{L.hsCode.en}</span>
                                 </th>
-                                <th className="doc-brand-bg" style={{ ...thStyle, width: "62px", textAlign: "right" as const }}>
+                                <th className="doc-brand-bg" style={{ ...thStyle, width: "62px" }}>
                                     {L.weight.tr}
                                     <span style={enSubLabelStyle}>{L.weight.en}</span>
                                 </th>
