@@ -133,6 +133,39 @@ export function redactPurchaseOrdersForPerms<T extends object>(items: T[], perms
     return items.map((p) => redactPurchaseOrderForPerms(p, perms));
 }
 
+/**
+ * RFQ detayı (SNAKE_CASE — raw row, mapper YOK). Tedarikçi fiyatları satın alma
+ * maliyeti sınıfında → `view_purchase_costs` yoksa null. Yapı:
+ *   { ...rfq, lines, vendors: [{ ...vendorRow, prices: [{unit_price,...}] }],
+ *     price_history: [{unit_price,...}] }
+ * Davet/durum/lead-time/MOQ takip alanları fiyat değil → dokunulmaz.
+ */
+export function redactRfqDetailForPerms<T extends object>(rfq: T, perms: Set<Permission>): T {
+    if (perms.has("view_purchase_costs")) return rfq;
+    const r = { ...rfq } as Row;
+    if (Array.isArray(r.vendors)) {
+        r.vendors = (r.vendors as Row[]).map((v) => {
+            const vr: Row = { ...v };
+            if (Array.isArray(vr.prices)) {
+                vr.prices = (vr.prices as Row[]).map((p) => {
+                    const pr: Row = { ...p };
+                    nullField(pr, "unit_price");
+                    return pr;
+                });
+            }
+            return vr;
+        });
+    }
+    if (Array.isArray(r.price_history)) {
+        r.price_history = (r.price_history as Row[]).map((h) => {
+            const hr: Row = { ...h };
+            nullField(hr, "unit_price");
+            return hr;
+        });
+    }
+    return r as T;
+}
+
 /** Tek PO (detail route için, snake_case). view_purchase_costs yoksa maliyet alanları null. */
 export function redactPurchaseOrderForPerms<T extends object>(po: T, perms: Set<Permission>): T {
     if (perms.has("view_purchase_costs")) return po;

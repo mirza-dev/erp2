@@ -8,6 +8,7 @@ import {
     Building2,
     ClipboardList,
     Factory,
+    FileSearch,
     FileText,
     LayoutDashboard,
     MailCheck,
@@ -92,6 +93,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
             label: "Satın Alma",
             items: [
                 { label: "Öneriler", href: "/dashboard/purchase/suggested", icon: TrendingUp, count: reorderCount || undefined, countTone: "warning" },
+                { label: "Fiyat Talepleri", href: "/dashboard/purchase/rfqs", icon: FileSearch },
                 { label: "Satın Alma Siparişleri", href: "/dashboard/purchase/orders", icon: ShoppingBag },
                 { label: "Tedarikçiler", href: "/dashboard/vendors", icon: Truck },
             ],

@@ -320,6 +320,87 @@ export interface PoLineRecommendationRow {
     created_at: string
 }
 
+// ── Tedarikçi Fiyat Talebi (RFQ) — migration 100 ──────────────
+export type SupplierRfqStatus = "draft" | "sent" | "awarded" | "cancelled"
+export type SupplierRfqVendorStatus = "invited" | "sent" | "responded" | "declined" | "no_response"
+
+export interface SupplierRfqRow {
+    id: string
+    rfq_number: string
+    title: string | null
+    status: SupplierRfqStatus
+    rfq_date: string
+    due_date: string | null
+    currency: string
+    notes: string | null
+    sent_at: string | null
+    awarded_at: string | null
+    cancelled_at: string | null
+    cancel_reason: string | null
+    created_by: string | null
+    created_at: string
+    updated_at: string
+}
+
+export interface SupplierRfqLineRow {
+    id: string
+    rfq_id: string
+    position: number
+    product_id: string
+    product_code: string | null
+    description: string | null
+    quantity: number
+    unit: string | null
+    target_date: string | null
+    notes: string | null
+}
+
+export interface SupplierRfqVendorRow {
+    id: string
+    rfq_id: string
+    vendor_id: string
+    status: SupplierRfqVendorStatus
+    sent_at: string | null
+    responded_at: string | null
+    currency: string
+    valid_until: string | null
+    lead_time_days: number | null
+    notes: string | null
+}
+
+export interface SupplierRfqPriceRow {
+    id: string
+    rfq_vendor_id: string
+    rfq_line_id: string
+    unit_price: number | null
+    lead_time_days: number | null
+    moq: number | null
+    notes: string | null
+    is_awarded: boolean
+}
+
+export interface SupplierPriceHistoryRow {
+    id: string
+    product_id: string
+    vendor_id: string
+    unit_price: number
+    currency: string
+    source_rfq_id: string | null
+    recorded_at: string
+    created_at: string
+}
+
+export interface SupplierRfqArchiveRow {
+    id: string
+    rfq_id: string
+    vendor_id: string
+    file_path: string
+    content_hash: string
+    byte_size: number
+    created_at: string
+    created_by: string | null
+}
+
 export interface BillOfMaterialsRow {
     id: string
     finished_product_id: string

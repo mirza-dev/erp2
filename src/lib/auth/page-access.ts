@@ -29,6 +29,7 @@ export const PAGE_ACCESS: PageAccessRule[] = [
     { prefix: "/dashboard/settings/note-templates", permission: "view_settings" },
     { prefix: "/dashboard/settings", permission: "view_dashboard", exact: true },
     { prefix: "/dashboard/purchase/suggested", permission: "view_purchase_suggestions" },
+    { prefix: "/dashboard/purchase/rfqs", permission: "view_rfqs" },
     { prefix: "/dashboard/purchase/orders", permission: "view_purchase_orders" },
     { prefix: "/dashboard/quotes", permission: "view_quotes" },
     { prefix: "/dashboard/orders", permission: "view_sales_orders" },
