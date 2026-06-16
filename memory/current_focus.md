@@ -7,7 +7,18 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-16 (**Teklif Ölçü/Ağırlık kolonları koşullu — 099 takip**)
+## Son Tamamlanan İş — 2026-06-16 (**Teklif satır tablosu sadeleştirme: Ölçü + Ağırlık kolonları KALDIRILDI**)
+
+**İstek (semantik):** Kullanıcı "ben hala teklif şimdi kg size bilgileri falan nasıl kullanılabilir, bayağı bir birim seçeneği koyduk, semantik hata var gibi" → ardından "ölçü derken size kolonu DN50 falan ürünün ismi, onları karıştırma" → ve "ağırlık kolonu tamamen olmasın, zaten birim kısmında onu hallettik: kg seçersek birim ağırlıkta yazılmış olur, adet seçersek ağırlık bilgisine gerek yok". **Kararlar (AskUserQuestion):** Ölçü kolonu TAMAMEN KALDIR (açıklamaya GÖMME — DN zaten ürün adında/açıklamada=çift yazım); Ağırlık kolonu da TAMAMEN KALDIR (birim karşılıyor).
+
+- **Kanıt:** seed ürün adı zaten DN içeriyor ("Küresel Vana **Class 600 DN20** A105 SW"); `buildQuoteLineDescription` açıklamayı ürün adıyla başlatır. `size_text` ("DN20·CL600") redundant. Ağırlık: `unit` ekseni (mig.099) kütle/adet ayrımını zaten yapıyor.
+- **Üç yüzeyden (form + HTML belge + PDF) iki kolon da kaldırıldı** + HTML/PDF "Toplam Ağırlık" satırı da. Silinen: `isWeightBasedUnit` helper (quote-document-helpers — bir tur önce eklenmişti, geri alındı), form "Ağırlık" toggle + `showWeightForced`/`showKgCol`/`showSizeCol` + Columns3 import + kg input + `handleKgChange`. colSpan SABİT (`baseCols=8` belge / `formBaseCols=9` form).
+- **VERİ HATTI DORMANT korunur:** `size_text`/`weight_kg` auto-fill (handleSelectProduct `p.sizeText`/qty×unitWeightKg), payload (`size_text`/`weight_kg`/`unit_weight_kg`/`kg_manual_override`), RPC, mapper, hydration AYNEN — yalnız görüntü kalktı → **migration YOK, eski tekliflerde veri kaybı yok**.
+- Testler: `quote-optional-columns` (bir tur önceki koşullu-kolon dosyası → iki kolonun + totalKg satırının YOKLUĞUNU source-lock'layan dosyaya yeniden yazıldı), faz4c/faz4a/faz1b mevcut source-lock'lar güncellendi (handleKgChange/kg input/Ölçü header/colSpan beklentileri). tsc 0 · lint 0 · **5410 test / 400 dosya** · build 0. Kural [[reference_quote_line_columns]]'da kalıcılaştı (ikisini de tekrar EKLEME). PUSH BEKLİYOR.
+
+---
+
+## Önceki İş — 2026-06-16 (**Teklif Ölçü/Ağırlık kolonları koşullu — 099 takip; SUPERSEDED**)
 
 **İstek:** Satır birimi (099) sonrası kullanıcı düzeni sorguladı: Ölçü (Size) birime bağlı (kg/metre üründe anlamsız, "her ürünün ölçüsü olmayabilir"), Ağırlık (Kg) çoğu teklifte gereksiz → ikisi de her zaman görünen kolon olarak kalabalık. **Kararlar (AskUserQuestion, 2/2 önerilen):** ikisi de **koşullu göster** — kolon yalnız en az bir satırda veri varsa görünür (form + belge).
 
