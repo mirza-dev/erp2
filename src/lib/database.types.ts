@@ -594,6 +594,10 @@ export interface QuoteLineItemRow {
     // 098: satır bazlı serbest "Not" alanı (description'dan AYRI; saf açıklayıcı,
     // toplamları etkilemez, siparişe taşınmaz).
     note: string | null
+    // 099: satır bazlı ölçü birimi (adet/metre/kg/m²…). Ürün seçilince
+    // products.unit'ten otomatik dolar, elle düzenlenebilir; belgede miktarla
+    // birlikte gösterilir; siparişe COALESCE ile öncelikli taşınır.
+    unit: string | null
     created_at: string
 }
 

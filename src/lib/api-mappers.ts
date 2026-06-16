@@ -287,6 +287,8 @@ function mapQuoteLineItem(line: QuoteLineItemRow): QuoteLineItem {
     kgManualOverride: line.kg_manual_override ?? false,
     // 098: satır bazlı serbest "Not" (description'dan AYRI; null → "").
     note: line.note ?? "",
+    // 099: satır bazlı ölçü birimi (null → "").
+    unit: line.unit ?? "",
   };
 }
 

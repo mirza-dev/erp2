@@ -13,6 +13,9 @@ export interface QuoteRow {
     // 098: satır bazlı serbest "Not" — ürün satırının altında müşteri belgesinde
     // (HTML + PDF) gösterilir. "" ise alt-satır render edilmez.
     note: string;
+    // 099: satır bazlı ölçü birimi (adet/metre/kg…). Miktar hücresinde değerle
+    // birleşik gösterilir ("70 adet"); "" ise yalnız sayı.
+    unit: string;
 }
 
 export interface QuoteSignature {

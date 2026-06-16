@@ -582,7 +582,8 @@ export default function QuoteDocument({ data }: Props) {
                                         {/* Faz 4a Review: Size kolonu (PMT brand "Ölçü") */}
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.size || "—"}</td>
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.desc || "—"}</td>
-                                        <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "center" as const }}>{row.qty || "—"}</td>
+                                        {/* 099: miktar + satır birimi birleşik ("70 adet"); birim boşsa yalnız sayı. */}
+                                        <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "center" as const, whiteSpace: "nowrap" as const }}>{row.qty ? `${row.qty}${row.unit ? ` ${row.unit}` : ""}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{isRealRow ? `${sym} ${fmt(price)}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const, fontWeight: 600 }}>{isRealRow ? `${sym} ${fmt(lineTotal)}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.hs || "—"}</td>

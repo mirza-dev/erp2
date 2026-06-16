@@ -59,8 +59,9 @@ describe("Gate kayıtları — 098 izlenir", () => {
     );
 
     it("sql-lint-baseline RPC redefinition zincirine 098 eklenmiş", () => {
-        expect(LINT_BASELINE).toMatch(/create_quote_with_lines:\s*\[[^\]]*"098"\]/);
-        expect(LINT_BASELINE).toMatch(/update_quote_with_lines:\s*\[[^\]]*"098"\]/);
+        // 099 turunda zincir "099" ile uzadı; 098 hâlâ zincirde olmalı.
+        expect(LINT_BASELINE).toMatch(/create_quote_with_lines:\s*\[[^\]]*"098"[^\]]*\]/);
+        expect(LINT_BASELINE).toMatch(/update_quote_with_lines:\s*\[[^\]]*"098"[^\]]*\]/);
     });
 
     it("check-migrations PROBES'a 098 (quote_line_items.note) eklenmiş", () => {

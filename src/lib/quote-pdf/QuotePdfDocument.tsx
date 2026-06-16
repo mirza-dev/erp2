@@ -59,7 +59,7 @@ const FONT = { heading: "Montserrat", body: "Inter" };
 const COLSCALE = 0.92;
 const COL = {
     rowNo: px(28 * COLSCALE), code: px(88 * COLSCALE), lead: px(80 * COLSCALE), size: px(60 * COLSCALE),
-    qty: px(52 * COLSCALE), unit: px(100 * COLSCALE), total: px(110 * COLSCALE), hs: px(80 * COLSCALE), kg: px(62 * COLSCALE),
+    qty: px(74 * COLSCALE), unit: px(100 * COLSCALE), total: px(110 * COLSCALE), hs: px(80 * COLSCALE), kg: px(62 * COLSCALE),
 };
 
 const S: Record<string, Style> = {
@@ -193,7 +193,8 @@ function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string })
             <Td width={COL.lead} bg={bg}>{row.lead || "—"}</Td>
             <Td width={COL.size} bg={bg}>{row.size || "—"}</Td>
             <Td grow bg={bg}>{row.desc || "—"}</Td>
-            <Td width={COL.qty} align="center" bg={bg}>{row.qty || "—"}</Td>
+            {/* 099: miktar + satır birimi birleşik ("70 adet"); birim boşsa yalnız sayı. */}
+            <Td width={COL.qty} align="center" bg={bg}>{row.qty ? `${row.qty}${row.unit ? ` ${row.unit}` : ""}` : "—"}</Td>
             <Td width={COL.unit} align="right" bg={bg}>{isRealRow ? `${sym} ${fmt(price)}` : "—"}</Td>
             <Td width={COL.total} align="right" bg={bg} style={{ fontWeight: 600 }}>{isRealRow ? `${sym} ${fmt(lineTotal)}` : "—"}</Td>
             <Td width={COL.hs} bg={bg} style={{ fontSize: px(9.5) }}>{row.hs || "—"}</Td>

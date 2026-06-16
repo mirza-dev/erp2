@@ -43,13 +43,17 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     receive_purchase_commitment: ["020", "021", "028"],
     next_quote_number: ["034", "073"],
     // 098: satır note kolonu INSERT'e eklendi — gövdeler 093 ile birebir.
-    create_quote_with_lines: ["035", "036", "065", "069", "071", "093", "098"],
-    update_quote_with_lines: ["035", "036", "065", "069", "071", "093", "098"],
-    accept_quote_and_create_order: ["077", "078", "080", "088"],
+    // 099: satır unit kolonu INSERT'e eklendi — gövdeler 098 ile birebir.
+    create_quote_with_lines: ["035", "036", "065", "069", "071", "093", "098", "099"],
+    update_quote_with_lines: ["035", "036", "065", "069", "071", "093", "098", "099"],
+    // 099: legacy draft yolunda order_lines.unit = COALESCE(qli.unit, p.unit)
+    // (teklif birimi öncelikli); geri kalan 088 ile birebir.
+    accept_quote_and_create_order: ["077", "078", "080", "088", "099"],
     // 094 (Y4): description kopyalama + qty<=0 pre-check geri geldi; index
     // cancelled'ı dışlar (iptal sonrası yeniden gönderim) — 088 davranışının
     // geri kalanı birebir korundu.
-    send_quote_and_create_pending_order: ["088", "094"],
+    // 099: order_lines.unit = COALESCE(qli.unit, p.unit); geri kalan 094 ile birebir.
+    send_quote_and_create_pending_order: ["088", "094", "099"],
     // 095 (Y7): gövdeler birebir; yalnız SET search_path + REVOKE/GRANT eklendi.
     try_acquire_scan_lock: ["019", "095"],
     release_scan_lock: ["019", "095"],

@@ -21,6 +21,8 @@ export interface CreateQuoteLineInput {
     kg_manual_override?: boolean;
     // 098: satır bazlı serbest "Not" (description'dan AYRI; saf açıklayıcı).
     note?: string | null;
+    // 099: satır bazlı ölçü birimi (adet/metre/kg…); boş → NULL.
+    unit?: string | null;
 }
 
 export interface CreateQuoteInput {

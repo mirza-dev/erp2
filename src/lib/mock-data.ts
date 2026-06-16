@@ -242,6 +242,8 @@ export interface QuoteLineItem {
     kgManualOverride: boolean;
     // 098: satır bazlı serbest "Not" (description'dan AYRI; null → "").
     note: string;
+    // 099: satır bazlı ölçü birimi (adet/metre/kg…; null → "").
+    unit: string;
 }
 
 export interface QuoteSummary {

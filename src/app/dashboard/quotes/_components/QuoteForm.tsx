@@ -41,6 +41,10 @@ interface QuoteRow {
     // 098: satır bazlı serbest "Not" (Ürün Tanımı/desc'ten AYRI). Açılır not
     // satırında düzenlenir; müşteri belgesinde satırın altında gösterilir.
     note: string;
+    // 099: satır bazlı ölçü birimi (adet/metre/kg…). Ürün seçilince
+    // products.unit'ten otomatik dolar; elle düzenlenebilir; Miktar hücresinde
+    // değerle birlikte gösterilir; siparişe COALESCE ile öncelikli taşınır.
+    unit: string;
 }
 
 type Currency = "TRY" | "USD" | "EUR";
@@ -51,7 +55,7 @@ function fmt(n: number) {
 }
 
 function emptyRow(id: number): QuoteRow {
-    return { id, productId: "", code: "", lead: "", desc: "", qty: "", price: "", hs: "", kg: "", size: "", unitWeightKg: "", kgManualOverride: false, note: "" };
+    return { id, productId: "", code: "", lead: "", desc: "", qty: "", price: "", hs: "", kg: "", size: "", unitWeightKg: "", kgManualOverride: false, note: "", unit: "" };
 }
 
 // Faz 1b: numeric(10,3) hedefi için 3 ondalığa yuvarla (float kalıntısını temizler).
@@ -295,6 +299,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     unitWeightKg: l.unitWeightKg !== null ? String(l.unitWeightKg) : "",
                     kgManualOverride: l.kgManualOverride,
                     note: l.note ?? "",
+                    unit: l.unit ?? "",
                 }));
                 setRows(mapped);
                 setNextId(initialData.lines.length + 1);
@@ -483,6 +488,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         // Faz 1b (V4-B3): GTİP + ölçü master'dan auto-fill (boşsa boş dolar — dormant)
         updateRow(rowId, "hs", p.hsCode ?? "");
         updateRow(rowId, "size", p.sizeText ?? "");
+        // 099: ölçü birimi master'dan auto-fill (products.unit NOT NULL). Kullanıcı
+        // sonra elle değiştirebilir; manuel kod satırında elle yazılır.
+        updateRow(rowId, "unit", p.unit ?? "");
         // Faz 1b (V3-B5/V4-A7): birim ağırlık + KG recompute. Yeni ürün seçimi
         // override'ı sıfırlar; KG = qty × birim ağırlık (qty 0 ise temizlenir,
         // ağırlıksız üründe KG temizlenir — eski ürün KG'si taşınmaz).
@@ -749,6 +757,8 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     kg_manual_override: r.kgManualOverride,
                     // 098: satır bazlı serbest not (boşsa gönderme)
                     note: r.note.trim() || undefined,
+                    // 099: satır bazlı ölçü birimi (boşsa gönderme → NULL)
+                    unit: r.unit.trim() || undefined,
                 })),
         };
     }
@@ -1286,6 +1296,12 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                             auto → diğer eksen visible olamaz) bu dropdown'u dikey kırpıyordu.
                             Dropdown açıkken (prodOpenRowId) overflow'u visible'a alıyoruz —
                             liste tam görünür; kapalıyken yatay scroll (geniş tablo) korunur. */}
+                        {/* 099: satır birimi için yaygın ölçü önerileri (serbest yazıma açık). */}
+                        <datalist id="quote-units">
+                            <option value="adet" /><option value="metre" /><option value="kg" /><option value="m²" />
+                            <option value="m³" /><option value="takım" /><option value="paket" /><option value="kutu" />
+                            <option value="ton" /><option value="litre" /><option value="rulo" /><option value="çift" />
+                        </datalist>
                         <div style={{ overflowX: prodOpenRowId !== null ? "visible" : "auto" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid var(--border-secondary)" }}>
                                 <thead>
@@ -1296,7 +1312,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                         {/* Faz 4a (2026-05-23): PMT brand "Ölçü / Size" kolonu */}
                                         <th className="q-th" style={{ ...th, width: "70px" }}>Size<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ölçü</span></th>
                                         <th className="q-th" style={th}>Description<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ürün Açıklaması</span></th>
-                                        <th className="q-th" style={{ ...th, width: "70px", textAlign: "center" }}>Qty<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Adet</span></th>
+                                        <th className="q-th" style={{ ...th, width: "92px", textAlign: "center" }}>Qty<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Miktar / Birim</span></th>
                                         <th className="q-th" style={{ ...th, width: "110px", textAlign: "right" }}>Unit Price<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Birim Fiyat</span></th>
                                         <th className="q-th" style={{ ...th, width: "115px", textAlign: "right" }}>Total Price<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Toplam Fiyat</span></th>
                                         <th className="q-th" style={{ ...th, width: "90px" }}>HS Code<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>GTİP Kodu</span></th>
@@ -1370,8 +1386,12 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                                     // sonraki product select desc'i override etmez.
                                                     setDescDirtyRowIds(prev => prev.has(row.id) ? prev : new Set(prev).add(row.id));
                                                 }} /></td>
-                                                {/* Qty */}
-                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} adet`} style={{ ...cellInput, textAlign: "center" }} type="number" min="1" step="1" placeholder="0" value={row.qty} onChange={e => handleQtyChange(row.id, e.target.value)} /></td>
+                                                {/* Qty + Birim (099): miktar üstte, ölçü birimi altta. Birim
+                                                    ürün seçilince products.unit'ten otomatik dolar, elle düzenlenebilir. */}
+                                                <td style={tdBase}>
+                                                    <input className="q-cell" aria-label={`Satır ${idx + 1} adet`} style={{ ...cellInput, textAlign: "center" }} type="number" min="1" step="1" placeholder="0" value={row.qty} onChange={e => handleQtyChange(row.id, e.target.value)} />
+                                                    <input className="q-cell" list="quote-units" aria-label={`Satır ${idx + 1} birim`} style={{ ...cellInput, textAlign: "center", fontSize: "10.5px", color: "var(--text-secondary)", marginTop: "2px" }} placeholder="birim" value={row.unit} onChange={e => updateRow(row.id, "unit", e.target.value)} />
+                                                </td>
                                                 {/* Unit Price */}
                                                 <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} birim fiyat`} style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.price} onChange={e => updateRow(row.id, "price", e.target.value)} /></td>
                                                 {/* Line Total */}
