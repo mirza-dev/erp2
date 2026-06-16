@@ -29,7 +29,12 @@ export async function dbGetRfqArchive(rfqId: string, vendorId: string): Promise<
     return data ?? null;
 }
 
-/** Arşiv satırı + storage HTML. Orphan-safe: upload başarısızsa DB satırı silinir. */
+/**
+ * Arşiv satırı + storage HTML. Yeniden-gönderim idempotent: storage path deterministik
+ * (`rfqs/<rfq>/<vendor>.html`) ve DB satırı UNIQUE(rfq_id, vendor_id) üzerinden upsert'lenir
+ * → ikinci gönderimde 23505 yerine güncelleme. Dosya satırdan ÖNCE yazılır → satır asla
+ * mevcut-olmayan dosyaya işaret etmez (orphan-satır yok).
+ */
 export async function dbCreateRfqArchive(input: CreateRfqArchiveInput): Promise<SupplierRfqArchiveRow> {
     if (!input.rfqId || !input.vendorId) throw new Error("RFQ/tedarikçi id zorunludur.");
     if (!input.html || input.byteSize <= 0) throw new Error("Arşiv içeriği boş olamaz.");
@@ -37,28 +42,28 @@ export async function dbCreateRfqArchive(input: CreateRfqArchiveInput): Promise<
     const supabase = createServiceClient();
     const path = `rfqs/${input.rfqId}/${input.vendorId}.html`;
 
-    const { data: row, error: insertErr } = await supabase
-        .from("supplier_rfq_archives")
-        .insert({
-            rfq_id: input.rfqId,
-            vendor_id: input.vendorId,
-            file_path: path,
-            content_hash: input.contentHash,
-            byte_size: input.byteSize,
-            created_by: input.createdBy ?? null,
-        })
-        .select()
-        .single();
-    if (insertErr) throw new Error(insertErr.message);
-    if (!row) throw new Error("Arşiv kaydı oluşturulamadı.");
-
     const { error: uploadErr } = await supabase.storage
         .from(STORAGE_BUCKET)
         .upload(path, Buffer.from(input.html, "utf-8"), { upsert: true, contentType: "text/html" });
-    if (uploadErr) {
-        await supabase.from("supplier_rfq_archives").delete().eq("id", row.id);
-        throw new Error(`Arşiv dosyası yüklenemedi: ${uploadErr.message}`);
-    }
+    if (uploadErr) throw new Error(`Arşiv dosyası yüklenemedi: ${uploadErr.message}`);
+
+    const { data: row, error: upsertErr } = await supabase
+        .from("supplier_rfq_archives")
+        .upsert(
+            {
+                rfq_id: input.rfqId,
+                vendor_id: input.vendorId,
+                file_path: path,
+                content_hash: input.contentHash,
+                byte_size: input.byteSize,
+                created_by: input.createdBy ?? null,
+            },
+            { onConflict: "rfq_id,vendor_id" },
+        )
+        .select()
+        .single();
+    if (upsertErr) throw new Error(upsertErr.message);
+    if (!row) throw new Error("Arşiv kaydı oluşturulamadı.");
     return row;
 }
 

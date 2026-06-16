@@ -54,6 +54,17 @@ export interface ListRfqFilter {
     search?: string;
 }
 
+/**
+ * Serbest-metin aramayı PostgREST `.or()` filtresine güvenle gömer. Değer çift tırnağa
+ * alınır → virgül/nokta/parantez koşul ayracı olarak yorumlanmaz (filtre enjeksiyonu
+ * engellenir); gömülü `"` ve `\` kaçışlanır. `%...%` ilike pattern'i korunur.
+ */
+export function buildRfqSearchOrFilter(search: string): string {
+    const escaped = search.trim().replace(/["\\]/g, "\\$&");
+    const s = `"%${escaped}%"`;
+    return `rfq_number.ilike.${s},title.ilike.${s}`;
+}
+
 export async function dbListRfqs(filter: ListRfqFilter = {}): Promise<RfqListRow[]> {
     const supabase = createServiceClient();
     let query = supabase
@@ -63,8 +74,7 @@ export async function dbListRfqs(filter: ListRfqFilter = {}): Promise<RfqListRow
 
     if (filter.status) query = query.eq("status", filter.status);
     if (filter.search?.trim()) {
-        const s = `%${filter.search.trim()}%`;
-        query = query.or(`rfq_number.ilike.${s},title.ilike.${s}`);
+        query = query.or(buildRfqSearchOrFilter(filter.search));
     }
 
     const { data: rfqs, error } = await query;

@@ -1,11 +1,17 @@
 # Roven — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-06-16_
+_Son güncelleme: 2026-06-17_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
+**Son tamamlanan iş:** **erp2-reviewer denetim turu — RFQ modülü O1/O2/D1 düzeltildi** (2026-06-17; GREEN; PUSH BEKLİYOR; **migration GEREKMEZ**). `/erp-review` (full) ilk uçtan-uca koşu — restart sonrası `erp2-reviewer` subagent çağrıldı. Bulgular `docs/audit/2026-06-17-review-bulgular.md` (K:0 Y:0 O:2 D:1 Nit:2; önceki 2026-06-16 turunun O1/O2/D1/D2'si `01501ff`'te zaten kapanmıştı → bu tur yeni noktalar). **Düzeltmeler:** **O1** `rfq-service.ts` tedarikçi e-postası gövdesi `escapeHtml`'siz interpole ediyordu (latent stored-XSS / konvansiyon sapması) → yerel `escapeHtml` helper'ı + `vendor_name`/`rfq_number`/`due_date` sarmalandı; **O2** `supplier-rfqs.ts` arama PostgREST `.or()`'a ham giriyordu (filtre enjeksiyonu) → `buildRfqSearchOrFilter` saf helper (çift-tırnak + `"`/`\` escape; `,`/`.`/`()` koşul ayracı olamaz); **D1** `rfq-archives.ts` yeniden gönderimde arşiv INSERT'i UNIQUE'e çarpıyordu → upload-önce + `upsert(onConflict: "rfq_id,vendor_id")` (orphan-satır da elendi). **+7 regresyon testi** (`rfq-review-fixes.test.ts`). tsc 0 · lint 0 · **5477 test** · build 0. ⚠️ **Araç notu:** bu koşuda semgrep+gitleaks sandbox izni reddiyle ÇALIŞAMADI (mekanik SAST/secret atlandı; elle+grep'e dayandı) — tam kapsama için izinli ortamda koşturulmalı. N1 (orders detay UI-only UTC karşılaştırması) / N2 (`rfq-validation` mig.103 sonrası ölü zorunlu alanlar) bilinçli bırakıldı. **Kalan:** push (main + codex FF) + isteğe bağlı N1/N2 temizliği.
+
+<details><summary>Önceki: Kapsamlı inceleme ajanı — `erp2-reviewer` subagent + Semgrep/gitleaks (`efab85c`)</summary>
+
 **Son tamamlanan iş:** **Kapsamlı inceleme ajanı — `erp2-reviewer` subagent + Semgrep/gitleaks** (2026-06-16; PUSH `efab85c` iki branch aynı SHA; **ürün kodu DEĞİŞMEDİ**). İstek: bug/semantik/güvenlik tarayan ajan + güvenilir repo/skill araştırması. 2 araştırma turu (yerel altyapı + web). **Kararlar (AskUserQuestion):** subagent / Semgrep+gitleaks / yerel-istek-üzerine / bespoke (vetted repodan beslen). **Yapıldı:** `.claude/agents/erp2-reviewer.md` (izole bağlam; önce REVIEW.md+domain-rules+permissions+gate-baseline+denetim-raporu okur → semgrep+gitleaks+npm audit yorumlar → güvenlik+semantik checklist → çıktı `docs/audit/<tarih>-review-bulgular.md` **K/Y/O/D + Kanıt/Etki/Düzeltme/Efor**, Nit≤5, gate-kapsadığını tekrar etmez, yalnız RAPOR); `.semgrep/erp-rules.yml` (7 kural: NEXT_PUBLIC secret[anon hariç]/UTC-slice Y6/para-yuvarlama D1/Tailwind/framer-motion/hardcoded-renk/dangerouslySetInnerHTML); `/erp-review` (full|diff) komutu; README notu. `brew install semgrep gitleaks` (1.166/8.30). **Regresyon-kanıt:** Y6 32 / D1 7 hit yeniden bulundu, next-public-secret 0. Detay [[reference_review_agent]]. **⚠️ Subagent oturum-başında yüklenir → `erp2-reviewer`'ı Task ile çağırmak için RESTART gerekir; ilk uçtan-uca koşu restart sonrası.**
+
+</details>
 
 <details><summary>Önceki: RFQ takip geliştirmeleri — 4 özellik (`1c89326`; mig.101+102 APPLY ✅, smoke ✅)</summary>
 

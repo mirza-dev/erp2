@@ -16,6 +16,16 @@ import { sendDirectEmail } from "@/lib/services/email-service";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** E-posta gövdesine gömülen değerleri HTML-escape eder (templates.ts konvansiyonu). */
+function escapeHtml(value: string): string {
+    return value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
 export interface SendRfqResult {
     sent: boolean;
     archived: number;
@@ -82,7 +92,7 @@ export async function serviceSendRfq(rfqId: string, actor: string): Promise<Send
         const res = await sendDirectEmail({
             to: vendor.vendor_email,
             subject,
-            html: `<p>Sayın ${vendor.vendor_name},</p><p><strong>${detail.rfq_number}</strong> numaralı fiyat talebimiz ektedir. Lütfen kalemler için birim fiyat, teslim süresi ve geçerlilik bildiriniz.${detail.due_date ? `<br>Yanıt son tarihi: <strong>${detail.due_date}</strong>` : ""}</p><p>Teşekkürler.</p>`,
+            html: `<p>Sayın ${escapeHtml(vendor.vendor_name)},</p><p><strong>${escapeHtml(detail.rfq_number)}</strong> numaralı fiyat talebimiz ektedir. Lütfen kalemler için birim fiyat, teslim süresi ve geçerlilik bildiriniz.${detail.due_date ? `<br>Yanıt son tarihi: <strong>${escapeHtml(detail.due_date)}</strong>` : ""}</p><p>Teşekkürler.</p>`,
             text,
             attachments: [{ filename: `Fiyat-Talebi-${detail.rfq_number}.pdf`, content: pdf }],
             replyTo: company?.email ?? undefined,
