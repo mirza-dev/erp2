@@ -175,7 +175,7 @@ function Td({ children, width, align, grow, bg, style }: {
     );
 }
 
-function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string }) {
+function ItemRow({ row, idx, sym, showSize, showKg }: { row: QuoteRow; idx: number; sym: string; showSize: boolean; showKg: boolean }) {
     const qty = parseFloat(row.qty) || 0;
     const price = parseFloat(row.price) || 0;
     const lineTotal = qty * price;
@@ -191,14 +191,14 @@ function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string })
             {/* Uzun kodda font bir tık küçülür → tire-kırılması 3 yerine 2 satırda kalır */}
             <Td width={COL.code} bg={bg} style={{ fontSize: row.code.length > 12 ? px(8.5) : px(9.5) }}>{row.code || "—"}</Td>
             <Td width={COL.lead} bg={bg}>{row.lead || "—"}</Td>
-            <Td width={COL.size} bg={bg}>{row.size || "—"}</Td>
+            {showSize && <Td width={COL.size} bg={bg}>{row.size || "—"}</Td>}
             <Td grow bg={bg}>{row.desc || "—"}</Td>
             {/* 099: miktar + satır birimi birleşik ("70 adet"); birim boşsa yalnız sayı. */}
             <Td width={COL.qty} align="center" bg={bg}>{row.qty ? `${row.qty}${row.unit ? ` ${row.unit}` : ""}` : "—"}</Td>
             <Td width={COL.unit} align="right" bg={bg}>{isRealRow ? `${sym} ${fmt(price)}` : "—"}</Td>
             <Td width={COL.total} align="right" bg={bg} style={{ fontWeight: 600 }}>{isRealRow ? `${sym} ${fmt(lineTotal)}` : "—"}</Td>
             <Td width={COL.hs} bg={bg} style={{ fontSize: px(9.5) }}>{row.hs || "—"}</Td>
-            <Td width={COL.kg} align="right" bg={bg}>{row.kg || "—"}</Td>
+            {showKg && <Td width={COL.kg} align="right" bg={bg}>{row.kg || "—"}</Td>}
         </View>
         {!!lineNote && (
             // 098: wrap=false YOK → uzun not sayfalara akar (kırpılmaz). Ürün
@@ -241,6 +241,10 @@ function TotalRow({ label, value, mutedLabel, grand }: {
 export default function QuotePdfDocument({ data }: { data: QuoteData }) {
     const sym = CURRENCY_SYMBOLS[data.currency] ?? "₺";
     const title = `${data.quoteNo || "Teklif"} — ${L.title.tr}`;
+    // Koşullu kolonlar (HTML belge ile aynı kural): Ölçü/Ağırlık yalnız en az bir
+    // satırda veri varsa render edilir; gizlenince Description (grow) genişler.
+    const showSize = data.rows.some(r => (r.size ?? "").trim() !== "");
+    const showKg = data.rows.some(r => (r.kg ?? "").trim() !== "");
 
     return (
         <Document title={title} author={data.sellerName || "Roven"} language="tr">
@@ -313,15 +317,15 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
                         <Th label={L.rowNo} width={COL.rowNo} />
                         <Th label={L.productCode} width={COL.code} />
                         <Th label={L.leadTime} width={COL.lead} />
-                        <Th label={L.size} width={COL.size} />
+                        {showSize && <Th label={L.size} width={COL.size} />}
                         <Th label={L.description} grow />
                         <Th label={L.qty} width={COL.qty} />
                         <Th label={L.unitPrice} width={COL.unit} />
                         <Th label={L.totalPrice} width={COL.total} />
                         <Th label={L.hsCode} width={COL.hs} />
-                        <Th label={L.weight} width={COL.kg} />
+                        {showKg && <Th label={L.weight} width={COL.kg} />}
                     </View>
-                    {data.rows.map((row, idx) => <ItemRow key={idx} row={row} idx={idx} sym={sym} />)}
+                    {data.rows.map((row, idx) => <ItemRow key={idx} row={row} idx={idx} sym={sym} showSize={showSize} showKg={showKg} />)}
                     {data.rows.length === 0 && (
                         <View style={S.row} wrap={false}>
                             <View style={{ ...S.td, flex: 1, alignItems: "center", padding: px(20) }}>

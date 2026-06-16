@@ -266,10 +266,10 @@ describe("Footer band — fabrika/merkez/tel/web horizontal (PMT brand)", () => 
 
 // ── 5. Faz 4a Review regression ──────────────────────────────────────────────
 
-describe("Faz 4a Review regression — Size kolonu + colSpan 10 + Size data", () => {
-    it("empty rows → colSpan=10 (Size kolonu eklendiğinde 9→10 olmuştu)", () => {
+describe("Faz 4a Review regression — Size kolonu + colSpan + Size data", () => {
+    it("empty rows → colSpan=8 (099 takip: veri yok → koşullu Size/Kg gizli, 8 sabit kolon)", () => {
         const html = render(makeData({ rows: [] }));
-        expect(html).toMatch(/colspan="10"/i);
+        expect(html).toMatch(/colspan="8"/i);
     });
 
     it("Size kolonu lines table'da render (TR 'Ölçü' + EN 'Size' header)", () => {

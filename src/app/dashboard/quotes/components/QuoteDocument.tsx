@@ -142,6 +142,14 @@ const enSectionSuffixStyle: React.CSSProperties = {
 export default function QuoteDocument({ data }: Props) {
     const sym = SYM[data.currency] ?? "₺";
 
+    // Koşullu kolonlar: Ölçü (Size) ve Ağırlık (Kg) yalnız en az bir satırda veri
+    // varsa render edilir (kg/metre ile satılan ürünlerde boş kalan kalabalık
+    // kolonlar gizlenir). Sabit 8 kolon (#/Kod/Lead/Açıklama/Miktar/Birim Fiyat/
+    // Toplam/GTİP) + koşullu Size/Kg → colSpan dinamik.
+    const showSize = data.rows.some(r => (r.size ?? "").trim() !== "");
+    const showKg = data.rows.some(r => (r.kg ?? "").trim() !== "");
+    const baseCols = 8 + (showSize ? 1 : 0) + (showKg ? 1 : 0);
+
     // ── Section styles ────────────────────────────────────────────────────────
 
     const docStyle: React.CSSProperties = {
@@ -530,11 +538,13 @@ export default function QuoteDocument({ data }: Props) {
                                     {L.leadTime.tr}
                                     <span style={enSubLabelStyle}>{L.leadTime.en}</span>
                                 </th>
-                                {/* Faz 4a Review: PMT brand "Ölçü / Size" kolonu */}
+                                {/* Faz 4a Review: PMT brand "Ölçü / Size" kolonu — koşullu (099 takip) */}
+                                {showSize && (
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "60px" }}>
                                     {L.size.tr}
                                     <span style={enSubLabelStyle}>{L.size.en}</span>
                                 </th>
+                                )}
                                 <th className="doc-brand-bg" style={thStyle}>
                                     {L.description.tr}
                                     <span style={enSubLabelStyle}>{L.description.en}</span>
@@ -555,10 +565,13 @@ export default function QuoteDocument({ data }: Props) {
                                     {L.hsCode.tr}
                                     <span style={enSubLabelStyle}>{L.hsCode.en}</span>
                                 </th>
+                                {/* Ağırlık (Kg) kolonu — koşullu (099 takip) */}
+                                {showKg && (
                                 <th className="doc-brand-bg" style={{ ...thStyle, width: "62px" }}>
                                     {L.weight.tr}
                                     <span style={enSubLabelStyle}>{L.weight.en}</span>
                                 </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
@@ -579,22 +592,22 @@ export default function QuoteDocument({ data }: Props) {
                                         <td style={{ ...tdStyle, background: rowBg, textAlign: "center" as const, color: C.muted, fontFamily: FONT.mono, fontSize: "9px" }}>{idx + 1}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.code || "—"}</td>
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.lead || "—"}</td>
-                                        {/* Faz 4a Review: Size kolonu (PMT brand "Ölçü") */}
-                                        <td style={{ ...tdStyle, background: rowBg }}>{row.size || "—"}</td>
+                                        {/* Faz 4a Review: Size kolonu (PMT brand "Ölçü") — koşullu */}
+                                        {showSize && <td style={{ ...tdStyle, background: rowBg }}>{row.size || "—"}</td>}
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.desc || "—"}</td>
                                         {/* 099: miktar + satır birimi birleşik ("70 adet"); birim boşsa yalnız sayı. */}
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "center" as const, whiteSpace: "nowrap" as const }}>{row.qty ? `${row.qty}${row.unit ? ` ${row.unit}` : ""}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{isRealRow ? `${sym} ${fmt(price)}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const, fontWeight: 600 }}>{isRealRow ? `${sym} ${fmt(lineTotal)}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.hs || "—"}</td>
-                                        <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{row.kg || "—"}</td>
+                                        {showKg && <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{row.kg || "—"}</td>}
                                     </tr>
                                     {lineNote && (
                                         // doc-no-break: HTML doğrudan-print fallback'inde not
                                         // bütünüyle sonraki sayfaya iter (kırpmaz; 800-cap'le tek
                                         // sayfaya sığar). Birincil çıktı react-pdf (preview-pdf).
                                         <tr className="doc-no-break">
-                                            <td colSpan={10} style={{ ...tdStyle, background: rowBg, fontSize: "9px", color: C.muted, lineHeight: 1.5, whiteSpace: "pre-wrap" as const, paddingTop: "1px", paddingBottom: "4px", paddingLeft: "20px", borderLeft: `2px solid ${C.brand}` }}>
+                                            <td colSpan={baseCols} style={{ ...tdStyle, background: rowBg, fontSize: "9px", color: C.muted, lineHeight: 1.5, whiteSpace: "pre-wrap" as const, paddingTop: "1px", paddingBottom: "4px", paddingLeft: "20px", borderLeft: `2px solid ${C.brand}` }}>
                                                 <span style={{ fontWeight: 700, color: C.brand }}>{L.lineNote.tr} / {L.lineNote.en}: </span>
                                                 {lineNote}
                                             </td>
@@ -605,8 +618,8 @@ export default function QuoteDocument({ data }: Props) {
                             })}
                             {data.rows.length === 0 && (
                                 <tr>
-                                    {/* Faz 4a Review: colSpan 9 → 10 (Size kolonu eklendi) */}
-                                    <td colSpan={10} style={{ ...tdStyle, textAlign: "center" as const, color: C.subtle, padding: "20px" }}>
+                                    {/* colSpan dinamik (koşullu Size/Kg) */}
+                                    <td colSpan={baseCols} style={{ ...tdStyle, textAlign: "center" as const, color: C.subtle, padding: "20px" }}>
                                         — {L.emptyRows.tr} / {L.emptyRows.en} —
                                     </td>
                                 </tr>

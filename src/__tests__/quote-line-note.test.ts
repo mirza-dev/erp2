@@ -275,8 +275,9 @@ describe("QuoteForm — satır notu entegrasyonu", () => {
 
     it("açılır not satırı toggle butonu + tam-genişlik textarea içerir", () => {
         expect(FORM_SOURCE).toMatch(/onClick=\{\(\)\s*=>\s*toggleNoteRow\(row\.id\)\}/);
-        // colSpan'lı not satırı + updateRow(row.id, "note", ...)
-        expect(FORM_SOURCE).toMatch(/colSpan=\{11\}/);
+        // colSpan'lı not satırı (099 takip: koşullu Size/Kg → dinamik formBaseCols)
+        // + updateRow(row.id, "note", ...)
+        expect(FORM_SOURCE).toMatch(/colSpan=\{formBaseCols\}/);
         expect(FORM_SOURCE).toMatch(/updateRow\(row\.id,\s*"note",\s*e\.target\.value\)/);
     });
 

@@ -285,13 +285,13 @@ describe("Faz 4a Review — preview/PDF contract", () => {
         expect(occ.length).toBe(4);
     });
 
-    it("QuoteDocument lines tablosu row.size render eder + colSpan empty 10'a güncel", () => {
+    it("QuoteDocument lines tablosu row.size render eder + colSpan dinamik (099 takip)", () => {
         expect(DOC_SOURCE).toMatch(/\{row\.size \|\| "—"\}/);
         // Faz 4c güncellemesi: Size header BILINGUAL_LABELS.size'den geliyor (quote-document-helpers.ts).
         // Map içeriği: { tr: "Ölçü", en: "Size" } — TR ana / EN alt italic.
         expect(DOC_HELPERS_SOURCE).toMatch(/size:\s*\{\s*tr:\s*"Ölçü"/);
-        // Empty colSpan eskiden 9; yeni Size kolonu ile 10
-        expect(DOC_SOURCE).toMatch(/colSpan=\{10\}/);
-        expect(DOC_SOURCE).not.toMatch(/colSpan=\{9\}/);
+        // 099 takip: Size/Kg koşullu → colSpan sabit değil, baseCols (8 + koşullu Size/Kg).
+        expect(DOC_SOURCE).toMatch(/colSpan=\{baseCols\}/);
+        expect(DOC_SOURCE).toMatch(/const baseCols = 8 \+ \(showSize \? 1 : 0\) \+ \(showKg \? 1 : 0\)/);
     });
 });

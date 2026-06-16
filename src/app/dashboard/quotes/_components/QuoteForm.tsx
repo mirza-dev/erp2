@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
-import { Eraser, FileText, Plus, RotateCcw, Save, Send, StickyNote, Trash2 } from "lucide-react";
+import { Columns3, Eraser, FileText, Plus, RotateCcw, Save, Send, StickyNote, Trash2 } from "lucide-react";
 import type { QuoteData } from "../components/quote-types";
 import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -116,6 +116,10 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     // 098: açık not satırı id'leri. Toggle butonu satırın altındaki tam-genişlik
     // not textarea'sını açar/kapar (descDirtyRowIds Set paterni).
     const [expandedNoteRowIds, setExpandedNoteRowIds] = useState<Set<number>>(new Set());
+    // 099 takip: Ölçü (Size) ve Ağırlık (Kg) kolonları koşullu. Varsayılan gizli;
+    // herhangi bir satırda veri varsa (ürün seçimiyle auto-fill veya yüklenen teklif)
+    // otomatik görünür. Boş quote'a elle giriş için bu toggle ile zorla açılır.
+    const [optionalColsForced, setOptionalColsForced] = useState(false);
     const [currency, setCurrency] = useState<Currency>("TRY");
     const [vatRate, setVatRate] = useState(20);
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
@@ -934,6 +938,14 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         border: "0.5px solid var(--border-secondary)",
     };
 
+    // 099 takip: koşullu Ölçü/Ağırlık kolonları — herhangi bir satırda veri varsa
+    // (ürün seçimi auto-fill veya yüklenen teklif) ya da kullanıcı toggle ile açtıysa
+    // görünür. Boş + zorlanmamış → gizli (kalabalık önlenir). Not açılır satırının
+    // colSpan'ı kolon sayısına göre dinamik (sabit 9 + koşullu Size/Kg).
+    const showSizeCol = optionalColsForced || rows.some(r => r.size.trim() !== "");
+    const showKgCol = optionalColsForced || rows.some(r => r.kg.trim() !== "");
+    const formBaseCols = 9 + (showSizeCol ? 1 : 0) + (showKgCol ? 1 : 0);
+
     // Faz 7: not şablonu picker'ı. readOnly'de veya ilgili kind'da şablon yoksa
     // render edilmez. Seçim → applyTemplateToField (boş→doldur, dolu→append).
     function renderTemplatePicker(
@@ -1280,6 +1292,18 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                             </div>
                             {!readOnly && (
                             <div className="q-no-print" style={{ display: "flex", gap: "6px" }}>
+                                {/* 099 takip: Ölçü & Ağırlık koşullu kolonları elle aç/kapa.
+                                    Veri varken zaten görünür; bu toggle boş quote'a giriş için. */}
+                                <Button
+                                    variant="secondary"
+                                    size="xs"
+                                    leftIcon={<Columns3 size={13} />}
+                                    onClick={() => setOptionalColsForced(v => !v)}
+                                    aria-pressed={optionalColsForced}
+                                    title="Ölçü ve Ağırlık kolonlarını göster/gizle"
+                                >
+                                    Ölçü & Ağırlık
+                                </Button>
                                 <Button variant="secondary" size="xs" leftIcon={<Eraser size={13} />} onClick={clearAll}>
                                     Temizle
                                 </Button>
@@ -1309,14 +1333,15 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                         <th className="q-th" style={{ ...th, width: "32px", textAlign: "center" }}>#</th>
                                         <th className="q-th" style={{ ...th, width: "90px" }}>Product Code<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ürün Kodu</span></th>
                                         <th className="q-th" style={{ ...th, width: "90px" }}>Lead Time<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Teslim Süresi</span></th>
-                                        {/* Faz 4a (2026-05-23): PMT brand "Ölçü / Size" kolonu */}
-                                        <th className="q-th" style={{ ...th, width: "70px" }}>Size<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ölçü</span></th>
+                                        {/* Faz 4a: PMT brand "Ölçü / Size" — koşullu (099 takip) */}
+                                        {showSizeCol && <th className="q-th" style={{ ...th, width: "70px" }}>Size<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ölçü</span></th>}
                                         <th className="q-th" style={th}>Description<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ürün Açıklaması</span></th>
                                         <th className="q-th" style={{ ...th, width: "92px", textAlign: "center" }}>Qty<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Miktar / Birim</span></th>
                                         <th className="q-th" style={{ ...th, width: "110px", textAlign: "right" }}>Unit Price<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Birim Fiyat</span></th>
                                         <th className="q-th" style={{ ...th, width: "115px", textAlign: "right" }}>Total Price<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Toplam Fiyat</span></th>
                                         <th className="q-th" style={{ ...th, width: "90px" }}>HS Code<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>GTİP Kodu</span></th>
-                                        <th className="q-th" style={{ ...th, width: "70px", textAlign: "right" }}>Kg<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ağırlık</span></th>
+                                        {/* Ağırlık (Kg) — koşullu (099 takip) */}
+                                        {showKgCol && <th className="q-th" style={{ ...th, width: "70px", textAlign: "right" }}>Kg<span style={{ display: "block", fontSize: "9px", opacity: .55, fontStyle: "italic", textTransform: "none", letterSpacing: 0, fontWeight: 400, marginTop: "1px" }}>Ağırlık</span></th>}
                                         <th className="q-th q-no-print" style={{ ...th, width: "56px" }}>
                                             <span className="q-sr-only">İşlemler</span>
                                         </th>
@@ -1377,8 +1402,8 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                                 </td>
                                                 {/* Lead */}
                                                 <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} teslim süresi`} style={cellInput} placeholder="30 gün" value={row.lead} onChange={e => updateRow(row.id, "lead", e.target.value)} /></td>
-                                                {/* Faz 4a: Size (PMT brand "Ölçü") */}
-                                                <td style={tdBase}><input className="q-cell" style={cellInput} placeholder={`3/4'' / DN50`} value={row.size} onChange={e => updateRow(row.id, "size", e.target.value)} aria-label={`Satır ${idx + 1} ölçü`} /></td>
+                                                {/* Faz 4a: Size (PMT brand "Ölçü") — koşullu (099 takip) */}
+                                                {showSizeCol && <td style={tdBase}><input className="q-cell" style={cellInput} placeholder={`3/4'' / DN50`} value={row.size} onChange={e => updateRow(row.id, "size", e.target.value)} aria-label={`Satır ${idx + 1} ölçü`} /></td>}
                                                 {/* Desc */}
                                                 <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} açıklama`} style={cellInput} placeholder="Ürün açıklaması / Description" value={row.desc} onChange={e => {
                                                     updateRow(row.id, "desc", e.target.value);
@@ -1400,8 +1425,8 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                                 </td>
                                                 {/* HS Code */}
                                                 <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} GTİP kodu`} style={cellInput} placeholder="8481.80" value={row.hs} onChange={e => updateRow(row.id, "hs", e.target.value)} /></td>
-                                                {/* Kg */}
-                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} ağırlık (kg)`} style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.kg} onChange={e => handleKgChange(row.id, e.target.value)} /></td>
+                                                {/* Kg — koşullu (099 takip) */}
+                                                {showKgCol && <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} ağırlık (kg)`} style={{ ...cellInput, textAlign: "right", fontFamily: "'JetBrains Mono', monospace", fontSize: "11.5px" }} type="number" min="0" step="any" placeholder="0.00" value={row.kg} onChange={e => handleKgChange(row.id, e.target.value)} /></td>}
                                                 {/* Aksiyonlar: Not + Sil */}
                                                 {!readOnly && (
                                                 <td style={{ ...tdBase, width: "56px", textAlign: "center", padding: "0 4px", whiteSpace: "nowrap" }} className="q-no-print">
@@ -1434,7 +1459,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                             {/* 098: açılır not satırı (tam genişlik) */}
                                             {!readOnly && noteOpen && (
                                                 <tr className="q-no-print">
-                                                    <td colSpan={11} style={{ ...tdBase, padding: "4px 8px 10px 8px", background: "var(--bg-tertiary)" }}>
+                                                    <td colSpan={formBaseCols} style={{ ...tdBase, padding: "4px 8px 10px 8px", background: "var(--bg-tertiary)" }}>
                                                         <label style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px", letterSpacing: "0.04em" }}>
                                                             <span>Satır {idx + 1} notu · belgede ürünün altında görünür</span>
                                                             <span style={{ color: row.note.length > MAX_QUOTE_LINE_NOTE ? "var(--danger-text)" : "var(--text-tertiary)" }}>{row.note.length}/{MAX_QUOTE_LINE_NOTE}</span>
