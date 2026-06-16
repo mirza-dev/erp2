@@ -188,14 +188,16 @@ describe("QuoteForm — Faz 4a UI alanları", () => {
         expect(FORM_SOURCE).toMatch(/size:\s*l\.sizeText/);
     });
 
-    it("Tablo başlığında 'Size / Ölçü' kolonu var", () => {
-        expect(FORM_SOURCE).toMatch(/>Size</);
-        expect(FORM_SOURCE).toMatch(/>Ölçü</);
+    it("Ölçü kolonu KALDIRILDI — th + size input yok (DN ürün adında)", () => {
+        expect(FORM_SOURCE).not.toMatch(/>Size</);
+        expect(FORM_SOURCE).not.toMatch(/>Ölçü</);
+        expect(FORM_SOURCE).not.toMatch(/aria-label=\{`Satır \$\{idx \+ 1\} ölçü`\}/);
     });
 
-    it("Tablo hücresinde size input + aria-label", () => {
-        expect(FORM_SOURCE).toMatch(/value=\{row\.size\}/);
-        expect(FORM_SOURCE).toMatch(/aria-label=\{`Satır \$\{idx \+ 1\} ölçü`\}/);
+    it("size_text veri hattı korunur (auto-fill + payload), yalnız görüntü kalktı", () => {
+        // Ürün seçiminde auto-fill + payload size_text + hydration aynen sürüyor.
+        expect(FORM_SOURCE).toMatch(/updateRow\(rowId, "size", p\.sizeText \?\? ""\)/);
+        expect(FORM_SOURCE).toMatch(/size_text:\s*r\.size/);
     });
 
     it("Teslimat/Ödeme bloğu bilingual etiket + textarea + aria-label", () => {
@@ -285,13 +287,12 @@ describe("Faz 4a Review — preview/PDF contract", () => {
         expect(occ.length).toBe(4);
     });
 
-    it("QuoteDocument lines tablosu row.size render eder + colSpan dinamik (099 takip)", () => {
-        expect(DOC_SOURCE).toMatch(/\{row\.size \|\| "—"\}/);
-        // Faz 4c güncellemesi: Size header BILINGUAL_LABELS.size'den geliyor (quote-document-helpers.ts).
-        // Map içeriği: { tr: "Ölçü", en: "Size" } — TR ana / EN alt italic.
-        expect(DOC_HELPERS_SOURCE).toMatch(/size:\s*\{\s*tr:\s*"Ölçü"/);
-        // 099 takip: Size/Kg koşullu → colSpan sabit değil, baseCols (8 + koşullu Size/Kg).
+    it("Ölçü + Ağırlık kolonları KALDIRILDI — standalone size/kg hücresi yok, colSpan sabit 8", () => {
+        // Ölçü (DN ürün adında) + Ağırlık (birim karşılıyor) kaldırıldı → standalone
+        // {row.size||"—"} / {row.kg||"—"} hücreleri yok. size_text/weight_kg veri hattı korunur.
+        expect(DOC_SOURCE).not.toMatch(/\{row\.size \|\| "—"\}/);
+        expect(DOC_SOURCE).not.toMatch(/\{row\.kg \|\| "—"\}/);
         expect(DOC_SOURCE).toMatch(/colSpan=\{baseCols\}/);
-        expect(DOC_SOURCE).toMatch(/const baseCols = 8 \+ \(showSize \? 1 : 0\) \+ \(showKg \? 1 : 0\)/);
+        expect(DOC_SOURCE).toMatch(/const baseCols = 8;/);
     });
 });

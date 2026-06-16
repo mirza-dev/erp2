@@ -142,13 +142,11 @@ const enSectionSuffixStyle: React.CSSProperties = {
 export default function QuoteDocument({ data }: Props) {
     const sym = SYM[data.currency] ?? "₺";
 
-    // Koşullu kolonlar: Ölçü (Size) ve Ağırlık (Kg) yalnız en az bir satırda veri
-    // varsa render edilir (kg/metre ile satılan ürünlerde boş kalan kalabalık
-    // kolonlar gizlenir). Sabit 8 kolon (#/Kod/Lead/Açıklama/Miktar/Birim Fiyat/
-    // Toplam/GTİP) + koşullu Size/Kg → colSpan dinamik.
-    const showSize = data.rows.some(r => (r.size ?? "").trim() !== "");
-    const showKg = data.rows.some(r => (r.kg ?? "").trim() !== "");
-    const baseCols = 8 + (showSize ? 1 : 0) + (showKg ? 1 : 0);
+    // Ölçü (size_text) ve Ağırlık (Kg) kolonları KALDIRILDI. Ölçü: DN/sınıf zaten
+    // ürün adında/açıklamasında. Ağırlık: birim zaten karşılıyor (kg seçilince miktar
+    // kütle; adet seçilince ağırlık gereksiz). Sabit 8 kolon:
+    // #/Kod/Lead/Açıklama/Miktar/Birim Fiyat/Toplam/GTİP.
+    const baseCols = 8;
 
     // ── Section styles ────────────────────────────────────────────────────────
 
@@ -538,13 +536,7 @@ export default function QuoteDocument({ data }: Props) {
                                     {L.leadTime.tr}
                                     <span style={enSubLabelStyle}>{L.leadTime.en}</span>
                                 </th>
-                                {/* Faz 4a Review: PMT brand "Ölçü / Size" kolonu — koşullu (099 takip) */}
-                                {showSize && (
-                                <th className="doc-brand-bg" style={{ ...thStyle, width: "60px" }}>
-                                    {L.size.tr}
-                                    <span style={enSubLabelStyle}>{L.size.en}</span>
-                                </th>
-                                )}
+                                {/* Ölçü kolonu KALDIRILDI — DN/sınıf zaten ürün adında/açıklamada. */}
                                 <th className="doc-brand-bg" style={thStyle}>
                                     {L.description.tr}
                                     <span style={enSubLabelStyle}>{L.description.en}</span>
@@ -565,13 +557,7 @@ export default function QuoteDocument({ data }: Props) {
                                     {L.hsCode.tr}
                                     <span style={enSubLabelStyle}>{L.hsCode.en}</span>
                                 </th>
-                                {/* Ağırlık (Kg) kolonu — koşullu (099 takip) */}
-                                {showKg && (
-                                <th className="doc-brand-bg" style={{ ...thStyle, width: "62px" }}>
-                                    {L.weight.tr}
-                                    <span style={enSubLabelStyle}>{L.weight.en}</span>
-                                </th>
-                                )}
+                                {/* Ağırlık (Kg) kolonu KALDIRILDI — birim zaten karşılıyor. */}
                             </tr>
                         </thead>
                         <tbody>
@@ -592,15 +578,12 @@ export default function QuoteDocument({ data }: Props) {
                                         <td style={{ ...tdStyle, background: rowBg, textAlign: "center" as const, color: C.muted, fontFamily: FONT.mono, fontSize: "9px" }}>{idx + 1}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.code || "—"}</td>
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.lead || "—"}</td>
-                                        {/* Faz 4a Review: Size kolonu (PMT brand "Ölçü") — koşullu */}
-                                        {showSize && <td style={{ ...tdStyle, background: rowBg }}>{row.size || "—"}</td>}
                                         <td style={{ ...tdStyle, background: rowBg }}>{row.desc || "—"}</td>
                                         {/* 099: miktar + satır birimi birleşik ("70 adet"); birim boşsa yalnız sayı. */}
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "center" as const, whiteSpace: "nowrap" as const }}>{row.qty ? `${row.qty}${row.unit ? ` ${row.unit}` : ""}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{isRealRow ? `${sym} ${fmt(price)}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const, fontWeight: 600 }}>{isRealRow ? `${sym} ${fmt(lineTotal)}` : "—"}</td>
                                         <td style={{ ...tdMonoStyle, background: rowBg, fontSize: "9.5px" }}>{row.hs || "—"}</td>
-                                        {showKg && <td style={{ ...tdMonoStyle, background: rowBg, textAlign: "right" as const }}>{row.kg || "—"}</td>}
                                     </tr>
                                     {lineNote && (
                                         // doc-no-break: HTML doğrudan-print fallback'inde not
@@ -656,15 +639,7 @@ export default function QuoteDocument({ data }: Props) {
                                 </td>
                                 <td style={totalValueTdStyle}>{sym} {fmt(data.vatTotal)}</td>
                             </tr>
-                            {data.totalKg > 0 && (
-                                <tr>
-                                    <td style={{ ...totalLabelTdStyle, color: C.subtle, fontWeight: 400 }}>
-                                        {L.totalWeight.tr}
-                                        <span style={totalLabelEnStyle}>{L.totalWeight.en}</span>
-                                    </td>
-                                    <td style={{ ...totalValueTdStyle, color: C.muted }}>{fmt(data.totalKg)} kg</td>
-                                </tr>
-                            )}
+                            {/* Toplam Ağırlık satırı KALDIRILDI — ağırlık tekliften çıkarıldı. */}
                             <tr>
                                 <td style={{ ...totalLabelTdStyle, background: C.brand, color: C.white, fontFamily: FONT.heading, fontWeight: 700, fontSize: "11px", letterSpacing: "0.04em" }} className="doc-brand-bg">
                                     {L.grandTotal.tr}

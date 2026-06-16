@@ -122,10 +122,10 @@ describe("QuoteForm Faz 1b — V4-B3 hs/size auto-fill + KG recompute", () => {
         );
     });
 
-    it("handleKgChange manuel düzenlemede override flag açar", () => {
-        expect(SOURCE).toMatch(
-            /function handleKgChange[\s\S]{0,200}kgManualOverride:\s*true/,
-        );
+    it("handleKgChange KALDIRILDI (Ağırlık kolonu kaldırıldı; elle kg girişi yok)", () => {
+        // Ağırlık (Kg) kolonu kaldırıldı → manuel kg girişi/handler'ı yok. weight_kg
+        // hâlâ qty × unitWeightKg ile otomatik hesaplanır (data hattı dormant).
+        expect(SOURCE).not.toMatch(/function handleKgChange/);
     });
 
     it("P1: handleSelectProduct kg'yi her durumda set eder (ağırlıksız üründe temizler, eski KG taşınmaz)", () => {
@@ -144,9 +144,9 @@ describe("QuoteForm Faz 1b — V4-B3 hs/size auto-fill + KG recompute", () => {
         expect(SOURCE).toMatch(/kg_manual_override:\s*r\.kgManualOverride/);
     });
 
-    it("qty/kg input'ları yeni handler'lara bağlı", () => {
+    it("qty input handleQtyChange'e bağlı (kg input kaldırıldı)", () => {
         expect(SOURCE).toMatch(/handleQtyChange\(row\.id, e\.target\.value\)/);
-        expect(SOURCE).toMatch(/handleKgChange\(row\.id, e\.target\.value\)/);
+        expect(SOURCE).not.toMatch(/handleKgChange\(row\.id, e\.target\.value\)/);
     });
 
     it("initialData satır hydrate'i unitWeightKg + kgManualOverride taşır", () => {

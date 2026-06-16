@@ -266,25 +266,17 @@ describe("Footer band — fabrika/merkez/tel/web horizontal (PMT brand)", () => 
 
 // ── 5. Faz 4a Review regression ──────────────────────────────────────────────
 
-describe("Faz 4a Review regression — Size kolonu + colSpan + Size data", () => {
-    it("empty rows → colSpan=8 (099 takip: veri yok → koşullu Size/Kg gizli, 8 sabit kolon)", () => {
+describe("Ölçü kolonu KALDIRILDI (DN ürün adında) — colSpan + size gizli", () => {
+    it("empty rows → colSpan=8 (8 sabit kolon; Size kolonu yok, Kg de boşken yok)", () => {
         const html = render(makeData({ rows: [] }));
         expect(html).toMatch(/colspan="8"/i);
     });
 
-    it("Size kolonu lines table'da render (TR 'Ölçü' + EN 'Size' header)", () => {
+    it("Ölçü/Size başlığı RENDER EDİLMEZ (kolon kaldırıldı)", () => {
         const html = render(makeData({ rows: [makeRow({ size: "DN50" })] }));
-        // Header bilingual
-        expect(html).toContain("Ölçü");
-        expect(html).toContain("Size");
-        // Cell value
-        expect(html).toContain("DN50");
-    });
-
-    it("row.size cell '—' fallback when empty (10. sütun korunur)", () => {
-        const html = render(makeData({ rows: [makeRow({ size: "" })] }));
-        // Diğer alanlar dolu — Size hücresinde — placeholder olmalı
-        expect(html).toContain("—");
+        expect(html).not.toContain("Ölçü");
+        // Açıklama hâlâ render (DN ürün adında/açıklamada taşınır)
+        expect(html).toContain("Description");
     });
 });
 
