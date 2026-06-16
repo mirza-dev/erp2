@@ -7,7 +7,18 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-16 (**Teklif satırı bazlı ölçü birimi — mig.099, APPLY BEKLİYOR ⚠️**)
+## Son Tamamlanan İş — 2026-06-16 (**Teklif Ölçü/Ağırlık kolonları koşullu — 099 takip**)
+
+**İstek:** Satır birimi (099) sonrası kullanıcı düzeni sorguladı: Ölçü (Size) birime bağlı (kg/metre üründe anlamsız, "her ürünün ölçüsü olmayabilir"), Ağırlık (Kg) çoğu teklifte gereksiz → ikisi de her zaman görünen kolon olarak kalabalık. **Kararlar (AskUserQuestion, 2/2 önerilen):** ikisi de **koşullu göster** — kolon yalnız en az bir satırda veri varsa görünür (form + belge).
+
+- **Doğrulanan:** quote ağırlığı yalnız bilgilendirme (sevkiyat ağırlığı `shipments.net/gross_weight_kg` AYRI, etkilenmez); belge toplam-ağırlık satırı zaten koşulluydu (`totalKg>0`), asıl kalabalık her-zaman-render edilen Size/Kg **kolonları**.
+- **Tek kural, üç yüzey (mig/veri YOK, saf sunum):** `showSize`/`showKg = rows.some(...)`. **QuoteDocument** (HTML): th+hücre koşullu, not/boş-satır `colSpan` dinamik (`baseCols = 8 + size + kg`). **QuotePdfDocument:** aynı, `ItemRow`'a prop; gizlenince Description (`grow`) genişler. **QuoteForm:** `showSizeCol/showKgCol = optionalColsForced || rows.some(...)` — ürün seçilince master'dan ölçü/ağırlık dolarsa kolonlar **otomatik belirir**; boş quote'a elle giriş için toolbar'a **"Ölçü & Ağırlık" toggle** (`Columns3`, `aria-pressed`); not satırı `colSpan={formBaseCols}` (9 + koşullu).
+- **Davranış:** kg/metre malı teklif → kolonlar hiç çıkmaz; valf teklifi → ölçülü/ağırlıklı ürün seçilince otomatik gelir (PDF'te "DN50"+ağırlık); boş quote → toggle ile aç.
+- +1 test dosyası `quote-optional-columns.test.ts` (+14: HTML koşullu th/colSpan, PDF render smoke + source-lock, form source-lock) + 3 mevcut source-lock güncellendi (faz4c empty colSpan 10→8, faz4a colSpan→baseCols, note row colSpan→formBaseCols). tsc 0 · lint 0 · **5415 test / 400 dosya** · build 0. **PUSH EDİLDİ** `80f0961`. Migration gerekmez.
+
+---
+
+## Önceki İş — 2026-06-16 (**Teklif satırı bazlı ölçü birimi — mig.099, APPLY ✅**)
 
 **İstek:** "teklif formunda birim kısmı üzerinde detaylı çalışmamız lazım her ürünün birimi vs aynı olmuyor onu nasıl yaparız" — Miktar kolonu her satıra sabit "Adet" yazıyordu; PMT çok-tipli katalogda her ürünün birimi farklı (adet/metre/kg/m²…). **Kararlar (AskUserQuestion, 3/3 önerilen):** (1) belge gösterimi = Miktar hücresine **birleşik** ("70 adet"), yeni kolon DEĞİL; (2) form girişi = ürün seçilince **otomatik dolar** + serbest düzenlenebilir (datalist); (3) siparişe taşıma = **teklif birimi öncelikli** COALESCE.
 
@@ -16,7 +27,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Zincir:** database.types(`unit:string|null`)/quotes.ts(CreateQuoteLineInput)/mock-data(QuoteLineItem)/api-mappers(null→"")/quote-types(döküman QuoteRow)/quote-archive-html. **Form:** QuoteRow+emptyRow+autofill+hydration+payload(`unit: r.unit.trim()||undefined`); Miktar hücresi miktar üstte + serbest birim input altta (`<datalist id="quote-units">` 12 öneri); Qty th "Miktar / Birim" + width 70→92. **Belge:** QuoteDocument(HTML) + QuotePdfDocument miktar+birim birleşik ("12 metre"; boşsa yalnız sayı); PDF qty kolonu 52→74; başlık zaten BILINGUAL "Miktar / Qty" (sabit "Adet" yalnız formdaydı→kalktı).
 - **Gate:** `sql-lint-baseline` 4 zincire 099 (create/update/send/accept) + `check-migrations` PROBES'a 099 (`quote_line_items.unit` column probe).
 - +1 test dosyası `quote-line-unit.test.ts` (+21: mig source-lock/mapper/RPC payload/HTML birleşik+başlık/arşiv/PDF render/form 7 source-lock/gate). tsc 0 · lint 0 · **5401 test / 399 dosya** · build 0. **PUSH EDİLDİ** `9f8fd17` (iki branch aynı SHA, diff boş). UI inline-style+CSS-var konvansiyonu (datalist + tema-uyumlu).
-- **Kalan (KULLANICI):** **mig.099 APPLY** (Studio → `npx tsx scripts/check-migrations.ts` doğrular) + smoke: ürün seç→birim otomatik dolar; elle "kg"→kaydet→yenile (korunur); Önizle/PDF "12 metre"; **Kabul et**→siparişte birimler teklifle aynı (COALESCE); koyu/aydınlık tema; demo bloklu.
+- **mig.099 APPLY ✅** (kullanıcı uyguladı). **Kalan (KULLANICI):** smoke: ürün seç→birim otomatik dolar; elle "kg"→kaydet→yenile (korunur); Önizle/PDF "12 metre"; **Kabul et**→siparişte birimler teklifle aynı (COALESCE); koyu/aydınlık tema; demo bloklu.
 
 ---
 
