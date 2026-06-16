@@ -4,7 +4,7 @@ import { dbCreateQuote, dbListQuotes } from "@/lib/supabase/quotes";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import { mapQuoteDetail, mapQuoteSummary } from "@/lib/api-mappers";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { validateQuoteLineQuantities, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
+import { validateQuoteLineQuantities, validateQuoteLineNotes, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
 import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
 import { redactQuotesForPerms } from "@/lib/auth/redact";
 
@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
         // Faz 2 (V7-A11): gerçek satırlarda adet pozitif tam sayı olmalı.
         const qtyErr = validateQuoteLineQuantities((body.lines ?? []) as QuoteLineForValidation[]);
         if (qtyErr) return NextResponse.json({ error: qtyErr }, { status: 422 });
+
+        // 098: satır notu uzunluk sınırı (belge sayfa-kırpılmasını önler)
+        const noteErr = validateQuoteLineNotes((body.lines ?? []) as QuoteLineForValidation[]);
+        if (noteErr) return NextResponse.json({ error: noteErr }, { status: 422 });
 
         // Faz 3 (V7): header iskonto sınırı (negatif / subtotal-üstü → 422).
         const discountAmount = Number(body.discount_amount ?? 0);

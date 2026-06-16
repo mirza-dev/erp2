@@ -18,6 +18,28 @@ export interface QuoteLineForValidation {
     quantity?: number;
     unit_price?: number;
     hs_code?: string | null;
+    note?: string | null;
+}
+
+/**
+ * 098 — satır bazlı not uzunluk sınırı. Not "kısa açıklama" içindir; bu sınır
+ * belgede (HTML print + PDF) tek sayfayı aşıp sayfa-kırpılmasına yol açacak
+ * pathololojik uzunlukları önler. Form textarea maxLength + sunucu doğrulaması
+ * bu TEK sabiti paylaşır.
+ */
+export const MAX_QUOTE_LINE_NOTE = 800;
+
+/**
+ * Her satır notu MAX_QUOTE_LINE_NOTE karakteri aşmamalı. Hata mesajı | null döner.
+ */
+export function validateQuoteLineNotes(lines: QuoteLineForValidation[]): string | null {
+    for (let i = 0; i < lines.length; i++) {
+        const note = lines[i].note;
+        if (typeof note === "string" && note.length > MAX_QUOTE_LINE_NOTE) {
+            return `Satır ${i + 1}: not ${MAX_QUOTE_LINE_NOTE} karakteri aşamaz (girilen: ${note.length}).`;
+        }
+    }
+    return null;
 }
 
 /**

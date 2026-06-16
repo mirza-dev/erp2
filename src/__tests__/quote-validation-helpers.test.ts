@@ -8,10 +8,29 @@
 import { describe, it, expect } from "vitest";
 import {
     validateQuoteLineQuantities,
+    validateQuoteLineNotes,
     validateQuoteForSend,
     findMissingHsLines,
+    MAX_QUOTE_LINE_NOTE,
     type QuoteLineForValidation,
 } from "@/lib/quote-validation";
+
+describe("validateQuoteLineNotes (098 — satır notu uzunluk sınırı)", () => {
+    it(`${MAX_QUOTE_LINE_NOTE} karakteri aşan not → hata (satır no'lu)`, () => {
+        const err = validateQuoteLineNotes([{ note: "a".repeat(MAX_QUOTE_LINE_NOTE + 1) }]);
+        expect(err).toMatch(/Satır 1.*aşamaz/i);
+    });
+    it("sınırda (tam MAX) not → geçer", () => {
+        expect(validateQuoteLineNotes([{ note: "a".repeat(MAX_QUOTE_LINE_NOTE) }])).toBeNull();
+    });
+    it("null/boş/yok not → geçer", () => {
+        expect(validateQuoteLineNotes([{ note: null }, { note: "" }, {}])).toBeNull();
+    });
+    it("sınır makul (300–2000 arası kısa-açıklama bandında)", () => {
+        expect(MAX_QUOTE_LINE_NOTE).toBeGreaterThanOrEqual(300);
+        expect(MAX_QUOTE_LINE_NOTE).toBeLessThanOrEqual(2000);
+    });
+});
 
 describe("validateQuoteLineQuantities (V7-A11)", () => {
     it("gerçek satır (product_id) küsüratlı qty → hata", () => {

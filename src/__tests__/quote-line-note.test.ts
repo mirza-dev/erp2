@@ -282,4 +282,21 @@ describe("QuoteForm — satır notu entegrasyonu", () => {
     it("readOnly modda not satırı gizli (noteOpen && !readOnly guard)", () => {
         expect(FORM_SOURCE).toMatch(/!readOnly\s*&&\s*noteOpen/);
     });
+
+    it("not textarea MAX_QUOTE_LINE_NOTE ile maxLength + karakter sayacı", () => {
+        expect(FORM_SOURCE).toMatch(/import\s*\{[^}]*MAX_QUOTE_LINE_NOTE[^}]*\}\s*from\s*["']@\/lib\/quote-validation["']/);
+        expect(FORM_SOURCE).toMatch(/maxLength=\{MAX_QUOTE_LINE_NOTE\}/);
+        expect(FORM_SOURCE).toMatch(/\{row\.note\.length\}\/\{MAX_QUOTE_LINE_NOTE\}/);
+    });
+});
+
+describe("quotes route'ları — satır notu uzunluk 422 kilidi (source-lock)", () => {
+    const POST_SRC = readFileSync(join(process.cwd(), "src/app/api/quotes/route.ts"), "utf8");
+    const PATCH_SRC = readFileSync(join(process.cwd(), "src/app/api/quotes/[id]/route.ts"), "utf8");
+    it("POST + PATCH validateQuoteLineNotes çağırır → 422", () => {
+        for (const src of [POST_SRC, PATCH_SRC]) {
+            expect(src).toMatch(/validateQuoteLineNotes\(\(body\.lines\s*\?\?\s*\[\]\)/);
+            expect(src).toMatch(/noteErr[\s\S]{0,60}status:\s*422/);
+        }
+    });
 });

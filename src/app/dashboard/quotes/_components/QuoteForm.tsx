@@ -11,7 +11,7 @@ import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import type { QuoteStatus } from "@/lib/database.types";
 import { buildQuoteLineDescription } from "@/lib/quote-description-builder";
-import { findMissingHsLines, validateQuoteForSend, validateQuoteLineQuantities } from "@/lib/quote-validation";
+import { findMissingHsLines, validateQuoteForSend, validateQuoteLineQuantities, MAX_QUOTE_LINE_NOTE } from "@/lib/quote-validation";
 import { roundMoney } from "@/lib/money-utils";
 import { applySendResultToast, sendQuoteEmail } from "../_utils/send-result";
 import { applyTemplateToField, templatesForField } from "@/lib/quote-note-templates";
@@ -1415,12 +1415,14 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                             {!readOnly && noteOpen && (
                                                 <tr className="q-no-print">
                                                     <td colSpan={11} style={{ ...tdBase, padding: "4px 8px 10px 8px", background: "var(--bg-tertiary)" }}>
-                                                        <label style={{ display: "block", fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px", letterSpacing: "0.04em" }}>
-                                                            Satır {idx + 1} notu · belgede ürünün altında görünür
+                                                        <label style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: "var(--text-tertiary)", marginBottom: "3px", letterSpacing: "0.04em" }}>
+                                                            <span>Satır {idx + 1} notu · belgede ürünün altında görünür</span>
+                                                            <span style={{ color: row.note.length > MAX_QUOTE_LINE_NOTE ? "var(--danger-text)" : "var(--text-tertiary)" }}>{row.note.length}/{MAX_QUOTE_LINE_NOTE}</span>
                                                         </label>
                                                         <textarea
                                                             aria-label={`Satır ${idx + 1} notu`}
                                                             value={row.note}
+                                                            maxLength={MAX_QUOTE_LINE_NOTE}
                                                             onChange={e => updateRow(row.id, "note", e.target.value)}
                                                             placeholder="Bu ürüne özel not (teslimat, uygulama, uyarı vb.)"
                                                             style={{
