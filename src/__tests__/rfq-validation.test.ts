@@ -58,14 +58,19 @@ describe("rfq-validation — tedarikçi fiyatları", () => {
 });
 
 describe("rfq-validation — karar (award)", () => {
-    it("geçerli award null döner", () => {
-        expect(validateRfqAwards([{ rfq_line_id: UUID_A, vendor_id: UUID_B, quantity: 2, unit_price: 10 }])).toBeNull();
+    it("geçerli award (yalnız id'ler) null döner", () => {
+        expect(validateRfqAwards([{ rfq_line_id: UUID_A, vendor_id: UUID_B }])).toBeNull();
     });
     it("boş liste reddedilir", () => {
         expect(validateRfqAwards([])).toMatch(/en az 1 kazanan/i);
     });
-    it("miktar pozitif tam sayı, fiyat negatif olamaz", () => {
-        expect(validateRfqAwards([{ rfq_line_id: UUID_A, vendor_id: UUID_B, quantity: 0, unit_price: 10 }])).toMatch(/pozitif tam sayı/i);
-        expect(validateRfqAwards([{ rfq_line_id: UUID_A, vendor_id: UUID_B, quantity: 1, unit_price: -5 }])).toMatch(/negatif/i);
+    it("rfq_line_id / vendor_id UUID olmalı", () => {
+        expect(validateRfqAwards([{ rfq_line_id: "yok", vendor_id: UUID_B }])).toMatch(/rfq_line_id/i);
+        expect(validateRfqAwards([{ rfq_line_id: UUID_A, vendor_id: "yok" }])).toMatch(/vendor_id/i);
+    });
+    it("quantity/unit_price DOĞRULANMAZ (mig.103 sunucu-otoriter) — gönderilse de yok sayılır", () => {
+        // Eski sözleşmede reddedilen değerler artık award'ı bloklamaz (sunucu türetir).
+        expect(validateRfqAwards([{ rfq_line_id: UUID_A, vendor_id: UUID_B, quantity: 0, unit_price: -5 }])).toBeNull();
+        expect(validateRfqAwards([{ rfq_line_id: UUID_A, vendor_id: UUID_B }])).toBeNull();
     });
 });

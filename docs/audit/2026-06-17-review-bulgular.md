@@ -12,9 +12,11 @@ _Tarih: 2026-06-17 · Ajan: `erp2-reviewer` · Mod: tam denetim (`src/` + `supab
 | Yüksek (Y) | 0 | — |
 | Orta (O) | 2 | ✅ O1+O2 düzeltildi (2026-06-17) |
 | Düşük (D) | 1 | ✅ D1 düzeltildi (2026-06-17) |
-| Nit | 2 | açık (bilinçli/kozmetik) |
+| Nit | 2 | ✅ N1+N2 temizlendi (2026-06-17) |
 
-> **Düzeltme turu (2026-06-17):** O1 (`rfq-service.ts` escapeHtml), O2 (`supplier-rfqs.ts` `buildRfqSearchOrFilter` çift-tırnak escape), D1 (`rfq-archives.ts` upload-önce + `upsert onConflict`) uygulandı. +7 regresyon testi (`src/__tests__/rfq-review-fixes.test.ts`). tsc 0 · lint 0 · 5477 test. **Migration GEREKMEZ** (yalnız uygulama kodu). N1/N2 bilinçli bırakıldı.
+> **Düzeltme turu (2026-06-17):** O1 (`rfq-service.ts` escapeHtml), O2 (`supplier-rfqs.ts` `buildRfqSearchOrFilter` çift-tırnak escape), D1 (`rfq-archives.ts` upload-önce + `upsert onConflict`) uygulandı. +7 regresyon testi (`src/__tests__/rfq-review-fixes.test.ts`). **Migration GEREKMEZ** (yalnız uygulama kodu).
+>
+> **Nit temizlik turu (2026-06-17):** N1 — `orders/[id]/page.tsx` teklif-vade karşılaştırması `localISODate(Date.now())`'e çevrildi (tek UTC-slice kalıbı). N2 — `validateRfqAwards` ölü `quantity`/`unit_price` zorunluluğu kaldırıldı (yalnız `{rfq_line_id, vendor_id}` UUID); `RfqAward` tipi daraltıldı; UI `handleAward` gereksiz fiyat/qty payload'ını göndermeyi bıraktı (fiyatsız-kalem UX guard'ı korundu). `rfq-validation.test.ts` award blokları yeni sözleşmeye güncellendi. tsc 0 · lint 0 · **5478 test**.
 
 **Bloklayan bulgu yok.** Etkin yüzey yine **RFQ modülü** (mig.100–103, `src/lib/rfq-*`, `rfq-service.ts`, `supplier-rfqs.ts`, `rfq-archives.ts`, `src/app/api/rfqs/**`).
 

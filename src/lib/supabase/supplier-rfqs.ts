@@ -251,12 +251,14 @@ export async function dbUpsertVendorQuote(
     if (error) throw new Error(error.message);
 }
 
+/**
+ * Award payload'ı yalnız hangi kalemin hangi tedarikçiye verildiğini taşır. quantity/
+ * unit_price BİLİNÇLİ YOK — mig.103 `award_rfq_create_pos` bunları supplier_rfq_lines /
+ * supplier_rfq_prices'tan sunucu-otoriter türetir (istemci fiyat/qty enjekte edemez).
+ */
 export interface RfqAward {
     rfq_line_id: string;
     vendor_id: string;
-    quantity: number;
-    unit_price: number;
-    discount_pct?: number;
 }
 export interface AwardedPO {
     vendor_id: string;

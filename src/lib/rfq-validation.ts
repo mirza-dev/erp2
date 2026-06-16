@@ -64,7 +64,11 @@ export function validateVendorPrices(raw: unknown): string | null {
     return null;
 }
 
-/** Karar (award) girdisi: ≥1; her award {rfq_line_id, vendor_id} UUID + quantity>0 + unit_price≥0. */
+/**
+ * Karar (award) girdisi: ≥1; her award yalnız {rfq_line_id, vendor_id} UUID. quantity/
+ * unit_price DOĞRULANMAZ — mig.103 bu değerleri istemciden YOK SAYIP supplier_rfq_lines /
+ * supplier_rfq_prices'tan sunucu-otoriter türetir (fiyatlanmamış kalem → RPC RAISE).
+ */
 export function validateRfqAwards(raw: unknown): string | null {
     if (!Array.isArray(raw)) return "Karar listesi geçerli değil.";
     if (raw.length === 0) return "En az 1 kazanan kalem seçilmelidir.";
@@ -75,12 +79,6 @@ export function validateRfqAwards(raw: unknown): string | null {
             if (typeof aw[k] !== "string" || !UUID_RE.test((aw[k] as string).trim()))
                 return `Karar ${i + 1}: ${k} geçerli UUID olmalıdır.`;
         }
-        const qty = Number(aw.quantity);
-        if (!Number.isFinite(qty) || !Number.isInteger(qty) || qty <= 0)
-            return `Karar ${i + 1}: miktar pozitif tam sayı olmalıdır.`;
-        const price = Number(aw.unit_price);
-        if (!Number.isFinite(price) || price < 0)
-            return `Karar ${i + 1}: birim fiyat negatif olamaz.`;
     }
     return null;
 }

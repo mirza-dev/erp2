@@ -8,6 +8,7 @@ import { formatCurrency, maskCurrency, formatDate } from "@/lib/utils";
 import { useOrderMutations, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapOrderDetail } from "@/lib/api-mappers";
+import { localISODate } from "@/lib/stock-utils";
 import type { OrderDetail } from "@/lib/mock-data";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -514,7 +515,7 @@ export default function OrderDetailPage() {
 
                 {/* Teklif süresi doldu uyarısı */}
                 {order.quoteValidUntil &&
-                 order.quoteValidUntil < new Date().toISOString().slice(0, 10) &&
+                 order.quoteValidUntil < localISODate(Date.now()) &&
                  (commercialStatus === "draft" || commercialStatus === "pending_approval") && (
                     <div style={{
                         background: "var(--danger-bg)",

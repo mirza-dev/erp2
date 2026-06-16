@@ -127,8 +127,8 @@ export default function RfqDetailPage({ params }: { params: Promise<{ id: string
             if (!vendorId) return [];
             const v = rfq.vendors.find(x => x.vendor_id === vendorId);
             const cell = v?.prices.find(p => p.rfq_line_id === line.id);
-            if (!v || !cell || cell.unit_price == null) return [];
-            return [{ rfq_line_id: line.id, vendor_id: vendorId, quantity: line.quantity, unit_price: cell.unit_price }];
+            if (!v || !cell || cell.unit_price == null) return []; // fiyatsız kalemi atla (UX); fiyat/qty sunucudan
+            return [{ rfq_line_id: line.id, vendor_id: vendorId }];
         });
         if (awards.length === 0) { toast({ type: "error", message: "Kazanan kalem seçilmedi (fiyatlı tedarikçi gerekli)." }); return; }
         if (!confirm(`${awards.length} kalem için satın alma siparişi oluşturulacak. Onaylıyor musunuz?`)) return;
