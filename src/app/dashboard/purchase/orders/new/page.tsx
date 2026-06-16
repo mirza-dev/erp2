@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import type { VendorRow, ProductRow, PurchaseOrderRow, PurchaseOrderLineRow } from "@/lib/database.types";
+import type { VendorRow, ProductRow, PurchaseOrderRow, PurchaseOrderLineRow, ProductVendorLinkRow } from "@/lib/database.types";
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px", padding: "6px 10px",
@@ -50,9 +50,14 @@ export function computeExpectedDate(leadTimeDays: number | null | undefined, bas
 }
 
 /** Test edilebilir pure helper: ürün seçilince satın alma birim fiyatını öner.
- * Satın alma = MALİYET fiyatı (cost_price). `price` SATIŞ fiyatıdır, fallback
- * olarak KULLANILMAZ (PO'yu şişirir). cost_price null → boş (kullanıcı elle girer). */
-export function pickPurchaseUnitPrice(product: { cost_price: number | null }): string {
+ * Öncelik: **tedarikçinin RFQ'da verdiği son fiyat** (vendorLastPrice, mig.100) >
+ * MALİYET fiyatı (cost_price) > boş. `price` SATIŞ fiyatıdır, fallback KULLANILMAZ
+ * (PO'yu şişirir). Tedarikçi-bazlı son fiyat global cost_price'tan daha isabetli. */
+export function pickPurchaseUnitPrice(
+    product: { cost_price: number | null },
+    vendorLastPrice?: number | null,
+): string {
+    if (vendorLastPrice != null) return String(vendorLastPrice);
     return product.cost_price != null ? String(product.cost_price) : "";
 }
 
@@ -106,6 +111,7 @@ function NewPurchaseOrderPageInner() {
     const [expectedDateDirty, setExpectedDateDirty] = useState(false);
     const [notes, setNotes] = useState<string>("");
     const [lines, setLines] = useState<LineDraft[]>([{ ...emptyLine }]);
+    const [vendorLinks, setVendorLinks] = useState<Record<string, ProductVendorLinkRow>>({});
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
 
@@ -173,12 +179,28 @@ function NewPurchaseOrderPageInner() {
     const addLine = () => setLines(prev => [...prev, { ...emptyLine }]);
     const removeLine = (idx: number) => setLines(prev => prev.filter((_, i) => i !== idx));
 
-    // Ürün seçilince birim fiyatı maliyet fiyatından (cost_price) otomatik doldur.
+    // Tedarikçi seçilince o tedarikçinin RFQ'da verdiği son fiyatları (product_vendor_links)
+    // çek → ürün seçiminde fiyat önerisi. Öneri yoksa cost_price fallback (davranış korunur).
+    useEffect(() => {
+        if (!vendorId) { setVendorLinks({}); return; }
+        void (async () => {
+            try {
+                const res = await fetch(`/api/product-vendor-links?vendor_id=${vendorId}`);
+                if (!res.ok) return;
+                const links = await res.json() as ProductVendorLinkRow[];
+                const map: Record<string, ProductVendorLinkRow> = {};
+                for (const l of links) map[l.product_id] = l;
+                setVendorLinks(map);
+            } catch { /* öneri yoksa cost_price fallback */ }
+        })();
+    }, [vendorId]);
+
+    // Ürün seçilince birim fiyatı öner: tedarikçi son fiyatı > cost_price > boş.
     const handleProductSelect = (idx: number, productId: string) => {
         const product = products.find(p => p.id === productId);
         updateLine(idx, {
             product_id: productId,
-            unit_price: product ? pickPurchaseUnitPrice(product) : "",
+            unit_price: product ? pickPurchaseUnitPrice(product, vendorLinks[productId]?.last_unit_price) : "",
         });
     };
 
@@ -327,6 +349,15 @@ function NewPurchaseOrderPageInner() {
                             <input type="number" min={0} step="0.01" value={l.unit_price}
                                 onChange={e => updateLine(idx, { unit_price: e.target.value })}
                                 aria-label={`Line ${idx + 1} birim fiyat`} style={inputStyle} />
+                            {(() => {
+                                const link = l.product_id ? vendorLinks[l.product_id] : undefined;
+                                if (!link || link.last_unit_price == null) return null;
+                                return (
+                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "3px", lineHeight: 1.3 }}>
+                                        son alış: {link.last_unit_price.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {link.last_price_currency ?? ""}{link.last_price_at ? ` (${link.last_price_at})` : ""}
+                                    </div>
+                                );
+                            })()}
                         </div>
                         <div>
                             {idx === 0 && <label style={labelStyle}>İskonto %</label>}

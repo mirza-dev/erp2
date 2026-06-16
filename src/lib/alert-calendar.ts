@@ -55,7 +55,7 @@ export const ALERT_CLASSES: AlertClass[] = [
     { id: "all",      label: "Tümü",       types: null,                                              icon: "⊞" },
     { id: "stock",    label: "Stok",       types: ["stock_critical", "stock_risk"],                  icon: "◉" },
     { id: "order",    label: "Sipariş",    types: ["order_shortage", "order_deadline"],              icon: "◈" },
-    { id: "shipment", label: "Vadeler",    types: ["overdue_shipment", "quote_expired", "po_overdue"], icon: "◇" },
+    { id: "shipment", label: "Vadeler",    types: ["overdue_shipment", "quote_expired", "po_overdue", "rfq_response_due"], icon: "◇" },
     { id: "system",   label: "Sistem",     types: ["sync_issue"],                                    icon: "⚙" },
     { id: "ai",       label: "AI Bulgular", types: null, source: "ai",                               icon: "✦" },
 ];

@@ -360,6 +360,15 @@ describe("pickPurchaseUnitPrice — satın alma birim fiyat önerisi (cost_price
         const { pickPurchaseUnitPrice } = await import("@/app/dashboard/purchase/orders/new/page");
         expect(pickPurchaseUnitPrice({ cost_price: 0 })).toBe("0");
     });
+
+    it("tedarikçi son fiyatı (mig.100) cost_price'tan önceliklidir", async () => {
+        const { pickPurchaseUnitPrice } = await import("@/app/dashboard/purchase/orders/new/page");
+        // vendor son fiyatı varsa cost_price ezilir (tedarikçi-bazlı daha isabetli)
+        expect(pickPurchaseUnitPrice({ cost_price: 420 }, 380)).toBe("380");
+        // vendor fiyatı yoksa (null/undefined) → cost_price fallback
+        expect(pickPurchaseUnitPrice({ cost_price: 420 }, null)).toBe("420");
+        expect(pickPurchaseUnitPrice({ cost_price: 420 })).toBe("420");
+    });
 });
 
 describe("computePoTotals — ara toplam / iskonto / KDV %20 / genel toplam", () => {
@@ -420,7 +429,8 @@ describe("New form — ürün seçimi unit_price auto-fill + currency uyarı + K
         expect(newSrc).toContain("onChange={e => handleProductSelect(idx, e.target.value)}");
         // handleProductSelect product_id + unit_price birlikte set eder
         expect(newSrc).toMatch(/handleProductSelect = \(idx: number, productId: string\) => \{/);
-        expect(newSrc).toContain("unit_price: product ? pickPurchaseUnitPrice(product) : \"\"");
+        // mig.100: tedarikçi son fiyatı (vendorLinks) ikinci parametre olarak geçer
+        expect(newSrc).toContain("unit_price: product ? pickPurchaseUnitPrice(product, vendorLinks[productId]?.last_unit_price) : \"\"");
         // eski salt-product_id onChange kalmamalı
         expect(newSrc).not.toContain("onChange={e => updateLine(idx, { product_id: e.target.value })}");
     });

@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import type { VendorRow, ProductRow } from "@/lib/database.types";
+import type { VendorRow, ProductRow, ProductVendorLinkRow } from "@/lib/database.types";
+import { suggestVendorsForProducts } from "@/lib/rfq-suggest";
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px", padding: "6px 10px",
@@ -75,6 +76,28 @@ export default function NewRfqPage() {
         setVendorIds(prev => prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]);
 
     const selectedProductIds = useMemo(() => new Set(lines.map(l => l.product_id).filter(Boolean)), [lines]);
+
+    // Seçili ürünleri tedarik eden tedarikçileri öner (product_vendor_links + son fiyat).
+    const [vendorLinks, setVendorLinks] = useState<ProductVendorLinkRow[]>([]);
+    useEffect(() => {
+        const ids = [...selectedProductIds];
+        if (ids.length === 0) { setVendorLinks([]); return; }
+        let active = true;
+        void (async () => {
+            try {
+                const res = await fetch(`/api/product-vendor-links?product_ids=${ids.join(",")}`);
+                if (active && res.ok) setVendorLinks(await res.json());
+            } catch { /* öneri yoksa tüm aktif tedarikçiler */ }
+        })();
+        return () => { active = false; };
+    }, [selectedProductIds]);
+
+    const suggestions = useMemo(
+        () => suggestVendorsForProducts(vendorLinks, [...selectedProductIds]),
+        [vendorLinks, selectedProductIds],
+    );
+    const selectSuggested = () =>
+        setVendorIds(prev => Array.from(new Set([...prev, ...suggestions.keys()])));
 
     const handleSubmit = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -182,19 +205,36 @@ export default function NewRfqPage() {
 
             {/* Vendors */}
             <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "16px", marginBottom: "16px" }}>
-                <strong style={{ fontSize: "13px", color: "var(--text-primary)", display: "block", marginBottom: "10px" }}>
-                    Tedarikçiler {vendorIds.length > 0 && <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>({vendorIds.length} seçili)</span>}
-                </strong>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                    <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>
+                        Tedarikçiler {vendorIds.length > 0 && <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>({vendorIds.length} seçili)</span>}
+                    </strong>
+                    {suggestions.size > 0 && (
+                        <button onClick={selectSuggested} style={{ padding: "4px 12px", fontSize: "12px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", cursor: "pointer" }}>
+                            Önerilenleri seç ({suggestions.size})
+                        </button>
+                    )}
+                </div>
                 {vendors.length === 0 ? (
                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Aktif tedarikçi yok. Önce Tedarikçiler sayfasından ekleyin.</div>
                 ) : (
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "6px" }}>
                         {vendors.map(v => {
                             const selected = vendorIds.includes(v.id);
+                            const sug = suggestions.get(v.id);
                             return (
-                                <label key={v.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", border: "0.5px solid var(--border-tertiary)", background: selected ? "var(--accent-bg)" : "var(--bg-tertiary)", color: "var(--text-primary)" }}>
-                                    <input type="checkbox" checked={selected} onChange={() => toggleVendor(v.id)} aria-label={v.name} />
-                                    <span>{v.name}{!v.contact_email && <span style={{ color: "var(--warning-text)", fontSize: "10px" }}> (e-posta yok)</span>}</span>
+                                <label key={v.id} style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "7px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", border: sug ? "1px solid var(--accent)" : "0.5px solid var(--border-tertiary)", background: selected ? "var(--accent-bg)" : "var(--bg-tertiary)", color: "var(--text-primary)" }}>
+                                    <input type="checkbox" checked={selected} onChange={() => toggleVendor(v.id)} aria-label={v.name} style={{ marginTop: "2px" }} />
+                                    <span>
+                                        {v.name}
+                                        {sug && <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 600, color: "var(--accent-text)", background: "var(--accent-bg)", padding: "1px 6px", borderRadius: "4px" }}>Önerilen</span>}
+                                        {!v.contact_email && <span style={{ color: "var(--warning-text)", fontSize: "10px" }}> (e-posta yok)</span>}
+                                        {sug?.lastUnitPrice != null && (
+                                            <span style={{ display: "block", fontSize: "10px", color: "var(--text-tertiary)" }}>
+                                                son: {sug.lastUnitPrice.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {sug.lastPriceCurrency ?? ""}
+                                            </span>
+                                        )}
+                                    </span>
                                 </label>
                             );
                         })}

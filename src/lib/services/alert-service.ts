@@ -6,6 +6,7 @@
 import { dbListAllActiveProducts, dbGetOpenShortagesByProduct, dbGetQuotedQuantities } from "@/lib/supabase/products";
 import { dbListOrders, dbListOverdueShipments } from "@/lib/supabase/orders";
 import { dbGetIncomingPOQuantities, dbListOverduePurchaseOrders } from "@/lib/supabase/purchase-orders";
+import { dbListRfqsAwaitingResponse } from "@/lib/supabase/supplier-rfqs";
 import {
     dbListAlerts,
     dbGetAlertById,
@@ -507,6 +508,43 @@ export async function serviceCheckOverduePurchaseOrders(): Promise<{ alerted: nu
             description: `Beklenen teslim tarihi ${po.expected_date} — ${daysLate} gün gecikti. Tedarikçiyle teyitleşin ya da teslim tarihini güncelleyin.`,
             entity_type: "purchase_order",
             entity_id: po.id,
+        });
+        if (alert) alerted++;
+    }
+    return { alerted, resolved };
+}
+
+// ── RFQ Yanıt Gecikmesi Scan (rfq_response_due) ──────────────
+//
+// serviceCheckOverduePurchaseOrders birebir aynası: yanıt son tarihi geçmiş +
+// yanıtlamayan tedarikçisi olan gönderilmiş RFQ'lar için uyarı; artık geçerli
+// olmayanlar çözülür. entity_type='supplier_rfq'.
+export async function serviceCheckRfqResponseDue(): Promise<{ alerted: number; resolved: number }> {
+    const [awaitingRfqs, activeAlerts] = await Promise.all([
+        dbListRfqsAwaitingResponse(),
+        dbListActiveAlerts(),
+    ]);
+
+    const rfqAlerts = activeAlerts.filter(a => a.type === "rfq_response_due");
+    const awaitingIds = new Set(awaitingRfqs.map(r => r.id));
+
+    const toResolve: BatchResolveEntry[] = rfqAlerts
+        .filter(a => a.entity_id !== null && !awaitingIds.has(a.entity_id))
+        .map(a => ({ type: "rfq_response_due", entityId: a.entity_id as string, reason: "rfq_responded_or_closed" }));
+    const resolved = toResolve.length > 0 ? await dbBatchResolveAlerts(toResolve) : 0;
+
+    const activeSet = new Set(rfqAlerts.map(a => a.entity_id));
+    let alerted = 0;
+    for (const rfq of awaitingRfqs) {
+        if (activeSet.has(rfq.id)) continue;
+        const daysLate = Math.max(1, dateDaysFromToday(rfq.due_date as string) * -1);
+        const alert = await dbCreateAlert({
+            type: "rfq_response_due",
+            severity: "warning",
+            title: `Yanıt Bekleyen Talep: ${rfq.rfq_number}`,
+            description: `Yanıt son tarihi ${rfq.due_date} — ${daysLate} gün geçti, hâlâ yanıtlamayan tedarikçi var. Tedarikçileri hatırlatın ya da son tarihi güncelleyin.`,
+            entity_type: "supplier_rfq",
+            entity_id: rfq.id,
         });
         if (alert) alerted++;
     }

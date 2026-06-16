@@ -1,6 +1,22 @@
 import { createServiceClient } from "./service";
 import type { ProductVendorLinkRow } from "@/lib/database.types";
 
+/** Vendor-bazlı (PO formu fiyat önerisi) veya ürün-bazlı (RFQ tedarikçi önerisi) link
+ * listesi. En az biri verilmeli; ikisi de verilirse AND. last_unit_price/currency/at
+ * RFQ'nin yazdığı son bilinen fiyatı taşır (mig.100). */
+export async function dbListVendorLinks(
+    filter: { vendorId?: string; productIds?: string[] },
+): Promise<ProductVendorLinkRow[]> {
+    if (!filter.vendorId && (!filter.productIds || filter.productIds.length === 0)) return [];
+    const supabase = createServiceClient();
+    let query = supabase.from("product_vendor_links").select("*");
+    if (filter.vendorId) query = query.eq("vendor_id", filter.vendorId);
+    if (filter.productIds && filter.productIds.length > 0) query = query.in("product_id", filter.productIds);
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+    return (data ?? []) as ProductVendorLinkRow[];
+}
+
 export interface UpsertProductVendorLinkInput {
     product_id: string;
     vendor_id: string;

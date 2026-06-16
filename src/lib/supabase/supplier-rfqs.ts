@@ -270,6 +270,74 @@ export async function dbCancelRfq(id: string, reason: string, actor: string): Pr
     if (error) throw new Error(error.message);
 }
 
+export interface PriceHistoryEntry extends SupplierPriceHistoryRow {
+    vendor_name: string;
+    rfq_number: string | null;
+}
+
+/** Bir ürünün tedarikçi fiyat geçmişi ("kimde ne kadar") — ürün detayı paneli. */
+export async function dbListProductPriceHistory(productId: string, limit = 50): Promise<PriceHistoryEntry[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("supplier_price_history")
+        .select("*, vendor:vendors(name), rfq:supplier_rfqs(rfq_number)")
+        .eq("product_id", productId)
+        .order("recorded_at", { ascending: false })
+        .limit(limit);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((h) => {
+        const vendorObj = (h as unknown as { vendor: { name: string } | null }).vendor;
+        const rfqObj = (h as unknown as { rfq: { rfq_number: string } | null }).rfq;
+        const { vendor: _v, rfq: _r, ...rest } = h as unknown as SupplierPriceHistoryRow & { vendor: unknown; rfq: unknown };
+        void _v; void _r;
+        return { ...(rest as SupplierPriceHistoryRow), vendor_name: vendorObj?.name ?? "—", rfq_number: rfqObj?.rfq_number ?? null };
+    });
+}
+
+/** Bir tedarikçinin verdiği son fiyatlar — tedarikçi detayı paneli. */
+export async function dbListVendorPriceHistory(vendorId: string, limit = 50): Promise<PriceHistoryEntry[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("supplier_price_history")
+        .select("*, vendor:vendors(name), rfq:supplier_rfqs(rfq_number)")
+        .eq("vendor_id", vendorId)
+        .order("recorded_at", { ascending: false })
+        .limit(limit);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((h) => {
+        const vendorObj = (h as unknown as { vendor: { name: string } | null }).vendor;
+        const rfqObj = (h as unknown as { rfq: { rfq_number: string } | null }).rfq;
+        const { vendor: _v, rfq: _r, ...rest } = h as unknown as SupplierPriceHistoryRow & { vendor: unknown; rfq: unknown };
+        void _v; void _r;
+        return { ...(rest as SupplierPriceHistoryRow), vendor_name: vendorObj?.name ?? "—", rfq_number: rfqObj?.rfq_number ?? null };
+    });
+}
+
+/** status='sent' & due_date geçmiş & en az bir tedarikçi yanıtlamamış RFQ'lar
+ * — rfq_response_due uyarı taraması için (Özellik 4). */
+export async function dbListRfqsAwaitingResponse(): Promise<SupplierRfqRow[]> {
+    const supabase = createServiceClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: rfqs, error } = await supabase
+        .from("supplier_rfqs")
+        .select("*")
+        .eq("status", "sent")
+        .not("due_date", "is", null)
+        .lt("due_date", today);
+    if (error) throw new Error(error.message);
+    const rows = rfqs ?? [];
+    if (rows.length === 0) return [];
+
+    // En az bir vendor invited/sent (yanıtlamamış) olanları süz.
+    const { data: vendors } = await supabase
+        .from("supplier_rfq_vendors")
+        .select("rfq_id, status")
+        .in("rfq_id", rows.map(r => r.id));
+    const awaiting = new Set<string>();
+    for (const v of vendors ?? []) if (v.status === "invited" || v.status === "sent") awaiting.add(v.rfq_id);
+    return rows.filter(r => awaiting.has(r.id));
+}
+
 /** Yalnız draft RFQ silinebilir (CASCADE satır/vendor/fiyat). */
 export async function dbDeleteRfq(id: string): Promise<void> {
     const supabase = createServiceClient();

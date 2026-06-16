@@ -66,6 +66,17 @@ export async function serviceSendRfq(rfqId: string, actor: string): Promise<Send
             continue;
         }
 
+        // Gerçek PDF eki (react-pdf). Üretim başarısızsa o tedarikçi için warning —
+        // belgesiz/HTML'siz mail GİTMEZ (arşiv HTML zaten in-app "Belge" view'da durur).
+        let pdf: Buffer;
+        try {
+            const { renderRfqPdfBuffer } = await import("@/lib/rfq-pdf");
+            pdf = await renderRfqPdfBuffer(buildRfqDocData(detail, vendor, company));
+        } catch (err) {
+            warnings.push(`${vendor.vendor_name}: PDF üretilemedi, e-posta atlandı (${err instanceof Error ? err.message : "hata"}).`);
+            continue;
+        }
+
         const subject = `Fiyat Talebi ${detail.rfq_number}${detail.title ? ` — ${detail.title}` : ""}`;
         const text = `Sayın ${vendor.vendor_name},\n\n${detail.rfq_number} numaralı fiyat talebimiz ektedir. Lütfen kalemler için birim fiyat, teslim süresi ve geçerlilik bildiriniz.${detail.due_date ? `\nYanıt son tarihi: ${detail.due_date}` : ""}\n\nTeşekkürler.`;
         const res = await sendDirectEmail({
@@ -73,7 +84,7 @@ export async function serviceSendRfq(rfqId: string, actor: string): Promise<Send
             subject,
             html: `<p>Sayın ${vendor.vendor_name},</p><p><strong>${detail.rfq_number}</strong> numaralı fiyat talebimiz ektedir. Lütfen kalemler için birim fiyat, teslim süresi ve geçerlilik bildiriniz.${detail.due_date ? `<br>Yanıt son tarihi: <strong>${detail.due_date}</strong>` : ""}</p><p>Teşekkürler.</p>`,
             text,
-            attachments: [{ filename: `Fiyat-Talebi-${detail.rfq_number}.html`, content: Buffer.from(html, "utf-8") }],
+            attachments: [{ filename: `Fiyat-Talebi-${detail.rfq_number}.pdf`, content: pdf }],
             replyTo: company?.email ?? undefined,
         });
         if (res.ok) emailed++;

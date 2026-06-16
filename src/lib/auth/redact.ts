@@ -134,6 +134,32 @@ export function redactPurchaseOrdersForPerms<T extends object>(items: T[], perms
 }
 
 /**
+ * product_vendor_links listesi (SNAKE_CASE). `last_unit_price` satın alma maliyeti →
+ * `view_purchase_costs` yoksa null (PO öneri ipucu + RFQ tedarikçi önerisi yüzeyleri).
+ * vendor_sku/lead_time/moq fiyat değil → dokunulmaz.
+ */
+export function redactVendorLinksForPerms<T extends object>(items: T[], perms: Set<Permission>): T[] {
+    if (perms.has("view_purchase_costs")) return items;
+    return items.map((l) => {
+        const r = { ...l } as Row;
+        nullField(r, "last_unit_price");
+        return r as T;
+    });
+}
+
+/**
+ * supplier_price_history listesi (SNAKE_CASE). `unit_price` → `view_purchase_costs` yoksa null.
+ */
+export function redactPriceHistoryForPerms<T extends object>(items: T[], perms: Set<Permission>): T[] {
+    if (perms.has("view_purchase_costs")) return items;
+    return items.map((h) => {
+        const r = { ...h } as Row;
+        nullField(r, "unit_price");
+        return r as T;
+    });
+}
+
+/**
  * RFQ detayı (SNAKE_CASE — raw row, mapper YOK). Tedarikçi fiyatları satın alma
  * maliyeti sınıfında → `view_purchase_costs` yoksa null. Yapı:
  *   { ...rfq, lines, vendors: [{ ...vendorRow, prices: [{unit_price,...}] }],

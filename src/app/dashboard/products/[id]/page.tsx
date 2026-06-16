@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { DynamicFieldEdit, FieldEdit } from "@/components/products/DynamicFieldEdit";
+import SupplierPricesPanel from "@/components/products/SupplierPricesPanel";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 
 // Mirror of server-side ALLOWED_MIME — client-safe (no server module imports).
@@ -1318,6 +1319,7 @@ export default function ProductDetailPage() {
                                 <FieldView label="Para Birimi" value={product.currency} />
                             </>
                         )}
+                        <SupplierPricesPanel productId={product.id} />
                     </div>
                 )}
 

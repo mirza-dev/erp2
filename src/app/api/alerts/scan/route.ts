@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { serviceScanStockAlerts, serviceCheckOverduePurchaseOrders } from "@/lib/services/alert-service";
+import { serviceScanStockAlerts, serviceCheckOverduePurchaseOrders, serviceCheckRfqResponseDue } from "@/lib/services/alert-service";
 import { serviceReconcileQuoteReservations } from "@/lib/services/quote-service";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
@@ -62,7 +62,14 @@ export async function POST(request: Request) {
         } catch (qrErr) {
             console.error("[POST /api/alerts/scan] quote reconcile", qrErr);
         }
-        return NextResponse.json({ ...result, poOverdue, quoteReconcile });
+        // RFQ yanıt gecikmesi taraması — aynı lock altında, non-fatal.
+        let rfqResponseDue: { alerted: number; resolved: number } = { alerted: 0, resolved: 0 };
+        try {
+            rfqResponseDue = await serviceCheckRfqResponseDue();
+        } catch (rfqErr) {
+            console.error("[POST /api/alerts/scan] rfq_response_due scan", rfqErr);
+        }
+        return NextResponse.json({ ...result, poOverdue, quoteReconcile, rfqResponseDue });
     } catch (err) {
         console.error("[POST /api/alerts/scan]", err);
         return NextResponse.json({ error: "Tarama başarısız." }, { status: 500 });

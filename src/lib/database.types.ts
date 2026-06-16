@@ -16,7 +16,7 @@ export type ProductType = "manufactured" | "commercial"
 export type ReservationStatus = "open" | "shipped" | "released"
 export type ShortageStatus = "open" | "resolved" | "cancelled"
 export type MovementType = "production" | "shipment" | "receipt" | "adjustment" | "reservation_create" | "reservation_release"
-export type AlertType = "stock_critical" | "stock_risk" | "purchase_recommended" | "order_shortage" | "sync_issue" | "order_deadline" | "quote_expired" | "overdue_shipment" | "po_overdue"
+export type AlertType = "stock_critical" | "stock_risk" | "purchase_recommended" | "order_shortage" | "sync_issue" | "order_deadline" | "quote_expired" | "overdue_shipment" | "po_overdue" | "rfq_response_due"
 export type AlertSeverity = "critical" | "warning" | "info"
 export type AlertStatus = "open" | "acknowledged" | "resolved" | "dismissed"
 export type ImportBatchStatus = "pending" | "processing" | "review" | "confirming" | "confirmed" | "failed"
@@ -240,6 +240,10 @@ export interface ProductVendorLinkRow {
     moq: number | null
     is_preferred: boolean
     notes: string | null
+    // mig.100 — RFQ son bilinen tedarikçi fiyatı (vendor yanıtı/award yazar)
+    last_unit_price: number | null
+    last_price_currency: string | null
+    last_price_at: string | null
     created_at: string
     updated_at: string
 }

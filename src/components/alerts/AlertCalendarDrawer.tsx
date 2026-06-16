@@ -93,6 +93,7 @@ export function AlertCalendarDrawer({
     const isOverdueShipment = alert.type === "overdue_shipment" && !!entityId && !isResolved;
     const isOrderShortage   = alert.type === "order_shortage" && !!entityId;
     const isPoOverdue       = alert.type === "po_overdue" && !!entityId && !isResolved;
+    const isRfqResponseDue  = alert.type === "rfq_response_due" && !!entityId && !isResolved;
 
     // ── quote_expired: süre uzatma formu ──
     const [newDate, setNewDate] = useState(() => {
@@ -348,6 +349,18 @@ export function AlertCalendarDrawer({
                             </p>
                             <ButtonLink href={`/dashboard/purchase/orders/${entityId}`} variant="primary" size="md" fullWidth>
                                 Siparişi Aç →
+                            </ButtonLink>
+                        </Section>
+                    )}
+
+                    {/* rfq_response_due → fiyat talebi detayına derin link */}
+                    {isRfqResponseDue && (
+                        <Section label="Fiyat Talebini Yönet">
+                            <p style={{ ...textBlock, color: "var(--text-secondary)", marginTop: 0, marginBottom: "10px" }}>
+                                Yanıt son tarihi geçti, hâlâ yanıtlamayan tedarikçi var. Tedarikçileri hatırlatın ya da son tarihi güncelleyin.
+                            </p>
+                            <ButtonLink href={`/dashboard/purchase/rfqs/${entityId}`} variant="primary" size="md" fullWidth>
+                                Talebi Aç →
                             </ButtonLink>
                         </Section>
                     )}
