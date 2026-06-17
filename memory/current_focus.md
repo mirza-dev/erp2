@@ -7,7 +7,16 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-17 (**Orders modülü derin denetim + bulgu düzeltmeleri**)
+## Son Tamamlanan İş — 2026-06-17 (**A1 — Orders sunucu tarafı sayfalama / RSC pilot**)
+
+`deferred_backlog` A1 (en büyük bekleyen). Kullanıcı kararı (AskUserQuestion): **RSC + loading.tsx tam yeniden** + **orders pilotu → sonra 5 listeye yay**. Önceki: liste `?all=1` ile TÜM satırları çekip `usePagination`+`useMemo` ile bellekte filtreler/dilimlerdi. **migration GEREKMEZ** (mevcut kolonlar + count:"exact").
+- **S0 (`src/lib/supabase/orders.ts`):** `dbListOrdersPaged(OrdersPageQuery)` tek sorguda `count:"exact"` → `{rows, total}` (range'den bağımsız total); tab→commercial/fulfillment eksen çevirisi (UI `matchesTab` birebir: shipped=fulfillment, approved=commercial≠shipped, draft/pending/cancelled=commercial), arama/tarih(`Tgün başı/sonu`)/döviz/müşteri SQL filtreleri ORDER/RANGE'den ÖNCE (filtre metotları select builder'da garanti, tip-derinliği patlamaz). `dbCountOrdersByTab` 6 global head+count (arama/tarih-bağımsız = eski rozet davranışı). `buildOrderSearchOrFilter` `.or()` güvenli escape (RFQ O2 emsali, `"`+`\`). service: `serviceListOrdersPaged`/`serviceCountOrdersByTab`.
+- **S1 (`orders/page.tsx`):** SUNUCU component (`force-dynamic`) — `await searchParams` (tab/search/customer[Id]/from/to/currency/page; eski `customer` deep-link → search) → `resolveAuthContext`+`view_sales_orders` guard (yoksa "yetkiniz yok") → Promise.all(paged, counts) → `redactOrdersForPerms` (route ile birebir; fiyat null) → `mapOrderSummary` → `<OrdersClient/>`. + `loading.tsx` aria-busy iskelet.
+- **S2 (`OrdersClient.tsx` YENİ client):** tüm filtre/arama/tarih/döviz/pagination URL'e yazılır (`navigate()`→`router.replace`+`useTransition` dim), arama 350ms debounce (yazarken responsive), satırlar yalnız geçerli sayfa prop'undan (`orders.map`), `computeTotalPages` + `<Pagination onPageChange={p=>navigate({page:p})}`; `usePermissions` korundu (`has("manage/delete_sales_orders")`, `canViewSalesPrices`), demo guard, bulk/single iptal→`router.refresh()`. `isOrderCancellable` buraya taşındı (export).
+- **Test:** +26 — `orders-pagination.test.ts` (filtre→sorgu çevirisi + total + escape + sayaç), `orders-rsc-pagination.test.ts` (RSC/client/loading mimari kilit), **9 source-lock testi page.tsx→OrdersClient.tsx yönlendirildi** (orders-page-title/pagination-integration/underlined-filter-tabs/theme-system/interactive-muted-text/button-source-regression/orders-review-fixes/faz7-ui-masking/orders-list-bug-fixes), `pagination-integration` orders case server-side'a özelleştirildi (`expectPaginationWired` paylaşıldığı için dokunulmadı).
+- tsc 0 · lint 0 · **5514 test** · build 0 (`/dashboard/orders` artık ƒ dynamic). **Kalan:** push (main+codex FF+proje-codex) + manuel smoke (filtre/sayfa URL'e yazılır + geri/ileri; tab sayaçları doğru; iptal→refresh; viewer redaction; demo bloklu; büyük veri sayfalanır). **Sonraki tur:** pattern'i products→customers→vendors→quotes→purchase/orders'a yay ([[deferred_backlog]] A1 kalanı).
+
+<details><summary>Önceki: Orders modülü derin denetim + bulgu düzeltmeleri</summary>
 
 `erp2-reviewer` orders modülünü taradı (rapor `docs/audit/2026-06-17-orders-review-bulgular.md`; K:0 Y:1 O:2 D:1 Nit:2; mekanik araçlar yeni bulgu yok). Kullanıcı "raporu commit'le + bulguları düzelt" → plan onaylı (AskUserQuestion: D1=tamamen kaldır, O1=yalnız guard). **migration GEREKMEZ** (try_resolve_shortages reuse).
 - **Y1 (kök):** `serviceReceivePOLines` (purchase-order-service.ts) mal kabulü sonrası alınan satırların DISTINCT ürünleri için `dbTryResolveShortages` (best-effort) → onaylı `partially_allocated` sipariş PO ile gelen stokla otomatik `allocated`'a yükselir (mig.008 promosyonu) → eskiden kalıcı sıkışıyordu + "Sevket" yanıltıcı aktifti.
@@ -16,6 +25,8 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **D1:** `partially_shipped` TS seviyesinde tamamen kaldırıldı — `database.types`/`mock-data`/`data-context` union, 3 UI config, view-model label+tone, seed-runner (senaryo→tam `shipped`), seed-data #9 (`shipped`), 2 test. Uygulanmış SQL'e DOKUNULMADI (007 vb. zararsız ölü dal).
 - **N1:** OrderForm 3× `new Date().toISOString().slice(0,10)` → `localISODate`. **N2:** parasut-status per-line `dbGetProductById` (N+1) → tek `dbGetProductParasutIds` batch.
 **+10 yeni test** (`orders-review-fixes.test.ts`: Y1/O2 davranış + O1/D1/N1/N2 source-lock) + 2 mevcut test güncellendi. tsc 0 · lint 0 · **5488 test** · build 0 (`/api/orders/[id]/reallocate` manifest'te). **Açık follow-up:** gate `route-guard-matrix.test.ts:62` method-seviye guard tespiti (ayrı tur, 100+ route reclass). **Kalan:** manuel smoke (PO mal kabul → otomatik allocated + Sevket; Yeniden Rezerve Et; allocated olmadan Sevket disabled).
+
+</details>
 
 ## Önceki İş — 2026-06-17 (**erp2-reviewer denetim turu — RFQ O1/O2/D1 düzeltildi**)
 

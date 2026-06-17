@@ -15,7 +15,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 describe("Faz 7 — liste/detay finansal maskeleme", () => {
     const cases: { file: string; perm: string }[] = [
         { file: "src/components/dashboard/RecentOrders.tsx", perm: "canViewSalesPrices" },
-        { file: "src/app/dashboard/orders/page.tsx", perm: "canViewSalesPrices" },
+        { file: "src/app/dashboard/orders/OrdersClient.tsx", perm: "canViewSalesPrices" },
         { file: "src/app/dashboard/orders/[id]/page.tsx", perm: "canViewSalesPrices" },
         { file: "src/app/dashboard/quotes/page.tsx", perm: "canViewSalesPrices" },
         { file: "src/app/dashboard/products/page.tsx", perm: "canViewSalesPrices" },
@@ -42,7 +42,7 @@ describe("Faz 7 — birincil CTA permission gating", () => {
     const ctas: { file: string; perm: string }[] = [
         // NOT: Genel Bakış (dashboard/page.tsx) tasarıma sadık SALT-BAKIŞ ekranıdır;
         // "Yeni Sipariş" CTA'sı liste sayfasında (orders/page.tsx) — burada aranmaz.
-        { file: "src/app/dashboard/orders/page.tsx", perm: "manage_sales_orders" },
+        { file: "src/app/dashboard/orders/OrdersClient.tsx", perm: "manage_sales_orders" },
         { file: "src/app/dashboard/quotes/page.tsx", perm: "manage_quotes" },
         { file: "src/app/dashboard/customers/page.tsx", perm: "manage_customers" },
         { file: "src/app/dashboard/products/page.tsx", perm: "manage_product_master" },
@@ -56,7 +56,7 @@ describe("Faz 7 — birincil CTA permission gating", () => {
     }
 
     it("destructive Sil butonları delete_* perm'e bağlı", () => {
-        expect(read("src/app/dashboard/orders/page.tsx")).toContain('has("delete_sales_orders")');
+        expect(read("src/app/dashboard/orders/OrdersClient.tsx")).toContain('has("delete_sales_orders")');
         expect(read("src/app/dashboard/customers/page.tsx")).toContain('has("delete_customers")');
         expect(read("src/app/dashboard/quotes/page.tsx")).toMatch(/canDeleteQuotes = has\("delete_quotes"\)/);
     });

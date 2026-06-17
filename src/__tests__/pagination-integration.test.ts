@@ -50,10 +50,18 @@ describe("Pagination — liste sayfası entegrasyonu", () => {
         expect(src).toContain('itemLabel="müşteri"');
     });
 
-    it("orders/page.tsx pagination wired", async () => {
-        const src = await readPage("src/app/dashboard/orders/page.tsx");
-        expectPaginationWired(src);
+    // A1: orders SUNUCU tarafı sayfalamaya geçti — client usePagination(filtered)
+    // /pagedItems yok; total + page sunucudan gelir, sayfa değişimi URL'e yazılır.
+    it("orders/OrdersClient.tsx server-side pagination wired", async () => {
+        const src = await readPage("src/app/dashboard/orders/OrdersClient.tsx");
+        expect(src).toContain('from "@/components/ui/Pagination"');
+        expect(src).toContain("computeTotalPages");
+        expect(src).toContain("<Pagination");
         expect(src).toContain('itemLabel="sipariş"');
+        expect(src).toContain("onPageChange={(p) => navigate({ page: p })}");
+        // client-side dilimleme kalmamalı (regression lock)
+        expect(src).not.toContain("usePagination(filtered");
+        expect(src).not.toContain("pagedItems");
     });
 
     it("products/page.tsx pagination wired", async () => {

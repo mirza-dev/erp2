@@ -7,7 +7,7 @@ const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
 const GLOBALS = read("src/app/globals.css");
 const UNDERLINED_TABS = read("src/components/ui/UnderlinedFilterTabs.tsx");
 const QUOTES_PAGE = read("src/app/dashboard/quotes/page.tsx");
-const ORDERS_PAGE = read("src/app/dashboard/orders/page.tsx");
+const ORDERS_PAGE = read("src/app/dashboard/orders/OrdersClient.tsx");
 const PRODUCTS_PAGE = read("src/app/dashboard/products/page.tsx");
 // 2026-06-10 sadeleştirme: tabBtnStyle + kolon algılama metni Excel sihirbazında
 const IMPORT_PAGE = read("src/app/dashboard/import/excel/page.tsx");

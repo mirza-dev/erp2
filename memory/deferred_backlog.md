@@ -3,7 +3,7 @@
 _Son güncelleme: 2026-06-17. Kullanıcı isteğiyle "sonraki tura bıraktığımız büyük işler" buraya çıkarıldı. Detaylı açık-yükümlülük + smoke listesi `CLAUDE.md` §Açık yükümlülükler'de._
 
 ## A. Ertelenmiş büyük teknik turlar (kod)
-- **A1. Tam server-side pagination** — performans çekirdek paketinde açıkça "SONRAKİ tur"a bırakıldı (RSC/loading.tsx + full pagination). Şu an SWR + `?all=1` ile listeler tüm veriyi client'a çekiyor (orders `pageSize:10000`). Veri büyüdükçe asıl kök çözüm. **En büyük bekleyen.**
+- **A1. Tam server-side pagination** — **ORDERS PİLOTU TAMAMLANDI** (2026-06-17; RSC + loading.tsx + `dbListOrdersPaged`/`dbCountOrdersByTab`; orders/page.tsx server component, OrdersClient.tsx URL-driven; PUSH BEKLİYOR). **KALAN: aynı pattern'i products → customers → vendors → quotes → purchase/orders'a yay** (hâlâ SWR `?all=1` + client `usePagination`). Pattern referansı: orders pilotu.
 - **A2. Upstash rate-limit (denetim O5)** — birçok turda "sonraki tur adayı" denip hiç yapılmadı. Auth/AI/public uçlarda gerçek rate-limit yok.
 - **A3. Gate guard-matrix method-seviye tespiti** — orders O1 turunun açık follow-up'ı. `src/__tests__/gate/route-guard-matrix.test.ts:62` dosya-seviye `src.includes` → method-seviye; aynı dosyadaki POST guard'ı GET'i de "korunmuş" sayıyor (kör nokta). 100+ route reclass (büyük/riskli). Tüm repodaki guard'sız GET'leri yakalar.
 

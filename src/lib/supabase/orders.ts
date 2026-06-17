@@ -52,6 +52,103 @@ export interface ListOrdersFilter {
     pageSize?: number;
 }
 
+// ── Server-side pagination (A1) ──────────────────────────────
+// Liste sayfaları artık "tüm satırları client'a çek → bellekte filtrele/dilimle"
+// yerine sunucu tarafında filtre + sayfalama yapar. UI filtre eksenleri
+// (tab/arama/tarih/döviz/müşteri) burada SQL'e çevrilir.
+
+/** UI filtre sekmesi — commercial + fulfillment birleşik kullanıcı kovaları. */
+export type OrderTab = "ALL" | "draft" | "pending_approval" | "approved" | "shipped" | "cancelled";
+
+export interface OrdersPageQuery {
+    tab?: OrderTab;
+    search?: string;       // order_number VEYA customer_name (ilike)
+    customer_id?: string;
+    date_from?: string;    // YYYY-MM-DD (created_at >= gün başı)
+    date_to?: string;      // YYYY-MM-DD (created_at <= gün sonu)
+    currency?: string;
+    page?: number;
+    pageSize?: number;
+}
+
+export interface OrdersPageResult {
+    rows: SalesOrderRow[];
+    total: number;         // filtre uygulanmış toplam satır (pagination için)
+}
+
+export const ORDERS_DEFAULT_PAGE_SIZE = 50;
+
+/**
+ * Arama terimini PostgREST `.or()` filtresine güvenli göm (filtre enjeksiyonu
+ * önlenir — RFQ buildRfqSearchOrFilter emsali). Çift-tırnaklı sarmalama `,` `.`
+ * `()` karakterlerinin koşul ayracı sayılmasını engeller.
+ */
+export function buildOrderSearchOrFilter(search: string): string {
+    const escaped = search.trim().replace(/["\\]/g, "\\$&");
+    const s = `"%${escaped}%"`;
+    return `order_number.ilike.${s},customer_name.ilike.${s}`;
+}
+
+/**
+ * Sunucu tarafı filtre + sayfalama. `count:"exact"` range'den bağımsız olarak
+ * filtre uygulanmış TOPLAM satırı döndürür → tek sorguyla hem sayfa hem total.
+ * Filtreler order/range'den ÖNCE (orijinal dbListOrders deseni — filtre
+ * metotları select builder'da garanti, tip-derinliği patlamaz).
+ */
+export async function dbListOrdersPaged(q: OrdersPageQuery = {}): Promise<OrdersPageResult> {
+    const supabase = createServiceClient();
+    const page = Math.max(1, q.page ?? 1);
+    const pageSize = Math.max(1, q.pageSize ?? ORDERS_DEFAULT_PAGE_SIZE);
+
+    let query = supabase.from("sales_orders").select("*", { count: "exact" });
+    // Tab → commercial/fulfillment eksen çevirisi (UI matchesTab ile birebir)
+    if (q.tab === "shipped") {
+        query = query.eq("fulfillment_status", "shipped");
+    } else if (q.tab === "approved") {
+        query = query.eq("commercial_status", "approved").neq("fulfillment_status", "shipped");
+    } else if (q.tab && q.tab !== "ALL") {
+        query = query.eq("commercial_status", q.tab);
+    }
+    if (q.customer_id) query = query.eq("customer_id", q.customer_id);
+    if (q.currency) query = query.eq("currency", q.currency);
+    if (q.date_from) query = query.gte("created_at", `${q.date_from}T00:00:00`);
+    if (q.date_to) query = query.lte("created_at", `${q.date_to}T23:59:59.999`);
+    if (q.search && q.search.trim()) query = query.or(buildOrderSearchOrFilter(q.search));
+
+    const { data, error, count } = await query
+        .order("created_at", { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
+    if (error) throw new Error(error.message);
+    return { rows: data ?? [], total: count ?? 0 };
+}
+
+/**
+ * Sekme rozet sayaçları — her kovanın GLOBAL adedi (arama/tarih/döviz/müşteri
+ * filtrelerinden bağımsız; mevcut UI davranışı birebir). 6 head+count paralel.
+ */
+export async function dbCountOrdersByTab(): Promise<Record<OrderTab, number>> {
+    const supabase = createServiceClient();
+    const head = () => supabase.from("sales_orders").select("id", { count: "exact", head: true });
+    const [all, draft, pending, approved, shipped, cancelled] = await Promise.all([
+        head(),
+        head().eq("commercial_status", "draft"),
+        head().eq("commercial_status", "pending_approval"),
+        head().eq("commercial_status", "approved").neq("fulfillment_status", "shipped"),
+        head().eq("fulfillment_status", "shipped"),
+        head().eq("commercial_status", "cancelled"),
+    ]);
+    const errored = [all, draft, pending, approved, shipped, cancelled].find(r => r.error);
+    if (errored?.error) throw new Error(errored.error.message);
+    return {
+        ALL: all.count ?? 0,
+        draft: draft.count ?? 0,
+        pending_approval: pending.count ?? 0,
+        approved: approved.count ?? 0,
+        shipped: shipped.count ?? 0,
+        cancelled: cancelled.count ?? 0,
+    };
+}
+
 // ── Helpers ──────────────────────────────────────────────────
 
 /** Generate a concurrency-safe order number via Postgres counter */

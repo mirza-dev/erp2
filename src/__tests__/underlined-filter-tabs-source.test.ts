@@ -9,7 +9,7 @@ const PURCHASE_ORDERS = read("src/app/dashboard/purchase/orders/page.tsx");
 const PRODUCTS = read("src/app/dashboard/products/page.tsx");
 const NOTE_TEMPLATES = read("src/app/dashboard/settings/note-templates/page.tsx");
 const QUOTES = read("src/app/dashboard/quotes/page.tsx");
-const ORDERS = read("src/app/dashboard/orders/page.tsx");
+const ORDERS = read("src/app/dashboard/orders/OrdersClient.tsx");
 
 describe("UnderlinedFilterTabs page adoption", () => {
     it("target pages use the shared underlined filter component", () => {

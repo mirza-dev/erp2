@@ -137,7 +137,7 @@ describe("source-locks — O1 / D1 / N1 / N2", () => {
             for (const l of unionLines) expect(l).not.toContain("partially_shipped");
         }
         // UI config Record'larında da yok
-        for (const p of ["src/components/dashboard/RecentOrders.tsx", "src/app/dashboard/orders/page.tsx"]) {
+        for (const p of ["src/components/dashboard/RecentOrders.tsx", "src/app/dashboard/orders/OrdersClient.tsx"]) {
             expect(read(p)).not.toContain("partially_shipped");
         }
     });

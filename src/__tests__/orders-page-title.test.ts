@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const SALES_ORDERS = readFileSync(
-    join(process.cwd(), "src/app/dashboard/orders/page.tsx"),
+    join(process.cwd(), "src/app/dashboard/orders/OrdersClient.tsx"),
     "utf8",
 );
 const PURCHASE_ORDERS = readFileSync(

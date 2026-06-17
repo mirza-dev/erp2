@@ -9,6 +9,8 @@ import { localISODate } from "@/lib/stock-utils";
 import {
     dbGetOrderById,
     dbListOrders,
+    dbListOrdersPaged,
+    dbCountOrdersByTab,
     dbCreateOrder,
     dbSubmitOrderForApproval,
     dbApproveOrder,
@@ -20,6 +22,9 @@ import {
     type CreateOrderInput,
     type UpdateOrderInput,
     type ListOrdersFilter,
+    type OrdersPageQuery,
+    type OrdersPageResult,
+    type OrderTab,
     type ApproveOrderResult,
     type OrderWithLines,
 } from "@/lib/supabase/orders";
@@ -122,6 +127,16 @@ export function validateOrderCreate(input: CreateOrderInput): ValidationResult {
 
 export async function serviceListOrders(filter: ListOrdersFilter = {}) {
     return dbListOrders(filter);
+}
+
+/** A1: sunucu tarafı filtre + sayfalama (RSC liste sayfası tüketir). */
+export async function serviceListOrdersPaged(q: OrdersPageQuery = {}): Promise<OrdersPageResult> {
+    return dbListOrdersPaged(q);
+}
+
+/** A1: sekme rozet sayaçları (global, filtre-bağımsız). */
+export async function serviceCountOrdersByTab(): Promise<Record<OrderTab, number>> {
+    return dbCountOrdersByTab();
 }
 
 export async function serviceGetOrder(id: string) {

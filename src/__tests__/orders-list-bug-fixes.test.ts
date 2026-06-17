@@ -8,10 +8,12 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isOrderCancellable } from "@/app/dashboard/orders/page";
+import { isOrderCancellable } from "@/app/dashboard/orders/OrdersClient";
 
+// A1 (2026-06-17): liste sunucu tarafı sayfalamaya geçti. UI etkileşimi
+// page.tsx (RSC) → OrdersClient.tsx (client) ayrıldı; kaynak kilitleri client'ta.
 const SRC = readFileSync(
-    join(process.cwd(), "src/app/dashboard/orders/page.tsx"),
+    join(process.cwd(), "src/app/dashboard/orders/OrdersClient.tsx"),
     "utf8",
 );
 
@@ -30,9 +32,13 @@ describe("isOrderCancellable", () => {
     });
 });
 
-describe("orders list — ?all=1 refetch", () => {
-    it("refetch /api/orders?all=1 kullanır (50-cap kalktı)", () => {
-        expect(SRC).toMatch(/fetch\("\/api\/orders\?all=1"\)/);
+describe("orders list — sunucu tarafı sayfalama (A1)", () => {
+    it("client artık ?all=1 mega-fetch yapmaz (sunucu filtreler+sayfalar)", () => {
+        expect(SRC).not.toMatch(/\?all=1/);
+    });
+    it("satırlar prop'tan (orders) gelir, bellekte filtre/dilimleme yok", () => {
+        expect(SRC).not.toContain("usePagination(");
+        expect(SRC).toMatch(/orders\.map\(/);
     });
 });
 
@@ -59,7 +65,7 @@ describe("orders list — toplu iptal sözcük + seçim", () => {
     });
     it("select-all cancellablePageIds kullanır (tüm pageIds değil)", () => {
         expect(SRC).toMatch(/cancellablePageIds/);
-        expect(SRC).toMatch(/pagedItems\.filter\(isOrderCancellable\)/);
+        expect(SRC).toMatch(/orders\.filter\(isOrderCancellable\)/);
     });
     it("satır checkbox yalnızca cancellable satırda render edilir", () => {
         expect(SRC).toMatch(/cancellable && \(/);
