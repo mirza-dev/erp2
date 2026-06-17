@@ -364,11 +364,13 @@ async function runPurchaseScanCheck() {
 
 async function runExpireQuotesCheck() {
   console.log("\n[19] Expire Quotes");
-  const { status, body } = await post("/api/orders/expire-quotes");
+  // 2026-06-18 (quotes denetimi O1): legacy /api/orders/expire-quotes kaldırıldı —
+  // canonical /api/quotes/expire (quotes tablosu + bağlı sipariş iptali) smoke'lanır.
+  const { status, body } = await post("/api/quotes/expire");
   const b = body as { expired?: unknown; alerted?: unknown };
   if (status !== 200 || typeof b.expired !== "number" || typeof b.alerted !== "number")
-    fail(`POST /api/orders/expire-quotes → ${status}`, JSON.stringify(body));
-  else ok(`POST /api/orders/expire-quotes → 200 (expired: ${b.expired}, alerted: ${b.alerted})`);
+    fail(`POST /api/quotes/expire → ${status}`, JSON.stringify(body));
+  else ok(`POST /api/quotes/expire → 200 (expired: ${b.expired}, alerted: ${b.alerted})`);
 }
 
 async function runAiObservabilityCheck() {

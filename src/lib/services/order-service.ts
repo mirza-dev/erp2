@@ -16,7 +16,6 @@ import {
     dbApproveOrder,
     dbShipOrderFull,
     dbCancelOrder,
-    dbListExpiredQuotes,
     dbUpdateOrderQuoteDeadline,
     dbUpdateOrderWithLines,
     type CreateOrderInput,
@@ -29,7 +28,7 @@ import {
     type OrderWithLines,
 } from "@/lib/supabase/orders";
 
-import { dbCreateAlert, dbListActiveAlerts, dbBatchResolveAlerts, type BatchResolveEntry } from "@/lib/supabase/alerts";
+import { dbBatchResolveAlerts, type BatchResolveEntry } from "@/lib/supabase/alerts";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
 import { dbGetProductById, dbTryResolveShortages, dbGetOpenShortageProductIds } from "@/lib/supabase/products";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -465,46 +464,8 @@ export async function serviceUpdateQuoteDeadline(
 }
 
 // ── Quote Expiry ─────────────────────────────────────────────
-
-/**
- * Süresi dolmuş teklifleri tarar:
- *   - draft → cancel_order RPC ile otomatik iptal (rezervasyon yok, güvenli)
- *   - pending_approval → quote_expired alert üretir (insan kararı gerekir)
- *
- * Endpoint: POST /api/orders/expire-quotes (CRON_SECRET ile çağrılır)
- */
-export async function serviceExpireQuotes(): Promise<{ expired: number; alerted: number }> {
-    const expiredOrders = await dbListExpiredQuotes();
-    if (expiredOrders.length === 0) return { expired: 0, alerted: 0 };
-
-    // Mevcut açık alert'ler — pending_approval dedup için
-    const activeAlerts = await dbListActiveAlerts();
-    const activeSet = new Set(
-        activeAlerts
-            .filter(a => a.type === "quote_expired")
-            .map(a => a.entity_id)
-    );
-
-    let expired = 0;
-    let alerted = 0;
-
-    for (const order of expiredOrders) {
-        if (order.commercial_status === "draft") {
-            const result = await dbCancelOrder(order.id);
-            if (result.success) expired++;
-        } else if (order.commercial_status === "pending_approval") {
-            if (activeSet.has(order.id)) continue;
-            await dbCreateAlert({
-                type: "quote_expired",
-                severity: "warning",
-                title: `Teklif Süresi Doldu: ${order.order_number}`,
-                description: `${order.customer_name} — ${order.order_number} teklifinin süresi ${order.quote_valid_until} tarihinde doldu. İptal veya uzatma gerekiyor.`,
-                entity_type: "sales_order",
-                entity_id: order.id,
-            });
-            alerted++;
-        }
-    }
-
-    return { expired, alerted };
-}
+// LEGACY serviceExpireQuotes (eski "teklif = sales_order" modeli) 2026-06-18
+// quotes denetiminde KALDIRILDI (O1): canonical quote-service.serviceExpireQuotes
+// (/api/quotes/expire) 088 modelini tam kapsar (quotes tablosu + bağlı sipariş
+// iptali/rezerv release + quote_expired alert). Legacy yol sales_orders.quote_valid_until
+// üzerinden çift/yanlış-atıflı alert + bant-dışı draft iptali üretiyordu.

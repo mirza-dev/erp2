@@ -16,14 +16,10 @@ async function readPage(rel: string): Promise<string> {
     return fs.readFile(path.resolve(ROOT, rel), "utf-8");
 }
 
-function expectPaginationWired(src: string) {
-    expect(src).toContain('from "@/hooks/usePagination"');
-    expect(src).toContain('from "@/components/ui/Pagination"');
-    expect(src).toContain("usePagination(filtered");
-    expect(src).toContain("pagedItems.map(");
-    // Eski kullanım kalmamalı (regression lock)
-    expect(src).not.toMatch(/\{\s*filtered\.map\(/);
-}
+// A1 (2026-06-17/18): 6 liste sayfası da SUNUCU tarafı sayfalamaya geçti →
+// eski client `usePagination(filtered)`/`pagedItems` kalıbını doğrulayan
+// `expectPaginationWired` helper'ı tüketicisiz kaldı, kaldırıldı. Her sayfa
+// artık kendi server-side assertion'larıyla doğrulanır (aşağıda).
 
 describe("Pagination — liste sayfası entegrasyonu", () => {
     // A1: vendors SUNUCU tarafı sayfalamaya geçti (VendorsClient).

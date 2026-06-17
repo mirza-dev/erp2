@@ -8,9 +8,9 @@ _Son güncelleme: 2026-06-17. Kullanıcı isteğiyle "sonraki tura bıraktığı
 - **A3. Gate guard-matrix method-seviye tespiti** — orders O1 turunun açık follow-up'ı. `src/__tests__/gate/route-guard-matrix.test.ts:62` dosya-seviye `src.includes` → method-seviye; aynı dosyadaki POST guard'ı GET'i de "korunmuş" sayıyor (kör nokta). 100+ route reclass (büyük/riskli). Tüm repodaki guard'sız GET'leri yakalar.
 
 ## B. Devam eden inceleme kampanyası (`erp2-reviewer`, modül modül)
-- Tamamlanan derin incelemeler: **RFQ ✅** (`docs/audit/2026-06-17-review-bulgular.md`), **Orders ✅** (`docs/audit/2026-06-17-orders-review-bulgular.md`).
-- **Kalan modüller** (henüz derin taranmadı): **quotes · parasut · import/AI · production · customers/products · alerts · settings**.
-- Önerilen sıra: **quotes** (orders'la en sıkı bağlı; finansal + rezervasyon kesişimi) ya da **parasut** (dış entegrasyon, en riskli).
+- Tamamlanan derin incelemeler: **RFQ ✅** (`docs/audit/2026-06-17-review-bulgular.md`), **Orders ✅** (`docs/audit/2026-06-17-orders-review-bulgular.md`), **Quotes ✅** (`docs/audit/2026-06-18-quotes-review-bulgular.md`; O1 legacy expire-quotes silindi, gerisi temiz).
+- **Kalan modüller** (henüz derin taranmadı): **parasut · import/AI · production · customers/products · alerts · settings**.
+- Önerilen sıra: **parasut** (dış entegrasyon, en riskli) ya da **import/AI** (en geniş yüzey).
 - `/erp-review <modül-yolu>` ile veya `erp2-reviewer` ajanını kapsam vererek çağır. Detay [[reference_review_agent]].
 
 ## C. Deploy / altyapı doğrulamaları (kod tek başına yetmez)

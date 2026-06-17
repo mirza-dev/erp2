@@ -87,15 +87,6 @@ jobs:
             -X POST "$APP_URL/api/parasut/sync-all" \
             -H "Authorization: Bearer $CRON_SECRET"
 
-      - name: Orders — expire quotes
-        id: orders_expire_quotes
-        continue-on-error: true
-        timeout-minutes: 5
-        run: |
-          curl --retry 3 --retry-delay 20 --max-time 60 -fsSL \
-            -X POST "$APP_URL/api/orders/expire-quotes" \
-            -H "Authorization: Bearer $CRON_SECRET"
-
       - name: Quotes — expire (standalone)
         id: quotes_expire
         continue-on-error: true
@@ -122,7 +113,6 @@ jobs:
             alerts_scan=${{ steps.alerts_scan.outcome }}
             purchase_copilot=${{ steps.purchase_copilot.outcome }}
             parasut_sync_all=${{ steps.parasut_sync_all.outcome }}
-            orders_expire_quotes=${{ steps.orders_expire_quotes.outcome }}
             quotes_expire=${{ steps.quotes_expire.outcome }}
             check_shipments=${{ steps.check_shipments.outcome }}
         run: |

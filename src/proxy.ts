@@ -25,7 +25,6 @@ const CRON_PATHS = [
     "/api/alerts/ai-suggest",
     "/api/parasut/sync-all",
     "/api/parasut/poll-e-documents",
-    "/api/orders/expire-quotes",
     "/api/orders/check-shipments",
     "/api/quotes/expire",
     "/api/email/retry-failed",

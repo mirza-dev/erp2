@@ -418,23 +418,10 @@ export async function dbCancelOrder(orderId: string): Promise<{ success: boolean
     return data as { success: boolean; error?: string };
 }
 
-/**
- * Süresi dolmuş açık teklifleri döner.
- * Kapsam: draft + pending_approval, quote_valid_until < bugün.
- * Sıralama: en eski geçerlilik tarihi üstte.
- */
-export async function dbListExpiredQuotes(): Promise<SalesOrderRow[]> {
-    const supabase = createServiceClient();
-    const today = localISODate(Date.now());
-    const { data, error } = await supabase
-        .from("sales_orders")
-        .select("*")
-        .in("commercial_status", ["draft", "pending_approval"])
-        .lt("quote_valid_until", today)
-        .order("quote_valid_until", { ascending: true });
-    if (error) throw new Error(error.message);
-    return data ?? [];
-}
+// LEGACY dbListExpiredQuotes (sales_orders.quote_valid_until tabanlı) 2026-06-18
+// quotes denetiminde KALDIRILDI (O1) — yalnız order-service.serviceExpireQuotes
+// kullanıyordu, o da canonical quote-service expiry lehine silindi. Süresi dolan
+// teklifler artık quotes tablosu üzerinden (quotes.dbListExpiredQuotes) ele alınır.
 
 export async function dbFindOrderByQuoteId(quoteId: string): Promise<SalesOrderRow | null> {
     const supabase = createServiceClient();
