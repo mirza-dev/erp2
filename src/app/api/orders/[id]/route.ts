@@ -26,14 +26,18 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // RBAC R3: view_sales_orders guard (demo-anon→viewer fallback bu izne sahip).
+        // Detay finansal alanlar + satır fiyatları ayrıca view_sales_prices'a tabi (redaction).
+        const ctx = await resolveAuthContext();
+        const guard = requirePermissionFor(ctx, "view_sales_orders");
+        if (guard) return guard;
+
         const { id } = await params;
         const order = await serviceGetOrder(id);
         if (!order) {
             return NextResponse.json({ error: "Sipariş bulunamadı." }, { status: 404 });
         }
-        // RBAC R3: detail finansal alanlar + satır fiyatları view_sales_prices'a tabi.
-        const perms = await getCurrentUserPermissions();
-        return NextResponse.json(redactOrderForPerms(order, perms));
+        return NextResponse.json(redactOrderForPerms(order, ctx.perms));
     } catch (err) {
         return handleApiError(err, "GET /api/orders/[id]");
     }

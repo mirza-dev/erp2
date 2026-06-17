@@ -157,7 +157,7 @@ export interface Order {
     customerId?: string;
     customerName: string;
     commercial_status: "draft" | "pending_approval" | "approved" | "cancelled";
-    fulfillment_status: "unallocated" | "partially_allocated" | "allocated" | "partially_shipped" | "shipped";
+    fulfillment_status: "unallocated" | "partially_allocated" | "allocated" | "shipped";
     grandTotal: number;
     currency: string;
     createdAt: string;

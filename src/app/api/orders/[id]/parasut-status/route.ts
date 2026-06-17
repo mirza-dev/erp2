@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { handleApiError } from "@/lib/api-error";
 import { dbGetOrderById } from "@/lib/supabase/orders";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
-import { dbGetProductById } from "@/lib/supabase/products";
+import { dbGetProductParasutIds } from "@/lib/supabase/products";
 import { dbCountRecentSyncLogsByStep } from "@/lib/supabase/sync-log";
 import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 
@@ -41,14 +41,13 @@ export async function GET(
             ? !!(await dbGetCustomerById(order.customer_id))?.parasut_contact_id
             : false;
 
+        // Batch: tüm satır ürünlerinin parasut_product_id'lerini tek sorguda al (N+1 yerine).
+        // product_id'siz satırlar atlanır (eski davranış); kalanların hepsi link'li olmalı.
         let productDone = order.lines.length > 0;
-        for (const line of order.lines) {
-            if (!line.product_id) continue;
-            const product = await dbGetProductById(line.product_id);
-            if (!product?.parasut_product_id) {
-                productDone = false;
-                break;
-            }
+        const lineProductIds = [...new Set(order.lines.map((l) => l.product_id).filter(Boolean) as string[])];
+        if (productDone && lineProductIds.length > 0) {
+            const parasutMap = await dbGetProductParasutIds(lineProductIds);
+            productDone = order.lines.every((l) => !l.product_id || !!parasutMap.get(l.product_id));
         }
 
         // Faz 11.3 (M2 fix) — son 24h step başına sync log denemesi sayısı (audit)

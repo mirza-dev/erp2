@@ -7,7 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-17 (**erp2-reviewer denetim turu — RFQ O1/O2/D1 düzeltildi**)
+## Son Tamamlanan İş — 2026-06-17 (**Orders modülü derin denetim + bulgu düzeltmeleri**)
+
+`erp2-reviewer` orders modülünü taradı (rapor `docs/audit/2026-06-17-orders-review-bulgular.md`; K:0 Y:1 O:2 D:1 Nit:2; mekanik araçlar yeni bulgu yok). Kullanıcı "raporu commit'le + bulguları düzelt" → plan onaylı (AskUserQuestion: D1=tamamen kaldır, O1=yalnız guard). **migration GEREKMEZ** (try_resolve_shortages reuse).
+- **Y1 (kök):** `serviceReceivePOLines` (purchase-order-service.ts) mal kabulü sonrası alınan satırların DISTINCT ürünleri için `dbTryResolveShortages` (best-effort) → onaylı `partially_allocated` sipariş PO ile gelen stokla otomatik `allocated`'a yükselir (mig.008 promosyonu) → eskiden kalıcı sıkışıyordu + "Sevket" yanıltıcı aktifti.
+- **O2:** yeni `POST /api/orders/[id]/reallocate` + `serviceReallocateOrder(orderId)` (yeni helper `dbGetOpenShortageProductIds` → her ürün için try_resolve_shortages, best-effort) + UI "Yeniden Rezerve Et" butonu (partially/unallocated'da, manage_sales_orders); **"Sevket" yalnız `allocated`'da aktif** (aksi tooltip'li disabled).
+- **O1:** `/api/orders` + `/api/orders/[id]` GET'lerine `resolveAuthContext + requirePermissionFor("view_sales_orders")` (gate dosya-seviye `src.includes` kör noktası nedeniyle açıktı; demo-anon→viewer fallback bu izne sahip → demo çalışır). PII redaction bilinçli eklenmedi.
+- **D1:** `partially_shipped` TS seviyesinde tamamen kaldırıldı — `database.types`/`mock-data`/`data-context` union, 3 UI config, view-model label+tone, seed-runner (senaryo→tam `shipped`), seed-data #9 (`shipped`), 2 test. Uygulanmış SQL'e DOKUNULMADI (007 vb. zararsız ölü dal).
+- **N1:** OrderForm 3× `new Date().toISOString().slice(0,10)` → `localISODate`. **N2:** parasut-status per-line `dbGetProductById` (N+1) → tek `dbGetProductParasutIds` batch.
+**+10 yeni test** (`orders-review-fixes.test.ts`: Y1/O2 davranış + O1/D1/N1/N2 source-lock) + 2 mevcut test güncellendi. tsc 0 · lint 0 · **5488 test** · build 0 (`/api/orders/[id]/reallocate` manifest'te). **Açık follow-up:** gate `route-guard-matrix.test.ts:62` method-seviye guard tespiti (ayrı tur, 100+ route reclass). **Kalan:** manuel smoke (PO mal kabul → otomatik allocated + Sevket; Yeniden Rezerve Et; allocated olmadan Sevket disabled).
+
+## Önceki İş — 2026-06-17 (**erp2-reviewer denetim turu — RFQ O1/O2/D1 düzeltildi**)
 
 `/erp-review` (full) ilk uçtan-uca koşu (restart sonrası `erp2-reviewer` subagent çağrıldı). Bulgular `docs/audit/2026-06-17-review-bulgular.md` (**K:0 Y:0 O:2 D:1 Nit:2**; önceki 2026-06-16 turunun O1/O2/D1/D2'si `01501ff`'te zaten kapanmıştı → bu tur yeni RFQ noktaları). **migration GEREKMEZ.** Kullanıcı "O1, O2, D1'i sırayla düzelt" dedi → uygulandı:
 - **O1** `rfq-service.ts:85` tedarikçi e-postası gövdesi `escapeHtml`'siz interpole ediyordu (latent stored-XSS / `templates.ts escapeHtml` konvansiyonundan sapma) → yerel `escapeHtml` helper + `vendor_name`/`rfq_number`/`due_date` sarmalandı.

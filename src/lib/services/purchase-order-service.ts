@@ -10,6 +10,7 @@ import {
     VALID_PO_TRANSITIONS,
 } from "@/lib/supabase/purchase-orders";
 import { dbListRecommendations, dbUpdateRecommendationStatus } from "@/lib/supabase/recommendations";
+import { dbTryResolveShortages } from "@/lib/supabase/products";
 
 export { VALID_PO_TRANSITIONS };
 
@@ -166,6 +167,26 @@ export async function serviceReceivePOLines(
 ): Promise<ReceiveResult> {
     await dbReceivePurchaseOrderLines(id, lines, actor ?? "system");
 
+    const po = await dbGetPurchaseOrderById(id);
+    if (!po) throw new Error("PO bulunamadı.");
+
+    // Mal kabulü gelen ürünlerin stoğunu artırdı → bu ürünler için açık shortage'ları
+    // FIFO çöz (inventory/movements + production-service ile aynı best-effort kalıp).
+    // try_resolve_shortages tüm shortage'ı çözülen siparişi partially_allocated→allocated
+    // yükseltir (mig.008) → PO ile tedarik edilen onaylı sipariş artık sevk edilebilir.
+    // Aksi halde sipariş partially_allocated'da kalıcı sıkışırdı (denetim Y1).
+    try {
+        const receivedLineIds = new Set(lines.map((l) => l.line_id));
+        const productIds = new Set(
+            po.lines.filter((pl) => receivedLineIds.has(pl.id)).map((pl) => pl.product_id),
+        );
+        for (const pid of productIds) {
+            await dbTryResolveShortages(pid);
+        }
+    } catch {
+        // fire-and-forget; yeniden tahsisat başarısız olsa mal kabul bozulmaz
+    }
+
     // best-effort: hata olsa da mal kabul başarılıdır
     try {
         await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/alerts/scan`, {
@@ -179,7 +200,5 @@ export async function serviceReceivePOLines(
         // fire-and-forget; alert scan başarısız olsa kabul işlemi bozulmaz
     }
 
-    const po = await dbGetPurchaseOrderById(id);
-    if (!po) throw new Error("PO bulunamadı.");
     return { id: po.id, status: po.status };
 }

@@ -53,7 +53,6 @@ export type FulfillmentStatus =
   | "unallocated"
   | "partially_allocated"
   | "allocated"
-  | "partially_shipped"
   | "shipped";
 
 type OrderTransition = CommercialStatus | "shipped";

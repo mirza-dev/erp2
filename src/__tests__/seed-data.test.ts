@@ -112,7 +112,7 @@ describe("seed-data — hesap formülleri (KDV %20 domain kuralı)", () => {
 describe("seed-data — enum geçerlilikleri", () => {
     it("sipariş çift ekseni geçerli kombinasyonlarda", () => {
         const commercial = new Set(["draft", "pending_approval", "approved", "cancelled"]);
-        const fulfillment = new Set(["unallocated", "partially_allocated", "allocated", "partially_shipped", "shipped"]);
+        const fulfillment = new Set(["unallocated", "partially_allocated", "allocated", "shipped"]);
         for (const o of SEED_ORDERS) {
             expect(commercial.has(o.commercial)).toBe(true);
             expect(fulfillment.has(o.fulfillment)).toBe(true);

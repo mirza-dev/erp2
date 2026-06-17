@@ -11,7 +11,7 @@ import { aiScoreOrder } from "@/lib/services/ai-service";
 import type { CommercialStatus } from "@/lib/database.types";
 import type { CreateOrderInput } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { actorFromAuthContext, getCurrentUserPermissions, resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
+import { actorFromAuthContext, resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 import { appendServerTiming, startSpan } from "@/lib/server-timing";
@@ -29,6 +29,14 @@ export async function GET(req: NextRequest) {
         const all = searchParams.get("all") === "1";
         const page = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
 
+        // RBAC R3: view_sales_orders guard (demo-anon→viewer fallback bu izne sahip →
+        // demo gezintisi çalışır). Tek auth round-trip; perms redaction'da yeniden kullanılır.
+        const authSpan = startSpan();
+        const ctx = await resolveAuthContext();
+        const guard = requirePermissionFor(ctx, "view_sales_orders");
+        if (guard) return guard;
+        const authMs = authSpan();
+
         const dbSpan = startSpan();
         const orders = await serviceListOrders({
             commercial_status: status ?? undefined,
@@ -38,12 +46,8 @@ export async function GET(req: NextRequest) {
         });
         const dbMs = dbSpan();
 
-        // RBAC R3: redaction per-request (serviceListOrders cache'siz; yine de perms ayrı).
-        const authSpan = startSpan();
-        const perms = await getCurrentUserPermissions(req);
-        const authMs = authSpan();
         return appendServerTiming(
-            NextResponse.json(redactOrdersForPerms(orders, perms)),
+            NextResponse.json(redactOrdersForPerms(orders, ctx.perms)),
             [{ name: "auth", ms: authMs }, { name: "db", ms: dbMs }],
         );
     } catch (err) {

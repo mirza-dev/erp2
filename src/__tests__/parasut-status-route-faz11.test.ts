@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const mockDbGetOrderById    = vi.fn();
 const mockDbGetCustomerById = vi.fn();
-const mockDbGetProductById  = vi.fn();
+const mockDbGetProductParasutIds = vi.fn();
 const mockDbCountRecentSyncLogsByStep = vi.fn();
 
 vi.mock("@/lib/supabase/orders", () => ({
@@ -19,7 +19,7 @@ vi.mock("@/lib/supabase/customers", () => ({
     dbGetCustomerById: (...a: unknown[]) => mockDbGetCustomerById(...a),
 }));
 vi.mock("@/lib/supabase/products", () => ({
-    dbGetProductById: (...a: unknown[]) => mockDbGetProductById(...a),
+    dbGetProductParasutIds: (...a: unknown[]) => mockDbGetProductParasutIds(...a),
 }));
 vi.mock("@/lib/supabase/sync-log", () => ({
     dbCountRecentSyncLogsByStep: (...a: unknown[]) => mockDbCountRecentSyncLogsByStep(...a),
@@ -70,7 +70,7 @@ beforeEach(() => {
     mockRequirePermissionFor.mockReturnValue(null);
     mockDbGetOrderById.mockResolvedValue(baseOrder);
     mockDbGetCustomerById.mockResolvedValue({ id: "cust-1", parasut_contact_id: null });
-    mockDbGetProductById.mockResolvedValue({ id: "prod-1", parasut_product_id: null });
+    mockDbGetProductParasutIds.mockResolvedValue(new Map([["prod-1", null]]));
     mockDbCountRecentSyncLogsByStep.mockResolvedValue({});
 });
 
@@ -101,7 +101,7 @@ describe("GET /api/orders/[id]/parasut-status", () => {
 
     it("contact + product done → productDone:true (tüm line products parasut_product_id var)", async () => {
         mockDbGetCustomerById.mockResolvedValue({ id: "cust-1", parasut_contact_id: "ct-1" });
-        mockDbGetProductById.mockResolvedValue({ id: "prod-1", parasut_product_id: "pr-1" });
+        mockDbGetProductParasutIds.mockResolvedValue(new Map([["prod-1", "pr-1"]]));
         const res = await GET(makeReq(), params);
         const body = await res.json();
         expect(body.badges.productDone).toBe(true);
@@ -117,9 +117,7 @@ describe("GET /api/orders/[id]/parasut-status", () => {
         });
         mockDbGetCustomerById.mockResolvedValue({ id: "cust-1", parasut_contact_id: "ct-1" });
         // prod-1 OK, prod-2 boş
-        mockDbGetProductById
-            .mockResolvedValueOnce({ id: "prod-1", parasut_product_id: "pr-1" })
-            .mockResolvedValueOnce({ id: "prod-2", parasut_product_id: null });
+        mockDbGetProductParasutIds.mockResolvedValue(new Map([["prod-1", "pr-1"], ["prod-2", null]]));
         const res = await GET(makeReq(), params);
         const body = await res.json();
         expect(body.badges.productDone).toBe(false);
@@ -134,7 +132,7 @@ describe("GET /api/orders/[id]/parasut-status", () => {
             parasut_e_document_id:        "ed-1",
         });
         mockDbGetCustomerById.mockResolvedValue({ id: "cust-1", parasut_contact_id: "ct-1" });
-        mockDbGetProductById.mockResolvedValue({ id: "prod-1", parasut_product_id: "pr-1" });
+        mockDbGetProductParasutIds.mockResolvedValue(new Map([["prod-1", "pr-1"]]));
         const res = await GET(makeReq(), params);
         const body = await res.json();
         expect(body.badges.contactDone).toBe(true);

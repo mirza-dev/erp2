@@ -10,7 +10,7 @@ import { useCustomers, useProducts, useOrderMutations } from "@/lib/data-context
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import { dateDaysFromToday } from "@/lib/stock-utils";
+import { dateDaysFromToday, localISODate } from "@/lib/stock-utils";
 
 // ── Shared types ───────────────────────────────────────────────
 
@@ -103,7 +103,7 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
     const [quoteValidUntil, setQuoteValidUntil] = useState<string>(
         isEdit
             ? (initial?.quoteValidUntil ?? "")
-            : new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10)
+            : localISODate(Date.now() + 15 * 86_400_000)
     );
     // Pasif/silinmiş satır ürünleri için select option'larına eklenecek stub'lar.
     const [extraProducts, setExtraProducts] = useState<Product[]>([]);
@@ -257,7 +257,7 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                 commercial_status: status,
                 fulfillment_status: "unallocated",
                 currency,
-                createdAt: new Date().toISOString().slice(0, 10),
+                createdAt: localISODate(Date.now()),
                 subtotal,
                 vatTotal: vat,
                 grandTotal,
@@ -799,7 +799,7 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                                 type="date"
                                 value={quoteValidUntil}
                                 onChange={e => setQuoteValidUntil(e.target.value)}
-                                min={new Date().toISOString().slice(0, 10)}
+                                min={localISODate(Date.now())}
                                 aria-label="Teklif geçerlilik tarihi"
                                 style={{ ...inputStyle, padding: "7px 10px" }}
                             />

@@ -122,6 +122,20 @@ export async function dbGetProductRefsByIds(ids: string[]): Promise<ProductRef[]
     return data ?? [];
 }
 
+/** Verilen ürün id'lerinin parasut_product_id eşlemesi (badge kontrolünde N+1'i önler). */
+export async function dbGetProductParasutIds(ids: string[]): Promise<Map<string, string | null>> {
+    if (ids.length === 0) return new Map();
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("products")
+        .select("id, parasut_product_id")
+        .in("id", ids);
+    if (error) throw new Error(error.message);
+    const map = new Map<string, string | null>();
+    for (const r of data ?? []) map.set(r.id as string, (r.parasut_product_id as string | null) ?? null);
+    return map;
+}
+
 export async function dbListProducts(filter: ListProductsFilter = {}): Promise<ProductWithStock[]> {
     const supabase = createServiceClient();
     const { page = 1, pageSize = 100, category, product_type, is_active } = filter;
@@ -338,6 +352,18 @@ export async function dbTryResolveShortages(productId: string): Promise<ResolveS
     });
     if (error) throw new Error(error.message);
     return data as ResolveShortagesResult;
+}
+
+/** Bir siparişin açık (open) shortage'larının distinct product_id'leri (yeniden tahsisat için). */
+export async function dbGetOpenShortageProductIds(orderId: string): Promise<string[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("shortages")
+        .select("product_id")
+        .eq("order_id", orderId)
+        .eq("status", "open");
+    if (error) throw new Error(error.message);
+    return [...new Set((data ?? []).map((r) => r.product_id as string))];
 }
 
 /**

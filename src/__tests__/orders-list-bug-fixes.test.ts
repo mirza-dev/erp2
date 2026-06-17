@@ -27,7 +27,6 @@ describe("isOrderCancellable", () => {
     });
     it("sevk edilmiş → iptal edilemez", () => {
         expect(isOrderCancellable({ commercial_status: "approved", fulfillment_status: "shipped" })).toBe(false);
-        expect(isOrderCancellable({ commercial_status: "approved", fulfillment_status: "partially_shipped" })).toBe(true);
     });
 });
 

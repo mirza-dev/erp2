@@ -673,14 +673,12 @@ const FULFILL_LABEL: Record<Order["fulfillment_status"], string> = {
     shipped: "Sevk edildi",
     allocated: "Rezerveli",
     partially_allocated: "Kısmi tahsis",
-    partially_shipped: "Kısmi sevk",
     unallocated: "Bekliyor",
 };
 const FULFILL_TONE: Record<Order["fulfillment_status"], Tone> = {
     shipped: "success",
     allocated: "info",
     partially_allocated: "info",
-    partially_shipped: "info",
     unallocated: "warning",
 };
 

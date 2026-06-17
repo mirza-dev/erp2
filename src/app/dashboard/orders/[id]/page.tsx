@@ -61,7 +61,6 @@ const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: s
     unallocated:         { label: "Rezervesiz",    cls: "badge-neutral",  description: "Stok henüz ayrılmadı" },
     partially_allocated: { label: "Kısmi Rezerve", cls: "badge-warning",  description: "Stok kısmen ayrıldı" },
     allocated:           { label: "Rezerveli",     cls: "badge-warning",  description: "Stok ayrıldı, sevkiyata hazır" },
-    partially_shipped:   { label: "Sevk Edildi",   cls: "badge-success",  description: "Müşteriye gönderildi" },
     shipped:             { label: "Sevk Edildi",   cls: "badge-success",  description: "Müşteriye gönderildi" },
 };
 
@@ -355,6 +354,38 @@ export default function OrderDetailPage() {
         }
     };
 
+    // O2: açık shortage'ları mevcut stoktan yeniden tahsis dener (PO mal kabulü dışında
+    // stok elle geldiğinde). Tümü çözülürse fulfillment allocated'a yükselir → Sevket açılır.
+    const handleReallocate = async () => {
+        if (!order) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setLoading("reallocate");
+        try {
+            const res = await fetch(`/api/orders/${order.id}/reallocate`, { method: "POST" });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast({ type: "error", message: data.error ?? "Yeniden rezerve başarısız." });
+                return;
+            }
+            // Güncel siparişi çek (fulfillment durumu değişmiş olabilir)
+            const fresh = await fetch(`/api/orders/${order.id}`);
+            if (fresh.ok) {
+                const od = await fresh.json();
+                setOrder(mapOrderDetail(od));
+                if (od.fulfillment_status) setFulfillmentStatus(od.fulfillment_status);
+            }
+            if (data.fulfillment_status === "allocated") {
+                toast({ type: "success", message: "Stok tamamen rezerve edildi — sevke hazır." });
+            } else {
+                toast({ type: "warning", message: "Kısmi rezerve — stok hâlâ yetersiz." });
+            }
+        } catch {
+            toast({ type: "error", message: "Yeniden rezerve sırasında hata oluştu." });
+        } finally {
+            setLoading(null);
+        }
+    };
+
     const requestTransition = (next: CommercialStatus | "shipped") => {
         if (next === "cancelled") {
             setConfirmDialog({
@@ -484,8 +515,21 @@ export default function OrderDetailPage() {
                                 <Button variant="dangerSoft" leftIcon={<CircleOff size={14} />} onClick={() => requestTransition("cancelled")} disabled={isDemo || loading !== null} loading={loading === "cancelled"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                                     İptal Et
                                 </Button>
+                                {/* O2: eksik stok varsa "Yeniden Rezerve Et" (PO mal kabulü zaten otomatik
+                                    dener; bu, stok elle geldiğinde manuel tetik). Tümü çözülürse Sevket açılır. */}
+                                {(fulfillmentStatus === "partially_allocated" || fulfillmentStatus === "unallocated") && has("manage_sales_orders") && (
+                                    <Button variant="secondary" leftIcon={<RefreshCw size={14} />} onClick={handleReallocate} disabled={isDemo || loading !== null} loading={loading === "reallocate"} title={isDemo ? DEMO_DISABLED_TOOLTIP : "Açık eksikleri mevcut stoktan yeniden rezerve dener"}>
+                                        {loading === "reallocate" ? "Rezerve ediliyor..." : "Yeniden Rezerve Et"}
+                                    </Button>
+                                )}
                                 {has("ship_sales_orders") && (
-                                    <Button variant="primary" onClick={() => handleTransition("shipped")} disabled={isDemo || loading !== null} loading={loading === "shipped"} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                    <Button
+                                        variant="primary"
+                                        onClick={() => handleTransition("shipped")}
+                                        disabled={isDemo || loading !== null || fulfillmentStatus !== "allocated"}
+                                        loading={loading === "shipped"}
+                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : (fulfillmentStatus !== "allocated" ? "Önce eksik stoğu rezerve edin" : undefined)}
+                                    >
                                         {loading === "shipped" ? "Paraşüt'e gönderiliyor..." : "Sevket"}
                                     </Button>
                                 )}

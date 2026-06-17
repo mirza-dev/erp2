@@ -10,6 +10,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
+    requirePermissionFor: vi.fn().mockReturnValue(null),
+    resolveAuthContext: vi.fn().mockResolvedValue({
+        perms: new Set(["view_sales_orders", "view_sales_prices", "view_purchase_costs", "view_financial_summary"]),
+    }),
     getCurrentUserPermissions: vi.fn().mockResolvedValue(
         new Set(["view_sales_prices", "view_purchase_costs", "view_financial_summary"])),
 }));

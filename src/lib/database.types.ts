@@ -11,7 +11,9 @@ export type Json = string | number | boolean | null | { [key: string]: any } | a
 // ── Enums ────────────────────────────────────────────────────
 
 export type CommercialStatus = "draft" | "pending_approval" | "approved" | "cancelled"
-export type FulfillmentStatus = "unallocated" | "partially_allocated" | "allocated" | "partially_shipped" | "shipped"
+// NOT: partially_shipped kaldırıldı (2026-06 denetim D1) — hiçbir RPC/servis bu duruma
+// geçiş yapmıyordu (kısmi sevk yok); yalnız tip+UI ölü kodu vardı.
+export type FulfillmentStatus = "unallocated" | "partially_allocated" | "allocated" | "shipped"
 export type ProductType = "manufactured" | "commercial"
 export type ReservationStatus = "open" | "shipped" | "released"
 export type ShortageStatus = "open" | "resolved" | "cancelled"

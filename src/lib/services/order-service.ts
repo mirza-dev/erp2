@@ -26,7 +26,7 @@ import {
 
 import { dbCreateAlert, dbListActiveAlerts, dbBatchResolveAlerts, type BatchResolveEntry } from "@/lib/supabase/alerts";
 import { dbGetCustomerById } from "@/lib/supabase/customers";
-import { dbGetProductById } from "@/lib/supabase/products";
+import { dbGetProductById, dbTryResolveShortages, dbGetOpenShortageProductIds } from "@/lib/supabase/products";
 import { createServiceClient } from "@/lib/supabase/service";
 import { enqueueInternalNotification } from "@/lib/services/notification-outbox-service";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
@@ -126,6 +126,43 @@ export async function serviceListOrders(filter: ListOrdersFilter = {}) {
 
 export async function serviceGetOrder(id: string) {
     return dbGetOrderById(id);
+}
+
+export interface ReallocateResult {
+    fulfillment_status: FulfillmentStatus | null;
+    productsTried: number;
+    shortagesResolved: number;
+}
+
+/**
+ * Bir siparişin açık shortage'larını mevcut stoktan yeniden tahsis etmeyi dener
+ * (manuel "Yeniden Rezerve Et"). Siparişin shortage ürünleri için FIFO
+ * try_resolve_shortages çağırır; tüm shortage çözülünce sipariş
+ * partially_allocated→allocated yükselir (mig.008). PO mal kabulü dışında stok
+ * elle geldiğinde de sevk yolunu açar (denetim O2). Best-effort: bir ürün
+ * çözülemese de diğerleri denenir. approved-only (try_resolve_shortages kapsamı).
+ */
+export async function serviceReallocateOrder(orderId: string): Promise<ReallocateResult> {
+    const order = await dbGetOrderById(orderId);
+    if (!order) throw new Error("Sipariş bulunamadı.");
+
+    const productIds = await dbGetOpenShortageProductIds(orderId);
+    let shortagesResolved = 0;
+    for (const pid of productIds) {
+        try {
+            const r = await dbTryResolveShortages(pid);
+            shortagesResolved += r.shortages_resolved;
+        } catch {
+            // best-effort — tek ürün hatası tüm işlemi bozmaz
+        }
+    }
+
+    const updated = await dbGetOrderById(orderId);
+    return {
+        fulfillment_status: updated?.fulfillment_status ?? null,
+        productsTried: productIds.length,
+        shortagesResolved,
+    };
 }
 
 export async function serviceCreateOrder(input: CreateOrderInput) {

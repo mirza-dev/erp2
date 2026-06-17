@@ -592,7 +592,7 @@ export interface SeedOrder {
     orderNumber: string;
     customerName: string;
     commercial: "draft" | "pending_approval" | "approved" | "cancelled";
-    fulfillment: "unallocated" | "partially_allocated" | "allocated" | "partially_shipped" | "shipped";
+    fulfillment: "unallocated" | "partially_allocated" | "allocated" | "shipped";
     currency: "TRY" | "USD" | "EUR";
     createdDaysAgo: number;
     quoteValidUntil?: string | null;
@@ -701,10 +701,10 @@ export const SEED_ORDERS: SeedOrder[] = [
             { sku: "TGAV-150-DN150-WCB", qty: 4, price: 830, disc: 0 },
         ],
     },
-    // 9) approved + partially_shipped — Abdi
+    // 9) approved + shipped — Abdi (eski partially_shipped; D1 ile kaldırıldı → tam sevk)
     {
         orderNumber: "ORD-2026-0009", customerName: "Abdi İbrahim İlaç A.Ş.",
-        commercial: "approved", fulfillment: "partially_shipped", currency: "EUR", createdDaysAgo: 12,
+        commercial: "approved", fulfillment: "shipped", currency: "EUR", createdDaysAgo: 12,
         plannedShipmentDate: daysAgo(2),
         lines: [
             { sku: "KST-600-DN20-A105-NPT", qty: 30, price: 28, disc: 0 },

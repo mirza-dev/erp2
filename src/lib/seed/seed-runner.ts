@@ -443,25 +443,6 @@ export async function runSeed(supabase: Service): Promise<Record<string, unknown
         const orderLines = (insertedLines ?? []).filter(l => l.order_id === orderId);
 
         for (const ol of orderLines) {
-            if (o.fulfillment === "partially_shipped") {
-                const shippedQty = Math.ceil(ol.quantity / 2);
-                const openQty = ol.quantity - shippedQty;
-                if (shippedQty > 0) {
-                    reservationRows.push({
-                        product_id: ol.product_id, order_id: orderId, order_line_id: ol.id,
-                        reserved_qty: shippedQty, status: "shipped",
-                    });
-                }
-                if (openQty > 0) {
-                    reservationRows.push({
-                        product_id: ol.product_id, order_id: orderId, order_line_id: ol.id,
-                        reserved_qty: openQty, status: "open",
-                    });
-                    productReservedQty.set(ol.product_id, (productReservedQty.get(ol.product_id) ?? 0) + openQty);
-                    remainingAvail.set(ol.product_id, (remainingAvail.get(ol.product_id) ?? 0) - openQty);
-                }
-                continue;
-            }
             if (o.fulfillment === "shipped") {
                 reservationRows.push({
                     product_id: ol.product_id, order_id: orderId, order_line_id: ol.id,
@@ -614,10 +595,10 @@ export async function runSeed(supabase: Service): Promise<Record<string, unknown
         }
     }
     for (const o of SEED_ORDERS) {
-        if (o.fulfillment !== "shipped" && o.fulfillment !== "partially_shipped") continue;
+        if (o.fulfillment !== "shipped") continue;
         for (const l of o.lines) {
             const prod = bySku(l.sku);
-            const qty = o.fulfillment === "partially_shipped" ? Math.ceil(l.qty / 2) : l.qty;
+            const qty = l.qty;
             movementRows.push({
                 product_id: prod.id, movement_type: "shipment", quantity: -qty,
                 reference_type: "order", reference_id: orderIdMap.get(o.orderNumber),
