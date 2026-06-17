@@ -9,7 +9,7 @@ import type { Product } from "@/lib/mock-data";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
-import { usePagination } from "@/hooks/usePagination";
+import { computeTotalPages, PAGE_SIZE } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
@@ -92,10 +92,16 @@ export default function ProductsPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has, canViewSalesPrices } = usePermissions();
-    const [mockProducts, setMockProducts] = useState<Product[]>([]);
+    // A1 sunucu tarafı sayfalama: pageRows = yalnız geçerli sayfanın satırları
+    // (eski "tüm katalog" mega-fetch yerine). total/counts sunucudan gelir.
+    const [pageRows, setPageRows] = useState<Product[]>([]);
+    const [total, setTotal] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [counts, setCounts] = useState<{ total: number; categories: Record<string, number>; critical: number } | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState("");
+    const [committedSearch, setCommittedSearch] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -139,17 +145,68 @@ export default function ProductsPage() {
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
     const [bulkDeleting, setBulkDeleting] = useState(false);
 
-    const refetch = useCallback(async () => {
-        const res = await fetch("/api/products");
-        if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data)) setMockProducts(data.map(mapProduct));
-        } else {
+    // Sinyal filtresi (riskli/uyarılı/öneri) → tüm-katalog overlay'lerinden id seti.
+    // null = "tümü" (id filtresi yok). Boş dizi = sinyal aktif ama eşleşen yok → boş liste.
+    const signalIds = useMemo<string[] | null>(() => {
+        if (alertFilter === "riskli") return Array.from(riskData.keys());
+        if (alertFilter === "uyarili") return Array.from(productsWithAlerts);
+        if (alertFilter === "oneri") {
+            return Array.from(recMap.entries())
+                .filter(([, r]) => r.status === "suggested")
+                .map(([id]) => id);
+        }
+        return null;
+    }, [alertFilter, riskData, productsWithAlerts, recMap]);
+
+    const buildListParams = useCallback(() => {
+        const params = new URLSearchParams();
+        params.set("paged", "1");
+        params.set("page", String(currentPage));
+        if (committedSearch) params.set("search", committedSearch);
+        for (const c of selectedCategories) params.append("category", c);
+        // İmalat/Ticari: yalnız tek seçim sunucu filtresi yaratır (her ikisi ya da
+        // hiçbiri = tüm tipler, eski client davranışıyla aynı).
+        if (filterManufactured && !filterCommercial) params.set("product_type", "manufactured");
+        else if (filterCommercial && !filterManufactured) params.set("product_type", "commercial");
+        if (signalIds !== null) {
+            params.set("signal", "1");
+            if (signalIds.length > 0) params.set("ids", signalIds.join(","));
+        }
+        return params;
+    }, [currentPage, committedSearch, selectedCategories, filterManufactured, filterCommercial, signalIds]);
+
+    const fetchList = useCallback(async () => {
+        try {
+            const res = await fetch(`/api/products?${buildListParams().toString()}`);
+            if (res.ok) {
+                const data = await res.json();
+                setPageRows(Array.isArray(data.rows) ? data.rows.map(mapProduct) : []);
+                setTotal(typeof data.total === "number" ? data.total : 0);
+                setLoadError(null);
+            } else {
+                setLoadError("Ürünler yüklenemedi.");
+            }
+        } catch {
             setLoadError("Ürünler yüklenemedi.");
         }
+    }, [buildListParams]);
+
+    const refetchCounts = useCallback(async () => {
+        try {
+            const res = await fetch("/api/products/counts");
+            if (res.ok) setCounts(await res.json());
+        } catch { /* graceful: sayaçlar yoksa rozet/dropdown 0 gösterir */ }
     }, []);
 
-    useEffect(() => { refetch(); }, [refetch]);
+    // Arama debounce (350ms) + filtre değişiminde sayfayı 1'e al (tek fetch).
+    useEffect(() => {
+        const t = setTimeout(() => { setCommittedSearch(search.trim()); setCurrentPage(1); }, 350);
+        return () => clearTimeout(t);
+    }, [search]);
+
+    // Tek fetch kaynağı: filtre/sayfa/sinyal değiştiğinde yeniden çeker.
+    useEffect(() => { fetchList(); }, [fetchList]);
+    useEffect(() => { refetchCounts(); }, [refetchCounts]);
 
     useEffect(() => {
         let cancelled = false;
@@ -169,7 +226,7 @@ export default function ProductsPage() {
         if (refreshing) return;
         setRefreshing(true);
         try {
-            await refetch();
+            await Promise.all([fetchList(), refetchCounts()]);
             // Run alert scan on manual refresh (not on mount — too expensive)
             try { await fetch("/api/alerts/scan", { method: "POST" }); } catch { /* non-fatal */ }
             try {
@@ -248,46 +305,24 @@ export default function ProductsPage() {
 
     const isMobile = windowWidth < 768;
 
-    const filtered = useMemo(() => mockProducts.filter((p) => {
-        const matchSearch =
-            p.name.toLowerCase().includes(search.toLowerCase()) ||
-            p.sku.toLowerCase().includes(search.toLowerCase());
-        const matchCategory = selectedCategories.length === 0 || selectedCategories.includes(p.category);
-        const pRisk = riskData.get(p.id);
-        const pRec = recMap.get(p.id);
-        const matchSignal =
-            alertFilter === "riskli" ? !!pRisk :
-            alertFilter === "uyarili" ? productsWithAlerts.has(p.id) :
-            alertFilter === "oneri" ? pRec?.status === "suggested" :
-            true;
-        const matchUsage =
-            (!filterManufactured && !filterCommercial) ||
-            (filterManufactured && !filterCommercial && p.productType === "manufactured") ||
-            (!filterManufactured && filterCommercial && p.productType === "commercial") ||
-            (filterManufactured && filterCommercial && (p.productType === "manufactured" || p.productType === "commercial"));
-        return matchSearch && matchCategory && matchSignal && matchUsage;
-    }), [mockProducts, search, selectedCategories, riskData, recMap, alertFilter, productsWithAlerts, filterManufactured, filterCommercial]);
-
-    const { pagedItems, currentPage, setCurrentPage, totalPages, totalItems, pageSize } =
-        usePagination(filtered, {
-            resetKey: `${search}|${alertFilter}|${selectedCategories.join(",")}|${filterManufactured ? "M" : ""}|${filterCommercial ? "C" : ""}`,
-        });
+    // Filtreleme/sayfalama SUNUCU tarafında (dbListProductsPaged + id.in). pageRows
+    // zaten yalnız geçerli sayfanın filtrelenmiş satırları → client'ta tekrar filtreleme YOK.
+    const totalPages = computeTotalPages(total, PAGE_SIZE);
 
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
-        useSelection(`${search}|${alertFilter}|${selectedCategories.join(",")}|${filterManufactured ? "M" : ""}|${filterCommercial ? "C" : ""}`);
-    const pageIds = pagedItems.map(p => p.id);
+        useSelection(`${committedSearch}|${alertFilter}|${selectedCategories.join(",")}|${filterManufactured ? "M" : ""}|${filterCommercial ? "C" : ""}|${currentPage}`);
+    const pageIds = pageRows.map(p => p.id);
 
-    const criticalCount = mockProducts.filter(p => p.promisable <= p.minStockLevel).length;
+    // Başlık/dropdown/kritik sayaçları tüm-katalog (sayfalamadan bağımsız) → counts ucundan.
+    const criticalCount = counts?.critical ?? 0;
+    const totalProductCount = counts?.total ?? 0;
 
     const categories = useMemo(
-        () => ["Tümü", ...Array.from(new Set(mockProducts.map(p => p.category).filter(Boolean))).sort()],
-        [mockProducts]
+        () => ["Tümü", ...(counts ? Object.keys(counts.categories).sort() : [])],
+        [counts]
     );
 
-    const categoryCounts: Record<string, number> = { "Tümü": mockProducts.length };
-    categories.slice(1).forEach(cat => {
-        categoryCounts[cat] = mockProducts.filter(p => p.category === cat).length;
-    });
+    const categoryCounts: Record<string, number> = { "Tümü": totalProductCount, ...(counts?.categories ?? {}) };
 
     const categoryButtonLabel: string =
         selectedCategories.length === 0
@@ -297,9 +332,10 @@ export default function ProductsPage() {
             : `Kategori (${selectedCategories.length})`;
     const categoryIsActive = selectedCategories.length > 0;
 
-    const riskliCount = mockProducts.filter(p => riskData.has(p.id)).length;
+    // Sinyal sayaçları tüm-katalog overlay'lerinden (riskData/alerts/recMap), sayfa değil.
+    const riskliCount = riskData.size;
     const uyariliCount = productsWithAlerts.size;
-    const oneriCount = mockProducts.filter(p => recMap.get(p.id)?.status === "suggested").length;
+    const oneriCount = Array.from(recMap.values()).filter(r => r.status === "suggested").length;
     const createMissingRequired = useMemo(
         () => getMissingRequiredAttributes(createTypeFields, createForm.attributes),
         [createTypeFields, createForm.attributes],
@@ -314,7 +350,7 @@ export default function ProductsPage() {
                 const errBody = await res.json().catch(() => null);
                 throw new Error(errBody?.error ?? "Ürün silinemedi.");
             }
-            await refetch();
+            await Promise.all([fetchList(), refetchCounts()]);
             toast({ type: "success", message: "Ürün silindi" });
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Ürün silinemedi.";
@@ -339,7 +375,7 @@ export default function ProductsPage() {
         clearAll();
         setBulkDeleteConfirm(false);
         setBulkDeleting(false);
-        await refetch();
+        await Promise.all([fetchList(), refetchCounts()]);
     };
 
     const handleCreateTypeChange = async (newTypeId: string) => {
@@ -395,7 +431,7 @@ export default function ProductsPage() {
                 body: JSON.stringify(body),
             });
             if (!res.ok) throw new Error(await res.text());
-            await refetch();
+            await Promise.all([fetchList(), refetchCounts()]);
             setCreateOpen(false);
             setCreateForm({
                 name: "", sku: "", category: "", unit: "adet",
@@ -440,7 +476,7 @@ export default function ProductsPage() {
                         Stok & Ürünler
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        {mockProducts.length} ürün · {categories.length - 1} kategori
+                        {totalProductCount} ürün · {categories.length - 1} kategori
                         {criticalCount > 0 && (
                             <span style={{ color: "var(--danger-text)", fontWeight: 600 }}> · {criticalCount} kritik</span>
                         )}
@@ -569,6 +605,7 @@ export default function ProductsPage() {
                         <div
                             onClick={() => {
                                 setSelectedCategories([]);
+                                setCurrentPage(1);
                                 setCategoryDropdownOpen(false);
                             }}
                             style={{
@@ -600,9 +637,12 @@ export default function ProductsPage() {
                             return (
                                 <div
                                     key={cat}
-                                    onClick={() => setSelectedCategories(prev =>
-                                        checked ? prev.filter(c => c !== cat) : [...prev, cat]
-                                    )}
+                                    onClick={() => {
+                                        setSelectedCategories(prev =>
+                                            checked ? prev.filter(c => c !== cat) : [...prev, cat]
+                                        );
+                                        setCurrentPage(1);
+                                    }}
                                     style={{
                                         padding: "8px 12px",
                                         fontSize: "12px",
@@ -653,8 +693,8 @@ export default function ProductsPage() {
                     const active = type === "manufactured" ? filterManufactured : filterCommercial;
                     const label  = type === "manufactured" ? "İmalat" : "Ticari";
                     const toggle = type === "manufactured"
-                        ? () => setFilterManufactured(p => !p)
-                        : () => setFilterCommercial(p => !p);
+                        ? () => { setFilterManufactured(p => !p); setCurrentPage(1); }
+                        : () => { setFilterCommercial(p => !p); setCurrentPage(1); };
                     return (
                         <button
                             key={type}
@@ -694,13 +734,13 @@ export default function ProductsPage() {
                 <UnderlinedFilterTabs
                     ariaLabel="Ürün sinyal filtresi"
                     items={[
-                        { key: "tumu", label: "Tümü", count: mockProducts.length },
+                        { key: "tumu", label: "Tümü", count: totalProductCount },
                         { key: "riskli", label: "Riskli", count: riskLoading ? null : riskliCount },
                         { key: "uyarili", label: "Uyarı var", count: uyariliCount },
                         { key: "oneri", label: "Öneri bekliyor", count: oneriCount },
                     ]}
                     activeKey={alertFilter}
-                    onChange={setAlertFilter}
+                    onChange={(k) => { setAlertFilter(k); setCurrentPage(1); }}
                 />
             </div>
 
@@ -771,7 +811,7 @@ export default function ProductsPage() {
                         </tr>
                     </thead>
                     <tbody>
-                        {pagedItems.map((product) => {
+                        {pageRows.map((product) => {
                             const isCritical = product.promisable <= product.minStockLevel;
                             const rowBg = hoveredId === product.id ? "var(--bg-secondary)" : "transparent";
                             return (
@@ -869,18 +909,18 @@ export default function ProductsPage() {
                     </tbody>
                 </table>
 
-                {filtered.length > 0 && (
+                {total > 0 && (
                     <Pagination
                         currentPage={currentPage}
                         totalPages={totalPages}
-                        totalItems={totalItems}
-                        pageSize={pageSize}
+                        totalItems={total}
+                        pageSize={PAGE_SIZE}
                         onPageChange={setCurrentPage}
                         itemLabel="ürün"
                     />
                 )}
 
-                {filtered.length === 0 && (
+                {total === 0 && (
                     <div style={{
                         padding: "40px 16px",
                         textAlign: "center",
@@ -902,7 +942,7 @@ export default function ProductsPage() {
                             <Button
                                 variant="secondary"
                                 size="sm"
-                                onClick={() => { setSearch(""); setAlertFilter("tumu"); }}
+                                onClick={() => { setSearch(""); setAlertFilter("tumu"); setCurrentPage(1); }}
                             >
                                 Filtreleri temizle
                             </Button>

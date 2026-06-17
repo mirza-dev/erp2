@@ -1,6 +1,7 @@
 import { createServiceClient } from "./service";
 import type { ProductWithStock } from "@/lib/database.types";
 import { unstable_cache } from "next/cache";
+import { orIlikeFilter } from "@/lib/list-query";
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -155,6 +156,100 @@ export async function dbListProducts(filter: ListProductsFilter = {}): Promise<P
     if (error) throw new Error(error.message);
 
     return (data ?? []).map(p => ({ ...p, available_now: p.on_hand - p.reserved }));
+}
+
+// ── A1: Stok & Ürünler sunucu tarafı sayfalama ───────────────
+// Diğer 5 listenin RSC kalıbından farklı: products sayfası "use client" kalır
+// (risk/alert overlay'leri AI/POST ve mount-sonrası çalışır → RSC'ye ucuza
+// taşınamaz). Bu helper temel liste filtrelerini (arama/kategori/tip + sinyal
+// id.in) SQL'e taşıyıp tek sorguda {rows,total} döner → client mega-fetch ölür.
+
+export const PRODUCTS_DEFAULT_PAGE_SIZE = 50;
+
+export interface ProductsPageQuery {
+    search?: string;
+    /** Çoklu kategori seçimi (UI dropdown). Boş → kategori filtresi yok. */
+    categories?: string[];
+    product_type?: "manufactured" | "commercial";
+    is_active?: boolean;
+    /** Sinyal filtresi (riskli/uyarılı/öneri) üyelik id seti → id.in. */
+    ids?: string[];
+    /** Sinyal filtresi aktif: ids boşsa TÜM ürünler değil BOŞ döner (tam sadakat). */
+    signalActive?: boolean;
+    page?: number;
+    pageSize?: number;
+}
+
+export interface ProductsPageResult {
+    rows: ProductWithStock[];
+    total: number;
+}
+
+export async function dbListProductsPaged(query: ProductsPageQuery = {}): Promise<ProductsPageResult> {
+    const {
+        search, categories, product_type, is_active = true,
+        ids, signalActive, page = 1, pageSize = PRODUCTS_DEFAULT_PAGE_SIZE,
+    } = query;
+
+    // Sinyal filtresi aktif ama eşleşen id yok → boş (yanlışlıkla tümünü döndürme).
+    if (signalActive && (!ids || ids.length === 0)) return { rows: [], total: 0 };
+
+    const supabase = createServiceClient();
+    let q = supabase.from("products").select("*", { count: "exact" });
+
+    if (is_active !== undefined) q = q.eq("is_active", is_active);
+    if (product_type) q = q.eq("product_type", product_type);
+    if (categories && categories.length > 0) q = q.in("category", categories);
+    if (ids && ids.length > 0) q = q.in("id", ids);
+    if (search && search.trim()) q = q.or(orIlikeFilter(["name", "sku"], search.trim()));
+
+    q = q.order("name").range((page - 1) * pageSize, page * pageSize - 1);
+
+    const { data, error, count } = await q;
+    if (error) throw new Error(error.message);
+
+    return {
+        rows: (data ?? []).map(p => ({ ...p, available_now: p.on_hand - p.reserved })),
+        total: count ?? 0,
+    };
+}
+
+export interface ProductListCounts {
+    /** Aktif ürün toplamı (başlık + "Tümü" sinyal sekmesi + kategori "Tümü"). */
+    total: number;
+    /** Kategori → ürün sayısı (dropdown sayaçları). Boş kategoriler hariç. */
+    categories: Record<string, number>;
+    /** Kritik: promisable ≤ min_stock_level (başlık rozeti). quoted aggregate gerekir. */
+    critical: number;
+}
+
+/**
+ * Liste başlık + kategori dropdown + kritik sayaçları — sayfalamadan bağımsız
+ * (tüm-katalog). Yalnızca hafif kolonları çeker (id/category/on_hand/reserved/
+ * min_stock_level) → eski full-object mega-fetch'e göre çok daha ucuz.
+ * Sinyal sayaçları (riskli/uyarılı/öneri) overlay uçlarından gelir, burada DEĞİL.
+ */
+export async function dbGetProductListCounts(opts: { is_active?: boolean } = {}): Promise<ProductListCounts> {
+    const is_active = opts.is_active ?? true;
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("products")
+        .select("id, category, on_hand, reserved, min_stock_level")
+        .eq("is_active", is_active);
+    if (error) throw new Error(error.message);
+
+    const rows = data ?? [];
+    const quotedMap = await dbGetQuotedQuantities();
+    const categories: Record<string, number> = {};
+    let critical = 0;
+    for (const r of rows) {
+        const cat = (r.category as string | null) ?? "";
+        if (cat) categories[cat] = (categories[cat] ?? 0) + 1;
+        const quoted = quotedMap.get(r.id as string) ?? 0;
+        const promisable = ((r.on_hand as number) - (r.reserved as number)) - quoted;
+        if (promisable <= (r.min_stock_level as number)) critical++;
+    }
+    return { total: rows.length, categories, critical };
 }
 
 export async function dbCreateProduct(input: CreateProductInput): Promise<ProductWithStock> {

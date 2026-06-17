@@ -44,6 +44,7 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     { path: "settings/user/profile", methods: ["GET", "PATCH"], cls: "self-auth", reason: "getUser() → kendi profili" },
 
     // ── redaction (kapı yok, alan maskeleme var — bilinçli) ───────────
+    { path: "products/counts", methods: ["GET"], cls: "public", reason: "A1 sunucu sayfalama: yalnız adetler (toplam/kategori/kritik) — fiyat/maliyet yok; products list GET ile aynı sınıf (proxy session önde)" },
     { path: "products/aging", methods: ["GET"], cls: "redaction", reason: "boundCapital/costPrice perm'e göre maskelenir" },
     { path: "products/[id]/quotes", methods: ["GET"], cls: "redaction", reason: "unitPrice/lineTotal view_sales_prices'a göre maskelenir" },
 

@@ -88,12 +88,26 @@ describe("Pagination — liste sayfası entegrasyonu", () => {
         expect(src).not.toContain("pagedItems");
     });
 
-    it("products/page.tsx pagination wired", async () => {
+    // A1: products SUNUCU tarafı sayfalamaya geçti — sayfa "use client" KALIR
+    // (risk/alert overlay'leri AI/POST), ama veri fetch'i sunucu-sayfalı
+    // (?paged=1 → {rows,total}) + sayaçlar /api/products/counts'tan; client
+    // dilimleme (usePagination(filtered)/pagedItems) kalmadı.
+    it("products/page.tsx server-side pagination wired", async () => {
         const src = await readPage("src/app/dashboard/products/page.tsx");
-        expectPaginationWired(src);
+        expect(src).toContain('from "@/components/ui/Pagination"');
+        expect(src).toContain("computeTotalPages");
+        expect(src).toContain("<Pagination");
         expect(src).toContain('itemLabel="ürün"');
-        // Multi-filter resetKey ingredients (regression lock)
+        expect(src).toContain("onPageChange={setCurrentPage}");
+        // Sunucu-sayfalı fetch + sayaç ucu
+        expect(src).toContain('paged');
+        expect(src).toContain("/api/products/counts");
+        // Multi-filter / sinyal id seti hâlâ var (regression lock)
         expect(src).toContain("alertFilter");
-        expect(src).toContain("selectedCategories.join");
+        expect(src).toContain("selectedCategories");
+        expect(src).toContain("signalIds");
+        // Client dilimleme kalmamalı
+        expect(src).not.toContain("usePagination(filtered");
+        expect(src).not.toContain("pagedItems");
     });
 });

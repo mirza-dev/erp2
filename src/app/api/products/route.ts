@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbListProducts, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
+import { dbListProducts, dbListProductsPaged, dbCreateProduct, dbGetQuotedQuantities, type CreateProductInput } from "@/lib/supabase/products";
 import { dbGetIncomingQuantities } from "@/lib/supabase/purchase-commitments";
 import { validateProductInput } from "@/lib/validation/product-input";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
@@ -103,6 +103,38 @@ export async function GET(req: NextRequest) {
             const dbMs = dbSpan();
             return appendServerTiming(
                 NextResponse.json(redactProductsForPerms(enriched, perms)),
+                [{ name: "auth", ms: authMs }, { name: "db", ms: dbMs }],
+            );
+        }
+        // A1: sunucu tarafı sayfalama (Stok & Ürünler client'ı). Mega-fetch yerine
+        // tek sayfa {rows,total} döner. Arama/çoklu-kategori/tip + sinyal id seti
+        // (riskli/uyarılı/öneri → id.in) SQL'de uygulanır. Dizi şekli (?all=1 /
+        // bare GET) DEĞİŞMEZ — yalnız paged=1 nesne döndürür.
+        if (searchParams.get("paged") === "1") {
+            const categories = searchParams.getAll("category").filter(Boolean);
+            const search = searchParams.get("search") ?? undefined;
+            const idsParam = searchParams.get("ids");
+            const ids = idsParam ? idsParam.split(",").filter(Boolean) : undefined;
+            const signalActive = searchParams.get("signal") === "1";
+            const pagedPage = Math.max(1, parseInt(searchParams.get("page") ?? "1") || 1);
+            const dbSpan = startSpan();
+            const { rows, total } = await dbListProductsPaged({
+                search,
+                categories,
+                product_type: (productType || undefined) as "manufactured" | "commercial" | undefined,
+                is_active: isActive,
+                ids,
+                signalActive,
+                page: pagedPage,
+            });
+            const [quotedMap, incomingMap] = await Promise.all([
+                dbGetQuotedQuantities(),
+                dbGetIncomingQuantities(),
+            ]);
+            const enriched = enrichProducts(rows, quotedMap, incomingMap);
+            const dbMs = dbSpan();
+            return appendServerTiming(
+                NextResponse.json({ rows: redactProductsForPerms(enriched, perms), total }),
                 [{ name: "auth", ms: authMs }, { name: "db", ms: dbMs }],
             );
         }

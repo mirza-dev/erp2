@@ -7,7 +7,15 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-17 (**A1 rollout — quotes · purchase/orders · customers · vendors server-side pagination**)
+## Son Tamamlanan İş — 2026-06-17 (**A1 — products server-side pagination → A1 EPIC TAMAMLANDI 6/6**)
+
+products A1'in son listesiydi; diğer 5 aynanın temiz RSC kalıbına UYMAZ (risk/alert overlay'leri AI/POST + mount-sonrası → RSC'ye ucuza taşınamaz). **Karar (AskUserQuestion):** "Client + sunucu-sayfalı fetch (tam sadakat)" — sayfa `"use client"` KALIR, mega-fetch → sayfalı `{rows,total}`; sinyal filtresi aktifken overlay ID seti sunucuya `id.in` ile geçer. **migration YOK.**
+- **`supabase/products.ts`:** `dbListProductsPaged` (arama name/sku `.or` + çoklu-kategori `in(category)` + tip `eq` + sinyal `in(id)` + `count:"exact"`; **`signalActive && ids boş → BOŞ`** [tümünü döndürmez, sorgu çalıştırmaz]); `dbGetProductListCounts` (tüm-katalog total+kategori+kritik [`promisable=on_hand-reserved-quoted ≤ minStok`, `dbGetQuotedQuantities` gerekir]; hafif kolonlar id/category/on_hand/reserved/min_stock_level — full-object değil); `PRODUCTS_DEFAULT_PAGE_SIZE=50`; `orIlikeFilter` import.
+- **route:** `GET /api/products?paged=1` → `{rows,total}` (dizi şekli `?all=1`/çıplak GET DEĞİŞMEZ — yalnız paged=1 nesne; enrich+redact aynen); YENİ `GET /api/products/counts` (yalnız adetler, hassas değil → gate baseline'a `public` kayıt; products list GET'le aynı sınıf).
+- **`products/page.tsx`:** `mockProducts`(tüm)→`pageRows`(sayfa)+`total`+`counts`; `signalIds` memo (riskli=riskData.keys/uyarılı=productsWithAlerts/öneri=recMap suggested → null=tümü); `buildListParams`+`fetchList`+`refetchCounts`; arama 350ms debounce + filtre değişiminde `setCurrentPage(1)` (kategori/tip/alertFilter/temizle handler'ları); `filtered`/`usePagination(filtered)`/`pagedItems` KALKTI → `computeTotalPages(total,PAGE_SIZE)`+`<Pagination onPageChange={setCurrentPage}>`; sinyal/kategori/kritik sayaçları overlay(size)+counts'tan (sayfadan değil); mutasyon→`fetchList()+refetchCounts()`.
+- **Test:** +7 (`products-pagination.test.ts` paged filtre/sinyal-boş-guard/range + counts agregasyon; `pagination-integration` products→server-side; gate matrix `products/counts` baseline). tsc 0 · lint 0 · **5545 test** · build 0 (`/api/products/counts` ƒ dynamic). **Kalan:** push + manuel smoke (arama/kategori/tip/sinyal sunucuda; sinyal sekmeleri tam-katalog [yalnız sayfa değil]; sayaçlar/kritik doğru; mutasyon→liste+sayaç; viewer redaction; demo bloklu). ⇒ [[deferred_backlog]] A1 TAMAMLANDI 6/6.
+
+<details><summary>Önceki: A1 rollout — quotes · purchase/orders · customers · vendors server-side pagination</summary>
 
 Orders pilotunun (aynı gün `d4ed2e9`) RSC + sunucu-filtre/sayfalama pattern'i 4 "ayna" listeye yayıldı; **products ERTELENDİ** (risk/AI/alert overlay tüm-set client → ayrı redesign turu, [[deferred_backlog]] A1 kalanı). Kararlar (AskUserQuestion): 4 ayna + products ertele · paylaşılan soyutlama. **migration YOK.**
 - **Shared infra:** `src/hooks/useListUrlState.ts` — `useListUrlState(current, serialize)` → `{navigate(partial), isPending}` (router.replace+useTransition; `current` REF'te → navigate kararlı, debounce effect'i parent render'da yeniden bağlanmaz) + `useDebouncedSearch(serverValue, onCommit, 350)`. `src/lib/list-query.ts` — `firstStr`/`parsePage`/`orIlikeFilter(columns, search)` (`.or()` güvenli escape, RFQ emsali; `buildOrderSearchOrFilter` buna delege). **Orders pilotu da bu hook'lara refactor edildi** (OrdersClient navigate/debounce → hook; tek bakım noktası).
@@ -18,6 +26,7 @@ Orders pilotunun (aynı gün `d4ed2e9`) RSC + sunucu-filtre/sayfalama pattern'i 
 - **vendors:** arama(name/contact_person/contact_email)+"Pasifleri göster"(all=1→isActive undefined); `dbListVendorsPaged`; TAB YOK → yalnız total (count-by-tab gerekmez).
 - **RSC sonucu:** client `loadError`/`loadVendors`/`loadOrders` graceful-retry kalktı → sunucu hatası Next error boundary'sine (sessiz yutma yok). Testlerdeki eski loadError kilitleri RSC'ye uyarlandı.
 - **Test:** +~50 (`{quotes,purchase-orders,customers,vendors}-pagination.test.ts` filtre→sorgu+total+sayaç + `list-url-state.test.tsx` hook + ~10 source-lock page→Client yönlendirildi: pagination-integration server-side/expectPaginationWired paylaşıldığı için DOKUNULMADI, underlined/button/faz7/theme/interactive/quotes-ui/purchase-orders-ui/customers-ui/vendors-ui). tsc 0 · lint 0 · **5538 test** · build 0 (5 hedef route ƒ dynamic). **Kalan:** push + manuel smoke (her sayfa: filtre/sayfa URL'e + geri/ileri; sayaçlar; mutasyon→refresh; viewer redaction; demo bloklu; customers pasif sekmesi dolu; büyük veri sayfalanır) + **sonraki tur: products** (ayrı/ağır).
+</details>
 
 <details><summary>Önceki: A1 — Orders sunucu tarafı sayfalama / RSC pilot (`d4ed2e9`)</summary>
 
