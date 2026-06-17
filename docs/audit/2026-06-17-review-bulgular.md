@@ -28,11 +28,27 @@ _Tarih: 2026-06-17 · Ajan: `erp2-reviewer` · Mod: tam denetim (`src/` + `supab
 - `localISODate` doğru kullanılmış (`supplier-rfqs.ts:322` — önceki O1 kapanmış).
 - `award_rfq_create_pos`: status guard + `FOR UPDATE` + mükerrer-satır kontrolü.
 
-### ⚠️ Araç kapsama notu (ÖNEMLİ)
-- **semgrep + gitleaks bu oturumda ÇALIŞTIRILAMADI** — sandbox `Bash` iznini bu iki ikili için reddetti (`dangerouslyDisableSandbox` dahil). Mekanik SAST/secret katmanı **atlandı**.
-- Bulgular elle (LLM) inceleme + hedefli `grep` (Y6 UTC, `NEXT_PUBLIC` secret, `dangerouslySetInnerHTML`, Tailwind/framer/hardcoded-renk, `revalidateTag`) kontrollerine dayanıyor.
-- `npm audit` → deps-gate'te (allowlist boş) zaten CI'da.
-- **Tam kapsama için semgrep + gitleaks izinli bir ortamda koşturulmalı** (önceki tur 2026-06-16 koşturabilmişti — bu turda izin reddi yaşandı).
+### ✅ Mekanik araç kapsaması (semgrep + gitleaks koştu — TEMİZ)
+> İlk inceleme turunda semgrep+gitleaks sandbox izniyle koşamamıştı; **kullanıcı isteğiyle tüm repo üzerinde çalıştırıldı (2026-06-17, aynı gün)** ve sonuçlar elle doğrulandı. **Yeni gerçek bulgu yok** — elle denetimin K:0 Y:0 sonucunu doğruladı.
+
+**gitleaks (8.30.1):**
+- **Git history (657 commit / 13.6 MB):** 2 bulgu → **ikisi de false-positive** — (1) `credentials-no-leak.test.ts:44` sentetik fixture (`cs_xK9…`; satır 73 `expect(body).not.toContain(CLIENT_SECRET)` ile sızmadığını doğrulayan kasıtlı sahte), (2) `settings/page.tsx` tarihsel commit (güncel working tree'de o satır placeholder; hardcoded secret yok).
+- **Working-tree (`--no-git`, 1.29 GB):** 149 ham → 143'ü `.next` build cache / `node_modules` / `.claude/worktrees` (gitignore'lı, commit edilmemiş gürültü); gerçek kaynak 6 = `.env.local` (5, **`.gitignore` `.env*` kapsıyor + hiçbir commit geçmişinde YOK** → doğru yerde, sızıntı değil) + test fixture (1). **Gerçek secret sızıntısı: 0.**
+
+**semgrep (1.166.0; 554 registry + 7 erp kuralı, 923 dosya):**
+- 85 bulgu — **hepsi `roven-*` özel kurallardan**; generic registry kuralları (p/owasp-top-ten · p/typescript · p/react · p/nextjs) ~0. Hepsi önceki denetimin triyaj ettiği kategorilerde, **yeni gerçek sorun yok:**
+
+  | Kural | Adet | Değerlendirme |
+  |---|---|---|
+  | `roven-hardcoded-color` | 33 | Belge/PDF/print yüzeyleri (tema-muaf) |
+  | `roven-utc-date-slice` | 29 | Test/seed/UI-display + **3 sunucu-tarafı GÜVENLİ doğrulandı** (ship route noon-anchored `T12:00:00Z`; `computeDueDate` Z-anchored UTC aritmetiği; `parasut.ts` mock) |
+  | `roven-tailwind-classname` | 9 | Proje CSS sınıfları ("grid" alt-dizesi false-positive) |
+  | `roven-inline-money-rounding` | 7 | Önceki denetimde D1 kapsamında kabul/düzeltildi |
+  | `roven-dangerously-set-inner-html` | 7 | **Hepsi statik CSS/tema-bootstrap** (kullanıcı verisi yok → XSS değil) |
+
+- 3 "parser hatası" = Türkçe JSX metni (`& Ürünler →`) semgrep TS-parser'ını takıyor (tsc'de sorunsuz) → o 3 dosya kısmi tarandı (küçük kapsam boşluğu, kod hatası değil).
+
+**`npm audit`** → deps-gate'te (allowlist boş) zaten CI'da; tekrar edilmedi.
 
 ---
 
