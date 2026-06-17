@@ -1,4 +1,5 @@
 import { createServiceClient } from "./service";
+import { orIlikeFilter } from "@/lib/list-query";
 import type { VendorRow } from "@/lib/database.types";
 import { isValidEmail, isValidTaxNumber } from "@/lib/validation";
 
@@ -76,6 +77,40 @@ export async function dbListVendors(filter: ListVendorsFilter = {}): Promise<Ven
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data ?? [];
+}
+
+// ── Server-side pagination (A1) ──────────────────────────────
+export interface VendorsPageQuery {
+    search?: string;                // name / contact_person / contact_email (ilike)
+    isActive?: boolean;             // undefined → tümü (aktif+pasif)
+    page?: number;
+    pageSize?: number;
+}
+
+export interface VendorsPageResult {
+    rows: VendorRow[];
+    total: number;
+}
+
+export const VENDORS_DEFAULT_PAGE_SIZE = 50;
+
+/** Sunucu tarafı filtre + sayfalama. count:"exact" total. */
+export async function dbListVendorsPaged(q: VendorsPageQuery = {}): Promise<VendorsPageResult> {
+    const supabase = createServiceClient();
+    const page = Math.max(1, q.page ?? 1);
+    const pageSize = Math.max(1, q.pageSize ?? VENDORS_DEFAULT_PAGE_SIZE);
+
+    let query = supabase.from("vendors").select("*", { count: "exact" });
+    if (q.isActive !== undefined) query = query.eq("is_active", q.isActive);
+    if (q.search && q.search.trim()) {
+        query = query.or(orIlikeFilter(["name", "contact_person", "contact_email"], q.search));
+    }
+
+    const { data, error, count } = await query
+        .order("name")
+        .range((page - 1) * pageSize, page * pageSize - 1);
+    if (error) throw new Error(error.message);
+    return { rows: data ?? [], total: count ?? 0 };
 }
 
 export async function dbGetVendorById(id: string): Promise<VendorRow | null> {

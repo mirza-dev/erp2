@@ -179,13 +179,13 @@ describe("Faz 4 follow-up — new page fromDraft preload", () => {
 
 describe("isPoCancellable — toplu iptal seçim yüklemi (satış siparişleri paritesi)", () => {
     it("received/cancelled → false (iptal edilemez)", async () => {
-        const { isPoCancellable } = await import("@/app/dashboard/purchase/orders/page");
+        const { isPoCancellable } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
         expect(isPoCancellable({ status: "received" })).toBe(false);
         expect(isPoCancellable({ status: "cancelled" })).toBe(false);
     });
 
     it("draft/sent/confirmed/partially_received → true (iptal edilebilir)", async () => {
-        const { isPoCancellable } = await import("@/app/dashboard/purchase/orders/page");
+        const { isPoCancellable } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
         expect(isPoCancellable({ status: "draft" })).toBe(true);
         expect(isPoCancellable({ status: "sent" })).toBe(true);
         expect(isPoCancellable({ status: "confirmed" })).toBe(true);
@@ -202,7 +202,7 @@ describe("Liste sayfası — hover state + toplu-iptal seçim + modal a11y", () 
         const fs = await import("fs/promises");
         const path = await import("path");
         listSrc = await fs.readFile(
-            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/page.tsx"),
+            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx"),
             "utf-8",
         );
     });
@@ -216,7 +216,7 @@ describe("Liste sayfası — hover state + toplu-iptal seçim + modal a11y", () 
     });
 
     it("toplu iptal seçimi yalnız iptal edilebilir PO'larda (cancellablePageIds)", () => {
-        expect(listSrc).toContain("const cancellablePageIds = pagedItems.filter(isPoCancellable)");
+        expect(listSrc).toContain("const cancellablePageIds = orders.filter(isPoCancellable)");
         expect(listSrc).toContain("toggleAll(cancellablePageIds)");
         expect(listSrc).toContain("isPageAllSelected(cancellablePageIds)");
         // satır checkbox koşullu
@@ -248,55 +248,56 @@ describe("Detay sayfası — iptal modalı aria-labelledby", () => {
 
 describe("formatExpectedDate — ISO → tr-TR (DD.MM.YYYY)", () => {
     it("dolu ISO tarih → tr-TR formatı", async () => {
-        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/page");
+        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
         // tr-TR locale gün.ay.yıl → "15.05.2026"
         expect(formatExpectedDate("2026-05-15")).toBe("15.05.2026");
     });
 
     it("null → '—' (ham ISO basılmaz)", async () => {
-        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/page");
+        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
         expect(formatExpectedDate(null)).toBe("—");
     });
 
     it("UTC midnight ile gün kayması yok (ayın ilk günü)", async () => {
-        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/page");
+        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
         // +"T00:00:00Z" olmadan yerel TZ bir önceki güne kaydırabilirdi
         expect(formatExpectedDate("2026-01-01")).toBe("01.01.2026");
     });
 });
 
-// ── Final ürün turu — sessiz yükleme hatası → görünür error state ──
+// ── A1 RSC: sunucu veri otoritesi + sessiz hata yutma yok ──
+// Eski client loadOrders/loadError modeli kalktı; veri SUNUCU page'inde çekilir,
+// hata atılırsa Next error boundary'sine (dashboard/error.tsx) düşer — boş listeye
+// sessizce yutulmaz.
 
-describe("Liste sayfası — loadOrders sessiz hata yutmuyor (loadError state)", () => {
-    let listSrc = "";
+describe("Liste sayfası — A1 sunucu sayfalama + sessiz hata yok", () => {
+    let pageSrc = "";
+    let clientSrc = "";
 
     beforeAll(async () => {
         const fs = await import("fs/promises");
         const path = await import("path");
-        listSrc = await fs.readFile(
+        pageSrc = await fs.readFile(
             path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/page.tsx"),
+            "utf-8",
+        );
+        clientSrc = await fs.readFile(
+            path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx"),
             "utf-8",
         );
     });
 
-    it("loadError state + !ordersRes.ok → setLoadError(true) + early return", () => {
-        expect(listSrc).toContain("const [loadError, setLoadError]");
-        expect(listSrc).toMatch(/if \(!ordersRes\.ok\) \{\s*setLoadError\(true\);\s*return;/);
-        // Eski sessiz "if (ordersRes.ok)" sarması kalmamalı
-        expect(listSrc).not.toContain("if (ordersRes.ok) {");
-    });
-
-    it("error banner: role=alert + Yeniden dene + empty state'ten ayrı dal", () => {
-        expect(listSrc).toMatch(/loadError \?[^]*role="alert"/);
-        expect(listSrc).toContain("Yeniden dene");
-        expect(listSrc).toContain("Siparişler yüklenemedi");
-        // empty state ("Henüz sipariş yok") artık loadError dalından SONRA gelir
-        expect(listSrc).toMatch(/loadError \?[^]*filtered\.length === 0 \?/);
+    it("sunucu sayfası dbListPurchaseOrdersPaged + count çağırır (client full-fetch yok)", () => {
+        expect(pageSrc).toContain("dbListPurchaseOrdersPaged");
+        expect(pageSrc).toContain("dbCountPurchaseOrdersByStatus");
+        // hata yutan boş-liste fallback'i yok (throw → error boundary)
+        expect(pageSrc).not.toMatch(/catch[\s\S]{0,80}\[\]/);
+        expect(clientSrc).not.toContain('fetch("/api/purchase-orders")');
     });
 
     it("expected_date hücresi formatExpectedDate ile (ham ISO değil)", () => {
-        expect(listSrc).toContain("formatExpectedDate(o.expected_date)");
-        expect(listSrc).not.toContain("{o.expected_date ?? \"—\"}");
+        expect(clientSrc).toContain("formatExpectedDate(o.expected_date)");
+        expect(clientSrc).not.toContain("{o.expected_date ?? \"—\"}");
     });
 });
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useTransition } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useListUrlState, useDebouncedSearch } from "@/hooks/useListUrlState";
 import { maskCurrency, formatDate } from "@/lib/utils";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 import type { OrderTab } from "@/lib/supabase/orders";
@@ -97,13 +98,10 @@ interface FilterState {
 export default function OrdersClient(props: OrdersClientProps) {
     const { orders, total, counts, page, pageSize, tab, search, customerId, dateFrom, dateTo, currency } = props;
     const router = useRouter();
-    const pathname = usePathname();
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has, canViewSalesPrices } = usePermissions();
-    const [isPending, startTransition] = useTransition();
 
-    const [searchText, setSearchText] = useState(search);
     const [refreshing, setRefreshing] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -118,35 +116,31 @@ export default function OrdersClient(props: OrdersClientProps) {
 
     // Sunucu (URL/props) filtre durumunun tek kaynak olması: kontrol değerleri
     // prop'tan okunur, değişiklik URL'e yazılır → sunucu yeniden render eder.
-    const navigate = useCallback((updates: Partial<FilterState>) => {
-        const next: FilterState = { tab, search, customerId, dateFrom, dateTo, currency, page, ...updates };
+    const serialize = (p: FilterState) => {
         const params = new URLSearchParams();
-        if (next.tab && next.tab !== "ALL") params.set("tab", next.tab);
-        if (next.search) params.set("search", next.search);
-        if (next.customerId) params.set("customerId", next.customerId);
-        if (next.dateFrom) params.set("from", next.dateFrom);
-        if (next.dateTo) params.set("to", next.dateTo);
-        if (next.currency) params.set("currency", next.currency);
-        if (next.page > 1) params.set("page", String(next.page));
-        const qs = params.toString();
-        startTransition(() => {
-            router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-        });
-    }, [tab, search, customerId, dateFrom, dateTo, currency, page, router, pathname]);
-
-    // Arama: yazarken responsive kalsın, duraklayınca URL'e yaz (debounce).
-    useEffect(() => { setSearchText(search); }, [search]);
-    useEffect(() => {
-        if (searchText === search) return;
-        const t = setTimeout(() => navigate({ search: searchText.trim(), page: 1 }), 350);
-        return () => clearTimeout(t);
-    }, [searchText, search, navigate]);
+        if (p.tab && p.tab !== "ALL") params.set("tab", p.tab);
+        if (p.search) params.set("search", p.search);
+        if (p.customerId) params.set("customerId", p.customerId);
+        if (p.dateFrom) params.set("from", p.dateFrom);
+        if (p.dateTo) params.set("to", p.dateTo);
+        if (p.currency) params.set("currency", p.currency);
+        if (p.page > 1) params.set("page", String(p.page));
+        return params;
+    };
+    const { navigate, isPending } = useListUrlState<FilterState>(
+        { tab, search, customerId, dateFrom, dateTo, currency, page },
+        serialize,
+    );
+    const { value: searchText, setValue: setSearchText } = useDebouncedSearch(
+        search,
+        (v) => navigate({ search: v, page: 1 }),
+    );
 
     const handleRefresh = () => {
         if (refreshing || isPending) return;
         setRefreshing(true);
-        startTransition(() => router.refresh());
-        // router.refresh() bir promise döndürmez; isPending kısa süre dimler.
+        router.refresh();
+        // router.refresh() bir promise döndürmez; kısa süre dimler.
         setTimeout(() => setRefreshing(false), 500);
     };
 
@@ -166,7 +160,7 @@ export default function OrdersClient(props: OrdersClientProps) {
                 toast({ type: "error", message: errBody.error || `İşlem başarısız (${res.status})` });
                 return;
             }
-            startTransition(() => router.refresh());
+            router.refresh();
         } finally {
             setDeletingId(null);
         }
@@ -193,7 +187,7 @@ export default function OrdersClient(props: OrdersClientProps) {
         clearAll();
         setBulkDeleteConfirm(false);
         setBulkDeleting(false);
-        startTransition(() => router.refresh());
+        router.refresh();
     };
 
     const totalPages = computeTotalPages(total, pageSize);

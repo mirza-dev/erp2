@@ -3,6 +3,7 @@ import { serviceListOrdersPaged, serviceCountOrdersByTab } from "@/lib/services/
 import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { mapOrderSummary } from "@/lib/api-mappers";
 import { ORDERS_DEFAULT_PAGE_SIZE, type OrderTab } from "@/lib/supabase/orders";
+import { firstStr, parsePage } from "@/lib/list-query";
 import OrdersClient from "./OrdersClient";
 
 // Sunucu tarafı filtre + sayfalama (A1). Auth/cookie okuduğu için zaten dinamik;
@@ -10,11 +11,6 @@ import OrdersClient from "./OrdersClient";
 export const dynamic = "force-dynamic";
 
 const VALID_TABS: readonly OrderTab[] = ["ALL", "draft", "pending_approval", "approved", "shipped", "cancelled"];
-
-function firstStr(v: string | string[] | undefined): string {
-    if (Array.isArray(v)) return v[0] ?? "";
-    return v ?? "";
-}
 
 export default async function OrdersPage({
     searchParams,
@@ -30,7 +26,7 @@ export default async function OrdersPage({
     const dateFrom = firstStr(sp.from);
     const dateTo = firstStr(sp.to);
     const currency = firstStr(sp.currency);
-    const page = Math.max(1, parseInt(firstStr(sp.page) || "1", 10) || 1);
+    const page = parsePage(sp.page);
 
     const ctx = await resolveAuthContext();
     if (!ctx.perms.has("view_sales_orders")) {

@@ -14,7 +14,7 @@ const SALES_ORDERS = readFileSync(
     "utf8",
 );
 const PURCHASE_ORDERS = readFileSync(
-    join(process.cwd(), "src/app/dashboard/purchase/orders/page.tsx"),
+    join(process.cwd(), "src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx"),
     "utf8",
 );
 

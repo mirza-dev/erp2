@@ -6,7 +6,7 @@ const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
 
 const GLOBALS = read("src/app/globals.css");
 const UNDERLINED_TABS = read("src/components/ui/UnderlinedFilterTabs.tsx");
-const QUOTES_PAGE = read("src/app/dashboard/quotes/page.tsx");
+const QUOTES_PAGE = read("src/app/dashboard/quotes/QuotesClient.tsx");
 const ORDERS_PAGE = read("src/app/dashboard/orders/OrdersClient.tsx");
 const PRODUCTS_PAGE = read("src/app/dashboard/products/page.tsx");
 // 2026-06-10 sadeleştirme: tabBtnStyle + kolon algılama metni Excel sihirbazında
@@ -40,7 +40,8 @@ describe("interactive muted text readability", () => {
     });
 
     it("non-interactive helper and empty-state copy remains tertiary, not promoted globally", () => {
-        expect(QUOTES_PAGE).toContain('Teklifler yükleniyor...');
+        // A1: yükleniyor metni RSC loading.tsx iskeletine taşındı; QuotesClient
+        // tertiary token'ı (chevron/empty-state) hâlâ kullanır.
         expect(QUOTES_PAGE).toContain('color: "var(--text-tertiary)"');
         expect(IMPORT_PAGE).toContain("AI kolon adlarını ERP alanlarına eşleştiriyor");
         expect(IMPORT_PAGE).toContain('color: "var(--text-tertiary)"');

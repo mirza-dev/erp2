@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const PAGE_SRC = readFileSync(
-    join(process.cwd(), "src/app/dashboard/vendors/page.tsx"),
+    join(process.cwd(), "src/app/dashboard/vendors/VendorsClient.tsx"),
     "utf8",
 );
 
@@ -43,31 +43,25 @@ describe("Tedarikçiler — toplu pasifleştirme onay modalı a11y", () => {
     });
 });
 
-// ── 2. Yükleme hatası — loadError banner ──────────────────────
+// ── 2. A1 RSC: sunucu veri + sessiz hata yok ──────────────────
+// Eski client loadVendors/loadError modeli kalktı; veri SUNUCU page'inde
+// (dbListVendorsPaged) çekilir, hata atılırsa Next error boundary'sine düşer.
 
-describe("Tedarikçiler — görünür yükleme hatası (loadError)", () => {
-    it("loadError state tanımlı ve loadVendors başında sıfırlanır, catch'te set edilir", () => {
-        expect(PAGE_SRC).toMatch(/const \[loadError, setLoadError\] = useState\(false\)/);
-        expect(PAGE_SRC).toMatch(/setLoadError\(false\)/);
-        expect(PAGE_SRC).toMatch(/setLoadError\(true\)/);
+describe("Tedarikçiler — A1 sunucu sayfalama + sessiz hata yok", () => {
+    const SERVER_SRC = readFileSync(
+        join(process.cwd(), "src/app/dashboard/vendors/page.tsx"),
+        "utf8",
+    );
+
+    it("sunucu sayfası dbListVendorsPaged çağırır (client full-fetch yok)", () => {
+        expect(SERVER_SRC).toContain("dbListVendorsPaged");
+        // hata yutan boş-liste fallback'i yok (throw → error boundary)
+        expect(SERVER_SRC).not.toMatch(/catch[\s\S]{0,80}\[\]/);
+        expect(PAGE_SRC).not.toContain('fetch(`/api/vendors?');
     });
 
-    it("loadError true iken role=alert banner + 'Yeniden dene' butonu (loadVendors refetch)", () => {
-        expect(PAGE_SRC).toMatch(/\) : loadError \? \(/);
-        expect(PAGE_SRC).toMatch(/role="alert"/);
-        expect(PAGE_SRC).toMatch(/Tedarikçiler yüklenemedi\. Lütfen tekrar deneyin\./);
-        expect(PAGE_SRC).toMatch(/Yeniden dene/);
-        expect(PAGE_SRC).toMatch(/onClick=\{\(\) => void loadVendors\(\)\}/);
-    });
-
-    it("empty-state ve Pagination loadError'dan sonra gelir (yanıltıcı 'hiç yok' gizlenir)", () => {
-        // loadError dalı, "Henüz tedarikçi eklenmemiş" empty-state'inden ÖNCE gelmeli.
-        const loadErrorIdx = PAGE_SRC.indexOf(") : loadError ? (");
-        const emptyIdx = PAGE_SRC.indexOf("Henüz tedarikçi eklenmemiş.");
-        expect(loadErrorIdx).toBeGreaterThan(-1);
-        expect(emptyIdx).toBeGreaterThan(loadErrorIdx);
-        // Pagination loadError ile de gate'lenir.
-        expect(PAGE_SRC).toMatch(/!loading && !loadError && filtered\.length > 0/);
+    it("empty-state mevcut (sunucu boş döndüğünde)", () => {
+        expect(PAGE_SRC).toContain("Henüz tedarikçi eklenmemiş.");
     });
 });
 
@@ -76,7 +70,7 @@ describe("Tedarikçiler — görünür yükleme hatası (loadError)", () => {
 describe("Tedarikçiler — toplu seçim yalnız aktif tedarikçiler", () => {
     it("select-all pageIds aktif alt-kümeyle hesaplanır", () => {
         expect(PAGE_SRC).toMatch(
-            /const pageIds = pagedItems\.filter\(v => v\.is_active\)\.map\(v => v\.id\)/,
+            /const pageIds = vendors\.filter\(v => v\.is_active\)\.map\(v => v\.id\)/,
         );
     });
 

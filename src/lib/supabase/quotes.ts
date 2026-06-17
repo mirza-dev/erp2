@@ -1,4 +1,5 @@
 import { createServiceClient } from "./service";
+import { orIlikeFilter } from "@/lib/list-query";
 import type { QuoteRow, QuoteStatus, QuoteWithLines } from "@/lib/database.types";
 
 // ── Input types ───────────────────────────────────────────────────────────────
@@ -120,6 +121,66 @@ export async function dbListQuotes(filter: { status?: string; page?: number } = 
     const { data, error } = await q;
     if (error) throw error;
     return (data ?? []) as unknown as QuoteRow[];
+}
+
+// ── Server-side pagination (A1) ──────────────────────────────
+const QUOTE_LIST_COLUMNS =
+    "id, quote_number, status, customer_name, currency, grand_total, quote_date, valid_until, created_at, updated_at";
+
+export type QuoteTab = "ALL" | QuoteStatus;
+
+export interface QuotesPageQuery {
+    status?: QuoteStatus;          // ALL → filtresiz
+    search?: string;               // quote_number VEYA customer_name (ilike)
+    currency?: string;
+    date_from?: string;            // YYYY-MM-DD (created_at >= gün başı)
+    date_to?: string;              // YYYY-MM-DD (created_at <= gün sonu)
+    page?: number;
+    pageSize?: number;
+}
+
+export interface QuotesPageResult {
+    rows: QuoteRow[];
+    total: number;
+}
+
+export const QUOTES_DEFAULT_PAGE_SIZE = 50;
+
+const QUOTE_STATUSES: QuoteStatus[] = ["draft", "sent", "accepted", "rejected", "expired", "revised"];
+
+/** Sunucu tarafı filtre + sayfalama (RSC liste). `count:"exact"` total. */
+export async function dbListQuotesPaged(q: QuotesPageQuery = {}): Promise<QuotesPageResult> {
+    const sb = createServiceClient();
+    const page = Math.max(1, q.page ?? 1);
+    const pageSize = Math.max(1, q.pageSize ?? QUOTES_DEFAULT_PAGE_SIZE);
+
+    let query = sb.from("quotes").select(QUOTE_LIST_COLUMNS, { count: "exact" });
+    if (q.status) query = query.eq("status", q.status);
+    if (q.currency) query = query.eq("currency", q.currency);
+    if (q.date_from) query = query.gte("created_at", `${q.date_from}T00:00:00`);
+    if (q.date_to) query = query.lte("created_at", `${q.date_to}T23:59:59.999`);
+    if (q.search && q.search.trim()) query = query.or(orIlikeFilter(["quote_number", "customer_name"], q.search));
+
+    const { data, error, count } = await query
+        .order("updated_at", { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
+    if (error) throw error;
+    return { rows: (data ?? []) as unknown as QuoteRow[], total: count ?? 0 };
+}
+
+/** Sekme rozet sayaçları — global (filtre-bağımsız; mevcut UI davranışı). */
+export async function dbCountQuotesByStatus(): Promise<Record<QuoteTab, number>> {
+    const sb = createServiceClient();
+    const head = () => sb.from("quotes").select("id", { count: "exact", head: true });
+    const [all, ...byStatus] = await Promise.all([
+        head(),
+        ...QUOTE_STATUSES.map((s) => head().eq("status", s)),
+    ]);
+    const errored = [all, ...byStatus].find((r) => r.error);
+    if (errored?.error) throw errored.error;
+    const out = { ALL: all.count ?? 0 } as Record<QuoteTab, number>;
+    QUOTE_STATUSES.forEach((s, i) => { out[s] = byStatus[i].count ?? 0; });
+    return out;
 }
 
 export async function dbUpdateQuote(

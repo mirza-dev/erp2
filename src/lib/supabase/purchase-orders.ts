@@ -1,5 +1,6 @@
 import { createServiceClient } from "./service";
 import { localISODate } from "@/lib/stock-utils";
+import { orIlikeFilter } from "@/lib/list-query";
 import type { PurchaseOrderRow, PurchaseOrderLineRow, PurchaseOrderStatus } from "@/lib/database.types";
 
 export type { PurchaseOrderStatus };
@@ -55,6 +56,66 @@ export async function dbListPurchaseOrders(
     const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data ?? [];
+}
+
+// ── Server-side pagination (A1) ──────────────────────────────
+export type PurchaseOrderTab = "all" | PurchaseOrderStatus;
+
+export interface PurchaseOrdersPageQuery {
+    status?: PurchaseOrderStatus;   // all → filtresiz
+    search?: string;                // po_number (ilike)
+    /** Ada göre eşleşen vendor_id'ler (sayfa tarafında çözülür) → arama vendor adını da kapsar. */
+    vendorIds?: string[];
+    page?: number;
+    pageSize?: number;
+}
+
+export interface PurchaseOrdersPageResult {
+    rows: PurchaseOrderRow[];
+    total: number;
+}
+
+export const PURCHASE_ORDERS_DEFAULT_PAGE_SIZE = 50;
+
+const PO_STATUSES: PurchaseOrderStatus[] = ["draft", "sent", "confirmed", "partially_received", "received", "cancelled"];
+
+/**
+ * Sunucu tarafı filtre + sayfalama. Arama po_number'ı kapsar; vendor adı araması
+ * `vendorIds` (sayfada çözülmüş) ile `.or(...,vendor_id.in.(...))` olarak eklenir.
+ */
+export async function dbListPurchaseOrdersPaged(q: PurchaseOrdersPageQuery = {}): Promise<PurchaseOrdersPageResult> {
+    const supabase = createServiceClient();
+    const page = Math.max(1, q.page ?? 1);
+    const pageSize = Math.max(1, q.pageSize ?? PURCHASE_ORDERS_DEFAULT_PAGE_SIZE);
+
+    let query = supabase.from("purchase_orders").select("*", { count: "exact" });
+    if (q.status) query = query.eq("status", q.status);
+    if (q.search && q.search.trim()) {
+        let or = orIlikeFilter(["po_number"], q.search);
+        if (q.vendorIds && q.vendorIds.length > 0) or += `,vendor_id.in.(${q.vendorIds.join(",")})`;
+        query = query.or(or);
+    }
+
+    const { data, error, count } = await query
+        .order("created_at", { ascending: false })
+        .range((page - 1) * pageSize, page * pageSize - 1);
+    if (error) throw new Error(error.message);
+    return { rows: data ?? [], total: count ?? 0 };
+}
+
+/** Sekme rozet sayaçları — global (all + 6 status). */
+export async function dbCountPurchaseOrdersByStatus(): Promise<Record<PurchaseOrderTab, number>> {
+    const supabase = createServiceClient();
+    const head = () => supabase.from("purchase_orders").select("id", { count: "exact", head: true });
+    const [all, ...byStatus] = await Promise.all([
+        head(),
+        ...PO_STATUSES.map((s) => head().eq("status", s)),
+    ]);
+    const errored = [all, ...byStatus].find((r) => r.error);
+    if (errored?.error) throw new Error(errored.error.message);
+    const out = { all: all.count ?? 0 } as Record<PurchaseOrderTab, number>;
+    PO_STATUSES.forEach((s, i) => { out[s] = byStatus[i].count ?? 0; });
+    return out;
 }
 
 export async function dbGetPurchaseOrderById(

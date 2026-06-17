@@ -1,5 +1,6 @@
 import { createServiceClient } from "./service";
 import { localISODate } from "@/lib/stock-utils";
+import { orIlikeFilter } from "@/lib/list-query";
 import type {
     SalesOrderRow,
     OrderLineRow,
@@ -84,9 +85,7 @@ export const ORDERS_DEFAULT_PAGE_SIZE = 50;
  * `()` karakterlerinin koşul ayracı sayılmasını engeller.
  */
 export function buildOrderSearchOrFilter(search: string): string {
-    const escaped = search.trim().replace(/["\\]/g, "\\$&");
-    const s = `"%${escaped}%"`;
-    return `order_number.ilike.${s},customer_name.ilike.${s}`;
+    return orIlikeFilter(["order_number", "customer_name"], search);
 }
 
 /**

@@ -26,28 +26,52 @@ function expectPaginationWired(src: string) {
 }
 
 describe("Pagination — liste sayfası entegrasyonu", () => {
-    it("vendors/page.tsx pagination wired", async () => {
-        const src = await readPage("src/app/dashboard/vendors/page.tsx");
-        expectPaginationWired(src);
+    // A1: vendors SUNUCU tarafı sayfalamaya geçti (VendorsClient).
+    it("vendors/VendorsClient.tsx server-side pagination wired", async () => {
+        const src = await readPage("src/app/dashboard/vendors/VendorsClient.tsx");
+        expect(src).toContain('from "@/components/ui/Pagination"');
+        expect(src).toContain("computeTotalPages");
+        expect(src).toContain("<Pagination");
         expect(src).toContain('itemLabel="tedarikçi"');
+        expect(src).toContain("onPageChange={(p) => navigate({ page: p })}");
+        expect(src).not.toContain("usePagination(filtered");
+        expect(src).not.toContain("pagedItems");
     });
 
-    it("purchase/orders/page.tsx pagination wired", async () => {
-        const src = await readPage("src/app/dashboard/purchase/orders/page.tsx");
-        expectPaginationWired(src);
+    // A1: purchase/orders SUNUCU tarafı sayfalamaya geçti (PurchaseOrdersClient).
+    it("purchase/orders/PurchaseOrdersClient.tsx server-side pagination wired", async () => {
+        const src = await readPage("src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx");
+        expect(src).toContain('from "@/components/ui/Pagination"');
+        expect(src).toContain("computeTotalPages");
+        expect(src).toContain("<Pagination");
         expect(src).toContain('itemLabel="sipariş"');
+        expect(src).toContain("onPageChange={(p) => navigate({ page: p })}");
+        expect(src).not.toContain("usePagination(filtered");
+        expect(src).not.toContain("pagedItems");
     });
 
-    it("quotes/page.tsx pagination wired", async () => {
-        const src = await readPage("src/app/dashboard/quotes/page.tsx");
-        expectPaginationWired(src);
+    // A1: quotes SUNUCU tarafı sayfalamaya geçti (QuotesClient).
+    it("quotes/QuotesClient.tsx server-side pagination wired", async () => {
+        const src = await readPage("src/app/dashboard/quotes/QuotesClient.tsx");
+        expect(src).toContain('from "@/components/ui/Pagination"');
+        expect(src).toContain("computeTotalPages");
+        expect(src).toContain("<Pagination");
         expect(src).toContain('itemLabel="teklif"');
+        expect(src).toContain("onPageChange={(p) => navigate({ page: p })}");
+        expect(src).not.toContain("usePagination(filtered");
+        expect(src).not.toContain("pagedItems");
     });
 
-    it("customers/page.tsx pagination wired", async () => {
-        const src = await readPage("src/app/dashboard/customers/page.tsx");
-        expectPaginationWired(src);
+    // A1: customers SUNUCU tarafı sayfalamaya geçti (CustomersClient).
+    it("customers/CustomersClient.tsx server-side pagination wired", async () => {
+        const src = await readPage("src/app/dashboard/customers/CustomersClient.tsx");
+        expect(src).toContain('from "@/components/ui/Pagination"');
+        expect(src).toContain("computeTotalPages");
+        expect(src).toContain("<Pagination");
         expect(src).toContain('itemLabel="müşteri"');
+        expect(src).toContain("onPageChange={(p) => navigate({ page: p })}");
+        expect(src).not.toContain("usePagination(filtered");
+        expect(src).not.toContain("pagedItems");
     });
 
     // A1: orders SUNUCU tarafı sayfalamaya geçti — client usePagination(filtered)

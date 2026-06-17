@@ -7,6 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-17 (**A1 rollout — quotes · purchase/orders · customers · vendors server-side pagination**)
+
+Orders pilotunun (aynı gün `d4ed2e9`) RSC + sunucu-filtre/sayfalama pattern'i 4 "ayna" listeye yayıldı; **products ERTELENDİ** (risk/AI/alert overlay tüm-set client → ayrı redesign turu, [[deferred_backlog]] A1 kalanı). Kararlar (AskUserQuestion): 4 ayna + products ertele · paylaşılan soyutlama. **migration YOK.**
+- **Shared infra:** `src/hooks/useListUrlState.ts` — `useListUrlState(current, serialize)` → `{navigate(partial), isPending}` (router.replace+useTransition; `current` REF'te → navigate kararlı, debounce effect'i parent render'da yeniden bağlanmaz) + `useDebouncedSearch(serverValue, onCommit, 350)`. `src/lib/list-query.ts` — `firstStr`/`parsePage`/`orIlikeFilter(columns, search)` (`.or()` güvenli escape, RFQ emsali; `buildOrderSearchOrFilter` buna delege). **Orders pilotu da bu hook'lara refactor edildi** (OrdersClient navigate/debounce → hook; tek bakım noktası).
+- **Her sayfa (orders S0–S3 tekrarı):** DB `db<X>Paged` (`count:"exact"` tek sorgu `{rows,total}`, filtreler ORDER/RANGE'den ÖNCE) + sayaç fn; `page.tsx`→SUNUCU (`force-dynamic`, `await searchParams`, RBAC redaction route-birebir, mapper, `<X>Client/>`) + `loading.tsx`; `<X>Client.tsx` URL-driven + 350ms arama debounce, mutasyon→`router.refresh()`.
+- **quotes:** status tab+arama(quote_number/customer_name)+döviz+`created_at` tarih; `dbListQuotesPaged`/`dbCountQuotesByStatus`; redactQuotesForPerms MAPPED summary üzerinde (map ÖNCE). bulk-delete `pickSucceededIds` sayım + refresh.
+- **purchase/orders:** status+arama; **vendor-adı araması** = ada eşleşen vendor_id'ler (sayfada çözülür) → `dbListPurchaseOrdersPaged` `.or(po_number.ilike, vendor_id.in.(...))`; vendorMap server'da tüm vendor'dan; `dbCountPurchaseOrdersByStatus`; redactPurchaseOrdersForPerms ham satır.
+- **customers:** arama(name/email/country)+aktif/pasif; `dbListCustomersPaged({is_active})`+`dbCountCustomers` (all/active/passive). **Pasif sekmesi DÜZELTİLDİ** (eski `dbListCustomers` yalnız is_active=true → pasif boştu). Mutasyon doğrudan fetch + `mutate(CUSTOMERS_KEY)` (dashboard cache) + refresh; DataContext liste aboneliği başlatılmaz.
+- **vendors:** arama(name/contact_person/contact_email)+"Pasifleri göster"(all=1→isActive undefined); `dbListVendorsPaged`; TAB YOK → yalnız total (count-by-tab gerekmez).
+- **RSC sonucu:** client `loadError`/`loadVendors`/`loadOrders` graceful-retry kalktı → sunucu hatası Next error boundary'sine (sessiz yutma yok). Testlerdeki eski loadError kilitleri RSC'ye uyarlandı.
+- **Test:** +~50 (`{quotes,purchase-orders,customers,vendors}-pagination.test.ts` filtre→sorgu+total+sayaç + `list-url-state.test.tsx` hook + ~10 source-lock page→Client yönlendirildi: pagination-integration server-side/expectPaginationWired paylaşıldığı için DOKUNULMADI, underlined/button/faz7/theme/interactive/quotes-ui/purchase-orders-ui/customers-ui/vendors-ui). tsc 0 · lint 0 · **5538 test** · build 0 (5 hedef route ƒ dynamic). **Kalan:** push + manuel smoke (her sayfa: filtre/sayfa URL'e + geri/ileri; sayaçlar; mutasyon→refresh; viewer redaction; demo bloklu; customers pasif sekmesi dolu; büyük veri sayfalanır) + **sonraki tur: products** (ayrı/ağır).
+
+<details><summary>Önceki: A1 — Orders sunucu tarafı sayfalama / RSC pilot (`d4ed2e9`)</summary>
+
 ## Son Tamamlanan İş — 2026-06-17 (**A1 — Orders sunucu tarafı sayfalama / RSC pilot**)
 
 `deferred_backlog` A1 (en büyük bekleyen). Kullanıcı kararı (AskUserQuestion): **RSC + loading.tsx tam yeniden** + **orders pilotu → sonra 5 listeye yay**. Önceki: liste `?all=1` ile TÜM satırları çekip `usePagination`+`useMemo` ile bellekte filtreler/dilimlerdi. **migration GEREKMEZ** (mevcut kolonlar + count:"exact").
@@ -25,6 +39,8 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **D1:** `partially_shipped` TS seviyesinde tamamen kaldırıldı — `database.types`/`mock-data`/`data-context` union, 3 UI config, view-model label+tone, seed-runner (senaryo→tam `shipped`), seed-data #9 (`shipped`), 2 test. Uygulanmış SQL'e DOKUNULMADI (007 vb. zararsız ölü dal).
 - **N1:** OrderForm 3× `new Date().toISOString().slice(0,10)` → `localISODate`. **N2:** parasut-status per-line `dbGetProductById` (N+1) → tek `dbGetProductParasutIds` batch.
 **+10 yeni test** (`orders-review-fixes.test.ts`: Y1/O2 davranış + O1/D1/N1/N2 source-lock) + 2 mevcut test güncellendi. tsc 0 · lint 0 · **5488 test** · build 0 (`/api/orders/[id]/reallocate` manifest'te). **Açık follow-up:** gate `route-guard-matrix.test.ts:62` method-seviye guard tespiti (ayrı tur, 100+ route reclass). **Kalan:** manuel smoke (PO mal kabul → otomatik allocated + Sevket; Yeniden Rezerve Et; allocated olmadan Sevket disabled).
+
+</details>
 
 </details>
 

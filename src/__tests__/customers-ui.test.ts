@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const PAGE_SRC = readFileSync(
-    join(process.cwd(), "src/app/dashboard/customers/page.tsx"),
+    join(process.cwd(), "src/app/dashboard/customers/CustomersClient.tsx"),
     "utf8",
 );
 const PANEL_SRC = readFileSync(
@@ -32,10 +32,11 @@ const CTX_SRC = readFileSync(
 // ── 1. Toplu silme context üzerinden (bayat satır fix) ────────
 
 describe("Cariler — toplu silme bayat satır bırakmaz", () => {
-    it("handleBulkDelete context deleteCustomer üzerinden geçer, ham fetch DELETE yok", () => {
-        expect(PAGE_SRC).toMatch(/Promise\.allSettled\(ids\.map\(id => deleteCustomer\(id\)\)\)/);
-        // ham fetch ile DELETE artık handleBulkDelete'te kullanılmaz
-        expect(PAGE_SRC).not.toMatch(/ids\.map\(id => fetch\(`\/api\/customers\/\$\{id\}`, \{ method: "DELETE" \}\)\)/);
+    it("A1: handleBulkDelete fetch DELETE + router.refresh (sunucu otoritesi → bayat satır yok)", () => {
+        // Eski stale-row sorunu client-liste'den geliyordu; RSC'de router.refresh
+        // sunucu listesini yeniden çekince silinen satırlar kaybolur.
+        expect(PAGE_SRC).toMatch(/fetch\(`\/api\/customers\/\$\{id\}`, \{ method: "DELETE" \}\)/);
+        expect(PAGE_SRC).toContain("router.refresh()");
     });
 
     it("açık panel toplu silmeye dahilse kapatılır (tek-silme paritesi)", () => {

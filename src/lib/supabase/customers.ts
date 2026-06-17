@@ -1,4 +1,5 @@
 import { createServiceClient } from "./service";
+import { orIlikeFilter } from "@/lib/list-query";
 import type { CustomerRow } from "@/lib/database.types";
 
 export interface CreateCustomerInput {
@@ -25,6 +26,58 @@ export async function dbListCustomers(): Promise<CustomerRow[]> {
         .order("name");
     if (error) throw new Error(error.message);
     return data ?? [];
+}
+
+// ── Server-side pagination (A1) ──────────────────────────────
+export type CustomerTab = "all" | "active" | "passive";
+
+export interface CustomersPageQuery {
+    search?: string;                // name / email / country (ilike)
+    is_active?: boolean;            // undefined → tümü
+    page?: number;
+    pageSize?: number;
+}
+
+export interface CustomersPageResult {
+    rows: CustomerRow[];
+    total: number;
+}
+
+export const CUSTOMERS_DEFAULT_PAGE_SIZE = 50;
+
+/**
+ * Sunucu tarafı filtre + sayfalama. `is_active` ile aktif/pasif ayrımı —
+ * eski dbListCustomers yalnız aktifleri döndürdüğü için "Pasif" sekmesi
+ * fiilen boştu; bu yol pasifleri de getirir. count:"exact" total.
+ */
+export async function dbListCustomersPaged(q: CustomersPageQuery = {}): Promise<CustomersPageResult> {
+    const supabase = createServiceClient();
+    const page = Math.max(1, q.page ?? 1);
+    const pageSize = Math.max(1, q.pageSize ?? CUSTOMERS_DEFAULT_PAGE_SIZE);
+
+    let query = supabase.from("customers").select("*", { count: "exact" });
+    if (q.is_active !== undefined) query = query.eq("is_active", q.is_active);
+    if (q.search && q.search.trim()) query = query.or(orIlikeFilter(["name", "email", "country"], q.search));
+
+    const { data, error, count } = await query
+        .order("name")
+        .range((page - 1) * pageSize, page * pageSize - 1);
+    if (error) throw new Error(error.message);
+    return { rows: data ?? [], total: count ?? 0 };
+}
+
+/** Rozet sayaçları — global (tümü / aktif / pasif). */
+export async function dbCountCustomers(): Promise<Record<CustomerTab, number>> {
+    const supabase = createServiceClient();
+    const head = () => supabase.from("customers").select("id", { count: "exact", head: true });
+    const [all, active, passive] = await Promise.all([
+        head(),
+        head().eq("is_active", true),
+        head().eq("is_active", false),
+    ]);
+    const errored = [all, active, passive].find((r) => r.error);
+    if (errored?.error) throw new Error(errored.error.message);
+    return { all: all.count ?? 0, active: active.count ?? 0, passive: passive.count ?? 0 };
 }
 
 export async function dbDeleteCustomer(id: string, actor?: string | null): Promise<void> {

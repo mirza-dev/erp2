@@ -117,7 +117,7 @@ describe("Revizyon UI/util (source-regex)", () => {
         expect(p).toMatch(/quote\.revisionOf/);
     });
     it("STATUS_META + QUOTE_TRANSITIONS revised", () => {
-        const list = readFileSync(join(process.cwd(), "src/app/dashboard/quotes/page.tsx"), "utf8");
+        const list = readFileSync(join(process.cwd(), "src/app/dashboard/quotes/QuotesClient.tsx"), "utf8");
         expect(list).toMatch(/revised:\s*\{ label: "Revize Edildi"/);
         const svc = readFileSync(join(process.cwd(), "src/lib/services/quote-service.ts"), "utf8");
         expect(svc).toMatch(/revised:\s*\[\]/);

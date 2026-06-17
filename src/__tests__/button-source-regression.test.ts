@@ -7,12 +7,12 @@ const projectRoot = process.cwd();
 // NOT: Genel Bakış (dashboard/page.tsx) tasarıma sadık SALT-BAKIŞ ekranıdır —
 // "Yeni Sipariş" CTA'sı yok (segment + Rapor indir header'ı); ana-CTA listesinden çıkarıldı.
 const PRIMARY_CTA_FILES = [
-    "src/app/dashboard/vendors/page.tsx",
-    "src/app/dashboard/customers/page.tsx",
+    "src/app/dashboard/vendors/VendorsClient.tsx",
+    "src/app/dashboard/customers/CustomersClient.tsx",
     "src/app/dashboard/products/page.tsx",
     "src/app/dashboard/orders/OrdersClient.tsx",
-    "src/app/dashboard/quotes/page.tsx",
-    "src/app/dashboard/purchase/orders/page.tsx",
+    "src/app/dashboard/quotes/QuotesClient.tsx",
+    "src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx",
     "src/app/dashboard/settings/product-types/page.tsx",
     "src/app/dashboard/settings/note-templates/page.tsx",
     "src/app/dashboard/settings/users/page.tsx",
@@ -33,18 +33,18 @@ const DETAIL_BUTTON_FILES = {
 const ACTION_BUTTON_FILES = {
     products: "src/app/dashboard/products/page.tsx",
     productDetail: "src/app/dashboard/products/[id]/page.tsx",
-    customers: "src/app/dashboard/customers/page.tsx",
-    vendors: "src/app/dashboard/vendors/page.tsx",
+    customers: "src/app/dashboard/customers/CustomersClient.tsx",
+    vendors: "src/app/dashboard/vendors/VendorsClient.tsx",
     orders: "src/app/dashboard/orders/OrdersClient.tsx",
     orderDetail: "src/app/dashboard/orders/[id]/page.tsx",
-    purchaseOrders: "src/app/dashboard/purchase/orders/page.tsx",
+    purchaseOrders: "src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx",
     purchaseOrderDetail: "src/app/dashboard/purchase/orders/[id]/page.tsx",
     purchaseSuggested: "src/app/dashboard/purchase/suggested/page.tsx",
     noteTemplates: "src/app/dashboard/settings/note-templates/page.tsx",
     productTypeDetail: "src/app/dashboard/settings/product-types/[id]/page.tsx",
     users: "src/app/dashboard/settings/users/page.tsx",
     resetDemo: "src/components/settings/ResetDemoSection.tsx",
-    quotes: "src/app/dashboard/quotes/page.tsx",
+    quotes: "src/app/dashboard/quotes/QuotesClient.tsx",
     production: "src/app/dashboard/production/page.tsx",
 } as const;
 

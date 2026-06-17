@@ -45,12 +45,12 @@ describe("orders OrdersClient.tsx — client etkileşim", () => {
     it('"use client" var', () => {
         expect(CLIENT).toMatch(/^\s*["']use client["']/m);
     });
-    it("filtre değişimi URL'e yazılır (sunucu yeniden render)", () => {
-        expect(CLIENT).toContain("router.replace");
+    it("filtre değişimi URL'e yazılır (paylaşılan useListUrlState)", () => {
+        expect(CLIENT).toContain("useListUrlState");
         expect(CLIENT).toContain("navigate(");
     });
-    it("arama debounce (yazarken responsive)", () => {
-        expect(CLIENT).toContain("setTimeout(() => navigate({ search:");
+    it("arama debounce paylaşılan useDebouncedSearch ile", () => {
+        expect(CLIENT).toContain("useDebouncedSearch");
     });
     it("data-context global liste'ye abone DEĞİL (useOrders yok)", () => {
         expect(CLIENT).not.toContain("useOrders");

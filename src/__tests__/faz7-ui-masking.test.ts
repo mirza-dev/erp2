@@ -17,9 +17,9 @@ describe("Faz 7 — liste/detay finansal maskeleme", () => {
         { file: "src/components/dashboard/RecentOrders.tsx", perm: "canViewSalesPrices" },
         { file: "src/app/dashboard/orders/OrdersClient.tsx", perm: "canViewSalesPrices" },
         { file: "src/app/dashboard/orders/[id]/page.tsx", perm: "canViewSalesPrices" },
-        { file: "src/app/dashboard/quotes/page.tsx", perm: "canViewSalesPrices" },
+        { file: "src/app/dashboard/quotes/QuotesClient.tsx", perm: "canViewSalesPrices" },
         { file: "src/app/dashboard/products/page.tsx", perm: "canViewSalesPrices" },
-        { file: "src/app/dashboard/customers/page.tsx", perm: "canViewFinancialSummary" },
+        { file: "src/app/dashboard/customers/CustomersClient.tsx", perm: "canViewFinancialSummary" },
         { file: "src/app/dashboard/products/aging/page.tsx", perm: "canViewPurchaseCosts" },
     ];
     for (const { file, perm } of cases) {
@@ -43,11 +43,11 @@ describe("Faz 7 — birincil CTA permission gating", () => {
         // NOT: Genel Bakış (dashboard/page.tsx) tasarıma sadık SALT-BAKIŞ ekranıdır;
         // "Yeni Sipariş" CTA'sı liste sayfasında (orders/page.tsx) — burada aranmaz.
         { file: "src/app/dashboard/orders/OrdersClient.tsx", perm: "manage_sales_orders" },
-        { file: "src/app/dashboard/quotes/page.tsx", perm: "manage_quotes" },
-        { file: "src/app/dashboard/customers/page.tsx", perm: "manage_customers" },
+        { file: "src/app/dashboard/quotes/QuotesClient.tsx", perm: "manage_quotes" },
+        { file: "src/app/dashboard/customers/CustomersClient.tsx", perm: "manage_customers" },
         { file: "src/app/dashboard/products/page.tsx", perm: "manage_product_master" },
-        { file: "src/app/dashboard/purchase/orders/page.tsx", perm: "manage_purchase_orders" },
-        { file: "src/app/dashboard/vendors/page.tsx", perm: "manage_vendors" },
+        { file: "src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx", perm: "manage_purchase_orders" },
+        { file: "src/app/dashboard/vendors/VendorsClient.tsx", perm: "manage_vendors" },
     ];
     for (const { file, perm } of ctas) {
         it(`${file} → has("${perm}") ile gizlenir`, () => {
@@ -57,8 +57,8 @@ describe("Faz 7 — birincil CTA permission gating", () => {
 
     it("destructive Sil butonları delete_* perm'e bağlı", () => {
         expect(read("src/app/dashboard/orders/OrdersClient.tsx")).toContain('has("delete_sales_orders")');
-        expect(read("src/app/dashboard/customers/page.tsx")).toContain('has("delete_customers")');
-        expect(read("src/app/dashboard/quotes/page.tsx")).toMatch(/canDeleteQuotes = has\("delete_quotes"\)/);
+        expect(read("src/app/dashboard/customers/CustomersClient.tsx")).toContain('has("delete_customers")');
+        expect(read("src/app/dashboard/quotes/QuotesClient.tsx")).toMatch(/canDeleteQuotes = has\("delete_quotes"\)/);
     });
 
     // F7 — CustomerDetailPanel "Yeni Sipariş"/"Düzenle" CTA'ları perm-gate'li.
