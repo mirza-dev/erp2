@@ -1210,6 +1210,18 @@ export async function serviceSyncOrderToParasut(orderId: string): Promise<SyncOr
                 error_message: pe.message,
             });
         } catch { /* best-effort */ }
+        // O1 (2026-06 denetim): auth hatası LOGLANDIKTAN SONRA eşik kontrolü — son 1
+        // saatte ≥3 auth hatası varsa critical OAuth re-auth alert'i açar; bu alert
+        // alert→sync-retry→OAuth-refresh kurtarma döngüsünü tetikler. Best-effort:
+        // alert yazımı sync sonucunu maskelemez. dbCreateAlert dedup'u
+        // (idx_alerts_active_dedup) aynı ALERT_ENTITY_PARASUT_AUTH için çift kayıt önler.
+        if (pe.kind === "auth") {
+            try {
+                await checkAuthAlertThreshold();
+            } catch (thresholdErr) {
+                console.error(JSON.stringify({ parasut_auth_threshold_fail: String(thresholdErr), orderId }));
+            }
+        }
         return { success: false, error: pe.message };
     } finally {
         try {
@@ -1393,6 +1405,16 @@ export async function serviceRetryParasutStep(
                 error_message: pe.message,
             });
         } catch { /* best-effort */ }
+        // O1 (2026-06 denetim): manuel step-retry'da da auth eşik kontrolü — ana sync
+        // ile aynı kurtarma döngüsü (alert→sync-retry→OAuth-refresh). Log yazıldıktan
+        // sonra; best-effort; dedup çift alert önler.
+        if (pe.kind === "auth") {
+            try {
+                await checkAuthAlertThreshold();
+            } catch (thresholdErr) {
+                console.error(JSON.stringify({ parasut_auth_threshold_fail: String(thresholdErr), orderId }));
+            }
+        }
         return { success: false, error: pe.message };
     } finally {
         try {
