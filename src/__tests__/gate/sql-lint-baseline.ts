@@ -34,7 +34,9 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     record_stock_movement: ["004", "008"],
     complete_production: ["004", "008"],
     try_resolve_shortages: ["004", "008"],
-    reverse_production: ["004", "008"],
+    // 104: entry select'e `for update` eklendi (eşzamanlı çift-DELETE'te idempotency —
+    // production review O1); gövdenin geri kalanı 008 ile birebir.
+    reverse_production: ["004", "008", "104"],
     // 093 (K2): order RPC'leri toplamları SUNUCUDA hesaplar; quote RPC'leri
     // override'ı koruyup makul-sapma kontrolü yapar — önceki davranışlar
     // (071 NULLIF/COALESCE cast'leri, draft guard, 081 header recompute) KORUNDU.

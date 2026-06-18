@@ -8,9 +8,10 @@ _Son güncelleme: 2026-06-17. Kullanıcı isteğiyle "sonraki tura bıraktığı
 - **A3. Gate guard-matrix method-seviye tespiti** — orders O1 turunun açık follow-up'ı. `src/__tests__/gate/route-guard-matrix.test.ts:62` dosya-seviye `src.includes` → method-seviye; aynı dosyadaki POST guard'ı GET'i de "korunmuş" sayıyor (kör nokta). 100+ route reclass (büyük/riskli). Tüm repodaki guard'sız GET'leri yakalar.
 
 ## B. Devam eden inceleme kampanyası (`erp2-reviewer`, modül modül)
-- Tamamlanan derin incelemeler: **RFQ ✅** (`docs/audit/2026-06-17-review-bulgular.md`), **Orders ✅** (`docs/audit/2026-06-17-orders-review-bulgular.md`), **Quotes ✅** (`docs/audit/2026-06-18-quotes-review-bulgular.md`; O1 legacy expire-quotes silindi, gerisi temiz).
-- **Kalan modüller** (henüz derin taranmadı): **parasut · import/AI · production · customers/products · alerts · settings**.
-- Önerilen sıra: **parasut** (dış entegrasyon, en riskli) ya da **import/AI** (en geniş yüzey).
+- Tamamlanan derin incelemeler: **RFQ ✅** (`docs/audit/2026-06-17-review-bulgular.md`), **Orders ✅** (`docs/audit/2026-06-17-orders-review-bulgular.md`), **Quotes ✅** (`docs/audit/2026-06-18-quotes-review-bulgular.md`; O1 legacy expire-quotes silindi), **Paraşüt ✅** (`docs/audit/2026-06-18-parasut-review-bulgular.md`; O1 checkAuthAlertThreshold orphaned→wire), **import/AI ✅** (`docs/audit/2026-06-18-import-ai-review-bulgular.md`; O1 iki guard'sız import GET→view_import, D1 ops-summary auth; purchase-copilot/parse/score RBAC İZLENEN), **production ✅** (`docs/audit/2026-06-18-production-review-bulgular.md`; O1 reverse_production eşzamanlı çift-DELETE idempotency→mig.104 `for update`; GET by-design dashboard-tier; **mig.104 APPLY BEKLİYOR**).
+- **Kalan modüller** (henüz derin taranmadı): **customers/products · alerts · settings**.
+- Önerilen sıra: **customers/products** ya da **alerts**.
+- **İzlenen RBAC borçları** (gate A3 method-seviye + bu turlardan): GET /api/quotes(+[id]) view_quotes; purchase-copilot POST + ai/parse + ai/score RBAC'siz (oturum-only, demo/anon bloklu → düşük).
 - `/erp-review <modül-yolu>` ile veya `erp2-reviewer` ajanını kapsam vererek çağır. Detay [[reference_review_agent]].
 
 ## C. Deploy / altyapı doğrulamaları (kod tek başına yetmez)
