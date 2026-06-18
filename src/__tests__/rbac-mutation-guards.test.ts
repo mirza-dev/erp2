@@ -66,8 +66,8 @@ import { POST as parasutSync } from "@/app/api/parasut/sync/route";
 import { POST as parasutRetry } from "@/app/api/parasut/retry/route";
 import { POST as productTypesPost } from "@/app/api/product-types/route";
 import { POST as importPost } from "@/app/api/import/route";
-import { PATCH as importBatchPatch, DELETE as importBatchDelete } from "@/app/api/import/[batchId]/route";
-import { PATCH as importDraftPatch } from "@/app/api/import/drafts/[id]/route";
+import { GET as importBatchGet, PATCH as importBatchPatch, DELETE as importBatchDelete } from "@/app/api/import/[batchId]/route";
+import { GET as importDraftGet, PATCH as importDraftPatch } from "@/app/api/import/drafts/[id]/route";
 import { GET as parasutInvoicesGet } from "@/app/api/parasut/invoices/route";
 import { GET as parasutStatsGet } from "@/app/api/parasut/stats/route";
 import { GET as parasutLogsGet } from "@/app/api/parasut/logs/route";
@@ -247,6 +247,16 @@ describe("R2 read-guards — viewer → 403 (Batch E: parasut finansal GET)", ()
     });
     it("parasut/logs GET → 403 (view_parasut)", async () => {
         expect((await parasutLogsGet(getReq("http://localhost/api/parasut/logs"))).status).toBe(403);
+    });
+    // Denetim O1 (2026-06 import/AI turu): iki guard'sız import GET'i kapatıldı.
+    // view_import yalnız admin+purchasing'de → viewer 403 (draft tedarikçi/fiyat
+    // verisi + batch metadata sızıntısı kapandı). Kardeş drafts-list/report GET pariteyi.
+    it("import [batchId] GET → 403 (view_import — viewer'da yok)", async () => {
+        const bp = { params: Promise.resolve({ batchId: "b1" }) };
+        expect((await importBatchGet(getReq("http://localhost/api/import/b1"), bp)).status).toBe(403);
+    });
+    it("import drafts/[id] GET → 403 (view_import — viewer'da yok)", async () => {
+        expect((await importDraftGet(getReq("http://localhost/api/import/drafts/d1"), params())).status).toBe(403);
     });
 });
 

@@ -7,10 +7,16 @@ import type { ImportFieldApproval } from "@/lib/import-center";
 
 // GET /api/import/drafts/[id]
 export async function GET(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // Denetim O1 (2026-06): view_import şartı — draft raw_data/parsed_data tedarikçi/
+        // fiyat/maliyet verisi taşıyabilir (Y1'in kardeş [batchId]/drafts list GET'ine
+        // view_import eklerken belirttiği gerekçe). Bu tekil GET Y1'de atlanmıştı; proxy
+        // demo'ya GET /api/* izni verdiğinden view_import'suz roller + demo okuyabiliyordu.
+        const guard = await requirePermission(req, "view_import");
+        if (guard) return guard;
         const { id } = await params;
         const draft = await dbGetDraft(id);
         if (!draft) return NextResponse.json({ error: "Draft bulunamadı." }, { status: 404 });

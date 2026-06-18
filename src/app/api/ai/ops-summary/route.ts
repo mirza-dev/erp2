@@ -6,6 +6,7 @@ import { computeCoverageDays, computeStockRiskLevel } from "@/lib/stock-utils";
 import { aiGenerateOpsSummary, isAIAvailable, type OpsSummaryInput } from "@/lib/services/ai-service";
 import { handleApiError } from "@/lib/api-error";
 import { guardAiRoute } from "@/lib/ai-route-limit";
+import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 
 async function gatherMetrics(): Promise<OpsSummaryInput> {
     const [products, alerts, pendingOrders, approvedOrders] = await Promise.all([
@@ -58,6 +59,17 @@ export async function POST(request?: NextRequest) {
         const limited = guardAiRoute(request, "ops-summary", 5);
         if (limited) return limited;
     }
+
+    // Denetim D1 (2026-06): bu uç operasyonel metrikleri (kritik stok kalemleri,
+    // sipariş sayıları) toplayıp AI'a yollar — rate-limit tek başına yetki değildir.
+    // stock-risk Y2 kalıbı: gerçek oturum + view_dashboard (tüm roller taşır → UI
+    // dashboard AI özet widget'ı kırılmaz; anon/proxy-fail-open + demo kapanır).
+    const ctx = await resolveAuthContext();
+    if (!ctx.user) {
+        return NextResponse.json({ error: "Kimlik doğrulama gerekiyor." }, { status: 401 });
+    }
+    const permGuard = requirePermissionFor(ctx, "view_dashboard");
+    if (permGuard) return permGuard;
 
     let metrics: OpsSummaryInput;
     try {

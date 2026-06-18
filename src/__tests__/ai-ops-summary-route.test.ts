@@ -4,7 +4,28 @@
  * computeCoverageDays and handleApiError run real (not mocked).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextResponse } from "next/server";
 import type { ProductWithStock, SalesOrderRow, AlertRow } from "@/lib/database.types";
+
+// ─── Auth guard mocks (Denetim D1 2026-06: ops-summary'ye session+view_dashboard eklendi) ─
+// Mevcut metrik/AI testleri yetkili kullanıcı varsayar → default authorized.
+// Yetki testleri (aşağıda) kendi describe beforeEach'inde override eder.
+const mockResolveAuthContext   = vi.fn();
+const mockRequirePermissionFor = vi.fn();
+
+vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext:   (...args: unknown[]) => mockResolveAuthContext(...args),
+    requirePermissionFor: (...args: unknown[]) => mockRequirePermissionFor(...args),
+}));
+
+// File-level: her testten ÖNCE yetkili default'a sıfırla (describe-level beforeEach'ten
+// önce çalışır → yetki describe'i kendi beforeEach'inde override edebilir, sızma yok).
+beforeEach(() => {
+    mockResolveAuthContext.mockResolvedValue({
+        user: { id: "u-1" }, userId: "u-1", roles: ["admin"], perms: new Set(),
+    });
+    mockRequirePermissionFor.mockReturnValue(null);
+});
 
 // ─── DB query mocks ───────────────────────────────────────────────────────────
 
@@ -386,5 +407,37 @@ describe("POST /api/ai/ops-summary — ConfigError on DB failure", () => {
         const res = await POST();
         const body = await res.json();
         expect(body.code).toBe("CONFIG_ERROR");
+    });
+});
+
+// ─── Auth guard (Denetim D1 2026-06: session + view_dashboard) ─────────────────
+
+describe("POST /api/ai/ops-summary — auth guard", () => {
+    beforeEach(() => {
+        // Bu dosyada global vi.clearAllMocks yok → call-count birikir; guard'ın
+        // gatherMetrics'i ATLADIĞINI kanıtlamak için db mock çağrı sayacını sıfırla.
+        mockDbListProducts.mockClear();
+        mockDbListAlerts.mockClear();
+        mockDbListOrders.mockClear();
+        // metrik toplanmamalı (guard erken döner) — yine de güvenli default
+        mockIsAIAvailable.mockReturnValue(false);
+        mockDbListProducts.mockResolvedValue([]);
+        mockDbListAlerts.mockResolvedValue([]);
+        mockDbListOrders.mockResolvedValue([]);
+    });
+
+    it("oturum yoksa 401 + gatherMetrics çağrılmaz", async () => {
+        mockResolveAuthContext.mockResolvedValue({ user: null, userId: null, roles: [], perms: new Set() });
+        const res = await POST();
+        expect(res.status).toBe(401);
+        expect(mockDbListProducts).not.toHaveBeenCalled();
+    });
+
+    it("view_dashboard yoksa 403 + gatherMetrics çağrılmaz", async () => {
+        mockRequirePermissionFor.mockReturnValue(NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 }));
+        const res = await POST();
+        expect(res.status).toBe(403);
+        expect(mockRequirePermissionFor).toHaveBeenCalledWith(expect.anything(), "view_dashboard");
+        expect(mockDbListProducts).not.toHaveBeenCalled();
     });
 });

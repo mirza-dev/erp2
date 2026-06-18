@@ -6,10 +6,16 @@ import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/import/[batchId]
 export async function GET(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ batchId: string }> }
 ) {
     try {
+        // Denetim O1 (2026-06): view_import şartı — batch detayı column_mapping_meta /
+        // sayaç sızdırır; kardeş list/report GET'leriyle paritede. Önceki "proxy yeter"
+        // varsayımı view_import'suz rolleri (sales/production/accounting/viewer) + demo'yu
+        // okutuyordu (proxy demo'ya GET /api/* izni verir, RBAC'i route'a bırakır).
+        const guard = await requirePermission(req, "view_import");
+        if (guard) return guard;
         const { batchId } = await params;
         const batch = await dbGetBatch(batchId);
         if (!batch) return NextResponse.json({ error: "Batch bulunamadı." }, { status: 404 });
