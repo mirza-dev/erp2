@@ -46,7 +46,8 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     // ── redaction (kapı yok, alan maskeleme var — bilinçli) ───────────
     { path: "products/counts", methods: ["GET"], cls: "public", reason: "A1 sunucu sayfalama: yalnız adetler (toplam/kategori/kritik) — fiyat/maliyet yok; products list GET ile aynı sınıf (proxy session önde)" },
     { path: "products/aging", methods: ["GET"], cls: "redaction", reason: "boundCapital/costPrice perm'e göre maskelenir" },
-    { path: "products/[id]/quotes", methods: ["GET"], cls: "redaction", reason: "unitPrice/lineTotal view_sales_prices'a göre maskelenir" },
+    // products/[id]/quotes: customers/products denetimi D1 (2026-06-19) — GET artık
+    // view_products guard'lı (kardeş shortages/supplier-prices kalıbı); redaction'dan çıktı.
 
     // ── 410 tombstone (DB erişimi yok — denetim O9 incelemesi: bulgu DEĞİL) ──
     { path: "quotes/[id]/convert", methods: ["POST"], cls: "public", reason: "Saf 410 Gone tombstone (Faz 6 V4-A8); DB/servis çağrısı yok" },

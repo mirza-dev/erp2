@@ -16,10 +16,16 @@ vi.mock("@/lib/supabase/products", () => ({
     dbLookupUserEmails: (...args: unknown[]) => mockDbLookupUserEmails(...args),
 }));
 
-// RBAC Faz 7: route unitPrice'ı view_sales_prices ile redakte eder. Mevcut testler
-// tam yetkili kullanıcı varsayar (unitPrice görünür). Redaction: aging-quotes-redaction.test.ts.
+// RBAC: route resolveAuthContext + requirePermissionFor(view_products) ile guard'lar,
+// sonra ctx.perms ile unitPrice'ı view_sales_prices'a göre redakte eder. Mevcut testler
+// tam yetkili kullanıcı varsayar (guard geçer, unitPrice görünür). Redaction + denied
+// path: aging-quotes-redaction.test.ts + customers-products-read-guards.test.ts.
 vi.mock("@/lib/auth/role-guard", () => ({
-    getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_sales_prices"])),
+    resolveAuthContext: vi.fn().mockResolvedValue({
+        user: { id: "u-1" }, userId: "u-1", roles: ["admin"],
+        perms: new Set(["view_products", "view_sales_prices"]),
+    }),
+    requirePermissionFor: vi.fn().mockReturnValue(null),
 }));
 
 import { GET } from "@/app/api/products/[id]/quotes/route";

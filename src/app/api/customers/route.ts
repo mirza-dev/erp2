@@ -12,8 +12,18 @@ const getCachedCustomers = unstable_cache(
 );
 
 // GET /api/customers
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
+        // RBAC: view_customers guard. Redaction (aşağıda) yalnız finansal alanı
+        // (total_revenue) maskeler — müşteri PII'sini (ad/e-posta/telefon/adres/
+        // vergi) korumaz. view_customers production'da YOK + /dashboard/customers
+        // page-access ile production'a kapalı → guard'sız GET production'a (ve
+        // proxy-fail-open/anon'a) PII sızdırıyordu. Demo=viewer (view_customers
+        // taşır) + tüm tüketici UI'ları view_customers-tier → guard hiçbir
+        // erişilebilir yüzeyi kırmaz, yalnız production'ı kapatır.
+        const guard = await requirePermission(req, "view_customers");
+        if (guard) return guard;
+
         const customers = await getCachedCustomers();
         // RBAC R3: redaction cache SONRASI, per-request (perms cache key'ine girmez).
         const perms = await getCurrentUserPermissions();

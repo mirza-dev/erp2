@@ -10,7 +10,7 @@
  * Diskriminatif: AYNI kaynak, FARKLI perm → farklı çıktı (per-request).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { Permission } from "@/lib/auth/permissions";
 
 const mockDbListProducts = vi.fn();
@@ -36,7 +36,17 @@ vi.mock("@/lib/supabase/aging", async (orig) => {
     };
 });
 vi.mock("@/lib/auth/role-guard", () => ({
+    // aging route → getCurrentUserPermissions (redaction)
     getCurrentUserPermissions: (...a: unknown[]) => mockGetPerms(...a),
+    // quotes route → resolveAuthContext + requirePermissionFor(view_products) guard
+    // sonra ctx.perms ile sales-price redaction. perms = mockGetPerms (tek kaynak).
+    resolveAuthContext: async () => ({
+        user: { id: "u-1" }, userId: "u-1", roles: ["x"], perms: await mockGetPerms(),
+    }),
+    requirePermissionFor: (ctx: { perms: Set<string> }, allowed: string | string[]) => {
+        const need = Array.isArray(allowed) ? allowed : [allowed];
+        return need.some(p => ctx.perms.has(p)) ? null : NextResponse.json({ error: "Yetkiniz yok." }, { status: 403 });
+    },
 }));
 
 import { GET as AGING_GET } from "@/app/api/products/aging/route";
@@ -123,7 +133,8 @@ describe("GET /api/products/aging — Faz 7 redaction", () => {
 
 describe("GET /api/products/[id]/quotes — Faz 7 redaction", () => {
     it("view_sales_prices → unitPrice + lineTotal görünür", async () => {
-        mockGetPerms.mockResolvedValue(P("view_sales_prices"));
+        // view_products guard'ı geçmeli (widget view_products-tier) + view_sales_prices → fiyat görünür
+        mockGetPerms.mockResolvedValue(P("view_products", "view_sales_prices"));
         const data = await (await QUOTES_GET(quotesReq(), { params: Promise.resolve({ id: "p1" }) })).json();
         expect(data.items[0].unitPrice).toBe(100);
         expect(data.items[0].lineTotal).toBe(480);

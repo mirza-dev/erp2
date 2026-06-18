@@ -35,6 +35,9 @@ export async function PATCH(
         const lengthErr = validateStringLengths(body);
         if (lengthErr) return NextResponse.json({ error: lengthErr }, { status: 400 });
         const customer = await dbUpdateCustomer(id, body);
+        // POST/DELETE paritesi: düzenleme de unstable_cache("customers", 30s)'i
+        // tazelemeli — yoksa düzenlenen müşteri ≤30s bayat görünüyordu.
+        revalidateTag("customers", "max");
         return NextResponse.json(customer);
     } catch (err) {
         return handleApiError(err, "PATCH /api/customers/[id]");
