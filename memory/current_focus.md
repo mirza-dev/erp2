@@ -7,6 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**alerts modülü derin denetim (kampanya B) + D1**)
+
+`erp2-reviewer` kampanyasının (RFQ✅+Orders✅+Quotes✅+Paraşüt✅+import/AI✅+production✅+customers/products✅ sonrası) **alerts** turu. Kapsam: 6 alert route + `/api/calendar-notes`(+[id]) + alert-service + helper'lar + sayfa/component. Rapor: `docs/audit/2026-06-19-alerts-review-bulgular.md` (**K:0 Y:0 O:0 D:1 Nit:0** — modül çok olgun). **migration YOK.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): D1 düzelt.**
+
+- **D1 (Düşük):** `GET /api/alerts/[id]` `view_alerts` guard'sızdı → `dbGetAlertById` `select("*")` tam satır (ai_reason+ai_inputs_summary+serbest user_note+created_by); liste GET bilinçli DAR kolon+dashboard-tier ama `[id]` detay tam satırı verir. Kardeş calendar/calendar-notes(+[id])/[id]-PATCH hepsi view_alerts/manage_alerts guard'lı; bu GET method-seviye kör noktada atlanmış → accounting (view_alerts YOK)+proxy-fail-open/anon tam detayı okuyabiliyordu. **GET'in UI tüketicisi YOK** (alerts/page.tsx tüm `/api/alerts/${id}` çağrıları PATCH) → guard hiçbir şeyi kırmaz. DÜZELTME: GET'e `requirePermission(view_alerts)` (PATCH+calendar kardeş kalıbı). Gate matrix yeşil (baseline değişmedi — A3 dosya-seviye PATCH guard'ı zaten "korunmuş" sayıyordu).
+- **By-design (bulgu değil):** liste GET dashboard-tier+DAR kolon (accounting AlertsPanel `useAlerts`); scan CRON_SECRET veya oturum (products mount'unda tüm view_products rollerinde oto-tetik `products/page.tsx:231` → session-tier zorunlu; idempotent+advisory-lock+non-destructive); ai-suggest cron-only (`requireCronSecret`); sync-retry manage_alerts; calendar GET view_alerts.
+- **Temiz:** calendar-notes(+[id]) session+view_alerts+`canView/canManageCalendarNote` (ownership+visibility)+validation (örnek-temiz); AI üretimi G1/G2 sanitize+dedup+halüsinasyon filtresi; advisory-lock'lar.
+- **GREEN:** tsc 0 · lint 0 · **5554 test** (+3 YENİ `alerts-read-guards.test.ts`) · build 0. KALAN: push + opsiyonel smoke (accounting→`GET /api/alerts/<id>` 403; alerts sayfası+dashboard tüm rollerde normal).
+
+<details><summary>Önceki: customers/products modülü derin denetim (kampanya B) + O1/D1/Nit</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**customers/products modülü derin denetim (kampanya B) + O1/D1/Nit**)
 
 `erp2-reviewer` kampanyasının (RFQ✅+Orders✅+Quotes✅+Paraşüt✅+import/AI✅+production✅ sonrası) **customers/products** turu. Kapsam: customers 2 route + products 10 route + `redact.ts` + sayfalar. Rapor: `docs/audit/2026-06-19-customers-products-review-bulgular.md` (**K:0 Y:0 O:1 D:1 Nit:1**). **migration YOK.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): O1 + D1 + Nit.**
@@ -17,6 +28,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **By-design (bulgu değil):** products/[id]/aging/counts GET guard'sız ama dashboard-tier (redaction'lı, accounting StockPanel); attachments+signed-URL GET proxy-only (O11 default-flip).
 - **Temiz:** redact.ts kapsamlı (cache-DIŞI per-request, perms key'e girmez), tüm yazma role-guard'lı, attachments UUID/product_id/kind-whitelist, supplier-prices/shortages view_products guard'lı, PATCH customers PATCHABLE whitelist.
 - **GREEN:** tsc 0 · lint 0 · **5551 test** (+6 YENİ `customers-products-read-guards.test.ts`; 2 mevcut quotes test auth-mock güncellendi) · build 0. KALAN: push + opsiyonel smoke (production→customers GET 403; accounting→products/[id]/quotes GET 403).
+</details>
 
 <details><summary>Önceki: production modülü derin denetim (kampanya B) + O1</summary>
 

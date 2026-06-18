@@ -6,10 +6,17 @@ import type { AlertStatus } from "@/lib/database.types";
 
 // GET /api/alerts/[id]
 export async function GET(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // RBAC: view_alerts guard. dbGetAlertById select("*") → tam satır (ai_reason,
+        // ai_inputs_summary, serbest user_note, created_by). Liste GET bilinçli dar
+        // kolon + dashboard-tier; bu detay route'u kardeş calendar/calendar-notes/[id]-PATCH
+        // gibi view_alerts-tier olmalı (accounting view_alerts taşımaz + page-access kapalı).
+        const guard = await requirePermission(req, "view_alerts");
+        if (guard) return guard;
+
         const { id } = await params;
         const alert = await serviceGetAlert(id);
         if (!alert) return NextResponse.json({ error: "Alert bulunamadı." }, { status: 404 });
