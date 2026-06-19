@@ -7,6 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**Purchase modülü derin denetim (erp2-reviewer) + O1**)
+
+Yeni erp2-reviewer turu (kullanıcı seçti); backlog'da denetlenmemiş **purchase / purchase-orders**. REVIEW.md + domain-rules §7/§13 ile koda karşı doğrulandı. **K:0 Y:0 — tek bulgu O1 (Orta).** PUSH EDİLDİ `4d70b65`. **migration YOK.** Rapor `docs/audit/2026-06-19-purchase-review-bulgular.md`.
+
+- **Doğrulanan sağlamlık:** 13 route guard'lı (GET view_purchase_orders/suggestions · mutasyon manage_purchase_orders · receive/from-rec requireRole admin|purchaser · cancel admin · rec PATCH manage_purchase_suggestions); `receive_po_lines` RPC (mig 051) atomik+doğru (PO+satır `FOR UPDATE` · **aşırı-kabul reddi** `received_qty+qty>quantity`→RAISE · `on_hand`+received_qty+commitment+movement+audit tek txn · header auto-status · Y1 reallocation `dbTryResolveShortages` bağlı); mal kabul yalnız `on_hand` artırır (reserved'a dokunmaz); finansal redaction `redactPurchaseOrdersForPerms`; from-rec duplicate-PO guard.
+- **O1 (DÜZELTİLDİ) — istemci-beslemeli actor/created_by:** 8 PO route'u (create/from-recommendations/receive/cancel/confirm/send/revise/lines) `actor`/`created_by`'ı `body`'den alıyordu → `inventory_movements.created_by`+`audit_log.actor`+`purchase_orders.created_by` sahtelenebilirdi (rol-gated → yetki yükseltme DEĞİL; non-repudiation/audit bütünlüğü kaybı; domain-rules §13; kodun geri kalanı zaten `getCurrentUserId()` — orders `ship` stok-çıkış otoriterken PO `receive` stok-giriş değildi, asimetri). Hepsi guard'dan **sonra** `getCurrentUserId()`'a çevrildi; confirm/send/revise gereksiz `safeParseJson` kaldırıldı; servis/RPC imzaları DEĞİŞMEDİ (blast radius yalnız route).
+- **Test:** po-receive + po-from-recommendations'a "body.actor görmezden gelinir, actor=oturum" davranışsal testleri; from-rec eski `undefined` assertion→session-id; 4 test dosyası role-guard mock'una `getCurrentUserId` eklendi (recommendations-validation-parity success testi de bunu gerektirdi). tsc 0 · lint 0 · **5583 test** (+2) · build 0.
+- **İkincil (Düşük, kapsam dışı):** `serviceReceivePOLines` alert-scan fetch'i `NEXT_PUBLIC_APP_URL ?? ""` relative URL → env yoksa sessiz fail (best-effort, production-service/inventory ile aynı kabul edilmiş repo-geneli kalıp).
+- **Mirror:** commit `4d70b65` + `git -C proje-codex reset --hard main` + push both.
+- **Kalan denetlenmemiş modül: yalnız vendors** (+ product-vendor-links).
+
+<details><summary>Önceki: Stok defteri / Inventory derin denetim + 2 düzeltme</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**Stok defteri / Inventory derin denetim (erp2-reviewer) + 2 düzeltme**)
 
 Yeni erp2-reviewer denetim turu; kullanıcı hedef olarak **stok defteri / inventory**'i seçti (çekirdek domain, daha önce özel bulgular doc'u yok). REVIEW.md + domain-rules.md §5–6 ile koda karşı doğrulandı. **No blocking issues — K:0 Y:0 O:0.** PUSH EDİLDİ `4179fd8`. **migration 105 APPLY EDİLDİ ✅** (kullanıcı; check-migrations MANUAL'a 105 eklendi). Rapor `docs/audit/2026-06-19-inventory-review-bulgular.md`.
@@ -18,6 +31,7 @@ Yeni erp2-reviewer denetim turu; kullanıcı hedef olarak **stok defteri / inven
 - **Test:** `import-confirm.test.ts` — sayım testleri delta→recount mutlak qty assertion'ına güncellendi + recount-failure testi eklendi. tsc 0 · lint 0 · **5581 test** (+1) · build 0.
 - **Mirror:** commit `4179fd8` + `git -C proje-codex reset --hard main` + push both → 4 ref de `4179fd8`, tree-hash `17f61de0` özdeş, `git diff main codex-experiment` BOŞ, ıraksama 0 0.
 - **migration 105 APPLY EDİLDİ ✅** (2026-06-19, kullanıcı); `check-migrations.ts` MANUAL map'ine 105 eklendi (otomatik probe yok → ⚠️ `prosrc LIKE '%for update%'` elle-doğrula satırı). Açık iş kalmadı.
+</details>
 
 <details><summary>Önceki: codex-experiment aynası: fast-mutation + tema-hydration → mirror</summary>
 
