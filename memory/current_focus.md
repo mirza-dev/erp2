@@ -9,7 +9,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## Son Tamamlanan İş — 2026-06-19 (**Stok defteri / Inventory derin denetim (erp2-reviewer) + 2 düzeltme**)
 
-Yeni erp2-reviewer denetim turu; kullanıcı hedef olarak **stok defteri / inventory**'i seçti (çekirdek domain, daha önce özel bulgular doc'u yok). REVIEW.md + domain-rules.md §5–6 ile koda karşı doğrulandı. **No blocking issues — K:0 Y:0 O:0.** PUSH EDİLDİ `4179fd8`. **migration 105 YENİ → APPLY BEKLİYOR.** Rapor `docs/audit/2026-06-19-inventory-review-bulgular.md`.
+Yeni erp2-reviewer denetim turu; kullanıcı hedef olarak **stok defteri / inventory**'i seçti (çekirdek domain, daha önce özel bulgular doc'u yok). REVIEW.md + domain-rules.md §5–6 ile koda karşı doğrulandı. **No blocking issues — K:0 Y:0 O:0.** PUSH EDİLDİ `4179fd8`. **migration 105 APPLY EDİLDİ ✅** (kullanıcı; check-migrations MANUAL'a 105 eklendi). Rapor `docs/audit/2026-06-19-inventory-review-bulgular.md`.
 
 - **Doğrulanan sağlamlık:** tüm stok mutasyonları atomik guard'lı RPC — `record_stock_movement` negatif-stok reddi · `increment_reserved` `least(on_hand,…)` cap · `adjust/decrement_on_hand` `greatest(0,…)` · `record_stock_transfer` ayrı `stock_location_balances`+`FOR UPDATE`, `products.on_hand`'e dokunmaz (RLS açık 084:84) · demo merkezi `proxy.ts:207-209` non-GET→403 (per-route guard gereksiz) · RBAC GET view_products / POST stock_adjust_* (A3). Doğrudan TS stok UPDATE yok (istisna seed-runner.ts:482, dev aracı).
 - **D-O1 (DÜZELTİLDİ) — import stok sayımı lost-update:** `import-service` `delta = quantity - prod.on_hand`'i `record_stock_movement` transaction'ı **dışında** okuyordu → eşzamanlı dış harekette `on_hand ≠ sayılan`. Çözüm: YENİ `recount_stock(p_product_id,p_counted_qty,p_notes,p_actor)` RPC (**mig 105**) — `FOR UPDATE` kilit, delta txn-içi, `on_hand`'i **mutlak** sayılan değere atar, delta hareketi kaydeder; negatif sayım red, delta=0 no-op. Wrapper `dbRecountStock` (products.ts); import sayım dalı JS-delta yerine bunu çağırır. Stok **hareketi** (in/out) hâlâ delta `dbRecordMovementAtomic`, transfer dalı değişmedi.
@@ -17,7 +17,7 @@ Yeni erp2-reviewer denetim turu; kullanıcı hedef olarak **stok defteri / inven
 - **Gate notu:** `recount_stock` tek-migration tanımlı → `sql-lint-baseline.ts` `REDEFINITION_CHAINS` GÜNCELLENMEZ (yalnız ≥2-migration fn izler; eklenseydi "hayalet zincir" gate'ini bozardı). `SECURITY DEFINER` yok → DEFINER hijyen gate'i tetiklenmez.
 - **Test:** `import-confirm.test.ts` — sayım testleri delta→recount mutlak qty assertion'ına güncellendi + recount-failure testi eklendi. tsc 0 · lint 0 · **5581 test** (+1) · build 0.
 - **Mirror:** commit `4179fd8` + `git -C proje-codex reset --hard main` + push both → 4 ref de `4179fd8`, tree-hash `17f61de0` özdeş, `git diff main codex-experiment` BOŞ, ıraksama 0 0.
-- **KALAN (kullanıcı-tarafı):** migration 105 Studio'da APPLY + `npm run check-migrations` probe.
+- **migration 105 APPLY EDİLDİ ✅** (2026-06-19, kullanıcı); `check-migrations.ts` MANUAL map'ine 105 eklendi (otomatik probe yok → ⚠️ `prosrc LIKE '%for update%'` elle-doğrula satırı). Açık iş kalmadı.
 
 <details><summary>Önceki: codex-experiment aynası: fast-mutation + tema-hydration → mirror</summary>
 

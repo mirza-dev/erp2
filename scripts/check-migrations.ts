@@ -71,6 +71,7 @@ const MANUAL: Record<string, string> = {
     "102": "create_rfq_with_lines ambiguity fix: SELECT prosrc NOT LIKE '%ON CONFLICT (rfq_id%' FROM pg_proc WHERE proname='create_rfq_with_lines'; (DISTINCT'li, ON CONFLICT'siz sürüm)",
     "103": "award_rfq_create_pos bütünlük: SELECT prosrc LIKE '%fiyat vermedi%' FROM pg_proc WHERE proname='award_rfq_create_pos'; (O2 sunucu-otoriter fiyat + D2 mükerrer satır guard)",
     "104": "reverse_production REDEFINE — entry select satır kilidi: SELECT prosrc LIKE '%for update%' FROM pg_proc WHERE proname='reverse_production'; (O1 eşzamanlı çift-DELETE → stok 2× düşme fix)",
+    "105": "recount_stock RPC var mı + FOR UPDATE: SELECT prosrc LIKE '%for update%' FROM pg_proc WHERE proname='recount_stock'; (D-O1 atomik stok sayımı — mutlak on_hand ataması)",
 };
 
 interface OpenApiSpec {
