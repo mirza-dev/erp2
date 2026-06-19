@@ -1595,6 +1595,7 @@ describe("serviceConfirmBatch — vendor upsert", () => {
                 lead_time_days: 21,
                 payment_terms_days: 30,
             }),
+            null, // D1: import actor (bu testte actorUserId verilmedi → null)
         );
         const [, patch] = mockDbUpdateVendor.mock.calls[0];
         expect(patch).not.toHaveProperty("price");
@@ -1624,6 +1625,7 @@ describe("serviceConfirmBatch — vendor upsert", () => {
                 currency: "EUR",
                 notes: "Ana tedarikçi",
             }),
+            null, // D1: import actor (bu testte actorUserId verilmedi → null)
         );
     });
 
@@ -1657,6 +1659,7 @@ describe("serviceConfirmBatch — vendor upsert", () => {
         expect(mockDbUpdateVendor).toHaveBeenCalledWith(
             "v-existing",
             expect.objectContaining({ contact_email: "satis@acme.com" }),
+            null, // D1: import actor (bu testte actorUserId verilmedi → null)
         );
     });
 
@@ -1684,6 +1687,7 @@ describe("serviceConfirmBatch — vendor upsert", () => {
         expect(mockDbUpdateVendor).toHaveBeenCalledWith(
             "v-new",
             expect.objectContaining({ name: "Yeni Tedarikçi Güncel", contact_phone: "555" }),
+            null, // D1: import actor (bu testte actorUserId verilmedi → null)
         );
     });
 });

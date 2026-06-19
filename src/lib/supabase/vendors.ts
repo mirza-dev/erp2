@@ -121,7 +121,7 @@ export async function dbGetVendorById(id: string): Promise<VendorRow | null> {
     return data;
 }
 
-export async function dbCreateVendor(input: CreateVendorInput): Promise<VendorRow> {
+export async function dbCreateVendor(input: CreateVendorInput, actor: string | null = null): Promise<VendorRow> {
     const validationError = validateVendorInput(input);
     if (validationError) throw new Error(validationError);
     if (!input.name || input.name.trim().length === 0) throw new Error("Tedarikçi adı zorunludur.");
@@ -152,13 +152,14 @@ export async function dbCreateVendor(input: CreateVendorInput): Promise<VendorRo
         entity_type: "vendor",
         entity_id: data.id,
         after_state: { name: data.name, currency: data.currency },
+        actor,
         source: "ui",
     });
 
     return data;
 }
 
-export async function dbUpdateVendor(id: string, patch: UpdateVendorInput): Promise<VendorRow> {
+export async function dbUpdateVendor(id: string, patch: UpdateVendorInput, actor: string | null = null): Promise<VendorRow> {
     const validationError = validateVendorInput(patch);
     if (validationError) throw new Error(validationError);
 
@@ -196,6 +197,7 @@ export async function dbUpdateVendor(id: string, patch: UpdateVendorInput): Prom
         entity_id: id,
         before_state: existing ? { name: existing.name, is_active: existing.is_active, currency: existing.currency } : null,
         after_state: updatePayload,
+        actor,
         source: "ui",
     });
 

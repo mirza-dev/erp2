@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListVendors, dbCreateVendor } from "@/lib/supabase/vendors";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
 import { unstable_cache, revalidateTag } from "next/cache";
 
 const getCachedVendors = unstable_cache(
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
             payment_terms_days: body.payment_terms_days != null ? Number(body.payment_terms_days) : null,
             lead_time_days: body.lead_time_days != null ? Number(body.lead_time_days) : null,
             notes: body.notes as string | null | undefined,
-        });
+        }, await getCurrentUserId());
 
         revalidateTag("vendors", "max");
         return NextResponse.json(vendor, { status: 201 });

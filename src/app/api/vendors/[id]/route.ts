@@ -63,7 +63,7 @@ export async function PATCH(
                 : undefined,
             notes: body.notes as string | null | undefined,
             is_active: body.is_active !== undefined ? Boolean(body.is_active) : undefined,
-        });
+        }, await getCurrentUserId());
 
         revalidateTag("vendors", "max");
         return NextResponse.json(updated);

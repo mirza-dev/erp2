@@ -572,7 +572,7 @@ async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}
                 };
 
                 if (existing) {
-                    const updatedVendor = await dbUpdateVendor(existing.id, vendorFields);
+                    const updatedVendor = await dbUpdateVendor(existing.id, vendorFields, actorUserId);
                     activeVendorsCache = vendors.map(v => v.id === updatedVendor.id ? updatedVendor : v);
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: existing.id });
                     updated++; bumpEntity(draft.entity_type, "updated");
@@ -594,7 +594,7 @@ async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}
                         payment_terms_days: maybeFiniteNumber(data.payment_terms_days),
                         lead_time_days: maybeFiniteNumber(data.lead_time_days),
                         notes: maybeString(data.notes),
-                    });
+                    }, actorUserId);
                     activeVendorsCache = [...vendors, vendor];
                     await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: vendor.id });
                     added++; bumpEntity(draft.entity_type, "added");

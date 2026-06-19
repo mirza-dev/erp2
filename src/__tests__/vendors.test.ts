@@ -297,6 +297,12 @@ describe("POST /api/vendors", () => {
         const body = await res.json();
         expect(body.name).toBe("Valf A.Ş.");
     });
+
+    it("D1: actor sunucudan (getCurrentUserId) helper'a geçer", async () => {
+        mockDbCreateVendor.mockResolvedValue(sampleVendor);
+        await vendorsPOST(makeReq({ name: "Valf A.Ş." }) as unknown as Parameters<typeof vendorsPOST>[0]);
+        expect(mockDbCreateVendor).toHaveBeenCalledWith(expect.any(Object), "u-test");
+    });
 });
 
 // ── GET /api/vendors/[id] ─────────────────────────────────────
@@ -349,6 +355,13 @@ describe("PATCH /api/vendors/[id]", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.name).toBe("Yeni İsim");
+    });
+
+    it("D1: actor sunucudan (getCurrentUserId) helper'a geçer", async () => {
+        mockDbGetVendorById.mockResolvedValue(sampleVendor);
+        mockDbUpdateVendor.mockResolvedValue(sampleVendor);
+        await vendorIdPATCH(makePatchReq({ name: "Yeni İsim" }) as unknown as Parameters<typeof vendorIdPATCH>[0], makeParams("v-1"));
+        expect(mockDbUpdateVendor).toHaveBeenCalledWith("v-1", expect.any(Object), "u-test");
     });
 });
 
