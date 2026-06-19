@@ -18,9 +18,10 @@ _Son güncelleme: 2026-06-17. Kullanıcı isteğiyle "sonraki tura bıraktığı
 - **C1. Login "Monolith" canlı tur** — ⚠️ **brick riski**: prod admin `app_metadata.roles` taşımalı VEYA `ADMIN_EMAILS` her iki Coolify env'inde set olmalı; Supabase "Allow new signups = OFF"; Google OAuth redirect-URL allowlist `…/auth/callback` + tarayıcı smoke. (Testler mock'lu, canlı doğrulanmadı.)
 - **C2. Paraşüt Faz 12 — Sandbox GATE** — gerçek Paraşüt API ile OAuth + list filtreleri + e-doc trackable_job + stok invariant testleri (`PARASUT_PLAN.md §Faz 12`). Paraşüt şu an MOCK; canlıya geçişin tek büyük bloğu. **Hiç başlanmadı.**
 
-## D. Migration APPLY + smoke (kullanıcı tarafı; yeşil testler kapsamaz)
-- ⚠️ **Liste bayat olabilir** — CLAUDE.md §Açık yükümlülükler mig.088 (BLOKER) + mig.091 "APPLY bekliyor" diyor, ama önceki `check-migrations` koşusu "088/090/091/092 CANLIDA UYGULANMIŞ" demişti. **İlk iş: `npx tsx scripts/check-migrations.ts` ile durumu kesinleştir.**
-- Smoke listeleri: orders Y1/O2 (PO mal kabul→otomatik allocated + "Yeniden Rezerve Et"; allocated olmadan Sevket disabled) · teklif gönder rezervasyon (088) · teklif e-posta Aşama 1/2 · mig.099 birim smoke.
+## D. Migration APPLY + smoke (kullanıcı tarafı; yeşil testler kapsamaz) — ✅ AI tarafı kapandı (2026-06-19)
+- ✅ **Durum kesinleşti:** `npx tsx scripts/check-migrations.ts` → **17/17 auto-probe GREEN** (073…100 canlıda; eski "088 BLOKER / 091 APPLY bekliyor" notları BAYAT). Rapor `docs/audit/2026-06-19-d-migration-smoke.md`.
+- ✅ **Gate hygiene:** `check-migrations.ts` MANUAL'a **mig.104** eklendi (önceden untracked → artık `⚠️ 104` raporlanır; `manuel: 7→8`).
+- ⏳ **Kalan = yalnız kullanıcı-tarafı** (DB conn/psql yok, tarayıcı sürülemez): (a) **8 MANUAL redefine SQL** Studio'da (089/093/094/095/101/102/103/104 — doc §2); (b) **browser smoke checklist** (doc §3): A3 guards (quotes/movements/customers/products-quotes/alerts 403) · production O1 eşzamanlı geri-alma (stok 1×) · orders Y1/O2 · mig.099 birim · quote send/mail · tema+demo.
 
 ---
 **Sıradaki tur kararı (kullanıcıya sorulacak):** A1 (server-side pagination, en büyük UX etkisi) mi, yoksa B (sıradaki modül derin incelemesi — quotes) mi?

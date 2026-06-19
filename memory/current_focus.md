@@ -7,7 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## Son Tamamlanan İş — 2026-06-19 (**A3 — route-guard gate METHOD-SEVİYE + yakaladığı 3 açık**)
+## Son Tamamlanan İş — 2026-06-19 (**D — Migration durumu + gate hygiene (mig.104) + smoke checklist**)
+
+`deferred_backlog` D. Rapor: `docs/audit/2026-06-19-d-migration-smoke.md`. **migration YOK; runtime kodu değişmedi.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): "Gate hygiene + tek doğrulama/smoke dosyası".**
+
+- **Durum kesinleşti:** `npx tsx scripts/check-migrations.ts` → **17/17 auto-probe GREEN** (073…100 canlıda) → eski CLAUDE.md "088 BLOKER / 091 APPLY bekliyor" notları BAYAT, gerçek durum temiz.
+- **Gate hygiene:** `check-migrations.ts` MANUAL map'ine **mig.104** (`reverse_production` REDEFINE — production O1 `for update`) eklendi; önceden hiç izlenmiyordu → artık `⚠️ 104 … elle doğrula` raporlanır (sessiz untracked kapandı; `manuel: 7→8`). 081/082/083 bilinçli dokunulmadı ("Tam kapsama" seçilmedi).
+- **Smoke doc 3 bölüm:** §1 probe sonucu (17/17 ✅); §2 **8 MANUAL redefine doğrulama SQL'i** (089 alerts CHECK po_overdue · 093 create_order v_line_total · 094 send_quote qli.description + uq index cancelled-hariç · 095 scan_lock search_path · 101 alerts CHECK rfq_response_due · 102 create_rfq ON CONFLICT'siz · 103 award fiyat-vermedi · 104 reverse_production for update — hepsi Studio, kullanıcı; OpenAPI fonksiyon gövdesi görmez); §3 **browser smoke checklist** (A3 guards: production/purchasing→quotes 403, accounting→movements/products-quotes/alerts 403, production→customers 403; production O1 eşzamanlı geri-alma stok 1×; orders Y1/O2; mig.099 birim; quote send/mail; tema+demo).
+- **Sınır (doc'ta net):** AI tarafı (probe + gate hygiene) kapandı; kalan iş kaçınılmaz **kullanıcı-tarafı** — ortamda `DATABASE_URL`/psql YOK (arbitrary SQL koşulamaz), tarayıcı sürülemez.
+- **Doğrulama:** check-migrations re-run `manuel: 8` + 104 satırı görünür · lint 0 (test/build'e dokunulmadı — runtime değişmedi, script vitest gate değil).
+
+<details><summary>Önceki: A3 — route-guard gate METHOD-SEVİYE + yakaladığı 3 açık</summary>
+
+### A3 — route-guard gate METHOD-SEVİYE + yakaladığı 3 açık
 
 `deferred_backlog` A3. Rapor: `docs/audit/2026-06-19-a3-method-level-guard-gate.md`. **migration YOK.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): Tam A3 (detektör+baseline+3 guard).**
 
@@ -16,6 +28,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Re-baseline:** 135 route→**26 guard'sız method** sınıflandırıldı: dashboard-tier (products/[id]/production/alerts/aging/counts/dashboard-counters/finance), config (note-templates(+[id])/product-types(+[id]/fields)), collateral (attachments+url), self-auth (settings/user/*), public (auth/*/exchange-rates/email-webhook + settings/company SAFE-whitelist GET), tombstone (quotes/[id]/convert).
 - **Yakaladığı 3 GERÇEK açık → guard eklendi:** `GET /api/quotes`+`GET /api/quotes/[id]`→`view_quotes` (İZLENEN borç kapandı; production+purchasing quote pipeline [müşteri+teklif no+tarih] okuyordu, redaction yalnız fiyat maskeler; dashboard KPI fail-soft + quotes sayfaları view_quotes-gated→consumer-safe); `GET /api/inventory/movements`→`view_products` (UI tüketicisi yok, accounting/anon'a açıktı).
 - **GREEN:** tsc 0 · lint 0 · **5562 test** (+8: YENİ `quotes-inventory-read-guards.test.ts` 9) · build 0. Gate artık gelecekteki TÜM method-seviye guard kör noktalarını PR'da yakalar. KALAN: push.
+</details>
 
 <details><summary>Önceki: settings modülü derin denetim TEMİZ + KAMPANYA B TAMAMLANDI</summary>
 
