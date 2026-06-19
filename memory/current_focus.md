@@ -7,6 +7,18 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**Vendors modülü derin denetim (erp2-reviewer) + D1 → modül kampanyası TAMAMLANDI**)
+
+Backlog'daki **son denetlenmemiş modül** vendors (+ product-vendor-links). REVIEW.md + domain-rules §13 ile koda karşı doğrulandı. **K:0 Y:0 O:0 — tek bulgu D1 (Düşük).** PUSH EDİLDİ `dcfd0ff`. **migration YOK.** Rapor `docs/audit/2026-06-19-vendors-review-bulgular.md`.
+
+- **Doğrulanan sağlamlık:** route'lar guard'lı (GET view_vendors · POST/PATCH manage_vendors · DELETE delete_vendors · links `requirePermissionFor(["view_products","view_vendors"])`); product-vendor-links'te **yazma route'u yok** (upsert yalnız import/RFQ servis yolundan, o da actor yazar); DELETE = soft-delete + aktif-PO FK guard (409) + server-authoritative actor (RBAC F6, `getCurrentUserId()`); validasyon (currency whitelist/non-negatif int/e-posta/vergi-no); redaction `redactVendorLinksForPerms` (last_unit_price); RLS açık `product_vendor_links` (mig 084:65).
+- **D1 (DÜZELTİLDİ) — create/update audit actor eksik:** `dbCreateVendor`/`dbUpdateVendor` audit_log insert'leri `actor` yazmıyordu (null), oysa aynı dosyadaki `dbDeactivateVendor` (F6) + `dbUpsertProductVendorLink` yazar → outlier. Güvenlik DEĞİL (route'lar manage_vendors-gated); audit tamlığı (domain-rules §13.2). İki helper'a opsiyonel `actor: string|null=null` param + audit'e alan; route POST/PATCH `getCurrentUserId()`, import-service vendor create/update `actorUserId` geçirir (default null → geriye dönük uyumlu).
+- **Test:** vendors.test.ts route POST/PATCH success'e "actor sunucudan helper'a geçer" (getCurrentUserId mock "u-test") assertion; import-confirm.test.ts'in 4 vendor create/update assertion'ına trailing `null` actor argümanı. tsc 0 · lint 0 · **5585 test** (+2) · build 0.
+- **Mirror:** commit `dcfd0ff` + `git -C proje-codex reset --hard main` + push both.
+- **MODÜL KAMPANYASI TAMAMLANDI:** tüm modüller (RFQ/orders/quotes/paraşüt/import-AI/production/customers-products/alerts/settings/inventory/purchase/vendors) derin tarandı. Denetlenmemiş modül kalmadı.
+
+<details><summary>Önceki: Purchase modülü derin denetim + O1</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**Purchase modülü derin denetim (erp2-reviewer) + O1**)
 
 Yeni erp2-reviewer turu (kullanıcı seçti); backlog'da denetlenmemiş **purchase / purchase-orders**. REVIEW.md + domain-rules §7/§13 ile koda karşı doğrulandı. **K:0 Y:0 — tek bulgu O1 (Orta).** PUSH EDİLDİ `4d70b65`. **migration YOK.** Rapor `docs/audit/2026-06-19-purchase-review-bulgular.md`.
@@ -17,6 +29,7 @@ Yeni erp2-reviewer turu (kullanıcı seçti); backlog'da denetlenmemiş **purcha
 - **İkincil (Düşük, kapsam dışı):** `serviceReceivePOLines` alert-scan fetch'i `NEXT_PUBLIC_APP_URL ?? ""` relative URL → env yoksa sessiz fail (best-effort, production-service/inventory ile aynı kabul edilmiş repo-geneli kalıp).
 - **Mirror:** commit `4d70b65` + `git -C proje-codex reset --hard main` + push both.
 - **Kalan denetlenmemiş modül: yalnız vendors** (+ product-vendor-links).
+</details>
 
 <details><summary>Önceki: Stok defteri / Inventory derin denetim + 2 düzeltme</summary>
 
