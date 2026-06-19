@@ -63,6 +63,7 @@ Raporlar:
 - [ ] **ADMIN_EMAILS** her iki Coolify ortamında (her iki domain) set + format doğru (virgülle ayrılmış geçerli e-postalar).
 - [ ] Supabase → Auth → **"Allow new signups = OFF"** (self-signup oturum bile yaratamaz; kod ikinci kilit).
 - [ ] Supabase → Auth → URL Configuration → **Redirect URLs**: her iki Coolify domain + localhost'un `…/auth/callback`'i ekli (eksikse Google login `pkce`/`code verifier` hatası verir; password login etkilenmez).
+- [ ] **Traefik `X-Real-IP` overwrite doğrulaması (rate-limit spoof direnci — A2/O5 denetimi D1).** `extractClientIp` (`src/lib/request-ip.ts`) IP anahtarını **X-Real-IP primary** alır; bu yalnız Traefik gelen (client-gönderdiği) `X-Real-IP`'i **üzerine yazıyorsa** spoof-dirençlidir. Traefik bu header'ı overwrite/strip etmiyorsa saldırgan `X-Real-IP: <rastgele>` ile per-request spoof yapıp rate-limit'i atlatır (XFF yerine X-Real-IP üzerinden). Kontrol: bir isteğe elle sahte `X-Real-IP`/`X-Forwarded-For` ekle → uygulamanın gördüğü IP gerçek peer olmalı (Traefik `forwardedHeaders`/`trustedIPs` ya da `X-Real-IP` set eden middleware ile). Not: rate-limit fail-open olduğu için bu felaket değil ama amplifikasyon vektörünü kapatır.
 - [ ] **Tarayıcı smoke (deploy sonrası):**
   - [ ] Password ile admin giriş → `/dashboard/settings/users` açılır.
   - [ ] Provize olmayan hesap → `/login?error=unauthorized` (döngü yok).

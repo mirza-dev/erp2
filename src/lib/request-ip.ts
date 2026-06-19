@@ -13,6 +13,10 @@
  * Yanlış-key worst-case OVER-LIMIT (fazla kısıtlar, güvenli) — asla under-limit
  * değil. (CDN eklenirse X-Real-IP edge IP'sini yansıtır → ayrı tur.)
  *
+ * ⚠️ VARSAYIM (deploy-doğrulanmalı): Traefik gelen `X-Real-IP`'i ÜZERİNE yazar →
+ * client spoof edemez. Traefik overwrite etmiyorsa spoof X-Real-IP üzerinden
+ * geri gelir → ops kontrolü: docs/audit/2026-06-19-c1-login-preflight.md §3.
+ *
  * Bu dosya `ioredis` / `rate-limiter-flexible` import etmez — IP çözümü
  * Redis runtime bağımlılığı taşımaz (re-export `src/lib/rate-limit.ts`'te).
  */

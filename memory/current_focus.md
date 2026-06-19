@@ -16,7 +16,8 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Doc:** §1 brick modeli §2 script (çıktı+exit kodları, e-postalar maskeli) §3 manuel checklist (ADMIN_EMAILS her iki Coolify env + Supabase signups-OFF + OAuth redirect URLs her iki domain+localhost /auth/callback + tarayıcı smoke) §4 kurtarma runbook (create-admin / ADMIN_EMAILS+redeploy / Studio app_metadata).
 - **Canlı koşu (2026-06-19):** 8 kullanıcı, **3 kalıcı admin** → prod brick-korumalı (ADMIN_EMAILS'ten bağımsız). Mutasyon YOK.
 - **Sınır:** AI tarafı (preflight script + brick modeli) kapandı; tarayıcı smoke + Coolify/Supabase dashboard ayarları kaçınılmaz kullanıcı-tarafı (prod ADMIN_EMAILS script'çe görülemez — LOCAL env okunur).
-- **Doğrulama:** tsc 0 · lint 0 · preflight canlı OK (exit 0, 3 admin) · full test 5568 değişmedi · build runtime kodu yok. KALAN: push.
+- **Doğrulama:** tsc 0 · lint 0 · preflight canlı OK (exit 0, 3 admin) · full test 5568 değişmedi · build runtime kodu yok.
+- **Denetim (A2+C1 yeni güvenlik kodu, REVIEW.md read-only):** K:0 Y:0 O:0 **D:1** Nit:2. Sağlam doğrulandı: hibrit fail-open (Redis down→route in-memory 5/dk korur), Redis-otoriter in-memory tüketmez, keyspace ayrı (`rl:ai` vs `rl:ai-<route>`), spoof-direnci. **D1:** `extractClientIp` X-Real-IP güveni deployment varsayımı (Traefik overwrite etmezse spoof X-Real-IP üzerinden geri gelir) → kod düzeltmesi yok (proxy'nin işi), aksiyon = C1 preflight §3'e Traefik X-Real-IP overwrite ops-kontrolü + `request-ip.ts` yorum-pointer eklendi. Nit'ler (looksLikeIp gevşek / Redis-up 2 round-trip) dokunulmadı. KALAN: push.
 
 <details><summary>Önceki: A2 — rate-limit sertleştirme: IP spoof fix + AI-route Redis-backed</summary>
 
