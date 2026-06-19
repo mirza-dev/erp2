@@ -7,6 +7,15 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**settings modülü derin denetim TEMİZ + KAMPANYA B TAMAMLANDI**)
+
+`erp2-reviewer` modül-modül kampanyasının **SON modülü: settings**. Kapsam: 10 settings route + admin/users(+[id]) + lib + sayfalar. Rapor: `docs/audit/2026-06-19-settings-review-bulgular.md` (**K:0 Y:0 O:0 D:0 Nit:0 — kampanyanın en olgun modülü, bulgu manufacture EDİLMEDİ**). **Kod değişikliği YOK** — yalnız rapor + memory. PUSH BEKLİYOR.
+
+- **Temiz doğrulananlar:** `admin/users` POST/PATCH/DELETE → `requireAdmin` (app_metadata.roles∋admin + zero-admin bootstrap + **listUsers HATASI fail-CLOSED**) + `normalizeAssignedRoles` (normalizeRole geçersiz rol atar → privilege injection yok, default viewer) + **last-admin lockout** (countAdmins fail-closed, PATCH-demote+DELETE); `api-keys-status` → `requireInternalOperator` + demo→false + yalnız boolean; `company` GET guard'sız ama **SAFE_COMPANY_FIELDS whitelist** (antet/branding, secret yok — PDF/başlık view-tier; PATCH/logo manage_settings+validateCompanyPatch); `files` GET/download view_settings · POST/DELETE manage_settings + MIME/size/kategori + **SVG-attachment XSS defense** (mig.046) + signed-URL TTL; `user/password` → **mevcut-şifre doğrulama** (cookie'siz izole client) + audit; avatar PNG/JPEG/WebP(SVG yok)+1MB; profile fullName 2-100; preferences self-auth. **view_settings/manage_settings yalnız admin** → settings admin-tier.
+- **KAMPANYA B (modül-modül derin inceleme) TAMAMLANDI** — 9 modül: RFQ·Orders·Quotes·Paraşüt·import/AI·production·customers/products·alerts·settings. Toplam bulgu profili: çoğunlukla method-seviye guard kör noktaları (gate A3) + bir stok-defteri idempotency (production O1/mig.104). Kalan iş B değil → A2 Upstash · A3 gate guard-matrisi · C1 Login canlı tur · C2 Paraşüt Faz12 · D migration/smoke ([[deferred_backlog]]).
+
+<details><summary>Önceki: alerts modülü derin denetim (kampanya B) + D1</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**alerts modülü derin denetim (kampanya B) + D1**)
 
 `erp2-reviewer` kampanyasının (RFQ✅+Orders✅+Quotes✅+Paraşüt✅+import/AI✅+production✅+customers/products✅ sonrası) **alerts** turu. Kapsam: 6 alert route + `/api/calendar-notes`(+[id]) + alert-service + helper'lar + sayfa/component. Rapor: `docs/audit/2026-06-19-alerts-review-bulgular.md` (**K:0 Y:0 O:0 D:1 Nit:0** — modül çok olgun). **migration YOK.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): D1 düzelt.**
@@ -15,6 +24,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **By-design (bulgu değil):** liste GET dashboard-tier+DAR kolon (accounting AlertsPanel `useAlerts`); scan CRON_SECRET veya oturum (products mount'unda tüm view_products rollerinde oto-tetik `products/page.tsx:231` → session-tier zorunlu; idempotent+advisory-lock+non-destructive); ai-suggest cron-only (`requireCronSecret`); sync-retry manage_alerts; calendar GET view_alerts.
 - **Temiz:** calendar-notes(+[id]) session+view_alerts+`canView/canManageCalendarNote` (ownership+visibility)+validation (örnek-temiz); AI üretimi G1/G2 sanitize+dedup+halüsinasyon filtresi; advisory-lock'lar.
 - **GREEN:** tsc 0 · lint 0 · **5554 test** (+3 YENİ `alerts-read-guards.test.ts`) · build 0. KALAN: push + opsiyonel smoke (accounting→`GET /api/alerts/<id>` 403; alerts sayfası+dashboard tüm rollerde normal).
+</details>
 
 <details><summary>Önceki: customers/products modülü derin denetim (kampanya B) + O1/D1/Nit</summary>
 
