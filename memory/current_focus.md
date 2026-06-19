@@ -7,6 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**Stok defteri / Inventory derin denetim (erp2-reviewer) + 2 düzeltme**)
+
+Yeni erp2-reviewer denetim turu; kullanıcı hedef olarak **stok defteri / inventory**'i seçti (çekirdek domain, daha önce özel bulgular doc'u yok). REVIEW.md + domain-rules.md §5–6 ile koda karşı doğrulandı. **No blocking issues — K:0 Y:0 O:0.** PUSH EDİLDİ `4179fd8`. **migration 105 YENİ → APPLY BEKLİYOR.** Rapor `docs/audit/2026-06-19-inventory-review-bulgular.md`.
+
+- **Doğrulanan sağlamlık:** tüm stok mutasyonları atomik guard'lı RPC — `record_stock_movement` negatif-stok reddi · `increment_reserved` `least(on_hand,…)` cap · `adjust/decrement_on_hand` `greatest(0,…)` · `record_stock_transfer` ayrı `stock_location_balances`+`FOR UPDATE`, `products.on_hand`'e dokunmaz (RLS açık 084:84) · demo merkezi `proxy.ts:207-209` non-GET→403 (per-route guard gereksiz) · RBAC GET view_products / POST stock_adjust_* (A3). Doğrudan TS stok UPDATE yok (istisna seed-runner.ts:482, dev aracı).
+- **D-O1 (DÜZELTİLDİ) — import stok sayımı lost-update:** `import-service` `delta = quantity - prod.on_hand`'i `record_stock_movement` transaction'ı **dışında** okuyordu → eşzamanlı dış harekette `on_hand ≠ sayılan`. Çözüm: YENİ `recount_stock(p_product_id,p_counted_qty,p_notes,p_actor)` RPC (**mig 105**) — `FOR UPDATE` kilit, delta txn-içi, `on_hand`'i **mutlak** sayılan değere atar, delta hareketi kaydeder; negatif sayım red, delta=0 no-op. Wrapper `dbRecountStock` (products.ts); import sayım dalı JS-delta yerine bunu çağırır. Stok **hareketi** (in/out) hâlâ delta `dbRecordMovementAtomic`, transfer dalı değişmedi.
+- **D2 (DÜZELTİLDİ — kaldırıldı) — ölü atomik-olmayan stok yardımcıları:** sıfır-çağıran (grep+test doğrulandı) — `dbRecordMovement` (products), `orders.ts` tüm `// Stock helpers (DEPRECATED)` bloğu (`StockConflict`/`dbGetProductStocks`/`dbReserveStock`/`dbReleaseStock`/`dbShipOrder`). Footgun (atomiklik/cap invariant'ı bypass). Plan'ın 4-fn listesi `dbShipOrder`'ı da kapsayacak şekilde genişletildi (tüm blok). `OrderLineRow` import korundu.
+- **Gate notu:** `recount_stock` tek-migration tanımlı → `sql-lint-baseline.ts` `REDEFINITION_CHAINS` GÜNCELLENMEZ (yalnız ≥2-migration fn izler; eklenseydi "hayalet zincir" gate'ini bozardı). `SECURITY DEFINER` yok → DEFINER hijyen gate'i tetiklenmez.
+- **Test:** `import-confirm.test.ts` — sayım testleri delta→recount mutlak qty assertion'ına güncellendi + recount-failure testi eklendi. tsc 0 · lint 0 · **5581 test** (+1) · build 0.
+- **Mirror:** commit `4179fd8` + `git -C proje-codex reset --hard main` + push both → 4 ref de `4179fd8`, tree-hash `17f61de0` özdeş, `git diff main codex-experiment` BOŞ, ıraksama 0 0.
+- **KALAN (kullanıcı-tarafı):** migration 105 Studio'da APPLY + `npm run check-migrations` probe.
+
+<details><summary>Önceki: codex-experiment aynası: fast-mutation + tema-hydration → mirror</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**codex-experiment aynası: fast-mutation + tema-hydration özelliği main'e adapte → mirror**)
 
 proje-codex worktree'sinde commit edilmemiş gerçek bir özellik vardı; mirror FF'i bozmuştu (login çakışması). **Kullanıcı kararı (AskUserQuestion): özelliği main'e adapte et + iki branch birebir mirror, hiçbir şey kaybolmasın, no semantic errors.** PUSH EDİLDİ `a6f002a`. **migration YOK.**
@@ -17,6 +31,7 @@ proje-codex worktree'sinde commit edilmemiş gerçek bir özellik vardı; mirror
 - **İnline REVIEW.md denetim TEMİZ:** tsc 0/lint 0/5580 test/build 0; production `refetchFailed` uyarısı artık fire etmez (optimistic add ile gereksiz; zararsız dead-code mirror-sadakati için bırakıldı); demo guard'lar 5 client'ta korundu; stok defteri UI-katmanı (server source-of-truth + mutate(PRODUCTS_KEY)).
 - **Mirror:** `git -C proje-codex reset --hard main` (feature artık main commit'inde → kayıp yok; önce commit SONRA reset).
 - **TAMAMLANDI:** commit `a6f002a` + `git -C proje-codex reset --hard main` + push both; doğrulandı → 4 ref de `a6f002a`, tree-hash `ff198da9` özdeş, `git diff main codex-experiment` BOŞ, ıraksama 0 0.
+</details>
 
 <details><summary>Önceki: Landing + login UI denetimi (erp2-reviewer) + 4 düzeltme</summary>
 
