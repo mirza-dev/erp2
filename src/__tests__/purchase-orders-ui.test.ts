@@ -216,7 +216,7 @@ describe("Liste sayfası — hover state + toplu-iptal seçim + modal a11y", () 
     });
 
     it("toplu iptal seçimi yalnız iptal edilebilir PO'larda (cancellablePageIds)", () => {
-        expect(listSrc).toContain("const cancellablePageIds = orders.filter(isPoCancellable)");
+        expect(listSrc).toContain("const cancellablePageIds = displayOrders.filter(isPoCancellable)");
         expect(listSrc).toContain("toggleAll(cancellablePageIds)");
         expect(listSrc).toContain("isPageAllSelected(cancellablePageIds)");
         // satır checkbox koşullu

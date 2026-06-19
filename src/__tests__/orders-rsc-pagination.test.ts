@@ -54,7 +54,7 @@ describe("orders OrdersClient.tsx — client etkileşim", () => {
     });
     it("data-context global liste'ye abone DEĞİL (useOrders yok)", () => {
         expect(CLIENT).not.toContain("useOrders");
-        expect(CLIENT).not.toContain("data-context");
+        expect(CLIENT).not.toContain("ORDERS_KEY");
     });
 });
 

@@ -70,7 +70,7 @@ describe("Tedarikçiler — A1 sunucu sayfalama + sessiz hata yok", () => {
 describe("Tedarikçiler — toplu seçim yalnız aktif tedarikçiler", () => {
     it("select-all pageIds aktif alt-kümeyle hesaplanır", () => {
         expect(PAGE_SRC).toMatch(
-            /const pageIds = vendors\.filter\(v => v\.is_active\)\.map\(v => v\.id\)/,
+            /const pageIds = displayVendors\.filter\(v => v\.is_active\)\.map\(v => v\.id\)/,
         );
     });
 

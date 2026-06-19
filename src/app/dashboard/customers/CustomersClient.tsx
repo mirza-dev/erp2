@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
 import { maskCurrency } from "@/lib/utils";
 import { type Customer } from "@/lib/mock-data";
 import { CUSTOMERS_KEY } from "@/lib/data-context";
+import { mapCustomer } from "@/lib/api-mappers";
+import { decrementCount, patchCountRecord, removeByIds, successfulResponseIds, upsertFirst } from "@/lib/fast-mutation";
 import { useListUrlState, useDebouncedSearch } from "@/hooks/useListUrlState";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import CustomerDetailPanel from "@/components/customers/CustomerDetailPanel";
@@ -77,11 +78,13 @@ interface FilterState {
 
 export default function CustomersClient(props: CustomersClientProps) {
     const { customers, total, counts, page, pageSize, tab, search } = props;
-    const router = useRouter();
     const { mutate } = useSWRConfig();
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has, canViewFinancialSummary } = usePermissions();
+    const [displayCustomers, setDisplayCustomers] = useState<Customer[]>(customers);
+    const [displayCounts, setDisplayCounts] = useState<Record<CustomerTab, number>>(counts);
+    const [displayTotal, setDisplayTotal] = useState(total);
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [newCustomer, setNewCustomer] = useState(newCustomerInitial);
@@ -104,8 +107,71 @@ export default function CustomersClient(props: CustomersClientProps) {
         search,
         (v) => navigate({ search: v, page: 1 }),
     );
-    // Mutasyon sonrası DataContext (dashboard) cache'ini de tazele.
-    const refreshAll = () => { mutate(CUSTOMERS_KEY); router.refresh(); };
+
+    useEffect(() => {
+        setDisplayCustomers(customers);
+        setDisplayCounts(counts);
+        setDisplayTotal(total);
+        setSelectedCustomer(prev => prev ? (customers.find(c => c.id === prev.id) ?? prev) : prev);
+    }, [customers, counts, total]);
+
+    const revalidateCustomers = () => {
+        void mutate(CUSTOMERS_KEY);
+    };
+
+    const matchesCurrentView = (customer: Customer): boolean => {
+        if (tab === "active" && !customer.isActive) return false;
+        if (tab === "passive" && customer.isActive) return false;
+        const needle = search.trim().toLowerCase();
+        if (!needle) return true;
+        return [
+            customer.name,
+            customer.email,
+            customer.country,
+        ].some(value => (value ?? "").toLowerCase().includes(needle));
+    };
+
+    const applyDeletedCustomers = (ids: string[]) => {
+        if (ids.length === 0) return;
+        const idSet = new Set(ids);
+        const previous = displayCustomers.filter(customer => idSet.has(customer.id));
+        setDisplayCustomers(prev => removeByIds(prev, idSet));
+        setDisplayCounts(prev => {
+            const patches: Partial<Record<CustomerTab, number>> = { all: -ids.length };
+            for (const customer of previous) {
+                patches[customer.isActive ? "active" : "passive"] =
+                    (patches[customer.isActive ? "active" : "passive"] ?? 0) - 1;
+            }
+            return patchCountRecord(prev, patches);
+        });
+        setDisplayTotal(prev => decrementCount(prev, ids.length));
+    };
+
+    const applyCreatedCustomer = (customer: Customer) => {
+        setDisplayCounts(prev => patchCountRecord(prev, {
+            all: 1,
+            [customer.isActive ? "active" : "passive"]: 1,
+        } as Partial<Record<CustomerTab, number>>));
+        if (matchesCurrentView(customer)) {
+            setDisplayTotal(prev => prev + 1);
+            if (page === 1) setDisplayCustomers(prev => upsertFirst(prev, customer));
+        }
+    };
+
+    const applyUpdatedCustomer = (customer: Customer) => {
+        const wasVisible = displayCustomers.some(c => c.id === customer.id);
+        const shouldStayVisible = matchesCurrentView(customer);
+        setSelectedCustomer(customer);
+        setDisplayCustomers(prev => {
+            const exists = prev.some(c => c.id === customer.id);
+            if (!shouldStayVisible) return prev.filter(c => c.id !== customer.id);
+            if (!exists) return prev;
+            return prev.map(c => c.id === customer.id ? customer : c);
+        });
+        if (wasVisible && !shouldStayVisible) {
+            setDisplayTotal(prev => decrementCount(prev));
+        }
+    };
 
     const setField = (key: keyof typeof newCustomerInitial) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -122,7 +188,8 @@ export default function CustomersClient(props: CustomersClientProps) {
             }
             toast({ type: "success", message: "Müşteri silindi" });
             if (selectedCustomer?.id === id) setSelectedCustomer(null);
-            refreshAll();
+            applyDeletedCustomers([id]);
+            revalidateCustomers();
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Müşteri silinemedi.";
             toast({ type: "error", message: msg });
@@ -156,10 +223,12 @@ export default function CustomersClient(props: CustomersClientProps) {
                 const errBody = await res.json().catch(() => null);
                 throw new Error(errBody?.error ?? "Müşteri eklenemedi. Lütfen tekrar deneyin.");
             }
+            const created = mapCustomer(await res.json());
             toast({ type: "success", message: `${newCustomer.name} müşteri olarak eklendi` });
             setShowAddModal(false);
             setNewCustomer(newCustomerInitial);
-            refreshAll();
+            applyCreatedCustomer(created);
+            revalidateCustomers();
         } catch (err) {
             const msg = err instanceof Error ? err.message : "Müşteri eklenemedi. Lütfen tekrar deneyin.";
             toast({ type: "error", message: msg });
@@ -170,29 +239,29 @@ export default function CustomersClient(props: CustomersClientProps) {
 
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
         useSelection(`${tab}|${search}|${page}`);
-    const pageIds = customers.map(c => c.id);
+    const pageIds = displayCustomers.map(c => c.id);
 
     const handleBulkDelete = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setBulkDeleting(true);
         const ids = Array.from(selectedIds);
         const results = await Promise.allSettled(
-            ids.map(id => fetch(`/api/customers/${id}`, { method: "DELETE" }).then(r => {
-                if (!r.ok) throw new Error(String(r.status));
-            })),
+            ids.map(id => fetch(`/api/customers/${id}`, { method: "DELETE" })),
         );
-        const failed = results.filter(r => r.status === "rejected").length;
-        const succeeded = ids.length - failed;
+        const succeededIds = successfulResponseIds(ids, results);
+        const failed = ids.length - succeededIds.length;
+        const succeeded = succeededIds.length;
         if (succeeded > 0) toast({ type: "success", message: `${succeeded} müşteri silindi.` });
         if (failed > 0) toast({ type: "error", message: `${failed} müşteri silinemedi.` });
-        if (selectedCustomer && ids.includes(selectedCustomer.id)) setSelectedCustomer(null);
+        if (selectedCustomer && succeededIds.includes(selectedCustomer.id)) setSelectedCustomer(null);
         clearAll();
         setBulkDeleteConfirm(false);
         setBulkDeleting(false);
-        refreshAll();
+        applyDeletedCustomers(succeededIds);
+        revalidateCustomers();
     };
 
-    const totalPages = computeTotalPages(total, pageSize);
+    const totalPages = computeTotalPages(displayTotal, pageSize);
 
     return (
         <>
@@ -204,7 +273,7 @@ export default function CustomersClient(props: CustomersClientProps) {
                             Cariler
                         </div>
                         <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                            {counts.all} müşteri · {counts.active} aktif
+                            {displayCounts.all} müşteri · {displayCounts.active} aktif
                         </div>
                     </div>
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", flex: "1 1 320px" }}>
@@ -245,15 +314,15 @@ export default function CustomersClient(props: CustomersClientProps) {
                     <UnderlinedFilterTabs
                         ariaLabel="Cari durumu filtresi"
                         items={[
-                            { key: "all", label: "Tümü", count: counts.all },
-                            { key: "active", label: "Aktif", count: counts.active },
-                            { key: "passive", label: "Pasif", count: counts.passive },
+                            { key: "all", label: "Tümü", count: displayCounts.all },
+                            { key: "active", label: "Aktif", count: displayCounts.active },
+                            { key: "passive", label: "Pasif", count: displayCounts.passive },
                         ]}
                         activeKey={tab}
                         onChange={(key) => navigate({ tab: key, page: 1 })}
                     />
                     <span style={{ fontSize: "12px", color: "var(--text-tertiary)", marginLeft: "auto", alignSelf: "center" }}>
-                        {total} müşteri
+                        {displayTotal} müşteri
                     </span>
                 </div>
 
@@ -323,13 +392,13 @@ export default function CustomersClient(props: CustomersClientProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            {customers.length === 0 ? (
+                            {displayCustomers.length === 0 ? (
                                 <tr>
                                     <td colSpan={9} style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px", border: "none" }}>
                                         {search ? "Arama kriterine uyan müşteri bulunamadı." : "Henüz müşteri yok."}
                                     </td>
                                 </tr>
-                            ) : customers.map((customer) => (
+                            ) : displayCustomers.map((customer) => (
                                 <tr
                                     key={customer.id}
                                     style={{
@@ -449,11 +518,11 @@ export default function CustomersClient(props: CustomersClientProps) {
                             ))}
                         </tbody>
                     </table>
-                    {total > 0 && (
+                    {displayTotal > 0 && (
                         <Pagination
                             currentPage={page}
                             totalPages={totalPages}
-                            totalItems={total}
+                            totalItems={displayTotal}
                             pageSize={pageSize}
                             onPageChange={(p) => navigate({ page: p })}
                             itemLabel="müşteri"
@@ -465,6 +534,7 @@ export default function CustomersClient(props: CustomersClientProps) {
             <CustomerDetailPanel
                 customer={selectedCustomer}
                 onClose={() => setSelectedCustomer(null)}
+                onCustomerUpdated={applyUpdatedCustomer}
             />
 
             {/* Bulk delete confirm modal */}

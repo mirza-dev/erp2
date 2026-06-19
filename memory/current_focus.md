@@ -7,6 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**codex-experiment aynası: fast-mutation + tema-hydration özelliği main'e adapte → mirror**)
+
+proje-codex worktree'sinde commit edilmemiş gerçek bir özellik vardı; mirror FF'i bozmuştu (login çakışması). **Kullanıcı kararı (AskUserQuestion): özelliği main'e adapte et + iki branch birebir mirror, hiçbir şey kaybolmasın, no semantic errors.** PUSH BEKLİYOR. **migration YOK.**
+
+- **Adapte edilen (1) fast-mutation/optimistic-UI:** YENİ `src/lib/fast-mutation.ts` (saf helper: successfulResponseIds/decrementCount/patchCountRecord/removeByIds/upsertFirst) + 2 yeni test (`fast-mutation.test`, `operation-speed-regression.test`); `data-context.tsx` (optimistic liste mutate + `updateCustomer`→`Customer|undefined` return + `addUretimKaydi`→`{entry?}` + üretim revalidation arka-plana, bloklamaz); 5 client (Orders/Customers/Purchase/Quotes/Vendors) `router.refresh()`→optimistic `displayX` state + `applyXxx` helper + `mutate(COUNTERS_KEY/PRODUCTS_KEY)`; `CustomerDetailPanel.onCustomerUpdated`.
+- **Adapte edilen (2) tema hydration guard:** `ThemeToggle` + login `Chrome` `mounted` flag.
+- **Reconciliation mekanizması:** 19 feature dosyası codex worktree→erp2 **verbatim kopya** (0a7e7d1↔0cf441a'da bu dosyalar AYNI → çakışmasız); `login/page.tsx`+`globals.css`+`login-page.test.tsx` **main OTORİTER** (D1/D2/Nit fix'lerim KORUNDU), yalnız login `Chrome`'a `mounted` guard elle eklendi.
+- **İnline REVIEW.md denetim TEMİZ:** tsc 0/lint 0/5580 test/build 0; production `refetchFailed` uyarısı artık fire etmez (optimistic add ile gereksiz; zararsız dead-code mirror-sadakati için bırakıldı); demo guard'lar 5 client'ta korundu; stok defteri UI-katmanı (server source-of-truth + mutate(PRODUCTS_KEY)).
+- **Mirror:** `git -C proje-codex reset --hard main` (feature artık main commit'inde → kayıp yok; önce commit SONRA reset).
+- KALAN: commit + reset --hard mirror + push both + SHA/tree-diff doğrula.
+
+<details><summary>Önceki: Landing + login UI denetimi (erp2-reviewer) + 4 düzeltme</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**Landing + login UI denetimi (erp2-reviewer) + 4 düzeltme**)
 
 REVIEW.md read-only (landing `src/app/page.tsx` + login `src/app/login/page.tsx` + auth/callback + globals login CSS). **No blocking issues — K:0 Y:0 O:0 D:2 Nit:2.** PUSH BEKLİYOR. **migration YOK; yalnız `login/page.tsx` + globals.css 1 satır + test.** **Kullanıcı kararı (AskUserQuestion): hepsini düzelt.**
@@ -18,6 +31,7 @@ REVIEW.md read-only (landing `src/app/page.tsx` + login `src/app/login/page.tsx`
 - **Nit-2:** `handleForgot` sıfırlama hatası `errAuth` ("e-posta/şifre hatalı") gösteriyordu → yeni `errReset` (TR/EN) mesajı.
 - **Test:** +2 (`login-page.test.tsx`): D1 malicious-attempted yansımaz (genel mesaj) + Nit-2 reset mesajı; 1 mevcut test güncellendi (aria-live assertion `null`).
 - **GREEN:** tsc 0 · lint 0 · **5570 test** (+2) · build 0. KALAN: push.
+</details>
 
 <details><summary>Önceki: C1 — Login brick-risk preflight + checklist + kurtarma runbook</summary>
 

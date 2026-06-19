@@ -103,7 +103,13 @@ function GoogleIcon() {
 /* Sağ üst: dil seçici + tema butonu (useTheme — ThemeProvider içinde). */
 function Chrome({ lang, setLang, t }: { lang: Lang; setLang: (l: Lang) => void; t: Strings }) {
     const { resolved, toggle } = useTheme();
-    const isDark = resolved === "dark";
+    // Hydration guard: tema sunucuda bilinmez → ilk render'da Moon (default), mount
+    // sonrası gerçek tema. SSR/client ikon uyuşmazlığını önler (ThemeToggle ile aynı kalıp).
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+    const isDark = mounted && resolved === "dark";
     const Icon = isDark ? Sun : Moon;
 
     return (

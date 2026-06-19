@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSWRConfig } from "swr";
 import { useListUrlState, useDebouncedSearch } from "@/hooks/useListUrlState";
 import { maskCurrency, formatDate } from "@/lib/utils";
 import type { CommercialStatus, FulfillmentStatus } from "@/lib/database.types";
 import type { OrderTab } from "@/lib/supabase/orders";
+import { COUNTERS_KEY, PRODUCTS_KEY } from "@/lib/data-context";
+import { decrementCount, patchCountRecord, successfulResponseIds } from "@/lib/fast-mutation";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { Order } from "@/lib/mock-data";
 import Button, { ButtonLink } from "@/components/ui/Button";
@@ -32,6 +35,14 @@ const fulfillmentStatusConfig: Record<FulfillmentStatus, { label: string; cls: s
     allocated:           { label: "Rezerveli",    cls: "badge-warning"  },
     shipped:             { label: "Sevk Edildi",  cls: "badge-success"  },
 };
+
+function getCommercialMeta(status: CommercialStatus) {
+    return commercialStatusConfig[status] ?? commercialStatusConfig.draft;
+}
+
+function getFulfillmentMeta(status: FulfillmentStatus) {
+    return fulfillmentStatusConfig[status] ?? null;
+}
 
 // Kullanıcıya görünen filtre sekmeleri (commercial + fulfillment birleşik).
 // Sunucu tarafı OrderTab ile aynı anahtarlar — sayaçlar `counts` prop'undan gelir.
@@ -98,10 +109,14 @@ interface FilterState {
 export default function OrdersClient(props: OrdersClientProps) {
     const { orders, total, counts, page, pageSize, tab, search, customerId, dateFrom, dateTo, currency } = props;
     const router = useRouter();
+    const { mutate } = useSWRConfig();
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has, canViewSalesPrices } = usePermissions();
 
+    const [displayOrders, setDisplayOrders] = useState<Order[]>(orders);
+    const [displayCounts, setDisplayCounts] = useState<Record<OrderTab, number>>(counts);
+    const [displayTotal, setDisplayTotal] = useState(total);
     const [refreshing, setRefreshing] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -113,6 +128,12 @@ export default function OrdersClient(props: OrdersClientProps) {
     useEffect(() => {
         document.title = "Satış Siparişleri · Roven";
     }, []);
+
+    useEffect(() => {
+        setDisplayOrders(orders);
+        setDisplayCounts(counts);
+        setDisplayTotal(total);
+    }, [orders, counts, total]);
 
     // Sunucu (URL/props) filtre durumunun tek kaynak olması: kontrol değerleri
     // prop'tan okunur, değişiklik URL'e yazılır → sunucu yeniden render eder.
@@ -160,7 +181,9 @@ export default function OrdersClient(props: OrdersClientProps) {
                 toast({ type: "error", message: errBody.error || `İşlem başarısız (${res.status})` });
                 return;
             }
-            router.refresh();
+            applyCancelledOrders([orderId]);
+            void mutate(COUNTERS_KEY);
+            void mutate(PRODUCTS_KEY);
         } finally {
             setDeletingId(null);
         }
@@ -170,7 +193,36 @@ export default function OrdersClient(props: OrdersClientProps) {
         useSelection(`${tab}|${search}|${customerId}|${dateFrom}|${dateTo}|${currency}|${page}`);
     // Select-all yalnızca iptal edilebilir satırları kapsar (sevk/iptal edilmiş
     // siparişler toplu iptalde 400 alırdı).
-    const cancellablePageIds = orders.filter(isOrderCancellable).map(o => o.id);
+    const cancellablePageIds = displayOrders.filter(isOrderCancellable).map(o => o.id);
+
+    const applyCancelledOrders = (ids: string[]) => {
+        if (ids.length === 0) return;
+        const idSet = new Set(ids);
+        const previous = displayOrders.filter(order => idSet.has(order.id));
+
+        setDisplayOrders(prev => {
+            const cancelled = prev.map(order => idSet.has(order.id)
+                ? { ...order, commercial_status: "cancelled" as const }
+                : order);
+            if (tab === "ALL" || tab === "cancelled") return cancelled;
+            return cancelled.filter(order => !idSet.has(order.id));
+        });
+
+        setDisplayCounts(prev => {
+            const patches: Partial<Record<OrderTab, number>> = { cancelled: ids.length };
+            for (const order of previous) {
+                const oldKey: OrderTab = order.fulfillment_status === "shipped"
+                    ? "shipped"
+                    : order.commercial_status;
+                patches[oldKey] = (patches[oldKey] ?? 0) - 1;
+            }
+            return patchCountRecord(prev, patches);
+        });
+
+        if (tab !== "ALL" && tab !== "cancelled") {
+            setDisplayTotal(prev => decrementCount(prev, ids.length));
+        }
+    };
 
     const handleBulkDelete = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -179,19 +231,22 @@ export default function OrdersClient(props: OrdersClientProps) {
         const results = await Promise.allSettled(
             ids.map(id => fetch(`/api/orders/${id}`, { method: "DELETE" })),
         );
-        const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
-        const succeeded = ids.length - failed;
+        const succeededIds = successfulResponseIds(ids, results);
+        const failed = ids.length - succeededIds.length;
+        const succeeded = succeededIds.length;
         // Soft-DELETE = iptal (silme değil). Dürüst sözcük (tekil buton "iptal et" der).
         if (succeeded > 0) toast({ type: "success", message: `${succeeded} sipariş iptal edildi.` });
         if (failed > 0) toast({ type: "error", message: `${failed} sipariş iptal edilemedi.` });
         clearAll();
         setBulkDeleteConfirm(false);
         setBulkDeleting(false);
-        router.refresh();
+        applyCancelledOrders(succeededIds);
+        void mutate(COUNTERS_KEY);
+        void mutate(PRODUCTS_KEY);
     };
 
-    const totalPages = computeTotalPages(total, pageSize);
-    const pendingCount = counts.pending_approval;
+    const totalPages = computeTotalPages(displayTotal, pageSize);
+    const pendingCount = displayCounts.pending_approval;
     const hasAdvancedFilter = !!(dateFrom || dateTo || currency || customerId);
 
     return (
@@ -203,7 +258,7 @@ export default function OrdersClient(props: OrdersClientProps) {
                         Satış Siparişleri
                     </h1>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        {counts.ALL} sipariş · {pendingCount} onay bekliyor
+                        {displayCounts.ALL} sipariş · {pendingCount} onay bekliyor
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -232,7 +287,7 @@ export default function OrdersClient(props: OrdersClientProps) {
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                 <UnderlinedFilterTabs
                     ariaLabel="Sipariş durumu filtresi"
-                    items={filterTabs.map((t) => ({ key: t.id, label: t.label, count: counts[t.id] }))}
+                    items={filterTabs.map((t) => ({ key: t.id, label: t.label, count: displayCounts[t.id] }))}
                     activeKey={tab}
                     onChange={(key) => navigate({ tab: key, page: 1 })}
                 />
@@ -391,7 +446,7 @@ export default function OrdersClient(props: OrdersClientProps) {
                         </tr>
                     </thead>
                     <tbody>
-                        {orders.length === 0 ? (
+                        {displayOrders.length === 0 ? (
                             <tr>
                                 <td colSpan={9} style={{ border: "none" }}>
                                     <EmptyState
@@ -409,9 +464,9 @@ export default function OrdersClient(props: OrdersClientProps) {
                                 </td>
                             </tr>
                         ) : (
-                            orders.map((order) => {
-                                const commercial = commercialStatusConfig[order.commercial_status];
-                                const fulfillment = fulfillmentStatusConfig[order.fulfillment_status];
+                            displayOrders.map((order) => {
+                                const commercial = getCommercialMeta(order.commercial_status);
+                                const fulfillment = getFulfillmentMeta(order.fulfillment_status);
                                 const isHovered = hoveredId === order.id;
                                 const cellBg = isHovered ? "var(--bg-secondary)" : "transparent";
                                 const cancellable = isOrderCancellable(order);
@@ -467,7 +522,7 @@ export default function OrdersClient(props: OrdersClientProps) {
                                             })()}
                                         </td>
                                         <td style={{ ...tdStyle, background: cellBg, textAlign: "center" }}>
-                                            {order.fulfillment_status !== "unallocated" && (
+                                            {fulfillment && order.fulfillment_status !== "unallocated" && (
                                                 <span
                                                     className={`badge ${fulfillment.cls}`}
                                                     style={{ fontSize: "10px", padding: "2px 6px" }}
@@ -526,11 +581,11 @@ export default function OrdersClient(props: OrdersClientProps) {
                         )}
                     </tbody>
                 </table>
-                {total > 0 && (
+                {displayTotal > 0 && (
                     <Pagination
                         currentPage={page}
                         totalPages={totalPages}
-                        totalItems={total}
+                        totalItems={displayTotal}
                         pageSize={pageSize}
                         onPageChange={(p) => navigate({ page: p })}
                         itemLabel="sipariş"

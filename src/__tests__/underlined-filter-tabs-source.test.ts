@@ -24,15 +24,15 @@ describe("UnderlinedFilterTabs page adoption", () => {
     });
 
     it("customers and note templates render counted tabs", () => {
-        expect(CUSTOMERS).toContain('{ key: "all", label: "Tümü", count: counts.all }');
-        expect(CUSTOMERS).toContain('{ key: "active", label: "Aktif", count: counts.active }');
+        expect(CUSTOMERS).toContain('{ key: "all", label: "Tümü", count: displayCounts.all }');
+        expect(CUSTOMERS).toContain('{ key: "active", label: "Aktif", count: displayCounts.active }');
         expect(NOTE_TEMPLATES).toContain('{ key: "all", label: "Tümü", count: templates.length }');
         expect(NOTE_TEMPLATES).toContain("count: kindCounts[kind]");
     });
 
     it("purchase orders use shared underlined tabs (A1: sunucu sayfalama, sayaç prop'tan)", () => {
         expect(PURCHASE_ORDERS).toContain('ariaLabel="Satın alma siparişi durumu filtresi"');
-        expect(PURCHASE_ORDERS).toContain("counts[t.key]");
+        expect(PURCHASE_ORDERS).toContain("displayCounts[t.key]");
         // A1: client-side full-fetch + bellekte filtre/sayaç kalktı (sunucu yapar)
         expect(PURCHASE_ORDERS).not.toContain('fetch("/api/purchase-orders")');
         expect(PURCHASE_ORDERS).not.toContain("orders.filter((o) => o.status === activeTab)");

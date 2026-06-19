@@ -6,6 +6,7 @@ import { useListUrlState, useDebouncedSearch } from "@/hooks/useListUrlState";
 import { maskCurrency, formatDate } from "@/lib/utils";
 import type { QuoteSummary } from "@/lib/mock-data";
 import { usePermissions } from "@/lib/auth/use-permissions";
+import { decrementCount, patchCountRecord, removeByIds, successfulResponseIds } from "@/lib/fast-mutation";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
@@ -13,7 +14,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { computeTotalPages } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
-import { getValidUntilBadge, canDeleteQuote, pickSucceededIds } from "./_utils/quote-display";
+import { getValidUntilBadge, canDeleteQuote } from "./_utils/quote-display";
 import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 import type { QuoteTab } from "@/lib/supabase/quotes";
@@ -91,6 +92,9 @@ export default function QuotesClient(props: QuotesClientProps) {
     const isDemo = useIsDemo();
     const { has, canViewSalesPrices } = usePermissions();
 
+    const [displayQuotes, setDisplayQuotes] = useState<QuoteSummary[]>(quotes);
+    const [displayCounts, setDisplayCounts] = useState<Record<QuoteTab, number>>(counts);
+    const [displayTotal, setDisplayTotal] = useState(total);
     const [refreshing, setRefreshing] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -99,6 +103,12 @@ export default function QuotesClient(props: QuotesClientProps) {
     const [bulkDeleting, setBulkDeleting] = useState(false);
 
     useEffect(() => { document.title = "Teklifler · Roven"; }, []);
+
+    useEffect(() => {
+        setDisplayQuotes(quotes);
+        setDisplayCounts(counts);
+        setDisplayTotal(total);
+    }, [quotes, counts, total]);
 
     const serialize = (p: FilterState) => {
         const params = new URLSearchParams();
@@ -139,7 +149,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                 toast({ type: "error", message: err.error || `İşlem başarısız (${res.status})` });
                 return;
             }
-            router.refresh();
+            applyDeletedQuotes([quoteId]);
         } finally {
             setDeletingId(null);
         }
@@ -149,7 +159,22 @@ export default function QuotesClient(props: QuotesClientProps) {
         useSelection(`${tab}|${search}|${currency}|${dateFrom}|${dateTo}|${page}`);
     // Seçim yalnız silinebilir (draft) satırlarla sınırlı (canDeleteQuote ile tutarlı).
     const canDeleteQuotes = has("delete_quotes");
-    const deletablePageIds = canDeleteQuotes ? quotes.filter(q => canDeleteQuote(q.status)).map(q => q.id) : [];
+    const deletablePageIds = canDeleteQuotes ? displayQuotes.filter(q => canDeleteQuote(q.status)).map(q => q.id) : [];
+
+    const applyDeletedQuotes = (ids: string[]) => {
+        if (ids.length === 0) return;
+        const idSet = new Set(ids);
+        const previous = displayQuotes.filter(quote => idSet.has(quote.id));
+        setDisplayQuotes(prev => removeByIds(prev, idSet));
+        setDisplayCounts(prev => {
+            const patches: Partial<Record<QuoteTab, number>> = { ALL: -ids.length };
+            for (const quote of previous) {
+                patches[quote.status] = (patches[quote.status] ?? 0) - 1;
+            }
+            return patchCountRecord(prev, patches);
+        });
+        setDisplayTotal(prev => decrementCount(prev, ids.length));
+    };
 
     const handleBulkDelete = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -159,18 +184,18 @@ export default function QuotesClient(props: QuotesClientProps) {
             ids.map(id => fetch(`/api/quotes/${id}`, { method: "DELETE" })),
         );
         // YALNIZ başarılı id'ler sayılır (409 sent / network fail ekranda kalır).
-        const succeededIds = pickSucceededIds(ids, results);
+        const succeededIds = successfulResponseIds(ids, results);
         const failed = ids.length - succeededIds.length;
         if (succeededIds.length > 0) toast({ type: "success", message: `${succeededIds.length} teklif silindi.` });
         if (failed > 0) toast({ type: "error", message: `${failed} teklif silinemedi.` });
         clearAll();
         setBulkDeleteConfirm(false);
         setBulkDeleting(false);
-        router.refresh();
+        applyDeletedQuotes(succeededIds);
     };
 
-    const totalPages = computeTotalPages(total, pageSize);
-    const draftCount = counts.draft;
+    const totalPages = computeTotalPages(displayTotal, pageSize);
+    const draftCount = displayCounts.draft;
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
@@ -181,7 +206,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                         Teklifler
                     </div>
                     <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        {counts.ALL} teklif{draftCount > 0 ? ` · ${draftCount} taslak` : ""}
+                        {displayCounts.ALL} teklif{draftCount > 0 ? ` · ${draftCount} taslak` : ""}
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -211,7 +236,7 @@ export default function QuotesClient(props: QuotesClientProps) {
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                 <UnderlinedFilterTabs
                     ariaLabel="Teklif durumu filtresi"
-                    items={filterTabs.map((t) => ({ key: t.id, label: t.label, count: counts[t.id] }))}
+                    items={filterTabs.map((t) => ({ key: t.id, label: t.label, count: displayCounts[t.id] }))}
                     activeKey={tab}
                     onChange={(key) => navigate({ tab: key, page: 1 })}
                 />
@@ -372,7 +397,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                         </tr>
                     </thead>
                     <tbody>
-                        {quotes.length === 0 ? (
+                        {displayQuotes.length === 0 ? (
                             <tr>
                                 <td colSpan={8} style={{ border: "none" }}>
                                     <EmptyState
@@ -390,7 +415,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                                 </td>
                             </tr>
                         ) : (
-                            quotes.map((q) => {
+                            displayQuotes.map((q) => {
                                 const statusCfg = quoteStatusConfig[q.status];
                                 const badge = (q.status === "draft" || q.status === "sent")
                                     ? getValidUntilBadge(q.validUntil)
@@ -502,11 +527,11 @@ export default function QuotesClient(props: QuotesClientProps) {
                         )}
                     </tbody>
                 </table>
-                {total > 0 && (
+                {displayTotal > 0 && (
                     <Pagination
                         currentPage={page}
                         totalPages={totalPages}
-                        totalItems={total}
+                        totalItems={displayTotal}
                         pageSize={pageSize}
                         onPageChange={(p) => navigate({ page: p })}
                         itemLabel="teklif"

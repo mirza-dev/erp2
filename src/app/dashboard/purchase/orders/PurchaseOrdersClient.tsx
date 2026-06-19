@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useSWRConfig } from "swr";
 import { useListUrlState, useDebouncedSearch } from "@/hooks/useListUrlState";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
@@ -12,6 +13,8 @@ import { useSelection } from "@/hooks/useSelection";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { PurchaseOrderRow, PurchaseOrderStatus } from "@/lib/database.types";
 import type { PurchaseOrderTab } from "@/lib/supabase/purchase-orders";
+import { PRODUCTS_KEY } from "@/lib/data-context";
+import { decrementCount, patchCountRecord, successfulResponseIds } from "@/lib/fast-mutation";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { CircleOff, Plus, RefreshCw } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
@@ -85,16 +88,26 @@ interface FilterState {
 export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
     const { orders, total, counts, page, pageSize, tab, search, vendorMap } = props;
     const router = useRouter();
+    const { mutate } = useSWRConfig();
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has } = usePermissions();
 
+    const [displayOrders, setDisplayOrders] = useState<PurchaseOrderRow[]>(orders);
+    const [displayCounts, setDisplayCounts] = useState<Record<PurchaseOrderTab, number>>(counts);
+    const [displayTotal, setDisplayTotal] = useState(total);
     const [refreshing, setRefreshing] = useState(false);
     const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
     const [bulkCancelling, setBulkCancelling] = useState(false);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
 
     useEffect(() => { document.title = "Satın Alma Siparişleri · Roven"; }, []);
+
+    useEffect(() => {
+        setDisplayOrders(orders);
+        setDisplayCounts(counts);
+        setDisplayTotal(total);
+    }, [orders, counts, total]);
 
     const serialize = (p: FilterState) => {
         const params = new URLSearchParams();
@@ -118,7 +131,33 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
 
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
         useSelection(`${search}|${tab}|${page}`);
-    const cancellablePageIds = orders.filter(isPoCancellable).map(o => o.id);
+    const cancellablePageIds = displayOrders.filter(isPoCancellable).map(o => o.id);
+
+    const applyCancelledPurchaseOrders = (ids: string[]) => {
+        if (ids.length === 0) return;
+        const idSet = new Set(ids);
+        const previous = displayOrders.filter(order => idSet.has(order.id));
+
+        setDisplayOrders(prev => {
+            const cancelled = prev.map(order => idSet.has(order.id)
+                ? { ...order, status: "cancelled" as const }
+                : order);
+            if (tab === "all" || tab === "cancelled") return cancelled;
+            return cancelled.filter(order => !idSet.has(order.id));
+        });
+
+        setDisplayCounts(prev => {
+            const patches: Partial<Record<PurchaseOrderTab, number>> = { cancelled: ids.length };
+            for (const order of previous) {
+                patches[order.status] = (patches[order.status] ?? 0) - 1;
+            }
+            return patchCountRecord(prev, patches);
+        });
+
+        if (tab !== "all" && tab !== "cancelled") {
+            setDisplayTotal(prev => decrementCount(prev, ids.length));
+        }
+    };
 
     const handleBulkCancel = async () => {
         if (isDemo) { toast({ type: "info", message: "Demo modda bu işlem yapılamaz." }); return; }
@@ -131,17 +170,19 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                 body: JSON.stringify({ reason: "Toplu iptal" }),
             })),
         );
-        const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
-        const succeeded = ids.length - failed;
+        const succeededIds = successfulResponseIds(ids, results);
+        const failed = ids.length - succeededIds.length;
+        const succeeded = succeededIds.length;
         if (succeeded > 0) toast({ type: "success", message: `${succeeded} sipariş iptal edildi.` });
         if (failed > 0) toast({ type: "error", message: `${failed} sipariş iptal edilemedi.` });
         clearAll();
         setBulkCancelConfirm(false);
         setBulkCancelling(false);
-        router.refresh();
+        applyCancelledPurchaseOrders(succeededIds);
+        void mutate(PRODUCTS_KEY);
     };
 
-    const totalPages = computeTotalPages(total, pageSize);
+    const totalPages = computeTotalPages(displayTotal, pageSize);
 
     return (
         <div style={{ maxWidth: "1200px", margin: "0 auto", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
@@ -152,7 +193,7 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                         Satın Alma Siparişleri
                     </h1>
                     <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: "4px 0 0" }}>
-                        {total} sipariş
+                        {displayTotal} sipariş
                     </p>
                 </div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -182,7 +223,7 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
 
             <UnderlinedFilterTabs
                 ariaLabel="Satın alma siparişi durumu filtresi"
-                items={STATUS_TABS.map((t) => ({ key: t.key, label: t.label, count: counts[t.key] }))}
+                items={STATUS_TABS.map((t) => ({ key: t.key, label: t.label, count: displayCounts[t.key] }))}
                 activeKey={tab}
                 onChange={(key) => navigate({ tab: key, page: 1 })}
                 style={{ marginBottom: "16px" }}
@@ -240,7 +281,7 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
 
             {/* Table */}
             <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>
-                {orders.length === 0 ? (
+                {displayOrders.length === 0 ? (
                     <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                         {search ? "Arama kriterine uyan sipariş bulunamadı." : "Henüz sipariş yok."}
                     </div>
@@ -269,7 +310,7 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            {orders.map(o => {
+                            {displayOrders.map(o => {
                                 const isHovered = hoveredId === o.id;
                                 const cancellable = isPoCancellable(o);
                                 return (
@@ -331,11 +372,11 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                         </tbody>
                     </table>
                 )}
-                {total > 0 && (
+                {displayTotal > 0 && (
                     <Pagination
                         currentPage={page}
                         totalPages={totalPages}
-                        totalItems={total}
+                        totalItems={displayTotal}
                         pageSize={pageSize}
                         onPageChange={(p) => navigate({ page: p })}
                         itemLabel="sipariş"

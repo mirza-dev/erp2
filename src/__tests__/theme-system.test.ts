@@ -20,6 +20,7 @@ const LAYOUT_SRC = read("src/app/layout.tsx");
 const GLOBALS_SRC = read("src/app/globals.css");
 const THEME_SRC = read("src/lib/theme/use-theme.tsx");
 const TOGGLE_SRC = read("src/components/layout/ThemeToggle.tsx");
+const LOGIN_SRC = read("src/app/login/page.tsx");
 const TOPBAR_SRC = read("src/components/layout/Topbar.tsx");
 const SIDEBAR_SRC = read("src/components/layout/Sidebar.tsx");
 const BUTTON_SRC = read("src/components/ui/Button.tsx");
@@ -157,6 +158,16 @@ describe("Tema — ThemeToggle UI", () => {
     it("güneş/ay ikonu + erişilebilir ad taşır", () => {
         expect(TOGGLE_SRC).toMatch(/import \{ Moon, Sun \}/);
         expect(TOGGLE_SRC).toMatch(/aria-label="Temayı değiştir"/);
+    });
+
+    it("hydration mismatch üretmemek için ikon/title mount öncesi stabil kalır", () => {
+        expect(TOGGLE_SRC).toMatch(/const \[mounted, setMounted\] = useState\(false\)/);
+        expect(TOGGLE_SRC).toMatch(/useEffect\(\(\) => \{[\s\S]*setMounted\(true\);[\s\S]*\}, \[\]\)/);
+        expect(TOGGLE_SRC).toMatch(/const isDark = mounted && resolved === "dark"/);
+        expect(TOGGLE_SRC).toMatch(/: "Temayı değiştir"/);
+        expect(LOGIN_SRC).toMatch(/function Chrome/);
+        expect(LOGIN_SRC).toMatch(/const \[mounted, setMounted\] = useState\(false\)/);
+        expect(LOGIN_SRC).toMatch(/const isDark = mounted && resolved === "dark"/);
     });
 
     it("uzun-bas ile 'system'e döner (Q1↔Q2 geri dönüş kancası)", () => {

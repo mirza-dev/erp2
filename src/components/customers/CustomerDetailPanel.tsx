@@ -15,6 +15,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 interface CustomerDetailPanelProps {
     customer: Customer | null;
     onClose: () => void;
+    onCustomerUpdated?: (customer: Customer) => void;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -52,6 +53,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default function CustomerDetailPanel({
     customer,
     onClose,
+    onCustomerUpdated,
 }: CustomerDetailPanelProps) {
     const router = useRouter();
     const { orders } = useOrders();
@@ -94,7 +96,8 @@ export default function CustomerDetailPanel({
         setEditSaving(true);
         setEditError(null);
         try {
-            await updateCustomer(customer.id, editForm);
+            const updated = await updateCustomer(customer.id, editForm);
+            if (updated) onCustomerUpdated?.(updated);
             setEditSaved(true);
             setTimeout(() => {
                 setEditMode(false);

@@ -37,7 +37,7 @@ const FORM_SRC = readFileSync(
 describe("quotes/page.tsx — Bulgu 3 / P2-A: toplu silme yalnız silinebilir satır + başarılı id", () => {
     it("seçim yalnız silinebilir (draft) satırlarla sınırlı — deletablePageIds", () => {
         // A1: sunucu sayfaladı → `quotes` prop'u geçerli sayfa (eski pagedItems).
-        expect(LIST_SRC).toMatch(/const deletablePageIds = canDeleteQuotes \? quotes\.filter\(q => canDeleteQuote\(q\.status\)\)/);
+        expect(LIST_SRC).toMatch(/const deletablePageIds = canDeleteQuotes \? displayQuotes\.filter\(q => canDeleteQuote\(q\.status\)\)/);
     });
 
     it("select-all üç helper'ı da deletablePageIds üzerinden çalışır (pageIds değil)", () => {
@@ -50,10 +50,13 @@ describe("quotes/page.tsx — Bulgu 3 / P2-A: toplu silme yalnız silinebilir sa
         expect(LIST_SRC).toMatch(/\{deletable && canDeleteQuotes && \(/);
     });
 
-    it("handleBulkDelete başarılı/başarısız sayımı pickSucceededIds ile (A1: sonra router.refresh)", () => {
-        expect(LIST_SRC).toMatch(/const succeededIds = pickSucceededIds\(ids, results\)/);
-        // A1: local prev.filter yerine sunucu otoritesi — başarısız satır refresh'te kalır.
-        expect(LIST_SRC).toContain("router.refresh()");
+    it("handleBulkDelete başarılı/başarısız sayımı ortak helper ile yapar ve local patch uygular", () => {
+        const bulkStart = LIST_SRC.indexOf("const handleBulkDelete");
+        const bulkEnd = LIST_SRC.indexOf("const totalPages", bulkStart);
+        const bulkBlock = LIST_SRC.slice(bulkStart, bulkEnd);
+        expect(LIST_SRC).toMatch(/const succeededIds = successfulResponseIds\(ids, results\)/);
+        expect(LIST_SRC).toContain("applyDeletedQuotes(succeededIds)");
+        expect(bulkBlock).not.toContain("router.refresh()");
         expect(LIST_SRC).toMatch(/succeededIds\.length\} teklif silindi/);
         // Eski yanıltıcı "tüm ids'i düşür" kalmadı
         expect(LIST_SRC).not.toMatch(/prev\.filter\(q => !ids\.includes\(q\.id\)\)/);

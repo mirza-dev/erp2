@@ -32,15 +32,14 @@ const CTX_SRC = readFileSync(
 // ── 1. Toplu silme context üzerinden (bayat satır fix) ────────
 
 describe("Cariler — toplu silme bayat satır bırakmaz", () => {
-    it("A1: handleBulkDelete fetch DELETE + router.refresh (sunucu otoritesi → bayat satır yok)", () => {
-        // Eski stale-row sorunu client-liste'den geliyordu; RSC'de router.refresh
-        // sunucu listesini yeniden çekince silinen satırlar kaybolur.
+    it("handleBulkDelete fetch DELETE + local patch yapar, router.refresh beklemez", () => {
         expect(PAGE_SRC).toMatch(/fetch\(`\/api\/customers\/\$\{id\}`, \{ method: "DELETE" \}\)/);
-        expect(PAGE_SRC).toContain("router.refresh()");
+        expect(PAGE_SRC).toContain("applyDeletedCustomers(succeededIds)");
+        expect(PAGE_SRC).not.toContain("router.refresh()");
     });
 
     it("açık panel toplu silmeye dahilse kapatılır (tek-silme paritesi)", () => {
-        expect(PAGE_SRC).toMatch(/if \(selectedCustomer && ids\.includes\(selectedCustomer\.id\)\) setSelectedCustomer\(null\)/);
+        expect(PAGE_SRC).toMatch(/if \(selectedCustomer && succeededIds\.includes\(selectedCustomer\.id\)\) setSelectedCustomer\(null\)/);
     });
 });
 

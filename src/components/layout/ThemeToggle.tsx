@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "@/lib/theme/use-theme";
 import { useToast } from "@/components/ui/Toast";
@@ -18,11 +18,19 @@ const LONG_PRESS_MS = 500;
 export default function ThemeToggle() {
     const { resolved, toggle, setTheme } = useTheme();
     const { toast } = useToast();
+    const [mounted, setMounted] = useState(false);
     const timerRef = useRef<number | null>(null);
     const longPressedRef = useRef(false);
 
-    const isDark = resolved === "dark";
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    const isDark = mounted && resolved === "dark";
     const Icon = isDark ? Moon : Sun;
+    const title = mounted
+        ? (isDark ? "Aydınlık temaya geç (uzun bas: sistem)" : "Koyu temaya geç (uzun bas: sistem)")
+        : "Temayı değiştir";
 
     const clearTimer = () => {
         if (timerRef.current !== null) {
@@ -53,7 +61,7 @@ export default function ThemeToggle() {
         <button
             type="button"
             aria-label="Temayı değiştir"
-            title={isDark ? "Aydınlık temaya geç (uzun bas: sistem)" : "Koyu temaya geç (uzun bas: sistem)"}
+            title={title}
             onClick={handleClick}
             onPointerDown={handlePointerDown}
             onPointerUp={clearTimer}

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useListUrlState, useDebouncedSearch } from "@/hooks/useListUrlState";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -10,6 +9,7 @@ import { computeTotalPages } from "@/hooks/usePagination";
 import { useSelection } from "@/hooks/useSelection";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { VendorRow } from "@/lib/database.types";
+import { decrementCount, removeByIds, successfulResponseIds, upsertFirst } from "@/lib/fast-mutation";
 import Button from "@/components/ui/Button";
 import { CircleOff, Pencil, Plus, RotateCcw } from "lucide-react";
 
@@ -138,10 +138,11 @@ interface FilterState {
 
 export default function VendorsClient(props: VendorsClientProps) {
     const { vendors, total, page, pageSize, search, showAll } = props;
-    const router = useRouter();
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has } = usePermissions();
+    const [displayVendors, setDisplayVendors] = useState<VendorRow[]>(vendors);
+    const [displayTotal, setDisplayTotal] = useState(total);
 
     // Drawer state
     const [drawerMode, setDrawerMode] = useState<"create" | "edit" | null>(null);
@@ -169,10 +170,54 @@ export default function VendorsClient(props: VendorsClientProps) {
         (v) => navigate({ search: v, page: 1 }),
     );
 
+    useEffect(() => {
+        setDisplayVendors(vendors);
+        setDisplayTotal(total);
+    }, [vendors, total]);
+
+    const matchesCurrentView = (vendor: VendorRow): boolean => {
+        if (!showAll && !vendor.is_active) return false;
+        const needle = search.trim().toLowerCase();
+        if (!needle) return true;
+        return [
+            vendor.name,
+            vendor.contact_person,
+            vendor.contact_email,
+        ].some(value => (value ?? "").toLowerCase().includes(needle));
+    };
+
+    const applySavedVendor = (vendor: VendorRow, mode: "create" | "edit") => {
+        if (!matchesCurrentView(vendor)) {
+            setDisplayVendors(prev => prev.filter(v => v.id !== vendor.id));
+            if (mode === "edit") setDisplayTotal(prev => decrementCount(prev));
+            return;
+        }
+        setDisplayVendors(prev => {
+            if (mode === "create") return page === 1 ? upsertFirst(prev, vendor) : prev;
+            return prev.map(v => v.id === vendor.id ? vendor : v);
+        });
+        if (mode === "create") setDisplayTotal(prev => prev + 1);
+    };
+
+    const applyDeactivatedVendors = (ids: string[]) => {
+        if (ids.length === 0) return;
+        const idSet = new Set(ids);
+        if (showAll) {
+            setDisplayVendors(prev => prev.map(v => idSet.has(v.id) ? { ...v, is_active: false } : v));
+        } else {
+            setDisplayVendors(prev => removeByIds(prev, idSet));
+            setDisplayTotal(prev => decrementCount(prev, ids.length));
+        }
+    };
+
+    const applyReactivatedVendor = (vendor: VendorRow) => {
+        setDisplayVendors(prev => prev.map(v => v.id === vendor.id ? vendor : v));
+    };
+
     const { selectedIds, toggleOne, toggleAll, clearAll, isPageAllSelected, isPageIndeterminate } =
         useSelection(`${search}|${showAll}|${page}`);
     // Toplu pasifleştirme yalnız aktif tedarikçiler için anlamlı (PO paterni).
-    const pageIds = vendors.filter(v => v.is_active).map(v => v.id);
+    const pageIds = displayVendors.filter(v => v.is_active).map(v => v.id);
 
     const handleBulkDeactivate = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -181,14 +226,15 @@ export default function VendorsClient(props: VendorsClientProps) {
         const results = await Promise.allSettled(
             ids.map(id => fetch(`/api/vendors/${id}`, { method: "DELETE" })),
         );
-        const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length;
-        const succeeded = ids.length - failed;
+        const succeededIds = successfulResponseIds(ids, results);
+        const failed = ids.length - succeededIds.length;
+        const succeeded = succeededIds.length;
         if (succeeded > 0) toast({ type: "success", message: `${succeeded} tedarikçi pasife alındı.` });
         if (failed > 0) toast({ type: "error", message: `${failed} tedarikçi pasife alınamadı.` });
         clearAll();
         setBulkDeactivateConfirm(false);
         setBulkDeactivating(false);
-        router.refresh();
+        applyDeactivatedVendors(succeededIds);
     };
 
     const setField = (key: keyof FormState) =>
@@ -215,13 +261,15 @@ export default function VendorsClient(props: VendorsClientProps) {
 
     const handleSave = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        const mode = drawerMode;
+        if (!mode) return;
         if (!form.name.trim()) { setFormError("Tedarikçi adı zorunludur."); return; }
         setSaving(true);
         setFormError(null);
         try {
             const payload = formToPayload(form);
             let res: Response;
-            if (drawerMode === "create") {
+            if (mode === "create") {
                 res = await fetch("/api/vendors", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -236,9 +284,9 @@ export default function VendorsClient(props: VendorsClientProps) {
             }
             const data = await res.json();
             if (!res.ok) { setFormError(data.error ?? "İşlem başarısız oldu."); return; }
-            toast({ type: "success", message: drawerMode === "create" ? "Tedarikçi eklendi." : "Tedarikçi güncellendi." });
+            toast({ type: "success", message: mode === "create" ? "Tedarikçi eklendi." : "Tedarikçi güncellendi." });
             closeDrawer();
-            router.refresh();
+            applySavedVendor(data as VendorRow, mode);
         } catch {
             setFormError("Beklenmeyen bir hata oluştu.");
         } finally {
@@ -255,7 +303,7 @@ export default function VendorsClient(props: VendorsClientProps) {
             const data = await res.json();
             if (!res.ok) { toast({ type: "error", message: data.error ?? "Pasife alınamadı." }); return; }
             toast({ type: "success", message: `${v.name} pasife alındı.` });
-            router.refresh();
+            applyDeactivatedVendors([v.id]);
         } catch {
             toast({ type: "error", message: "Beklenmeyen bir hata oluştu." });
         } finally {
@@ -276,7 +324,7 @@ export default function VendorsClient(props: VendorsClientProps) {
             const data = await res.json();
             if (!res.ok) { toast({ type: "error", message: data.error ?? "Aktifleştirilemedi." }); return; }
             toast({ type: "success", message: `${v.name} aktifleştirildi.` });
-            router.refresh();
+            applyReactivatedVendor(data as VendorRow);
         } catch {
             toast({ type: "error", message: "Beklenmeyen bir hata oluştu." });
         } finally {
@@ -284,7 +332,7 @@ export default function VendorsClient(props: VendorsClientProps) {
         }
     };
 
-    const totalPages = computeTotalPages(total, pageSize);
+    const totalPages = computeTotalPages(displayTotal, pageSize);
 
     return (
         <div style={{ maxWidth: "1100px", margin: "0 auto", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
@@ -295,7 +343,7 @@ export default function VendorsClient(props: VendorsClientProps) {
                         Tedarikçiler
                     </h1>
                     <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: "4px 0 0" }}>
-                        {total} tedarikçi
+                        {displayTotal} tedarikçi
                     </p>
                 </div>
                 {has("manage_vendors") && (
@@ -372,7 +420,7 @@ export default function VendorsClient(props: VendorsClientProps) {
                 borderRadius: "8px",
                 overflow: "hidden",
             }}>
-                {vendors.length === 0 ? (
+                {displayVendors.length === 0 ? (
                     <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                         {search ? "Arama kriterine uyan tedarikçi bulunamadı." : "Henüz tedarikçi eklenmemiş."}
                     </div>
@@ -401,7 +449,7 @@ export default function VendorsClient(props: VendorsClientProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            {vendors.map(v => (
+                            {displayVendors.map(v => (
                                 <tr key={v.id} style={{ transition: "background 0.08s" }}
                                     onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-secondary)")}
                                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
@@ -510,11 +558,11 @@ export default function VendorsClient(props: VendorsClientProps) {
                         </tbody>
                     </table>
                 )}
-                {total > 0 && (
+                {displayTotal > 0 && (
                     <Pagination
                         currentPage={page}
                         totalPages={totalPages}
-                        totalItems={total}
+                        totalItems={displayTotal}
                         pageSize={pageSize}
                         onPageChange={(p) => navigate({ page: p })}
                         itemLabel="tedarikçi"

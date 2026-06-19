@@ -93,13 +93,13 @@ interface DataContextValue {
   addCustomer: (
     c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">
   ) => Promise<void>;
-  updateCustomer: (id: string, updates: Partial<Customer>) => Promise<void>;
+  updateCustomer: (id: string, updates: Partial<Customer>) => Promise<Customer | undefined>;
   deleteCustomer: (id: string) => Promise<void>;
   addProduct: (
     p: Omit<Product, "id" | "reserved" | "available_now" | "isActive" | "quoted" | "promisable" | "incoming" | "forecasted">
   ) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
-  addUretimKaydi: (k: Omit<UretimKaydi, "id">) => Promise<{ refetchFailed?: boolean }>;
+  addUretimKaydi: (k: Omit<UretimKaydi, "id">) => Promise<{ refetchFailed?: boolean; entry?: UretimKaydi }>;
   deleteUretimKaydi: (id: string) => Promise<{ refetchFailed?: boolean }>;
   addOrder: (
     detail: Omit<OrderDetail, "id" | "orderNumber" | "itemCount">
@@ -261,7 +261,7 @@ export function useCustomers() {
     }
   }, [mutate]);
 
-  const updateCustomer = useCallback(async (id: string, updates: Partial<Customer>): Promise<void> => {
+  const updateCustomer = useCallback(async (id: string, updates: Partial<Customer>): Promise<Customer | undefined> => {
     if (demoGuard()) return;
     const body = buildCustomerPatch(updates);
     const res = await fetch(`/api/customers/${id}`, {
@@ -274,9 +274,11 @@ export function useCustomers() {
       throw new Error(errBody?.error ?? "Müşteri güncellenemedi.");
     }
     const data = await res.json();
+    const mapped = mapCustomer(data);
     await mutate(CUSTOMERS_KEY,
-      (prev: Customer[] | undefined) => (prev ?? []).map(c => (c.id === id ? mapCustomer(data) : c)),
+      (prev: Customer[] | undefined) => (prev ?? []).map(c => (c.id === id ? mapped : c)),
       { revalidate: false });
+    return mapped;
   }, [mutate]);
 
   const deleteCustomer = useCallback(async (id: string) => {
@@ -518,25 +520,23 @@ export function useProduction() {
   const { data, isLoading, error } = useSWR<UretimKaydi[]>(productionKey, productionFetcher, SWR_DEFAULTS);
   const { mutate } = useSWRConfig();
 
-  // POST/DELETE sonrası üretim + ürün listeleri tazelenir (stok değişti).
-  // Revalidation hatası yutulmaz — { refetchFailed: true } sözleşmesi korunur
-  // (çağıran sayfa "liste güncel olmayabilir" uyarısı gösterir).
-  const revalidateAfterMutation = useCallback(async (): Promise<boolean> => {
-    let refetchFailed = false;
-    const results = await Promise.allSettled([
+  // POST/DELETE sonrası üretim + ürün listeleri arkada tazelenir (stok değişti).
+  // Kullanıcı akışı revalidation'ı beklemez; hata olursa console'da kalır ve
+  // bir sonraki manuel yenileme / SWR tazelemesi server truth'u geri getirir.
+  const revalidateAfterMutation = useCallback((): void => {
+    void Promise.allSettled([
       mutate(productionKey),
       mutate(PRODUCTS_KEY),
-    ]);
-    for (const r of results) {
-      if (r.status === "rejected") {
-        refetchFailed = true;
-        console.error("production mutation refetch failed", r.reason);
+    ]).then(results => {
+      for (const r of results) {
+        if (r.status === "rejected") {
+          console.error("production mutation background refetch failed", r.reason);
+        }
       }
-    }
-    return refetchFailed;
+    });
   }, [mutate, productionKey]);
 
-  const addUretimKaydi = useCallback(async (k: Omit<UretimKaydi, "id">): Promise<{ refetchFailed?: boolean }> => {
+  const addUretimKaydi = useCallback(async (k: Omit<UretimKaydi, "id">): Promise<{ refetchFailed?: boolean; entry?: UretimKaydi }> => {
     if (demoGuard()) return {};
     try {
       const body = {
@@ -559,13 +559,20 @@ export function useProduction() {
         const fallback = errBody?.error ?? "Üretim kaydedilemedi.";
         throw new Error(buildShortageMessage(errBody?.shortages, fallback));
       }
-      const refetchFailed = await revalidateAfterMutation();
-      return { refetchFailed };
+      const data = await res.json().catch(() => null) as { entry_id?: string } | null;
+      const entry = data?.entry_id ? { ...k, id: data.entry_id } : undefined;
+      if (entry) {
+        await mutate(productionKey,
+          (prev: UretimKaydi[] | undefined) => [entry, ...(prev ?? [])],
+          { revalidate: false });
+      }
+      revalidateAfterMutation();
+      return { entry };
     } catch (err) {
       console.error("addUretimKaydi failed:", err);
       throw err;
     }
-  }, [revalidateAfterMutation]);
+  }, [mutate, productionKey, revalidateAfterMutation]);
 
   const deleteUretimKaydi = useCallback(async (id: string): Promise<{ refetchFailed?: boolean }> => {
     if (demoGuard()) return {};
@@ -578,8 +585,8 @@ export function useProduction() {
       await mutate(productionKey,
         (prev: UretimKaydi[] | undefined) => (prev ?? []).filter(x => x.id !== id),
         { revalidate: false });
-      const refetchFailed = await revalidateAfterMutation();
-      return { refetchFailed };
+      revalidateAfterMutation();
+      return {};
     } catch (err) {
       console.error("deleteUretimKaydi failed:", err);
       throw err;

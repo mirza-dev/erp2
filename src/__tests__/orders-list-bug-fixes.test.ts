@@ -36,9 +36,10 @@ describe("orders list — sunucu tarafı sayfalama (A1)", () => {
     it("client artık ?all=1 mega-fetch yapmaz (sunucu filtreler+sayfalar)", () => {
         expect(SRC).not.toMatch(/\?all=1/);
     });
-    it("satırlar prop'tan (orders) gelir, bellekte filtre/dilimleme yok", () => {
+    it("satırlar prop'tan başlayan displayOrders katmanından gelir, bellekte filtre/dilimleme yok", () => {
         expect(SRC).not.toContain("usePagination(");
-        expect(SRC).toMatch(/orders\.map\(/);
+        expect(SRC).toMatch(/useState<Order\[\]>\(orders\)/);
+        expect(SRC).toMatch(/displayOrders\.map\(/);
     });
 });
 
@@ -65,7 +66,7 @@ describe("orders list — toplu iptal sözcük + seçim", () => {
     });
     it("select-all cancellablePageIds kullanır (tüm pageIds değil)", () => {
         expect(SRC).toMatch(/cancellablePageIds/);
-        expect(SRC).toMatch(/orders\.filter\(isOrderCancellable\)/);
+        expect(SRC).toMatch(/displayOrders\.filter\(isOrderCancellable\)/);
     });
     it("satır checkbox yalnızca cancellable satırda render edilir", () => {
         expect(SRC).toMatch(/cancellable && \(/);
