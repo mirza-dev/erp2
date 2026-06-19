@@ -355,31 +355,6 @@ export interface RecordMovementInput {
     created_by?: string;
 }
 
-/** @deprecated Use dbRecordMovementAtomic() — atomik DB transaction */
-export async function dbRecordMovement(input: RecordMovementInput): Promise<void> {
-    const supabase = createServiceClient();
-
-    // Record movement
-    const { error: mErr } = await supabase.from("inventory_movements").insert({
-        product_id: input.product_id,
-        movement_type: input.movement_type,
-        quantity: input.quantity,
-        reference_type: input.reference_type ?? "manual",
-        reference_id: input.reference_id ?? null,
-        notes: input.notes ?? null,
-        created_by: input.created_by ?? null,
-        source: "ui",
-    });
-    if (mErr) throw new Error(mErr.message);
-
-    // Update on_hand projection
-    const { error: pErr } = await supabase.rpc("adjust_on_hand", {
-        p_product_id: input.product_id,
-        p_delta: input.quantity,
-    });
-    if (pErr) throw new Error(pErr.message);
-}
-
 // ── Atomic Inventory Operations ─────────────────────────────
 
 export interface RecordMovementResult {
@@ -403,6 +378,39 @@ export async function dbRecordMovementAtomic(input: RecordMovementInput): Promis
     });
     if (error) throw new Error(error.message);
     return data as RecordMovementResult;
+}
+
+export interface RecountStockResult {
+    success: boolean;
+    error?: string;
+    new_on_hand?: number;
+    delta?: number;
+    movement_id?: string;
+}
+
+/**
+ * Atomik fiziksel stok sayımı: ürün satırını `for update` ile kilitler, delta'yı
+ * transaction içinde hesaplar ve `on_hand`'i MUTLAK sayılan değere atar.
+ *
+ * D-O1: import stok sayımı eskiden JS'te `delta = counted - prod.on_hand` ile,
+ * okuma RPC transaction'ının dışında hesaplıyordu → eşzamanlı dış harekette
+ * `on_hand ≠ sayılan` (lost update). recount_stock bunu txn-içi kilitle çözer.
+ */
+export async function dbRecountStock(input: {
+    product_id: string;
+    counted_qty: number;
+    notes?: string;
+    created_by?: string;
+}): Promise<RecountStockResult> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase.rpc("recount_stock", {
+        p_product_id: input.product_id,
+        p_counted_qty: input.counted_qty,
+        p_notes: input.notes ?? null,
+        p_actor: input.created_by ?? null,
+    });
+    if (error) throw new Error(error.message);
+    return data as RecountStockResult;
 }
 
 export interface RecordStockTransferResult {

@@ -33,6 +33,7 @@ const mockDbUpdateProduct = vi.fn();
 const mockDbListProductTypes = vi.fn();
 const mockDbGetProductTypeWithFields = vi.fn();
 const mockDbRecordMovementAtomic = vi.fn();
+const mockDbRecountStock = vi.fn();
 const mockDbRecordStockTransfer = vi.fn();
 const mockDbListVendors = vi.fn();
 const mockDbCreateVendor = vi.fn();
@@ -82,6 +83,7 @@ vi.mock("@/lib/supabase/products", () => ({
     dbCreateProduct: (...args: unknown[]) => mockDbCreateProduct(...args),
     dbFindProductBySku: (...args: unknown[]) => mockDbFindProductBySku(...args),
     dbRecordMovementAtomic: (...args: unknown[]) => mockDbRecordMovementAtomic(...args),
+    dbRecountStock: (...args: unknown[]) => mockDbRecountStock(...args),
     dbRecordStockTransfer: (...args: unknown[]) => mockDbRecordStockTransfer(...args),
     dbUpdateProduct: (...args: unknown[]) => mockDbUpdateProduct(...args),
 }));
@@ -164,6 +166,7 @@ function makeDraft(overrides: Partial<ImportDraftRow> = {}): ImportDraftRow {
 beforeEach(() => {
     mockDbFindCustomerByEmail.mockResolvedValue(null);
     mockDbRecordMovementAtomic.mockResolvedValue({ success: true });
+    mockDbRecountStock.mockResolvedValue({ success: true, new_on_hand: 0, delta: 0 });
     mockDbRecordStockTransfer.mockResolvedValue({ success: true });
     mockDbUpsertProductVendorLink.mockResolvedValue({ id: "link-1" });
     mockDbListVendors.mockResolvedValue([]);
@@ -826,7 +829,9 @@ describe("serviceConfirmBatch — on_hand rules", () => {
         expect(updatePayload).not.toHaveProperty("on_hand");
     });
 
-    it("stock entity_type defaults to count mode and records delta movement", async () => {
+    it("stock entity_type defaults to count mode and recounts to absolute counted qty", async () => {
+        // D-O1: stok sayımı artık delta'yı JS'te hesaplamaz; recount_stock RPC'ye
+        // MUTLAK sayılan miktarı geçer (txn-içi kilitle delta hesaplanır → drift yok).
         const draft = makeDraft({
             entity_type: "stock",
             parsed_data: { sku: "GV-050", on_hand: 30 },
@@ -837,30 +842,49 @@ describe("serviceConfirmBatch — on_hand rules", () => {
         const result = await serviceConfirmBatch("batch-1");
 
         expect(result.updated).toBe(1);
-        expect(mockDbRecordMovementAtomic).toHaveBeenCalledWith(expect.objectContaining({
+        expect(mockDbRecountStock).toHaveBeenCalledWith(expect.objectContaining({
             product_id: "existing-p",
-            quantity: -20,
-            reference_type: "import",
+            counted_qty: 30,
         }));
+        // Sayım yolu artık delta-temelli dbRecordMovementAtomic çağırmaz.
+        expect(mockDbRecordMovementAtomic).not.toHaveBeenCalled();
         expect(mockDbUpdateProduct).not.toHaveBeenCalled();
     });
 
-    it("AI stock_count operation records counted-current delta", async () => {
+    it("AI stock_count operation recounts to absolute counted qty (no JS delta)", async () => {
+        const draft = makeDraft({
+            entity_type: "stock",
+            parsed_data: { sku: "GV-050", on_hand: 30, __ai_import_operation: "stock_count" },
+        });
+        mockDbListDrafts.mockResolvedValue([draft]);
+        // on_hand 50 olsa bile JS delta hesaplamaz; recount'a mutlak 30 geçer.
+        mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", on_hand: 50 });
+
+        const result = await serviceConfirmBatch("batch-1");
+
+        expect(result.updated).toBe(1);
+        expect(mockDbRecountStock).toHaveBeenCalledWith(expect.objectContaining({
+            product_id: "existing-p",
+            counted_qty: 30,
+        }));
+        expect(mockDbRecordMovementAtomic).not.toHaveBeenCalled();
+        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+    });
+
+    it("stock_count: recount_stock failure → row skipped with error", async () => {
         const draft = makeDraft({
             entity_type: "stock",
             parsed_data: { sku: "GV-050", on_hand: 30, __ai_import_operation: "stock_count" },
         });
         mockDbListDrafts.mockResolvedValue([draft]);
         mockDbFindProductBySku.mockResolvedValue({ id: "existing-p", sku: "GV-050", on_hand: 50 });
+        mockDbRecountStock.mockResolvedValueOnce({ success: false, error: "Ürün aktif değil." });
 
         const result = await serviceConfirmBatch("batch-1");
 
-        expect(result.updated).toBe(1);
-        expect(mockDbRecordMovementAtomic).toHaveBeenCalledWith(expect.objectContaining({
-            product_id: "existing-p",
-            quantity: -20,
-        }));
-        expect(mockDbUpdateProduct).not.toHaveBeenCalled();
+        expect(result.skipped).toBe(1);
+        expect(result.errors[0]).toContain("Stok sayımı kaydedilemedi");
+        expect(mockDbUpdateDraft).toHaveBeenCalledWith(draft.id, expect.objectContaining({ status: "rejected" }));
     });
 
     it("AI stock_movement operation requires direction and records signed movement", async () => {

@@ -12,7 +12,7 @@ import type { VendorRow } from "@/lib/database.types";
 import { dbIncrementMappingSuccess } from "@/lib/supabase/column-mappings";
 import { dbCreateCustomer, dbFindCustomerByName, dbFindCustomerByCode, dbFindCustomerByEmail, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbLookupEntityAlias, dbSaveEntityAlias } from "@/lib/supabase/entity-aliases";
-import { dbCreateProduct, dbFindProductBySku, dbRecordMovementAtomic, dbRecordStockTransfer, dbUpdateProduct } from "@/lib/supabase/products";
+import { dbCreateProduct, dbFindProductBySku, dbRecordMovementAtomic, dbRecordStockTransfer, dbRecountStock, dbUpdateProduct } from "@/lib/supabase/products";
 import type { Permission } from "@/lib/auth/permissions";
 import { roundMoney } from "@/lib/money-utils";
 import { dbCreateVendor, dbListVendors, dbUpdateVendor } from "@/lib/supabase/vendors";
@@ -835,54 +835,65 @@ async function runConfirmFlow(batchId: string, options: ConfirmBatchOptions = {}
                     skipped++; bumpEntity(draft.entity_type, "skipped");
                     continue;
                 }
-                let delta: number;
-                let movementNote: string;
+                // Stok SAYIMI (recount): on_hand'i mutlak sayılan değere atar.
+                // D-O1: delta'yı JS'te (stale on_hand ile) hesaplamak yerine
+                // recount_stock RPC satırı `for update` ile kilitler, delta'yı
+                // txn-içi hesaplar — eşzamanlı dış harekette drift yok.
                 if (stockOperation === "stock_count") {
-                    delta = quantity - prod.on_hand;
-                    movementNote = `Excel/CSV stok sayımı: mevcut ${prod.on_hand}, sayılan ${quantity}`;
-                    if (delta === 0) {
-                        await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: prod.id });
-                        updated++; bumpEntity(draft.entity_type, "updated");
-                        continue;
-                    }
-                } else {
-                    const direction = normalizeStockDirection(data.direction);
-                    if (!direction) {
-                        errors.push(`Satır ${rowNum}: Stok hareketi için yön zorunludur (in/out/transfer).`);
+                    const recount = await dbRecountStock({
+                        product_id: prod.id,
+                        counted_qty: quantity,
+                        notes: maybeString(data.notes) ?? `Excel/CSV stok sayımı: sayılan ${quantity}`,
+                        created_by: actorUserId ?? undefined,
+                    });
+                    if (!recount.success) {
+                        errors.push(`Satır ${rowNum}: Stok sayımı kaydedilemedi — ${recount.error ?? "bilinmeyen hata"}`);
                         await dbUpdateDraft(draft.id, { status: "rejected" });
                         skipped++; bumpEntity(draft.entity_type, "skipped");
                         continue;
                     }
-                    if (quantity <= 0) {
-                        errors.push(`Satır ${rowNum}: Stok hareketi miktarı pozitif olmalıdır.`);
-                        await dbUpdateDraft(draft.id, { status: "rejected" });
-                        skipped++; bumpEntity(draft.entity_type, "skipped");
-                        continue;
-                    }
-                    if (direction === "transfer") {
-                        const fromLocation = maybeString(data.from_location);
-                        const toLocation = maybeString(data.to_location);
-                        if (!fromLocation || !toLocation) {
-                            errors.push(`Satır ${rowNum}: Transfer için çıkış ve giriş lokasyonu zorunludur.`);
-                            await dbUpdateDraft(draft.id, { status: "rejected" });
-                            skipped++; bumpEntity(draft.entity_type, "skipped");
-                            continue;
-                        }
-                        await dbRecordStockTransfer({
-                            product_id: prod.id,
-                            quantity,
-                            from_location: fromLocation,
-                            to_location: toLocation,
-                            notes: maybeString(data.notes) ?? "Excel/CSV stok transferi",
-                            actor: actorUserId,
-                        });
-                        await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: prod.id });
-                        updated++; bumpEntity(draft.entity_type, "updated");
-                        continue;
-                    }
-                    delta = direction === "in" ? quantity : -quantity;
-                    movementNote = `Excel/CSV stok hareketi (${direction}): ${quantity}`;
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: prod.id });
+                    updated++; bumpEntity(draft.entity_type, "updated");
+                    continue;
                 }
+
+                // Stok HAREKETİ (in/out/transfer): delta-temelli (sayım değil).
+                const direction = normalizeStockDirection(data.direction);
+                if (!direction) {
+                    errors.push(`Satır ${rowNum}: Stok hareketi için yön zorunludur (in/out/transfer).`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
+                    continue;
+                }
+                if (quantity <= 0) {
+                    errors.push(`Satır ${rowNum}: Stok hareketi miktarı pozitif olmalıdır.`);
+                    await dbUpdateDraft(draft.id, { status: "rejected" });
+                    skipped++; bumpEntity(draft.entity_type, "skipped");
+                    continue;
+                }
+                if (direction === "transfer") {
+                    const fromLocation = maybeString(data.from_location);
+                    const toLocation = maybeString(data.to_location);
+                    if (!fromLocation || !toLocation) {
+                        errors.push(`Satır ${rowNum}: Transfer için çıkış ve giriş lokasyonu zorunludur.`);
+                        await dbUpdateDraft(draft.id, { status: "rejected" });
+                        skipped++; bumpEntity(draft.entity_type, "skipped");
+                        continue;
+                    }
+                    await dbRecordStockTransfer({
+                        product_id: prod.id,
+                        quantity,
+                        from_location: fromLocation,
+                        to_location: toLocation,
+                        notes: maybeString(data.notes) ?? "Excel/CSV stok transferi",
+                        actor: actorUserId,
+                    });
+                    await dbUpdateDraft(draft.id, { status: "merged", matched_entity_id: prod.id });
+                    updated++; bumpEntity(draft.entity_type, "updated");
+                    continue;
+                }
+                const delta = direction === "in" ? quantity : -quantity;
+                const movementNote = `Excel/CSV stok hareketi (${direction}): ${quantity}`;
                 const movement = await dbRecordMovementAtomic({
                     product_id: prod.id,
                     movement_type: delta > 0 ? "receipt" : "adjustment",
