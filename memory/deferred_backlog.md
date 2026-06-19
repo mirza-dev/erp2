@@ -15,8 +15,8 @@ _Son güncelleme: 2026-06-17. Kullanıcı isteğiyle "sonraki tura bıraktığı
 - `/erp-review <modül-yolu>` ile veya `erp2-reviewer` ajanını kapsam vererek çağır. Detay [[reference_review_agent]].
 
 ## C. Deploy / altyapı doğrulamaları (kod tek başına yetmez)
-- **C1. Login "Monolith" canlı tur** — ⚠️ **brick riski**: prod admin `app_metadata.roles` taşımalı VEYA `ADMIN_EMAILS` her iki Coolify env'inde set olmalı; Supabase "Allow new signups = OFF"; Google OAuth redirect-URL allowlist `…/auth/callback` + tarayıcı smoke. (Testler mock'lu, canlı doğrulanmadı.)
-- **C2. Paraşüt Faz 12 — Sandbox GATE** — gerçek Paraşüt API ile OAuth + list filtreleri + e-doc trackable_job + stok invariant testleri (`PARASUT_PLAN.md §Faz 12`). Paraşüt şu an MOCK; canlıya geçişin tek büyük bloğu. **Hiç başlanmadı.**
+- **C1. Login brick-risk** — ✅ **AI tarafı TAMAMLANDI** (2026-06-19; rapor `docs/audit/2026-06-19-c1-login-preflight.md`). YENİ `scripts/check-auth-preflight.ts` (`npm run preflight:auth`, read-only `listUsers`+gerçek `parseRoles` → kalıcı/bootstrap admin sayar; 0 admin→exit 1 BRICK; canlı koşu 3 kalıcı admin→prod korumalı) + brick modeli + manuel checklist + kurtarma runbook. **Kalan kullanıcı-tarafı:** ADMIN_EMAILS her iki Coolify env + Supabase "signups OFF" + OAuth redirect URLs + tarayıcı smoke (doc §3). (Karar: LoginMonolith UI redesign ayrı iş, kapsam dışı.)
+- **C2. Paraşüt Faz 12 — Sandbox GATE** — gerçek Paraşüt API ile OAuth + list filtreleri + e-doc trackable_job + stok invariant testleri (`PARASUT_PLAN.md §Faz 12`). Paraşüt şu an MOCK; canlıya geçişin tek büyük bloğu. **Hiç başlanmadı. ⚠️ Kullanıcının Paraşüt API'si YOK → ertelendi (2026-06-19).**
 
 ## D. Migration APPLY + smoke (kullanıcı tarafı; yeşil testler kapsamaz) — ✅ AI tarafı kapandı (2026-06-19)
 - ✅ **Durum kesinleşti:** `npx tsx scripts/check-migrations.ts` → **17/17 auto-probe GREEN** (073…100 canlıda; eski "088 BLOKER / 091 APPLY bekliyor" notları BAYAT). Rapor `docs/audit/2026-06-19-d-migration-smoke.md`.

@@ -12,6 +12,7 @@
     "smoke": "tsx scripts/smoke.ts",
     "eval": "tsx scripts/run-acceptance-eval.ts",
     "create-admin": "tsx scripts/create-admin.ts",
+    "preflight:auth": "tsx scripts/check-auth-preflight.ts",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

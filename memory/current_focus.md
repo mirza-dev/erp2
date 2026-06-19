@@ -7,6 +7,19 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**C1 — Login brick-risk preflight + checklist + kurtarma runbook**)
+
+`deferred_backlog` C1. Rapor: `docs/audit/2026-06-19-c1-login-preflight.md`. **migration YOK; runtime kodu DEĞİŞMEZ.** PUSH BEKLİYOR. **Kullanıcı kararı (AskUserQuestion): brick-risk preflight + checklist** (LoginMonolith UI redesign DEĞİL — o ayrı untracked design_handoff).
+
+- **Brick modeli (kod izli):** `proxy.ts:241` her oturumu `isProvisionedUser(app_metadata,email,ADMIN_EMAILS)` ile süzer; kurtarma kolu (`/dashboard/settings/users` + `/api/admin/users`) admin ister = `parseRoles ∋ admin` (`permissions.ts:142`). Deploy sonrası HİÇBİR `auth.users`'ta `app_metadata.roles ∋ admin` YOK + prod `ADMIN_EMAILS` boşsa → kimse admin değil → kimse provize/düzeltilemez → **BRICK** (password login bile kurtarmaz — aynı kapılar kapalı).
+- **Çözüm (D'nin `check-migrations` deseni):** YENİ `scripts/check-auth-preflight.ts` (read-only tek `auth.admin.listUsers` + gerçek `parseRoles`/`isProvisionedUser` import → drift yok). Raporlar: kalıcı admin (`parseRoles(...,[])∋admin` env-bağımsız, prod'da geçerli) / bootstrap admin (yalnız LOCAL ADMIN_EMAILS) / ADMIN_EMAILS format / mis-provision (user_metadata rol var, app_metadata yok→sessiz viewer). **Exit:** kalıcı+bootstrap==0→1 (BRICK), kalıcı==0&bootstrap>0→0+⚠️, listUsers hata→fail-closed 1. `npm run preflight:auth` script'i eklendi.
+- **Doc:** §1 brick modeli §2 script (çıktı+exit kodları, e-postalar maskeli) §3 manuel checklist (ADMIN_EMAILS her iki Coolify env + Supabase signups-OFF + OAuth redirect URLs her iki domain+localhost /auth/callback + tarayıcı smoke) §4 kurtarma runbook (create-admin / ADMIN_EMAILS+redeploy / Studio app_metadata).
+- **Canlı koşu (2026-06-19):** 8 kullanıcı, **3 kalıcı admin** → prod brick-korumalı (ADMIN_EMAILS'ten bağımsız). Mutasyon YOK.
+- **Sınır:** AI tarafı (preflight script + brick modeli) kapandı; tarayıcı smoke + Coolify/Supabase dashboard ayarları kaçınılmaz kullanıcı-tarafı (prod ADMIN_EMAILS script'çe görülemez — LOCAL env okunur).
+- **Doğrulama:** tsc 0 · lint 0 · preflight canlı OK (exit 0, 3 admin) · full test 5568 değişmedi · build runtime kodu yok. KALAN: push.
+
+<details><summary>Önceki: A2 — rate-limit sertleştirme: IP spoof fix + AI-route Redis-backed</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**A2 — rate-limit sertleştirme: IP spoof fix + AI-route Redis-backed**)
 
 `deferred_backlog` A2 (denetim **O5**). **migration YOK.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): "Mevcut altyapıyı sertleştir (Upstash YOK)".**
@@ -16,6 +29,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **(2) `ai-route-limit.ts` hibrit:** `guardAiRoute` **async** — önce paylaşımlı Redis (`rateLimitCheck(ip:<ip>, aiRoutePolicy(route,limit))`; yeni `aiRoutePolicy` helper `rate-limit.ts`'te → `rl:ai-<route>` keyspace). `fromRedis=true` otoriter (429/allow); `fromRedis=false` (Redis yok/down/circuit) → mevcut in-memory `checkAiRateLimit` fallback (defense-in-depth + CI/Redis-down eski davranış birebir). 5 AI route'a `await` (stock-risk/parse/score/purchase-copilot/ops-summary; cron'lar yalnız yorumda anar). Tradeoff: dosya artık ioredis taşıyan rate-limit'i import eder (`extractClientIp` yine request-ip'ten — re-export korunur).
 - **Test:** request-ip.test + rate-limit-helpers.test spoof-direnci yeniden yazıldı (eski "soldaki/ilki alınır" testleri O5 hatasını KODLUYORDU → bilinçli güncellendi, neden yorumda); ai-route-limit.test `@/lib/rate-limit` mock'landı (default fromRedis:false→fallback yolu; override fromRedis:true→Redis-primary 429/allow + key-check); ai-route-limit-integration regex `await guardAiRoute`'a uyarlandı. Gate route-guard-matrix `guardAiRoute` token'ı etkilenmez (AI route'lar guarded kalır).
 - **GREEN:** tsc 0 · lint 0 · **5568 test** (+6) · build 0. **Sınır:** prod Traefik X-Real-IP set etmiyorsa keying farklılaşır (over-limit; ayrı smoke); REDIS_URL prod'da set olmalı ki AI limit instance'lar arası paylaşılsın. KALAN: push.
+</details>
 
 <details><summary>Önceki: D — migration durumu + gate hygiene (mig.104) + smoke checklist</summary>
 
