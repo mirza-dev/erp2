@@ -7,12 +7,25 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**A3 — route-guard gate METHOD-SEVİYE + yakaladığı 3 açık**)
+
+`deferred_backlog` A3. Rapor: `docs/audit/2026-06-19-a3-method-level-guard-gate.md`. **migration YOK.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): Tam A3 (detektör+baseline+3 guard).**
+
+- **Sorun:** `route-guard-matrix.test.ts` `guarded`'ı dosya-seviye (`src.includes`) → bir method guard'lıysa tüm dosya korunmuş sayılıyor, guard'sız kardeş GET görünmüyordu (kampanya B'nin 9 modülde elle bulduğu kör nokta sınıfı).
+- **Çözüm (detektör):** gate yeniden yazıldı — her exported method gövdesi ayrı taranır (`export fn X`→sonraki export) + **file-local guard-helper çözümü** (gövdesinde guard içeren dosya-yerel fn/const, brace-eşlemeli `blockAfter` → calendar-notes `context()` çözülür; admin/users `requireAdmin(` direkt pattern) + `requireCronSecret(` pattern'e eklendi (email/outbox/process robustça guarded→baseline'dan düştü). `route-guard-baseline.ts` **method-anahtarlı** (methods=kasıtlı guard'sız method; per path+method violation+stale).
+- **Re-baseline:** 135 route→**26 guard'sız method** sınıflandırıldı: dashboard-tier (products/[id]/production/alerts/aging/counts/dashboard-counters/finance), config (note-templates(+[id])/product-types(+[id]/fields)), collateral (attachments+url), self-auth (settings/user/*), public (auth/*/exchange-rates/email-webhook + settings/company SAFE-whitelist GET), tombstone (quotes/[id]/convert).
+- **Yakaladığı 3 GERÇEK açık → guard eklendi:** `GET /api/quotes`+`GET /api/quotes/[id]`→`view_quotes` (İZLENEN borç kapandı; production+purchasing quote pipeline [müşteri+teklif no+tarih] okuyordu, redaction yalnız fiyat maskeler; dashboard KPI fail-soft + quotes sayfaları view_quotes-gated→consumer-safe); `GET /api/inventory/movements`→`view_products` (UI tüketicisi yok, accounting/anon'a açıktı).
+- **GREEN:** tsc 0 · lint 0 · **5562 test** (+8: YENİ `quotes-inventory-read-guards.test.ts` 9) · build 0. Gate artık gelecekteki TÜM method-seviye guard kör noktalarını PR'da yakalar. KALAN: push.
+
+<details><summary>Önceki: settings modülü derin denetim TEMİZ + KAMPANYA B TAMAMLANDI</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**settings modülü derin denetim TEMİZ + KAMPANYA B TAMAMLANDI**)
 
 `erp2-reviewer` modül-modül kampanyasının **SON modülü: settings**. Kapsam: 10 settings route + admin/users(+[id]) + lib + sayfalar. Rapor: `docs/audit/2026-06-19-settings-review-bulgular.md` (**K:0 Y:0 O:0 D:0 Nit:0 — kampanyanın en olgun modülü, bulgu manufacture EDİLMEDİ**). **Kod değişikliği YOK** — yalnız rapor + memory. PUSH BEKLİYOR.
 
 - **Temiz doğrulananlar:** `admin/users` POST/PATCH/DELETE → `requireAdmin` (app_metadata.roles∋admin + zero-admin bootstrap + **listUsers HATASI fail-CLOSED**) + `normalizeAssignedRoles` (normalizeRole geçersiz rol atar → privilege injection yok, default viewer) + **last-admin lockout** (countAdmins fail-closed, PATCH-demote+DELETE); `api-keys-status` → `requireInternalOperator` + demo→false + yalnız boolean; `company` GET guard'sız ama **SAFE_COMPANY_FIELDS whitelist** (antet/branding, secret yok — PDF/başlık view-tier; PATCH/logo manage_settings+validateCompanyPatch); `files` GET/download view_settings · POST/DELETE manage_settings + MIME/size/kategori + **SVG-attachment XSS defense** (mig.046) + signed-URL TTL; `user/password` → **mevcut-şifre doğrulama** (cookie'siz izole client) + audit; avatar PNG/JPEG/WebP(SVG yok)+1MB; profile fullName 2-100; preferences self-auth. **view_settings/manage_settings yalnız admin** → settings admin-tier.
 - **KAMPANYA B (modül-modül derin inceleme) TAMAMLANDI** — 9 modül: RFQ·Orders·Quotes·Paraşüt·import/AI·production·customers/products·alerts·settings. Toplam bulgu profili: çoğunlukla method-seviye guard kör noktaları (gate A3) + bir stok-defteri idempotency (production O1/mig.104). Kalan iş B değil → A2 Upstash · A3 gate guard-matrisi · C1 Login canlı tur · C2 Paraşüt Faz12 · D migration/smoke ([[deferred_backlog]]).
+</details>
 
 <details><summary>Önceki: alerts modülü derin denetim (kampanya B) + D1</summary>
 

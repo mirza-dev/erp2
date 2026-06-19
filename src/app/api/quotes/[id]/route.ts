@@ -23,10 +23,16 @@ function getCachedQuote(id: string) {
 
 // GET /api/quotes/[id]
 export async function GET(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        // RBAC (A3): view_quotes guard (liste GET ile birebir). Detay müşteri +
+        // teklif/revizyon zinciri taşır; redaction yalnız fiyatı maskeler. production+
+        // purchasing'de view_quotes yok + sayfa page-access ile kapalı.
+        const guard = await requirePermission(req, "view_quotes");
+        if (guard) return guard;
+
         const { id } = await params;
         const data = await getCachedQuote(id);
         if (!data) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -20,6 +20,13 @@ const getCachedQuotes = unstable_cache(
 // GET /api/quotes?status=draft
 export async function GET(req: NextRequest) {
     try {
+        // RBAC (A3): view_quotes guard. Liste müşteri + teklif no + tarih (pipeline)
+        // taşır; redaction yalnız fiyatı (grandTotal) maskeler. view_quotes production+
+        // purchasing'de YOK + /dashboard/quotes page-access ile onlara kapalı → guard'sız
+        // GET pipeline'ı sızdırıyordu. Dashboard Teklif Hattı KPI fail-soft (.catch→null).
+        const guard = await requirePermission(req, "view_quotes");
+        if (guard) return guard;
+
         const status = req.nextUrl.searchParams.get("status") ?? undefined;
         const data = await getCachedQuotes(status);
         // RBAC R3 (Faz 4 tamamlama): sales-financial — view_sales_prices yoksa grandTotal null.

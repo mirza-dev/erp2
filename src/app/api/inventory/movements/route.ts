@@ -11,6 +11,12 @@ import { requirePermission } from "@/lib/auth/role-guard";
 // GET /api/inventory/movements?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
     try {
+        // RBAC (A3): view_products guard (kardeş products sub-route kalıbı —
+        // shortages/supplier-prices). Stok hareket geçmişi; UI tüketicisi yok ama
+        // accounting (view_products yok) + anon'a açıktı.
+        const guard = await requirePermission(req, "view_products");
+        if (guard) return guard;
+
         const { searchParams } = req.nextUrl;
         const productId = searchParams.get("product_id");
         const limit = Math.min(parseInt(searchParams.get("limit") ?? "50") || 50, 500);
