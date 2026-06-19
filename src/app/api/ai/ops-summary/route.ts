@@ -56,7 +56,7 @@ async function gatherMetrics(): Promise<OpsSummaryInput> {
 export async function POST(request?: NextRequest) {
     // Route-level AI rate limit (2026-05-26) — Anthropic fatura amplifikasyonu koruması.
     if (request) {
-        const limited = guardAiRoute(request, "ops-summary", 5);
+        const limited = await guardAiRoute(request, "ops-summary", 5);
         if (limited) return limited;
     }
 

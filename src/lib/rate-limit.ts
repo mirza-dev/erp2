@@ -146,6 +146,16 @@ export const POLICIES = {
     API_ANON:     { name: "anon",  points: 30,  duration: 60 },                        // 30 / dk
 } as const satisfies Record<string, RatePolicy>;
 
+/**
+ * Per-route AI politikası — `ai-route-limit.ts` route-seviye guard'ı için.
+ * Her route ayrı `name` → ayrı limiter (keyspace `rl:ai-<route>`); anahtar
+ * IP'dir → per-route/per-IP izolasyon. 1 dk pencere (in-memory fallback ile
+ * birebir). Mevcut `rateLimitCheck` fail-open/circuit/timeout davranışını verir.
+ */
+export function aiRoutePolicy(route: string, limit: number): RatePolicy {
+    return { name: `ai-${route}`, points: limit, duration: 60 };
+}
+
 // ── Limiter cache ────────────────────────────────────────────────────────────
 
 const _limiters = new Map<string, RateLimiterRedis>();

@@ -7,15 +7,29 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**A2 — rate-limit sertleştirme: IP spoof fix + AI-route Redis-backed**)
+
+`deferred_backlog` A2 (denetim **O5**). **migration YOK.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): "Mevcut altyapıyı sertleştir (Upstash YOK)".**
+
+- **Bağlam:** M-3 turunda tam ioredis Redis-backed middleware rate-limit ZATEN kuruluydu (`rate-limit.ts` + `proxy.ts`); "Upstash" backlog adı bayat. O5'in iki gerçek artık-açığı kaldı: (1) IP spoof — `extractClientIp` XFF'in soldaki (client-kontrollü) değerini alıyordu (Traefik gerçek peer'ı append eder → spoof); (2) `ai-route-limit.ts` in-memory per-instance (çoklu-instance etkisiz, deploy'da sıfırlanır).
+- **(1) `request-ip.ts` spoof-direnci:** X-Real-IP PRIMARY (Traefik-set, spoof edilemez) → XFF EN SAĞDAKİ (son) hop fallback (Traefik'in eklediği gerçek client) → hafif IP doğrulaması → `0.0.0.0`. Yanlış-key worst-case OVER-limit (güvenli), asla under-limit. Hem middleware hem AI guard anahtarı düzelir.
+- **(2) `ai-route-limit.ts` hibrit:** `guardAiRoute` **async** — önce paylaşımlı Redis (`rateLimitCheck(ip:<ip>, aiRoutePolicy(route,limit))`; yeni `aiRoutePolicy` helper `rate-limit.ts`'te → `rl:ai-<route>` keyspace). `fromRedis=true` otoriter (429/allow); `fromRedis=false` (Redis yok/down/circuit) → mevcut in-memory `checkAiRateLimit` fallback (defense-in-depth + CI/Redis-down eski davranış birebir). 5 AI route'a `await` (stock-risk/parse/score/purchase-copilot/ops-summary; cron'lar yalnız yorumda anar). Tradeoff: dosya artık ioredis taşıyan rate-limit'i import eder (`extractClientIp` yine request-ip'ten — re-export korunur).
+- **Test:** request-ip.test + rate-limit-helpers.test spoof-direnci yeniden yazıldı (eski "soldaki/ilki alınır" testleri O5 hatasını KODLUYORDU → bilinçli güncellendi, neden yorumda); ai-route-limit.test `@/lib/rate-limit` mock'landı (default fromRedis:false→fallback yolu; override fromRedis:true→Redis-primary 429/allow + key-check); ai-route-limit-integration regex `await guardAiRoute`'a uyarlandı. Gate route-guard-matrix `guardAiRoute` token'ı etkilenmez (AI route'lar guarded kalır).
+- **GREEN:** tsc 0 · lint 0 · **5568 test** (+6) · build 0. **Sınır:** prod Traefik X-Real-IP set etmiyorsa keying farklılaşır (over-limit; ayrı smoke); REDIS_URL prod'da set olmalı ki AI limit instance'lar arası paylaşılsın. KALAN: push.
+
+<details><summary>Önceki: D — migration durumu + gate hygiene (mig.104) + smoke checklist</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**D — Migration durumu + gate hygiene (mig.104) + smoke checklist**)
 
-`deferred_backlog` D. Rapor: `docs/audit/2026-06-19-d-migration-smoke.md`. **migration YOK; runtime kodu değişmedi.** PUSH BEKLİYOR. **Kullanıcı kapsam kararı (AskUserQuestion): "Gate hygiene + tek doğrulama/smoke dosyası".**
+`deferred_backlog` D. Rapor: `docs/audit/2026-06-19-d-migration-smoke.md`. **migration YOK; runtime kodu değişmedi.** PUSH EDİLDİ `9dc8c33`. **Kullanıcı kapsam kararı (AskUserQuestion): "Gate hygiene + tek doğrulama/smoke dosyası".**
 
 - **Durum kesinleşti:** `npx tsx scripts/check-migrations.ts` → **17/17 auto-probe GREEN** (073…100 canlıda) → eski CLAUDE.md "088 BLOKER / 091 APPLY bekliyor" notları BAYAT, gerçek durum temiz.
 - **Gate hygiene:** `check-migrations.ts` MANUAL map'ine **mig.104** (`reverse_production` REDEFINE — production O1 `for update`) eklendi; önceden hiç izlenmiyordu → artık `⚠️ 104 … elle doğrula` raporlanır (sessiz untracked kapandı; `manuel: 7→8`). 081/082/083 bilinçli dokunulmadı ("Tam kapsama" seçilmedi).
 - **Smoke doc 3 bölüm:** §1 probe sonucu (17/17 ✅); §2 **8 MANUAL redefine doğrulama SQL'i** (089 alerts CHECK po_overdue · 093 create_order v_line_total · 094 send_quote qli.description + uq index cancelled-hariç · 095 scan_lock search_path · 101 alerts CHECK rfq_response_due · 102 create_rfq ON CONFLICT'siz · 103 award fiyat-vermedi · 104 reverse_production for update — hepsi Studio, kullanıcı; OpenAPI fonksiyon gövdesi görmez); §3 **browser smoke checklist** (A3 guards: production/purchasing→quotes 403, accounting→movements/products-quotes/alerts 403, production→customers 403; production O1 eşzamanlı geri-alma stok 1×; orders Y1/O2; mig.099 birim; quote send/mail; tema+demo).
 - **Sınır (doc'ta net):** AI tarafı (probe + gate hygiene) kapandı; kalan iş kaçınılmaz **kullanıcı-tarafı** — ortamda `DATABASE_URL`/psql YOK (arbitrary SQL koşulamaz), tarayıcı sürülemez.
 - **Doğrulama:** check-migrations re-run `manuel: 8` + 104 satırı görünür · lint 0 (test/build'e dokunulmadı — runtime değişmedi, script vitest gate değil).
+
+</details>
 
 <details><summary>Önceki: A3 — route-guard gate METHOD-SEVİYE + yakaladığı 3 açık</summary>
 

@@ -1,5 +1,5 @@
 /**
- * Route-level AI rate limit (in-memory, single-container best-effort).
+ * Route-level AI rate limit — Redis-backed primary + in-memory fallback.
  *
  * Amaç: Anthropic fatura amplifikasyonunu engellemek — kullanıcı/saldırgan
  * `/api/ai/*` endpoint'lerini hızla çağırırsa her istek token yakar. Bu
@@ -11,20 +11,23 @@
  * tamamen INVOKE EDİLMEMİŞTİ. Route-içi guard middleware bypass olsa bile
  * çalışmaya devam eder (defense-in-depth).
  *
- * Kapsam: in-memory rolling window. Process restart'ta sıfırlanır
- * (Coolify rolling deploy = saldırgan 5 yeni istek alır, pratikte cost
- * sınırlı). Multi-instance scale-up'a geçilirse Upstash REST refactor zorunlu
- * (planlanan 1-2 hafta).
+ * HİBRİT (O5, 2026-06-19): in-memory per-instance limit çoklu-instance'da
+ * etkisizdi + deploy'da sıfırlanıyordu. Artık önce paylaşımlı ioredis Redis
+ * (`rate-limit.ts`) sayacı denenir; Redis yok/down/circuit-open ise (fail-open
+ * sinyali `fromRedis=false`) AŞAĞIDAKİ in-memory rolling window'a düşülür.
+ * Böylece Redis varken instance'lar arası paylaşılır + deploy'da sıfırlanmaz;
+ * Redis yokken eski best-effort davranış birebir korunur (defense-in-depth).
+ * Tradeoff: bu dosya artık ioredis taşıyan `rate-limit.ts`'i import eder
+ * (node-runtime route bundle'ı; middleware zaten yüklüyor — kabul edildi).
  *
- * Memory profili: cleanup amortize — her 5 dk'da bir tüm Map taranır, expired
- * timestamp'ler + boş entry'ler silinir. Yüksek-RPS senaryoda Map büyür ama
- * cleanup periyodu sınırlı tutar.
+ * In-memory fallback memory profili: cleanup amortize — her 5 dk'da bir tüm
+ * Map taranır, expired timestamp'ler + boş entry'ler silinir.
  */
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-// Redis-bağımsız import — `rate-limit.ts` üzerinden gitmek `ioredis` +
-// `rate-limiter-flexible` modüllerini gereksiz yere yüklerdi.
+// `extractClientIp` yine Redis-bağımsız helper'dan (re-export zinciri korunur).
 import { extractClientIp } from "@/lib/request-ip";
+import { rateLimitCheck, aiRoutePolicy } from "@/lib/rate-limit";
 
 const WINDOW_MS = 60_000;                    // 1 dk rolling window
 const DEFAULT_LIMIT = 5;                     // 5 req/dk/IP/route
@@ -78,44 +81,62 @@ export function checkAiRateLimit(
     return { ok: true, remaining: limit - arr.length, retryAfter: 0 };
 }
 
-/**
- * Route handler'ı için tek-satır guard.
- *
- * Dönüş `null` → devam et; `NextResponse` → 429 ile erken çık (Retry-After +
- * X-RateLimit-* header'lar set edilmiş).
- *
- * Kullanım:
- * ```ts
- * if (!(await checkAuth(...))) return 401;
- * const limited = guardAiRoute(request, "purchase-copilot", 5);
- * if (limited) return limited;
- * // ... Anthropic çağrısı
- * ```
- */
-export function guardAiRoute(
-    request: NextRequest,
-    route: string,
-    limit: number = DEFAULT_LIMIT,
-): NextResponse | null {
-    const ip = extractClientIp(request);
-    const res = checkAiRateLimit(route, ip, limit);
-    if (res.ok) return null;
+/** 429 yanıtı (Retry-After + X-RateLimit-* header'lar). */
+function tooManyRequests(limit: number, retryAfter: number): NextResponse {
     return new NextResponse(
         JSON.stringify({
             error: "AI istek limiti aşıldı. Lütfen biraz bekleyin.",
-            retryAfter: res.retryAfter,
+            retryAfter,
         }),
         {
             status: 429,
             headers: {
                 "Content-Type": "application/json",
-                "Retry-After": String(res.retryAfter),
+                "Retry-After": String(retryAfter),
                 "X-RateLimit-Limit": String(limit),
                 "X-RateLimit-Remaining": "0",
                 "X-RateLimit-Window": "60",
             },
         },
     );
+}
+
+/**
+ * Route handler'ı için tek-satır guard (Redis-primary + in-memory fallback).
+ *
+ * Dönüş `null` → devam et; `NextResponse` → 429 ile erken çık (Retry-After +
+ * X-RateLimit-* header'lar set edilmiş).
+ *
+ * Akış:
+ *  1. Paylaşımlı Redis sayacı (`rateLimitCheck` + `aiRoutePolicy`).
+ *  2. `fromRedis === true` → otoriter: !ok → 429, ok → null.
+ *  3. `fromRedis === false` (Redis yok/down/circuit-open) → in-memory
+ *     `checkAiRateLimit` fallback (eski best-effort davranış).
+ *
+ * Kullanım:
+ * ```ts
+ * if (!(await checkAuth(...))) return 401;
+ * const limited = await guardAiRoute(request, "purchase-copilot", 5);
+ * if (limited) return limited;
+ * // ... Anthropic çağrısı
+ * ```
+ */
+export async function guardAiRoute(
+    request: NextRequest,
+    route: string,
+    limit: number = DEFAULT_LIMIT,
+): Promise<NextResponse | null> {
+    const ip = extractClientIp(request);
+
+    // 1. Paylaşımlı Redis sayacı (instance'lar arası + deploy-kalıcı).
+    const redis = await rateLimitCheck(`ip:${ip}`, aiRoutePolicy(route, limit));
+    if (redis.fromRedis) {
+        return redis.ok ? null : tooManyRequests(limit, redis.retryAfter);
+    }
+
+    // 2. Redis yok/down/circuit-open → in-memory fallback (defense-in-depth).
+    const res = checkAiRateLimit(route, ip, limit);
+    return res.ok ? null : tooManyRequests(limit, res.retryAfter);
 }
 
 /** Test-only — Map'i + cleanup timer'ı sıfırla (test izolasyon). */

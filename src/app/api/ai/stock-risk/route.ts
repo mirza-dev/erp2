@@ -31,7 +31,7 @@ export async function POST(request?: NextRequest) {
     // `request` opsiyonel — Next.js production'da her zaman set; mevcut unit testler
     // POST() ile çağırıyor, guard onları kırmasın diye `if (request)` ile sarılı.
     if (request) {
-        const limited = guardAiRoute(request, "stock-risk", 5);
+        const limited = await guardAiRoute(request, "stock-risk", 5);
         if (limited) return limited;
     }
 

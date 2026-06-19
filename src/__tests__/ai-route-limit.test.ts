@@ -1,11 +1,23 @@
 /**
- * AI Route-level rate limit — pure helper + guardAiRoute davranış testleri.
+ * AI Route-level rate limit — pure helper + guardAiRoute hibrit davranış testleri.
  *
- * Module-level singleton state — her test arasında `__resetAiRateLimitForTests`
- * çağrılır. Mock yok, pure function (Date.now + Map).
+ * `checkAiRateLimit` (in-memory pure) mock'suz test edilir.
+ * `guardAiRoute` artık Redis-primary + in-memory fallback (O5, 2026-06-19):
+ * `@/lib/rate-limit.rateLimitCheck` mock'lanır — DEFAULT `fromRedis:false`
+ * (Redis yok → in-memory fallback yolu test edilir, eski davranış birebir),
+ * override ile `fromRedis:true` otoriter yol (429/allow) test edilir.
+ *
+ * Module-level singleton state — her test arasında `__resetAiRateLimitForTests`.
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { NextRequest } from "next/server";
+
+const { mockRateLimitCheck } = vi.hoisted(() => ({ mockRateLimitCheck: vi.fn() }));
+vi.mock("@/lib/rate-limit", () => ({
+    rateLimitCheck: (...args: unknown[]) => mockRateLimitCheck(...args),
+    aiRoutePolicy: (route: string, limit: number) => ({ name: `ai-${route}`, points: limit, duration: 60 }),
+}));
+
 import {
     checkAiRateLimit,
     guardAiRoute,
@@ -15,6 +27,10 @@ import {
 
 beforeEach(() => {
     __resetAiRateLimitForTests();
+    // DEFAULT: Redis yok/down → fail-open sinyali → guardAiRoute in-memory'e düşer.
+    mockRateLimitCheck.mockResolvedValue({
+        ok: true, limit: 5, remaining: 5, retryAfter: 0, fromRedis: false,
+    });
 });
 
 describe("checkAiRateLimit — rolling window", () => {
@@ -97,26 +113,27 @@ describe("checkAiRateLimit — rolling window", () => {
     });
 });
 
-describe("guardAiRoute — NextResponse integration", () => {
+describe("guardAiRoute — in-memory fallback (Redis yok, fromRedis=false)", () => {
     function makeReq(ip: string = "8.8.8.8"): NextRequest {
         const req = new NextRequest("http://localhost/api/ai/test");
-        req.headers.set("x-forwarded-for", ip);
+        // X-Real-IP = Traefik-set primary (spoof-resistant); guardAiRoute bunu okur.
+        req.headers.set("x-real-ip", ip);
         return req;
     }
 
-    it("ok → null (devam)", () => {
+    it("ok → null (devam)", async () => {
         const req = makeReq();
-        const result = guardAiRoute(req, "guard-test", 5);
+        const result = await guardAiRoute(req, "guard-test", 5);
         expect(result).toBeNull();
     });
 
     it("limit aşıldı → 429 NextResponse + Retry-After + X-RateLimit-* header", async () => {
         const req = makeReq("7.7.7.7");
         for (let i = 0; i < 5; i++) {
-            const ok = guardAiRoute(req, "guard-429", 5);
+            const ok = await guardAiRoute(req, "guard-429", 5);
             expect(ok).toBeNull();
         }
-        const blocked = guardAiRoute(req, "guard-429", 5);
+        const blocked = await guardAiRoute(req, "guard-429", 5);
         expect(blocked).not.toBeNull();
         expect(blocked!.status).toBe(429);
         expect(blocked!.headers.get("Retry-After")).toBeTruthy();
@@ -127,6 +144,46 @@ describe("guardAiRoute — NextResponse integration", () => {
         expect(body.error).toMatch(/AI istek limiti aşıldı/);
         expect(typeof body.retryAfter).toBe("number");
         expect(body.retryAfter).toBeGreaterThan(0);
+    });
+});
+
+describe("guardAiRoute — Redis-primary (fromRedis=true otoriter)", () => {
+    function makeReq(ip: string = "8.8.8.8"): NextRequest {
+        const req = new NextRequest("http://localhost/api/ai/test");
+        req.headers.set("x-real-ip", ip);
+        return req;
+    }
+
+    it("Redis ok=true → null (in-memory'e dokunmaz)", async () => {
+        mockRateLimitCheck.mockResolvedValueOnce({
+            ok: true, limit: 5, remaining: 4, retryAfter: 0, fromRedis: true,
+        });
+        const result = await guardAiRoute(makeReq(), "redis-allow", 5);
+        expect(result).toBeNull();
+        // Redis otoriter → in-memory sayaç tüketilmemeli
+        expect(__getAiRateLimitMapSize()).toBe(0);
+    });
+
+    it("Redis ok=false → 429 (in-memory'e DÜŞMEDEN, retryAfter Redis'ten)", async () => {
+        mockRateLimitCheck.mockResolvedValueOnce({
+            ok: false, limit: 5, remaining: 0, retryAfter: 42, fromRedis: true,
+        });
+        const blocked = await guardAiRoute(makeReq("6.6.6.6"), "redis-block", 5);
+        expect(blocked).not.toBeNull();
+        expect(blocked!.status).toBe(429);
+        expect(blocked!.headers.get("Retry-After")).toBe("42");
+        expect(__getAiRateLimitMapSize()).toBe(0);
+    });
+
+    it("guardAiRoute anahtarı ip:<extractClientIp> + aiRoutePolicy(route, limit)", async () => {
+        mockRateLimitCheck.mockResolvedValueOnce({
+            ok: true, limit: 10, remaining: 9, retryAfter: 0, fromRedis: true,
+        });
+        await guardAiRoute(makeReq("9.9.9.9"), "key-check", 10);
+        expect(mockRateLimitCheck).toHaveBeenCalledWith(
+            "ip:9.9.9.9",
+            { name: "ai-key-check", points: 10, duration: 60 },
+        );
     });
 });
 

@@ -2,18 +2,24 @@
  * M-3 Rate Limiting — pure helper testleri (extractClientIp + detectSupabaseAuthCookie).
  *
  * Bu helper'lar middleware sıralamasında kritik:
- *   - extractClientIp: Coolify Traefik X-Forwarded-For zinciri client IP'sini çıkarır
+ *   - extractClientIp: X-Real-IP primary + XFF son-hop (spoof-dayanıklı, O5)
  *   - detectSupabaseAuthCookie: getUser() maliyetine girmeden auth proxy
  */
 import { describe, it, expect } from "vitest";
 import { extractClientIp, detectSupabaseAuthCookie } from "@/lib/rate-limit";
 
-// ── extractClientIp ──────────────────────────────────────────────────────────
+// ── extractClientIp (spoof-dayanıklı, O5 2026-06-19) ──────────────────────────
 
-describe("extractClientIp — Coolify Traefik X-Forwarded-For", () => {
-    it("xff zinciri varsa ilki client IP (virgül + trim)", () => {
+describe("extractClientIp — X-Real-IP primary + XFF son-hop", () => {
+    it("XFF zincirinde EN SAĞDAKİ (son) hop alınır — soldaki spoof edilebilir", () => {
+        // Eski sürüm soldaki (203.0.113.45) alıyordu = O5 spoof açığı; artık son hop.
         const req = { headers: new Headers({ "x-forwarded-for": "203.0.113.45, 10.0.0.1, 172.20.0.1" }) };
-        expect(extractClientIp(req)).toBe("203.0.113.45");
+        expect(extractClientIp(req)).toBe("172.20.0.1");
+    });
+
+    it("X-Real-IP varsa XFF'i ezer (Traefik-set primary)", () => {
+        const req = { headers: new Headers({ "x-real-ip": "198.51.100.7", "x-forwarded-for": "1.2.3.4" }) };
+        expect(extractClientIp(req)).toBe("198.51.100.7");
     });
 
     it("xff yoksa x-real-ip fallback", () => {

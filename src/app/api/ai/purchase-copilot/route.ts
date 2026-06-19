@@ -96,7 +96,7 @@ async function handler(request: NextRequest | undefined, method: "GET" | "POST")
     // "AI önerisi oluşturulamadı" yanlış mesajı tetikliyordu).
     // Middleware-level Redis rate limit şu an pasif (Docker network sorunu); guard burada.
     if (request) {
-        const limited = guardAiRoute(request, "purchase-copilot", 10);
+        const limited = await guardAiRoute(request, "purchase-copilot", 10);
         if (limited) return limited;
     }
 

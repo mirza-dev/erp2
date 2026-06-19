@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
         // Route-level AI rate limit (2026-05-26) — validasyondan sonra, Anthropic
         // çağrısından önce. Limit 10/dk: import wizard çoklu satır parse'i tolere eder.
-        const limited = guardAiRoute(req, "parse", 10);
+        const limited = await guardAiRoute(req, "parse", 10);
         if (limited) return limited;
 
         const result = await aiParseEntity(body);

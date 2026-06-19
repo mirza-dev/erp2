@@ -58,8 +58,9 @@ describe("AI route guard — 5 route'ta source pattern kilidi", () => {
                 expect(src).toMatch(pattern);
             });
 
-            it("guard → if (limited) return limited; erken çıkış", () => {
-                expect(src).toMatch(/const\s+limited\s*=\s*guardAiRoute\(/);
+            it("guard → if (limited) return limited; erken çıkış (await — Redis-backed)", () => {
+                // guardAiRoute artık async (Redis-primary + in-memory fallback) → await zorunlu.
+                expect(src).toMatch(/const\s+limited\s*=\s*await\s+guardAiRoute\(/);
                 expect(src).toMatch(/if\s*\(limited\)\s*return\s+limited;?/);
             });
         });
