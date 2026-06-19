@@ -7,6 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-19 (**Landing + login UI denetimi (erp2-reviewer) + 4 düzeltme**)
+
+REVIEW.md read-only (landing `src/app/page.tsx` + login `src/app/login/page.tsx` + auth/callback + globals login CSS). **No blocking issues — K:0 Y:0 O:0 D:2 Nit:2.** PUSH BEKLİYOR. **migration YOK; yalnız `login/page.tsx` + globals.css 1 satır + test.** **Kullanıcı kararı (AskUserQuestion): hepsini düzelt.**
+
+- **Temiz doğrulandı:** landing tema-pinli pazarlama (kendi token scope'u, belgeli istisna), login tema-duyarlı CSS-var (globals.css `.login-monolith` vb.), Tailwind/framer YOK, React-escape (XSS yok), callback redirect relative/sabit (open-redirect yok), GoogleIcon brand-renk istisnası, custom checkbox a11y.
+- **D1 (Düşük):** `attempted` URL param'ı (`login/page.tsx` useEffect) doğrulanmadan hata kutusuna yansıyordu → React escape (XSS yok) ama crafted `?error=unauthorized&attempted=<metin>` kurbana keyfi metin gösterir. **Fix:** `attempted && isEmail(attempted)` ise yansıt, değilse genel `errUnauthorized` (mevcut `isEmail` helper).
+- **D2 (Düşük):** boş `<a href="mailto:">` → boş mail penceresi. **Fix:** düz metin `<span className="login-foot-em">` (globals.css'e `.login-foot-em` accent+label-weight eklendi; `.login-foot a` korundu).
+- **Nit-1:** `role="alert"` + `aria-live="polite"` çakışması (alert zaten assertive) → `aria-live` kaldırıldı.
+- **Nit-2:** `handleForgot` sıfırlama hatası `errAuth` ("e-posta/şifre hatalı") gösteriyordu → yeni `errReset` (TR/EN) mesajı.
+- **Test:** +2 (`login-page.test.tsx`): D1 malicious-attempted yansımaz (genel mesaj) + Nit-2 reset mesajı; 1 mevcut test güncellendi (aria-live assertion `null`).
+- **GREEN:** tsc 0 · lint 0 · **5570 test** (+2) · build 0. KALAN: push.
+
+<details><summary>Önceki: C1 — Login brick-risk preflight + checklist + kurtarma runbook</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**C1 — Login brick-risk preflight + checklist + kurtarma runbook**)
 
 `deferred_backlog` C1. Rapor: `docs/audit/2026-06-19-c1-login-preflight.md`. **migration YOK; runtime kodu DEĞİŞMEZ.** PUSH BEKLİYOR. **Kullanıcı kararı (AskUserQuestion): brick-risk preflight + checklist** (LoginMonolith UI redesign DEĞİL — o ayrı untracked design_handoff).
@@ -18,6 +32,7 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 - **Sınır:** AI tarafı (preflight script + brick modeli) kapandı; tarayıcı smoke + Coolify/Supabase dashboard ayarları kaçınılmaz kullanıcı-tarafı (prod ADMIN_EMAILS script'çe görülemez — LOCAL env okunur).
 - **Doğrulama:** tsc 0 · lint 0 · preflight canlı OK (exit 0, 3 admin) · full test 5568 değişmedi · build runtime kodu yok.
 - **Denetim (A2+C1 yeni güvenlik kodu, REVIEW.md read-only):** K:0 Y:0 O:0 **D:1** Nit:2. Sağlam doğrulandı: hibrit fail-open (Redis down→route in-memory 5/dk korur), Redis-otoriter in-memory tüketmez, keyspace ayrı (`rl:ai` vs `rl:ai-<route>`), spoof-direnci. **D1:** `extractClientIp` X-Real-IP güveni deployment varsayımı (Traefik overwrite etmezse spoof X-Real-IP üzerinden geri gelir) → kod düzeltmesi yok (proxy'nin işi), aksiyon = C1 preflight §3'e Traefik X-Real-IP overwrite ops-kontrolü + `request-ip.ts` yorum-pointer eklendi. Nit'ler (looksLikeIp gevşek / Redis-up 2 round-trip) dokunulmadı. KALAN: push.
+</details>
 
 <details><summary>Önceki: A2 — rate-limit sertleştirme: IP spoof fix + AI-route Redis-backed</summary>
 

@@ -622,6 +622,8 @@ body {
 .login-foot { text-align: center; color: var(--text-tertiary); font-size: 12px; line-height: 1.5; }
 .login-foot a { color: var(--accent-text); text-decoration: none; font-weight: var(--font-label-weight); }
 .login-foot a:hover { text-decoration: underline; }
+/* "Yöneticinizle iletişime geçin" — link değil vurgulu metin (sahte mailto kaldırıldı). */
+.login-foot-em { color: var(--accent-text); font-weight: var(--font-label-weight); }
 
 @keyframes lg-panel {
   from { opacity: 0; transform: translateY(8px); }

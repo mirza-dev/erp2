@@ -39,6 +39,7 @@ const STR = {
         errEmailEmpty: "E-posta adresi gerekli.",
         errEmailInvalid: "Geçerli bir e-posta girin.",
         errPwEmpty: "Şifre gerekli.",
+        errReset: "Sıfırlama bağlantısı gönderilemedi. Lütfen tekrar deneyin.",
         resetSent: "Sıfırlama bağlantısı e-postanıza gönderildi.",
         themeLabel: "Temayı değiştir",
     },
@@ -67,6 +68,7 @@ const STR = {
         errEmailEmpty: "Email is required.",
         errEmailInvalid: "Enter a valid email.",
         errPwEmpty: "Password is required.",
+        errReset: "Could not send reset link. Please try again.",
         resetSent: "A reset link has been sent to your email.",
         themeLabel: "Toggle theme",
     },
@@ -147,9 +149,11 @@ function LoginForm({ t }: { t: Strings }) {
             const reason = params.get("reason");
             setAuthError(reason === "provider" || reason === "pkce" ? t.errOAuthConfig : t.errOAuth);
         } else if (err === "unauthorized") {
+            // `attempted` ham URL param'ı — yalnız GEÇERLİ e-posta ise yansıt
+            // (React escape ettiğinden XSS yok ama crafted link keyfi metin gösterebilir).
             const attempted = params.get("attempted");
             setAuthError(
-                attempted
+                attempted && isEmail(attempted)
                     ? t.errUnauthorizedEmail.replace("{email}", attempted)
                     : t.errUnauthorized,
             );
@@ -220,7 +224,7 @@ function LoginForm({ t }: { t: Strings }) {
             redirectTo: `${window.location.origin}/login`,
         });
         if (resetErr) {
-            setAuthError(t.errAuth);
+            setAuthError(t.errReset);
             return;
         }
         setNotice(t.resetSent);
@@ -229,7 +233,7 @@ function LoginForm({ t }: { t: Strings }) {
     return (
         <form className="login-panel login-panel--bare" onSubmit={handleSubmit} noValidate>
             {authError && (
-                <div className="login-error" role="alert" aria-live="polite">
+                <div className="login-error" role="alert">
                     <AlertCircle size={16} strokeWidth={2} aria-hidden="true" />
                     <span>{authError}</span>
                 </div>
@@ -364,7 +368,7 @@ function LoginForm({ t }: { t: Strings }) {
             </Button>
 
             <p className="login-foot">
-                {t.noAccount} <a href="mailto:">{t.contact}</a>
+                {t.noAccount} <span className="login-foot-em">{t.contact}</span>
             </p>
         </form>
     );

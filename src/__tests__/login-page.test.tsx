@@ -134,7 +134,8 @@ describe("LoginPage (Monolith)", () => {
 
         const alert = await screen.findByRole("alert");
         expect(alert.textContent).toContain("E-posta veya şifre hatalı.");
-        expect(alert.getAttribute("aria-live")).toBe("polite");
+        // Nit-1: role="alert" zaten assertive live-region → aria-live="polite" kaldırıldı (çakışma).
+        expect(alert.getAttribute("aria-live")).toBeNull();
         expect(mockClearDemoMode).not.toHaveBeenCalled();
         expect(router.push).not.toHaveBeenCalled();
     });
@@ -244,6 +245,35 @@ describe("LoginPage (Monolith)", () => {
             configurable: true,
             value: { ...window.location, search: orig },
         });
+    });
+
+    it("D1: ?attempted=<e-posta-OLMAYAN metin> YANSITILMAZ → genel 'yetkili değil' mesajı", async () => {
+        // Sosyal-mühendislik: crafted link keyfi metin koymaya çalışır → isEmail guard ile elenir.
+        const orig = window.location.search;
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: { ...window.location, search: "?error=unauthorized&attempted=Hesabiniz+askiya+alindi+0850-555" },
+        });
+        render(<LoginPage />);
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).not.toContain("askiya");
+        expect(alert.textContent).not.toContain("0850-555");
+        expect(alert.textContent).toMatch(/yetkili değil/i);
+        Object.defineProperty(window, "location", {
+            configurable: true,
+            value: { ...window.location, search: orig },
+        });
+    });
+
+    it("Nit-2: şifre sıfırlama hatasında reset'e özgü mesaj gösterir (errAuth değil)", async () => {
+        mockResetPasswordForEmail.mockResolvedValue({ error: { message: "rate limited" } });
+        render(<LoginPage />);
+        fireEvent.change(screen.getByLabelText("E-posta"), { target: { value: "user@example.com" } });
+        fireEvent.click(screen.getByRole("button", { name: "Şifremi unuttum" }));
+
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).toMatch(/gönderilemedi/i);
+        expect(alert.textContent).not.toContain("E-posta veya şifre hatalı.");
     });
 
     it("?error=oauth&reason=pkce yapılandırma mesajı gösterir", async () => {
