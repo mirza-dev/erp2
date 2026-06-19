@@ -22,6 +22,8 @@ const mockRequireRole = vi.fn();
 vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: (...a: unknown[]) => mockRequirePermission(...a),
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    // O1: actor sunucu-otoriter — route getCurrentUserId() ile oturum kullanıcısını alır.
+    getCurrentUserId: vi.fn().mockResolvedValue("session-user-id"),
 }));
 
 const mockDbGetRec = vi.fn();

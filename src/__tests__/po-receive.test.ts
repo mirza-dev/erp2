@@ -78,6 +78,8 @@ const mockRequireRole = vi.fn();
 vi.mock("@/lib/auth/role-guard", () => ({
     getCurrentUserRole: vi.fn().mockResolvedValue("purchaser"),
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    // O1: actor sunucu-otoriter — route getCurrentUserId() ile oturum kullanıcısını alır.
+    getCurrentUserId: vi.fn().mockResolvedValue("session-user-id"),
 }));
 
 // ── Next.js mocks ─────────────────────────────────────────────
@@ -227,6 +229,20 @@ describe("POST /api/purchase-orders/[id]/receive", () => {
         await POST(makeRequest({ lines: [{ line_id: VALID_LINE_ID, qty: 10 }] }), makeParams());
         expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
         expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+    });
+
+    it("O1: actor oturum kullanıcısıdır, istemci body.actor görmezden gelinir", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValueOnce(makePO("confirmed"));
+        mockServiceReceivePOLines.mockResolvedValueOnce({ id: VALID_PO_ID, status: "received" });
+        await POST(
+            makeRequest({ lines: [{ line_id: VALID_LINE_ID, qty: 5 }], actor: "spoofed-actor" }),
+            makeParams(),
+        );
+        expect(mockServiceReceivePOLines).toHaveBeenCalledWith(
+            VALID_PO_ID,
+            [{ line_id: VALID_LINE_ID, qty: 5 }],
+            "session-user-id",
+        );
     });
 });
 

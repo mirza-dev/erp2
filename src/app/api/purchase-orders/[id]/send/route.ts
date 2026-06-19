@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetPurchaseOrderById } from "@/lib/supabase/purchase-orders";
 import { serviceSendPO } from "@/lib/services/purchase-order-service";
-import { handleApiError, safeParseJson } from "@/lib/api-error";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { handleApiError } from "@/lib/api-error";
+import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // POST /api/purchase-orders/[id]/send — draft → sent
@@ -19,8 +19,8 @@ export async function POST(
         const existing = await dbGetPurchaseOrderById(id);
         if (!existing) return NextResponse.json({ error: "PO bulunamadı." }, { status: 404 });
 
-        const parsed = await safeParseJson(req);
-        const actor = parsed.ok ? ((parsed.data as Record<string, unknown>).actor as string | undefined) : undefined;
+        // O1: actor sunucu-otoriter (oturum kullanıcısı) — istemci gövdesi DEĞİL.
+        const actor = (await getCurrentUserId()) ?? undefined;
 
         const result = await serviceSendPO(id, actor);
         revalidateTag("purchase-orders", "max");

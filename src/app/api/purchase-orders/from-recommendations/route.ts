@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
-import { requireRole } from "@/lib/auth/role-guard";
+import { requireRole, getCurrentUserId } from "@/lib/auth/role-guard";
 import {
     serviceCreatePOFromRecommendations,
     type CreatePOFromRecsLine,
@@ -88,7 +88,8 @@ export async function POST(req: NextRequest) {
                 notes: typeof body.notes === "string" ? body.notes : null,
                 lines,
             },
-            typeof body.actor === "string" ? body.actor : undefined,
+            // O1: actor sunucu-otoriter (oturum kullanıcısı) — istemci gövdesi DEĞİL.
+            (await getCurrentUserId()) ?? undefined,
         );
 
         revalidateTag("purchase-orders", "max");

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetPurchaseOrderById, dbReplacePurchaseOrderLines, validatePoLines } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { validateStringLengths } from "@/lib/validation/string-lengths";
-import { requirePermission } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 
 // PUT /api/purchase-orders/[id]/lines — atomik replace (B3)
@@ -37,7 +37,8 @@ export async function PUT(
         const linesErr = validatePoLines(body.lines);
         if (linesErr) return NextResponse.json({ error: linesErr }, { status: 400 });
 
-        const actor = (body.actor as string | undefined) ?? "system";
+        // O1: actor sunucu-otoriter (oturum kullanıcısı) — istemci gövdesi DEĞİL.
+        const actor = (await getCurrentUserId()) ?? "system";
 
         await dbReplacePurchaseOrderLines(
             id,

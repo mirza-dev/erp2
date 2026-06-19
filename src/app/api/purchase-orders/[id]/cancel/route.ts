@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetPurchaseOrderById } from "@/lib/supabase/purchase-orders";
 import { serviceCancelPO } from "@/lib/services/purchase-order-service";
-import { requireRole } from "@/lib/auth/role-guard";
+import { requireRole, getCurrentUserId } from "@/lib/auth/role-guard";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 
@@ -35,7 +35,8 @@ export async function POST(
             return NextResponse.json({ error: "İptal gerekçesi zorunludur." }, { status: 400 });
         }
 
-        const actor = (body.actor as string | undefined) ?? "system";
+        // O1: actor sunucu-otoriter (oturum kullanıcısı) — istemci gövdesi DEĞİL.
+        const actor = (await getCurrentUserId()) ?? "system";
         const result = await serviceCancelPO(id, reason, actor);
         revalidateTag("purchase-orders", "max");
         revalidateTag("products", "max");  // pending commitment cancel → incoming etkilenir

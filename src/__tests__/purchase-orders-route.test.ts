@@ -57,6 +57,8 @@ vi.mock("@/lib/auth/role-guard", () => ({
     requirePermission: vi.fn().mockResolvedValue(null),
     // Faz 4 R3: GET redaction view_purchase_costs okur → tam veri için sete eklenir (no-op).
     getCurrentUserPermissions: vi.fn().mockResolvedValue(new Set(["view_purchase_orders", "manage_purchase_orders", "view_purchase_costs"])),
+    // O1: actor/createdBy sunucu-otoriter — route getCurrentUserId() ile oturum kullanıcısını alır.
+    getCurrentUserId: vi.fn().mockResolvedValue("session-user-id"),
 }));
 
 const mockRevalidateTag = vi.fn();

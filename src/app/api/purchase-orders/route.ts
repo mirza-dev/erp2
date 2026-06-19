@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbListPurchaseOrders, dbCreatePurchaseOrder, validatePoLines, isValidPoCurrency } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { validateStringLengths } from "@/lib/validation/string-lengths";
-import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
+import { requirePermission, getCurrentUserPermissions, getCurrentUserId } from "@/lib/auth/role-guard";
 import { redactPurchaseOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
@@ -61,7 +61,8 @@ export async function POST(req: NextRequest) {
             currency:     String(body.currency),
             notes:        body.notes as string | null | undefined,
             lines:        body.lines as Parameters<typeof dbCreatePurchaseOrder>[0]["lines"],
-            createdBy:    body.created_by as string | null | undefined,
+            // O1: createdBy sunucu-otoriter (oturum kullanıcısı) — istemci gövdesi DEĞİL.
+            createdBy:    (await getCurrentUserId()) ?? undefined,
         });
 
         revalidateTag("purchase-orders", "max");

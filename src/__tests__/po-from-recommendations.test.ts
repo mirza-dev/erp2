@@ -74,6 +74,8 @@ const mockRequireRole = vi.fn();
 vi.mock("@/lib/auth/role-guard", () => ({
     getCurrentUserRole: vi.fn().mockResolvedValue("purchaser"),
     requireRole: (...a: unknown[]) => mockRequireRole(...a),
+    // O1: actor sunucu-otoriter — route getCurrentUserId() ile oturum kullanıcısını alır.
+    getCurrentUserId: vi.fn().mockResolvedValue("session-user-id"),
 }));
 
 // ── Next.js mocks ─────────────────────────────────────────────
@@ -270,7 +272,15 @@ describe("POST /api/purchase-orders/from-recommendations", () => {
                     { recommendation_id: REC_ID2, quantity: 20, unit_price: 25, discount_pct: 0, notes: null },
                 ],
             },
-            undefined, // actor
+            "session-user-id", // O1: actor sunucudan (getCurrentUserId), istemci gövdesinden DEĞİL
+        );
+    });
+
+    it("O1: istemci body.actor görmezden gelinir — actor oturum kullanıcısıdır", async () => {
+        await POST(makeRequest({ ...validBody, actor: "spoofed-actor" }));
+        expect(mockServiceCreatePO).toHaveBeenCalledWith(
+            expect.any(Object),
+            "session-user-id",
         );
     });
 

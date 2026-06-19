@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetPurchaseOrderById } from "@/lib/supabase/purchase-orders";
 import { serviceReceivePOLines } from "@/lib/services/purchase-order-service";
-import { requireRole } from "@/lib/auth/role-guard";
+import { requireRole, getCurrentUserId } from "@/lib/auth/role-guard";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 
@@ -57,7 +57,9 @@ export async function POST(
             qty: Number(l.qty),
         }));
 
-        const actor = (body.actor as string | undefined) ?? "system";
+        // O1: actor sunucu-otoriter (oturum kullanıcısı) — istemci gövdesi DEĞİL.
+        // Stok hareketi created_by + audit_log.actor buradan beslenir.
+        const actor = (await getCurrentUserId()) ?? "system";
         const result = await serviceReceivePOLines(id, lines, actor);
 
         revalidateTag("purchase-orders", "max");
