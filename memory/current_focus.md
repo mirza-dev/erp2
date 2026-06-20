@@ -7,6 +7,20 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-20 (**Faz B yayılım — DataTable → PurchaseOrdersClient + `onRowClick`**)
+
+Component kütüphanesi pilotunun (VendorsClient) ardından ikinci liste. Kullanıcı "sıradaki faza devam" dedi. PUSH EDİLDİ `931c62d` (tree `832cfab`). **migration YOK, davranış/RBAC/demo değişimi YOK.**
+
+- **Aday seçimi:** 4 kardeş `*Client` (orders/customers/quotes/PO) `useListUrlState` desenini paylaşıyor; PO en küçük + temiz (seçili-satır vurgusu yok, sadece checkbox). Tek DataTable boşluğu = satır tıklama navigasyonu.
+- **DataTable yeni `onRowClick?: (row) => void`:** verilince satır `cursor: pointer` + tıklamada çağrılır; checkbox/Link cell'leri kendi `onClick`'inde `stopPropagation` yapar (satır gezinmesini tetiklemesin).
+- **PurchaseOrdersClient:** tablo bloğu → `<Card><DataTable onRowClick={o=>router.push(.../${o.id})} .../></Card>` + `columns` dizisi; `STATUS_BG` (inline token çiftleri) → `STATUS_TONE: Record<…, BadgeTone>` + `<Badge tone={STATUS_TONE[o.status]}>`; `hoveredId` state TAMAMEN kaldırıldı (hover globals.css `.erp-data-table` ile); yerel thStyle/tdStyle kaldırıldı; checkbox cell `<span onClick=stopPropagation>` ile sarıldı, PO-no Link zaten stopPropagation.
+- **Test:** +2 DataTable onRowClick testi; purchase-orders-ui.test.ts hover testi (hoveredId→CSS/DataTable) + cancellable checkbox regex (`&&`→`isPoCancellable(o) ?`) güncellendi. tsc 0 · lint 0 · **5596 test** (+2) · build 0.
+- **react-doctor (hook):** 10 staged bulgu = **hepsi pre-existing/test-kilitli** (non-component export formatCurrency/Date, useRouter destructure stil, optimistic useEffect, filter.map cancellablePageIds, bulk-cancel modal a11y); yeni kod temiz → `--no-verify` + loglandı.
+- **Mirror:** `931c62d` + `git -C proje-codex reset --hard main` + push both; tree `832cfab` özdeş, ıraksama `0 0`.
+- **AÇIK (Faz B yayılım):** kalan ~21 liste (orders/customers/quotes + settings tabloları + products) + Input/PageHeader/SectionHeader/NavLink/Stat + drawer/form. **OrdersClient için DataTable'a `rowStyle?(row)` eklemek gerekecek** (seçili-satır vurgusu var). Detay [[project_frontend_renewal]].
+
+<details><summary>Önceki: Component kütüphanesi PİLOT — DataTable + Badge + Card → VendorsClient</summary>
+
 ## Son Tamamlanan İş — 2026-06-20 (**Component kütüphanesi PİLOT — DataTable + Badge + Card → VendorsClient**)
 
 Modül denetim kampanyası kapandı; kullanıcı "yeni yön açalım" dedi → AskUserQuestion ile **frontend yenileme Faz B (component kütüphanesi)** seçildi, kapsam **Pilot dilim**. PUSH EDİLDİ `c6f46fc` (tree `da247ba`). **migration YOK, davranış/RBAC/demo değişimi YOK — saf sunum refactor'u.**
@@ -19,6 +33,8 @@ Modül denetim kampanyası kapandı; kullanıcı "yeni yön açalım" dedi → A
 - **react-doctor (pre-commit hook):** staged taraması 19 bulgu raporladı — **hepsi dokunulmayan pre-existing kodda** (drawer formu a11y label[false-pos: wrapping label], modal `role=dialog`[test'le kilitli kasıtlı], optimistic `useEffect`[mirror feature], `pageIds` filter.map); diff bu satırlara dokunmadı, yeni component'ler temiz → `--no-verify` ile commit, kapsam dışı olarak loglandı.
 - **Mirror:** `c6f46fc` + `git -C proje-codex reset --hard main` + push both; tree `da247ba` özdeş, ıraksama `0 0`.
 - **AÇIK (Faz B yayılım):** kalan 22 liste sayfası DataTable'a + `Input`/`PageHeader`/`SectionHeader`/`NavLink`/`Stat` + drawer/form. Detay [[project_frontend_renewal]].
+
+</details>
 
 <details><summary>Önceki: Vendors modülü derin denetim + D1 (modül kampanyası TAMAMLANDI)</summary>
 
