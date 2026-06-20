@@ -43,6 +43,22 @@ describe("DataTable", () => {
         expect((headerCells[1] as HTMLElement).style.width).toBe("80px");
     });
 
+    it("minWidth verilince table'a uygulanır + overflow-x wrapper sarar", () => {
+        const { container } = render(
+            <DataTable columns={columns} rows={rows} rowKey={r => r.id} minWidth="700px" />,
+        );
+        const table = container.querySelector("table.erp-data-table") as HTMLElement;
+        expect(table.style.minWidth).toBe("700px");
+        const wrapper = table.parentElement as HTMLElement;
+        expect(wrapper.style.overflowX).toBe("auto");
+    });
+
+    it("minWidth yokken table'da minWidth set edilmez", () => {
+        const { container } = render(<DataTable columns={columns} rows={rows} rowKey={r => r.id} />);
+        const table = container.querySelector("table.erp-data-table") as HTMLElement;
+        expect(table.style.minWidth).toBe("");
+    });
+
     it("rows boşken emptyMessage gösterir, tablo render etmez", () => {
         const { container } = render(
             <DataTable columns={columns} rows={[]} rowKey={r => r.id} emptyMessage="Kayıt yok." />,

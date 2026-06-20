@@ -43,18 +43,20 @@ describe("Cariler — toplu silme bayat satır bırakmaz", () => {
     });
 });
 
-// ── 2. Hover hoveredId state (DOM-mutation antipattern fix) ───
+// ── 2. Tablo DataTable'a taşındı; hover CSS, satır tıklama panel açar ───
 
-describe("Cariler — hover hoveredId state", () => {
-    it("hoveredId state tanımlı + satır background koşullu", () => {
-        expect(PAGE_SRC).toMatch(/const \[hoveredId, setHoveredId\] = useState<string \| null>\(null\)/);
-        expect(PAGE_SRC).toMatch(/hoveredId === customer\.id \? "var\(--bg-secondary\)" : "transparent"/);
+describe("Cariler — DataTable + CSS hover (hoveredId antipattern kaldırıldı)", () => {
+    it("liste Card + DataTable kullanır; hoveredId state + DOM-yazımı kaldırıldı", () => {
+        // Hover artık globals.css `.erp-data-table tbody tr:hover` ile (rerender yok).
+        expect(PAGE_SRC).toContain("<DataTable");
+        expect(PAGE_SRC).toContain('minWidth="700px"');
+        expect(PAGE_SRC).not.toContain("const [hoveredId, setHoveredId]");
+        expect(PAGE_SRC).not.toContain("setHoveredId");
+        expect(PAGE_SRC).not.toMatch(/querySelectorAll\("td"\)\.forEach\(td => \(td\.style\.background/);
     });
 
-    it("onMouseEnter/Leave setHoveredId çağırır, querySelectorAll DOM-yazımı yok", () => {
-        expect(PAGE_SRC).toMatch(/onMouseEnter=\{\(\) => setHoveredId\(customer\.id\)\}/);
-        expect(PAGE_SRC).toMatch(/onMouseLeave=\{\(\) => setHoveredId\(null\)\}/);
-        expect(PAGE_SRC).not.toMatch(/querySelectorAll\("td"\)\.forEach\(td => \(td\.style\.background/);
+    it("satır tıklama detay panelini açar (onRowClick → setSelectedCustomer)", () => {
+        expect(PAGE_SRC).toContain("onRowClick={c => setSelectedCustomer(c)}");
     });
 });
 

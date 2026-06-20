@@ -28,6 +28,11 @@ export interface DataTableProps<T> {
      * öğeler (checkbox, link) kendi onClick'inde `e.stopPropagation()` yapmalı.
      */
     onRowClick?: (row: T) => void;
+    /**
+     * Tablo için minimum genişlik (örn. "700px"). Dar ekranda tablo bu genişliğin
+     * altına inmez; DataTable tabloyu `overflow-x: auto` ile sarar (yatay kaydırma).
+     */
+    minWidth?: string;
 }
 
 const thStyle: CSSProperties = {
@@ -59,6 +64,7 @@ export default function DataTable<T>({
     emptyMessage,
     footer,
     onRowClick,
+    minWidth,
 }: DataTableProps<T>) {
     if (rows.length === 0) {
         return (
@@ -80,7 +86,11 @@ export default function DataTable<T>({
 
     return (
         <>
-            <table className="erp-data-table" style={{ width: "100%", borderCollapse: "collapse" }}>
+            <div style={{ overflowX: "auto" }}>
+            <table
+                className="erp-data-table"
+                style={{ width: "100%", borderCollapse: "collapse", ...(minWidth ? { minWidth } : {}) }}
+            >
                 <thead>
                     <tr style={{ background: "var(--bg-secondary)" }}>
                         {columns.map(col => (
@@ -122,6 +132,7 @@ export default function DataTable<T>({
                     ))}
                 </tbody>
             </table>
+            </div>
             {footer}
         </>
     );
