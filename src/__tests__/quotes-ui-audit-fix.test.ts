@@ -70,13 +70,14 @@ describe("quotes/page.tsx — DOM mutation + UX + a11y fixes", () => {
         expect(LIST_SRC).not.toMatch(/querySelector\(["']\[data-delete\]["']\)/);
     });
 
-    it("hoveredId state tanımlı (React state ile hover yönetimi)", () => {
-        expect(LIST_SRC).toMatch(/const \[hoveredId, setHoveredId\] = useState<string \| null>\(null\)/);
-    });
-
-    it("onMouseEnter/Leave React state setter'larını çağırıyor", () => {
-        expect(LIST_SRC).toMatch(/onMouseEnter=\{\(\) => setHoveredId\(q\.id\)\}/);
-        expect(LIST_SRC).toMatch(/onMouseLeave=\{\(\) => setHoveredId\(null\)\}/);
+    it("Card + DataTable kullanır; hoveredId state kaldırıldı (hover + reveal CSS)", () => {
+        // Faz B: satır hover + sil/chevron reveal artık globals.css `.erp-data-table`
+        // ve `.row-reveal` ile (React state / DOM mutation yok).
+        expect(LIST_SRC).toContain("<DataTable");
+        expect(LIST_SRC).toMatch(/rows=\{displayQuotes\}/);
+        expect(LIST_SRC).not.toMatch(/const \[hoveredId, setHoveredId\]/);
+        expect(LIST_SRC).not.toMatch(/onMouseEnter/);
+        expect(LIST_SRC).toContain('className="row-reveal"');
     });
 
     it("data-chevron ve data-delete attribute'ları kaldırıldı", () => {
@@ -84,12 +85,8 @@ describe("quotes/page.tsx — DOM mutation + UX + a11y fixes", () => {
         expect(LIST_SRC).not.toMatch(/data-delete/);
     });
 
-    it("UX bug fix: confirmId onMouseLeave'de sıfırlanmıyor", () => {
-        // onMouseLeave handler artık tek satır: () => setHoveredId(null)
-        // confirmId ile ilgili tek setter handleDelete içinde kalır.
-        const onMouseLeaveBlock = LIST_SRC.match(/onMouseLeave=\{\(\)[\s\S]{0,60}setHoveredId\(null\)\}/);
-        expect(onMouseLeaveBlock).not.toBeNull();
-        // Hiçbir handler içinde "if (confirmId === q.id) setConfirmId(null)" kalmadı
+    it("UX bug fix: confirmId hover handler'ında sıfırlanmıyor", () => {
+        // Hiçbir handler içinde "if (confirmId === q.id) setConfirmId(null)" kalmadı.
         expect(LIST_SRC).not.toMatch(/if \(confirmId === q\.id\) setConfirmId\(null\)/);
     });
 

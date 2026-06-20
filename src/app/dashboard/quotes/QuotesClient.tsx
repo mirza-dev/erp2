@@ -8,6 +8,8 @@ import type { QuoteSummary } from "@/lib/mock-data";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { decrementCount, patchCountRecord, removeByIds, successfulResponseIds } from "@/lib/fast-mutation";
 import Button, { ButtonLink } from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -38,24 +40,6 @@ const quoteStatusConfig: Record<QuoteStatus, { label: string; cls: string }> = {
     rejected: { label: "Reddedildi",  cls: "badge-danger"  },
     expired:  { label: "Süresi Doldu", cls: "badge-warning" },
     revised:  { label: "Revize Edildi", cls: "badge-neutral" },
-};
-
-const thStyle: React.CSSProperties = {
-    textAlign: "left",
-    padding: "10px 14px",
-    fontSize: "12px",
-    fontWeight: "var(--font-table-heading-weight)",
-    color: "var(--text-secondary)",
-    borderBottom: "var(--line-width) solid var(--surface-border)",
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: "10px 14px",
-    fontSize: "13px",
-    fontWeight: "var(--font-table-cell-weight)",
-    borderBottom: "var(--line-width) solid var(--border-tertiary)",
-    color: "var(--text-primary)",
-    lineHeight: 1.4,
 };
 
 const badgeColors = {
@@ -99,7 +83,6 @@ export default function QuotesClient(props: QuotesClientProps) {
     const [refreshing, setRefreshing] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
-    const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
     const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -197,6 +180,145 @@ export default function QuotesClient(props: QuotesClientProps) {
 
     const totalPages = computeTotalPages(displayTotal, pageSize);
     const draftCount = displayCounts.draft;
+
+    const columns: DataTableColumn<QuoteSummary>[] = [
+        {
+            key: "select",
+            width: "36px",
+            headerStyle: { padding: "10px 8px 10px 14px" },
+            cellStyle: { padding: "10px 8px 10px 14px" },
+            header: canDeleteQuotes ? (
+                <input
+                    type="checkbox"
+                    checked={isPageAllSelected(deletablePageIds)}
+                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(deletablePageIds); }}
+                    onChange={() => toggleAll(deletablePageIds)}
+                    onClick={e => e.stopPropagation()}
+                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                    aria-label="Sayfadaki tüm teklifleri seç"
+                />
+            ) : null,
+            // Yalnız silinebilir (draft) satırlar seçilebilir.
+            cell: q => (canDeleteQuote(q.status) && canDeleteQuotes) ? (
+                <span onClick={e => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        checked={selectedIds.has(q.id)}
+                        onChange={() => toggleOne(q.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                        aria-label={`${q.quoteNumber} seç`}
+                    />
+                </span>
+            ) : null,
+        },
+        {
+            key: "quoteNumber",
+            header: "Teklif No",
+            cellStyle: { fontWeight: 500 },
+            cell: q => q.quoteNumber,
+        },
+        {
+            key: "customerName",
+            header: "Müşteri",
+            cell: q => q.customerName,
+        },
+        {
+            key: "status",
+            header: "Durum",
+            align: "center",
+            cell: q => {
+                const statusCfg = quoteStatusConfig[q.status];
+                return <span className={`badge ${statusCfg.cls}`}>{statusCfg.label}</span>;
+            },
+        },
+        {
+            key: "validity",
+            header: "Geçerlilik",
+            align: "center",
+            cell: q => {
+                const badge = (q.status === "draft" || q.status === "sent")
+                    ? getValidUntilBadge(q.validUntil)
+                    : null;
+                if (!badge) return null;
+                return (
+                    <span style={{
+                        display: "inline-block",
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        padding: "2px 6px",
+                        borderRadius: "3px",
+                        background: badgeColors[badge.type].bg,
+                        color: badgeColors[badge.type].color,
+                        border: `0.5px solid ${badgeColors[badge.type].border}`,
+                    }}>
+                        {badge.text}
+                    </span>
+                );
+            },
+        },
+        {
+            key: "createdAt",
+            header: "Tarih",
+            cellStyle: { color: "var(--text-secondary)" },
+            cell: q => formatDate(q.createdAt),
+        },
+        {
+            key: "grandTotal",
+            header: "Tutar",
+            align: "right",
+            cellStyle: { fontWeight: 500 },
+            cell: q => maskCurrency(q.grandTotal, q.currency, canViewSalesPrices),
+        },
+        {
+            key: "action",
+            header: "",
+            align: "right",
+            width: "64px",
+            cellStyle: { padding: "10px 8px" },
+            cell: q => {
+                const deletable = canDeleteQuote(q.status);
+                return (
+                    <div
+                        style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        {deletable && canDeleteQuotes && (
+                            confirmId === q.id ? (
+                                <Button
+                                    variant="danger"
+                                    size="xs"
+                                    leftIcon={<Trash2 size={13} />}
+                                    onClick={(e) => handleDelete(e, q.id)}
+                                    disabled={deletingId === q.id}
+                                >
+                                    Evet, sil
+                                </Button>
+                            ) : (
+                                <span className="row-reveal">
+                                    <Button
+                                        variant="dangerSoft"
+                                        size="xs"
+                                        iconOnly
+                                        onClick={(e) => handleDelete(e, q.id)}
+                                        disabled={isDemo || deletingId === q.id}
+                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                                        aria-label="Teklifi sil"
+                                        leftIcon={<Trash2 size={13} />}
+                                    />
+                                </span>
+                            )
+                        )}
+                        <span className="row-reveal" aria-hidden="true" style={{ color: "var(--text-tertiary)" }}>
+                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </span>
+                    </div>
+                );
+            },
+        },
+    ];
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
@@ -364,182 +486,39 @@ export default function QuotesClient(props: QuotesClientProps) {
             )}
 
             {/* Table */}
-            <div
-                style={{
-                    background: "var(--surface-raised)",
-                    border: "var(--line-width) solid var(--surface-border)",
-                    borderRadius: "6px",
-                    overflowX: "auto",
-                    boxShadow: "var(--surface-shadow-sm)",
-                }}
-            >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "740px" }}>
-                    <thead>
-                        <tr style={{ background: "var(--table-header-bg)" }}>
-                            <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
-                                {canDeleteQuotes && (
-                                    <input
-                                        type="checkbox"
-                                        checked={isPageAllSelected(deletablePageIds)}
-                                        ref={el => { if (el) el.indeterminate = isPageIndeterminate(deletablePageIds); }}
-                                        onChange={() => toggleAll(deletablePageIds)}
-                                        onClick={e => e.stopPropagation()}
-                                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                        aria-label="Sayfadaki tüm teklifleri seç"
-                                    />
-                                )}
-                            </th>
-                            <th style={thStyle}>Teklif No</th>
-                            <th style={thStyle}>Müşteri</th>
-                            <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
-                            <th style={{ ...thStyle, textAlign: "center" }}>Geçerlilik</th>
-                            <th style={thStyle}>Tarih</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Tutar</th>
-                            <th style={{ ...thStyle, width: "32px" }}></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {displayQuotes.length === 0 ? (
-                            <tr>
-                                <td colSpan={8} style={{ border: "none" }}>
-                                    <EmptyState
-                                        title={
-                                            search
-                                                ? `"${search}" ile eşleşen teklif bulunamadı`
-                                                : `${filterTabs.find(t => t.id === tab)?.label ?? ""} durumunda teklif yok`
-                                        }
-                                        description="Arama terimini değiştirmeyi veya filtreleri temizlemeyi deneyin."
-                                        action={{
-                                            label: "Filtreleri Temizle",
-                                            onClick: () => navigate({ search: "", tab: "ALL", currency: "", dateFrom: "", dateTo: "", page: 1 }),
-                                        }}
-                                    />
-                                </td>
-                            </tr>
-                        ) : (
-                            displayQuotes.map((q) => {
-                                const statusCfg = quoteStatusConfig[q.status];
-                                const badge = (q.status === "draft" || q.status === "sent")
-                                    ? getValidUntilBadge(q.validUntil)
-                                    : null;
-                                const deletable = canDeleteQuote(q.status);
-
-                                const isHovered = hoveredId === q.id;
-                                const rowBg = isHovered ? "var(--table-row-hover)" : "transparent";
-                                return (
-                                    <tr
-                                        key={q.id}
-                                        style={{ cursor: "pointer" }}
-                                        onClick={() => router.push(`/dashboard/quotes/${q.id}`)}
-                                        onMouseEnter={() => setHoveredId(q.id)}
-                                        onMouseLeave={() => setHoveredId(null)}
-                                    >
-                                        <td
-                                            style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px", background: rowBg }}
-                                            onClick={e => e.stopPropagation()}
-                                        >
-                                            {/* Yalnız silinebilir (draft) satırlar seçilebilir. */}
-                                            {deletable && canDeleteQuotes && (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.has(q.id)}
-                                                    onChange={() => toggleOne(q.id)}
-                                                    onClick={e => e.stopPropagation()}
-                                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                                    aria-label={`${q.quoteNumber} seç`}
-                                                />
-                                            )}
-                                        </td>
-                                        <td style={{
-                                            ...tdStyle,
-                                            fontWeight: 500,
-                                            background: rowBg,
-                                            borderLeft: isHovered ? "2px solid var(--accent)" : "2px solid transparent",
-                                        }}>
-                                            {q.quoteNumber}
-                                        </td>
-                                        <td style={{ ...tdStyle, background: rowBg }}>
-                                            {q.customerName}
-                                        </td>
-                                        <td style={{ ...tdStyle, textAlign: "center", background: rowBg }}>
-                                            <span className={`badge ${statusCfg.cls}`}>{statusCfg.label}</span>
-                                        </td>
-                                        <td style={{ ...tdStyle, textAlign: "center", background: rowBg }}>
-                                            {badge && (
-                                                <span style={{
-                                                    display: "inline-block",
-                                                    fontSize: "10px",
-                                                    fontWeight: 600,
-                                                    padding: "2px 6px",
-                                                    borderRadius: "3px",
-                                                    background: badgeColors[badge.type].bg,
-                                                    color: badgeColors[badge.type].color,
-                                                    border: `0.5px solid ${badgeColors[badge.type].border}`,
-                                                }}>
-                                                    {badge.text}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td style={{ ...tdStyle, color: "var(--text-secondary)", background: rowBg }}>
-                                            {formatDate(q.createdAt)}
-                                        </td>
-                                        <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500, background: rowBg }}>
-                                            {maskCurrency(q.grandTotal, q.currency, canViewSalesPrices)}
-                                        </td>
-                                        <td
-                                            style={{ ...tdStyle, width: "64px", textAlign: "right", padding: "10px 8px", background: rowBg }}
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
-                                                {deletable && canDeleteQuotes && (
-                                                    confirmId === q.id ? (
-                                                        <Button
-                                                            variant="danger"
-                                                            size="xs"
-                                                            leftIcon={<Trash2 size={13} />}
-                                                            onClick={(e) => handleDelete(e, q.id)}
-                                                            disabled={deletingId === q.id}
-                                                        >
-                                                            Evet, sil
-                                                        </Button>
-                                                    ) : (
-                                                        <Button
-                                                            variant="dangerSoft"
-                                                            size="xs"
-                                                            iconOnly
-                                                            onClick={(e) => handleDelete(e, q.id)}
-                                                            disabled={isDemo || deletingId === q.id}
-                                                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                                            aria-label="Teklifi sil"
-                                                            leftIcon={<Trash2 size={13} />}
-                                                            style={{ opacity: isHovered ? 1 : 0 }}
-                                                        />
-                                                    )
-                                                )}
-                                                <span aria-hidden="true" style={{ opacity: isHovered ? 1 : 0, color: "var(--text-tertiary)" }}>
-                                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                                        <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                                    </svg>
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-                {displayTotal > 0 && (
-                    <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        totalItems={displayTotal}
-                        pageSize={pageSize}
-                        onPageChange={(p) => navigate({ page: p })}
-                        itemLabel="teklif"
-                    />
-                )}
-            </div>
+            <Card>
+                <DataTable
+                    columns={columns}
+                    rows={displayQuotes}
+                    rowKey={q => q.id}
+                    onRowClick={q => router.push(`/dashboard/quotes/${q.id}`)}
+                    minWidth="740px"
+                    emptyMessage={
+                        <EmptyState
+                            title={
+                                search
+                                    ? `"${search}" ile eşleşen teklif bulunamadı`
+                                    : `${filterTabs.find(t => t.id === tab)?.label ?? ""} durumunda teklif yok`
+                            }
+                            description="Arama terimini değiştirmeyi veya filtreleri temizlemeyi deneyin."
+                            action={{
+                                label: "Filtreleri Temizle",
+                                onClick: () => navigate({ search: "", tab: "ALL", currency: "", dateFrom: "", dateTo: "", page: 1 }),
+                            }}
+                        />
+                    }
+                    footer={displayTotal > 0 ? (
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            totalItems={displayTotal}
+                            pageSize={pageSize}
+                            onPageChange={(p) => navigate({ page: p })}
+                            itemLabel="teklif"
+                        />
+                    ) : null}
+                />
+            </Card>
 
             {/* Bulk delete confirm modal */}
             {bulkDeleteConfirm && (
