@@ -7,6 +7,16 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## ▶ SIRADAKİ İŞ (compact sonrası buradan başla) — Faz B #5: QuotesClient → DataTable
+
+**Bağlam:** Frontend yenileme Faz B component kütüphanesi yayılımı. Vendors/PO/Customers/Orders DataTable'a geçti (`397f23a`'da, main+codex mirror sağlıklı). Sıra **QuotesClient** (`src/app/dashboard/quotes/QuotesClient.tsx`) — OrdersClient'ın neredeyse ikizi, aynı kalıpla dönüştür. **Ek DataTable eklentisi GEREKMEZ** (`.row-reveal` + `minWidth` + `onRowClick` hazır).
+
+**QuotesClient yapısı (önceden incelendi):** `<table minWidth:740px>`; satır `onClick→router.push(/dashboard/quotes/${q.id})`; `isHovered/rowBg` YALNIZ hover (Orders gibi, seçili-satır YOK)→CSS devralır; quoteNumber hücresinde `borderLeft: isHovered accent` (Orders gibi DÜŞÜR); sil butonu + chevron `opacity: isHovered?1:0` (→`.row-reveal`).
+
+**Kolonlar (8):** select-checkbox (`deletable && canDeleteQuotes`, stopPropagation span) · quoteNumber (fontWeight500) · customerName · durum (`<span className="badge ${quoteStatusConfig[q.status].cls}">` KORU) · geçerlilik alt-rozeti (`getValidUntilBadge(q.validUntil)` yalnız draft/sent → inline `badgeColors[badge.type]` span KORU) · createdAt (`formatDate`) · grandTotal (right, `maskCurrency(.., canViewSalesPrices)`) · aksiyon (right ~64px, stopPropagation: `canDeleteQuotes && deletable` → `confirmId===q.id ? "Evet, sil" Button : <span className="row-reveal"><Button iconOnly/></span>` + chevron `.row-reveal`).
+
+**Adımlar:** import Card/DataTable; thStyle/tdStyle + `hoveredId` state kaldır; columns dizisi; tablo bloğu→`<Card><DataTable columns rows={displayQuotes} rowKey onRowClick minWidth="740px" emptyMessage footer={Pagination}/></Card>`. Sonra: `quotes-ui` benzeri source-regex testi VARSA güncelle (hoveredId→DataTable/row-reveal, cancellable/deletable ternary). **Doğrula:** tsc/lint/vitest/build hepsi yeşil. **Commit+mirror+push:** `.claude/settings.local.json` STAGE ETME; commit msg sonu `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; react-doctor pre-existing bulgu→`--no-verify`+logla; main commit → `git -C proje-codex reset --hard main` → push both (codex artık ff). Memory'leri güncelle (bu blok + Son girdi + project_frontend_renewal + MEMORY.md pointer). **Kalan Faz B:** settings tabloları + products + Input/PageHeader/SectionHeader/NavLink/Stat + drawer/form. `rowStyle?(row)` hâlâ yok (gerçek seçili-satır-vurgusu çıkarsa ekle).
+
 ## Son Tamamlanan İş — 2026-06-20 (**Faz B #4 — DataTable → OrdersClient + `.row-reveal` CSS utility**)
 
 Faz B yayılım #4 (Vendors/PO/Customers'tan sonra). Satış siparişleri listesi Card+DataTable'a. PUSH EDİLDİ `024c2d8` (main+codex, **codex bu sefer ff — mirror sağlıklı, force gerekmedi**). migration YOK; davranış/RBAC/demo değişmedi.
