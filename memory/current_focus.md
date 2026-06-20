@@ -7,15 +7,45 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## ▶ SIRADAKİ İŞ (compact sonrası buradan başla) — Faz B #5: QuotesClient → DataTable
+## ▶ SIRADAKİ İŞ (compact sonrası buradan başla) — Faz B #7: products/page.tsx → DataTable
 
-**Bağlam:** Frontend yenileme Faz B component kütüphanesi yayılımı. Vendors/PO/Customers/Orders DataTable'a geçti (`397f23a`'da, main+codex mirror sağlıklı). Sıra **QuotesClient** (`src/app/dashboard/quotes/QuotesClient.tsx`) — OrdersClient'ın neredeyse ikizi, aynı kalıpla dönüştür. **Ek DataTable eklentisi GEREKMEZ** (`.row-reveal` + `minWidth` + `onRowClick` hazır).
+**Bağlam:** Frontend yenileme Faz B component kütüphanesi yayılımı. Dönüştürülen listeler: **Vendors/PO/Customers/Orders/Quotes + 3 settings tablosu (users/email-deliveries/product-types)**. Sıra = **products/page.tsx** (`src/app/dashboard/products/page.tsx`). Sonra: `Input`/`PageHeader`/`SectionHeader`/`NavLink`/`Stat` component'leri + drawer/form konsolidasyonu.
 
-**QuotesClient yapısı (önceden incelendi):** `<table minWidth:740px>`; satır `onClick→router.push(/dashboard/quotes/${q.id})`; `isHovered/rowBg` YALNIZ hover (Orders gibi, seçili-satır YOK)→CSS devralır; quoteNumber hücresinde `borderLeft: isHovered accent` (Orders gibi DÜŞÜR); sil butonu + chevron `opacity: isHovered?1:0` (→`.row-reveal`).
+**ÖNEMLİ — products bir RSC/server-side-paged Client değil, en karmaşık liste:** `"use client"` KALIR; `?paged=1` mega-fetch (`{rows,total}`), risk/alert overlay (AI sinyalleri), POST aksiyonları, drawer edit modu, dinamik kategori, scan lock var (detay [[project_products_page]]). Tablo DOM'u DataTable'a taşınmadan ÖNCE yapısını derinlemesine oku: hover-highlight var mı, satır-tıklama drawer mı açıyor (muhtemelen), seçim/overlay hücreleri nasıl. Kalıbı ona göre uygula — Orders/Quotes ikizi DEĞİL.
 
-**Kolonlar (8):** select-checkbox (`deletable && canDeleteQuotes`, stopPropagation span) · quoteNumber (fontWeight500) · customerName · durum (`<span className="badge ${quoteStatusConfig[q.status].cls}">` KORU) · geçerlilik alt-rozeti (`getValidUntilBadge(q.validUntil)` yalnız draft/sent → inline `badgeColors[badge.type]` span KORU) · createdAt (`formatDate`) · grandTotal (right, `maskCurrency(.., canViewSalesPrices)`) · aksiyon (right ~64px, stopPropagation: `canDeleteQuotes && deletable` → `confirmId===q.id ? "Evet, sil" Button : <span className="row-reveal"><Button iconOnly/></span>` + chevron `.row-reveal`).
+**Kalıp (genel):** ham `<table>` + yerel thStyle/tdStyle (+varsa `hoveredId`) → `<Card><DataTable columns rows rowKey [onRowClick] [minWidth] [rowStyle] emptyMessage [footer]/></Card>`. Hover globals.css `.erp-data-table` devralır; hover-reveal öğeler `.row-reveal`; per-row stil (opacity/vurgu) → **`rowStyle?(row)` ARTIK VAR** (Faz B #6'da eklendi). checkbox/aksiyon hücreleri `onClick stopPropagation`. `.badge` CSS-class rozetleri KORUNUR. Davranış/RBAC/demo/veri/route/AI overlay değişmez; migration yok.
 
-**Adımlar:** import Card/DataTable; thStyle/tdStyle + `hoveredId` state kaldır; columns dizisi; tablo bloğu→`<Card><DataTable columns rows={displayQuotes} rowKey onRowClick minWidth="740px" emptyMessage footer={Pagination}/></Card>`. Sonra: `quotes-ui` benzeri source-regex testi VARSA güncelle (hoveredId→DataTable/row-reveal, cancellable/deletable ternary). **Doğrula:** tsc/lint/vitest/build hepsi yeşil. **Commit+mirror+push:** `.claude/settings.local.json` STAGE ETME; commit msg sonu `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; react-doctor pre-existing bulgu→`--no-verify`+logla; main commit → `git -C proje-codex reset --hard main` → push both (codex artık ff). Memory'leri güncelle (bu blok + Son girdi + project_frontend_renewal + MEMORY.md pointer). **Kalan Faz B:** settings tabloları + products + Input/PageHeader/SectionHeader/NavLink/Stat + drawer/form. `rowStyle?(row)` hâlâ yok (gerçek seçili-satır-vurgusu çıkarsa ekle).
+**Akış:** ilgili sayfayı dönüştür → source-lock testi VARSA güncelle (niyet korunur) → tsc/lint/vitest/build yeşil → commit (`.claude/settings.local.json` STAGE ETME; sonu `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`; react-doctor pre-existing bulgu hook'ta advisory→commit geçer, doğrula+logla) → `git -C ../proje-codex reset --hard main` → push both (codex ff) → SHA+tree+divergence doğrula → memory güncelle.
+
+<details><summary>Önceki: Faz B #6 — DataTable → 3 settings tablosu + DataTable rowStyle</summary>
+
+## Son Tamamlanan İş — 2026-06-20 (**Faz B #6 — DataTable → settings tabloları (users/email-deliveries/product-types) + DataTable `rowStyle`**)
+
+Faz B yayılım #6. Üç settings tablosu Card/DataTable'a. KOD PUSH `dceb9a8` (main+codex ff). migration YOK; davranış/RBAC/demo değişmedi; saf sunum. Bu tablolar Orders/Quotes ikizi DEĞİL: hover-highlight / satır-tıklama / `.row-reveal` / seçim YOK (aksiyonlar her zaman görünür buton) → `onRowClick` kullanılmadı.
+
+- **DataTable YENİ `rowStyle?: (row)=>CSSProperties`:** satır `<tr>`'ye biner (onRowClick cursor'ının üstüne). İlk gerçek kullanım = product-types pasif-kayıt `opacity: is_active?1:0.55`. Generic+reusable; mevcut çağrıları etkilemez. +2 DataTable testi.
+- **email-deliveries:** 7 kolon, minWidth=900px, emptyMessage; STATUS_META rozet inline KORUNDU; İncele/Tekrar Dene + detay aside + suppression/incident section'ları aynen.
+- **product-types:** 7 kolon, `rowStyle` opacity; yerel thStyle/tdStyle KALDIRILDI (tableWrapStyle korundu); loading DataTable dışına sarıldı; Şablon `<Link>` + Düzenle ButtonLink korundu.
+- **users:** 5 kolon; Roller kolonunda inline rol-düzenleme (RoleCheckboxes+Kaydet/İptal) aynen `cell`'e taşındı; siz rozeti + Sil guard'ları (isSelf/isDemo/deletingId) + last-admin-lockout/RBAC/demo korundu; loading/empty sarmalama korundu.
+- tsc/lint 0, **5600 test** (+2), build 0. react-doctor settings sayfa pre-existing patternleri (modal a11y/rol-edit form) → advisory, commit geçti.
+- **AÇIK (Faz B):** products/page.tsx + Input/PageHeader/SectionHeader/NavLink/Stat + drawer/form. Detay [[project_frontend_renewal]].
+
+</details>
+
+<details><summary>Önceki: Faz B #5 — DataTable → QuotesClient</summary>
+
+## Son Tamamlanan İş — 2026-06-20 (**Faz B #5 — DataTable → QuotesClient**)
+
+Faz B yayılım #5 (Orders'ın birebir ikizi). Teklif listesi Card+DataTable'a. PUSH EDİLDİ `cdb5be3` (main+codex ff, mirror sağlıklı, divergence 0 0). migration YOK; davranış/RBAC/demo değişmedi; saf sunum.
+
+- **QuotesClient:** ham `<table minWidth:740px>` + `hoveredId` state → `<Card><DataTable columns rows={displayQuotes} rowKey onRowClick={q=>router.push(/dashboard/quotes/${q.id})} minWidth="740px" emptyMessage={<EmptyState>} footer={Pagination}/></Card>`. 8 kolon: select-checkbox (stopPropagation span) · quoteNumber (fontWeight500) · customerName · durum (`badge ${cls}` KORUNDU) · geçerlilik alt-rozeti (`getValidUntilBadge` draft/sent, inline `badgeColors` KORUNDU) · createdAt · grandTotal (right, maskCurrency) · aksiyon (right 64px, sil+chevron `.row-reveal`).
+- **Kaldırıldı:** yerel thStyle/tdStyle, `hoveredId`+onMouseEnter/Leave, rowBg, quoteNumber sol-accent border, sil/chevron `opacity:isHovered` (→`.row-reveal`).
+- **Test:** quotes-ui-audit-fix iki hover testi (hoveredId state + onMouseEnter/Leave) → tek `Card+DataTable/row-reveal` testi (`<DataTable`, `rows={displayQuotes}`, `not hoveredId/onMouseEnter`, `row-reveal`); confirmId-reset negatif assertion korundu. Net **-1 test → 5598** (5599'dan). tsc/lint 0, build 0.
+- **AÇIK (Faz B):** settings tabloları (users/email-deliveries/product-types) + products/page.tsx + Input/PageHeader/SectionHeader/NavLink/Stat + drawer/form. Detay [[project_frontend_renewal]].
+
+</details>
+
+<details><summary>Önceki: Faz B #4 — DataTable → OrdersClient + `.row-reveal` CSS utility</summary>
 
 ## Son Tamamlanan İş — 2026-06-20 (**Faz B #4 — DataTable → OrdersClient + `.row-reveal` CSS utility**)
 
@@ -26,6 +56,8 @@ Faz B yayılım #4 (Vendors/PO/Customers'tan sonra). Satış siparişleri listes
 - **OrdersClient:** tablo → Card+DataTable+onRowClick(router.push)+minWidth="740px"; 9 kolon; durum rozetleri `className="badge ..."` KORUNDU (ayrı CSS-class badge sistemi, kapsam dışı — Quotes da kullanır); sil+chevron `<span className="row-reveal">`; emptyMessage=mevcut `<EmptyState>`; hoveredId+cellBg+sol-accent border KALDIRILDI (sol-accent flourish'i diğer listelerle tutarlılık için düşürüldü).
 - **Test (niyet korunur):** orders-list-bug-fixes (hoveredId→DataTable+row-reveal, cancellable ternary, displayOrders.map→rows prop); operation-speed (fulfillment guard ternary); theme-system (ORDERS_SRC döngüden çıktı — token'lar DataTable.tsx'te). tsc/lint 0, **5599 test**, build 0.
 - **AÇIK (Faz B):** kalan ~20 liste. Sıradaki en mantıklı: **QuotesClient** (Orders'ın ikizi: router.push + `.row-reveal` ZATEN HAZIR + `.badge` rozetleri + geçerlilik alt-rozeti). Sonra settings tabloları + products. `rowStyle?(row)` HÂLÂ YAZILMADI (Orders'ta gerekmedi; gerçek seçili-satır-vurgusu olan liste çıkarsa gerekecek). Detay [[project_frontend_renewal]].
+
+</details>
 
 <details><summary>Önceki: Faz B #3 CustomersClient DataTable + codex premium light theme ENTEGRE</summary>
 
