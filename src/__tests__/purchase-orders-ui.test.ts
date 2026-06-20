@@ -179,13 +179,13 @@ describe("Faz 4 follow-up — new page fromDraft preload", () => {
 
 describe("isPoCancellable — toplu iptal seçim yüklemi (satış siparişleri paritesi)", () => {
     it("received/cancelled → false (iptal edilemez)", async () => {
-        const { isPoCancellable } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
+        const { isPoCancellable } = await import("@/lib/purchase-order-ui");
         expect(isPoCancellable({ status: "received" })).toBe(false);
         expect(isPoCancellable({ status: "cancelled" })).toBe(false);
     });
 
     it("draft/sent/confirmed/partially_received → true (iptal edilebilir)", async () => {
-        const { isPoCancellable } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
+        const { isPoCancellable } = await import("@/lib/purchase-order-ui");
         expect(isPoCancellable({ status: "draft" })).toBe(true);
         expect(isPoCancellable({ status: "sent" })).toBe(true);
         expect(isPoCancellable({ status: "confirmed" })).toBe(true);
@@ -249,18 +249,18 @@ describe("Detay sayfası — iptal modalı aria-labelledby", () => {
 
 describe("formatExpectedDate — ISO → tr-TR (DD.MM.YYYY)", () => {
     it("dolu ISO tarih → tr-TR formatı", async () => {
-        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
+        const { formatExpectedDate } = await import("@/lib/purchase-order-ui");
         // tr-TR locale gün.ay.yıl → "15.05.2026"
         expect(formatExpectedDate("2026-05-15")).toBe("15.05.2026");
     });
 
     it("null → '—' (ham ISO basılmaz)", async () => {
-        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
+        const { formatExpectedDate } = await import("@/lib/purchase-order-ui");
         expect(formatExpectedDate(null)).toBe("—");
     });
 
     it("UTC midnight ile gün kayması yok (ayın ilk günü)", async () => {
-        const { formatExpectedDate } = await import("@/app/dashboard/purchase/orders/PurchaseOrdersClient");
+        const { formatExpectedDate } = await import("@/lib/purchase-order-ui");
         // +"T00:00:00Z" olmadan yerel TZ bir önceki güne kaydırabilirdi
         expect(formatExpectedDate("2026-01-01")).toBe("01.01.2026");
     });

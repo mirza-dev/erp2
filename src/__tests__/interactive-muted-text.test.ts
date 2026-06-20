@@ -18,7 +18,7 @@ describe("interactive muted text readability", () => {
 
         expect(declarations).toHaveLength(2);
         expect(GLOBALS).toContain("--text-interactive-muted: #96a2b2;");
-        expect(GLOBALS).toContain("--text-interactive-muted: #5f6d7c;");
+        expect(GLOBALS).toContain("--text-interactive-muted: #536275;");
     });
 
     it("quote and order filter tabs use the interactive muted token with UI weight", () => {

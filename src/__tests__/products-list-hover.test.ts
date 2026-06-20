@@ -22,7 +22,8 @@ describe("products list — hover state (no DOM mutation)", () => {
         expect(SRC).toMatch(/onMouseLeave=\{\(\) => setHoveredId\(null\)\}/);
     });
     it("satır td'leri koşullu rowBg kullanır", () => {
-        expect(SRC).toMatch(/const rowBg = hoveredId === product\.id \? "var\(--bg-secondary\)" : "transparent"/);
+        // premium light theme: bg-secondary → table-row-hover token'ı.
+        expect(SRC).toMatch(/const rowBg = hoveredId === product\.id \? "var\(--table-row-hover\)" : "transparent"/);
         expect(SRC).toMatch(/background: rowBg/);
     });
     it("REGRESSION: doğrudan td.style.background DOM mutation YOK", () => {

@@ -39,15 +39,16 @@ const thStyle: CSSProperties = {
     textAlign: "left",
     padding: "10px 14px",
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: "var(--font-table-heading-weight)",
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    borderBottom: "var(--line-width) solid var(--surface-border)",
 };
 
 const tdStyle: CSSProperties = {
     padding: "10px 14px",
     fontSize: "13px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    fontWeight: "var(--font-table-cell-weight)",
+    borderBottom: "var(--line-width) solid var(--border-tertiary)",
     color: "var(--text-primary)",
     lineHeight: 1.4,
 };
@@ -92,7 +93,7 @@ export default function DataTable<T>({
                 style={{ width: "100%", borderCollapse: "collapse", ...(minWidth ? { minWidth } : {}) }}
             >
                 <thead>
-                    <tr style={{ background: "var(--bg-secondary)" }}>
+                    <tr style={{ background: "var(--table-header-bg)" }}>
                         {columns.map(col => (
                             <th
                                 key={col.key}

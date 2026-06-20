@@ -30,9 +30,9 @@ const newCustomerInitial = {
 const modalInputStyle: React.CSSProperties = {
     fontSize: "13px",
     padding: "6px 10px",
-    border: "0.5px solid var(--border-secondary)",
+    border: "var(--line-width) solid var(--input-border)",
     borderRadius: "6px",
-    background: "var(--bg-tertiary)",
+    background: "var(--input-bg)",
     color: "var(--text-primary)",
     width: "100%",
     boxSizing: "border-box" as const,
@@ -422,9 +422,9 @@ export default function CustomersClient(props: CustomersClientProps) {
                             style={{
                                 fontSize: "12px",
                                 padding: "6px 12px",
-                                border: "0.5px solid var(--border-secondary)",
+                                border: "var(--line-width) solid var(--input-border)",
                                 borderRadius: "6px",
-                                background: "var(--bg-primary)",
+                                background: "var(--input-bg)",
                                 color: "var(--text-primary)",
                                 width: "100%",
                                 maxWidth: "220px",
@@ -537,8 +537,9 @@ export default function CustomersClient(props: CustomersClientProps) {
                         style={{
                             position: "fixed", top: "50%", left: "50%",
                             transform: "translate(-50%, -50%)", zIndex: 101,
-                            background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                            background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
                             borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                            boxShadow: "var(--surface-shadow)",
                         }}>
                         <div id="bulk-delete-customers-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
                             {selectedIds.size} müşteriyi sil
@@ -593,10 +594,10 @@ export default function CustomersClient(props: CustomersClientProps) {
                             zIndex: 61,
                             width: "100%",
                             maxWidth: "480px",
-                            background: "var(--bg-primary)",
-                            border: "0.5px solid var(--border-primary)",
+                            background: "var(--surface-raised)",
+                            border: "var(--line-width) solid var(--surface-border)",
                             borderRadius: "10px",
-                            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+                            boxShadow: "var(--surface-shadow)",
                             overflow: "hidden",
                         }}
                     >
@@ -607,7 +608,7 @@ export default function CustomersClient(props: CustomersClientProps) {
                                 alignItems: "center",
                                 justifyContent: "space-between",
                                 padding: "14px 18px",
-                                borderBottom: "0.5px solid var(--border-tertiary)",
+                                borderBottom: "var(--line-width) solid var(--surface-border)",
                             }}
                         >
                             <div id="add-customer-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
@@ -619,7 +620,7 @@ export default function CustomersClient(props: CustomersClientProps) {
                                 style={{
                                     fontSize: "12px",
                                     padding: "4px 10px",
-                                    border: "0.5px solid var(--border-secondary)",
+                                    border: "var(--line-width) solid var(--border-secondary)",
                                     borderRadius: "6px",
                                     background: "transparent",
                                     color: "var(--text-secondary)",
@@ -691,7 +692,7 @@ export default function CustomersClient(props: CustomersClientProps) {
                                 alignItems: "center",
                                 justifyContent: "flex-end",
                                 padding: "12px 18px",
-                                borderTop: "0.5px solid var(--border-tertiary)",
+                                borderTop: "var(--line-width) solid var(--surface-border)",
                             }}
                         >
                             <Button variant="secondary" size="md" onClick={() => setShowAddModal(false)}>

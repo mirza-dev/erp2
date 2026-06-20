@@ -813,7 +813,7 @@ export default function ProductsPage() {
                     <tbody>
                         {pageRows.map((product) => {
                             const isCritical = product.promisable <= product.minStockLevel;
-                            const rowBg = hoveredId === product.id ? "var(--bg-secondary)" : "transparent";
+                            const rowBg = hoveredId === product.id ? "var(--table-row-hover)" : "transparent";
                             return (
                                 <tr
                                     key={product.id}

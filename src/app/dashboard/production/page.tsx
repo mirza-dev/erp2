@@ -78,9 +78,9 @@ export function formatProductionDateLabel(value: string): string {
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
     padding: "6px 10px",
-    border: "0.5px solid var(--border-secondary)",
+    border: "var(--line-width) solid var(--input-border)",
     borderRadius: "6px",
-    background: "var(--bg-tertiary)",
+    background: "var(--input-bg)",
     color: "var(--text-primary)",
     width: "100%",
     boxSizing: "border-box",
@@ -90,9 +90,9 @@ const thStyle: React.CSSProperties = {
     textAlign: "left",
     padding: "9px 14px",
     fontSize: "11px",
-    fontWeight: 500,
+    fontWeight: "var(--font-table-heading-weight)",
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    borderBottom: "var(--line-width) solid var(--surface-border)",
     textTransform: "uppercase" as const,
     letterSpacing: "0.04em",
 };
@@ -100,7 +100,8 @@ const thStyle: React.CSSProperties = {
 const tdStyle: React.CSSProperties = {
     padding: "9px 14px",
     fontSize: "13px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    fontWeight: "var(--font-table-cell-weight)",
+    borderBottom: "var(--line-width) solid var(--border-tertiary)",
     color: "var(--text-primary)",
 };
 
@@ -419,14 +420,15 @@ function ProductionPageInner() {
 
             {/* Form */}
             <div style={{
-                background: "var(--bg-primary)",
-                border: "0.5px solid var(--border-tertiary)",
+                background: "var(--surface-raised)",
+                border: "var(--line-width) solid var(--surface-border)",
                 borderRadius: "6px",
                 overflow: "hidden",
+                boxShadow: "var(--surface-shadow-sm)",
             }}>
                 <div style={{
                     padding: "12px 16px",
-                    borderBottom: "0.5px solid var(--border-tertiary)",
+                    borderBottom: "var(--line-width) solid var(--surface-border)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -508,10 +510,10 @@ function ProductionPageInner() {
                 {voiceTranscript && (
                     <div style={{
                         padding: "8px 16px",
-                        borderBottom: "0.5px solid var(--border-tertiary)",
+                        borderBottom: "var(--line-width) solid var(--border-tertiary)",
                         fontSize: "12px",
                         color: "var(--text-secondary)",
-                        background: "var(--bg-secondary)",
+                        background: "var(--surface-subtle)",
                         display: "flex", alignItems: "center", gap: "6px",
                     }}>
                         <Mic size={13} strokeWidth={1.8} aria-hidden="true" style={{ flexShrink: 0, color: "var(--accent-text)" }} />
@@ -522,7 +524,7 @@ function ProductionPageInner() {
                 <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", minWidth: "600px", borderCollapse: "collapse" }}>
                     <thead>
-                        <tr style={{ background: "var(--bg-secondary)" }}>
+                        <tr style={{ background: "var(--table-header-bg)" }}>
                             <th style={{ ...thStyle, width: "34px" }}>#</th>
                             <th style={thStyle}>Ürün</th>
                             <th style={{ ...thStyle, width: "90px", textAlign: "right" as const }}>Adet</th>
@@ -534,7 +536,7 @@ function ProductionPageInner() {
                         {lines.map((line, idx) => {
                             const selectedProduct = products.find(p => p.id === line.productId);
                             return (
-                                <tr key={line.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)", background: line._lowConfidence ? "var(--warning-bg)" : undefined }}>
+                                <tr key={line.id} style={{ borderBottom: "var(--line-width) solid var(--border-tertiary)", background: line._lowConfidence ? "var(--warning-bg)" : undefined }}>
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px", textAlign: "center" }}>
                                         {idx + 1}
                                     </td>
@@ -641,14 +643,15 @@ function ProductionPageInner() {
 
             {/* Selected date log */}
             <div style={{
-                background: "var(--bg-primary)",
-                border: "0.5px solid var(--border-tertiary)",
+                background: "var(--surface-raised)",
+                border: "var(--line-width) solid var(--surface-border)",
                 borderRadius: "6px",
                 overflow: "hidden",
+                boxShadow: "var(--surface-shadow-sm)",
             }}>
                 <div style={{
                     padding: "12px 16px",
-                    borderBottom: "0.5px solid var(--border-tertiary)",
+                    borderBottom: "var(--line-width) solid var(--surface-border)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
@@ -673,7 +676,7 @@ function ProductionPageInner() {
                     <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "480px" }}>
                         <thead>
-                            <tr style={{ background: "var(--bg-secondary)" }}>
+                            <tr style={{ background: "var(--table-header-bg)" }}>
                                 <th style={thStyle}>SKU</th>
                                 <th style={thStyle}>Ürün</th>
                                 <th style={{ ...thStyle, textAlign: "right" as const }}>Üretilen Adet</th>
@@ -683,7 +686,7 @@ function ProductionPageInner() {
                         </thead>
                         <tbody>
                             {selectedDateLogs.map(kaydi => (
-                                <tr key={kaydi.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                                <tr key={kaydi.id} style={{ borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>
                                     <td style={{ ...tdStyle, fontWeight: 500 }}>{kaydi.productName}</td>
                                     <td style={{ ...tdStyle, textAlign: "right" as const, fontWeight: 600, color: "var(--success-text)" }}>
@@ -717,12 +720,13 @@ function ProductionPageInner() {
             {/* Other date logs */}
             {otherDateLogs.length > 0 && (
                 <div style={{
-                    background: "var(--bg-primary)",
-                    border: "0.5px solid var(--border-tertiary)",
+                    background: "var(--surface-raised)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "6px",
                     overflow: "hidden",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}>
-                    <div style={{ padding: "12px 16px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                    <div style={{ padding: "12px 16px", borderBottom: "var(--line-width) solid var(--surface-border)" }}>
                         <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
                             Diğer Günlerin Kayıtları
                         </div>
@@ -730,7 +734,7 @@ function ProductionPageInner() {
                     <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "460px" }}>
                         <thead>
-                            <tr style={{ background: "var(--bg-secondary)" }}>
+                            <tr style={{ background: "var(--table-header-bg)" }}>
                                 <th style={thStyle}>Tarih</th>
                                 <th style={thStyle}>SKU</th>
                                 <th style={thStyle}>Ürün</th>
@@ -739,7 +743,7 @@ function ProductionPageInner() {
                         </thead>
                         <tbody>
                             {otherDateLogs.map(kaydi => (
-                                <tr key={kaydi.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)" }}>
+                                <tr key={kaydi.id} style={{ borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.tarih}</td>
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>
                                     <td style={tdStyle}>{kaydi.productName}</td>
@@ -774,12 +778,13 @@ function ProductionPageInner() {
                             aria-labelledby="delete-production-title"
                             onClick={e => e.stopPropagation()}
                             style={{
-                                background: "var(--bg-primary)",
-                                border: "0.5px solid var(--border-secondary)",
+                                background: "var(--surface-raised)",
+                                border: "var(--line-width) solid var(--surface-border)",
                                 borderRadius: "8px",
                                 padding: "20px",
                                 maxWidth: "400px", width: "100%",
                                 display: "flex", flexDirection: "column", gap: "12px",
+                                boxShadow: "var(--surface-shadow)",
                             }}
                         >
                             <div id="delete-production-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>

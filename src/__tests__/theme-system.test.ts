@@ -5,7 +5,7 @@
  *   - İlk açılış: sistem tercihini izle (prefers-color-scheme); elle seçim hatırlanır.
  *   - Geçiş: Topbar'da küçük ikon (güneş/ay), avatar öncesi.
  *   - Kayıt: yalnız localStorage (FOUC-suz, backend yok).
- *   - Aydınlık palet: premium cool slate (#eef3f8 zemin / #1f2937 metin / #1f6fd1 steel-blue accent).
+ *   - Aydınlık palet: premium open slate (#e8eef5 zemin / #172033 metin / #123f73 navy accent).
  *
  * "Sıfır frontend bozulması": baskı/marka belgeleri (QuoteDocument, PurchaseOrderDocument)
  * tema-MUAF — sabit hex'leri korumalı (yanlışlıkla tokenize edilirse regression yakalanır).
@@ -24,6 +24,8 @@ const LOGIN_SRC = read("src/app/login/page.tsx");
 const TOPBAR_SRC = read("src/components/layout/Topbar.tsx");
 const SIDEBAR_SRC = read("src/components/layout/Sidebar.tsx");
 const BUTTON_SRC = read("src/components/ui/Button.tsx");
+const CARD_SRC = read("src/components/ui/Card.tsx");
+const DATA_TABLE_SRC = read("src/components/ui/DataTable.tsx");
 const DASH_LAYOUT_SRC = read("src/app/dashboard/layout.tsx");
 const PRODUCTS_SRC = read("src/app/dashboard/products/page.tsx");
 const ORDERS_SRC = read("src/app/dashboard/orders/OrdersClient.tsx");
@@ -68,16 +70,16 @@ describe("Tema — palet blokları (globals.css)", () => {
     });
 
     it("aydınlık palet premium cool slate anahtar değerlerini taşır", () => {
-        expect(GLOBALS_SRC).toMatch(/--bg-secondary:\s*#eef3f8/);
-        expect(GLOBALS_SRC).toMatch(/--text-primary:\s*#1f2937/);
-        expect(GLOBALS_SRC).toMatch(/--accent:\s*#1f6fd1/);
+        expect(GLOBALS_SRC).toMatch(/--bg-secondary:\s*#e8eef5/);
+        expect(GLOBALS_SRC).toMatch(/--text-primary:\s*#172033/);
+        expect(GLOBALS_SRC).toMatch(/--accent:\s*#123f73/);
     });
 
     it("aydınlık tema okunurluk için destek metin ve sınır kontrastını artırır", () => {
-        expect(GLOBALS_SRC).toMatch(/--text-secondary:\s*#4b5a68/);
-        expect(GLOBALS_SRC).toMatch(/--text-tertiary:\s*#6f7b88/);
-        expect(GLOBALS_SRC).toMatch(/--surface-border:\s*#ccd9e6/);
-        expect(GLOBALS_SRC).toMatch(/--input-border:\s*#bdcddd/);
+        expect(GLOBALS_SRC).toMatch(/--text-secondary:\s*#435064/);
+        expect(GLOBALS_SRC).toMatch(/--text-tertiary:\s*#647386/);
+        expect(GLOBALS_SRC).toMatch(/--surface-border:\s*#bdcad9/);
+        expect(GLOBALS_SRC).toMatch(/--input-border:\s*#adbdcf/);
     });
 
     it("color-scheme her iki temada native uyum için ayarlı", () => {
@@ -103,12 +105,12 @@ describe("Tema — palet blokları (globals.css)", () => {
     });
 
     it("light tema premium shell/surface materyal tokenlarını taşır", () => {
-        expect(GLOBALS_SRC).toMatch(/--app-bg:\s*#eef3f8/);
-        expect(GLOBALS_SRC).toMatch(/--shell-bg:\s*#f8fbff/);
+        expect(GLOBALS_SRC).toMatch(/--app-bg:\s*#e8eef5/);
+        expect(GLOBALS_SRC).toMatch(/--shell-bg:\s*#f5f8fc/);
         expect(GLOBALS_SRC).toMatch(/--surface-raised:\s*#ffffff/);
         expect(GLOBALS_SRC).toMatch(/--surface-shadow:/);
-        expect(GLOBALS_SRC).toMatch(/--table-header-bg:\s*#f4f7fb/);
-        expect(GLOBALS_SRC).toMatch(/--input-bg:\s*#fbfdff/);
+        expect(GLOBALS_SRC).toMatch(/--table-header-bg:\s*#eef3f8/);
+        expect(GLOBALS_SRC).toMatch(/--input-bg:\s*#f8fbfe/);
         expect(GLOBALS_SRC).toMatch(/--nav-active-bg:/);
     });
 
@@ -192,10 +194,22 @@ describe("Tema — ThemeToggle UI", () => {
         expect(GLOBALS_SRC).toMatch(/\.topbar-shell[\s\S]*var\(--shell-bg\)/);
     });
 
-    it("primary Button tema-bilir steel-blue tokenlarından gelir", () => {
+    it("primary Button tema-bilir navy tokenlarından gelir", () => {
         expect(BUTTON_SRC).toContain("var(--button-primary-bg)");
         expect(BUTTON_SRC).toContain("var(--button-primary-shadow)");
         expect(GLOBALS_SRC).toMatch(/--button-primary-bg:/);
+    });
+
+    it("ortak Card ve DataTable düz bg tokenları yerine semantic surface/table tokenlarını kullanır", () => {
+        expect(CARD_SRC).toContain("var(--surface-raised)");
+        expect(CARD_SRC).toContain("var(--surface-border)");
+        expect(CARD_SRC).toContain("var(--surface-shadow-sm)");
+        expect(DATA_TABLE_SRC).toContain("var(--table-header-bg)");
+        expect(DATA_TABLE_SRC).toContain("var(--surface-border)");
+        expect(DATA_TABLE_SRC).toContain("var(--font-table-heading-weight)");
+        expect(DATA_TABLE_SRC).toContain("var(--font-table-cell-weight)");
+        expect(DATA_TABLE_SRC).not.toContain('background: "var(--bg-primary)"');
+        expect(DATA_TABLE_SRC).not.toContain('background: "var(--bg-secondary)"');
     });
 
     it("temsilci tablolar line-width ve tablo font ağırlığı tokenlarını kullanır", () => {

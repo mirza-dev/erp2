@@ -21,9 +21,9 @@ import { CircleOff, Pencil, Plus, RotateCcw } from "lucide-react";
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
     padding: "6px 10px",
-    border: "0.5px solid var(--border-secondary)",
+    border: "var(--line-width) solid var(--input-border)",
     borderRadius: "6px",
-    background: "var(--bg-tertiary)",
+    background: "var(--input-bg)",
     color: "var(--text-primary)",
     width: "100%",
     boxSizing: "border-box",
@@ -46,7 +46,7 @@ const drawerOverlayStyle: React.CSSProperties = {
 };
 
 const drawerPanelStyle: React.CSSProperties = {
-    background: "var(--bg-primary)",
+    background: "var(--surface-raised)",
     width: "420px",
     maxWidth: "100vw",
     padding: "24px",
@@ -55,7 +55,8 @@ const drawerPanelStyle: React.CSSProperties = {
     flexDirection: "column",
     gap: "16px",
     height: "100vh",
-    boxShadow: "-4px 0 24px rgba(0,0,0,0.18)",
+    borderLeft: "var(--line-width) solid var(--surface-border)",
+    boxShadow: "var(--surface-shadow)",
 };
 
 // ── Initial form state ────────────────────────────────────────
@@ -563,8 +564,9 @@ export default function VendorsClient(props: VendorsClientProps) {
                         style={{
                             position: "fixed", top: "50%", left: "50%",
                             transform: "translate(-50%, -50%)", zIndex: 101,
-                            background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                            background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
                             borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                            boxShadow: "var(--surface-shadow)",
                         }}
                     >
                         <div id="bulk-deactivate-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>

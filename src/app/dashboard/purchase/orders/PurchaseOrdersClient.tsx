@@ -15,6 +15,7 @@ import type { PurchaseOrderRow, PurchaseOrderStatus } from "@/lib/database.types
 import type { PurchaseOrderTab } from "@/lib/supabase/purchase-orders";
 import { PRODUCTS_KEY } from "@/lib/data-context";
 import { decrementCount, patchCountRecord, successfulResponseIds } from "@/lib/fast-mutation";
+import { formatExpectedDate, isPoCancellable } from "@/lib/purchase-order-ui";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Badge, { type BadgeTone } from "@/components/ui/Badge";
@@ -49,17 +50,6 @@ const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
 function formatCurrency(amount: number, currency: string): string {
     const sym = currency === "USD" ? "$" : currency === "EUR" ? "€" : "₺";
     return `${sym}${amount.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-/** ISO tarih (YYYY-MM-DD) → tr-TR (DD.MM.YYYY). null → "—". UTC midnight gün kayması önlenir. */
-export function formatExpectedDate(iso: string | null): string {
-    if (!iso) return "—";
-    return new Date(iso + "T00:00:00Z").toLocaleDateString("tr-TR");
-}
-
-/** PO iptal edilebilir mi? Toplu iptal seçimi yalnız bunları kapsar. */
-export function isPoCancellable(po: { status: PurchaseOrderStatus }): boolean {
-    return !["received", "cancelled"].includes(po.status);
 }
 
 export interface PurchaseOrdersClientProps {
@@ -312,8 +302,8 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                     aria-label="Sipariş ara"
                     style={{
                         fontSize: "13px", padding: "6px 10px",
-                        border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                        background: "var(--bg-tertiary)", color: "var(--text-primary)",
+                        border: "var(--line-width) solid var(--input-border)", borderRadius: "6px",
+                        background: "var(--input-bg)", color: "var(--text-primary)",
                         maxWidth: "320px", width: "100%",
                     }}
                 />
@@ -382,8 +372,9 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                     <div role="dialog" aria-modal="true" aria-labelledby="bulk-cancel-title" style={{
                         position: "fixed", top: "50%", left: "50%",
                         transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                        background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
                         borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                        boxShadow: "var(--surface-shadow)",
                     }}>
                         <div id="bulk-cancel-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
                             {selectedIds.size} siparişi iptal et

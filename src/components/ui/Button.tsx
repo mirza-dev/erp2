@@ -110,7 +110,7 @@ const VARIANT_STYLES: Record<Variant, VariantStyle> = {
         bg: "transparent",
         border: "transparent",
         color: "var(--text-secondary)",
-        hoverBg: "var(--bg-tertiary)",
+        hoverBg: "var(--nav-hover-bg)",
         hoverColor: "var(--text-primary)",
     },
     toolbar: {
@@ -125,7 +125,7 @@ const VARIANT_STYLES: Record<Variant, VariantStyle> = {
         bg: "transparent",
         border: "var(--border-tertiary)",
         color: "var(--text-secondary)",
-        hoverBg: "var(--bg-tertiary)",
+        hoverBg: "var(--nav-hover-bg)",
         hoverBorder: "var(--border-secondary)",
         hoverColor: "var(--text-primary)",
     },

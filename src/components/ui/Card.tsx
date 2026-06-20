@@ -13,9 +13,10 @@ export default function Card({ children, style }: CardProps) {
     return (
         <div
             style={{
-                background: "var(--bg-primary)",
-                border: "0.5px solid var(--border-tertiary)",
+                background: "var(--surface-raised)",
+                border: "var(--line-width) solid var(--surface-border)",
                 borderRadius: "8px",
+                boxShadow: "var(--surface-shadow-sm)",
                 overflow: "hidden",
                 ...style,
             }}

@@ -44,15 +44,16 @@ const thStyle: React.CSSProperties = {
     textAlign: "left",
     padding: "10px 14px",
     fontSize: "12px",
-    fontWeight: 500,
+    fontWeight: "var(--font-table-heading-weight)",
     color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    borderBottom: "var(--line-width) solid var(--surface-border)",
 };
 
 const tdStyle: React.CSSProperties = {
     padding: "10px 14px",
     fontSize: "13px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
+    fontWeight: "var(--font-table-cell-weight)",
+    borderBottom: "var(--line-width) solid var(--border-tertiary)",
     color: "var(--text-primary)",
     lineHeight: 1.4,
 };
@@ -252,9 +253,9 @@ export default function QuotesClient(props: QuotesClientProps) {
                         style={{
                             fontSize: "12px",
                             padding: "6px 12px",
-                            border: "0.5px solid var(--border-secondary)",
+                            border: "var(--line-width) solid var(--input-border)",
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: "var(--text-primary)",
                             width: "200px",
                         }}
@@ -267,9 +268,9 @@ export default function QuotesClient(props: QuotesClientProps) {
                         style={{
                             fontSize: "12px",
                             padding: "5px 8px",
-                            border: `0.5px solid ${dateFrom ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            border: `var(--line-width) solid ${dateFrom ? "var(--accent-border)" : "var(--input-border)"}`,
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: dateFrom ? "var(--text-primary)" : "var(--text-tertiary)",
                             cursor: "pointer",
                         }}
@@ -283,9 +284,9 @@ export default function QuotesClient(props: QuotesClientProps) {
                         style={{
                             fontSize: "12px",
                             padding: "5px 8px",
-                            border: `0.5px solid ${dateTo ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            border: `var(--line-width) solid ${dateTo ? "var(--accent-border)" : "var(--input-border)"}`,
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: dateTo ? "var(--text-primary)" : "var(--text-tertiary)",
                             cursor: "pointer",
                         }}
@@ -297,9 +298,9 @@ export default function QuotesClient(props: QuotesClientProps) {
                         style={{
                             fontSize: "12px",
                             padding: "5px 8px",
-                            border: `0.5px solid ${currency ? "var(--accent-border)" : "var(--border-secondary)"}`,
+                            border: `var(--line-width) solid ${currency ? "var(--accent-border)" : "var(--input-border)"}`,
                             borderRadius: "6px",
-                            background: "var(--bg-primary)",
+                            background: "var(--input-bg)",
                             color: currency ? "var(--text-primary)" : "var(--text-tertiary)",
                             cursor: "pointer",
                         }}
@@ -316,7 +317,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                             style={{
                                 fontSize: "11px",
                                 padding: "5px 10px",
-                                border: "0.5px solid var(--border-secondary)",
+                                border: "var(--line-width) solid var(--border-secondary)",
                                 borderRadius: "6px",
                                 background: "transparent",
                                 color: "var(--text-secondary)",
@@ -365,15 +366,16 @@ export default function QuotesClient(props: QuotesClientProps) {
             {/* Table */}
             <div
                 style={{
-                    background: "var(--bg-primary)",
-                    border: "0.5px solid var(--border-tertiary)",
+                    background: "var(--surface-raised)",
+                    border: "var(--line-width) solid var(--surface-border)",
                     borderRadius: "6px",
                     overflowX: "auto",
+                    boxShadow: "var(--surface-shadow-sm)",
                 }}
             >
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "740px" }}>
                     <thead>
-                        <tr style={{ background: "var(--bg-secondary)" }}>
+                        <tr style={{ background: "var(--table-header-bg)" }}>
                             <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
                                 {canDeleteQuotes && (
                                     <input
@@ -423,7 +425,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                                 const deletable = canDeleteQuote(q.status);
 
                                 const isHovered = hoveredId === q.id;
-                                const rowBg = isHovered ? "var(--bg-secondary)" : "transparent";
+                                const rowBg = isHovered ? "var(--table-row-hover)" : "transparent";
                                 return (
                                     <tr
                                         key={q.id}
@@ -549,8 +551,9 @@ export default function QuotesClient(props: QuotesClientProps) {
                     <div style={{
                         position: "fixed", top: "50%", left: "50%",
                         transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--bg-primary)", border: "0.5px solid var(--border-primary)",
+                        background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
                         borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
+                        boxShadow: "var(--surface-shadow)",
                     }}>
                         <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
                             {selectedIds.size} teklifi sil
