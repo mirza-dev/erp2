@@ -655,6 +655,18 @@ body {
 }
 
 /* ============================================
+   DataTable — satır hover (DOM mutation değil; rerender yok)
+   ============================================ */
+
+.erp-data-table tbody tr {
+  transition: background 0.08s;
+}
+
+.erp-data-table tbody tr:hover {
+  background: var(--bg-secondary);
+}
+
+/* ============================================
    Scrollbar — minimal
    ============================================ */
 

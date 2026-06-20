@@ -75,6 +75,7 @@ describe("Tedarikçiler — toplu seçim yalnız aktif tedarikçiler", () => {
     });
 
     it("per-row checkbox yalnız v.is_active iken render edilir", () => {
-        expect(PAGE_SRC).toMatch(/\{v\.is_active && \(\s*<input\s+type="checkbox"/);
+        // DataTable kolon cell'i: v => v.is_active ? (<input type="checkbox" .../>) : null
+        expect(PAGE_SRC).toMatch(/v\.is_active \? \(\s*<input\s+type="checkbox"/);
     });
 });

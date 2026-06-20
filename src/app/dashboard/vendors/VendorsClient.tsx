@@ -11,26 +11,12 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import type { VendorRow } from "@/lib/database.types";
 import { decrementCount, removeByIds, successfulResponseIds, upsertFirst } from "@/lib/fast-mutation";
 import Button from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Badge from "@/components/ui/Badge";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { CircleOff, Pencil, Plus, RotateCcw } from "lucide-react";
 
 // ── Styles ────────────────────────────────────────────────────
-
-const thStyle: React.CSSProperties = {
-    textAlign: "left",
-    padding: "10px 14px",
-    fontSize: "12px",
-    fontWeight: 500,
-    color: "var(--text-secondary)",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: "10px 14px",
-    fontSize: "13px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    color: "var(--text-primary)",
-    lineHeight: 1.4,
-};
 
 const inputStyle: React.CSSProperties = {
     fontSize: "13px",
@@ -334,6 +320,136 @@ export default function VendorsClient(props: VendorsClientProps) {
 
     const totalPages = computeTotalPages(displayTotal, pageSize);
 
+    const checkboxCellStyle: React.CSSProperties = { width: "36px", padding: "10px 8px 10px 14px" };
+
+    const columns: DataTableColumn<VendorRow>[] = [
+        {
+            key: "select",
+            width: "36px",
+            headerStyle: checkboxCellStyle,
+            cellStyle: checkboxCellStyle,
+            header: (
+                <input
+                    type="checkbox"
+                    checked={isPageAllSelected(pageIds)}
+                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
+                    onChange={() => toggleAll(pageIds)}
+                    onClick={e => e.stopPropagation()}
+                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                    aria-label="Sayfadaki tüm tedarikçileri seç"
+                />
+            ),
+            cell: v => v.is_active ? (
+                <input
+                    type="checkbox"
+                    checked={selectedIds.has(v.id)}
+                    onChange={() => toggleOne(v.id)}
+                    onClick={e => e.stopPropagation()}
+                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                    aria-label={`${v.name} seç`}
+                />
+            ) : null,
+        },
+        {
+            key: "vendor",
+            header: "Tedarikçi",
+            cell: v => (
+                <>
+                    <div style={{ fontWeight: 500 }}>{v.name}</div>
+                    {v.contact_person && (
+                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>{v.contact_person}</div>
+                    )}
+                </>
+            ),
+        },
+        {
+            key: "contact",
+            header: "İletişim",
+            cell: v => (
+                <>
+                    {v.contact_email && (
+                        <div style={{ fontSize: "12px" }}>{v.contact_email}</div>
+                    )}
+                    {v.contact_phone && (
+                        <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>{v.contact_phone}</div>
+                    )}
+                    {!v.contact_email && !v.contact_phone && (
+                        <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>—</span>
+                    )}
+                </>
+            ),
+        },
+        {
+            key: "currency",
+            header: "Para Birimi",
+            cell: v => <Badge tone="neutral">{v.currency}</Badge>,
+        },
+        {
+            key: "lead_time",
+            header: "Tedarik Süresi",
+            align: "center",
+            cell: v => v.lead_time_days != null ? `${v.lead_time_days} gün` : "—",
+        },
+        {
+            key: "payment_terms",
+            header: "Ödeme Vadesi",
+            align: "center",
+            cell: v => v.payment_terms_days != null ? `${v.payment_terms_days} gün` : "—",
+        },
+        {
+            key: "status",
+            header: "Durum",
+            align: "center",
+            cell: v => (
+                <Badge tone={v.is_active ? "success" : "neutral"}>
+                    {v.is_active ? "Aktif" : "Pasif"}
+                </Badge>
+            ),
+        },
+        {
+            key: "actions",
+            header: "İşlem",
+            align: "right",
+            cell: v => (
+                <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        leftIcon={<Pencil size={14} />}
+                        onClick={() => openEdit(v)}
+                        disabled={isDemo}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Düzenle"}
+                    >
+                        Düzenle
+                    </Button>
+                    {v.is_active ? (
+                        <Button
+                            variant="dangerSoft"
+                            size="sm"
+                            leftIcon={<CircleOff size={14} />}
+                            onClick={() => handleDeactivate(v)}
+                            disabled={isDemo || deactivatingId === v.id}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Pasife al"}
+                        >
+                            {deactivatingId === v.id ? "..." : "Pasife al"}
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="success"
+                            size="sm"
+                            leftIcon={<RotateCcw size={14} />}
+                            onClick={() => handleReactivate(v)}
+                            disabled={isDemo || reactivatingId === v.id}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Aktifleştir"}
+                        >
+                            {reactivatingId === v.id ? "..." : "Aktifleştir"}
+                        </Button>
+                    )}
+                </div>
+            ),
+        },
+    ];
+
     return (
         <div style={{ maxWidth: "1100px", margin: "0 auto", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
             {/* Header */}
@@ -414,161 +530,24 @@ export default function VendorsClient(props: VendorsClientProps) {
             )}
 
             {/* Table */}
-            <div style={{
-                background: "var(--bg-primary)",
-                border: "0.5px solid var(--border-tertiary)",
-                borderRadius: "8px",
-                overflow: "hidden",
-            }}>
-                {displayVendors.length === 0 ? (
-                    <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                        {search ? "Arama kriterine uyan tedarikçi bulunamadı." : "Henüz tedarikçi eklenmemiş."}
-                    </div>
-                ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                            <tr style={{ background: "var(--bg-secondary)" }}>
-                                <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={isPageAllSelected(pageIds)}
-                                        ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
-                                        onChange={() => toggleAll(pageIds)}
-                                        onClick={e => e.stopPropagation()}
-                                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                        aria-label="Sayfadaki tüm tedarikçileri seç"
-                                    />
-                                </th>
-                                <th style={thStyle}>Tedarikçi</th>
-                                <th style={thStyle}>İletişim</th>
-                                <th style={thStyle}>Para Birimi</th>
-                                <th style={{ ...thStyle, textAlign: "center" }}>Tedarik Süresi</th>
-                                <th style={{ ...thStyle, textAlign: "center" }}>Ödeme Vadesi</th>
-                                <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>İşlem</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {displayVendors.map(v => (
-                                <tr key={v.id} style={{ transition: "background 0.08s" }}
-                                    onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-secondary)")}
-                                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                                >
-                                    <td
-                                        style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
-                                        onClick={e => e.stopPropagation()}
-                                    >
-                                        {v.is_active && (
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.has(v.id)}
-                                                onChange={() => toggleOne(v.id)}
-                                                onClick={e => e.stopPropagation()}
-                                                style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                                aria-label={`${v.name} seç`}
-                                            />
-                                        )}
-                                    </td>
-                                    <td style={tdStyle}>
-                                        <div style={{ fontWeight: 500 }}>{v.name}</div>
-                                        {v.contact_person && (
-                                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>{v.contact_person}</div>
-                                        )}
-                                    </td>
-                                    <td style={tdStyle}>
-                                        {v.contact_email && (
-                                            <div style={{ fontSize: "12px" }}>{v.contact_email}</div>
-                                        )}
-                                        {v.contact_phone && (
-                                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>{v.contact_phone}</div>
-                                        )}
-                                        {!v.contact_email && !v.contact_phone && (
-                                            <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>—</span>
-                                        )}
-                                    </td>
-                                    <td style={tdStyle}>
-                                        <span style={{
-                                            fontSize: "11px",
-                                            padding: "2px 7px",
-                                            borderRadius: "5px",
-                                            background: "var(--bg-tertiary)",
-                                            color: "var(--text-secondary)",
-                                            fontWeight: 500,
-                                        }}>
-                                            {v.currency}
-                                        </span>
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                                        {v.lead_time_days != null ? `${v.lead_time_days} gün` : "—"}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                                        {v.payment_terms_days != null ? `${v.payment_terms_days} gün` : "—"}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                                        <span style={{
-                                            fontSize: "11px",
-                                            padding: "2px 7px",
-                                            borderRadius: "5px",
-                                            background: v.is_active ? "var(--success-bg)" : "var(--bg-tertiary)",
-                                            color: v.is_active ? "var(--success-text)" : "var(--text-tertiary)",
-                                            fontWeight: 500,
-                                        }}>
-                                            {v.is_active ? "Aktif" : "Pasif"}
-                                        </span>
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right" }}>
-                                        <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
-                                            <Button
-                                                variant="secondary"
-                                                size="sm"
-                                                leftIcon={<Pencil size={14} />}
-                                                onClick={() => openEdit(v)}
-                                                disabled={isDemo}
-                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Düzenle"}
-                                            >
-                                                Düzenle
-                                            </Button>
-                                            {v.is_active ? (
-                                                <Button
-                                                    variant="dangerSoft"
-                                                    size="sm"
-                                                    leftIcon={<CircleOff size={14} />}
-                                                    onClick={() => handleDeactivate(v)}
-                                                    disabled={isDemo || deactivatingId === v.id}
-                                                    title={isDemo ? DEMO_DISABLED_TOOLTIP : "Pasife al"}
-                                                >
-                                                    {deactivatingId === v.id ? "..." : "Pasife al"}
-                                                </Button>
-                                            ) : (
-                                                <Button
-                                                    variant="success"
-                                                    size="sm"
-                                                    leftIcon={<RotateCcw size={14} />}
-                                                    onClick={() => handleReactivate(v)}
-                                                    disabled={isDemo || reactivatingId === v.id}
-                                                    title={isDemo ? DEMO_DISABLED_TOOLTIP : "Aktifleştir"}
-                                                >
-                                                    {reactivatingId === v.id ? "..." : "Aktifleştir"}
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-                {displayTotal > 0 && (
-                    <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        totalItems={displayTotal}
-                        pageSize={pageSize}
-                        onPageChange={(p) => navigate({ page: p })}
-                        itemLabel="tedarikçi"
-                    />
-                )}
-            </div>
+            <Card>
+                <DataTable
+                    columns={columns}
+                    rows={displayVendors}
+                    rowKey={v => v.id}
+                    emptyMessage={search ? "Arama kriterine uyan tedarikçi bulunamadı." : "Henüz tedarikçi eklenmemiş."}
+                    footer={displayTotal > 0 ? (
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            totalItems={displayTotal}
+                            pageSize={pageSize}
+                            onPageChange={(p) => navigate({ page: p })}
+                            itemLabel="tedarikçi"
+                        />
+                    ) : null}
+                />
+            </Card>
 
             {/* Bulk deactivate confirm modal */}
             {bulkDeactivateConfirm && (
