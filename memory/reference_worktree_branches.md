@@ -1,8 +1,10 @@
 ---
-name: Roven — Worktree / İki-Branch / Memory Symlink Mekanizması
+name: roven-worktree-i-ki-branch-memory-symlink-mekanizmas
 description: erp2=main + proje-codex=codex-experiment birebir-ayna; push akışı; ~/.claude memory symlink — her iki ajanın senkron çalışması için
-metadata:
+metadata: 
+  node_type: memory
   type: reference
+  originSessionId: 14992303-287a-4b73-b0e6-d62dbec7425c
 ---
 
 Proje iki git worktree ile çalışır; ikisi `.git`'i paylaşır. Birebir-ayna politikası ile her iki branch (ve iki Coolify ortamı) aynı kodu çalıştırır.
@@ -27,6 +29,11 @@ Genelde proje-codex'te (codex-experiment) çalışılıp commit atılır, sonra:
 **⚠️ TEKRARLAYAN TUZAK — ff'yi proje-codex cwd'sinde çalıştırma (bu oturumda 3 kez yaşandı):** commit proje-codex'te (codex-experiment) atılır; eğer ff komutunu `cd erp2` OLMADAN, çıplak `git merge --ff-only <sha>` olarak proje-codex cwd'sinde çalıştırırsan → HEAD zaten o sha'da olduğu için **"Already up to date"** der, **main HİÇ ilerlemez**, sessizce ayrışır (codex önde, main geride). Ardından `git push origin main` de proje-codex'ten "Everything up-to-date" der → push'lanmış sanırsın ama main eski SHA'da kalır. **Kural:** ff + push main MUTLAKA ya `git -C /Users/mirzasaribiyik/Projects/erp2 merge --ff-only <sha>` (`-C` ile, cwd değiştirmeden) ya da ayrı `cd /Users/mirzasaribiyik/Projects/erp2 && git merge --ff-only <sha> && git push origin main` bloğunda. Push sonrası 3. adım doğrulaması (diff BOŞ) bu sapmayı yakalar — atlanmamalı.
 
 **React Doctor** pre-commit advisory uyarı verir ama **commit'i BLOKLAMAZ** (advisory).
+
+## ⚠️ codex-experiment ıraksaması (remote'ta benzersiz commit) — entegrasyon + re-mirror
+
+Bazen codex-experiment remote'ta **main'de olmayan gerçek bir commit** taşır (kullanıcı doğrudan o branch'e iş push'lar — örn. 2026-06-20 `2b7e7ec premium light theme surfaces`). Bu mirror'ı bozar ve push akışını kırar (`git push origin codex-experiment` → "non-fast-forward" reddi). Kör force-push YAPMA (gerçek iş silinir) — **kullanıcıya sor** (AskUserQuestion: temayı/işi main'e entegre et / main'i onun üstüne kur / ayrı bırak). Önceki örnek: kullanıcı "main'e entegre et" dedi → `git cherry-pick -n <codex-sha>` + çakışma çözümü (HEAD=main işin korunur, getiri token/component'leri oto-merge) + ek test fix + commit → main artık codex-sha içeriğini KAPSAR.
+- **Re-mirror:** entegrasyon sonrası codex-experiment'i main'e almak `git push --force-with-lease=codex-experiment:<eski-codex-sha>` gerektirir (non-ff, eski SHA düşer ama içeriği main'de yaşar → kayıpsız). **Bu force-push otomatik mod sınıflandırıcısı tarafından ENGELLENİR** (yıkıcı sayılır) → kullanıcı yetkisi/elle koşması gerekir. main push'u (ff) engellenmez.
 
 ## Memory symlink (KRİTİK — her iki ajan senkronu)
 

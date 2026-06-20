@@ -7,6 +7,17 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-20 (**Faz B #3 CustomersClient DataTable + codex "premium light theme" main'e ENTEGRE**)
+
+İki iş bir turda. **(A)** Faz B yayılım #3: CustomersClient → Card+DataTable (`64af65d`). **(B)** codex-experiment'e ayrıca eklenmiş gerçek commit `2b7e7ec feat(ui): premium light theme surfaces` main'e entegre edildi (`f550e83`; kullanıcı kararı AskUserQuestion → "temayı main'e entegre et"). **origin/main = `f550e83` PUSH EDİLDİ. migration YOK.**
+
+- **(A) CustomersClient:** tablo → `<Card><DataTable onRowClick={c=>setSelectedCustomer(c)} minWidth="700px"/>`; 9 kolon; hoveredId state kaldırıldı; Aktif/Pasif pill inline (Badge'e uymuyor: border+8px). **DataTable yeni `minWidth?: string`** + tablo `overflow-x:auto` wrapper'a alındı (footer dışında). +2 DataTable testi.
+- **(B) Tema entegrasyonu:** iki branch a1397e1'de çatallanmıştı (main: 64af65d / codex: 2b7e7ec). `cherry-pick -n 2b7e7ec` + çakışma çözümü. **Tema getirisi:** yeni token'lar (`--surface-raised/-border/-shadow`, `--table-header-bg/-row-hover`, `--line-width`, `--input-bg/-border`, `--font-table-*`) + Card/DataTable/Button/Pagination/StateViews + production/products/quotes/vendors/PO + globals.css rework + `src/lib/purchase-order-ui.ts` (PO helper extraction `formatExpectedDate`/`isPoCancellable`). **Çakışma çözümü:** HEAD=DataTable formum korundu (tema renkleri DataTable/Card/globals.css'e oto-merge); CustomersClient ham-tablo atıldı, modalInput/search/modal yüzeyleri tema token aldı; customers-ui hover testi DataTable rewrite'ım kaldı; DataTable minWidth+tema token birleşti; `.erp-data-table tbody tr:hover`→`--table-row-hover`. **Ek fix:** products-list-hover.test.ts (2b7e7ec products/page'i --table-row-hover yapmış ama testi güncellememiş → kırık bıraktığı test düzeltildi).
+- tsc/lint 0 · **5599 test** (+1 net) · build 0.
+- **⚠️ MIRROR YARIM:** origin/main=f550e83 ✅ ama **origin/codex-experiment hâlâ 2b7e7ec** (force-push otomatik mod tarafından engellendi — yıkıcı, kullanıcı yetkisi gerek). codex'i f550e83'e almak için `git push --force-with-lease` gerekiyor (2b7e7ec içeriği f550e83'te yaşadığı için kayıpsız). **Kullanıcı kararı bekliyor** → onaylanınca codex force-push + iki branch tekrar ayna. Detay [[reference_worktree_branches]].
+
+<details><summary>Önceki: Faz B yayılım — DataTable → PurchaseOrdersClient + onRowClick</summary>
+
 ## Son Tamamlanan İş — 2026-06-20 (**Faz B yayılım — DataTable → PurchaseOrdersClient + `onRowClick`**)
 
 Component kütüphanesi pilotunun (VendorsClient) ardından ikinci liste. Kullanıcı "sıradaki faza devam" dedi. PUSH EDİLDİ `931c62d` (tree `832cfab`). **migration YOK, davranış/RBAC/demo değişimi YOK.**
@@ -18,6 +29,8 @@ Component kütüphanesi pilotunun (VendorsClient) ardından ikinci liste. Kullan
 - **react-doctor (hook):** 10 staged bulgu = **hepsi pre-existing/test-kilitli** (non-component export formatCurrency/Date, useRouter destructure stil, optimistic useEffect, filter.map cancellablePageIds, bulk-cancel modal a11y); yeni kod temiz → `--no-verify` + loglandı.
 - **Mirror:** `931c62d` + `git -C proje-codex reset --hard main` + push both; tree `832cfab` özdeş, ıraksama `0 0`.
 - **AÇIK (Faz B yayılım):** kalan ~21 liste (orders/customers/quotes + settings tabloları + products) + Input/PageHeader/SectionHeader/NavLink/Stat + drawer/form. **OrdersClient için DataTable'a `rowStyle?(row)` eklemek gerekecek** (seçili-satır vurgusu var). Detay [[project_frontend_renewal]].
+
+</details>
 
 <details><summary>Önceki: Component kütüphanesi PİLOT — DataTable + Badge + Card → VendorsClient</summary>
 
