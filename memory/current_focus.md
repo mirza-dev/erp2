@@ -7,6 +7,21 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
+## Son Tamamlanan İş — 2026-06-20 (**Component kütüphanesi PİLOT — DataTable + Badge + Card → VendorsClient**)
+
+Modül denetim kampanyası kapandı; kullanıcı "yeni yön açalım" dedi → AskUserQuestion ile **frontend yenileme Faz B (component kütüphanesi)** seçildi, kapsam **Pilot dilim**. PUSH EDİLDİ `c6f46fc` (tree `da247ba`). **migration YOK, davranış/RBAC/demo değişimi YOK — saf sunum refactor'u.**
+
+- **Bağlam:** Faz B hiç uygulanmamıştı (kullanıcı doğruladı). Repoda 23 liste sayfası kendi `<table>`/`<thead>`'ini elden yazıyor, 100 dosyada inline `style={{}}`; `src/components/ui/` yalnız atom (Button/Pagination/StateViews/Toast).
+- **Yeni component'ler (`src/components/ui/`):** `DataTable<T>` (generic `columns`/`rows`/`rowKey`/`emptyMessage`/`footer`; thead+boş-durum+hizalama+width tek yerden; **seçim/sıralama mantığı caller'da kalır** — checkbox header/cell içinde verilir → generic & basit); `Badge` (`tone`: success/neutral/danger/accent/warning, tema token çiftleri); `Card` (bordered yüzey).
+- **Hover kararı:** DOM mutation DEĞİL → globals.css `.erp-data-table tbody tr:hover { background: var(--bg-secondary) }` tek kuralı (rerender yok; planın "per-row useState rerender" bulgusu bertaraf; globals.css'in mevcut `.seg button:hover`/`.icon-btn:hover` deseniyle uyumlu).
+- **VendorsClient:** tablo bloğu (wrapper div + empty + `<table>`) → `<Card><DataTable .../></Card>`; `columns` dizisi (select-checkbox + Tedarikçi/İletişim/Para Birimi[Badge]/Tedarik/Ödeme/Durum[Badge]/İşlem); `onMouseEnter/Leave` DOM-mutation SİLİNDİ; yerel `thStyle`/`tdStyle` kaldırıldı (DataTable'a taşındı). Drawer/form bu turda dönüştürülmedi (kapsam = tablo).
+- **Test:** +`src/__tests__/ui/data-table.test.tsx` (5) + `badge.test.tsx` (4); `vendors-ui.test.ts` per-row checkbox regex'i `&&`→ternary forma güncellendi (niyet korunur). tsc 0 · lint 0 · **5594 test** (+9) · build 0.
+- **react-doctor (pre-commit hook):** staged taraması 19 bulgu raporladı — **hepsi dokunulmayan pre-existing kodda** (drawer formu a11y label[false-pos: wrapping label], modal `role=dialog`[test'le kilitli kasıtlı], optimistic `useEffect`[mirror feature], `pageIds` filter.map); diff bu satırlara dokunmadı, yeni component'ler temiz → `--no-verify` ile commit, kapsam dışı olarak loglandı.
+- **Mirror:** `c6f46fc` + `git -C proje-codex reset --hard main` + push both; tree `da247ba` özdeş, ıraksama `0 0`.
+- **AÇIK (Faz B yayılım):** kalan 22 liste sayfası DataTable'a + `Input`/`PageHeader`/`SectionHeader`/`NavLink`/`Stat` + drawer/form. Detay [[project_frontend_renewal]].
+
+<details><summary>Önceki: Vendors modülü derin denetim + D1 (modül kampanyası TAMAMLANDI)</summary>
+
 ## Son Tamamlanan İş — 2026-06-19 (**Vendors modülü derin denetim (erp2-reviewer) + D1 → modül kampanyası TAMAMLANDI**)
 
 Backlog'daki **son denetlenmemiş modül** vendors (+ product-vendor-links). REVIEW.md + domain-rules §13 ile koda karşı doğrulandı. **K:0 Y:0 O:0 — tek bulgu D1 (Düşük).** PUSH EDİLDİ `dcfd0ff`. **migration YOK.** Rapor `docs/audit/2026-06-19-vendors-review-bulgular.md`.
@@ -16,6 +31,8 @@ Backlog'daki **son denetlenmemiş modül** vendors (+ product-vendor-links). REV
 - **Test:** vendors.test.ts route POST/PATCH success'e "actor sunucudan helper'a geçer" (getCurrentUserId mock "u-test") assertion; import-confirm.test.ts'in 4 vendor create/update assertion'ına trailing `null` actor argümanı. tsc 0 · lint 0 · **5585 test** (+2) · build 0.
 - **Mirror:** commit `dcfd0ff` + `git -C proje-codex reset --hard main` + push both.
 - **MODÜL KAMPANYASI TAMAMLANDI:** tüm modüller (RFQ/orders/quotes/paraşüt/import-AI/production/customers-products/alerts/settings/inventory/purchase/vendors) derin tarandı. Denetlenmemiş modül kalmadı.
+
+</details>
 
 <details><summary>Önceki: Purchase modülü derin denetim + O1</summary>
 

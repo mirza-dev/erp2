@@ -1,12 +1,15 @@
 ---
-name: Roven — Frontend Yenileme Planı
-description: frontend-renewal.md — DOM mutation fix, component lib, accessibility, görsel yenileme — plan var, uygulama başlamadı
-type: project
+name: roven-frontend-yenileme-plan
+description: "frontend-renewal.md — DOM mutation fix, component lib, accessibility, görsel yenileme — plan var, uygulama başlamadı"
+metadata: 
+  node_type: memory
+  type: project
+  originSessionId: 14992303-287a-4b73-b0e6-d62dbec7425c
 ---
 
 **Dosya:** `/Users/mirzasaribiyik/Projects/erp2/frontend-renewal.md` (2026-04-08, gitignore'da değil)
 
-**Durum:** PLAN HAZIR — **kısmen turlarda uygulandı** (formal frontend-renewal commit'i yok ama maddeler ayrı turlarda kapatıldı). KAPANANLAR: DOM mutation fix (orders/quotes/products/customers/PO/production turlarında `hoveredId` state'e geçildi), a11y (modal `role=dialog`/`aria-modal`/`aria-labelledby` + aria-label çoğu sayfada), `prefers-reduced-motion` global guard (tema turunda `062bfa9`), Topbar yeniden tasarım ("Sakin düz" `bf28fb0` — breadcrumb yerine sola-başlık). AÇIK: component lib (`DataTable`/`Card`/`Badge`/`Input`/`PageHeader`/`SectionHeader`/`NavLink`/`Stat` — hâlâ yok), kalan inline-style→token konsolidasyonu.
+**Durum:** PLAN HAZIR — **kısmen turlarda uygulandı** (formal frontend-renewal commit'i yok ama maddeler ayrı turlarda kapatıldı). KAPANANLAR: DOM mutation fix (orders/quotes/products/customers/PO/production turlarında `hoveredId` state'e geçildi), a11y (modal `role=dialog`/`aria-modal`/`aria-labelledby` + aria-label çoğu sayfada), `prefers-reduced-motion` global guard (tema turunda `062bfa9`), Topbar yeniden tasarım ("Sakin düz" `bf28fb0` — breadcrumb yerine sola-başlık). **Faz B PİLOT BAŞLADI (2026-06-20, `c6f46fc`):** `src/components/ui/` altına `DataTable<T>` (generic kolon/satır + thead/boş-durum/hizalama/footer; seçim mantığı caller'da kalır) + `Badge` (tone token çiftleri) + `Card` oluşturuldu; ilk uygulama **yalnız VendorsClient** (tablo bloğu → Card+DataTable, iki inline pill → Badge, onMouseEnter DOM-mutation kaldırıldı, hover globals.css `.erp-data-table tbody tr:hover` ile = rerender yok). +9 test, tsc/lint 0, build 0, migration YOK. **AÇIK:** kalan 22 liste sayfasına DataTable yayılımı (ayrı turlar) + `Input`/`PageHeader`/`SectionHeader`/`NavLink`/`Stat` component'leri + drawer/form konsolidasyonu + kalan inline-style→token.
 
 ---
 
@@ -23,7 +26,7 @@ type: project
 | Faz | Konu | Açıklama |
 |-----|------|----------|
 | A | Design Token Genişletme | `globals.css`'e typography scale, spacing (4pt grid), z-index, hover tokens, skip-link, ~~reduced-motion~~ ✅ + tema token'ları (`--highlight-inset` vb. ✅) |
-| B | Component Kütüphanesi | DataTable, Card, Badge, Input, PageHeader, SectionHeader, NavLink, Stat (hepsi `src/components/ui/`) — **AÇIK (yapılmadı)** |
+| B | Component Kütüphanesi | DataTable, Card, Badge, Input, PageHeader, SectionHeader, NavLink, Stat (hepsi `src/components/ui/`) — **PİLOT YAPILDI** (`c6f46fc`): DataTable+Badge+Card var, VendorsClient'a uygulandı; kalan 22 liste + Input/PageHeader/SectionHeader/NavLink/Stat AÇIK |
 | C | DOM Mutation Fix | `onMouseEnter` style mutation → `useState(hovered)` — **ÇOĞU YAPILDI** (orders/quotes/products/customers/PO/production) |
 | D | Accessibility | Skip link, aria-label ✅(çoğu), focus trap (Sidebar mobile), form label-input bağlantısı — kısmen |
 | E | Görsel Yenileme | Landing, Login split-screen, Sidebar, ~~Topbar breadcrumb~~ → **Topbar "Sakin düz" yapıldı** (`bf28fb0`, sola-başlık), Dashboard, Orders |
