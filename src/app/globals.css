@@ -666,6 +666,17 @@ body {
   background: var(--table-row-hover);
 }
 
+/* Satır üzerine gelince beliren öğeler (sil butonu, chevron) — JS hoveredId
+   state'i yerine saf CSS (rerender yok). Daima DOM'da, yalnız görünürlük değişir. */
+.erp-data-table tbody tr .row-reveal {
+  opacity: 0;
+  transition: opacity 0.08s;
+}
+
+.erp-data-table tbody tr:hover .row-reveal {
+  opacity: 1;
+}
+
 /* ============================================
    Scrollbar — minimal
    ============================================ */

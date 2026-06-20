@@ -39,7 +39,8 @@ describe("orders list — sunucu tarafı sayfalama (A1)", () => {
     it("satırlar prop'tan başlayan displayOrders katmanından gelir, bellekte filtre/dilimleme yok", () => {
         expect(SRC).not.toContain("usePagination(");
         expect(SRC).toMatch(/useState<Order\[\]>\(orders\)/);
-        expect(SRC).toMatch(/displayOrders\.map\(/);
+        // DataTable'a satırlar prop ile geçer (map artık DataTable içinde).
+        expect(SRC).toMatch(/rows=\{displayOrders\}/);
     });
 });
 
@@ -51,9 +52,13 @@ describe("orders list — DOM mutation hover kaldırıldı", () => {
         expect(SRC).not.toMatch(/data-chevron/);
         expect(SRC).not.toMatch(/data-delete/);
     });
-    it("hoveredId state kullanılıyor", () => {
-        expect(SRC).toMatch(/setHoveredId/);
-        expect(SRC).toMatch(/const isHovered = hoveredId === order\.id/);
+    it("Card + DataTable kullanır; hoveredId state kaldırıldı (hover + reveal CSS)", () => {
+        // Satır hover + sil/chevron reveal artık globals.css `.erp-data-table` ile.
+        expect(SRC).toContain("<DataTable");
+        expect(SRC).toContain('minWidth="740px"');
+        expect(SRC).not.toMatch(/setHoveredId/);
+        expect(SRC).not.toMatch(/const isHovered = hoveredId === order\.id/);
+        expect(SRC).toContain('className="row-reveal"');
     });
 });
 
@@ -69,6 +74,7 @@ describe("orders list — toplu iptal sözcük + seçim", () => {
         expect(SRC).toMatch(/displayOrders\.filter\(isOrderCancellable\)/);
     });
     it("satır checkbox yalnızca cancellable satırda render edilir", () => {
-        expect(SRC).toMatch(/cancellable && \(/);
+        // DataTable kolon cell'i: isOrderCancellable(order) ? (<input/>) : null
+        expect(SRC).toMatch(/isOrderCancellable\(order\) \?/);
     });
 });

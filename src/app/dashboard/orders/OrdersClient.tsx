@@ -12,6 +12,8 @@ import { decrementCount, patchCountRecord, successfulResponseIds } from "@/lib/f
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { Order } from "@/lib/mock-data";
 import Button, { ButtonLink } from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -54,24 +56,6 @@ const filterTabs: { id: OrderTab; label: string }[] = [
     { id: "cancelled",        label: "İptal" },
     { id: "draft",            label: "Taslak" },
 ];
-
-const thStyle: React.CSSProperties = {
-    textAlign: "left",
-    padding: "10px 14px",
-    fontSize: "12px",
-    fontWeight: "var(--font-table-heading-weight)",
-    color: "var(--text-secondary)",
-    borderBottom: "var(--line-width) solid var(--surface-border)",
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: "10px 14px",
-    fontSize: "13px",
-    fontWeight: "var(--font-table-cell-weight)",
-    borderBottom: "var(--line-width) solid var(--border-tertiary)",
-    color: "var(--text-primary)",
-    lineHeight: 1.4,
-};
 
 // Toplu işlem = soft-DELETE = iptal. Yalnızca iptal edilebilir siparişler
 // seçilebilir: zaten iptal edilmiş VEYA sevk edilmiş siparişler iptal edilemez
@@ -120,9 +104,9 @@ export default function OrdersClient(props: OrdersClientProps) {
     const [refreshing, setRefreshing] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmId, setConfirmId] = useState<string | null>(null);
+    // hoveredId kaldırıldı — satır hover + reveal artık globals.css `.erp-data-table` ile.
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
     const [bulkDeleting, setBulkDeleting] = useState(false);
-    const [hoveredId, setHoveredId] = useState<string | null>(null);
 
     // Browser tab title — sidebar label ile hizalı.
     useEffect(() => {
@@ -248,6 +232,157 @@ export default function OrdersClient(props: OrdersClientProps) {
     const totalPages = computeTotalPages(displayTotal, pageSize);
     const pendingCount = displayCounts.pending_approval;
     const hasAdvancedFilter = !!(dateFrom || dateTo || currency || customerId);
+
+    const checkboxCellStyle: React.CSSProperties = { width: "36px", padding: "10px 8px 10px 14px" };
+
+    const columns: DataTableColumn<Order>[] = [
+        {
+            key: "select",
+            width: "36px",
+            headerStyle: checkboxCellStyle,
+            cellStyle: checkboxCellStyle,
+            header: (
+                <input
+                    type="checkbox"
+                    checked={isPageAllSelected(cancellablePageIds)}
+                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(cancellablePageIds); }}
+                    onChange={() => toggleAll(cancellablePageIds)}
+                    onClick={e => e.stopPropagation()}
+                    disabled={cancellablePageIds.length === 0}
+                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: cancellablePageIds.length === 0 ? "not-allowed" : "pointer" }}
+                    aria-label="Sayfadaki iptal edilebilir siparişleri seç"
+                />
+            ),
+            cell: order => isOrderCancellable(order) ? (
+                <span style={{ display: "inline-flex" }} onClick={e => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        checked={selectedIds.has(order.id)}
+                        onChange={() => toggleOne(order.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                        aria-label={`${order.orderNumber} seç`}
+                    />
+                </span>
+            ) : null,
+        },
+        {
+            key: "orderNumber",
+            header: "Sipariş No",
+            cellStyle: { fontWeight: 500 },
+            cell: order => order.orderNumber,
+        },
+        {
+            key: "customer",
+            header: "Müşteri",
+            cell: order => order.customerName,
+        },
+        {
+            key: "commercial",
+            header: "Ticari Durum",
+            align: "center",
+            cell: order => {
+                const commercial = getCommercialMeta(order.commercial_status);
+                return (
+                    <>
+                        <span className={`badge ${commercial.cls}`}>{commercial.label}</span>
+                        {order.quoteValidUntil &&
+                         (order.commercial_status === "draft" || order.commercial_status === "pending_approval") && (() => {
+                            const daysLeft = dateDaysFromToday(order.quoteValidUntil!);
+                            const expired = daysLeft < 0;
+                            const urgent = !expired && daysLeft <= 3;
+                            return (
+                                <span style={{
+                                    display: "inline-block",
+                                    fontSize: "9px", fontWeight: 700,
+                                    padding: "1px 5px", borderRadius: "3px",
+                                    background: expired ? "var(--danger-bg)" : urgent ? "var(--warning-bg)" : "var(--bg-tertiary)",
+                                    color: expired ? "var(--danger-text)" : urgent ? "var(--warning-text)" : "var(--text-secondary)",
+                                    border: `var(--line-width) solid ${expired ? "var(--danger-border)" : urgent ? "var(--warning-border)" : "var(--border-secondary)"}`,
+                                    marginLeft: "4px",
+                                }}>
+                                    {expired ? "Süresi Doldu" : `${daysLeft} gün kaldı`}
+                                </span>
+                            );
+                        })()}
+                    </>
+                );
+            },
+        },
+        {
+            key: "fulfillment",
+            header: "Lojistik",
+            align: "center",
+            cell: order => {
+                const fulfillment = getFulfillmentMeta(order.fulfillment_status);
+                return fulfillment && order.fulfillment_status !== "unallocated" ? (
+                    <span className={`badge ${fulfillment.cls}`} style={{ fontSize: "10px", padding: "2px 6px" }}>
+                        {fulfillment.label}
+                    </span>
+                ) : null;
+            },
+        },
+        {
+            key: "date",
+            header: "Tarih",
+            cellStyle: { color: "var(--text-secondary)" },
+            cell: order => formatDate(order.createdAt),
+        },
+        {
+            key: "itemCount",
+            header: "Kalem",
+            align: "center",
+            cellStyle: { color: "var(--text-secondary)" },
+            cell: order => order.itemCount,
+        },
+        {
+            key: "amount",
+            header: "Tutar",
+            align: "right",
+            cellStyle: { fontWeight: 500 },
+            cell: order => maskCurrency(order.grandTotal, order.currency, canViewSalesPrices),
+        },
+        {
+            key: "actions",
+            header: "",
+            align: "right",
+            width: "64px",
+            cellStyle: { padding: "10px 8px" },
+            cell: order => (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }} onClick={e => e.stopPropagation()}>
+                    {has("delete_sales_orders") && (confirmId === order.id ? (
+                        <Button
+                            variant="danger"
+                            size="xs"
+                            leftIcon={<CircleOff size={13} />}
+                            onClick={(e) => handleDelete(e, order.id)}
+                            disabled={deletingId === order.id}
+                        >
+                            Evet, iptal et
+                        </Button>
+                    ) : (
+                        <span className="row-reveal">
+                            <Button
+                                variant="dangerSoft"
+                                size="xs"
+                                iconOnly
+                                leftIcon={<CircleOff size={13} />}
+                                onClick={(e) => handleDelete(e, order.id)}
+                                disabled={isDemo || deletingId === order.id}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "İptal et"}
+                                aria-label={`${order.orderNumber} iptal et`}
+                            />
+                        </span>
+                    ))}
+                    <span className="row-reveal" style={{ color: "var(--text-tertiary)" }} aria-hidden="true">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                    </span>
+                </div>
+            ),
+        },
+    ];
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
@@ -411,187 +546,39 @@ export default function OrdersClient(props: OrdersClientProps) {
             )}
 
             {/* Table */}
-            <div
-                style={{
-                    background: "var(--surface-raised)",
-                    border: "var(--line-width) solid var(--surface-border)",
-                    borderRadius: "6px",
-                    overflowX: "auto",
-                    boxShadow: "var(--surface-shadow-sm)",
-                }}
-            >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: "740px" }}>
-                    <thead>
-                        <tr style={{ background: "var(--table-header-bg)" }}>
-                            <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
-                                <input
-                                    type="checkbox"
-                                    checked={isPageAllSelected(cancellablePageIds)}
-                                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(cancellablePageIds); }}
-                                    onChange={() => toggleAll(cancellablePageIds)}
-                                    onClick={e => e.stopPropagation()}
-                                    disabled={cancellablePageIds.length === 0}
-                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: cancellablePageIds.length === 0 ? "not-allowed" : "pointer" }}
-                                    aria-label="Sayfadaki iptal edilebilir siparişleri seç"
-                                />
-                            </th>
-                            <th style={thStyle}>Sipariş No</th>
-                            <th style={thStyle}>Müşteri</th>
-                            <th style={{ ...thStyle, textAlign: "center" }}>Ticari Durum</th>
-                            <th style={{ ...thStyle, textAlign: "center" }}>Lojistik</th>
-                            <th style={thStyle}>Tarih</th>
-                            <th style={{ ...thStyle, textAlign: "center" }}>Kalem</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Tutar</th>
-                            <th style={{ ...thStyle, width: "32px" }}></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {displayOrders.length === 0 ? (
-                            <tr>
-                                <td colSpan={9} style={{ border: "none" }}>
-                                    <EmptyState
-                                        title={
-                                            search
-                                                ? `"${search}" ile eşleşen sipariş bulunamadı`
-                                                : `${filterTabs.find(t => t.id === tab)?.label ?? ""} durumunda sipariş yok`
-                                        }
-                                        description="Arama terimini değiştirmeyi veya filtreleri temizlemeyi deneyin."
-                                        action={{
-                                            label: "Filtreleri Temizle",
-                                            onClick: () => navigate({ search: "", tab: "ALL", customerId: "", dateFrom: "", dateTo: "", currency: "", page: 1 }),
-                                        }}
-                                    />
-                                </td>
-                            </tr>
-                        ) : (
-                            displayOrders.map((order) => {
-                                const commercial = getCommercialMeta(order.commercial_status);
-                                const fulfillment = getFulfillmentMeta(order.fulfillment_status);
-                                const isHovered = hoveredId === order.id;
-                                const cellBg = isHovered ? "var(--bg-secondary)" : "transparent";
-                                const cancellable = isOrderCancellable(order);
-                                return (
-                                    <tr
-                                        key={order.id}
-                                        style={{ cursor: "pointer", background: cellBg }}
-                                        onClick={() => router.push(`/dashboard/orders/${order.id}`)}
-                                        onMouseEnter={() => setHoveredId(order.id)}
-                                        onMouseLeave={() => setHoveredId(null)}
-                                    >
-                                        <td
-                                            style={{ ...tdStyle, background: cellBg, width: "36px", padding: "10px 8px 10px 14px", borderLeft: isHovered ? "2px solid var(--accent)" : "2px solid transparent" }}
-                                            onClick={e => e.stopPropagation()}
-                                        >
-                                            {cancellable && (
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedIds.has(order.id)}
-                                                    onChange={() => toggleOne(order.id)}
-                                                    onClick={e => e.stopPropagation()}
-                                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                                    aria-label={`${order.orderNumber} seç`}
-                                                />
-                                            )}
-                                        </td>
-                                        <td style={{ ...tdStyle, background: cellBg, fontWeight: 500 }}>
-                                            {order.orderNumber}
-                                        </td>
-                                        <td style={{ ...tdStyle, background: cellBg }}>
-                                            {order.customerName}
-                                        </td>
-                                        <td style={{ ...tdStyle, background: cellBg, textAlign: "center" }}>
-                                            <span className={`badge ${commercial.cls}`}>{commercial.label}</span>
-                                            {order.quoteValidUntil &&
-                                             (order.commercial_status === "draft" || order.commercial_status === "pending_approval") && (() => {
-                                                const daysLeft = dateDaysFromToday(order.quoteValidUntil!);
-                                                const expired = daysLeft < 0;
-                                                const urgent = !expired && daysLeft <= 3;
-                                                return (
-                                                    <span style={{
-                                                        display: "inline-block",
-                                                        fontSize: "9px", fontWeight: 700,
-                                                        padding: "1px 5px", borderRadius: "3px",
-                                                        background: expired ? "var(--danger-bg)" : urgent ? "var(--warning-bg)" : "var(--bg-tertiary)",
-                                                        color: expired ? "var(--danger-text)" : urgent ? "var(--warning-text)" : "var(--text-secondary)",
-                                                        border: `var(--line-width) solid ${expired ? "var(--danger-border)" : urgent ? "var(--warning-border)" : "var(--border-secondary)"}`,
-                                                        marginLeft: "4px",
-                                                    }}>
-                                                        {expired ? "Süresi Doldu" : `${daysLeft} gün kaldı`}
-                                                    </span>
-                                                );
-                                            })()}
-                                        </td>
-                                        <td style={{ ...tdStyle, background: cellBg, textAlign: "center" }}>
-                                            {fulfillment && order.fulfillment_status !== "unallocated" && (
-                                                <span
-                                                    className={`badge ${fulfillment.cls}`}
-                                                    style={{ fontSize: "10px", padding: "2px 6px" }}
-                                                >
-                                                    {fulfillment.label}
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td style={{ ...tdStyle, background: cellBg, color: "var(--text-secondary)" }}>
-                                            {formatDate(order.createdAt)}
-                                        </td>
-                                        <td style={{ ...tdStyle, background: cellBg, textAlign: "center", color: "var(--text-secondary)" }}>
-                                            {order.itemCount}
-                                        </td>
-                                        <td style={{ ...tdStyle, background: cellBg, textAlign: "right", fontWeight: 500 }}>
-                                            {maskCurrency(order.grandTotal, order.currency, canViewSalesPrices)}
-                                        </td>
-                                        <td
-                                            style={{ ...tdStyle, background: cellBg, width: "64px", textAlign: "right", padding: "10px 8px" }}
-                                            onClick={(e) => e.stopPropagation()}
-                                        >
-                                            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}>
-                                                {has("delete_sales_orders") && (confirmId === order.id ? (
-                                                    <Button
-                                                        variant="danger"
-                                                        size="xs"
-                                                        leftIcon={<CircleOff size={13} />}
-                                                        onClick={(e) => handleDelete(e, order.id)}
-                                                        disabled={deletingId === order.id}
-                                                    >
-                                                        Evet, iptal et
-                                                    </Button>
-                                                ) : (
-                                                    <Button
-                                                        variant="dangerSoft"
-                                                        size="xs"
-                                                        iconOnly
-                                                        leftIcon={<CircleOff size={13} />}
-                                                        onClick={(e) => handleDelete(e, order.id)}
-                                                        disabled={isDemo || deletingId === order.id}
-                                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "İptal et"}
-                                                        aria-label={`${order.orderNumber} iptal et`}
-                                                        style={{ opacity: isHovered ? 1 : 0 }}
-                                                    />
-                                                ))}
-                                                <span style={{ opacity: isHovered ? 1 : 0, color: "var(--text-tertiary)" }} aria-hidden="true">
-                                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                                                        <path d="M4 2l4 4-4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-                                                    </svg>
-                                                </span>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })
-                        )}
-                    </tbody>
-                </table>
-                {displayTotal > 0 && (
-                    <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        totalItems={displayTotal}
-                        pageSize={pageSize}
-                        onPageChange={(p) => navigate({ page: p })}
-                        itemLabel="sipariş"
-                    />
-                )}
-            </div>
+            <Card>
+                <DataTable
+                    columns={columns}
+                    rows={displayOrders}
+                    rowKey={o => o.id}
+                    onRowClick={o => router.push(`/dashboard/orders/${o.id}`)}
+                    minWidth="740px"
+                    emptyMessage={
+                        <EmptyState
+                            title={
+                                search
+                                    ? `"${search}" ile eşleşen sipariş bulunamadı`
+                                    : `${filterTabs.find(t => t.id === tab)?.label ?? ""} durumunda sipariş yok`
+                            }
+                            description="Arama terimini değiştirmeyi veya filtreleri temizlemeyi deneyin."
+                            action={{
+                                label: "Filtreleri Temizle",
+                                onClick: () => navigate({ search: "", tab: "ALL", customerId: "", dateFrom: "", dateTo: "", currency: "", page: 1 }),
+                            }}
+                        />
+                    }
+                    footer={displayTotal > 0 ? (
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            totalItems={displayTotal}
+                            pageSize={pageSize}
+                            onPageChange={(p) => navigate({ page: p })}
+                            itemLabel="sipariş"
+                        />
+                    ) : null}
+                />
+            </Card>
 
             {/* Bulk delete confirm modal */}
             {bulkDeleteConfirm && (

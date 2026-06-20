@@ -29,7 +29,8 @@ describe("ana operasyonlar — işlem sonrası tam route refresh kullanılmaz", 
     const source = src("src/app/dashboard/orders/OrdersClient.tsx");
     expect(source).toContain("function getFulfillmentMeta");
     expect(source).toContain("fulfillmentStatusConfig[status] ?? null");
-    expect(source).toContain('{fulfillment && order.fulfillment_status !== "unallocated"');
+    // DataTable kolon cell'i: fulfillment && order.fulfillment_status !== "unallocated" ? (...)
+    expect(source).toContain('fulfillment && order.fulfillment_status !== "unallocated"');
   });
 
   it("teklif silme handler'ları başarılı id'leri local listeden düşürür", () => {
