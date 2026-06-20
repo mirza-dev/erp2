@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 
 afterEach(cleanup);
@@ -49,6 +49,23 @@ describe("DataTable", () => {
         );
         expect(screen.getByText("Kayıt yok.")).toBeTruthy();
         expect(container.querySelector("table")).toBeNull();
+    });
+
+    it("onRowClick verilince satır tıklanınca ilgili row ile çağrılır + cursor pointer", () => {
+        const onRowClick = vi.fn();
+        const { container } = render(
+            <DataTable columns={columns} rows={rows} rowKey={r => r.id} onRowClick={onRowClick} />,
+        );
+        const firstRow = container.querySelector("tbody tr") as HTMLElement;
+        expect(firstRow.style.cursor).toBe("pointer");
+        fireEvent.click(firstRow);
+        expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    });
+
+    it("onRowClick yokken satır cursor pointer almaz", () => {
+        const { container } = render(<DataTable columns={columns} rows={rows} rowKey={r => r.id} />);
+        const firstRow = container.querySelector("tbody tr") as HTMLElement;
+        expect(firstRow.style.cursor).toBe("");
     });
 
     it("footer hem dolu hem boş durumda render edilir", () => {

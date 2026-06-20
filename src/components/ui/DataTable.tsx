@@ -22,6 +22,12 @@ export interface DataTableProps<T> {
     emptyMessage?: ReactNode;
     /** Tablonun altına (kart içinde) render edilir — örn. <Pagination/>. */
     footer?: ReactNode;
+    /**
+     * Satıra tıklayınca çağrılır (örn. detay sayfasına gitme). Verilirse satır
+     * `cursor: pointer` alır. Satır içinde gezinmeyi tetiklememesi gereken
+     * öğeler (checkbox, link) kendi onClick'inde `e.stopPropagation()` yapmalı.
+     */
+    onRowClick?: (row: T) => void;
 }
 
 const thStyle: CSSProperties = {
@@ -52,6 +58,7 @@ export default function DataTable<T>({
     rowKey,
     emptyMessage,
     footer,
+    onRowClick,
 }: DataTableProps<T>) {
     if (rows.length === 0) {
         return (
@@ -93,7 +100,11 @@ export default function DataTable<T>({
                 </thead>
                 <tbody>
                     {rows.map(row => (
-                        <tr key={rowKey(row)}>
+                        <tr
+                            key={rowKey(row)}
+                            onClick={onRowClick ? () => onRowClick(row) : undefined}
+                            style={onRowClick ? { cursor: "pointer" } : undefined}
+                        >
                             {columns.map(col => (
                                 <td
                                     key={col.key}

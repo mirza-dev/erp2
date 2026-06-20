@@ -16,17 +16,11 @@ import type { PurchaseOrderTab } from "@/lib/supabase/purchase-orders";
 import { PRODUCTS_KEY } from "@/lib/data-context";
 import { decrementCount, patchCountRecord, successfulResponseIds } from "@/lib/fast-mutation";
 import Button, { ButtonLink } from "@/components/ui/Button";
+import Card from "@/components/ui/Card";
+import Badge, { type BadgeTone } from "@/components/ui/Badge";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { CircleOff, Plus, RefreshCw } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
-
-const thStyle: React.CSSProperties = {
-    textAlign: "left", padding: "10px 14px", fontSize: "12px", fontWeight: 500,
-    color: "var(--text-secondary)", borderBottom: "0.5px solid var(--border-tertiary)",
-};
-const tdStyle: React.CSSProperties = {
-    padding: "10px 14px", fontSize: "13px", borderBottom: "0.5px solid var(--border-tertiary)",
-    color: "var(--text-primary)", lineHeight: 1.4,
-};
 
 const STATUS_TABS: { key: PurchaseOrderTab; label: string }[] = [
     { key: "all", label: "Tümü" },
@@ -38,13 +32,13 @@ const STATUS_TABS: { key: PurchaseOrderTab; label: string }[] = [
     { key: "cancelled", label: "İptal" },
 ];
 
-const STATUS_BG: Record<PurchaseOrderStatus, { bg: string; text: string }> = {
-    draft:              { bg: "var(--bg-tertiary)",     text: "var(--text-secondary)" },
-    sent:               { bg: "var(--accent-bg)",       text: "var(--accent-text)" },
-    confirmed:          { bg: "var(--success-bg)",      text: "var(--success-text)" },
-    partially_received: { bg: "var(--warning-bg)",      text: "var(--warning-text)" },
-    received:           { bg: "var(--success-bg)",      text: "var(--success-text)" },
-    cancelled:          { bg: "var(--danger-bg)",       text: "var(--danger-text)" },
+const STATUS_TONE: Record<PurchaseOrderStatus, BadgeTone> = {
+    draft:              "neutral",
+    sent:               "accent",
+    confirmed:          "success",
+    partially_received: "warning",
+    received:           "success",
+    cancelled:          "danger",
 };
 
 const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
@@ -99,7 +93,6 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
     const [refreshing, setRefreshing] = useState(false);
     const [bulkCancelConfirm, setBulkCancelConfirm] = useState(false);
     const [bulkCancelling, setBulkCancelling] = useState(false);
-    const [hoveredId, setHoveredId] = useState<string | null>(null);
 
     useEffect(() => { document.title = "Satın Alma Siparişleri · Roven"; }, []);
 
@@ -183,6 +176,86 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
     };
 
     const totalPages = computeTotalPages(displayTotal, pageSize);
+
+    const checkboxCellStyle: React.CSSProperties = { width: "36px", padding: "10px 8px 10px 14px" };
+
+    const columns: DataTableColumn<PurchaseOrderRow>[] = [
+        {
+            key: "select",
+            width: "36px",
+            headerStyle: checkboxCellStyle,
+            cellStyle: checkboxCellStyle,
+            header: (
+                <input
+                    type="checkbox"
+                    checked={isPageAllSelected(cancellablePageIds)}
+                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(cancellablePageIds); }}
+                    onChange={() => toggleAll(cancellablePageIds)}
+                    onClick={e => e.stopPropagation()}
+                    disabled={cancellablePageIds.length === 0}
+                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: cancellablePageIds.length === 0 ? "not-allowed" : "pointer" }}
+                    aria-label="Sayfadaki iptal edilebilir siparişleri seç"
+                />
+            ),
+            cell: o => isPoCancellable(o) ? (
+                <span style={{ display: "inline-flex" }} onClick={e => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        checked={selectedIds.has(o.id)}
+                        onChange={() => toggleOne(o.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                        aria-label={`${o.po_number} seç`}
+                    />
+                </span>
+            ) : null,
+        },
+        {
+            key: "po_number",
+            header: "PO No",
+            cell: o => (
+                <Link
+                    href={`/dashboard/purchase/orders/${o.id}`}
+                    style={{ color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    {o.po_number}
+                </Link>
+            ),
+        },
+        {
+            key: "vendor",
+            header: "Tedarikçi",
+            cell: o => vendorMap[o.vendor_id] ?? "—",
+        },
+        {
+            key: "status",
+            header: "Durum",
+            align: "center",
+            cell: o => <Badge tone={STATUS_TONE[o.status]}>{STATUS_LABEL[o.status]}</Badge>,
+        },
+        {
+            key: "expected_date",
+            header: "Beklenen Tarih",
+            align: "center",
+            cellStyle: { color: "var(--text-secondary)" },
+            cell: o => formatExpectedDate(o.expected_date),
+        },
+        {
+            key: "grand_total",
+            header: "Toplam",
+            align: "right",
+            cellStyle: { fontVariantNumeric: "tabular-nums" },
+            cell: o => formatCurrency(o.grand_total, o.currency),
+        },
+        {
+            key: "created_at",
+            header: "Oluşturulma",
+            align: "right",
+            cellStyle: { color: "var(--text-tertiary)", fontSize: "12px" },
+            cell: o => new Date(o.created_at).toLocaleDateString("tr-TR"),
+        },
+    ];
 
     return (
         <div style={{ maxWidth: "1200px", margin: "0 auto", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
@@ -280,109 +353,25 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
             )}
 
             {/* Table */}
-            <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>
-                {displayOrders.length === 0 ? (
-                    <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
-                        {search ? "Arama kriterine uyan sipariş bulunamadı." : "Henüz sipariş yok."}
-                    </div>
-                ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                            <tr style={{ background: "var(--bg-secondary)" }}>
-                                <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={isPageAllSelected(cancellablePageIds)}
-                                        ref={el => { if (el) el.indeterminate = isPageIndeterminate(cancellablePageIds); }}
-                                        onChange={() => toggleAll(cancellablePageIds)}
-                                        onClick={e => e.stopPropagation()}
-                                        disabled={cancellablePageIds.length === 0}
-                                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: cancellablePageIds.length === 0 ? "not-allowed" : "pointer" }}
-                                        aria-label="Sayfadaki iptal edilebilir siparişleri seç"
-                                    />
-                                </th>
-                                <th style={thStyle}>PO No</th>
-                                <th style={thStyle}>Tedarikçi</th>
-                                <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
-                                <th style={{ ...thStyle, textAlign: "center" }}>Beklenen Tarih</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>Toplam</th>
-                                <th style={{ ...thStyle, textAlign: "right" }}>Oluşturulma</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {displayOrders.map(o => {
-                                const isHovered = hoveredId === o.id;
-                                const cancellable = isPoCancellable(o);
-                                return (
-                                <tr key={o.id}
-                                    style={{
-                                        transition: "background 0.08s", cursor: "pointer",
-                                        background: isHovered ? "var(--bg-secondary)" : "transparent",
-                                    }}
-                                    onMouseEnter={() => setHoveredId(o.id)}
-                                    onMouseLeave={() => setHoveredId(null)}
-                                    onClick={() => router.push(`/dashboard/purchase/orders/${o.id}`)}
-                                >
-                                    <td
-                                        style={{ ...tdStyle, width: "36px", padding: "10px 8px 10px 14px" }}
-                                        onClick={e => e.stopPropagation()}
-                                    >
-                                        {cancellable && (
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.has(o.id)}
-                                                onChange={() => toggleOne(o.id)}
-                                                onClick={e => e.stopPropagation()}
-                                                style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                                aria-label={`${o.po_number} seç`}
-                                            />
-                                        )}
-                                    </td>
-                                    <td style={tdStyle}>
-                                        <Link
-                                            href={`/dashboard/purchase/orders/${o.id}`}
-                                            style={{ color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}
-                                            onClick={e => e.stopPropagation()}
-                                        >
-                                            {o.po_number}
-                                        </Link>
-                                    </td>
-                                    <td style={tdStyle}>{vendorMap[o.vendor_id] ?? "—"}</td>
-                                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                                        <span style={{
-                                            fontSize: "11px", padding: "2px 8px", borderRadius: "5px",
-                                            background: STATUS_BG[o.status].bg, color: STATUS_BG[o.status].text,
-                                            fontWeight: 500,
-                                        }}>
-                                            {STATUS_LABEL[o.status]}
-                                        </span>
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "center", color: "var(--text-secondary)" }}>
-                                        {formatExpectedDate(o.expected_date)}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                                        {formatCurrency(o.grand_total, o.currency)}
-                                    </td>
-                                    <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)", fontSize: "12px" }}>
-                                        {new Date(o.created_at).toLocaleDateString("tr-TR")}
-                                    </td>
-                                </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
-                {displayTotal > 0 && (
-                    <Pagination
-                        currentPage={page}
-                        totalPages={totalPages}
-                        totalItems={displayTotal}
-                        pageSize={pageSize}
-                        onPageChange={(p) => navigate({ page: p })}
-                        itemLabel="sipariş"
-                    />
-                )}
-            </div>
+            <Card>
+                <DataTable
+                    columns={columns}
+                    rows={displayOrders}
+                    rowKey={o => o.id}
+                    onRowClick={o => router.push(`/dashboard/purchase/orders/${o.id}`)}
+                    emptyMessage={search ? "Arama kriterine uyan sipariş bulunamadı." : "Henüz sipariş yok."}
+                    footer={displayTotal > 0 ? (
+                        <Pagination
+                            currentPage={page}
+                            totalPages={totalPages}
+                            totalItems={displayTotal}
+                            pageSize={pageSize}
+                            onPageChange={(p) => navigate({ page: p })}
+                            itemLabel="sipariş"
+                        />
+                    ) : null}
+                />
+            </Card>
             {/* Bulk cancel confirm modal */}
             {bulkCancelConfirm && (
                 <>

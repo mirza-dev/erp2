@@ -207,20 +207,21 @@ describe("Liste sayfası — hover state + toplu-iptal seçim + modal a11y", () 
         );
     });
 
-    it("hover DOM-mutation antipattern kaldırıldı → hoveredId state", () => {
-        expect(listSrc).toContain("const [hoveredId, setHoveredId]");
-        expect(listSrc).toContain("setHoveredId(o.id)");
-        expect(listSrc).toContain("const isHovered = hoveredId === o.id");
-        // Eski doğrudan DOM yazımı kalmamalı
+    it("hover DOM-mutation/hoveredId antipattern kaldırıldı → CSS `.erp-data-table` + DataTable", () => {
+        // Satır hover artık globals.css `.erp-data-table tbody tr:hover` ile (rerender yok);
+        // eski hoveredId state + DOM yazımı kaldırıldı, tablo DataTable'a taşındı.
+        expect(listSrc).not.toContain("const [hoveredId, setHoveredId]");
         expect(listSrc).not.toContain("e.currentTarget.style.background");
+        expect(listSrc).toContain("<DataTable");
+        expect(listSrc).toContain("onRowClick={o => router.push(`/dashboard/purchase/orders/${o.id}`)}");
     });
 
     it("toplu iptal seçimi yalnız iptal edilebilir PO'larda (cancellablePageIds)", () => {
         expect(listSrc).toContain("const cancellablePageIds = displayOrders.filter(isPoCancellable)");
         expect(listSrc).toContain("toggleAll(cancellablePageIds)");
         expect(listSrc).toContain("isPageAllSelected(cancellablePageIds)");
-        // satır checkbox koşullu
-        expect(listSrc).toMatch(/\{cancellable && \(\s*<input/);
+        // satır checkbox koşullu (DataTable kolon cell'i: isPoCancellable(o) ? (<input/>) : null)
+        expect(listSrc).toMatch(/isPoCancellable\(o\) \?\s*\(/);
         // eski pageIds bağımlılığı kalmamalı
         expect(listSrc).not.toContain("toggleAll(pageIds)");
     });
