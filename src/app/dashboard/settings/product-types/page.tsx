@@ -13,6 +13,7 @@ import {
     SlidersHorizontal,
 } from "lucide-react";
 import Button, { ButtonLink } from "@/components/ui/Button";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { useToast } from "@/components/ui/Toast";
 import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-utils";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
@@ -51,25 +52,6 @@ const tableWrapStyle: React.CSSProperties = {
     borderRadius: "8px",
     overflow: "hidden",
     background: "var(--bg-primary)",
-};
-
-const thStyle: React.CSSProperties = {
-    padding: "10px 12px",
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    textAlign: "left",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    background: "var(--bg-secondary)",
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: "12px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    color: "var(--text-primary)",
-    fontSize: "13px",
-    verticalAlign: "middle",
 };
 
 const inputStyle: React.CSSProperties = {
@@ -243,6 +225,69 @@ export default function TechnicalTemplatesPage() {
         }
     }
 
+    const templateColumns: DataTableColumn<ProductTypeStatsRow>[] = [
+        {
+            key: "name",
+            header: "Şablon",
+            cell: template => (
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "8px",
+                        border: "0.5px solid var(--border-secondary)",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "var(--text-secondary)",
+                        background: "var(--bg-secondary)",
+                        flex: "0 0 auto",
+                    }}>
+                        {template.icon || <SlidersHorizontal size={15} />}
+                    </span>
+                    <div>
+                        <Link
+                            href={`/dashboard/settings/product-types/${template.id}`}
+                            style={{ color: "var(--text-primary)", textDecoration: "none", fontWeight: 650 }}
+                        >
+                            {template.name}
+                        </Link>
+                        {template.description && (
+                            <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px", maxWidth: "360px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {template.description}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ),
+        },
+        { key: "products", header: "Ürün", cell: t => t.product_count },
+        { key: "fields", header: "Alan", cell: t => t.field_count },
+        { key: "required", header: "Zorunlu", cell: t => t.required_field_count },
+        { key: "missing", header: "Eksik Veri", cell: t => statusBadge(t) },
+        {
+            key: "status",
+            header: "Durum",
+            cell: t => t.is_active ? (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "var(--success-text)", fontSize: "12px" }}>
+                    <CheckCircle2 size={13} /> Aktif
+                </span>
+            ) : (
+                <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>Pasif</span>
+            ),
+        },
+        {
+            key: "action",
+            header: "İşlem",
+            align: "right",
+            cell: t => (
+                <ButtonLink href={`/dashboard/settings/product-types/${t.id}`} variant="secondary" size="sm" leftIcon={<Pencil size={14} />}>
+                    Düzenle
+                </ButtonLink>
+            ),
+        },
+    ];
+
     return (
         <div style={pageStyle}>
             <div style={toolbarStyle}>
@@ -289,82 +334,17 @@ export default function TechnicalTemplatesPage() {
             )}
 
             <div style={tableWrapStyle}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                        <tr>
-                            <th style={thStyle}>Şablon</th>
-                            <th style={thStyle}>Ürün</th>
-                            <th style={thStyle}>Alan</th>
-                            <th style={thStyle}>Zorunlu</th>
-                            <th style={thStyle}>Eksik Veri</th>
-                            <th style={thStyle}>Durum</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>İşlem</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {loading ? (
-                            <tr>
-                                <td colSpan={7} style={{ ...tdStyle, color: "var(--text-tertiary)" }}>Yükleniyor…</td>
-                            </tr>
-                        ) : templates.length === 0 ? (
-                            <tr>
-                                <td colSpan={7} style={{ ...tdStyle, color: "var(--text-tertiary)" }}>Teknik şablon yok.</td>
-                            </tr>
-                        ) : templates.map(template => (
-                            <tr key={template.id} style={{ opacity: template.is_active ? 1 : 0.55 }}>
-                                <td style={tdStyle}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                                        <span style={{
-                                            width: "30px",
-                                            height: "30px",
-                                            borderRadius: "8px",
-                                            border: "0.5px solid var(--border-secondary)",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            color: "var(--text-secondary)",
-                                            background: "var(--bg-secondary)",
-                                            flex: "0 0 auto",
-                                        }}>
-                                            {template.icon || <SlidersHorizontal size={15} />}
-                                        </span>
-                                        <div>
-                                            <Link
-                                                href={`/dashboard/settings/product-types/${template.id}`}
-                                                style={{ color: "var(--text-primary)", textDecoration: "none", fontWeight: 650 }}
-                                            >
-                                                {template.name}
-                                            </Link>
-                                            {template.description && (
-                                                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px", maxWidth: "360px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                    {template.description}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </td>
-                                <td style={tdStyle}>{template.product_count}</td>
-                                <td style={tdStyle}>{template.field_count}</td>
-                                <td style={tdStyle}>{template.required_field_count}</td>
-                                <td style={tdStyle}>{statusBadge(template)}</td>
-                                <td style={tdStyle}>
-                                    {template.is_active ? (
-                                        <span style={{ display: "inline-flex", alignItems: "center", gap: "5px", color: "var(--success-text)", fontSize: "12px" }}>
-                                            <CheckCircle2 size={13} /> Aktif
-                                        </span>
-                                    ) : (
-                                        <span style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>Pasif</span>
-                                    )}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: "right" }}>
-                                    <ButtonLink href={`/dashboard/settings/product-types/${template.id}`} variant="secondary" size="sm" leftIcon={<Pencil size={14} />}>
-                                        Düzenle
-                                    </ButtonLink>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                {loading ? (
+                    <div style={{ padding: "12px", color: "var(--text-tertiary)", fontSize: "13px" }}>Yükleniyor…</div>
+                ) : (
+                    <DataTable
+                        columns={templateColumns}
+                        rows={templates}
+                        rowKey={t => t.id}
+                        rowStyle={t => ({ opacity: t.is_active ? 1 : 0.55 })}
+                        emptyMessage="Teknik şablon yok."
+                    />
+                )}
             </div>
 
             {showCreate && (

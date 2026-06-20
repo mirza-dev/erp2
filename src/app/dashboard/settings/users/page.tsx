@@ -6,6 +6,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { createClient } from "@/lib/supabase/client";
 import { ROLES, ROLE_LABELS, type Role } from "@/lib/auth/permissions";
 import Button from "@/components/ui/Button";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
 interface User {
@@ -222,6 +223,116 @@ export default function UsersPage() {
         }
     };
 
+    const userColumns: DataTableColumn<User>[] = [
+        {
+            key: "email",
+            header: "E-posta",
+            cell: user => (
+                <>
+                    {user.email}
+                    {user.email === currentEmail && (
+                        <span
+                            style={{
+                                marginLeft: "8px",
+                                fontSize: "10px",
+                                color: "var(--accent-text)",
+                                background: "var(--accent-bg)",
+                                padding: "1px 6px",
+                                borderRadius: "4px",
+                            }}
+                        >
+                            siz
+                        </span>
+                    )}
+                </>
+            ),
+        },
+        {
+            key: "roles",
+            header: "Roller",
+            cellStyle: { minWidth: "220px", color: "var(--text-secondary)" },
+            cell: user => editingRolesId === user.id ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <RoleCheckboxes selected={editRolesDraft} onToggle={toggleEditRole} disabled={isDemo} />
+                    <div style={{ display: "flex", gap: "8px" }}>
+                        <Button
+                            size="xs"
+                            onClick={() => handleSaveRoles(user)}
+                            disabled={isDemo || savingRoles}
+                        >
+                            {savingRoles ? "Kaydediliyor..." : "Kaydet"}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="xs"
+                            onClick={() => setEditingRolesId(null)}
+                        >
+                            İptal
+                        </Button>
+                    </div>
+                </div>
+            ) : (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    {user.roles.map((r) => (
+                        <span
+                            key={r}
+                            style={{
+                                fontSize: "11px", color: "var(--text-secondary)",
+                                background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)",
+                                padding: "1px 7px", borderRadius: "4px",
+                            }}
+                        >
+                            {ROLE_LABELS[r] ?? r}
+                        </span>
+                    ))}
+                    <Button
+                        variant="secondary"
+                        size="xs"
+                        leftIcon={<Pencil size={13} />}
+                        onClick={() => startEditRoles(user)}
+                        disabled={isDemo}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Rolleri düzenle"}
+                        aria-label={`${user.email} rollerini düzenle`}
+                    >
+                        Düzenle
+                    </Button>
+                </div>
+            ),
+        },
+        {
+            key: "lastSignIn",
+            header: "Son Giriş",
+            cellStyle: { fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap" },
+            cell: user => formatDate(user.last_sign_in_at),
+        },
+        {
+            key: "createdAt",
+            header: "Oluşturulma",
+            cellStyle: { fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "nowrap" },
+            cell: user => formatDate(user.created_at),
+        },
+        {
+            key: "action",
+            header: "",
+            align: "right",
+            cell: user => {
+                const isSelf = user.email === currentEmail;
+                return (
+                    <Button
+                        variant="dangerSoft"
+                        size="xs"
+                        leftIcon={<Trash2 size={13} />}
+                        onClick={() => handleDelete(user)}
+                        disabled={isDemo || isSelf || deletingId === user.id}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                    >
+                        {deletingId === user.id ? "Siliniyor..." : "Sil"}
+                    </Button>
+                );
+            },
+        },
+    ];
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Header */}
@@ -321,160 +432,11 @@ export default function UsersPage() {
                         Henüz kullanıcı yok.
                     </div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                        <thead>
-                            <tr>
-                                {["E-posta", "Roller", "Son Giriş", "Oluşturulma", ""].map((h) => (
-                                    <th
-                                        key={h}
-                                        style={{
-                                            padding: "9px 14px",
-                                            fontSize: "11px",
-                                            fontWeight: 500,
-                                            color: "var(--text-tertiary)",
-                                            borderBottom: "0.5px solid var(--border-tertiary)",
-                                            textAlign: "left",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.04em",
-                                            whiteSpace: "nowrap",
-                                        }}
-                                    >
-                                        {h}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {users.map((user) => {
-                                const isSelf = user.email === currentEmail;
-                                return (
-                                    <tr key={user.id}>
-                                        <td
-                                            style={{
-                                                padding: "10px 14px",
-                                                fontSize: "13px",
-                                                color: "var(--text-primary)",
-                                                borderBottom: "0.5px solid var(--border-tertiary)",
-                                            }}
-                                        >
-                                            {user.email}
-                                            {isSelf && (
-                                                <span
-                                                    style={{
-                                                        marginLeft: "8px",
-                                                        fontSize: "10px",
-                                                        color: "var(--accent-text)",
-                                                        background: "var(--accent-bg)",
-                                                        padding: "1px 6px",
-                                                        borderRadius: "4px",
-                                                    }}
-                                                >
-                                                    siz
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: "10px 14px",
-                                                fontSize: "12px",
-                                                color: "var(--text-secondary)",
-                                                borderBottom: "0.5px solid var(--border-tertiary)",
-                                                minWidth: "220px",
-                                            }}
-                                        >
-                                            {editingRolesId === user.id ? (
-                                                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                                                    <RoleCheckboxes selected={editRolesDraft} onToggle={toggleEditRole} disabled={isDemo} />
-                                                    <div style={{ display: "flex", gap: "8px" }}>
-                                                        <Button
-                                                            size="xs"
-                                                            onClick={() => handleSaveRoles(user)}
-                                                            disabled={isDemo || savingRoles}
-                                                        >
-                                                            {savingRoles ? "Kaydediliyor..." : "Kaydet"}
-                                                        </Button>
-                                                        <Button
-                                                            variant="secondary"
-                                                            size="xs"
-                                                            onClick={() => setEditingRolesId(null)}
-                                                        >
-                                                            İptal
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                                                    {user.roles.map((r) => (
-                                                        <span
-                                                            key={r}
-                                                            style={{
-                                                                fontSize: "11px", color: "var(--text-secondary)",
-                                                                background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)",
-                                                                padding: "1px 7px", borderRadius: "4px",
-                                                            }}
-                                                        >
-                                                            {ROLE_LABELS[r] ?? r}
-                                                        </span>
-                                                    ))}
-                                                    <Button
-                                                        variant="secondary"
-                                                        size="xs"
-                                                        leftIcon={<Pencil size={13} />}
-                                                        onClick={() => startEditRoles(user)}
-                                                        disabled={isDemo}
-                                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Rolleri düzenle"}
-                                                        aria-label={`${user.email} rollerini düzenle`}
-                                                    >
-                                                        Düzenle
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: "10px 14px",
-                                                fontSize: "12px",
-                                                color: "var(--text-secondary)",
-                                                borderBottom: "0.5px solid var(--border-tertiary)",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            {formatDate(user.last_sign_in_at)}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: "10px 14px",
-                                                fontSize: "12px",
-                                                color: "var(--text-secondary)",
-                                                borderBottom: "0.5px solid var(--border-tertiary)",
-                                                whiteSpace: "nowrap",
-                                            }}
-                                        >
-                                            {formatDate(user.created_at)}
-                                        </td>
-                                        <td
-                                            style={{
-                                                padding: "10px 14px",
-                                                borderBottom: "0.5px solid var(--border-tertiary)",
-                                                textAlign: "right",
-                                            }}
-                                        >
-                                            <Button
-                                                variant="dangerSoft"
-                                                size="xs"
-                                                leftIcon={<Trash2 size={13} />}
-                                                onClick={() => handleDelete(user)}
-                                                disabled={isDemo || isSelf || deletingId === user.id}
-                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                            >
-                                                {deletingId === user.id ? "Siliniyor..." : "Sil"}
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                    <DataTable
+                        columns={userColumns}
+                        rows={users}
+                        rowKey={user => user.id}
+                    />
                 )}
             </div>
         </div>

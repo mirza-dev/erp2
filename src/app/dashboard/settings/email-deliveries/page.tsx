@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, MailCheck, RefreshCw, ShieldOff, Wrench, X } from "lucide-react";
 import Button from "@/components/ui/Button";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { useToast } from "@/components/ui/Toast";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { EmailDeliveryStatus, EmailLogRow, EmailSuppressionRow, MaintenanceIncidentRow } from "@/lib/database.types";
@@ -112,6 +113,40 @@ export default function EmailDeliveriesPage() {
     if (permissionLoading) return <div style={{ padding: 24, color: "var(--text-secondary)" }}>Yükleniyor…</div>;
     if (!internalOperator) return <div style={{ padding: 24, color: "var(--text-secondary)" }}>Bu bakım alanına erişiminiz yok.</div>;
 
+    const deliveryColumns: DataTableColumn<SafeDelivery>[] = [
+        {
+            key: "status",
+            header: "Durum",
+            cell: row => {
+                const meta = STATUS_META[row.delivery_status];
+                return <span style={{ padding: "3px 7px", borderRadius: 5, color: meta.color, background: meta.bg, border: `var(--line-width) solid ${meta.border}` }}>{meta.label}</span>;
+            },
+        },
+        {
+            key: "subject",
+            header: "Konu",
+            cellStyle: { maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+            cell: row => <span title={row.subject}>{row.subject}</span>,
+        },
+        { key: "recipient", header: "Alıcı", cellStyle: { color: "var(--text-secondary)" }, cell: row => row.recipient_email },
+        { key: "type", header: "Tür", cellStyle: { color: "var(--text-secondary)" }, cell: row => row.notification_type },
+        { key: "created", header: "Oluşturma", cellStyle: { color: "var(--text-secondary)" }, cell: row => formatDate(row.created_at) },
+        { key: "attempts", header: "Deneme", cellStyle: { color: "var(--text-secondary)" }, cell: row => row.attempt_count },
+        {
+            key: "action",
+            header: "Aksiyon",
+            cell: row => {
+                const retryable = !!row.outbox_id && row.status === "failed" && !["bounced", "complained", "suppressed"].includes(row.delivery_status);
+                return (
+                    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <Button variant="secondary" size="xs" onClick={() => setSelectedDelivery(row)}>İncele</Button>
+                        {retryable && <Button variant="secondary" size="xs" loading={workingId === row.id} onClick={() => void action(row.id, `/api/maintenance/email-deliveries/${row.id}/retry`)}>Tekrar Dene</Button>}
+                    </div>
+                );
+            },
+        },
+    ];
+
     return (
         <div style={{ padding: "22px 24px 40px", display: "grid", gap: "18px" }}>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
@@ -157,31 +192,13 @@ export default function EmailDeliveriesPage() {
                     <input aria-label="Bitiş tarihi" type="date" value={to} onChange={e => setTo(e.target.value)} style={{ width: "100%", minWidth: 0, height: 34, borderRadius: 6, border: "var(--line-width) solid var(--border-secondary)", background: "var(--input-bg)", color: "var(--text-primary)", padding: "0 10px" }} />
                     <Button variant="secondary" size="sm" fullWidth onClick={() => void load()}>Filtrele</Button>
                 </div>
-                <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", minWidth: 900, borderCollapse: "collapse", fontSize: 12 }}>
-                        <thead><tr>{["Durum", "Konu", "Alıcı", "Tür", "Oluşturma", "Deneme", "Aksiyon"].map(x => <th key={x} style={{ padding: "9px 12px", textAlign: "left", color: "var(--text-secondary)", borderBottom: "var(--line-width) solid var(--border-secondary)" }}>{x}</th>)}</tr></thead>
-                        <tbody>
-                            {deliveries.map(row => {
-                                const meta = STATUS_META[row.delivery_status];
-                                const retryable = !!row.outbox_id && row.status === "failed" && !["bounced", "complained", "suppressed"].includes(row.delivery_status);
-                                return <tr key={row.id}>
-                                    <td style={{ padding: "10px 12px", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}><span style={{ padding: "3px 7px", borderRadius: 5, color: meta.color, background: meta.bg, border: `var(--line-width) solid ${meta.border}` }}>{meta.label}</span></td>
-                                    <td title={row.subject} style={{ maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", padding: "10px 12px", color: "var(--text-primary)", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>{row.subject}</td>
-                                    <td style={{ padding: "10px 12px", color: "var(--text-secondary)", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>{row.recipient_email}</td>
-                                    <td style={{ padding: "10px 12px", color: "var(--text-secondary)", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>{row.notification_type}</td>
-                                    <td style={{ padding: "10px 12px", color: "var(--text-secondary)", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>{formatDate(row.created_at)}</td>
-                                    <td style={{ padding: "10px 12px", color: "var(--text-secondary)", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>{row.attempt_count}</td>
-                                    <td style={{ padding: "10px 12px", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
-                                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                                            <Button variant="secondary" size="xs" onClick={() => setSelectedDelivery(row)}>İncele</Button>
-                                            {retryable && <Button variant="secondary" size="xs" loading={workingId === row.id} onClick={() => void action(row.id, `/api/maintenance/email-deliveries/${row.id}/retry`)}>Tekrar Dene</Button>}
-                                        </div>
-                                    </td>
-                                </tr>;
-                            })}
-                        </tbody>
-                    </table>
-                </div>
+                <DataTable
+                    columns={deliveryColumns}
+                    rows={deliveries}
+                    rowKey={row => row.id}
+                    minWidth="900px"
+                    emptyMessage="Teslimat kaydı bulunamadı."
+                />
             </section>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>

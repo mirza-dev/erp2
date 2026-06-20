@@ -84,6 +84,35 @@ describe("DataTable", () => {
         expect(firstRow.style.cursor).toBe("");
     });
 
+    it("rowStyle satır <tr>'ye uygulanır (örn. pasif kaydı soluklaştırma)", () => {
+        const { container } = render(
+            <DataTable
+                columns={columns}
+                rows={rows}
+                rowKey={r => r.id}
+                rowStyle={r => ({ opacity: r.qty > 15 ? 1 : 0.55 })}
+            />,
+        );
+        const bodyRows = container.querySelectorAll("tbody tr");
+        expect((bodyRows[0] as HTMLElement).style.opacity).toBe("0.55");
+        expect((bodyRows[1] as HTMLElement).style.opacity).toBe("1");
+    });
+
+    it("rowStyle ve onRowClick birlikte: cursor pointer korunur + stil biner", () => {
+        const { container } = render(
+            <DataTable
+                columns={columns}
+                rows={rows}
+                rowKey={r => r.id}
+                onRowClick={() => {}}
+                rowStyle={() => ({ opacity: 0.5 })}
+            />,
+        );
+        const firstRow = container.querySelector("tbody tr") as HTMLElement;
+        expect(firstRow.style.cursor).toBe("pointer");
+        expect(firstRow.style.opacity).toBe("0.5");
+    });
+
     it("footer hem dolu hem boş durumda render edilir", () => {
         const footer = <div>FOOTER</div>;
         const { rerender } = render(

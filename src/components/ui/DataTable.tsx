@@ -33,6 +33,11 @@ export interface DataTableProps<T> {
      * altına inmez; DataTable tabloyu `overflow-x: auto` ile sarar (yatay kaydırma).
      */
     minWidth?: string;
+    /**
+     * Satır bazlı ek stil (örn. pasif kaydı soluklaştırma `opacity`). `onRowClick`
+     * `cursor: pointer`'ının üstüne biner. Verilmezse satıra ek stil uygulanmaz.
+     */
+    rowStyle?: (row: T) => CSSProperties;
 }
 
 const thStyle: CSSProperties = {
@@ -66,6 +71,7 @@ export default function DataTable<T>({
     footer,
     onRowClick,
     minWidth,
+    rowStyle,
 }: DataTableProps<T>) {
     if (rows.length === 0) {
         return (
@@ -114,7 +120,10 @@ export default function DataTable<T>({
                         <tr
                             key={rowKey(row)}
                             onClick={onRowClick ? () => onRowClick(row) : undefined}
-                            style={onRowClick ? { cursor: "pointer" } : undefined}
+                            style={{
+                                ...(onRowClick ? { cursor: "pointer" } : {}),
+                                ...rowStyle?.(row),
+                            }}
                         >
                             {columns.map(col => (
                                 <td
