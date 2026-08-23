@@ -9,15 +9,28 @@
 -- Kullanım: Supabase Dashboard → SQL Editor → yapıştır → Run.
 -- Hiçbir şey değiştirmez; yalnız katalog okur.
 --
+-- HER SATIR KISA HÜKÜM döndürür (✅/❌). Ham CHECK/index tanımı döndürmek
+-- cazip ama SQL editörü uzun metni kırpıyor → hüküm okunamıyordu (2026-08-24).
+-- Ham tanıma bakmak gerekirse dosyanın sonundaki yorumlu blok var.
+--
 -- Deploy günü (bkz. memory C3) bu sorgu + `npx tsx scripts/check-migrations.ts`
 -- + `npm run preflight:auth` üçlüsü açılış hamlesidir.
 -- ────────────────────────────────────────────────────────────────────────────
 
-select '089+101' as mig, 'alerts type CHECK (po_overdue / rfq_response_due)' as kontrol,
-       pg_get_constraintdef(oid) as sonuc
+select '089' as mig, 'alerts type CHECK → po_overdue' as kontrol,
+       case when pg_get_constraintdef(oid) like '%po_overdue%'
+            then '✅ VAR' else '❌ YOK — 089 uygulanmamış' end as sonuc
   from pg_constraint
  where conrelid = 'alerts'::regclass and contype = 'c'
-   and pg_get_constraintdef(oid) ilike '%type%'
+   and pg_get_constraintdef(oid) ilike '%stock_critical%'
+
+union all
+select '101', 'alerts type CHECK → rfq_response_due',
+       case when pg_get_constraintdef(oid) like '%rfq_response_due%'
+            then '✅ VAR' else '❌ YOK — 101 uygulanmamış' end
+  from pg_constraint
+ where conrelid = 'alerts'::regclass and contype = 'c'
+   and pg_get_constraintdef(oid) ilike '%stock_critical%'
 
 union all
 select '093', 'create_order_with_lines → v_line_total (finansal recompute)',
@@ -30,7 +43,10 @@ select '094a', 'send_quote_and_create_pending_order → qli.description',
   from pg_proc where proname = 'send_quote_and_create_pending_order'
 
 union all
-select '094b', 'uq_sales_orders_quote_id (cancelled HARİÇ olmalı)', indexdef
+select '094b', 'uq_sales_orders_quote_id → cancelled HARİÇ (kısmi indeks)',
+       case when indexdef ilike '%where%' and indexdef ilike '%cancelled%'
+            then '✅ KISMİ — iptal sonrası yeniden gönderilebilir'
+            else '❌ TAM İNDEKS — 094 uygulanmamış (iptal sonrası gönderilemez)' end
   from pg_indexes where indexname = 'uq_sales_orders_quote_id'
 
 union all
@@ -39,7 +55,7 @@ select '095', 'scan lock fonksiyonları → search_path (lock hijyeni)',
   from pg_proc where proname like '%scan_lock%'
 
 union all
-select '102', 'create_rfq_with_lines → ON CONFLICT (rfq_id ambiguity temiz mi',
+select '102', 'create_rfq_with_lines → ON CONFLICT (rfq_id ambiguity temiz mi)',
        case when prosrc not like '%ON CONFLICT (rfq_id%' then '✅ TEMİZ (102 uygulanmış)'
             else '❌ ESKİ SÜRÜM — 102 uygulanmamış' end
   from pg_proc where proname = 'create_rfq_with_lines'
@@ -60,3 +76,9 @@ select '105', 'recount_stock → FOR UPDATE (atomik stok sayımı)',
   from pg_proc where proname = 'recount_stock'
 
 order by 1, 2;
+
+-- ── Ham tanımlar (gerekirse ayrı çalıştır; editör kırpabilir) ────────────────
+-- select pg_get_constraintdef(oid) from pg_constraint
+--  where conrelid = 'alerts'::regclass and contype = 'c'
+--    and pg_get_constraintdef(oid) ilike '%stock_critical%';
+-- select indexdef from pg_indexes where indexname = 'uq_sales_orders_quote_id';
