@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 
 export interface DataTableColumn<T> {
     key: string;
@@ -24,10 +24,20 @@ export interface DataTableProps<T> {
     footer?: ReactNode;
     /**
      * Satıra tıklayınca çağrılır (örn. detay sayfasına gitme). Verilirse satır
-     * `cursor: pointer` alır. Satır içinde gezinmeyi tetiklememesi gereken
-     * öğeler (checkbox, link) kendi onClick'inde `e.stopPropagation()` yapmalı.
+     * `cursor: pointer` alır ve **klavyeyle de çalışır**: `tabIndex=0` + Enter/Space.
+     * Satır içinde gezinmeyi tetiklememesi gereken öğeler (checkbox, link) kendi
+     * onClick'inde `e.stopPropagation()` yapmalı.
+     *
+     * NOT: satıra `role="button"` verilmez — `<tr role="button">` satırı ekran
+     * okuyucuda "tablo satırı" olmaktan çıkarır (hücre/sütun bağlamı kaybolur).
+     * Tablo semantiği korunur, klavye erişimi ayrıca sağlanır.
      */
     onRowClick?: (row: T) => void;
+    /**
+     * `onRowClick` varken satırın erişilebilir adı (örn. "X ürünü detayını gör").
+     * Verilmezse satıra `aria-label` basılmaz. `onRowClick` yoksa yok sayılır.
+     */
+    rowAriaLabel?: (row: T) => string;
     /**
      * Tablo için minimum genişlik (örn. "700px"). Dar ekranda tablo bu genişliğin
      * altına inmez; DataTable tabloyu `overflow-x: auto` ile sarar (yatay kaydırma).
@@ -70,6 +80,7 @@ export default function DataTable<T>({
     emptyMessage,
     footer,
     onRowClick,
+    rowAriaLabel,
     minWidth,
     rowStyle,
 }: DataTableProps<T>) {
@@ -120,6 +131,18 @@ export default function DataTable<T>({
                         <tr
                             key={rowKey(row)}
                             onClick={onRowClick ? () => onRowClick(row) : undefined}
+                            {...(onRowClick
+                                ? {
+                                    tabIndex: 0,
+                                    onKeyDown: (e: KeyboardEvent<HTMLTableRowElement>) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            onRowClick(row);
+                                        }
+                                    },
+                                    "aria-label": rowAriaLabel?.(row),
+                                }
+                                : {})}
                             style={{
                                 ...(onRowClick ? { cursor: "pointer" } : {}),
                                 ...rowStyle?.(row),

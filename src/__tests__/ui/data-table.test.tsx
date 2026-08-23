@@ -84,6 +84,80 @@ describe("DataTable", () => {
         expect(firstRow.style.cursor).toBe("");
     });
 
+    // ── Satır klavye erişimi (Faz B #7) ──────────────────────────────────────
+    // Tıklanabilir satır yalnız fareyle çalışmamalı. products/page.tsx bunu elle
+    // yazıyordu (tabIndex/onKeyDown/aria-label); DataTable'a taşındı → onRowClick
+    // kullanan TÜM listeler klavyeyle gezilebilir.
+
+    it("onRowClick verilince satır tabIndex=0 alır ama role=button ALMAZ", () => {
+        const { container } = render(
+            <DataTable columns={columns} rows={rows} rowKey={r => r.id} onRowClick={() => {}} />,
+        );
+        const firstRow = container.querySelector("tbody tr") as HTMLElement;
+        expect(firstRow.getAttribute("tabindex")).toBe("0");
+        // <tr role="button"> satırı ekran okuyucuda "tablo satırı" olmaktan çıkarır.
+        expect(firstRow.getAttribute("role")).toBeNull();
+    });
+
+    it("Enter ve Space satırı tetikler (preventDefault ile)", () => {
+        const onRowClick = vi.fn();
+        const { container } = render(
+            <DataTable columns={columns} rows={rows} rowKey={r => r.id} onRowClick={onRowClick} />,
+        );
+        const firstRow = container.querySelector("tbody tr") as HTMLElement;
+
+        const enter = fireEvent.keyDown(firstRow, { key: "Enter" });
+        expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+        expect(enter).toBe(false); // preventDefault çağrıldı → sayfa kaymaz
+
+        const space = fireEvent.keyDown(firstRow, { key: " " });
+        expect(onRowClick).toHaveBeenCalledTimes(2);
+        expect(space).toBe(false);
+    });
+
+    it("ilgisiz tuş satırı tetiklemez", () => {
+        const onRowClick = vi.fn();
+        const { container } = render(
+            <DataTable columns={columns} rows={rows} rowKey={r => r.id} onRowClick={onRowClick} />,
+        );
+        fireEvent.keyDown(container.querySelector("tbody tr") as HTMLElement, { key: "a" });
+        expect(onRowClick).not.toHaveBeenCalled();
+    });
+
+    it("rowAriaLabel satıra aria-label basar; verilmezse attribute yok", () => {
+        const { container, rerender } = render(
+            <DataTable
+                columns={columns}
+                rows={rows}
+                rowKey={r => r.id}
+                onRowClick={() => {}}
+                rowAriaLabel={r => `${r.name} detayını gör`}
+            />,
+        );
+        const bodyRows = container.querySelectorAll("tbody tr");
+        expect(bodyRows[0].getAttribute("aria-label")).toBe("Alfa detayını gör");
+        expect(bodyRows[1].getAttribute("aria-label")).toBe("Beta detayını gör");
+
+        rerender(
+            <DataTable columns={columns} rows={rows} rowKey={r => r.id} onRowClick={() => {}} />,
+        );
+        expect(container.querySelector("tbody tr")!.getAttribute("aria-label")).toBeNull();
+    });
+
+    it("onRowClick yokken satır odaklanabilir DEĞİL (tabIndex/aria-label yok)", () => {
+        const { container } = render(
+            <DataTable
+                columns={columns}
+                rows={rows}
+                rowKey={r => r.id}
+                rowAriaLabel={r => r.name}
+            />,
+        );
+        const firstRow = container.querySelector("tbody tr") as HTMLElement;
+        expect(firstRow.getAttribute("tabindex")).toBeNull();
+        expect(firstRow.getAttribute("aria-label")).toBeNull();
+    });
+
     it("rowStyle satır <tr>'ye uygulanır (örn. pasif kaydı soluklaştırma)", () => {
         const { container } = render(
             <DataTable
