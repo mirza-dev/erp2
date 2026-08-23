@@ -29,9 +29,17 @@ Drawer'a ait tüm state'ler (`selectedProductId`, `drawerEditMode`, `drawerSavin
 
 **Stok sekmesi kartları:** on_hand / promisable (satılabilir) / reserved / min_stock_level / quoted (teklifte) / incoming (bekleniyor). Hepsi GET response'tan geliyor (P2-001 fix).
 
-## Liste Sayfası — 6 Sabit Kolon
+## Liste Sayfası — 6 Sabit Kolon (+ seçim ve aksiyon)
 
 SKU / Ürün Adı / Stok / Satılabilir / Fiyat / Min stok. Eski Kategori/Kapsam/Son Tarih/Sinyal kolonları kaldırıldı.
+
+**Faz B #7 (2026-08-23, `2095ae2`) — tablo artık `Card` + ortak `DataTable`.** Sayfa `"use client"` KALIR (A1'de sunucu-sayfalı fetch'e geçmişti: `?paged=1` → `{rows,total}` + `/api/products/counts`); değişen yalnız sunum.
+- Kolonlar `columns: DataTableColumn<Product>[]` dizisinde. `price`/`minStock` dar ekranda gizli → `wideOnlyColumns` spread'i (`...(isMobile ? [] : wideOnlyColumns)`), eski `{!isMobile && <th/>}` koşullarının karşılığı.
+- Satır tıklaması `onRowClick={product => router.push(...)}` — **parametre adı `product` KALMALI**, `products-page-drawer-removed.test.ts` bu regex'i kilitliyor.
+- Satır klavye erişimi artık DataTable'dan gelir (`tabIndex=0` + Enter/Space); erişilebilir ad `rowAriaLabel={product => \`${product.name} detayını gör\`}`. Eski elle yazılmış `tabIndex`/`role="button"`/`onKeyDown` kaldırıldı — `role="button"` bilinçli düşürüldü (tablo satırı semantiğini yok ediyordu).
+- **Dikkat:** `cellStyle` kolona statiktir → Stok/Satılabilir'in satır bazlı koşullu rengi hücre içeriğinde `<span style>` ile. DataTable ortak stili `whiteSpace:nowrap` VERMEZ → kolon bazında `headerStyle`/`cellStyle` ile veriliyor (Ürün Adı'nın `textOverflow:ellipsis`'i buna bağlı).
+- `hoveredId` + `onMouseEnter/Leave` + `rowBg` KALDIRILDI (hover globals.css `.erp-data-table`). Yerel `thStyle`/`tdStyle` KALDIRILDI; `modalInputStyle` KALDI.
+- Boş durum `emptyMessage`, Pagination `footer` prop'unda. Boş durum artık `total===0` yerine `rows.length===0` ile render olur (bilinçli).
 
 ## Kategori Yönetimi
 
