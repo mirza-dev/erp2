@@ -11,6 +11,8 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { computeTotalPages, PAGE_SIZE } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
+import Card from "@/components/ui/Card";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { useSelection } from "@/hooks/useSelection";
 import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
@@ -37,26 +39,6 @@ interface RiskRecEntry {
     status: string;
     decidedAt?: string | null;
 }
-
-const thStyle: React.CSSProperties = {
-    textAlign: "left",
-    padding: "10px 14px",
-    fontSize: "12px",
-    fontWeight: "var(--font-table-heading-weight)",
-    color: "var(--text-secondary)",
-    borderBottom: "var(--line-width) solid var(--surface-border)",
-    whiteSpace: "nowrap",
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: "10px 14px",
-    fontSize: "13px",
-    fontWeight: "var(--font-table-cell-weight)",
-    borderBottom: "var(--line-width) solid var(--border-tertiary)",
-    color: "var(--text-primary)",
-    lineHeight: 1.4,
-    whiteSpace: "nowrap",
-};
 
 const modalInputStyle: React.CSSProperties = {
     fontSize: "13px",
@@ -104,7 +86,6 @@ export default function ProductsPage() {
     const [committedSearch, setCommittedSearch] = useState("");
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-    const [hoveredId, setHoveredId] = useState<string | null>(null);
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
     const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
     const categoryDropdownRef = useRef<HTMLDivElement>(null);
@@ -451,6 +432,162 @@ export default function ProductsPage() {
         }
     };
 
+    // ── Faz B #7: liste tablosu Card + DataTable'a taşındı ──────────────────
+    // İki incelik:
+    //  1) `cellStyle` kolona statiktir, satıra değil → Stok/Satılabilir'in satır
+    //     bazlı koşullu rengi hücre içeriğinde <span style> ile veriliyor.
+    //  2) Sayfanın eski yerel thStyle/tdStyle'ı tüm hücrelere whiteSpace:nowrap
+    //     veriyordu; DataTable'ın ortak stili vermez → kolon bazında geri veriliyor
+    //     (Ürün Adı'nın textOverflow:ellipsis'i nowrap olmadan çalışmaz).
+    const NOWRAP: React.CSSProperties = { whiteSpace: "nowrap" };
+    const checkboxCellStyle: React.CSSProperties = { width: "36px", padding: "10px 8px 10px 14px" };
+
+    // Dar ekranda gizlenen kolonlar (eski `{!isMobile && <th/>}` koşullarının karşılığı).
+    const wideOnlyColumns: DataTableColumn<Product>[] = [
+        {
+            key: "price",
+            header: "Fiyat",
+            align: "right",
+            headerStyle: NOWRAP,
+            cellStyle: { ...NOWRAP, color: "var(--text-secondary)" },
+            cell: product => product.price != null
+                ? maskCurrency(product.price, product.currency, canViewSalesPrices)
+                : "—",
+        },
+        {
+            key: "minStock",
+            header: "Min stok",
+            align: "right",
+            headerStyle: NOWRAP,
+            cellStyle: { ...NOWRAP, color: "var(--text-secondary)" },
+            cell: product => formatNumber(product.minStockLevel),
+        },
+    ];
+
+    const columns: DataTableColumn<Product>[] = [
+        {
+            key: "select",
+            header: (
+                <input
+                    type="checkbox"
+                    checked={isPageAllSelected(pageIds)}
+                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
+                    onChange={() => toggleAll(pageIds)}
+                    onClick={e => e.stopPropagation()}
+                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                    aria-label="Sayfadaki tüm ürünleri seç"
+                />
+            ),
+            width: "36px",
+            headerStyle: checkboxCellStyle,
+            cellStyle: checkboxCellStyle,
+            cell: product => (
+                <span style={{ display: "inline-flex" }} onClick={e => e.stopPropagation()}>
+                    <input
+                        type="checkbox"
+                        checked={selectedIds.has(product.id)}
+                        onChange={() => toggleOne(product.id)}
+                        onClick={e => e.stopPropagation()}
+                        style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
+                        aria-label={`${product.name} seç`}
+                    />
+                </span>
+            ),
+        },
+        {
+            key: "sku",
+            header: "SKU",
+            headerStyle: NOWRAP,
+            cellStyle: { ...NOWRAP, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "12px" },
+            cell: product => product.sku,
+        },
+        {
+            key: "name",
+            header: "Ürün Adı",
+            headerStyle: NOWRAP,
+            cellStyle: { ...NOWRAP, fontWeight: 500, maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis" },
+            cell: product => product.name,
+        },
+        {
+            key: "onHand",
+            header: "Stok",
+            align: "right",
+            headerStyle: NOWRAP,
+            cellStyle: { ...NOWRAP, fontWeight: 600 },
+            cell: product => (
+                <span style={{ color: product.promisable <= product.minStockLevel ? "var(--danger-text)" : "var(--text-primary)" }}>
+                    {formatNumber(product.on_hand)}
+                </span>
+            ),
+        },
+        {
+            key: "promisable",
+            header: "Satılabilir",
+            align: "right",
+            headerStyle: NOWRAP,
+            cellStyle: { ...NOWRAP, fontWeight: 600 },
+            cell: product => (
+                <span style={{
+                    color: product.promisable <= 0
+                        ? "var(--danger-text)"
+                        : product.promisable <= product.minStockLevel
+                            ? "var(--warning-text)"
+                            : "var(--text-primary)",
+                }}>
+                    {formatNumber(product.promisable)}
+                </span>
+            ),
+        },
+        ...(isMobile ? [] : wideOnlyColumns),
+        {
+            key: "actions",
+            header: "",
+            align: "right",
+            width: isMobile ? "36px" : "100px",
+            headerStyle: NOWRAP,
+            cellStyle: { ...NOWRAP, paddingRight: "12px" },
+            cell: product => (
+                <div
+                    style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}
+                    onClick={e => e.stopPropagation()}
+                >
+                    {has("manage_product_master") && (confirmDeleteId === product.id ? (
+                        <>
+                            <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Emin misin?</span>
+                            <Button
+                                variant="danger"
+                                size="xs"
+                                leftIcon={<Trash2 size={13} />}
+                                disabled={deletingId === product.id}
+                                onClick={() => handleDelete(product.id)}
+                            >
+                                {deletingId === product.id ? "…" : "Evet"}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="xs"
+                                onClick={() => setConfirmDeleteId(null)}
+                            >
+                                Hayır
+                            </Button>
+                        </>
+                    ) : (
+                        <Button
+                            variant="dangerSoft"
+                            size="xs"
+                            leftIcon={<Trash2 size={13} />}
+                            onClick={() => !isDemo && setConfirmDeleteId(product.id)}
+                            disabled={isDemo}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        >
+                            Sil
+                        </Button>
+                    ))}
+                </div>
+            ),
+        },
+    ];
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {/* Load error banner */}
@@ -777,179 +914,50 @@ export default function ProductsPage() {
             )}
 
             {/* Table */}
-            <div
-                style={{
-                    background: "var(--surface-raised)",
-                    border: "var(--line-width) solid var(--surface-border)",
-                    borderRadius: "6px",
-                    overflow: "hidden",
-                    overflowX: "auto",
-                    boxShadow: "var(--surface-shadow-sm)",
-                }}
-            >
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", minWidth: isMobile ? "360px" : "640px" }}>
-                    <thead>
-                        <tr style={{ background: "var(--table-header-bg)" }}>
-                            <th style={{ ...thStyle, width: "36px", padding: "10px 8px 10px 14px" }}>
-                                <input
-                                    type="checkbox"
-                                    checked={isPageAllSelected(pageIds)}
-                                    ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
-                                    onChange={() => toggleAll(pageIds)}
-                                    onClick={e => e.stopPropagation()}
-                                    style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                    aria-label="Sayfadaki tüm ürünleri seç"
-                                />
-                            </th>
-                            <th style={thStyle}>SKU</th>
-                            <th style={thStyle}>Ürün Adı</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Stok</th>
-                            <th style={{ ...thStyle, textAlign: "right" }}>Satılabilir</th>
-                            {!isMobile && <th style={{ ...thStyle, textAlign: "right" }}>Fiyat</th>}
-                            {!isMobile && <th style={{ ...thStyle, textAlign: "right" }}>Min stok</th>}
-                            <th style={{ ...thStyle, width: isMobile ? "36px" : "100px" }}></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {pageRows.map((product) => {
-                            const isCritical = product.promisable <= product.minStockLevel;
-                            const rowBg = hoveredId === product.id ? "var(--table-row-hover)" : "transparent";
-                            return (
-                                <tr
-                                    key={product.id}
-                                    tabIndex={0}
-                                    role="button"
-                                    aria-label={`${product.name} detayını gör`}
-                                    style={{ cursor: "pointer" }}
-                                    onClick={() => router.push(`/dashboard/products/${product.id}`)}
-                                    onKeyDown={e => {
-                                        if (e.key === "Enter" || e.key === " ") {
-                                            e.preventDefault();
-                                            router.push(`/dashboard/products/${product.id}`);
-                                        }
-                                    }}
-                                    onMouseEnter={() => setHoveredId(product.id)}
-                                    onMouseLeave={() => setHoveredId(null)}
+            <Card>
+                <DataTable
+                    columns={columns}
+                    rows={pageRows}
+                    rowKey={p => p.id}
+                    onRowClick={product => router.push(`/dashboard/products/${product.id}`)}
+                    rowAriaLabel={product => `${product.name} detayını gör`}
+                    minWidth={isMobile ? "360px" : "640px"}
+                    emptyMessage={
+                        <>
+                            <div style={{ fontWeight: 500, color: "var(--text-secondary)", marginBottom: "4px" }}>
+                                Ürün bulunamadı
+                            </div>
+                            <div style={{ fontSize: "12px", marginBottom: (search || alertFilter !== "tumu") ? "12px" : "0" }}>
+                                {search
+                                    ? `"${search}" aramasıyla eşleşen ürün yok`
+                                    : alertFilter === "riskli" ? "Şu an riskli ürün yok"
+                                    : alertFilter === "uyarili" ? "Aktif uyarısı olan ürün yok"
+                                    : alertFilter === "oneri" ? "Bekleyen önerisi olan ürün yok"
+                                    : selectedCategories.length > 0 ? `Seçili kategorilerde ürün yok` : "Ürün bulunamadı"}
+                            </div>
+                            {(search || alertFilter !== "tumu") && (
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => { setSearch(""); setAlertFilter("tumu"); setCurrentPage(1); }}
                                 >
-                                    <td
-                                        style={{ ...tdStyle, background: rowBg, width: "36px", padding: "10px 8px 10px 14px" }}
-                                        onClick={e => e.stopPropagation()}
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.has(product.id)}
-                                            onChange={() => toggleOne(product.id)}
-                                            onClick={e => e.stopPropagation()}
-                                            style={{ width: "14px", height: "14px", accentColor: "var(--accent)", cursor: "pointer" }}
-                                            aria-label={`${product.name} seç`}
-                                        />
-                                    </td>
-                                    <td style={{ ...tdStyle, background: rowBg, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "12px" }}>
-                                        {product.sku}
-                                    </td>
-                                    <td style={{ ...tdStyle, background: rowBg, fontWeight: 500, maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                        {product.name}
-                                    </td>
-                                    <td style={{ ...tdStyle, background: rowBg, textAlign: "right", fontWeight: 600, color: isCritical ? "var(--danger-text)" : "var(--text-primary)" }}>
-                                        {formatNumber(product.on_hand)}
-                                    </td>
-                                    <td style={{ ...tdStyle, background: rowBg, textAlign: "right", fontWeight: 600, color: product.promisable <= 0 ? "var(--danger-text)" : product.promisable <= product.minStockLevel ? "var(--warning-text)" : "var(--text-primary)" }}>
-                                        {formatNumber(product.promisable)}
-                                    </td>
-                                    {!isMobile && (
-                                        <td style={{ ...tdStyle, background: rowBg, textAlign: "right", color: "var(--text-secondary)" }}>
-                                            {product.price != null ? maskCurrency(product.price, product.currency, canViewSalesPrices) : "—"}
-                                        </td>
-                                    )}
-                                    {!isMobile && (
-                                        <td style={{ ...tdStyle, background: rowBg, textAlign: "right", color: "var(--text-secondary)" }}>
-                                            {formatNumber(product.minStockLevel)}
-                                        </td>
-                                    )}
-                                    <td
-                                        style={{ ...tdStyle, background: rowBg, textAlign: "right", paddingRight: "12px" }}
-                                        onClick={e => e.stopPropagation()}
-                                    >
-                                        {has("manage_product_master") && (confirmDeleteId === product.id ? (
-                                            <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
-                                                <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Emin misin?</span>
-                                                <Button
-                                                    variant="danger"
-                                                    size="xs"
-                                                    leftIcon={<Trash2 size={13} />}
-                                                    disabled={deletingId === product.id}
-                                                    onClick={() => handleDelete(product.id)}
-                                                >
-                                                    {deletingId === product.id ? "…" : "Evet"}
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    size="xs"
-                                                    onClick={() => setConfirmDeleteId(null)}
-                                                >
-                                                    Hayır
-                                                </Button>
-                                            </span>
-                                        ) : (
-                                            <Button
-                                                variant="dangerSoft"
-                                                size="xs"
-                                                leftIcon={<Trash2 size={13} />}
-                                                onClick={() => !isDemo && setConfirmDeleteId(product.id)}
-                                                disabled={isDemo}
-                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                            >
-                                                Sil
-                                            </Button>
-                                        ))}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-
-                {total > 0 && (
-                    <Pagination
-                        currentPage={currentPage}
-                        totalPages={totalPages}
-                        totalItems={total}
-                        pageSize={PAGE_SIZE}
-                        onPageChange={setCurrentPage}
-                        itemLabel="ürün"
-                    />
-                )}
-
-                {total === 0 && (
-                    <div style={{
-                        padding: "40px 16px",
-                        textAlign: "center",
-                        color: "var(--text-tertiary)",
-                        fontSize: "13px",
-                    }}>
-                        <div style={{ fontWeight: 500, color: "var(--text-secondary)", marginBottom: "4px" }}>
-                            Ürün bulunamadı
-                        </div>
-                        <div style={{ fontSize: "12px", marginBottom: (search || alertFilter !== "tumu") ? "12px" : "0" }}>
-                            {search
-                                ? `"${search}" aramasıyla eşleşen ürün yok`
-                                : alertFilter === "riskli" ? "Şu an riskli ürün yok"
-                                : alertFilter === "uyarili" ? "Aktif uyarısı olan ürün yok"
-                                : alertFilter === "oneri" ? "Bekleyen önerisi olan ürün yok"
-                                : selectedCategories.length > 0 ? `Seçili kategorilerde ürün yok` : "Ürün bulunamadı"}
-                        </div>
-                        {(search || alertFilter !== "tumu") && (
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => { setSearch(""); setAlertFilter("tumu"); setCurrentPage(1); }}
-                            >
-                                Filtreleri temizle
-                            </Button>
-                        )}
-                    </div>
-                )}
-            </div>
+                                    Filtreleri temizle
+                                </Button>
+                            )}
+                        </>
+                    }
+                    footer={total > 0 ? (
+                        <Pagination
+                            currentPage={currentPage}
+                            totalPages={totalPages}
+                            totalItems={total}
+                            pageSize={PAGE_SIZE}
+                            onPageChange={setCurrentPage}
+                            itemLabel="ürün"
+                        />
+                    ) : null}
+                />
+            </Card>
 
 
             {/* Bulk delete confirm modal */}

@@ -38,19 +38,24 @@ describe("Faz 2b — products list page (drawer removed)", () => {
     });
 
     it("tablo başlıkları: SKU/Ürün Adı/Stok/Satılabilir/Fiyat/Min stok (6 kolon)", () => {
-        expect(SOURCE).toMatch(/>SKU</);
-        expect(SOURCE).toMatch(/>Ürün Adı</);
-        expect(SOURCE).toMatch(/>Stok</);
-        expect(SOURCE).toMatch(/>Satılabilir</);
-        expect(SOURCE).toMatch(/>Fiyat</);
-        expect(SOURCE).toMatch(/>Min stok</);
+        // Faz B #7: tablo DataTable'a taşındı → başlıklar JSX <th> literal'i değil,
+        // kolon tanımındaki `header:` alanı. Niyet aynı: bu 6 kolon listede olmalı.
+        expect(SOURCE).toMatch(/header: "SKU"/);
+        expect(SOURCE).toMatch(/header: "Ürün Adı"/);
+        expect(SOURCE).toMatch(/header: "Stok"/);
+        expect(SOURCE).toMatch(/header: "Satılabilir"/);
+        expect(SOURCE).toMatch(/header: "Fiyat"/);
+        expect(SOURCE).toMatch(/header: "Min stok"/);
     });
 
     it("eski Kapsam/Son Tarih/Sinyal kolonları kaldırılmış", () => {
-        // Header literals removed
+        // Hem eski JSX <th> literal'i hem yeni kolon-tanımı formu kilitli.
         expect(SOURCE).not.toMatch(/>Kapsam</);
         expect(SOURCE).not.toMatch(/>Son Tarih</);
         expect(SOURCE).not.toMatch(/>Sinyal</);
+        expect(SOURCE).not.toMatch(/header: "Kapsam"/);
+        expect(SOURCE).not.toMatch(/header: "Son Tarih"/);
+        expect(SOURCE).not.toMatch(/header: "Sinyal"/);
     });
 
     it("useRouter import edilmiş", () => {

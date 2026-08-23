@@ -27,7 +27,6 @@ const BUTTON_SRC = read("src/components/ui/Button.tsx");
 const CARD_SRC = read("src/components/ui/Card.tsx");
 const DATA_TABLE_SRC = read("src/components/ui/DataTable.tsx");
 const DASH_LAYOUT_SRC = read("src/app/dashboard/layout.tsx");
-const PRODUCTS_SRC = read("src/app/dashboard/products/page.tsx");
 const STOCK_GRID_SRC = read("src/components/dashboard/StockDataGrid.tsx");
 const QUOTE_DOC_SRC = read("src/app/dashboard/quotes/components/QuoteDocument.tsx");
 const PO_DOC_SRC = read("src/components/purchase/PurchaseOrderDocument.tsx");
@@ -212,9 +211,10 @@ describe("Tema — ThemeToggle UI", () => {
     });
 
     it("temsilci tablolar line-width ve tablo font ağırlığı tokenlarını kullanır", () => {
-        // OrdersClient DataTable'a taşındı → tema token'ları DataTable.tsx'te (üstteki
-        // testte kapsanır). Henüz kendi <table>'ını tutan temsilciler kontrol edilir.
-        for (const src of [PRODUCTS_SRC, STOCK_GRID_SRC]) {
+        // OrdersClient (Faz B #4) ve products/page.tsx (Faz B #7) DataTable'a taşındı
+        // → tema token'ları DataTable.tsx'te (üstteki testte kapsanır). Henüz kendi
+        // <table>'ını tutan temsilciler burada kontrol edilir.
+        for (const src of [STOCK_GRID_SRC]) {
             expect(src).toContain("var(--line-width) solid var(--surface-border)");
             expect(src).toContain("var(--line-width) solid var(--border-tertiary)");
             expect(src).toContain("var(--font-table-heading-weight)");
