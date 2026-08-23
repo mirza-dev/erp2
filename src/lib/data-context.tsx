@@ -91,7 +91,7 @@ interface DataContextValue {
   orders: Order[];
   uretimKayitlari: UretimKaydi[];
   addCustomer: (
-    c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">
+    c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "revenueByCurrency" | "lastOrderDate" | "isActive">
   ) => Promise<void>;
   updateCustomer: (id: string, updates: Partial<Customer>) => Promise<Customer | undefined>;
   deleteCustomer: (id: string) => Promise<void>;
@@ -224,7 +224,7 @@ export function useCustomers() {
   const { mutate } = useSWRConfig();
 
   const addCustomer = useCallback(async (
-    fields: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "lastOrderDate" | "isActive">
+    fields: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "revenueByCurrency" | "lastOrderDate" | "isActive">
   ) => {
     if (demoGuard()) return;
     try {

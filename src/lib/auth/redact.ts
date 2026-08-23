@@ -44,12 +44,20 @@ export function redactProductsForPerms<T extends object>(items: T[], perms: Set<
     });
 }
 
-/** customers GET (snake_case): `total_revenue` ← view_financial_summary. */
+/**
+ * customers GET (snake_case): `total_revenue` + `revenue_by_currency`
+ * ← view_financial_summary.
+ *
+ * `revenue_by_currency` (2026-08-24) `total_revenue` ile AYNI hassasiyette:
+ * cari kendi para birimi dışındaki ciroyu da taşır. Yalnız `total_revenue`
+ * null'lanırsa döküm alanı finansal veriyi olduğu gibi sızdırır.
+ */
 export function redactCustomersForPerms<T extends object>(items: T[], perms: Set<Permission>): T[] {
     if (perms.has("view_financial_summary")) return items;
     return items.map((c) => {
         const r = { ...c } as Row;
         nullField(r, "total_revenue");
+        nullField(r, "revenue_by_currency");
         return r as T;
     });
 }

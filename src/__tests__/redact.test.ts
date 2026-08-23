@@ -89,6 +89,29 @@ describe("redactCustomersForPerms", () => {
         expect("total_revenue" in out[0]).toBe(false);
         expect(rows[0].total_revenue).toBe(50000);
     });
+
+    // revenue_by_currency (2026-08-24) total_revenue ile AYNI hassasiyette:
+    // yalnız total_revenue null'lanırsa döküm alanı ciroyu olduğu gibi sızdırır.
+    it("yetki yok → revenue_by_currency de null (döküm alanı SIZDIRMAZ)", () => {
+        const withBreakdown = [{
+            id: "c1", name: "Abdi İbrahim", currency: "EUR",
+            total_revenue: 5904, revenue_by_currency: { EUR: 5904, USD: 5889.6 },
+        }];
+        const out = redactCustomersForPerms(withBreakdown, P());
+        expect(out[0].total_revenue).toBeNull();
+        expect(out[0].revenue_by_currency).toBeNull();
+        expect(out[0].name).toBe("Abdi İbrahim");
+        // kaynak mutasyona uğramadı
+        expect(withBreakdown[0].revenue_by_currency).toEqual({ EUR: 5904, USD: 5889.6 });
+    });
+
+    it("yetki VAR → revenue_by_currency dokunulmadan geçer", () => {
+        const withBreakdown = [{
+            id: "c1", total_revenue: 5904, revenue_by_currency: { EUR: 5904, USD: 5889.6 },
+        }];
+        const out = redactCustomersForPerms(withBreakdown, P("view_financial_summary"));
+        expect(out[0].revenue_by_currency).toEqual({ EUR: 5904, USD: 5889.6 });
+    });
 });
 
 // ── orders (list + detail) ─────────────────────────────────────────────────────

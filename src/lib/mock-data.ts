@@ -146,8 +146,16 @@ export interface Customer {
     currency: string;
     notes: string;
     isActive: boolean;
+    /** Ciroya sayılan (approved) sipariş adedi — okuma anında hesaplanır. */
     totalOrders: number;
+    /** Cari KENDİ para birimindeki ciro. Karışık PB'de tam döküm aşağıda. */
     totalRevenue: number;
+    /**
+     * Para birimi → ciro. Bir cari birden çok PB'de sipariş verebilir; bu
+     * tutarlar ASLA toplanmaz (bkz. `@/lib/customer-stats`). Yetkisiz
+     * kullanıcıda redaction sonrası boş obje gelir.
+     */
+    revenueByCurrency: Record<string, number>;
     lastOrderDate: string;
 }
 
@@ -525,6 +533,7 @@ export const mockCustomers: Customer[] = [
         isActive: true,
         totalOrders: 12,
         totalRevenue: 285000,
+        revenueByCurrency: { USD: 285000 },
         lastOrderDate: "2026-02-15",
     },
     {
@@ -541,6 +550,7 @@ export const mockCustomers: Customer[] = [
         isActive: true,
         totalOrders: 28,
         totalRevenue: 1450000,
+        revenueByCurrency: { USD: 1450000 },
         lastOrderDate: "2026-03-10",
     },
     {
@@ -557,6 +567,7 @@ export const mockCustomers: Customer[] = [
         isActive: true,
         totalOrders: 9,
         totalRevenue: 520000,
+        revenueByCurrency: { USD: 520000 },
         lastOrderDate: "2026-01-28",
     },
     {
@@ -573,6 +584,7 @@ export const mockCustomers: Customer[] = [
         isActive: true,
         totalOrders: 2,
         totalRevenue: 38000,
+        revenueByCurrency: { EUR: 38000 },
         lastOrderDate: "2026-03-05",
     },
     {
@@ -589,6 +601,7 @@ export const mockCustomers: Customer[] = [
         isActive: true,
         totalOrders: 45,
         totalRevenue: 3200000,
+        revenueByCurrency: { TRY: 3200000 },
         lastOrderDate: "2026-03-12",
     },
     {
@@ -605,6 +618,7 @@ export const mockCustomers: Customer[] = [
         isActive: true,
         totalOrders: 18,
         totalRevenue: 680000,
+        revenueByCurrency: { EUR: 680000 },
         lastOrderDate: "2026-02-20",
     },
 ];

@@ -7,6 +7,7 @@ import { Pencil, Plus, Save, X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import { maskCurrency, formatDate } from "@/lib/utils";
 import type { Customer } from "@/lib/mock-data";
+import { primaryRevenue } from "@/lib/customer-stats";
 import { useOrders, useCustomers } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { useToast } from "@/components/ui/Toast";
@@ -69,15 +70,21 @@ export default function CustomerDetailPanel({
 
     if (!customer) return null;
 
-    // Dynamic stats from actual orders
+    // "Son Siparişler" listesi için — sayaçlar İÇİN DEĞİL (aşağıya bak).
     const customerOrders = orders.filter(o =>
         o.customerId ? o.customerId === customer.id : o.customerName === customer.name
     );
-    const totalOrders = customerOrders.length;
-    const totalRevenue = customerOrders.reduce((sum, o) => sum + o.grandTotal, 0);
-    const recentOrders = [...customerOrders]
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    const recentOrders = customerOrders
+        .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, 5);
+
+    // Sayaçlar sunucuda hesaplanıp cari kaydıyla gelir (`@/lib/customer-stats`).
+    // Panel eskiden bunları context'teki siparişlerden kendisi topluyordu; o
+    // hesap İKİ YÖNDEN yanlıştı: taslak/iptal siparişleri de sayıyor ve FARKLI
+    // para birimlerini üst üste ekliyordu. Artık liste sayfasıyla birebir aynı
+    // kural (yalnız `approved`, PB'ler ayrı) — iki ekran çelişmez.
+    const totalOrders = customer.totalOrders;
+    const revenue = primaryRevenue(customer.revenueByCurrency, customer.currency);
 
     const openEdit = () => {
         setEditForm({ ...customer });
@@ -301,8 +308,15 @@ export default function CustomerDetailPanel({
                             <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "10px 12px" }}>
                                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Toplam Ciro</div>
                                 <div style={{ fontSize: "16px", fontWeight: 500, color: "var(--success-text)" }}>
-                                    {canViewFinancialSummary && totalRevenue > 0 ? maskCurrency(totalRevenue, customer.currency, true) : "—"}
+                                    {canViewFinancialSummary && (revenue.amount > 0 || revenue.others.length > 0)
+                                        ? maskCurrency(revenue.amount, revenue.currency, true)
+                                        : "—"}
                                 </div>
+                                {canViewFinancialSummary && revenue.others.map(o => (
+                                    <div key={o.currency} style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
+                                        {maskCurrency(o.amount, o.currency, true)}
+                                    </div>
+                                ))}
                             </div>
                         </div>
 

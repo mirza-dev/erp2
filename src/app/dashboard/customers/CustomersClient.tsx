@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSWRConfig } from "swr";
 import { maskCurrency } from "@/lib/utils";
 import { type Customer } from "@/lib/mock-data";
+import { primaryRevenue } from "@/lib/customer-stats";
 import { CUSTOMERS_KEY } from "@/lib/data-context";
 import { mapCustomer } from "@/lib/api-mappers";
 import { decrementCount, patchCountRecord, removeByIds, successfulResponseIds, upsertFirst } from "@/lib/fast-mutation";
@@ -344,7 +345,25 @@ export default function CustomersClient(props: CustomersClientProps) {
             header: "Toplam Gelir",
             align: "right",
             cellStyle: { fontWeight: 500, color: "var(--success-text)" },
-            cell: customer => maskCurrency(customer.totalRevenue, customer.currency, canViewFinancialSummary),
+            // Karışık para birimi DÜRÜSTÇE ayrı satırda: bir cari hem EUR hem
+            // USD sipariş verebilir (canlı veride var) ve bunları toplamak
+            // anlamsız bir sayı üretir.
+            cell: customer => {
+                const { amount, currency, others } = primaryRevenue(
+                    customer.revenueByCurrency, customer.currency,
+                );
+                if (!canViewFinancialSummary) return "—";
+                return (
+                    <>
+                        <div>{maskCurrency(amount, currency, true)}</div>
+                        {others.map(o => (
+                            <div key={o.currency} style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                {maskCurrency(o.amount, o.currency, true)}
+                            </div>
+                        ))}
+                    </>
+                );
+            },
         },
         {
             key: "chevron",

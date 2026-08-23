@@ -159,7 +159,7 @@ export function mapProductAttachment(
 
 // ── Customer ──────────────────────────────────────────────
 
-export function mapCustomer(row: CustomerRow): Customer {
+export function mapCustomer(row: CustomerRow & { revenue_by_currency?: Record<string, number> | null }): Customer {
   return {
     id: row.id,
     name: row.name,
@@ -174,6 +174,8 @@ export function mapCustomer(row: CustomerRow): Customer {
     isActive: row.is_active,
     totalOrders: row.total_orders,
     totalRevenue: row.total_revenue,
+    // RBAC R3'te null'lanabilir (yetkisiz) → {} ile UI sözleşmesi korunur.
+    revenueByCurrency: row.revenue_by_currency ?? {},
     lastOrderDate: row.last_order_date ?? "",
   };
 }

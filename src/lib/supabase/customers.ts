@@ -1,6 +1,80 @@
 import { createServiceClient } from "./service";
 import { orIlikeFilter } from "@/lib/list-query";
 import type { CustomerRow } from "@/lib/database.types";
+import {
+    aggregateCustomerOrderStats,
+    emptyCustomerOrderStats,
+    CUSTOMER_REVENUE_STATUS,
+    type CustomerOrderStats,
+    type CustomerStatSourceOrder,
+} from "@/lib/customer-stats";
+
+/**
+ * Liste satırı + okuma anında hesaplanan sipariş/gelir sayaçları.
+ *
+ * `total_orders` / `total_revenue` / `last_order_date` DB kolonları ÖLÜ
+ * (hiç güncellenmiyor, bkz. `@/lib/customer-stats`) — bu yol onları
+ * `sales_orders`'tan hesaplanan gerçek değerlerle DEĞİŞTİREREK döndürür.
+ * `total_revenue` cari KENDİ para birimindeki toplamdır; para birimleri
+ * toplanmadığı için tam dökümü `revenue_by_currency` taşır.
+ */
+export interface CustomerRowWithStats extends CustomerRow {
+    revenue_by_currency: Record<string, number>;
+}
+
+/** PostgREST tek istekte en fazla 1000 satır döner — sessiz kırpma tuzağı. */
+const ORDER_STATS_BATCH = 1000;
+
+/**
+ * Verilen cariler için `sales_orders`'tan sipariş/gelir sayaçlarını toplar.
+ * Boş id listesinde ağa çıkmaz. 1000'er satırlık sayfalarla İLERLER: tek
+ * istekle yetinmek, siparişi çok olan kurulumlarda toplamları sessizce
+ * eksik gösterirdi.
+ */
+export async function dbCustomerOrderStats(
+    customerIds: string[],
+): Promise<Map<string, CustomerOrderStats>> {
+    const ids = [...new Set(customerIds)].filter(Boolean);
+    if (ids.length === 0) return new Map();
+
+    const supabase = createServiceClient();
+    const rows: CustomerStatSourceOrder[] = [];
+    for (let from = 0; ; from += ORDER_STATS_BATCH) {
+        const { data, error } = await supabase
+            .from("sales_orders")
+            .select("customer_id, commercial_status, grand_total, currency, created_at")
+            .in("customer_id", ids)
+            .eq("commercial_status", CUSTOMER_REVENUE_STATUS)
+            .order("created_at", { ascending: true })
+            .range(from, from + ORDER_STATS_BATCH - 1);
+        if (error) throw new Error(error.message);
+        const batch = (data ?? []) as CustomerStatSourceOrder[];
+        rows.push(...batch);
+        if (batch.length < ORDER_STATS_BATCH) break;
+    }
+    return aggregateCustomerOrderStats(rows);
+}
+
+/**
+ * Ham cari satırlarına gerçek sayaçları bindirir. Ölü kolonların yerini
+ * hesaplanan değerler alır → sayfa/route/mapper tarafında ek iş gerekmez.
+ */
+export async function attachCustomerOrderStats(
+    rows: CustomerRow[],
+): Promise<CustomerRowWithStats[]> {
+    if (rows.length === 0) return [];
+    const stats = await dbCustomerOrderStats(rows.map(r => r.id));
+    return rows.map(row => {
+        const s = stats.get(row.id) ?? emptyCustomerOrderStats();
+        return {
+            ...row,
+            total_orders: s.orderCount,
+            total_revenue: s.revenueByCurrency[row.currency] ?? 0,
+            last_order_date: s.lastOrderDate,
+            revenue_by_currency: s.revenueByCurrency,
+        };
+    });
+}
 
 export interface CreateCustomerInput {
     name: string;
@@ -17,7 +91,7 @@ export interface CreateCustomerInput {
     customer_code?: string;
 }
 
-export async function dbListCustomers(): Promise<CustomerRow[]> {
+export async function dbListCustomers(): Promise<CustomerRowWithStats[]> {
     const supabase = createServiceClient();
     const { data, error } = await supabase
         .from("customers")
@@ -25,7 +99,7 @@ export async function dbListCustomers(): Promise<CustomerRow[]> {
         .eq("is_active", true)
         .order("name");
     if (error) throw new Error(error.message);
-    return data ?? [];
+    return attachCustomerOrderStats(data ?? []);
 }
 
 // ── Server-side pagination (A1) ──────────────────────────────
@@ -39,7 +113,7 @@ export interface CustomersPageQuery {
 }
 
 export interface CustomersPageResult {
-    rows: CustomerRow[];
+    rows: CustomerRowWithStats[];
     total: number;
 }
 
@@ -63,7 +137,8 @@ export async function dbListCustomersPaged(q: CustomersPageQuery = {}): Promise<
         .order("name")
         .range((page - 1) * pageSize, page * pageSize - 1);
     if (error) throw new Error(error.message);
-    return { rows: data ?? [], total: count ?? 0 };
+    // Sayaçlar YALNIZ bu sayfadaki cariler için toplanır (tüm katalog değil).
+    return { rows: await attachCustomerOrderStats(data ?? []), total: count ?? 0 };
 }
 
 /** Rozet sayaçları — global (tümü / aktif / pasif). */
