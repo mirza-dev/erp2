@@ -6,6 +6,7 @@ import { AlertCircle, Check, CheckCircle2, Eye, EyeOff, Lock, LogIn, Mail, Moon,
 import { createClient } from "@/lib/supabase/client";
 import { clearDemoMode } from "@/lib/demo-utils";
 import { REMEMBER_COOKIE } from "@/lib/auth/remember";
+import { isBackendUnreachable } from "@/lib/auth/auth-error";
 import { ThemeProvider, useTheme } from "@/lib/theme/use-theme";
 import RovenLogo from "@/components/layout/RovenLogo";
 import Button from "@/components/ui/Button";
@@ -32,6 +33,7 @@ const STR = {
         noAccount: "Hesabınız yok mu?",
         contact: "Yöneticinizle iletişime geçin",
         errAuth: "E-posta veya şifre hatalı.",
+        errUnreachable: "Sunucuya ulaşılamıyor. İnternet bağlantınızı kontrol edin; sorun sürerse yöneticinize bildirin.",
         errOAuth: "Google ile giriş tamamlanamadı.",
         errOAuthConfig: "Google girişi yapılandırma nedeniyle tamamlanamadı — dönüş adresi Supabase'de kayıtlı olmayabilir. Yöneticinize bildirin.",
         errUnauthorized: "Hesabınız bu sisteme yetkili değil. Yöneticinizle iletişime geçin.",
@@ -61,6 +63,7 @@ const STR = {
         noAccount: "Don't have an account?",
         contact: "Contact your administrator",
         errAuth: "Email or password is incorrect.",
+        errUnreachable: "Cannot reach the server. Check your connection; if the problem persists, contact your administrator.",
         errOAuth: "Google sign-in could not be completed.",
         errOAuthConfig: "Google sign-in failed due to configuration — the return URL may not be registered in Supabase. Notify your administrator.",
         errUnauthorized: "Your account is not authorized for this system. Contact your administrator.",
@@ -193,7 +196,9 @@ function LoginForm({ t }: { t: Strings }) {
         const supabase = createClient();
         const { error: authErr } = await supabase.auth.signInWithPassword({ email, password });
         if (authErr) {
-            setAuthError(t.errAuth);
+            // Erişilemeyen backend'i "şifre hatalı" diye göstermek kullanıcıyı yanlış
+            // yönlendiriyordu (2026-08-24: proje host'u ENOTFOUND, ekran şifreyi suçluyordu).
+            setAuthError(isBackendUnreachable(authErr) ? t.errUnreachable : t.errAuth);
             setLoading(false);
             return;
         }

@@ -140,6 +140,49 @@ describe("LoginPage (Monolith)", () => {
         expect(router.push).not.toHaveBeenCalled();
     });
 
+    it("backend erişilemezken şifreyi SUÇLAMAZ, ulaşılamıyor mesajı gösterir", async () => {
+        // 2026-08-24: Supabase projesi DNS'te yoktu (ENOTFOUND) → auth-js
+        // AuthRetryableFetchError(msg, 0) fırlatır. Ekran "şifre hatalı" diyordu.
+        mockSignInWithPassword.mockResolvedValue({
+            error: { name: "AuthRetryableFetchError", status: 0, message: "fetch failed" },
+        });
+        render(<LoginPage />);
+        fillCredentials();
+
+        fireEvent.click(screen.getByRole("button", { name: "Giriş Yap" }));
+
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).toContain("Sunucuya ulaşılamıyor.");
+        expect(alert.textContent).not.toContain("E-posta veya şifre hatalı.");
+        expect(router.push).not.toHaveBeenCalled();
+    });
+
+    it("sunucu arızasında (5xx) da ulaşılamıyor mesajı gösterir", async () => {
+        mockSignInWithPassword.mockResolvedValue({
+            error: { name: "AuthRetryableFetchError", status: 503, message: "service unavailable" },
+        });
+        render(<LoginPage />);
+        fillCredentials();
+
+        fireEvent.click(screen.getByRole("button", { name: "Giriş Yap" }));
+
+        expect((await screen.findByRole("alert")).textContent).toContain("Sunucuya ulaşılamıyor.");
+    });
+
+    it("gerçek kimlik hatası (400) hâlâ şifre mesajını gösterir — ayrım korunur", async () => {
+        mockSignInWithPassword.mockResolvedValue({
+            error: { name: "AuthApiError", status: 400, message: "Invalid login credentials" },
+        });
+        render(<LoginPage />);
+        fillCredentials();
+
+        fireEvent.click(screen.getByRole("button", { name: "Giriş Yap" }));
+
+        const alert = await screen.findByRole("alert");
+        expect(alert.textContent).toContain("E-posta veya şifre hatalı.");
+        expect(alert.textContent).not.toContain("Sunucuya ulaşılamıyor.");
+    });
+
     it("başarılı girişte auth payload'ını, demo temizliğini ve yönlendirmeyi korur", async () => {
         render(<LoginPage />);
         fillCredentials();
