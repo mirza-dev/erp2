@@ -170,8 +170,9 @@ describe("QuoteForm Faz 1b — V4-A3 satıcı snapshot + freeze", () => {
 
     it("P2: company_settings effect dep array hasSellerSnapshot içerir (lint warning yok)", () => {
         // Effect hasSellerSnapshot okuyor → exhaustive-deps gereği dep array'de.
-        // `}, [hasSellerSnapshot]);` yalnız bu effect'e ait (benzersiz anchor).
-        expect(SOURCE).toMatch(/\}, \[hasSellerSnapshot\]\);/);
+        // mig.106'dan beri effect `initialData`yı da okuyor (yeni teklifte
+        // geçerlilik varsayılanını doldurur) → o da dep array'de olmalı.
+        expect(SOURCE).toMatch(/\}, \[hasSellerSnapshot, initialData\]\);/);
     });
 
     it("initialData satıcı snapshot'ını hydrate eder", () => {

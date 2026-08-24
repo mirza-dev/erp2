@@ -116,6 +116,8 @@ const initialFirmaForm = {
     email: "",
     website: "",
     currency: "USD",
+    // mig.106 — yeni teklifte "Geçerlilik" varsayılanı (quote_date + N gün).
+    quoteValidityDays: "30",
 };
 
 function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
@@ -147,6 +149,8 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     email: s.email ?? "",
                     website: s.website ?? "",
                     currency: s.currency ?? "USD",
+                    // Migration uygulanmadıysa alan hiç gelmez → 30'a düşer.
+                    quoteValidityDays: String(s.quote_validity_days ?? 30),
                 };
                 setForm(loaded);
                 savedRef.current = loaded;
@@ -175,6 +179,12 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         if (form.email && !isValidEmail(form.email)) errors.email = "Geçerli bir e-posta girin.";
         if (form.taxNo && !isValidTaxNumber(form.taxNo)) errors.taxNo = "Vergi numarası 10 veya 11 hane olmalı.";
         if (form.website && !isValidUrl(form.website)) errors.website = "Geçerli bir web adresi girin.";
+        // mig.106 — API + DB CHECK ile birebir (1..365 tam sayı). Boş/0 bırakılırsa
+        // teklif doğar doğmaz süresi dolmuş görünürdü.
+        const validityDays = Number(form.quoteValidityDays);
+        if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365) {
+            errors.quoteValidityDays = "1 ile 365 arasında tam sayı girin.";
+        }
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -198,6 +208,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     email: form.email,
                     website: form.website,
                     currency: form.currency,
+                    quote_validity_days: Number(form.quoteValidityDays),
                 }),
             });
             if (!res.ok) {
@@ -419,6 +430,22 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                             <option value="EUR">EUR — Euro</option>
                             <option value="TRY">TRY — Türk Lirası</option>
                         </select>
+                    </div>
+                    <div>
+                        <label style={labelStyle}>Teklif Geçerlilik Süresi (gün)</label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={365}
+                            style={inputStyle}
+                            value={form.quoteValidityDays}
+                            onChange={set("quoteValidityDays")}
+                            placeholder="30"
+                        />
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                            Yeni teklifte geçerlilik tarihi bu kadar gün sonrası olarak dolar; teklif bazında değiştirilebilir.
+                        </div>
+                        {fieldErrors.quoteValidityDays && <FieldError msg={fieldErrors.quoteValidityDays} />}
                     </div>
                 </div>
             </div>

@@ -116,3 +116,36 @@ export function getQuoteConvertAction(quoteNumber: string): QuoteConvertInfo {
         confirmLabel: "Evet, Dönüştür",
     };
 }
+
+/** Firma ayarı gelmediğinde / migration uygulanmadan önce kullanılan varsayılan. */
+export const DEFAULT_QUOTE_VALIDITY_DAYS = 30;
+
+/**
+ * `YYYY-MM-DD` + n gün → `YYYY-MM-DD`.
+ *
+ * Yerel takvim aritmetiği: `new Date(y, m, d + n)` ay/yıl taşmasını ve yaz
+ * saatini kendi halleder. UTC'ye çevirmek gün kaydırabilirdi — bu alan
+ * string olarak karşılaştırılıyor (getValidUntilBadge, expire cron).
+ */
+export function addDaysToISODate(iso: string, days: number): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+    const d = new Date(
+        Number(iso.slice(0, 4)),
+        Number(iso.slice(5, 7)) - 1,
+        Number(iso.slice(8, 10)) + days,
+    );
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/**
+ * Firma ayarından gelen gün sayısını güvene alır: tam sayı ve 1..365 dışındaysa
+ * varsayılana düşer. API/DB CHECK'i zaten koruyor; bu, migration uygulanmadan
+ * önce alanın hiç gelmemesi ve bozuk veri ihtimaline karşı son savunma.
+ */
+export function normalizeValidityDays(raw: unknown): number {
+    if (typeof raw !== "number" || !Number.isInteger(raw) || raw < 1 || raw > 365) {
+        return DEFAULT_QUOTE_VALIDITY_DAYS;
+    }
+    return raw;
+}

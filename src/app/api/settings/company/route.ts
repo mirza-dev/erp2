@@ -16,7 +16,10 @@ const getCachedCompanySettings = unstable_cache(
 // Yalnızca bu alanlar dışarıya döner. Tabloya ileride eklenen kimlik/token alanları sızmaz.
 const SAFE_COMPANY_FIELDS = [
     "id", "name", "tax_office", "tax_no", "address",
-    "phone", "email", "website", "logo_url", "currency", "updated_at",
+    "phone", "email", "website", "logo_url", "currency",
+    // mig.106 — QuoteForm yeni teklifte geçerlilik varsayılanı için okur.
+    "quote_validity_days",
+    "updated_at",
 ] as const;
 
 // GET /api/settings/company
@@ -65,6 +68,14 @@ function validateCompanyPatch(patch: Record<string, unknown>): string | null {
     if (typeof currency === "string" && currency.length > 0 && !ALLOWED_CURRENCIES.has(currency)) {
         return "Para birimi USD, EUR veya TRY olmalı.";
     }
+    // mig.106 — DB CHECK'i (1..365) ile birebir; 0/negatif "doğar doğmaz süresi
+    // dolmuş" teklif üretir, 365 üstü fiili süresizliktir.
+    const validity = patch.quote_validity_days;
+    if (validity !== undefined) {
+        if (typeof validity !== "number" || !Number.isInteger(validity) || validity < 1 || validity > 365) {
+            return "Teklif geçerlilik süresi 1-365 gün arasında tam sayı olmalı.";
+        }
+    }
     return null;
 }
 
@@ -79,7 +90,7 @@ export async function PATCH(req: NextRequest) {
         const body = parsed.data as Record<string, unknown>;
         // Sadece izin verilen alanları al
         // logo_url burada intentionally yok — logo değişimi için /logo endpoint kullanılmalı (MIME/size doğrulama)
-        const allowed = ["name", "tax_office", "tax_no", "address", "phone", "email", "website", "currency"] as const;
+        const allowed = ["name", "tax_office", "tax_no", "address", "phone", "email", "website", "currency", "quote_validity_days"] as const;
         const patch: Record<string, unknown> = {};
         for (const key of allowed) {
             if (key in body) patch[key] = body[key];

@@ -75,6 +75,13 @@ select '105', 'recount_stock → FOR UPDATE (atomik stok sayımı)',
        case when lower(prosrc) like '%for update%' then '✅ VAR' else '❌ YOK — 105 uygulanmamış' end
   from pg_proc where proname = 'recount_stock'
 
+union all
+select '106', 'company_settings.quote_validity_days (teklif geçerlilik varsayılanı)',
+       case when exists (
+                select 1 from information_schema.columns
+                 where table_name = 'company_settings' and column_name = 'quote_validity_days')
+            then '✅ VAR' else '❌ YOK — 106 uygulanmamış' end
+
 order by 1, 2;
 
 -- ── Ham tanımlar (gerekirse ayrı çalıştır; editör kırpabilir) ────────────────

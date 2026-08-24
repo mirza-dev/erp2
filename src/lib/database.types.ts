@@ -938,6 +938,9 @@ export interface CompanySettingsRow {
     // Faz 5 (V3-B3): teklif numarası prefix/separator — next_quote_number() okur.
     quote_number_prefix: string
     quote_number_separator: string
+    // mig.106: yeni teklifte "Geçerlilik" varsayılanı (quote_date + N gün).
+    // Migration uygulanmadan önce PostgREST bu alanı DÖNDÜRMEZ → opsiyonel.
+    quote_validity_days?: number
     updated_at: string
 }
 

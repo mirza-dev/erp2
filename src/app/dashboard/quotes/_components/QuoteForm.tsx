@@ -16,6 +16,7 @@ import { roundMoney } from "@/lib/money-utils";
 import { applySendResultToast, sendQuoteEmail } from "../_utils/send-result";
 import { applyTemplateToField, templatesForField } from "@/lib/quote-note-templates";
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
+import { addDaysToISODate, normalizeValidityDays } from "../_utils/quote-display";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -370,9 +371,27 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                 setSellerTaxId(prev => prev === "" && s.tax_no ? s.tax_no : prev);
                 setSellerWeb(prev => prev === "" && s.website ? s.website : prev);
                 setLogoSrc(prev => prev === null && s.logo_url ? s.logo_url : prev);
+                // ── Geçerlilik varsayılanı (mig.106) ────────────────────────
+                // "Geçerlilik" alanı boş başlıyordu ve opsiyonel gönderiliyordu →
+                // kullanıcı elle doldurmadıkça `valid_until` null kalıyordu. Canlı
+                // veride 16 teklifin hiçbirinde yoktu ⇒ expire cron'u,
+                // `quote_expired` uyarısı ve "Süresi Doldu" sekmesi FİİLEN ÖLÜ
+                // (gönderilen teklif süresiz açık görünüyordu).
+                //
+                // Buraya yazılır, ayrı bir effect'e DEĞİL: quoteDate'i bekleyen
+                // effect bir effect-zinciri kurardı (fazladan render + kırılgan).
+                // Bu dal yalnız yeni teklifte çalışır (hasSellerSnapshot guard'ı)
+                // ve orada quoteDate init'te aynı ifadeyle bugüne set edilir.
+                // Migration uygulanmadıysa alan hiç gelmez → varsayılana düşer.
+                if (!initialData) {
+                    const days = normalizeValidityDays(s.quote_validity_days);
+                    const base = new Date().toISOString().slice(0, 10);
+                    // Yalnız BOŞKEN — kullanıcının yazdığının üstüne yazılmaz.
+                    setValidUntil(prev => (prev === "" ? addDaysToISODate(base, days) : prev));
+                }
             })
             .catch(() => {/* ağ hatası — form çalışmaya devam eder */});
-    }, [hasSellerSnapshot]);
+    }, [hasSellerSnapshot, initialData]);
 
     // ── Customer autocomplete ─────────────────────────────────────────────────
     const handleCustCompanyChange = (value: string) => {
