@@ -17,6 +17,7 @@ import { applySendResultToast, sendQuoteEmail } from "../_utils/send-result";
 import { applyTemplateToField, templatesForField } from "@/lib/quote-note-templates";
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 import { addDaysToISODate, normalizeValidityDays } from "../_utils/quote-display";
+import { stockHintForLine, stockHintColor } from "@/lib/stock-availability";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1346,6 +1347,16 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                         const lt = lineTotal(row);
                                         const noteOpen = expandedNoteRowIds.has(row.id);
                                         const hasNote = row.note.trim().length > 0;
+                                        // A1 (2026-08-24): teklif formunda stok farkındalığı HİÇ YOKTU —
+                                        // satışçı 3 adetlik valften 100 adet teklif edip müşteriye söz
+                                        // verebiliyordu; uyarı ancak teklif siparişe dönüşürken çıkıyordu
+                                        // (huninin yanlış ucu). OrderForm ile AYNI kural/metin.
+                                        // Yalnız listeden seçilmiş ürün (productId) için — manuel kod
+                                        // satırında stok bilinemez.
+                                        const liveProduct = row.productId
+                                            ? products.find(p => p.id === row.productId)
+                                            : null;
+                                        const stockHint = stockHintForLine(liveProduct, parseFloat(row.qty) || 0);
                                         return (
                                             <Fragment key={row.id}>
                                             <tr>
@@ -1391,6 +1402,16 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                                                     </div>
                                                                 </div>
                                                             ))}
+                                                        </div>
+                                                    )}
+                                                    {stockHint && (
+                                                        <div style={{
+                                                            fontSize: "10.5px",
+                                                            marginTop: "3px",
+                                                            color: stockHintColor(stockHint.level),
+                                                            fontWeight: stockHint.level === "insufficient" ? 600 : 400,
+                                                        }}>
+                                                            {stockHint.text}
                                                         </div>
                                                     )}
                                                 </td>

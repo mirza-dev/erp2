@@ -6,6 +6,7 @@ import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { formatCurrency, safeRandomUUID } from "@/lib/utils";
 import { roundMoney } from "@/lib/money-utils";
 import { type Customer, type Product, type OrderLineItem } from "@/lib/mock-data";
+import { stockHintForLine, stockHintColor } from "@/lib/stock-availability";
 import { useCustomers, useProducts, useOrderMutations } from "@/lib/data-context";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
@@ -578,9 +579,10 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                                 {lines.map((line, idx) => {
                                     const total = lineTotal(line);
                                     const liveProduct = line.product ? productOptions.find(p => p.id === line.product!.id) : null;
-                                    const promisable = liveProduct?.promisable ?? null;
-                                    const stockInsufficient = promisable !== null && line.quantity > promisable;
-                                    const stockLow = promisable !== null && !stockInsufficient && promisable <= (liveProduct?.minStockLevel ?? 0);
+                                    // A1: kural `@/lib/stock-availability`'ye taşındı — QuoteForm ile
+                                    // AYNI cümleyi kurar (metin birebir korundu).
+                                    const stockHint = stockHintForLine(liveProduct, line.quantity);
+                                    const stockInsufficient = stockHint?.level === "insufficient";
                                     return (
                                         <tr key={line.id} style={{ borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                             <td style={{ padding: "8px 12px", color: "var(--text-tertiary)", fontSize: "12px", textAlign: "center" }}>
@@ -603,17 +605,14 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                                                         </option>
                                                     ))}
                                                 </select>
-                                                {promisable !== null && (
+                                                {stockHint && (
                                                     <div style={{
                                                         fontSize: "11px",
                                                         marginTop: "3px",
-                                                        color: stockInsufficient ? "var(--danger-text)" : stockLow ? "var(--warning-text)" : "var(--text-tertiary)",
+                                                        color: stockHintColor(stockHint.level),
                                                         fontWeight: stockInsufficient ? 600 : 400,
                                                     }}>
-                                                        {stockInsufficient
-                                                            ? `Stok yetersiz — ${promisable} ${liveProduct?.unit} verilebilir (Stokta ${liveProduct?.on_hand}, Tekliflerde ${liveProduct?.quoted})`
-                                                            : `Stokta: ${liveProduct?.on_hand} | Tekliflerde: ${liveProduct?.quoted} | Verilebilir: ${promisable} ${liveProduct?.unit}${stockLow ? " — Düşük" : ""}`
-                                                        }
+                                                        {stockHint.text}
                                                     </div>
                                                 )}
                                             </td>
