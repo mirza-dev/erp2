@@ -730,6 +730,9 @@ function ProductionPageInner() {
                         <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
                             Diğer Günlerin Kayıtları
                         </div>
+                        <div style={{ fontSize: "11.5px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                            Bir kaydı düzeltmek için satıra tıklayın — o güne geçilir.
+                        </div>
                     </div>
                     <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "460px" }}>
@@ -743,7 +746,24 @@ function ProductionPageInner() {
                         </thead>
                         <tbody>
                             {otherDateLogs.map(kaydi => (
-                                <tr key={kaydi.id} style={{ borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
+                                /* A2: geri alma (reverse_production) YALNIZ seçili günün
+                                   listesinde vardı — kullanıcı hatalı kaydı burada görüyor
+                                   ama üzerinde hiçbir şey yapamıyordu. Silme butonunu buraya
+                                   da koymak BOZUK olurdu: onay modalı hedefi `selectedDateLogs`
+                                   içinde arıyor. Bunun yerine satır o güne geçirir → mevcut
+                                   tek onaylı silme akışı devralır (tek yıkıcı yüzey korunur). */
+                                <tr
+                                    key={kaydi.id}
+                                    onClick={() => setTarih(kaydi.tarih)}
+                                    tabIndex={0}
+                                    aria-label={`${kaydi.tarih} tarihine geç — ${kaydi.productName}`}
+                                    onKeyDown={e => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setTarih(kaydi.tarih);
+                                        }
+                                    }}
+                                    style={{ borderBottom: "var(--line-width) solid var(--border-tertiary)", cursor: "pointer" }}>
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.tarih}</td>
                                     <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>
                                     <td style={tdStyle}>{kaydi.productName}</td>
