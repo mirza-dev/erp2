@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { RfqListRow } from "@/lib/supabase/supplier-rfqs";
 import type { SupplierRfqStatus } from "@/lib/database.types";
 import { localISODate } from "@/lib/stock-utils";
+import Button, { ButtonLink } from "@/components/ui/Button";
+import { Plus, RefreshCw } from "lucide-react";
 
 const STATUS_LABEL: Record<SupplierRfqStatus, string> = {
     draft: "Taslak",
@@ -41,6 +42,7 @@ export default function RfqListPage() {
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -64,19 +66,52 @@ export default function RfqListPage() {
         return () => clearTimeout(t);
     }, [load]);
 
+    const handleRefresh = async () => {
+        if (refreshing || loading) return;
+        setRefreshing(true);
+        try {
+            await load();
+        } finally {
+            setRefreshing(false);
+        }
+    };
+
     const isOverdue = (r: RfqListRow) =>
         r.status === "sent" && r.due_date != null && r.due_date < localISODate(Date.now());
 
     return (
         <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                    Fiyat Talepleri
-                </h1>
-                <Link href="/dashboard/purchase/rfqs/new" style={{
-                    padding: "8px 16px", fontSize: "13px", fontWeight: 500,
-                    background: "var(--accent)", color: "#fff", borderRadius: "6px", textDecoration: "none",
-                }}>+ Yeni Fiyat Talebi</Link>
+                <div>
+                    <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                        Fiyat Talepleri
+                    </h1>
+                    <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: "4px 0 0" }}>
+                        {loading ? "Yükleniyor…" : `${rows.length} talep`}
+                    </p>
+                </div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    {/* Diğer 7 listede olan "Yenile" burada yoktu. Bu sayfa RSC
+                        değil — kendi fetch'ini yapıyor, dolayısıyla
+                        router.refresh() DEĞİL load() çağrılır. */}
+                    <Button
+                        variant="toolbar"
+                        size="md"
+                        onClick={handleRefresh}
+                        disabled={refreshing || loading}
+                        aria-label="Fiyat taleplerini yenile"
+                        leftIcon={<RefreshCw size={15} />}
+                    >
+                        {refreshing ? "Yenileniyor…" : "Yenile"}
+                    </Button>
+                    <ButtonLink
+                        href="/dashboard/purchase/rfqs/new"
+                        size="cta"
+                        leftIcon={<Plus size={15} />}
+                    >
+                        Yeni Fiyat Talebi
+                    </ButtonLink>
+                </div>
             </div>
 
             <div style={{ display: "flex", gap: "6px", marginBottom: "14px", flexWrap: "wrap" }}>
